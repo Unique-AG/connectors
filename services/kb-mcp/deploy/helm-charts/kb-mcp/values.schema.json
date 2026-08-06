@@ -2007,6 +2007,44 @@
           }
         }
       ]
+    },
+    "mcpConfig": {
+      "type": "object",
+      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Secrets (ZITADEL_CLIENT_ID/SECRET, UNIQUE_APP_*) stay out of values.yaml — deliver them via envVars/secretKeyRef or the overlay's external-secrets.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "If disabled, none of the fields below are mapped to environment variables.",
+          "default": true
+        },
+        "app": {
+          "type": "object",
+          "description": "Application URLs",
+          "properties": {
+            "publicBaseUrl": {
+              "type": "string",
+              "description": "Public URL of this MCP service (the Gateway/Kong host clients hit). Used for the OAuth redirect base and must match routes.hostname, e.g. https://kb-mcp.<tenant>.unique.app. Leave unset for pure localhost dev, where local traffic already matches env.UNIQUE_MCP_LOCAL_BASE_URL."
+            },
+            "frontendBaseUrl": {
+              "type": "string",
+              "description": "Unique web app origin (the product UI), NOT this MCP. Optional — only used for knowledge-upload deep links in citations. Leave unset to fall back to unique://content/{id} links, e.g. https://<tenant>.unique.app."
+            }
+          },
+          "additionalProperties": false
+        },
+        "zitadel": {
+          "type": "object",
+          "description": "Zitadel OIDC issuer (non-secret). clientId/clientSecret are secrets — set via envVars/secretKeyRef or overlay external-secrets, not here.",
+          "properties": {
+            "baseUrl": {
+              "type": "string",
+              "description": "Zitadel issuer base URL, e.g. https://id.<tenant>.unique.app."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {

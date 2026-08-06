@@ -16,22 +16,36 @@ env:
   # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
   UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
 
-# -- Environment variables from secrets / Argo overlays.
-# UNIQUE_MCP_* URLs are not secrets — set them in the overlay `env:` (examples below).
-# App/Zitadel credentials stay in envVars via secretKeyRef.
-#
-# ArgoCD overlay examples for UNIQUE_MCP_*:
-#   env:
-#     # Public URL of THIS MCP service (Gateway/Kong host clients hit).
-#     # Used for OAuth redirect base + FastMCP Host allowlist (allowed_hosts).
-#     # Must match the routes.hostname you enable in this overlay, e.g.:
-#     #   https://kb-mcp.<tenant>.unique.app
-#     UNIQUE_MCP_PUBLIC_BASE_URL: https://kb-mcp.<tenant>.unique.app
-#
-#     # Unique web app origin (the product UI), NOT this MCP.
-#     # Optional — only for knowledge-upload deep links in citations:
-#     # Leave unset to fall back to unique://content/{id} links.
-#     UNIQUE_MCP_FRONTEND_BASE_URL: https://<tenant>.unique.app
+# -- Non-secret, tenant-specific config — mapped to env vars by
+# templates/_ext.tpl + _helpers.tpl (chart.config.mcpEnv). Set these in the
+# overlay `mcpConfig:` block instead of hand-writing UNIQUE_MCP_*/ZITADEL_BASE_URL
+# under `env:`.
+mcpConfig:
+  enabled: true
+  app:
+    # Public URL of THIS MCP service (Gateway/Kong host clients hit). Used for
+    # the OAuth redirect base + FastMCP Host allowlist. Must match the
+    # routes.hostname you enable in the overlay, e.g.:
+    #   publicBaseUrl: https://kb-mcp.<tenant>.unique.app
+    publicBaseUrl: ""
+    # Unique web app origin (the product UI), NOT this MCP. Optional — only
+    # for knowledge-upload deep links in citations. Leave unset to fall back
+    # to unique://content/{id} links, e.g.:
+    #   frontendBaseUrl: https://<tenant>.unique.app
+    frontendBaseUrl: ""
+  zitadel:
+    # Zitadel issuer base URL (non-secret; clientId/clientSecret are secrets,
+    # see envVars below), e.g.:
+    #   baseUrl: https://id.<tenant>.unique.app
+    baseUrl: ""
+
+# -- Secrets. The Unique QA overlay delivers these via
+# `extraEnvSecrets: [kb-mcp-secrets]` + external-secrets, not the envVars +
+# secretKeyRef pattern below — that pattern is kept as a portable fallback
+# for third-party installs without external-secrets.
+# STORAGE_ENCRYPTION_KEY is the Fernet key protecting OAuth proxy state at
+# rest in Postgres (see postgresql: below) — generate with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 #
 # Example for loading secrets (uncomment and customize as needed):
 #   envVars:
@@ -60,11 +74,6 @@ env:
 #         secretKeyRef:
 #           name: kb-mcp-unique-secret
 #           key: UNIQUE_APP_ENDPOINT_SECRET
-#     - name: ZITADEL_BASE_URL
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-zitadel-secret
-#           key: ZITADEL_BASE_URL
 #     - name: ZITADEL_CLIENT_ID
 #       valueFrom:
 #         secretKeyRef:
@@ -75,6 +84,11 @@ env:
 #         secretKeyRef:
 #           name: kb-mcp-zitadel-secret
 #           key: ZITADEL_CLIENT_SECRET
+#     - name: STORAGE_ENCRYPTION_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-oauth-storage-secret
+#           key: STORAGE_ENCRYPTION_KEY
 envVars: []
 
 image:
@@ -130,8 +144,30 @@ volumeMounts:
   - name: tmp
     mountPath: /tmp
 
+# OAuth proxy storage (client registrations, upstream/refresh tokens, JTI
+# mappings). Required — kb_mcp.settings.Settings refuses to boot without a
+# durable DATABASE_URL + STORAGE_ENCRYPTION_KEY (see kb_mcp/settings.py). The
+# base chart injects DATABASE_URL from this block; STORAGE_ENCRYPTION_KEY
+# still comes from envVars/secretKeyRef or overlay external-secrets above.
 postgresql:
-  enabled: false
+  enabled: true
+  connection:
+    sslMode: verify
+    # ── Use-case B — in-cluster PostgreSQL (CloudNativePG) ────────────────────
+    #
+    # host:
+    #   fromKubernetesService:
+    #     name: <release-name>-pg-cluster-rw
+    #     namespace: <namespace>
+    #     port: 5432
+    #     podPort: 5432
+    #     podSelectorLabels:
+    #       cnpg.io/cluster: <release-name>-pg-cluster
+    #
+    # url:
+    #   fromSecret:
+    #     name: <release-name>-pg-cluster-app
+    #     key: fqdn-uri
 
 rabbitmq:
   enabled: false
@@ -168,6 +204,23 @@ hooks:
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 # Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+# postgresql.connection.url is an opaque source (the real host lives inside the
+# secret, unknown at render time), so egress generation is soft-skipped for it.
+# When enabling networkPolicy in an overlay that also uses connection.url, set
+# postgresql.networkPolicyEgressManaged: true and add the Postgres egress rule
+# yourself, e.g. (Cilium, matching the commented host.fromKubernetesService
+# selector above):
+#   postgresql:
+#     networkPolicyEgressManaged: true
+#   networkPolicy:
+#     egress:
+#       - toEndpoints:
+#           - matchLabels:
+#               cnpg.io/cluster: <release-name>-pg-cluster
+#         toPorts:
+#           - ports:
+#               - port: "5432"
+#                 protocol: TCP
 networkPolicy:
   enabled: false
   flavor: cilium
@@ -183,10 +236,14 @@ networkPolicy:
 # Required via envVars (secrets) for a working deploy:
 # - UNIQUE_APP_KEY / UNIQUE_APP_ID / UNIQUE_API_BASE_URL
 # - UNIQUE_APP_ENDPOINT / UNIQUE_APP_ENDPOINT_SECRET
-# - ZITADEL_BASE_URL / ZITADEL_CLIENT_ID / ZITADEL_CLIENT_SECRET
-# Required via overlay env: (plain URLs, see comments above envVars):
-# - UNIQUE_MCP_PUBLIC_BASE_URL = https://kb-mcp.<tenant>.unique.app
-# Optional via overlay env::
-# - UNIQUE_MCP_FRONTEND_BASE_URL = https://<tenant>.unique.app (citation deep links)
+# - ZITADEL_CLIENT_ID / ZITADEL_CLIENT_SECRET
+# - STORAGE_ENCRYPTION_KEY (OAuth proxy storage encryption key)
+# Required via overlay mcpConfig: (non-secret, see comments above envVars):
+# - mcpConfig.app.publicBaseUrl = https://kb-mcp.<tenant>.unique.app
+# - mcpConfig.zitadel.baseUrl = https://id.<tenant>.unique.app
+# Optional via overlay mcpConfig:
+# - mcpConfig.app.frontendBaseUrl = https://<tenant>.unique.app (citation deep links)
+# Required via overlay postgresql.connection (see comments above): a durable
+# Postgres backing the OAuth proxy's client/token/JTI storage.
 # Do NOT set UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID in production —
 # those are local unauthenticated-dev fallbacks only (identity comes from OIDC / _meta).
