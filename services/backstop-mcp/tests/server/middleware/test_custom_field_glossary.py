@@ -330,7 +330,7 @@ class TestGlossaryScopesComeFromToolMeta:
         from backstop_mcp.server.tools.registry import TOOLS
         from backstop_mcp.server.tools.system_info import get_system_info
 
-        assert TOOLS == (get_system_info, get_organization, get_person, list_custom_fields)
+        assert (get_system_info, get_organization, get_person, list_custom_fields) == TOOLS
 
         org_meta = getattr(get_organization, "__fastmcp__", None)
         assert isinstance(org_meta, ToolMeta)

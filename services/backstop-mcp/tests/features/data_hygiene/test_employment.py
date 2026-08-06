@@ -12,10 +12,10 @@ Each test below is meant to read as a mini walkthrough:
    (what `EmploymentIndexFactory.index_for_person` / `index_for_organization` delegate to), then
    query `status` / `departure` / `pairs` — or `classify_employment` directly for a single type.
 
-Numbered classes below correspond to the nine cases in
-`docs/plans/2026-08-05-employment-index-design.md`'s "Testing strategy". The remaining classes
-cover the parsing/gate/malformed-input edge cases of `_employment_edges` and `classify_employment`
-that predate `EmploymentIndex` and are unaffected by its single-winner-per-pair fold.
+Numbered classes below cover the nine behavioural cases for `EmploymentIndex`. The remaining
+classes cover the parsing/gate/malformed-input edge cases of `_employment_edges` and
+`classify_employment` that predate `EmploymentIndex` and are unaffected by its
+single-winner-per-pair fold.
 """
 
 from datetime import date

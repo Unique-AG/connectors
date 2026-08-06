@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import TypeVar, cast
+from typing import cast
 
 from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel, TypeAdapter
-
-T = TypeVar("T", bound=BaseModel)
 
 
 def tool_payload(result: CallToolResult) -> dict[str, object]:
@@ -22,7 +20,7 @@ def tool_payload(result: CallToolResult) -> dict[str, object]:
     return cast(dict[str, object], payload)
 
 
-def tool_model(result: CallToolResult, model: type[T]) -> T:
+def tool_model[T: BaseModel](result: CallToolResult, model: type[T]) -> T:
     return model.model_validate(tool_payload(result))
 
 

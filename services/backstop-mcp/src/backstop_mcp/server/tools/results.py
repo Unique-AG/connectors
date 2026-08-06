@@ -14,10 +14,7 @@ from pydantic import BaseModel
 
 def tool_result(payload: BaseModel | dict[str, object]) -> CallToolResult:
     """Serialize a domain payload as a single JSON text content block."""
-    if isinstance(payload, BaseModel):
-        text = payload.model_dump_json()
-    else:
-        text = json.dumps(payload)
+    text = payload.model_dump_json() if isinstance(payload, BaseModel) else json.dumps(payload)
     return CallToolResult(content=[TextContent(type="text", text=text)])
 
 
