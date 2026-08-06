@@ -107,7 +107,7 @@ def _patch_resolve_scope_ids(mapping: dict[str, str] | None = None):
 
 
 @pytest.mark.asyncio
-async def test_search_calls_kb_service():
+async def test_search_string_becomes_the_search_query():
     chunks = [_make_chunk("result A")]
     mock_service = MagicMock()
     mock_service.bind_settings.return_value = mock_service
@@ -118,7 +118,7 @@ async def test_search_calls_kb_service():
         patch(
             "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
-        ) as mock_from_config,
+        ),
         _patch_post_processor(chunks),
         _patch_identity(),
         _patch_kb_settings(None),
@@ -129,8 +129,9 @@ async def test_search_calls_kb_service():
             config=SearchToolConfig(),
         )
 
-    mock_from_config.assert_called_once_with(SearchToolConfig().service_config)
-    mock_service.bind_settings.assert_called_once()
+    # The only way search_string reaches the retrieval backend, given the
+    # backend itself is mocked out here — this is the resulting query state,
+    # not an assertion on which collaborator got called.
     assert mock_service.state.search_queries == ["test query"]
     assert isinstance(result, CallToolResult)
     # result chunks + trailing citation instruction

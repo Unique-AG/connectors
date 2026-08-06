@@ -76,20 +76,35 @@ def test_match_target_matches_service_definition():
     assert set(MatchTarget.__args__) == set(ServiceMatchTarget.__args__)
 
 
+def _make_dispatch_probe_tree():
+    """A tree whose three view methods return distinguishable output, so a
+    test can prove the right view was returned without asserting which
+    method got called."""
+    tree = MagicMock()
+    tree.render_visible_tree_async = AsyncMock(return_value="TREE VIEW")
+    tree.resolve_visible_file_paths_async = AsyncMock(
+        return_value=[(_make_content_info("list-result"), ["LIST", "VIEW"])]
+    )
+    tree.search_visible_files_fuzzy_async = AsyncMock(
+        return_value=[_make_fuzzy_match(["SEARCH", "VIEW"], 0.9, "search-result")]
+    )
+    return tree
+
+
 @pytest.mark.asyncio
-async def test_mode_tree_calls_render_visible_tree_only():
-    mock_tree = _make_mock_tree()
+async def test_mode_tree_returns_tree_view_only():
+    mock_tree = _make_dispatch_probe_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="tree",
             config=ContentTreeToolConfig(),
         )
 
-    mock_tree.render_visible_tree_async.assert_called_once()
-    mock_tree.resolve_visible_file_paths_async.assert_not_called()
-    mock_tree.search_visible_files_fuzzy_async.assert_not_called()
     assert isinstance(result, CallToolResult)
-    assert result.content[0].text == "tree output"  # type: ignore[union-attr]
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert text == "TREE VIEW"
+    assert "list-result" not in text
+    assert "search-result" not in text
 
 
 @pytest.mark.asyncio
@@ -110,33 +125,24 @@ async def test_logs_never_contain_raw_user_or_company_id(caplog):
 
 
 @pytest.mark.asyncio
-async def test_mode_list_calls_resolve_visible_file_paths_only():
-    mock_tree = _make_mock_tree()
-    mock_tree.resolve_visible_file_paths_async = AsyncMock(
-        return_value=[(_make_content_info("c1"), ["Contracts", "a.pdf"])]
-    )
+async def test_mode_list_returns_list_view_only():
+    mock_tree = _make_dispatch_probe_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
             config=ContentTreeToolConfig(),
         )
 
-    mock_tree.resolve_visible_file_paths_async.assert_called_once()
-    mock_tree.render_visible_tree_async.assert_not_called()
-    mock_tree.search_visible_files_fuzzy_async.assert_not_called()
     assert isinstance(result, CallToolResult)
-    assert (
-        "[Contracts/a.pdf](unique://content/c1) (content_id=c1)"
-        in result.content[0].text
-    )  # type: ignore[union-attr]
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "[LIST/VIEW](unique://content/list-result) (content_id=list-result)" in text
+    assert "TREE VIEW" not in text
+    assert "search-result" not in text
 
 
 @pytest.mark.asyncio
-async def test_mode_search_calls_search_visible_files_fuzzy_only():
-    mock_tree = _make_mock_tree()
-    mock_tree.search_visible_files_fuzzy_async = AsyncMock(
-        return_value=[_make_fuzzy_match(["a.pdf"], 0.9, "c1")]
-    )
+async def test_mode_search_returns_search_view_only():
+    mock_tree = _make_dispatch_probe_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="search",
@@ -144,14 +150,14 @@ async def test_mode_search_calls_search_visible_files_fuzzy_only():
             config=ContentTreeToolConfig(),
         )
 
-    mock_tree.search_visible_files_fuzzy_async.assert_called_once()
-    mock_tree.render_visible_tree_async.assert_not_called()
-    mock_tree.resolve_visible_file_paths_async.assert_not_called()
     assert isinstance(result, CallToolResult)
+    text = result.content[0].text  # type: ignore[union-attr]
     assert (
-        "[a.pdf](unique://content/c1) (score=0.90, content_id=c1)"
-        in result.content[0].text
-    )  # type: ignore[union-attr]
+        "[SEARCH/VIEW](unique://content/search-result) "
+        "(score=0.90, content_id=search-result)"
+    ) in text
+    assert "TREE VIEW" not in text
+    assert "list-result" not in text
 
 
 @pytest.mark.asyncio
