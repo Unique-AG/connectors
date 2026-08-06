@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.features.custom_fields import CustomFieldsService
+from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class Services:
 
     backstop: BackstopClientFactory
     custom_fields: CustomFieldsService
+    employment_index_factory: EmploymentIndexFactory
 
 
 _services: Services | None = None
@@ -67,3 +69,7 @@ async def get_backstop_client() -> BackstopClient:
 
 def get_custom_fields_service() -> CustomFieldsService:
     return get_services().custom_fields
+
+
+def get_employment_index_factory() -> EmploymentIndexFactory:
+    return get_services().employment_index_factory
