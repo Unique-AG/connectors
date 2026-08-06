@@ -2,7 +2,7 @@ import ssl
 from datetime import timedelta
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from backstop_mcp.config import (
     AppConfig,
@@ -78,6 +78,17 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 30_000
         assert config.default_page_size == 100
         assert config.report_page_size == 500
+        assert config.custom_field_overrides == {}
+        assert config.custom_field_schema_ttl_minutes == 7 * 24 * 60
+        assert config.employment_relationship_type_ids == ()
+        assert config.employment_relationship_type_markers == ("employ",)
+        assert config.former_employment_relationship_type_ids == ()
+        assert config.former_employment_relationship_type_markers == (
+            "former",
+            "previous",
+            "ex-",
+            "no longer",
+        )
 
     def test_strips_trailing_slash_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.backstopsolutions.com/")
@@ -111,9 +122,37 @@ class TestBackstopConfigDefaults:
         assert config.default_page_size == 50
         assert config.report_page_size == 250
 
+    def test_employment_relationship_types_parse_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "1, 2,3")
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "Employment, Works At")
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "9")
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "Used To Work")
+
+        config = BackstopConfig()
+
+        assert config.employment_relationship_type_ids == ("1", "2", "3")
+        assert config.employment_relationship_type_markers == ("Employment", "Works At")
+        assert config.former_employment_relationship_type_ids == ("9",)
+        assert config.former_employment_relationship_type_markers == ("Used To Work",)
+
+    def test_configured_markers_replace_the_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A tenant's phrasing is the whole vocabulary; an empty value leaves ids to decide."""
+        monkeypatch.setenv(
+            "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "Placement Ended"
+        )
+        assert BackstopConfig().former_employment_relationship_type_markers == ("Placement Ended",)
+
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "")
+        assert BackstopConfig().former_employment_relationship_type_markers == ()
+
     def test_report_page_size_rejects_values_over_500(self) -> None:
         with pytest.raises(ValueError, match="report_page_size"):
             BackstopConfig(report_page_size=501)
+
+    def test_schema_ttl_rejects_zero(self) -> None:
+        """A zero TTL would refetch the whole schema on every call."""
+        with pytest.raises(ValueError, match="custom_field_schema_ttl_minutes"):
+            BackstopConfig(custom_field_schema_ttl_minutes=0)
 
 
 class TestAuthConfig:
@@ -146,6 +185,33 @@ class TestAuthConfig:
         """A zero interval would spin the sweep loop without ever sleeping."""
         with pytest.raises(ValueError, match="cleanup_interval_hours"):
             AuthConfig(cleanup_interval_hours=0)
+
+
+class TestBackstopServiceAccount:
+    def test_absent_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("BACKSTOP_SERVICE_USERNAME", raising=False)
+        monkeypatch.delenv("BACKSTOP_SERVICE_API_TOKEN", raising=False)
+        config = BackstopConfig()
+
+        assert config.service_username is None
+        assert config.service_api_token is None
+
+    def test_reads_both_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_SERVICE_USERNAME", "svc-bot")
+        monkeypatch.setenv("BACKSTOP_SERVICE_API_TOKEN", "svc-token")
+        config = BackstopConfig()
+
+        assert config.service_username == "svc-bot"
+        assert config.service_api_token is not None
+        assert config.service_api_token.get_secret_value() == "svc-token"
+
+    def test_rejects_username_without_token(self) -> None:
+        with pytest.raises(ValueError, match="must be set together"):
+            BackstopConfig(service_username="svc-bot")
+
+    def test_rejects_token_without_username(self) -> None:
+        with pytest.raises(ValueError, match="must be set together"):
+            BackstopConfig(service_api_token=SecretStr("svc-token"))
 
 
 class TestPublicBaseUrl:
