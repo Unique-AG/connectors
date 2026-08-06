@@ -4,19 +4,24 @@ If it reads the environment, it is declared in this file. No exceptions.
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from fastmcp.server.server import Transport
 from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from unique_mcp.util.find_env_file import find_env_file
 
+# Shared with main.py, which also loads this file into the process env for
+# libraries (unique-toolkit, configure_logging, configure_tracing) that read
+# os.environ directly instead of going through Settings.
+ENV_FILE: Path | None = find_env_file(filenames=["kb_mcp.env", ".env"], required=False)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        # Env vars WIN over the file here. The old main.py's
-        # load_dotenv(cwd/'.env', override=True) had it backwards, letting a
-        # stray .env silently beat K8s secrets.
-        env_file=find_env_file(filenames=["kb_mcp.env", ".env"], required=False),
+        # Env vars win over the file here — unlike the old load_dotenv(override=True),
+        # which let a stray .env beat K8s secrets.
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         frozen=True,
         extra="ignore",
@@ -55,7 +60,7 @@ class Settings(BaseSettings):
         description=("DEV ONLY. Per-pod storage that loses all sessions on restart."),
     )
 
-    # ── Content-tree cache (was _ContentTreeCacheSettings) ──
+    # ── Content-tree cache ──
     content_tree_cache_ttl_seconds: int = Field(
         default=1800, validation_alias="KB_SEARCH_CONTENT_TREE_CACHE_TTL_SECONDS"
     )
@@ -63,7 +68,7 @@ class Settings(BaseSettings):
         default=128, validation_alias="KB_SEARCH_CONTENT_TREE_CACHE_MAX_ENTRIES"
     )
 
-    # ── Search scope lookups (was the _LOOKUP_CONCURRENCY constant) ──
+    # ── Search scope lookups ──
     scope_lookup_concurrency: int = 8
 
     @property

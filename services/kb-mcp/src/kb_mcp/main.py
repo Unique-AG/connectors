@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 from unique_mcp.logging import configure_logging
@@ -8,11 +9,18 @@ from unique_toolkit.monitoring import configure_tracing
 
 from kb_mcp.auth import build_auth
 from kb_mcp.references import SERVER_CITATION_INSTRUCTIONS
-from kb_mcp.settings import get_settings
+from kb_mcp.settings import ENV_FILE, get_settings
 
 
 def main() -> None:
-    # First statement: config errors fail fast at boot, before any other setup.
+    # Settings only feeds Settings' own fields from .env. configure_logging,
+    # configure_tracing, and unique_toolkit's settings read raw os.environ
+    # (and unique_toolkit looks for a file named unique.env, not .env), so
+    # populate the process env too — same file Settings resolved, same
+    # env-wins-over-file precedence (override=False).
+    load_dotenv(ENV_FILE, override=False)
+
+    # Config errors fail fast at boot, before any other setup.
     settings = get_settings()
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
