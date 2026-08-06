@@ -86,12 +86,13 @@ class TestGetPerson:
         assert isinstance(result, PersonResolvedResponse)
         assert result.resolved == ResolvedPartyEcho(id="p9", type="people", name="Jane Doe")
         assert result.departed is True
-        assert result.departed_detail is not None
-        assert result.departed_detail.signal == "former_relationship_type"
-        assert result.departed_detail.relationship_type_name == "is a former employee of"
-        assert result.departed_detail.organization_id == "o1"
+        assert len(result.departures) == 1
+        departure = result.departures[0]
+        assert departure.signal == "former_relationship_type"
+        assert departure.relationship_type_name == "is a former employee of"
+        assert departure.organization_id == "o1"
         # The type carried the signal; this tenant recorded no date.
-        assert result.departed_detail.end_date is None
+        assert departure.end_date is None
         assert result.as_of == AsOfEcho(
             modified_timestamp="2023-01-01T00:00:00Z", modified_by="crm-admin"
         )
@@ -103,11 +104,12 @@ class TestGetPerson:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_current_employment_at_the_same_org_is_not_departed(
+    async def test_undated_tie_at_the_same_org_breaks_toward_departed(
         self, connect_user: ConnectUser
     ) -> None:
-        """The real shape that used to answer by array position: a person carrying both
-        `is a former employee of` and `is employee of` against one organization is current."""
+        """A person carrying both `is a former employee of` and `is employee of` against one
+        organization, neither dated: `EmploymentIndex`'s winner-per-pair fold breaks an undated
+        tie toward `FORMER` — under-reporting a departure is the costlier error."""
         await connect_user("user-person-3", "person-dave")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
@@ -123,8 +125,9 @@ class TestGetPerson:
         result = await get_person(ctx_never_elicit(), search="Jane Doe")
 
         assert isinstance(result, PersonResolvedResponse)
-        assert result.departed is False
-        assert result.departed_detail is None
+        assert result.departed is True
+        assert len(result.departures) == 1
+        assert result.departures[0].organization_id == "o1"
 
     @pytest.mark.asyncio
     @respx.mock

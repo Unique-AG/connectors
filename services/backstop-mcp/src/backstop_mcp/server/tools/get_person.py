@@ -2,7 +2,7 @@ from typing import ClassVar, Literal
 from urllib.parse import quote
 
 from fastmcp import Context
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import (
     BackstopApiDocument,
@@ -17,6 +17,7 @@ from backstop_mcp.features.data_hygiene import (
     ENTITY_RELATIONSHIPS_RELATIONSHIP,
     AsOfEcho,
     DepartedContactEcho,
+    EmploymentStatus,
     as_of_echo,
     departed_echo,
     extract_as_of,
@@ -30,7 +31,7 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.server.runtime import get_backstop_client, get_departed_contact_detector
+from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
 
 
 class PersonAttributes(BaseModel):
@@ -44,9 +45,11 @@ class PersonAttributes(BaseModel):
 class PersonResolvedResponse(BaseModel):
     """`get_person` once the person was found and fetched.
 
-    Always returns the person when resolved. When employment has ended, `departed` is true and
-    `departed_detail` carries the hard signal — relay both to the user and do not present the
-    person as a current contact unless they asked for historical contacts.
+    Always returns the person when resolved. When employment has ended anywhere, `departed` is
+    true and `departures` carries one entry per organization the person has left, each already
+    identifying its own `organization_id` — relay every entry to the user and do not present the
+    person as a current contact at any of those organizations unless they asked for historical
+    contacts.
     """
 
     status: Literal["resolved"] = "resolved"
@@ -54,7 +57,7 @@ class PersonResolvedResponse(BaseModel):
     resolved: ResolvedPartyEcho
     as_of: AsOfEcho | None = None
     departed: bool = False
-    departed_detail: DepartedContactEcho | None = None
+    departures: list[DepartedContactEcho] = Field(default_factory=list)
 
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -74,7 +77,7 @@ async def get_person(
 
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
     trip). When the CRM links the person to an organization as a past employee, or an employment
-    endDate has passed, `departed` is true — always relay `departed` / `departed_detail` to the
+    endDate has passed, `departed` is true — always relay `departed` / `departures` to the
     user; do not present a departed person as a current contact unless they explicitly asked for
     historical contacts.
 
@@ -111,17 +114,28 @@ async def get_person(
     # linked from the relationships, so nothing on the person points at them.
     relationship_types = included_of_type(document, ENTITY_RELATIONSHIP_TYPES_RESOURCE)
 
-    departed = get_departed_contact_detector().verify(
+    index = get_employment_index_factory().index_for_person(
         relationships=relationships,
         relationship_types=relationship_types,
     )
+    # Every FORMER pair for this index is this same person's own former employment: the index
+    # was built from the person's own side-loaded relationships, so every edge's `person_id` is
+    # theirs — there is no other person to filter by.
+    departures: list[DepartedContactEcho] = []
+    for record in index.pairs(status=EmploymentStatus.FORMER):
+        assert record.departure is not None, (
+            "EmploymentIndex invariant: a FORMER record always carries departure evidence"
+        )
+        echo = departed_echo(record.departure)
+        assert echo is not None
+        departures.append(echo)
 
     return PersonResolvedResponse(
         person=attributes,
         resolved=party_echo(resolved),
         as_of=as_of_echo(extract_as_of(attributes)),
-        departed=departed is not None,
-        departed_detail=departed_echo(departed),
+        departed=bool(departures),
+        departures=departures,
     )
 
 

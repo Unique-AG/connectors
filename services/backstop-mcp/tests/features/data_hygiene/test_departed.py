@@ -5,8 +5,9 @@ Each test below is meant to read as a mini walkthrough:
 1. **Configure the checks** — which relationship types count as employment / former
    employment (`EmploymentRules` / `TypeVocabulary`).
 2. **Prepare the side-loaded record** — `entityRelationships` plus their types.
-3. **Run verification** — `detect_departed_employment` (what `EmploymentIndexFactory.index_for_person`
-   delegates to) or `classify_employment` for a single type.
+3. **Run verification** — `detect_departed_employment` (what
+   `EmploymentIndexFactory.index_for_person` delegates to) or `classify_employment` for a single
+   type.
 
 The record builders and the type vocabulary a real instance uses live in `helpers.py`. The
 detector that assembles the rules from configuration is in `test_service.py`.

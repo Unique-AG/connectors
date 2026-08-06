@@ -30,6 +30,7 @@ from backstop_mcp.features.data_hygiene.types import (
     DepartedEmployment,
     DepartureSignal,
     EmploymentRules,
+    EmploymentStatus,
     TypeVocabulary,
 )
 
@@ -45,6 +46,7 @@ __all__ = [
     "EmploymentIndex",
     "EmploymentIndexFactory",
     "EmploymentRules",
+    "EmploymentStatus",
     "TypeVocabulary",
     "as_of_echo",
     "build_organization_employment_index",
