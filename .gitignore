@@ -107,3 +107,7 @@ services/**/src/tenant-configs/*
 **/.pytest_cache/
 **/.ruff_cache/
 *.py[cod]
+
+# Local docs used by llm for apis which give us no other option
+*.docs-local
+services/backstop-mcp/.coverage
