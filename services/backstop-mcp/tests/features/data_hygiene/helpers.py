@@ -3,16 +3,30 @@
 The type ids and names are the ones a real instance uses: `is employee of` and `is a former
 employee of` against the same organization, plus `has portal access to` as a person→org link that
 is not employment at all.
+
+The mirror types (`is employee of (mirror)` / `is a former employee of (mirror)`) are what an
+organization's own GET side-loads instead — same meaning, different ids and names, and pointing
+the other direction. `owns account` / `management company of` are org-side types the design doc
+cites as `IRRELEVANT`: person↔organization is not the shape at all (an org owning an account or
+managing another org), so they must drop out rather than count as employment either way.
 """
 
 EMPLOYEE_TYPE = "456439"
 FORMER_TYPE = "459795"
 PORTAL_TYPE = "633147"
+EMPLOYEE_MIRROR_TYPE = "456441"
+FORMER_MIRROR_TYPE = "459797"
+OWNS_ACCOUNT_TYPE = "700001"
+MANAGEMENT_COMPANY_TYPE = "700002"
 
 TYPE_NAMES = {
     EMPLOYEE_TYPE: "is employee of",
     FORMER_TYPE: "is a former employee of",
     PORTAL_TYPE: "has portal access to",
+    EMPLOYEE_MIRROR_TYPE: "is employee of (mirror)",
+    FORMER_MIRROR_TYPE: "is a former employee of (mirror)",
+    OWNS_ACCOUNT_TYPE: "owns account",
+    MANAGEMENT_COMPANY_TYPE: "management company of",
 }
 
 
@@ -32,6 +46,8 @@ def person_org(
     er_id: str,
     *,
     end_date: str | None = None,
+    start_date: str | None = None,
+    created_timestamp: str | None = None,
     source_type: str | None = "people",
     source_id: str | None = "p1",
     dest_type: str | None = "organizations",
@@ -41,7 +57,10 @@ def person_org(
     """One `entityRelationships` resource linking a person side to an org side.
 
     A `None` id or type leaves that key off the side entirely, which is how Backstop returns a
-    side it did not resolve.
+    side it did not resolve. `source_type`/`dest_type`/`source_id`/`dest_id` already suffice to
+    simulate an organization's own GET: pass the organization as `source_*` and the person as
+    `dest_*` (or vice versa) — `_employer_side`/`_person_id` match structurally by resource type,
+    not by literal JSON key, so no separate builder is needed for that payload shape.
     """
     attributes: dict[str, object] = {
         "sourceEntity": _side(resource_id=source_id, resource_type=source_type),
@@ -49,6 +68,10 @@ def person_org(
     }
     if end_date is not None:
         attributes["endDate"] = end_date
+    if start_date is not None:
+        attributes["startDate"] = start_date
+    if created_timestamp is not None:
+        attributes["createdTimestamp"] = created_timestamp
     relationships: dict[str, object] = {}
     if type_id is not None:
         relationships["entityRelationshipType"] = {
