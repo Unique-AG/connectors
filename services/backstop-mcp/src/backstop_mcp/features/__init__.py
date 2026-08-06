@@ -1,9 +1,10 @@
 """Feature implementations: what this connector actually does.
 
-Only Backstop credential bridging (`auth`) lands in this PR — login form, token lifetime,
-encryption at rest. CRM custom-field schema discovery (`custom_fields`), name-to-record lookup
-(`party_resolver`), and read-response provenance / departed-contact detection (`data_hygiene`)
-are stacked on top in later PRs.
+So far: Backstop credential bridging (`auth`), name-to-record lookup (`party_resolver`), the
+shared entity-type vocabulary (`entity_types`), and the resolution algebra party/custom-field
+resolution share (`resolution`). CRM custom-field schema discovery (`custom_fields`) and
+read-response provenance / departed-contact detection (`data_hygiene`) land in later PRs, stacked
+on top of this.
 
 Layering rules, both enforced by `tests/test_layering.py`:
 

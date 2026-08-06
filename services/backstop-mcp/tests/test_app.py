@@ -2,7 +2,7 @@
 
 Everything else in this suite builds its collaborators the way `create_app` does; nothing was
 testing `create_app` itself, which is where the wiring lives that is easiest to get wrong — the
-`attach_auth` cycle, the nested lifespan, the route table.
+`attach_auth` cycle, the nested lifespans, middleware registration, the route table.
 
 These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
 """
@@ -133,7 +133,8 @@ class TestWiring:
 
     def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
         _ = app_client
-        assert get_services().backstop is not None
+        services = get_services()
+        assert services.backstop is not None
 
     def test_lifespan_teardown_releases_the_services(
         self, postgres_container: PostgresContainer
@@ -230,15 +231,9 @@ class TestToolRegistration:
 
         assert response.status_code == 401
 
-    def test_every_registered_tool_has_a_distinct_name(self) -> None:
-        """`create_app` registers by iterating TOOLS, so a duplicate name would shadow.
-
-        `TOOLS` is empty in this PR — the first tools land with `features/custom_fields` and
-        `features/party_resolver`. The uniqueness property still holds trivially.
-        """
-        names = [fn.__name__ for fn in TOOLS]
-
-        assert len(names) == len(set(names))
+    def test_no_tools_are_registered_yet(self) -> None:
+        """`TOOLS` is empty until the first tool lands in a later PR."""
+        assert TOOLS == ()
 
 
 class TestConfigTranslation:
