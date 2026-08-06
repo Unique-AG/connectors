@@ -1,14 +1,10 @@
 """Durable OAuth proxy storage — see auth/__init__.py:build_auth.
 
-Every FastMCP-issued access token is a reference token: OAuthProxy re-validates
-it against this store on every request (see the JTI-mapping lookup in
-fastmcp.server.auth.oauth_proxy.proxy.OAuthProxy.load_access_token). Six
-collections live here (client registrations, transactions, authorization
-codes, upstream tokens, JTI mappings, refresh tokens); losing them on a pod
-restart or across replicas logs out every user. Settings._storage_must_be_durable
-already refuses to boot without either a real DATABASE_URL +
-STORAGE_ENCRYPTION_KEY or an explicit ALLOW_EPHEMERAL_OAUTH_STORAGE opt-in, so
-by the time build_storage runs, exactly one of the two branches below is valid.
+Every FastMCP-issued access token is a reference token, re-validated against
+this store on every request, so losing it on a pod restart or across replicas
+logs out every user. Settings._storage_must_be_durable already refuses to
+boot without a durable config or an explicit ephemeral opt-in, so exactly one
+of the two branches below is valid by the time this runs.
 """
 
 import tempfile

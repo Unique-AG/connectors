@@ -30,12 +30,8 @@ def build_auth(settings: Settings) -> OIDCProxy:
         # token-swap after /token succeeds; otherwise every /mcp call returns
         # invalid_token despite a successful login.
         verify_id_token=True,
-        # OIDCProxy's docstring warns required_scopes causes an invalid_token
-        # loop — stale for verify_id_token=True: FastMCP only wires
-        # required_scopes into the JWT verifier when verify_id_token=False.
-        # With verify_id_token=True it withholds them from the verifier (id
-        # tokens carry no scope claim) and instead records them as
-        # self.required_scopes + calls update_default_scopes for us
-        # (fastmcp.server.auth.oidc_proxy.OIDCProxy.__init__).
+        # OIDCProxy's docstring warning about an invalid_token loop is stale
+        # for verify_id_token=True: it withholds required_scopes from the JWT
+        # verifier in that case and calls update_default_scopes for us instead.
         required_scopes=list(ZITADEL_DEFAULT_MCP_SCOPES),
     )

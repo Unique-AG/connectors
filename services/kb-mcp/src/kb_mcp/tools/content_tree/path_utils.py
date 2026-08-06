@@ -1,10 +1,4 @@
-"""Display-path helpers for content_tree rows.
-
-Toolkit path segments carry a sentinel for orphan folders and may contain
-``[``/``]`` characters that would break the outer ``[label](url)`` markdown
-wrapper — these helpers normalize both before a segment list is rendered or
-matched against a ``folder_path`` filter.
-"""
+"""Display-path helpers for content_tree rows."""
 
 from collections.abc import Sequence
 

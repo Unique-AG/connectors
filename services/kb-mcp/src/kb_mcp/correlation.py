@@ -1,12 +1,8 @@
 """Correlation-id helper for tool logging.
 
-``user_id``/``company_id`` are typed ``SecretStr`` with accessors named
-``get_confidential_user_id()``/``get_confidential_company_id()`` in
-``unique_toolkit.app.unique_settings.UniqueSettings`` — the codebase's own
-convention treats them as confidential, and logging them raw would land
-them in Loki in plaintext. Log a truncated hash instead: enough to
-correlate lines from the same caller across a request, without exposing
-who. FastMCP does the same thing with JTIs (``jti[:16]``).
+user_id/company_id are confidential (unique_toolkit's own UniqueSettings
+types them SecretStr) — hash and truncate instead of logging them raw, the
+same pattern FastMCP uses for JTIs (jti[:16]).
 """
 
 import hashlib

@@ -59,9 +59,8 @@ _META = merge_tool_meta(
 
 @tool(
     name="search",
-    # Composed from REFERENCE_FORMAT_INFORMATION (also reused below in _META),
-    # so this can't be the docstring — a literal docstring can't reference a
-    # module constant and still get FastMCP's automatic __doc__ inference.
+    # Not the docstring: this reuses REFERENCE_FORMAT_INFORMATION (also in
+    # _META below), and a literal docstring can't reference a module constant.
     description=(
         "Search the knowledge base for the given query and return relevant "
         "chunks. " + REFERENCE_FORMAT_INFORMATION
