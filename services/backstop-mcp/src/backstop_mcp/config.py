@@ -6,7 +6,9 @@ from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, TypedDict, cast
 
 from pydantic import (
+    BaseModel,
     BeforeValidator,
+    ConfigDict,
     Field,
     HttpUrl,
     PostgresDsn,
@@ -17,6 +19,22 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
+
+
+class CustomFieldOverrideConfig(BaseModel):
+    """Human-facing overlay for a CRM custom-field definition (env JSON value).
+
+    The deserialization shape only. `create_app` converts these to
+    `features.custom_fields.FieldOverride` — the domain's own type — so the custom-field feature
+    never imports this module for something that isn't configuration.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    display_name: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    description: str | None = None
+
 
 PKG_VERSION = pkg_version("backstop-mcp")
 
@@ -175,8 +193,7 @@ class BackstopConfig(BaseSettings):
     .../236.
 
     Also carries the tuning knobs for the shared HTTP client: timeouts, per-user concurrency
-    limits, retry behavior for 429s, and default pagination sizes. Custom-field overrides and
-    the departed-contact vocabulary land here once those features do.
+    limits, retry behavior for 429s, and default pagination sizes.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_")
@@ -209,6 +226,34 @@ class BackstopConfig(BaseSettings):
     # stop bounding report pages without any error to notice.
     page_limit_param: str = Field(default="page[limit]", min_length=1)
     page_offset_param: str = Field(default="page[offset]", min_length=1)
+
+    # Optional human overlays for weird CRM custom-field names (e.g. `is1` → Investor Status).
+    # Env value is JSON: {"organizations:is1": {"display_name": "...", "aliases": [...]}}.
+    # Keys are entityType:crmName — see custom_fields/overrides.py. crmName is the CRM's own
+    # field identifier, unique per entity type and stable across tenants, unlike the numeric
+    # definitionId (which is opaque and differs per Backstop instance).
+    custom_field_overrides: dict[str, CustomFieldOverrideConfig] = Field(default_factory=dict)
+
+    # How long a persisted custom-field schema snapshot stays usable before it's re-fetched.
+    # Field definitions change rarely (a CRM admin adding a field), so the default is a week;
+    # lower it if an instance's schema churns and stale glossaries start misleading callers.
+    custom_field_schema_ttl_minutes: int = Field(default=7 * 24 * 60, ge=1)
+
+    # Optional service account used ONLY to warm the custom-field schema snapshot at startup,
+    # so the very first user's tools/list already carries the glossary. Without it the schema
+    # is fetched lazily by the first authenticated caller instead. This token sees instance-wide
+    # custom-field metadata, so treat it like any other shared secret.
+    service_username: str | None = None
+    service_api_token: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_complete_service_account(self) -> "BackstopConfig":
+        """Reject a half-configured service account rather than silently skipping warming."""
+        if (self.service_username is None) != (self.service_api_token is None):
+            raise ValueError(
+                "BACKSTOP_SERVICE_USERNAME and BACKSTOP_SERVICE_API_TOKEN must be set together"
+            )
+        return self
 
 
 class DatabaseConfig(BaseSettings):

@@ -51,12 +51,13 @@ _CONFIG_MODULE = "backstop_mcp.config"
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
 # directly testable without being callable from production code that should go through the front
-# door. A new package belongs here as soon as its `__init__` exports anything (`custom_fields`
-# and `data_hygiene` land in later PRs and join this list then).
+# door. A new package belongs here as soon as its `__init__` exports anything (`data_hygiene`
+# lands in a later PR and joins this list then).
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.backstop_client",
     "backstop_mcp.db",
     "backstop_mcp.features.auth",
+    "backstop_mcp.features.custom_fields",
     "backstop_mcp.features.party_resolver",
     "backstop_mcp.server.middleware",
     "backstop_mcp.server.tools",
@@ -196,11 +197,11 @@ class TestTheDetectionItself:
         )
 
     def test_catches_reaching_past_the_init_for_a_service_too(self) -> None:
-        """Not only the pure pieces: `search` is behind the front door as well."""
+        """Not only the pure pieces: `service` is behind the front door as well."""
         assert _internal_imports(
-            "from backstop_mcp.features.party_resolver.search import search_parties",
+            "from backstop_mcp.features.custom_fields.service import CustomFieldsService",
             _SRC / "server",
-        ) == [("backstop_mcp.features.party_resolver.search", 1)]
+        ) == [("backstop_mcp.features.custom_fields.service", 1)]
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
@@ -222,7 +223,7 @@ class TestFeaturesDoNotImportServer:
         sources = sorted(_FEATURES.rglob("*.py"))
         assert sources, f"no python sources found under {_FEATURES}"
         packages = {p.relative_to(_FEATURES).parts[0] for p in sources if p.name != "__init__.py"}
-        assert {"auth", "party_resolver"} <= packages
+        assert {"auth", "custom_fields", "party_resolver"} <= packages
 
     @pytest.mark.parametrize("source", sorted(_FEATURES.rglob("*.py")), ids=_source_id)
     def test_no_feature_module_imports_from_server(self, source: pathlib.Path) -> None:
