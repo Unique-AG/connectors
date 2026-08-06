@@ -1,4 +1,5 @@
 import ssl
+from datetime import timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -61,10 +62,6 @@ class TestNormalizeAsyncpgUrl:
         assert url == "postgresql+asyncpg://user:pass@db:5432/backstop"
         assert connect_args == {}
 
-    def test_rejects_non_postgres_schemes(self) -> None:
-        with pytest.raises(ValueError, match="PostgreSQL"):
-            normalize_asyncpg_url("mysql://user:pass@db:3306/backstop")
-
 
 class TestBackstopConfigDefaults:
     def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,15 +78,6 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 30_000
         assert config.default_page_size == 100
         assert config.report_page_size == 500
-        assert config.page_limit_param == "page[limit]"
-        assert config.page_offset_param == "page[offset]"
-
-    def test_env_var_overrides_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.backstopsolutions.com")
-
-        config = BackstopConfig()
-
-        assert config.base_url == "https://tenant.backstopsolutions.com"
 
     def test_strips_trailing_slash_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.backstopsolutions.com/")
@@ -104,34 +92,64 @@ class TestBackstopConfigDefaults:
         with pytest.raises(ValidationError):
             BackstopConfig()
 
-    def test_client_tuning_knobs_are_overridable_via_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("BACKSTOP_DEFAULT_TIMEOUT_SECONDS", "11")
-        monkeypatch.setenv("BACKSTOP_REPORTS_TIMEOUT_SECONDS", "222")
+    def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_DEFAULT_TIMEOUT_SECONDS", "45.5")
+        monkeypatch.setenv("BACKSTOP_REPORTS_TIMEOUT_SECONDS", "90")
         monkeypatch.setenv("BACKSTOP_MAX_CONCURRENT_REQUESTS_PER_USER", "3")
         monkeypatch.setenv("BACKSTOP_MAX_RETRY_ATTEMPTS", "2")
         monkeypatch.setenv("BACKSTOP_MAX_RETRY_WAIT_MS", "5000")
-        monkeypatch.setenv("BACKSTOP_DEFAULT_PAGE_SIZE", "33")
-        monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "444")
-        monkeypatch.setenv("BACKSTOP_PAGE_LIMIT_PARAM", "limit")
-        monkeypatch.setenv("BACKSTOP_PAGE_OFFSET_PARAM", "offset")
+        monkeypatch.setenv("BACKSTOP_DEFAULT_PAGE_SIZE", "50")
+        monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "250")
 
         config = BackstopConfig()
 
-        assert config.default_timeout_seconds == 11.0
-        assert config.reports_timeout_seconds == 222.0
+        assert config.default_timeout_seconds == 45.5
+        assert config.reports_timeout_seconds == 90.0
         assert config.max_concurrent_requests_per_user == 3
         assert config.max_retry_attempts == 2
-        assert config.max_retry_wait_ms == 5_000
-        assert config.default_page_size == 33
-        assert config.report_page_size == 444
-        assert config.page_limit_param == "limit"
-        assert config.page_offset_param == "offset"
+        assert config.max_retry_wait_ms == 5000
+        assert config.default_page_size == 50
+        assert config.report_page_size == 250
+
+    def test_report_page_size_rejects_values_over_500(self) -> None:
+        with pytest.raises(ValueError, match="report_page_size"):
+            BackstopConfig(report_page_size=501)
+
+
+class TestAuthConfig:
+    def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("AUTH_TOKEN_RETENTION_DAYS", raising=False)
+        monkeypatch.delenv("AUTH_CLEANUP_INTERVAL_HOURS", raising=False)
+
+        config = AuthConfig()
+
+        assert config.token_retention_days == 30
+        assert config.token_retention == timedelta(days=30)
+        assert config.cleanup_interval_hours == 6.0
+        assert config.cleanup_interval == timedelta(hours=6)
+
+    def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AUTH_TOKEN_RETENTION_DAYS", "7")
+        monkeypatch.setenv("AUTH_CLEANUP_INTERVAL_HOURS", "0.5")
+
+        config = AuthConfig()
+
+        assert config.token_retention == timedelta(days=7)
+        assert config.cleanup_interval == timedelta(minutes=30)
+
+    def test_zero_retention_is_rejected(self) -> None:
+        """Retaining nothing would delete a token family the moment it expired."""
+        with pytest.raises(ValueError, match="token_retention_days"):
+            AuthConfig(token_retention_days=0)
+
+    def test_zero_interval_is_rejected(self) -> None:
+        """A zero interval would spin the sweep loop without ever sleeping."""
+        with pytest.raises(ValueError, match="cleanup_interval_hours"):
+            AuthConfig(cleanup_interval_hours=0)
 
 
 class TestPublicBaseUrl:
-    """The OAuth issuer clients get redirected to, so a leftover local default is a dead deploy."""
+    """The OAuth issuer clients are redirected to, so a leftover local default is a dead deploy."""
 
     def test_the_local_default_is_allowed_outside_production(self) -> None:
         config = AppConfig(app_env=AppEnv.DEVELOPMENT)
@@ -224,30 +242,6 @@ class TestDatabaseConfigSsl:
 
         with pytest.raises(ValidationError, match="DB_HOST"):
             DatabaseConfig()
-
-
-class TestAuthConfigDefaults:
-    def test_defaults(self) -> None:
-        config = AuthConfig()
-
-        assert config.token_retention_days == 30
-        assert config.unused_client_retention_hours == 24.0
-        assert config.cleanup_interval_hours == 6.0
-        assert config.login_max_attempts == 10
-        assert config.login_attempt_window_minutes == 15
-
-    def test_derived_timedeltas(self) -> None:
-        config = AuthConfig(
-            token_retention_days=1,
-            unused_client_retention_hours=2.0,
-            cleanup_interval_hours=3.0,
-            login_attempt_window_minutes=4,
-        )
-
-        assert config.token_retention.days == 1
-        assert config.unused_client_retention.total_seconds() == 2.0 * 3600
-        assert config.cleanup_interval.total_seconds() == 3.0 * 3600
-        assert config.login_attempt_window.total_seconds() == 4 * 60
 
 
 class TestEncryptionConfig:

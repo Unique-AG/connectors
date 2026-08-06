@@ -55,8 +55,8 @@ def create_app(
     type here (`BackstopTransportSettings`, `RetrySettings`, `BackstopCredentialSecret`), so the
     tuning knobs a deployment sets are the ones every request actually uses.
 
-    No tools yet: `TOOLS` is empty until `features/custom_fields` and `features/party_resolver`
-    land, so the registration loop below is a no-op for now.
+    Client + auth only so far: no custom-field schema, no tools yet — those land in later PRs,
+    wired in here the same way.
     """
     config = config or AppConfig()
     backstop_config = backstop_config or BackstopConfig()
@@ -145,7 +145,8 @@ def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
     """Translate the env-parsed Backstop config into the transport's own settings type.
 
     Field-for-field, and deliberately explicit rather than derived by reflection: adding a knob
-    to `BackstopConfig` that the transport should see is then a visible edit here.
+    to `BackstopConfig` that the transport should see is then a visible edit here, and one it
+    should *not* see (the service account, the custom-field overrides) simply never appears.
     """
     return BackstopTransportSettings(
         base_url=config.base_url,

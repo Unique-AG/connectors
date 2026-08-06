@@ -5,13 +5,14 @@ An MCP server over the [Backstop](https://www.backstopsolutions.com/) CRM REST A
 Backstop has no OAuth, so this service *is* the OAuth 2.1 authorization server for its MCP
 clients. A client registers dynamically, gets redirected to a login form hosted here, and submits
 a Backstop username + personal API token. That credential is verified against Backstop, encrypted
-(Fernet) and stored in Postgres; every tool call would then act as that user against
-Backstop — never as a shared service account. Failed logins are rate-limited per username
+(Fernet) and stored in Postgres; every tool call will act as that user against Backstop —
+never as a shared service account. Failed logins are rate-limited per username
 (`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
 
-This PR adds the shared Backstop HTTP client and the OAuth credential bridge. The service starts,
-authenticates MCP clients, and lets them log in against Backstop — it still exposes no MCP tools.
-The feature packages and tools that use the client land in later PRs.
+This PR adds the Backstop HTTP client, the OAuth/login bridge, and a name-to-record lookup library
+(`party_resolver`) that resolves "Capstone" or "Investor Status" against the live instance. No MCP
+tools are exposed yet — `list_custom_fields`, `get_organization`, `get_person`, and
+`get_system_info` land in a later PR, once custom-field schema discovery is in place.
 
 ## Layout
 
@@ -21,11 +22,14 @@ src/backstop_mcp/
   config.py              one BaseSettings class per concern, read only at the root
   logging.py metrics.py  cross-cutting, used by both sides below
   features/              what the connector does
+    resolution.py          the shared "which record is that?" algebra + ambiguity policy
+    entity_types.py        canonical Backstop entity-type vocabulary
     auth/                  Backstop credential bridging: login form, encryption, token rotation
-  server/                how it's exposed over MCP
-    runtime.py             the process-wide service holder tools reach through
-    tools/                 tool functions + the single registry declaring them — empty for now
-    middleware/             FastMCP and ASGI middleware — empty for now
+    party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
+  server/                how it's exposed over MCP — no tools registered yet
+    runtime.py             the process-wide service holder tools will reach through
+    tools/                 empty registry until the first tool lands
+    middleware/            empty until the custom-field glossary middleware lands
   backstop_client/       HTTP transport: auth headers, concurrency gate, retries, pagination
   db/                    SQLAlchemy models, engine, alembic migrations
 ```
