@@ -1,8 +1,9 @@
 """Shared test construction helpers.
 
-Mirrors what `create_app()` does, minus the web layer: build one `BackstopClientFactory` the way
-production does. Tests that need a client go through the factory exactly as production does, so
-the concurrency gate and config injection under test are the real ones.
+Mirrors what `create_app()` does, minus the web layer: build one `BackstopClientFactory`, and
+install it in the single `runtime.Services` holder. Tests that need a client go through the
+factory exactly as production does, so the concurrency gate and config injection under test are
+the real ones.
 """
 
 from pydantic import SecretStr
@@ -44,3 +45,14 @@ def client_factory(
     """
     config = backstop_config(base_url, **overrides)
     return BackstopClientFactory(transport_settings(config), retry_settings(config), auth=auth)
+
+
+def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:
+    attributes: dict[str, object] = {**attrs}
+    if name is not None:
+        attributes["name"] = name
+    return {"type": type, "id": id, "attributes": attributes}
+
+
+def collection(*resources: dict[str, object]) -> dict[str, object]:
+    return {"data": list(resources)}
