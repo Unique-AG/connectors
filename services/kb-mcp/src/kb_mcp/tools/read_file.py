@@ -31,7 +31,7 @@ from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.references import file_reference_url, markdown_citation_link
-from kb_mcp.settings import KbMcpServerSettings
+from kb_mcp.settings import Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,7 +93,9 @@ def _error(text: str) -> CallToolResult:
     return CallToolResult(isError=True, content=[TextContent(type="text", text=text)])
 
 
-def _with_reference_header(result: CallToolResult, content: Content) -> CallToolResult:
+def _with_reference_header(
+    result: CallToolResult, content: Content, settings: Settings
+) -> CallToolResult:
     """Prefix successful reads with a markdown link that opens the file."""
     if result.isError or not result.content:
         return result
@@ -103,7 +105,7 @@ def _with_reference_header(result: CallToolResult, content: Content) -> CallTool
     url = file_reference_url(
         content.id,
         metadata=content.metadata,
-        frontend_base_url=KbMcpServerSettings().frontend_base_url_str(),
+        frontend_base_url=settings.frontend_base_url_str(),
     )
     header = markdown_citation_link(content.title or content.key, url)
     first.text = f"{header}\n\n{first.text}"
@@ -264,6 +266,7 @@ async def read_file(
     config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
 ) -> CallToolResult:
     """Read one KB file by content_id; dispatch by extension."""
+    kb_settings = get_settings()
     try:
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
@@ -302,7 +305,7 @@ async def read_file(
             result = _render_text(
                 full_text, start_page, end_page, config.max_tokens_per_call
             )
-        return _with_reference_header(result, content)
+        return _with_reference_header(result, content, kb_settings)
     except Exception as exc:
         _LOGGER.exception("read_file error")
         return CallToolResult(

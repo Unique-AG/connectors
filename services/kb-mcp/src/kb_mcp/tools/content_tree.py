@@ -13,7 +13,6 @@ from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -31,7 +30,7 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
 )
 
 from kb_mcp.references import file_reference_url, markdown_citation_link
-from kb_mcp.settings import KbMcpServerSettings
+from kb_mcp.settings import Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,18 +76,8 @@ class ContentTreeToolConfig(BaseModel):
     max_concurrent_scope_lookups: int = 25
 
 
-class _ContentTreeCacheSettings(BaseSettings):
-    """Process-wide, not per-company: an operational concern, not a business one."""
-
-    model_config = SettingsConfigDict(env_prefix="KB_SEARCH_CONTENT_TREE_CACHE_")
-
-    ttl_seconds: int = 1800
-    max_entries: int = 128
-
-
 # Keeps ContentTree instances alive across calls, keyed by (company_id,
 # user_id). Single-process only.
-_cache_settings = _ContentTreeCacheSettings()
 _tree_cache: AsyncTTLCache | None = None
 
 # Toolkit path helpers emit this sentinel when content has no folderIdPath
@@ -134,12 +123,12 @@ def _file_link(
     return markdown_citation_link(display, url)
 
 
-def _get_tree_cache() -> AsyncTTLCache:
+def _get_tree_cache(settings: Settings) -> AsyncTTLCache:
     global _tree_cache
     if _tree_cache is None:
         _tree_cache = AsyncTTLCache(
-            maxsize=_cache_settings.max_entries,
-            ttl_ms=_cache_settings.ttl_seconds * 1000,
+            maxsize=settings.content_tree_cache_max_entries,
+            ttl_ms=settings.content_tree_cache_ttl_seconds * 1000,
         )
     return _tree_cache
 
@@ -253,6 +242,7 @@ async def content_tree(
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> CallToolResult:
     """Dispatch to ContentTree by mode; validate mode='search' needs query."""
+    kb_settings = get_settings()
     try:
         if mode == "search" and not query:
             return CallToolResult(
@@ -270,7 +260,7 @@ async def content_tree(
         company_id = settings.authcontext.get_confidential_company_id()
         user_id = settings.authcontext.get_confidential_user_id()
 
-        cache = _get_tree_cache()
+        cache = _get_tree_cache(kb_settings)
 
         async def _construct() -> ContentTree:
             return ContentTree(company_id=company_id, user_id=user_id)
@@ -315,7 +305,7 @@ async def content_tree(
                 ]
             effective_limit = limit if limit is not None else config.default_limit
             rows = rows[:effective_limit]
-            frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
+            frontend_base_url = kb_settings.frontend_base_url_str()
             lines = [
                 f"{_file_link(content_info, segments, frontend_base_url)} "
                 f"(content_id={content_info.id})"
@@ -338,7 +328,7 @@ async def content_tree(
             metadata_filter=metadata_filter,
             max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
         )
-        frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
+        frontend_base_url = kb_settings.frontend_base_url_str()
         lines = [
             f"{_file_link(m.content_info, m.path_segments, frontend_base_url)} "
             f"(score={m.score:.2f}, content_id={m.content_info.id})"

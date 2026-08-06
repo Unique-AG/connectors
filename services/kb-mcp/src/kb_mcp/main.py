@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 from starlette.middleware import Middleware
@@ -12,26 +11,26 @@ from unique_mcp.auth.zitadel.oidc_proxy import (
 from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
-from unique_mcp.settings import ServerSettings
 from unique_toolkit.monitoring import configure_tracing
 
 from kb_mcp.references import SERVER_CITATION_INSTRUCTIONS
+from kb_mcp.settings import get_settings
 
 
 def main() -> None:
-    # Single .env for local (toolkit prefers unique.env; mcp/zitadel prefer their
-    # own names — loading into the process env covers all of them).
-    # override=True so service .env wins over stale shell UNIQUE_MCP_* exports.
-    load_dotenv(Path.cwd() / ".env", override=True)
+    # First statement: config errors fail fast at boot, before any other setup.
+    settings = get_settings()
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
     configure_logging()
 
-    server_settings = ServerSettings()
-
     oidc_proxy = create_zitadel_oidc_proxy(
-        mcp_server_base_url=server_settings.base_url.encoded_string(),
-        zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(),  # pyright: ignore[reportCallIssue]
+        mcp_server_base_url=settings.base_url.encoded_string(),
+        zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(
+            base_url=settings.zitadel_base_url,
+            client_id=settings.zitadel_client_id,
+            client_secret=settings.zitadel_client_secret.get_secret_value(),
+        ),
         # Zitadel often issues opaque (non-JWT) access tokens even when the app
         # is configured for JWT. Verify the OIDC id_token instead so the
         # token-swap after /token succeeds; otherwise every /mcp call returns
@@ -68,11 +67,11 @@ def main() -> None:
     # (kubelet Host is the pod IP, not PUBLIC), e.g.
     # FASTMCP_HTTP_HOST_ORIGIN_PROTECTION=auto + chart probe httpHeaders.
     # OAuth redirect / token-swap base still comes from UNIQUE_MCP_PUBLIC_BASE_URL
-    # via ServerSettings — not from this Host allowlist.
+    # via Settings — not from this Host allowlist.
     mcp.run(
-        transport=server_settings.transport_scheme,
-        host=server_settings.local_base_url.host,
-        port=server_settings.local_base_url.port,
+        transport=settings.transport_scheme,
+        host=settings.local_base_url.host,
+        port=settings.local_base_url.port,
         log_level="info",
         middleware=middleware,
     )

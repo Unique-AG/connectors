@@ -83,13 +83,11 @@ def _patch_identity():
     )
 
 
-def _patch_frontend_settings(base_url: str | None = None):
+def _patch_kb_settings(base_url: str | None = None, lookup_concurrency: int = 8):
     mock_settings = MagicMock()
     mock_settings.frontend_base_url_str.return_value = base_url
-    return patch(
-        "kb_mcp.tools.search.KbMcpServerSettings",
-        return_value=mock_settings,
-    )
+    mock_settings.scope_lookup_concurrency = lookup_concurrency
+    return patch("kb_mcp.tools.search.get_settings", return_value=mock_settings)
 
 
 def _patch_resolve_scope_ids(mapping: dict[str, str] | None = None):
@@ -114,7 +112,7 @@ async def test_search_calls_kb_service():
         ) as mock_from_config,
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings(None),
+        _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
         result = await search(
@@ -145,7 +143,7 @@ async def test_search_uses_defaults_when_no_config_provided():
         ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings(None),
+        _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
         result = await search(
@@ -364,7 +362,7 @@ async def test_search_results_are_numbered_sequentially_and_include_citation_blo
         ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings(None),
+        _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
         result = await search(
@@ -397,7 +395,7 @@ async def test_search_uses_frontend_deep_links_when_scopes_resolved():
         ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings("https://example.unique.app"),
+        _patch_kb_settings("https://example.unique.app"),
         _patch_resolve_scope_ids(
             {"cont_aaaaaaaaaaaaaaaaaaaaaaa1": "scope_uy3cznkuysy3gasrxx2m4ezb"}
         ),

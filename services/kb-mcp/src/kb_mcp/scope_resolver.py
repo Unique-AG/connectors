@@ -13,12 +13,12 @@ from kb_mcp.references import scope_id_from_chunk, scope_id_from_metadata
 
 _LOGGER = logging.getLogger(__name__)
 
-_LOOKUP_CONCURRENCY = 8
-
 
 async def resolve_scope_ids(
     chunks: list[ContentChunk],
     settings: UniqueSettings,
+    *,
+    lookup_concurrency: int,
 ) -> dict[str, str]:
     """Map content id → leaf scope id for the given search chunks.
 
@@ -45,7 +45,7 @@ async def resolve_scope_ids(
 
     user_id = settings.authcontext.get_confidential_user_id()
     company_id = settings.authcontext.get_confidential_company_id()
-    semaphore = asyncio.Semaphore(_LOOKUP_CONCURRENCY)
+    semaphore = asyncio.Semaphore(lookup_concurrency)
 
     async def _lookup(content_id: str) -> tuple[str, str | None]:
         async with semaphore:

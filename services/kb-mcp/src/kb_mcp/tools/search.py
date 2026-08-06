@@ -36,7 +36,7 @@ from kb_mcp.references import (
     citation_instruction_content,
 )
 from kb_mcp.scope_resolver import resolve_scope_ids
-from kb_mcp.settings import KbMcpServerSettings
+from kb_mcp.settings import get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ async def search(
     config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
 ) -> CallToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
+    kb_settings = get_settings()
 
     try:
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
@@ -101,11 +102,15 @@ async def search(
             isError=True, content=[TextContent(type="text", text=str(exc))]
         )
 
-    frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
+    frontend_base_url = kb_settings.frontend_base_url_str()
     scope_by_content_id: dict[str, str] = {}
     if frontend_base_url and chunks:
         try:
-            scope_by_content_id = await resolve_scope_ids(chunks, settings)
+            scope_by_content_id = await resolve_scope_ids(
+                chunks,
+                settings,
+                lookup_concurrency=kb_settings.scope_lookup_concurrency,
+            )
         except Exception:
             _LOGGER.exception("scope resolution failed; falling back to unique:// URLs")
 

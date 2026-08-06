@@ -234,16 +234,18 @@ async def test_cache_reuses_same_content_tree_instance_for_same_identity():
 
 
 def test_cache_settings_default_and_env_override(monkeypatch):
-    from kb_mcp.tools.content_tree import _ContentTreeCacheSettings
+    from kb_mcp.settings import get_settings
 
-    assert _ContentTreeCacheSettings().max_entries == 128
-    assert _ContentTreeCacheSettings().ttl_seconds == 1800
+    assert get_settings().content_tree_cache_max_entries == 128
+    assert get_settings().content_tree_cache_ttl_seconds == 1800
 
     monkeypatch.setenv("KB_SEARCH_CONTENT_TREE_CACHE_MAX_ENTRIES", "999")
-    assert _ContentTreeCacheSettings().max_entries == 999
+    get_settings.cache_clear()
+    assert get_settings().content_tree_cache_max_entries == 999
 
     monkeypatch.setenv("KB_SEARCH_CONTENT_TREE_CACHE_TTL_SECONDS", "60")
-    assert _ContentTreeCacheSettings().ttl_seconds == 60
+    get_settings.cache_clear()
+    assert get_settings().content_tree_cache_ttl_seconds == 60
 
 
 @pytest.mark.asyncio
