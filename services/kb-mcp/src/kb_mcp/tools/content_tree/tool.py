@@ -6,13 +6,12 @@
 """
 
 import logging
-from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -21,9 +20,7 @@ from unique_mcp import (
     get_unique_settings_async,
     merge_tool_meta,
 )
-from unique_toolkit._common.pydantic.rjsf_tags import RJSFMetaTag
 from unique_toolkit.content.schemas import ContentInfo
-from unique_toolkit.content.smart_rules import Operator, Statement, UniqueQLField
 from unique_toolkit.experimental.components.content_tree import ContentTree
 from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
@@ -31,89 +28,31 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
 
 from kb_mcp.references import file_reference_url, markdown_citation_link
 from kb_mcp.settings import Settings, get_settings
-
-_LOGGER = logging.getLogger(__name__)
-
-MatchTarget = Literal["key", "path", "both"]
-
-# Applied when metadata_filter is unset. Not the field's own default:
-# UniqueQLField's schema declares string|null but its serializer returns
-# dict|None, so any non-None default breaks admin-UI rendering. Kept as a
-# Statement (`.to_dict()` per call) so no shared mutable dict is handed to
-# downstream service calls.
-_DEFAULT_METADATA_FILTER_STATEMENT = Statement(
-    operator=Operator.NOT_CONTAINS,
-    path=["folderIdPath"],
-    value="user-memory",
+from kb_mcp.tools.content_tree.config import (
+    DEFAULT_METADATA_FILTER_STATEMENT,
+    ContentTreeToolConfig,
+    MatchTarget,
+)
+from kb_mcp.tools.content_tree.path_utils import (
+    display_path,
+    display_path_segments,
+    normalize_path_segment,
 )
 
-
-class ContentTreeToolConfig(BaseModel):
-    # dict[str, Any] breaks the admin schema generator (RJSF can't infer
-    # `items` for a nested array under Any); UniqueQLField avoids this.
-    metadata_filter: Annotated[
-        UniqueQLField,
-        RJSFMetaTag(
-            {
-                "ui:options": {"customValidation": "uniqueql"},
-                "anyOf": [
-                    {
-                        "ui:widget": "textarea",
-                        "ui:placeholder": (
-                            '{"operator": "equals", "value": "...", "path": ["fieldName"]}'
-                        ),
-                        "ui:emptyValue": "",
-                    },
-                    {},
-                ],
-            }
-        ),
-    ] = Field(default=None)
-    default_limit: int = 50
-    default_min_score: float = 0.6
-    default_match_on: MatchTarget = "both"
-    default_case_sensitive: bool = False
-    max_concurrent_scope_lookups: int = 25
-
+_LOGGER = logging.getLogger(__name__)
 
 # Keeps ContentTree instances alive across calls, keyed by (company_id,
 # user_id). Single-process only.
 _tree_cache: AsyncTTLCache | None = None
 
-# Toolkit path helpers emit this sentinel when content has no folderIdPath
-# (chat uploads, loose files). Strip it from display labels only — do not
-# change toolkit emission; other callers may rely on the literal value.
-_NO_FOLDER_PATH_SENTINEL = "_no_folder_path"
-
-
-def _normalize_path_segment(segment: str) -> str:
-    """Strip ``[`` / ``]`` so display labels and folder_path filters stay aligned."""
-    return segment.replace("[", "").replace("]", "")
-
-
-def _display_path_segments(segments: Sequence[str]) -> list[str]:
-    """Path segments for display and filtering (sentinel dropped, brackets stripped)."""
-    return [
-        _normalize_path_segment(s) for s in segments if s != _NO_FOLDER_PATH_SENTINEL
-    ]
-
-
-def _display_path(segments: Sequence[str]) -> str:
-    """Join path segments for display labels.
-
-    Drops the orphan-folder sentinel and strips ``[`` / ``]`` so folder names
-    like ``[SM]`` cannot break the outer ``[label](url)`` markdown wrapper.
-    """
-    return "/".join(_display_path_segments(segments))
-
 
 def _file_link(
     content_info: ContentInfo,
-    segments: Sequence[str],
+    segments: list[str],
     frontend_base_url: str | None,
 ) -> str:
     """Render a file row as a markdown citation (sentinel/brackets stripped)."""
-    display = _display_path(segments)
+    display = display_path(segments)
     url = file_reference_url(
         content_info.id,
         metadata=content_info.metadata,
@@ -275,7 +214,7 @@ async def content_tree(
         metadata_filter = (
             config.metadata_filter.to_dict()
             if config.metadata_filter is not None
-            else _DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
+            else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
         )
 
         if mode == "tree":
@@ -295,13 +234,12 @@ async def content_tree(
                 # Match against display paths (brackets stripped, sentinel dropped)
                 # so filters like "SM/AlpenSys" work when segments are ["[SM]", ...].
                 prefix = tuple(
-                    _normalize_path_segment(p)
-                    for p in folder_path.strip("/").split("/")
+                    normalize_path_segment(p) for p in folder_path.strip("/").split("/")
                 )
                 rows = [
                     (content_info, segments)
                     for content_info, segments in rows
-                    if tuple(_display_path_segments(segments)[: len(prefix)]) == prefix
+                    if tuple(display_path_segments(segments)[: len(prefix)]) == prefix
                 ]
             effective_limit = limit if limit is not None else config.default_limit
             rows = rows[:effective_limit]

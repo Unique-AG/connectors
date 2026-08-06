@@ -32,7 +32,9 @@ def _make_settings(company_id: str = "company-1", user_id: str = "user-1"):
 def identity(monkeypatch):
     """Per-request identity now resolves in-body; tests may override the mock."""
     mock = AsyncMock(return_value=_make_settings())
-    monkeypatch.setattr("kb_mcp.tools.content_tree.get_unique_settings_async", mock)
+    monkeypatch.setattr(
+        "kb_mcp.tools.content_tree.tool.get_unique_settings_async", mock
+    )
     return mock
 
 
@@ -62,7 +64,7 @@ def _make_mock_tree():
 
 @pytest.fixture(autouse=True)
 def _reset_cache():
-    import kb_mcp.tools.content_tree as ct_module
+    import kb_mcp.tools.content_tree.tool as ct_module
 
     ct_module._tree_cache = None
     yield
@@ -76,7 +78,7 @@ def test_match_target_matches_service_definition():
 @pytest.mark.asyncio
 async def test_mode_tree_calls_render_visible_tree_only():
     mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="tree",
             config=ContentTreeToolConfig(),
@@ -95,7 +97,7 @@ async def test_mode_list_calls_resolve_visible_file_paths_only():
     mock_tree.resolve_visible_file_paths_async = AsyncMock(
         return_value=[(_make_content_info("c1"), ["Contracts", "a.pdf"])]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
             config=ContentTreeToolConfig(),
@@ -117,7 +119,7 @@ async def test_mode_search_calls_search_visible_files_fuzzy_only():
     mock_tree.search_visible_files_fuzzy_async = AsyncMock(
         return_value=[_make_fuzzy_match(["a.pdf"], 0.9, "c1")]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="search",
             query="a.pdf",
@@ -136,7 +138,7 @@ async def test_mode_search_calls_search_visible_files_fuzzy_only():
 
 @pytest.mark.asyncio
 async def test_mode_search_without_query_returns_error_without_calling_service():
-    with patch("kb_mcp.tools.content_tree.ContentTree") as mock_cls:
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
         result = await content_tree(
             mode="search",
             query=None,
@@ -159,7 +161,7 @@ async def test_folder_path_prefix_filter_is_case_sensitive_exact_match():
             (_make_content_info("c3"), ["Other", "c.pdf"]),
         ]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
             folder_path="Contracts/2024",
@@ -190,7 +192,7 @@ async def test_folder_path_filter_matches_display_path_with_brackets_stripped():
             (_make_content_info("c3"), ["Contracts", "c.pdf"]),
         ]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
             folder_path="SM/AlpenSys",
@@ -209,7 +211,7 @@ async def test_limit_none_falls_back_to_config_default_limit():
     mock_tree = _make_mock_tree()
     mock_tree.resolve_visible_file_paths_async = AsyncMock(return_value=rows)
     config = ContentTreeToolConfig(default_limit=2)
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="list",
             limit=None,
@@ -224,7 +226,7 @@ async def test_limit_none_falls_back_to_config_default_limit():
 async def test_cache_reuses_same_content_tree_instance_for_same_identity():
     mock_tree = _make_mock_tree()
     with patch(
-        "kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree
+        "kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree
     ) as mock_cls:
         await content_tree(mode="tree", config=ContentTreeToolConfig())
         await content_tree(mode="tree", config=ContentTreeToolConfig())
@@ -251,7 +253,7 @@ def test_cache_settings_default_and_env_override(monkeypatch):
 @pytest.mark.asyncio
 async def test_refresh_true_invalidates_caller_cache_only():
     mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="tree",
             refresh=True,
@@ -267,7 +269,7 @@ async def test_refresh_true_invalidates_caller_cache_only():
 @pytest.mark.asyncio
 async def test_refresh_false_does_not_invalidate_cache():
     mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         await content_tree(
             mode="tree",
             refresh=False,
@@ -281,7 +283,7 @@ async def test_refresh_false_does_not_invalidate_cache():
 async def test_refresh_reuses_cached_instance_then_invalidates():
     mock_tree = _make_mock_tree()
     with patch(
-        "kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree
+        "kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree
     ) as mock_cls:
         await content_tree(mode="tree", config=ContentTreeToolConfig())
         await content_tree(mode="tree", refresh=True, config=ContentTreeToolConfig())
@@ -301,7 +303,7 @@ async def test_default_metadata_filter_excludes_user_memory_folder():
         "path": ["folderIdPath"],
         "value": "user-memory",
     }
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         await content_tree(
             mode="tree",
             config=ContentTreeToolConfig(),
@@ -322,21 +324,21 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
     config = ContentTreeToolConfig(metadata_filter=custom_filter)
 
     mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-tree")
         await content_tree(mode="tree", config=config)
     _, kwargs = mock_tree.render_visible_tree_async.call_args
     assert kwargs["metadata_filter"] == custom_filter
 
     mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-list")
         await content_tree(mode="list", config=config)
     _, kwargs = mock_tree.resolve_visible_file_paths_async.call_args
     assert kwargs["metadata_filter"] == custom_filter
 
     mock_tree = _make_mock_tree()
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         identity.return_value = _make_settings(user_id="user-search")
         await content_tree(mode="search", query="a.pdf", config=config)
     _, kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
@@ -346,7 +348,7 @@ async def test_admin_configured_metadata_filter_flows_through_to_service_calls(
 @pytest.mark.asyncio
 async def test_cache_miss_for_different_identity_constructs_new_instance(identity):
     with patch(
-        "kb_mcp.tools.content_tree.ContentTree",
+        "kb_mcp.tools.content_tree.tool.ContentTree",
         side_effect=lambda **kwargs: _make_mock_tree(),
     ) as mock_cls:
         identity.return_value = _make_settings(company_id="company-1", user_id="user-1")
@@ -375,7 +377,7 @@ async def test_list_uses_frontend_deep_link_when_scope_known(monkeypatch):
     mock_tree.resolve_visible_file_paths_async = AsyncMock(
         return_value=[(info, ["Contracts", "a.pdf"])]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
     text = result.content[0].text  # type: ignore[union-attr]
@@ -399,7 +401,7 @@ async def test_list_strips_brackets_from_sm_folder_path():
             )
         ]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
     text = result.content[0].text  # type: ignore[union-attr]
@@ -427,7 +429,7 @@ async def test_list_strips_no_folder_path_sentinel_keeps_unique_link():
             )
         ]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
     text = result.content[0].text  # type: ignore[union-attr]
@@ -450,7 +452,7 @@ async def test_search_strips_no_folder_path_sentinel_keeps_unique_link():
             )
         ]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(
             mode="search",
             query="Chat_orphan",
@@ -475,7 +477,7 @@ async def test_list_orphan_with_scope_owner_keeps_deep_link(monkeypatch):
     mock_tree.resolve_visible_file_paths_async = AsyncMock(
         return_value=[(info, ["_no_folder_path", "orphan.pdf"])]
     )
-    with patch("kb_mcp.tools.content_tree.ContentTree", return_value=mock_tree):
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
     text = result.content[0].text  # type: ignore[union-attr]

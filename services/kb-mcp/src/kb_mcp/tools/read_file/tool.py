@@ -13,7 +13,7 @@ import tiktoken
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import Field, RootModel, field_validator
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -32,15 +32,12 @@ from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.references import file_reference_url, markdown_citation_link
 from kb_mcp.settings import Settings, get_settings
+from kb_mcp.tools.read_file.config import ReadFileToolConfig
 
 _LOGGER = logging.getLogger(__name__)
 
 _TEXT_EXTENSIONS = {".txt", ".md", ".html", ".json", ".csv"}
 _CHUNKED_EXTENSIONS = {".pdf", ".docx"}
-
-
-class ReadFileToolConfig(BaseModel):
-    max_tokens_per_call: int = 8_000
 
 
 class SupportedFileExtension(RootModel[str]):

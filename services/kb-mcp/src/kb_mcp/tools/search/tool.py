@@ -29,14 +29,14 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchService,
 )
 
-from kb_mcp.config import SearchToolConfig
 from kb_mcp.references import (
     REFERENCE_FORMAT_INFORMATION,
     chunk_to_text_content,
     citation_instruction_content,
 )
-from kb_mcp.scope_resolver import resolve_scope_ids
 from kb_mcp.settings import get_settings
+from kb_mcp.tools.search.config import SearchToolConfig
+from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)
 

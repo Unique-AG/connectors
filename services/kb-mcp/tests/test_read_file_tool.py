@@ -21,7 +21,7 @@ def _make_settings(company_id: str = "company-1", user_id: str = "user-1"):
 def _identity(monkeypatch):
     """Per-request identity now resolves in-body via unique_mcp."""
     monkeypatch.setattr(
-        "kb_mcp.tools.read_file.get_unique_settings_async",
+        "kb_mcp.tools.read_file.tool.get_unique_settings_async",
         AsyncMock(return_value=_make_settings()),
     )
 
@@ -42,14 +42,14 @@ def _make_chunk(text: str, order: int, start_page: int, end_page: int) -> Conten
 
 def _patch_search_contents(content: Content):
     return patch(
-        "kb_mcp.tools.read_file.search_contents_async",
+        "kb_mcp.tools.read_file.tool.search_contents_async",
         AsyncMock(return_value=[content]),
     )
 
 
 def _patch_download(data: bytes):
     return patch(
-        "kb_mcp.tools.read_file.download_content_to_bytes_async",
+        "kb_mcp.tools.read_file.tool.download_content_to_bytes_async",
         AsyncMock(return_value=data),
     )
 
@@ -60,7 +60,7 @@ async def test_unsupported_extension_returns_error_without_downstream_calls():
     with (
         _patch_search_contents(content),
         patch(
-            "kb_mcp.tools.read_file.download_content_to_bytes_async"
+            "kb_mcp.tools.read_file.tool.download_content_to_bytes_async"
         ) as mock_download,
     ):
         result = await read_file(
@@ -387,7 +387,7 @@ async def test_text_non_utf8_bytes_degrade_instead_of_failing():
 @pytest.mark.asyncio
 async def test_identity_refusal_surfaces_as_tool_error(monkeypatch):
     monkeypatch.setattr(
-        "kb_mcp.tools.read_file.get_unique_settings_async",
+        "kb_mcp.tools.read_file.tool.get_unique_settings_async",
         AsyncMock(side_effect=ValueError("Refusing UNIQUE_AUTH_* env fallback")),
     )
     result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())

@@ -11,7 +11,6 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchConfig,
 )
 
-from kb_mcp.config import SearchToolConfig
 from kb_mcp.references import (
     CITATION_RESULT_INSTRUCTION,
     REFERENCE_FORMAT_INFORMATION,
@@ -22,7 +21,8 @@ from kb_mcp.references import (
     reference_url,
     scope_id_from_folder_id_path,
 )
-from kb_mcp.tools.search import _TOOL_DESCRIPTION, search
+from kb_mcp.tools.search import SearchToolConfig, search
+from kb_mcp.tools.search.tool import _TOOL_DESCRIPTION
 
 
 def test_json_schema_has_service_config():
@@ -70,7 +70,7 @@ def _patch_post_processor(chunks: list):
     mock_pp = MagicMock()
     mock_pp.process = AsyncMock(return_value=chunks)
     return patch(
-        "kb_mcp.tools.search.InternalSearchPostProcessor.from_settings",
+        "kb_mcp.tools.search.tool.InternalSearchPostProcessor.from_settings",
         return_value=mock_pp,
     )
 
@@ -78,7 +78,7 @@ def _patch_post_processor(chunks: list):
 def _patch_identity():
     """Per-request identity resolves in-body via unique_mcp; return a stub."""
     return patch(
-        "kb_mcp.tools.search.get_unique_settings_async",
+        "kb_mcp.tools.search.tool.get_unique_settings_async",
         new=AsyncMock(return_value=MagicMock()),
     )
 
@@ -87,12 +87,12 @@ def _patch_kb_settings(base_url: str | None = None, lookup_concurrency: int = 8)
     mock_settings = MagicMock()
     mock_settings.frontend_base_url_str.return_value = base_url
     mock_settings.scope_lookup_concurrency = lookup_concurrency
-    return patch("kb_mcp.tools.search.get_settings", return_value=mock_settings)
+    return patch("kb_mcp.tools.search.tool.get_settings", return_value=mock_settings)
 
 
 def _patch_resolve_scope_ids(mapping: dict[str, str] | None = None):
     return patch(
-        "kb_mcp.tools.search.resolve_scope_ids",
+        "kb_mcp.tools.search.tool.resolve_scope_ids",
         new=AsyncMock(return_value=mapping or {}),
     )
 
@@ -107,7 +107,7 @@ async def test_search_calls_kb_service():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ) as mock_from_config,
         _patch_post_processor(chunks),
@@ -138,7 +138,7 @@ async def test_search_uses_defaults_when_no_config_provided():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         _patch_post_processor(chunks),
@@ -159,7 +159,7 @@ async def test_search_uses_defaults_when_no_config_provided():
 async def test_search_returns_error_result_on_service_failure():
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             side_effect=RuntimeError("KB unavailable"),
         ),
         _patch_identity(),
@@ -185,11 +185,11 @@ async def test_search_returns_error_result_on_post_processor_failure():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         patch(
-            "kb_mcp.tools.search.InternalSearchPostProcessor.from_settings",
+            "kb_mcp.tools.search.tool.InternalSearchPostProcessor.from_settings",
             return_value=mock_pp,
         ),
         _patch_identity(),
@@ -206,7 +206,7 @@ async def test_search_returns_error_result_on_post_processor_failure():
 @pytest.mark.asyncio
 async def test_search_returns_error_when_identity_unresolvable():
     with patch(
-        "kb_mcp.tools.search.get_unique_settings_async",
+        "kb_mcp.tools.search.tool.get_unique_settings_async",
         new=AsyncMock(side_effect=ValueError("Refusing to fall back to UNIQUE_AUTH_")),
     ):
         result = await search(
@@ -357,7 +357,7 @@ async def test_search_results_are_numbered_sequentially_and_include_citation_blo
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         _patch_post_processor(chunks),
@@ -390,7 +390,7 @@ async def test_search_uses_frontend_deep_links_when_scopes_resolved():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         _patch_post_processor(chunks),
