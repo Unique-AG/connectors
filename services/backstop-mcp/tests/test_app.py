@@ -14,6 +14,7 @@ from collections.abc import Iterator
 from typing import Protocol, cast
 
 import pytest
+from mcp.server.auth.provider import AccessToken
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
@@ -26,6 +27,7 @@ from backstop_mcp.config import (
     DatabaseConfig,
     EncryptionConfig,
 )
+from backstop_mcp.features.auth.context import NotConnectedError
 from backstop_mcp.server.runtime import get_services
 from backstop_mcp.server.tools.registry import TOOLS
 
@@ -82,20 +84,31 @@ def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
 
 
 class TestWiring:
-    def test_the_auth_cycle_is_closed(self, app_client: TestClient) -> None:
+    @pytest.mark.asyncio
+    async def test_the_auth_cycle_is_closed(
+        self, app_client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """`attach_auth` must have run: without it `for_current_caller` asserts instead of working.
 
         The provider needs the client factory (to verify credentials at login) and the factory
         needs the provider (for the token-revocation hook), so this is the one step in the graph
-        that can't be expressed by constructor order alone.
+        that can't be expressed by constructor order alone. If the cycle were open,
+        `for_current_caller` would raise an `AssertionError` from the factory itself rather than
+        reaching the credential lookup that raises `NotConnectedError` below.
         """
         _ = app_client  # the app is built and started by the fixture
-        factory = get_services().backstop
+        monkeypatch.setattr(
+            "backstop_mcp.features.auth.context.get_access_token",
+            lambda: AccessToken(
+                token="access-token",
+                client_id="client-1",
+                scopes=[],
+                subject="user-never-connected",
+            ),
+        )
 
-        # Reaching into the private attribute deliberately: the observable alternative is to make
-        # an authenticated tool call, and what needs asserting here is purely that the cycle was
-        # closed during construction.
-        assert factory._auth is not None  # pyright: ignore[reportPrivateUsage]
+        with pytest.raises(NotConnectedError):
+            await get_services().backstop.for_current_caller()
 
     def test_the_factory_owns_the_settings_create_app_was_given(
         self, app_client: TestClient

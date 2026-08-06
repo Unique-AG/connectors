@@ -1,7 +1,7 @@
 import os
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import cast
 
 import httpx
@@ -274,17 +274,20 @@ class TestGlossaryMiddleware:
         key = os.urandom(32)
         await _store_credential(session_factory, "user-list-2", key)
         _authenticate_as(monkeypatch, "user-list-2")
-        respx.get(f"{base_url}/custom-field-definitions").mock(return_value=httpx.Response(500))
+        definitions_route = respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(500)
+        )
         respx.get(f"{base_url}/lov-entries").mock(return_value=httpx.Response(500))
         wired = wire(base_url, encryption_key=key)
 
         first = await wired.middleware.on_list_tools(None, _one_org_tool)  # pyright: ignore[reportArgumentType]
         assert first[0].description == "Fetch an organization."
-        assert wired.middleware._warm_failed_at is not None  # pyright: ignore[reportPrivateUsage]
+        assert definitions_route.call_count == 1
 
-        wired.middleware._warm_failed_at = datetime.now(UTC) - timedelta(seconds=1)  # pyright: ignore[reportPrivateUsage]
+        # Still inside the cooldown window: no second attempt against Backstop.
         second = await wired.middleware.on_list_tools(None, _one_org_tool)  # pyright: ignore[reportArgumentType]
         assert second[0].description == "Fetch an organization."
+        assert definitions_route.call_count == 1
 
     @pytest.mark.asyncio
     async def test_fresh_schema_skips_credential_resolution(

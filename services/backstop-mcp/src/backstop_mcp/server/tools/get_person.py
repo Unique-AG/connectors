@@ -1,4 +1,4 @@
-from typing import ClassVar, Literal
+from typing import Annotated, ClassVar, Literal
 from urllib.parse import quote
 
 from fastmcp import Context
@@ -71,8 +71,25 @@ type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResol
 )
 async def get_person(
     ctx: Context,
-    party_id: str | None = None,
-    search: str | None = None,
+    party_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Trusted Backstop person Party ID from a prior resolve echo "
+                "(`id` / `type` / `name`). Never invent or guess. Exactly one of "
+                "`party_id` or `search` must be provided."
+            ),
+        ),
+    ] = None,
+    search: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Person name or email to resolve when no trusted `party_id` is available. "
+                "Exactly one of `party_id` or `search` must be provided."
+            ),
+        ),
+    ] = None,
 ) -> CallToolResult:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 

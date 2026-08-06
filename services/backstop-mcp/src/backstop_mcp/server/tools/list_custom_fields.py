@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastmcp.tools import tool
 from mcp.types import CallToolResult, ToolAnnotations
@@ -28,8 +28,24 @@ class ListCustomFieldsResponse(BaseModel):
     ),
 )
 async def list_custom_fields(
-    entity_type: EntityType,
-    refresh: bool = False,
+    entity_type: Annotated[
+        EntityType,
+        Field(
+            description=(
+                "Backstop entity type whose custom-field definitions to list: "
+                "organizations, people, contacts, employees, opportunities, or accounts."
+            ),
+        ),
+    ],
+    refresh: Annotated[
+        bool,
+        Field(
+            description=(
+                "When true, re-fetch custom-field definitions from Backstop into the cache "
+                "instead of using the cached catalog."
+            ),
+        ),
+    ] = False,
 ) -> CallToolResult:
     """List custom-field definitions for one Backstop entity type.
 
