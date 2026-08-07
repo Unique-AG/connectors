@@ -8,7 +8,6 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
-from backstop_mcp.features.party_resolver.email import looks_like_email
 from backstop_mcp.features.party_resolver.types import (
     PartyAttributes,
     PartyCandidate,
@@ -32,6 +31,12 @@ _EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
 }
 
 
+def looks_like_email(value: str) -> bool:
+    """Return True when `value` has a non-empty local and domain around `@`."""
+    local, separator, domain = value.strip().partition("@")
+    return separator == "@" and bool(local) and bool(domain)
+
+
 async def search_by_email(
     client: BackstopClient,
     *,
@@ -49,7 +54,7 @@ async def search_by_email(
     breaching it.
     """
     fields = _EMAIL_FIELDS[search_type]
-    responses = await asyncio.gather(
+    documents = await asyncio.gather(
         *(
             client.get(
                 f"/{search_type}",
@@ -59,7 +64,7 @@ async def search_by_email(
             for field in fields
         )
     )
-    return _merge_candidates(responses, search_type=search_type)
+    return _merge_candidates(documents, search_type=search_type)
 
 
 async def quick_search(
@@ -110,23 +115,21 @@ def _quick_search_params(
     search: str,
     options: QuickSearchOptions,
 ) -> dict[str, object]:
-    assert options.limit > 0, "QuickSearchOptions.limit must be positive"
-
     params: dict[str, object] = {
         "filter[searchText][eq]": search,
         "filter[searchTypes][eq]": search_type,
         "filter[limit][eq]": options.limit,
-        "filter[showAll][eq]": _bool_param(options.show_all),
-        "filter[enhanceSearchTypes][eq]": _bool_param(options.enhance_search_types),
+        "filter[showAll][eq]": options.show_all,
+        "filter[enhanceSearchTypes][eq]": options.enhance_search_types,
         "page[limit]": options.limit,
         "page[offset]": 0,
     }
 
     if options.full_email_match is None:
         if looks_like_email(search):
-            params["filter[fullEmailMatch][eq]"] = "true"
+            params["filter[fullEmailMatch][eq]"] = True
     else:
-        params["filter[fullEmailMatch][eq]"] = _bool_param(options.full_email_match)
+        params["filter[fullEmailMatch][eq]"] = options.full_email_match
 
     if options.filter_type is not None:
         params["filter[filterType][eq]"] = options.filter_type
@@ -134,22 +137,14 @@ def _quick_search_params(
     return params
 
 
-def _bool_param(value: bool) -> str:
-    return "true" if value else "false"
-
-
 def _merge_candidates(
     documents: Sequence[_PartyCollectionDocument], *, search_type: SearchType
 ) -> tuple[PartyCandidate, ...]:
-    seen_ids: set[str] = set()
-    merged: list[PartyCandidate] = []
+    by_id: dict[str, PartyCandidate] = {}
     for document in documents:
         for candidate in _candidates_from_document(document, search_type=search_type):
-            if candidate.key in seen_ids:
-                continue
-            seen_ids.add(candidate.key)
-            merged.append(candidate)
-    return tuple(merged)
+            by_id.setdefault(candidate.key, candidate)
+    return tuple(by_id.values())
 
 
 def _candidates_from_document(
@@ -172,5 +167,5 @@ def _candidate_from_resource(
     return Candidate(
         key=resource.id,
         label=label,
-        value=ResolvedParty(id=resource.id, type=search_type, name=name),
+        value=ResolvedParty(id=resource.id, search_type=search_type, name=name),
     )

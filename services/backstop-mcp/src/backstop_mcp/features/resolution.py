@@ -23,15 +23,15 @@ The policy itself:
 """
 
 import logging
+from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from typing import Literal, Protocol, cast
+from typing import Annotated, ClassVar, Literal, Protocol, cast
 
 from fastmcp import Context
 from fastmcp.server.elicitation import AcceptedElicitation
 from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
 from mcp.types import ClientCapabilities, ElicitationCapability
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -39,41 +39,45 @@ logger = logging.getLogger(__name__)
 # --- Internal algebra -----------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Candidate[T]:
+class Candidate[T](BaseModel):
     """One plausible match.
 
     `key` is a stable identity used to map an elicitation answer back to `value`; `label` is
     what the user sees. `value` is whatever the calling subsystem resolves to.
     """
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
     key: str
     label: str
     value: T
 
 
-@dataclass(frozen=True)
-class Resolved[T]:
+class Resolved[T](BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
     value: T
     status: Literal["resolved"] = "resolved"
 
 
-@dataclass(frozen=True)
-class Ambiguous[T]:
+class Ambiguous[T](BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
     query: str
     scope: str
     candidates: tuple[Candidate[T], ...]
     status: Literal["ambiguous"] = "ambiguous"
 
 
-@dataclass(frozen=True)
-class NotFound:
+class NotFound(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     query: str
     scope: str
     status: Literal["not_found"] = "not_found"
 
 
-type Resolution[T] = Resolved[T] | Ambiguous[T] | NotFound
+type Resolution[T] = Annotated[Resolved[T] | Ambiguous[T] | NotFound, Field(discriminator="status")]
 type Unresolved[T] = Ambiguous[T] | NotFound
 
 
@@ -91,15 +95,17 @@ def from_candidates[T](
 # --- Batch algebra (policy step 3) ----------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class BatchResolvedItem[T]:
+class BatchResolvedItem[T](BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
     index: int
     value: T
 
 
-@dataclass(frozen=True)
-class BatchUnresolvedItem[T]:
+class BatchUnresolvedItem[T](BaseModel):
     """One unresolved batch input. Empty `candidates` means not found."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     index: int
     query: str
@@ -107,24 +113,28 @@ class BatchUnresolvedItem[T]:
     candidates: tuple[Candidate[T], ...]
 
 
-@dataclass(frozen=True)
-class BatchResolved[T]:
+class BatchResolved[T](BaseModel):
     """Every input resolved. `values` is ordered by input index."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     values: tuple[T, ...]
     status: Literal["resolved"] = "resolved"
 
 
-@dataclass(frozen=True)
-class BatchAmbiguous[T]:
+class BatchAmbiguous[T](BaseModel):
     """At least one input did not resolve; includes the ones that did, for continuity."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     unresolved: tuple[BatchUnresolvedItem[T], ...]
     resolved: tuple[BatchResolvedItem[T], ...]
     status: Literal["ambiguous"] = "ambiguous"
 
 
-type BatchResolution[T] = BatchResolved[T] | BatchAmbiguous[T]
+type BatchResolution[T] = Annotated[
+    BatchResolved[T] | BatchAmbiguous[T], Field(discriminator="status")
+]
 
 
 def collect_batch[T](
@@ -197,24 +207,21 @@ def client_supports_elicitation(ctx: Context) -> bool:
         return False
 
 
-def _unique_labels[T](
-    candidates: Sequence[Candidate[T]],
-) -> tuple[list[str], dict[str, Candidate[T]]]:
-    """Build a collision-free label list, since an elicit enum needs distinct strings."""
-    by_label: dict[str, Candidate[T]] = {}
-    labels: list[str] = []
-    for candidate in candidates:
-        display = candidate.label
-        if display in by_label:
-            display = f"{candidate.label} [{candidate.key}]"
-            suffix = 2
-            while display in by_label:
-                display = f"{candidate.label} [{candidate.key}] #{suffix}"
-                suffix += 1
-        by_label[display] = candidate
-        labels.append(display)
-    assert len(labels) == len(set(labels))
-    return labels, by_label
+def _unique_labels[T](candidates: Sequence[Candidate[T]]) -> dict[str, Candidate[T]]:
+    """Collision-free display labels for an elicit enum.
+
+    `Candidate.key` is unique, so colliding bare labels are disambiguated with `[key]` —
+    both sides of a collision get the key suffix so the user sees equally-qualified options.
+    """
+    seen = Counter(candidate.label for candidate in candidates)
+    return {
+        (
+            candidate.label
+            if seen[candidate.label] == 1
+            else f"{candidate.label} [{candidate.key}]"
+        ): candidate
+        for candidate in candidates
+    }
 
 
 async def elicit_choice[T](
@@ -238,9 +245,9 @@ async def elicit_choice[T](
         )
         return ambiguous
 
-    labels, by_label = _unique_labels(ambiguous.candidates)
+    by_label = _unique_labels(ambiguous.candidates)
     try:
-        result = await ctx.elicit(message=prompt, response_type=labels)
+        result = await ctx.elicit(message=prompt, response_type=list(by_label))
     except Exception as exc:
         logger.warning("resolution.elicit.degraded", extra={"error": str(exc)})
         return ambiguous
@@ -259,25 +266,24 @@ async def elicit_choice[T](
 # --- LLM-facing response models -------------------------------------------------------------
 
 
-class CandidateEcho(BaseModel):
-    """Base shape every candidate echo shares. Subsystems subclass it to add their own fields."""
+class CandidateResponse(BaseModel):
+    """Base shape every candidate response shares. Subsystems subclass to add their fields."""
 
     key: str
     label: str
 
 
 # Generic rather than "subclass and narrow `candidates`": a mutable `list[...]` field is
-# invariant, so a subclass redeclaring it as `list[PartyCandidateEcho]` is genuinely unsound
-# (someone holding the base type could append a plain `CandidateEcho`). Parameterizing gives
-# each subsystem a distinct concrete model — pydantic resolves the subscript to a real class,
-# which is also what FastMCP needs to build a tool's output schema.
-class AmbiguousResponse[EchoT: CandidateEcho](BaseModel):
+# invariant, so a subclass redeclaring it as `list[PartyCandidateResponse]` is genuinely
+# unsound. Parameterizing gives each subsystem a distinct concrete model — pydantic resolves
+# the subscript to a real class, which is also what FastMCP needs for tool output schemas.
+class AmbiguousResponse[CandidateT: CandidateResponse](BaseModel):
     """Returned when a query matched several records and no single one could be chosen."""
 
     status: Literal["ambiguous"] = "ambiguous"
     query: str
     scope: str
-    candidates: list[EchoT] = Field(default_factory=list)
+    candidates: list[CandidateT] = Field(default_factory=list)
 
 
 class NotFoundResponse(BaseModel):
@@ -288,21 +294,21 @@ class NotFoundResponse(BaseModel):
     scope: str
 
 
-class BatchUnresolvedEcho[EchoT: CandidateEcho](BaseModel):
+class BatchUnresolvedResponse[CandidateT: CandidateResponse](BaseModel):
     index: int
     query: str
     scope: str
-    candidates: list[EchoT] = Field(default_factory=list)
+    candidates: list[CandidateT] = Field(default_factory=list)
 
 
-class BatchResolvedEcho[ResolvedT](BaseModel):
+class BatchResolvedResponse[ResolvedT](BaseModel):
     """One batch input that did resolve, kept so the model can continue with it."""
 
     index: int
     value: ResolvedT
 
 
-class BatchAmbiguousResponse[EchoT: CandidateEcho, ResolvedT](BaseModel):
+class BatchAmbiguousResponse[CandidateT: CandidateResponse, ResolvedT](BaseModel):
     """One combined payload for a batch where at least one input didn't resolve.
 
     `resolved` carries the inputs that did settle (policy step 3), so the model can keep those
@@ -310,20 +316,20 @@ class BatchAmbiguousResponse[EchoT: CandidateEcho, ResolvedT](BaseModel):
     """
 
     status: Literal["ambiguous"] = "ambiguous"
-    unresolved: list[BatchUnresolvedEcho[EchoT]] = Field(default_factory=list)
-    resolved: list[BatchResolvedEcho[ResolvedT]] = Field(default_factory=list)
+    unresolved: list[BatchUnresolvedResponse[CandidateT]] = Field(default_factory=list)
+    resolved: list[BatchResolvedResponse[ResolvedT]] = Field(default_factory=list)
 
 
-type ToEcho[T, EchoT] = Callable[[Candidate[T]], EchoT]
-type ToResolved[T, ResolvedT] = Callable[[T], ResolvedT]
+type ToCandidateResponse[T, CandidateT] = Callable[[Candidate[T]], CandidateT]
+type ToResolvedResponse[T, ResolvedT] = Callable[[T], ResolvedT]
 
 
-def unresolved_response[T, EchoT: CandidateEcho](
+def unresolved_response[T, CandidateT: CandidateResponse](
     result: Unresolved[T],
     *,
-    ambiguous_model: type[AmbiguousResponse[EchoT]],
-    to_echo: ToEcho[T, EchoT],
-) -> AmbiguousResponse[EchoT] | NotFoundResponse:
+    ambiguous_model: type[AmbiguousResponse[CandidateT]],
+    to_candidate: ToCandidateResponse[T, CandidateT],
+) -> AmbiguousResponse[CandidateT] | NotFoundResponse:
     """Convert a non-`Resolved` outcome into this subsystem's standard tool response.
 
     Callers short-circuit on this before doing any tool-specific fetch: there is nothing left
@@ -334,19 +340,19 @@ def unresolved_response[T, EchoT: CandidateEcho](
     return ambiguous_model(
         query=result.query,
         scope=result.scope,
-        candidates=[to_echo(candidate) for candidate in result.candidates],
+        candidates=[to_candidate(candidate) for candidate in result.candidates],
     )
 
 
-def batch_ambiguous_response[T, EchoT: CandidateEcho, ResolvedT](
+def batch_ambiguous_response[T, CandidateT: CandidateResponse, ResolvedT](
     result: BatchAmbiguous[T],
     *,
-    batch_model: type[BatchAmbiguousResponse[EchoT, ResolvedT]],
-    unresolved_model: type[BatchUnresolvedEcho[EchoT]],
-    resolved_model: type[BatchResolvedEcho[ResolvedT]],
-    to_echo: ToEcho[T, EchoT],
-    to_resolved: ToResolved[T, ResolvedT],
-) -> BatchAmbiguousResponse[EchoT, ResolvedT]:
+    batch_model: type[BatchAmbiguousResponse[CandidateT, ResolvedT]],
+    unresolved_model: type[BatchUnresolvedResponse[CandidateT]],
+    resolved_model: type[BatchResolvedResponse[ResolvedT]],
+    to_candidate: ToCandidateResponse[T, CandidateT],
+    to_resolved: ToResolvedResponse[T, ResolvedT],
+) -> BatchAmbiguousResponse[CandidateT, ResolvedT]:
     """Convert a `BatchAmbiguous` into the wire payload, including already-resolved items."""
     return batch_model(
         unresolved=[
@@ -354,7 +360,7 @@ def batch_ambiguous_response[T, EchoT: CandidateEcho, ResolvedT](
                 index=item.index,
                 query=item.query,
                 scope=item.scope,
-                candidates=[to_echo(candidate) for candidate in item.candidates],
+                candidates=[to_candidate(candidate) for candidate in item.candidates],
             )
             for item in result.unresolved
         ],

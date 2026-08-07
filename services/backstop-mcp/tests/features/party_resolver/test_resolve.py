@@ -41,7 +41,7 @@ class TestTrustedPartyId:
 
         assert isinstance(result, Resolved)
         assert result.value.id == "org-123"
-        assert result.value.type == "organizations"
+        assert result.value.search_type == "organizations"
         assert result.value.name is None
         assert len(respx.calls) == 0
 
@@ -58,7 +58,7 @@ class TestTrustedPartyId:
 
         assert isinstance(result, Resolved)
         assert result.value.id == "person-9"
-        assert result.value.type == "people"
+        assert result.value.search_type == "people"
         assert result.value.name == "Ada Lovelace"
         assert len(respx.calls) == 0
 
