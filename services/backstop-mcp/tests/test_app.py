@@ -7,13 +7,12 @@ testing `create_app` itself, which is where the wiring lives that is easiest to 
 These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
 """
 
-import base64
 import dataclasses
-import os
 from collections.abc import Iterator
 from typing import Protocol, cast
 
 import pytest
+from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AccessToken
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
@@ -78,7 +77,7 @@ def _configs(postgres: PostgresContainer) -> dict[str, object]:
         "backstop_config": BackstopConfig(base_url=_BASE_URL),
         "database_config": DatabaseConfig.model_validate({"url": url}),
         "encryption_config": EncryptionConfig(
-            encryption_key=base64.b64encode(os.urandom(32)).decode()  # pyright: ignore[reportArgumentType]
+            encryption_key=Fernet.generate_key().decode()  # pyright: ignore[reportArgumentType]
         ),
         "auth_config": AuthConfig(),
     }
@@ -198,7 +197,7 @@ class TestReadyReportsDatabaseUnreachable:
                 {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
             ),
             encryption_config=EncryptionConfig(
-                encryption_key=base64.b64encode(os.urandom(32)).decode()  # pyright: ignore[reportArgumentType]
+                encryption_key=Fernet.generate_key().decode()  # pyright: ignore[reportArgumentType]
             ),
         )
         with TestClient(app) as client:

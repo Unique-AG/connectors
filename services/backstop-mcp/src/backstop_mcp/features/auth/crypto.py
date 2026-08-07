@@ -1,16 +1,8 @@
-import base64
-import os
-
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.config import EncryptionConfig
-
-_NONCE_SIZE = 12
-_ENVELOPE_VERSION = b"\x01"
-_KEY_SIZE = 32
 
 
 class InvalidCredentialEnvelopeError(ValueError):
@@ -30,22 +22,27 @@ class _CredentialPayload(BaseModel):
 
 
 def load_key(config: EncryptionConfig) -> bytes:
+    """Load and validate a Fernet key from `BACKSTOP_MCP_ENCRYPTION_KEY`.
+
+    The env value must be a Fernet key: url-safe base64 encoding of 32 bytes. Generate with
+    `Fernet.generate_key()`.
+    """
     assert config.encryption_key is not None, "EncryptionConfig validates this is set"
-    key = base64.b64decode(config.encryption_key.get_secret_value())
-    if len(key) != _KEY_SIZE:
+    key = config.encryption_key.get_secret_value().encode("ascii")
+    try:
+        Fernet(key)
+    except (TypeError, ValueError) as exc:
         raise ValueError(
-            f"BACKSTOP_MCP_ENCRYPTION_KEY must decode to {_KEY_SIZE} bytes (AES-256), got "
-            + str(len(key))
-        )
+            "BACKSTOP_MCP_ENCRYPTION_KEY must be a Fernet key "
+            + "(url-safe base64-encoded 32-byte key); generate with: "
+            + "python -c \"from cryptography.fernet import Fernet; "
+            + 'print(Fernet.generate_key().decode())"'
+        ) from exc
     return key
 
 
 def encrypt_credential(credential: BackstopCredentialSecret, key: bytes) -> bytes:
-    """Encrypt a Backstop credential for storage.
-
-    Envelope: version byte || 12-byte nonce || AES-256-GCM ciphertext+tag over the
-    credential serialized as JSON. A fresh random nonce is used every call.
-    """
+    """Encrypt a Backstop credential for storage with Fernet (AES-128-CBC + HMAC)."""
     plaintext = (
         _CredentialPayload(
             username=credential.username, api_token=credential.api_token.get_secret_value()
@@ -53,30 +50,16 @@ def encrypt_credential(credential: BackstopCredentialSecret, key: bytes) -> byte
         .model_dump_json()
         .encode("utf-8")
     )
-    nonce = os.urandom(_NONCE_SIZE)
-    ciphertext = AESGCM(key).encrypt(nonce, plaintext, None)
-    return _ENVELOPE_VERSION + nonce + ciphertext
+    return Fernet(key).encrypt(plaintext)
 
 
 def decrypt_credential(blob: bytes, key: bytes) -> BackstopCredentialSecret:
     """Decrypt a credential blob previously produced by `encrypt_credential`."""
-    if len(blob) < len(_ENVELOPE_VERSION) + _NONCE_SIZE:
-        raise InvalidCredentialEnvelopeError("Credential blob is too short to be valid")
-
-    version = blob[: len(_ENVELOPE_VERSION)]
-    if version != _ENVELOPE_VERSION:
-        raise InvalidCredentialEnvelopeError(
-            f"Unsupported credential envelope version: {version!r}"
-        )
-
-    nonce = blob[len(_ENVELOPE_VERSION) : len(_ENVELOPE_VERSION) + _NONCE_SIZE]
-    ciphertext = blob[len(_ENVELOPE_VERSION) + _NONCE_SIZE :]
-
     try:
-        plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
-    except InvalidTag as exc:
+        plaintext = Fernet(key).decrypt(blob)
+    except InvalidToken as exc:
         raise InvalidCredentialEnvelopeError(
-            "Credential blob failed authentication — wrong key or tampered data"
+            "Credential blob failed authentication — wrong key, tampered, or malformed data"
         ) from exc
 
     try:

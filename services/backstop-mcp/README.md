@@ -5,7 +5,7 @@ An MCP server over the [Backstop](https://www.backstopsolutions.com/) CRM REST A
 Backstop has no OAuth, so this service *is* the OAuth 2.1 authorization server for its MCP
 clients. A client registers dynamically, gets redirected to a login form hosted here, and submits
 a Backstop username + personal API token. That credential is verified against Backstop, encrypted
-(AES-256-GCM) and stored in Postgres; every tool call would then act as that user against
+(Fernet) and stored in Postgres; every tool call would then act as that user against
 Backstop — never as a shared service account. Failed logins are rate-limited per username
 (`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
 
@@ -53,7 +53,7 @@ uv run backstop-mcp
 Generate an encryption key with:
 
 ```bash
-python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
 ## Migrations

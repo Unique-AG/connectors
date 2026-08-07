@@ -10,9 +10,9 @@ from sqlalchemy import (
     Index,
     LargeBinary,
     String,
-    Text,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -23,7 +23,7 @@ class Base(DeclarativeBase):
 class OAuthClient(Base):
     """A dynamically-registered (RFC 7591) MCP client allowed to talk to this auth server.
 
-    `client_metadata_json` stores the full serialized `mcp.shared.auth.OAuthClientInformationFull`
+    `client_metadata` stores the full `mcp.shared.auth.OAuthClientInformationFull` document
     (it has ~15 optional RFC 7591 fields) rather than mapping each field to its own column, so
     nothing is lost or needs re-deriving when reconstructing the client for `get_client()`.
     """
@@ -31,7 +31,7 @@ class OAuthClient(Base):
     __tablename__: str = "oauth_clients"
 
     client_id: Mapped[str] = mapped_column(String, primary_key=True)
-    client_metadata_json: Mapped[str] = mapped_column(Text)
+    client_metadata: Mapped[dict[str, object]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -84,7 +84,7 @@ class OAuthToken(Base):
     """An issued MCP-facing access/refresh token pair.
 
     Tokens are bearer credentials — unlike `BackstopCredential.encrypted_blob`, which needs the
-    AES key to be useful, a leaked plaintext token here would be directly usable. So only a
+    Fernet key to be useful, a leaked plaintext token here would be directly usable. So only a
     SHA-256 hash of each token is stored; lookups hash the presented token and query by hash.
 
     `rotated_from` links a refresh to the token row it replaced (audit trail). `family_id` is

@@ -1,9 +1,9 @@
 import asyncio
-import os
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AuthorizationParams, TokenError
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
@@ -39,7 +39,7 @@ def _make_provider(
     return BackstopOAuthProvider(
         base_url="https://backstop-mcp.example",
         session_factory=factory,
-        encryption_key=os.urandom(32),
+        encryption_key=Fernet.generate_key(),
         backstop_clients=client_factory("https://api.backstopsolutions.com"),
         # Effectively off by default: the throttle has its own tests below, and every other test
         # here would otherwise depend on how many failed logins its neighbours happened to make.

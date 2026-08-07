@@ -1,7 +1,7 @@
 import asyncio
-import os
 
 import pytest
+from cryptography.fernet import Fernet
 from pydantic import SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -18,7 +18,7 @@ type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 
 def _random_key() -> bytes:
-    return os.urandom(32)
+    return Fernet.generate_key()
 
 
 class TestSaveAndGetCredential:
