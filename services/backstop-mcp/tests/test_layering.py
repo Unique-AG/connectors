@@ -192,16 +192,16 @@ class TestTheDetectionItself:
         ]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
-        # Verbatim shape of the import `get_person.py` used to carry, alongside a
-        # `BackstopConfig()` it built itself.
+        # The shape `get_person.py` would carry if it reached past the package front door
+        # instead of importing `features.data_hygiene` itself.
         assert _internal_imports(
-            "from backstop_mcp.features.data_hygiene.departed import detect_departed_employment",
+            "from backstop_mcp.features.data_hygiene.service import DataHygieneService",
             _SRC / "server" / "tools",
-        ) == [("backstop_mcp.features.data_hygiene.departed", 1)]
+        ) == [("backstop_mcp.features.data_hygiene.service", 1)]
 
     def test_the_same_import_is_fine_inside_the_feature(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.data_hygiene.departed import detect_departed_employment",
+            "from backstop_mcp.features.data_hygiene.service import DataHygieneService",
             _package_directory("backstop_mcp.features.data_hygiene"),
         )
 

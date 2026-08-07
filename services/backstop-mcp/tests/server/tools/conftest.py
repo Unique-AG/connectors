@@ -5,11 +5,11 @@ production, so these fixtures install a real `Services` — one `BackstopClientF
 auth context pointed at the test database) plus one `CustomFieldsService`.
 """
 
-import os
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 
 import pytest
+from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -52,7 +52,7 @@ async def connect_user(
         base_url: str = BASE_URL,
         overrides: dict[str, FieldOverride] | None = None,
     ) -> ConnectedUser:
-        key = os.urandom(32)
+        key = Fernet.generate_key()
 
         async def _noop_revoke(_subject: str) -> None:
             return None

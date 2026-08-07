@@ -5,8 +5,8 @@ user would still never hear about it — so each response is asserted whole.
 """
 
 from datetime import date
+from typing import cast
 
-from backstop_mcp.coerce import as_object_dict, as_object_list
 from backstop_mcp.features.data_hygiene import (
     AsOf,
     DepartedContactResponse,
@@ -70,12 +70,14 @@ class TestDepartedResponse:
     def test_the_schema_publishes_the_possible_signals(self) -> None:
         """Typed as the enum, so a caller reads the two values off the tool schema."""
         schema: dict[str, object] = DepartedContactResponse.model_json_schema()
-        definitions = as_object_dict(schema.get("$defs"))
-        assert definitions is not None
-        signal = as_object_dict(definitions.get("DepartureSignal"))
-        assert signal is not None
+        definitions = schema["$defs"]
+        assert isinstance(definitions, dict)
+        signal = cast("dict[str, object]", definitions)["DepartureSignal"]
+        assert isinstance(signal, dict)
+        values = cast("dict[str, object]", signal)["enum"]
+        assert isinstance(values, list)
 
-        assert set(as_object_list(signal.get("enum"))) == {
+        assert set(cast("list[object]", values)) == {
             "former_relationship_type",
             "end_date_passed",
         }

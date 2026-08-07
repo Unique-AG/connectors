@@ -3,11 +3,25 @@
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.dates import LenientDate
+
+
+def _clean_or_none(value: object) -> object:
+    """Backstop sends `""` and `"  "` where it means "unset"; both are absence, not a value."""
+    return (value.strip() or None) if isinstance(value, str) else value
+
+
+# The one place the "stripped, non-empty, else absent" rule is written for this feature. Fields
+# carry it so readers get a value that is already clean, instead of every call site re-checking.
+#
+# Annotated on the *union*, not on the `str` arm: a `BeforeValidator` inside
+# `Annotated[str, ...] | None` still has its result checked against `str`, so returning None for
+# a blank fails validation rather than selecting the None arm.
+CleanStr = Annotated[str | None, BeforeValidator(_clean_or_none)]
 
 # Which resource types can hold an employment relationship, as the canonical plurals that
 # `entity_types.normalize_entity_type` maps to — `employment.py` compares through it. Backstop
@@ -44,7 +58,7 @@ class EntityRelationshipRef(StrEnum):
 class EntityRefAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    resource_id: str | None = Field(default=None, alias="resourceId")
+    resource_id: CleanStr = Field(default=None, alias="resourceId")
     resource_type: str | None = Field(default=None, alias="resourceType")
 
 
@@ -63,7 +77,7 @@ class EntityRelationshipAttributes(BaseModel):
 class RelationshipTypeAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    name: str | None = None
+    name: CleanStr = None
 
 
 class ProvenanceFields(BaseModel):
@@ -74,7 +88,7 @@ class ProvenanceFields(BaseModel):
     # parks the keys in `extra` when a subclass uses `extra="allow"`.
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    modified_timestamp: str | None = Field(default=None, alias="modifiedTimestamp")
+    modified_timestamp: CleanStr = Field(default=None, alias="modifiedTimestamp")
     modified_by: object | None = Field(default=None, alias="modifiedBy")
 
 
@@ -83,8 +97,8 @@ class AsOf(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    modified_timestamp: str | None = None
-    modified_by: str | None = None
+    modified_timestamp: CleanStr = None
+    modified_by: CleanStr = None
 
 
 class EmploymentStatus(StrEnum):

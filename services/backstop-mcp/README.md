@@ -21,6 +21,7 @@ src/backstop_mcp/
   logging.py metrics.py  cross-cutting, used by both sides below
   features/              what the connector does
     resolution.py          the shared "which record is that?" algebra + ambiguity policy
+    entity_types.py        canonical Backstop entity-type vocabulary
     auth/                  Backstop credential bridging: login form, encryption, token rotation
     custom_fields/         CRM custom-field schema discovery, caching and resolution
     party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
@@ -49,7 +50,9 @@ uv run backstop-mcp
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
-- Ready: `GET /ready` — 503 when Postgres is unreachable or custom-field schema is not loaded
+- Ready: `GET /ready` — 503 when Postgres is unreachable. Also reports whether the
+  custom-field schema has loaded, which never gates readiness: it fills lazily per caller,
+  and tools degrade to `list_custom_fields` without it
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
 Generate an encryption key with:

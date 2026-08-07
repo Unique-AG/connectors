@@ -1,6 +1,7 @@
 """Tool-facing responses for provenance and departed-contact signals."""
 
 from datetime import date
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,7 +11,7 @@ from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, D
 class DepartedContactResponse(BaseModel):
     """Hard signal that employment at an organization has ended. Always relay this flag."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     # Typed as the enum, not `str`, so the tool schema publishes the two possible values instead
     # of a free-form string the caller has to read a description to interpret.

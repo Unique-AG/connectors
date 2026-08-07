@@ -13,7 +13,6 @@ from datetime import date
 from typing import TypeGuard
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.coerce import as_clean_str
 from backstop_mcp.features.data_hygiene.types import (
     ORG_SIDE_TYPES,
     PERSON_SIDE_TYPES,
@@ -146,9 +145,8 @@ def _relationship_type_names(*, resources: Sequence[RelationshipTypeResource]) -
     """`id → name` for the side-loaded relationship types. Unnamed ones are dropped."""
     names: dict[str, str] = {}
     for resource in resources:
-        name = as_clean_str(resource.attributes.name)
-        if name is not None:
-            names[resource.id] = name
+        if resource.attributes.name is not None:
+            names[resource.id] = resource.attributes.name
     return names
 
 
@@ -181,10 +179,9 @@ def _employer_side(*, attrs: EntityRelationshipAttributes) -> _Employer | None:
     else:
         return None
 
-    organization_id = as_clean_str(organization.resource_id)
-    if organization_id is None:
+    if organization.resource_id is None:
         return None
-    return _Employer(organization_id=organization_id, organization_type=organization_type)
+    return _Employer(organization_id=organization.resource_id, organization_type=organization_type)
 
 
 def _is_organization(side_type: str | None) -> TypeGuard[str]:
@@ -297,7 +294,7 @@ def _person_id(*, attrs: EntityRelationshipAttributes) -> str | None:
         person = second
     else:
         return None
-    return as_clean_str(person.resource_id)
+    return person.resource_id
 
 
 def build_employment_index(
