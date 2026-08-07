@@ -1,7 +1,14 @@
-from dataclasses import dataclass
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Self
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.resolution import BatchResolution, Candidate, Resolution
@@ -16,14 +23,25 @@ __all__ = [
     "SearchType",
 ]
 
+
+def _blank_to_none(value: object) -> object:
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
+_NonEmptyStr = Annotated[
+    str,
+    BeforeValidator(_blank_to_none),
+    StringConstraints(strip_whitespace=True, min_length=1),
+]
 
 
 class PartyAttributes(BaseModel):
     """Shape of a party resource's `attributes` in `search.py`'s JSON:API responses.
 
-    A pydantic model (unlike the plain dataclasses below) because it's deserialized straight
-    off the wire via `BackstopApiCollectionDocument[PartyAttributes]` /
+    Deserialized straight off the wire via `BackstopApiCollectionDocument[PartyAttributes]` /
     `BackstopApiResourceDocument[PartyAttributes]` — see `backstop_client.json_api`.
     `extra="ignore"` since only `id`/`name`/`label` (derived here) ever leave `search.py`.
     Names are stripped here so `search.py`'s display-name fallback can use plain truthiness
@@ -47,12 +65,13 @@ class PartyAttributes(BaseModel):
         return composed or None
 
 
-@dataclass(frozen=True)
-class ResolvedParty:
+class ResolvedParty(BaseModel):
     """A party identity after successful resolution."""
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     id: str
-    type: SearchType
+    search_type: SearchType
     name: str | None = None
 
 
@@ -63,29 +82,33 @@ type PartyResolution = Resolution[ResolvedParty]
 type BatchPartyResolution = BatchResolution[ResolvedParty]
 
 
-@dataclass(frozen=True)
-class PartyResolveItem:
+class PartyResolveItem(BaseModel):
     """One batch input: exactly one of `party_id` or `search` must be set.
 
     When `party_id` is set, optional `name` is passed through on the trusted-id short-circuit
     (no existence check). `name` is ignored when `search` is set.
+
+    `party_id` is interpolated into a Backstop path (e.g. `/organizations/{id}`) after
+    `quote(..., safe='')`; rejecting `/` here keeps defence-in-depth consistent for every entry
+    point that builds a `PartyResolveItem`.
     """
 
-    party_id: str | None = None
-    search: str | None = None
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    party_id: _NonEmptyStr | None = None
+    search: _NonEmptyStr | None = None
     name: str | None = None
 
-    def __post_init__(self) -> None:
-        party_id = (self.party_id or "").strip() or None
-        search = (self.search or "").strip() or None
-        object.__setattr__(self, "party_id", party_id)
-        object.__setattr__(self, "search", search)
-        if (party_id is None) == (search is None):
+    @model_validator(mode="after")
+    def _exactly_one_selector(self) -> Self:
+        if (self.party_id is None) == (self.search is None):
             raise ValueError("Exactly one of party_id or search must be provided")
+        if self.party_id is not None and "/" in self.party_id:
+            raise ValueError(f"party_id {self.party_id!r} must not contain '/'")
+        return self
 
 
-@dataclass(frozen=True)
-class QuickSearchOptions:
+class QuickSearchOptions(BaseModel):
     """Caller-overridable knobs for `GET /quick-search`.
 
     `full_email_match=None` means auto: true when the search looks like an email, else omit/false.
@@ -93,7 +116,10 @@ class QuickSearchOptions:
     `page[limit]` is aligned with `limit` by the search layer.
     """
 
-    limit: int = 10
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    # Upper bound matches Backstop's documented max page size for report-sized reads.
+    limit: int = Field(default=10, gt=0, le=500)
     full_email_match: bool | None = None
     show_all: bool = False
     enhance_search_types: bool = False

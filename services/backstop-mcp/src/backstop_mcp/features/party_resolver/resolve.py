@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from fastmcp import Context
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.party_resolver.email import looks_like_email
 from backstop_mcp.features.party_resolver.search import (
     fetch_party_name,
+    looks_like_email,
     quick_search,
     search_by_email,
 )
@@ -27,57 +27,36 @@ from backstop_mcp.features.resolution import (
 )
 
 
-def _normalize_party_id_or_search(
-    party_id: str | None,
-    search: str | None,
-) -> tuple[str | None, str | None]:
-    normalized_party_id = (party_id or "").strip() or None
-    normalized_search = (search or "").strip() or None
-    if (normalized_party_id is None) == (normalized_search is None):
-        raise ValueError("Exactly one of party_id or search must be provided")
-    # `party_id` is a caller-trusted shortcut that skips any existence check and later gets
-    # interpolated into a Backstop request path (e.g. `/organizations/{id}`) — reject a
-    # value containing '/' so a crafted party_id can't redirect the request to an
-    # unintended path/endpoint.
-    if normalized_party_id is not None and "/" in normalized_party_id:
-        raise ValueError(f"party_id {normalized_party_id!r} must not contain '/'")
-    return normalized_party_id, normalized_search
-
-
 async def _resolve_one(
     client: BackstopClient,
     *,
     search_type: SearchType,
-    party_id: str | None = None,
-    search: str | None = None,
-    name: str | None = None,
+    item: PartyResolveItem,
     confirm_name: bool = False,
     quick_search_options: QuickSearchOptions | None = None,
 ) -> PartyResolution:
-    assert (party_id is None) != (search is None), (
-        "Exactly one of party_id or search must be provided"
-    )
-
-    if party_id is not None:
-        resolved_name = name
+    if item.party_id is not None:
+        resolved_name = item.name
         if resolved_name is None and confirm_name:
             resolved_name = await fetch_party_name(
-                client, search_type=search_type, party_id=party_id
+                client, search_type=search_type, party_id=item.party_id
             )
-        return Resolved(value=ResolvedParty(id=party_id, type=search_type, name=resolved_name))
+        return Resolved(
+            value=ResolvedParty(id=item.party_id, search_type=search_type, name=resolved_name)
+        )
 
-    assert search is not None
-    if looks_like_email(search):
-        candidates = await search_by_email(client, search_type=search_type, email=search)
+    assert item.search is not None
+    if looks_like_email(item.search):
+        candidates = await search_by_email(client, search_type=search_type, email=item.search)
     else:
         candidates = await quick_search(
             client,
             search_type=search_type,
-            search=search,
+            search=item.search,
             options=quick_search_options,
         )
 
-    return from_candidates(candidates, query=search, scope=search_type)
+    return from_candidates(candidates, query=item.search, scope=search_type)
 
 
 async def resolve_party(
@@ -98,13 +77,11 @@ async def resolve_party(
     makes a wrong id visible instead of silent. Callers that fetch the record anyway (e.g.
     `get_organization`) leave it off and backfill from their own response.
     """
-    party_id, search = _normalize_party_id_or_search(party_id, search)
+    item = PartyResolveItem(party_id=party_id, search=search, name=name)
     outcome = await _resolve_one(
         client,
         search_type=search_type,
-        party_id=party_id,
-        search=search,
-        name=name,
+        item=item,
         confirm_name=confirm_name,
         quick_search_options=quick_search_options,
     )
@@ -139,9 +116,7 @@ async def resolve_parties(
             _resolve_one(
                 client,
                 search_type=search_type,
-                party_id=item.party_id,
-                search=item.search,
-                name=item.name,
+                item=item,
                 confirm_name=confirm_name,
                 quick_search_options=quick_search_options,
             )

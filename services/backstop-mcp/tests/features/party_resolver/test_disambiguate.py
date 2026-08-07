@@ -33,7 +33,7 @@ def _candidate(party_id: str, label: str) -> Candidate[ResolvedParty]:
     return Candidate(
         key=party_id,
         label=label,
-        value=ResolvedParty(id=party_id, type="organizations", name=label),
+        value=ResolvedParty(id=party_id, search_type="organizations", name=label),
     )
 
 
@@ -201,7 +201,7 @@ class TestDisambiguateElicit:
 
     @pytest.mark.asyncio
     async def test_duplicate_labels_are_made_unique_for_elicit(self) -> None:
-        """An elicit enum needs distinct strings, so colliding labels get their key appended."""
+        """An elicit enum needs distinct strings; collisions get equal `[key]` qualification."""
         captured: dict[str, object] = {}
 
         async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
@@ -216,7 +216,7 @@ class TestDisambiguateElicit:
 
         assert isinstance(result, Resolved)
         assert result.value.id == "o2"
-        assert captured["response_type"] == ["Acme", "Acme [o2]"]
+        assert captured["response_type"] == ["Acme [o1]", "Acme [o2]"]
         assert captured["message"] == "Which Acme?"
 
     @pytest.mark.asyncio
