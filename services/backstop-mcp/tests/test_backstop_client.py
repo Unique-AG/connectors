@@ -118,6 +118,20 @@ class TestBackstopClientAutoRaises:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_auth_failure_hook_error_still_raises_backstop_auth_error(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
+
+        async def on_auth_failure() -> None:
+            raise RuntimeError("revoke failed")
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with pytest.raises(BackstopAuthError):
+            await client.raw_request("GET", "/system-info")
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_raises_backstop_api_error_on_other_error_statuses(
         self, factory: BackstopClientFactory
     ) -> None:
@@ -611,6 +625,28 @@ class TestUntrustedNextLink:
 
         assert exc_info.value.url == "https://evil.example.com/records"
         assert exc_info.value.expected_host == httpx.URL(_BASE_URL).netloc.decode("ascii")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_refuses_same_host_scheme_downgrade(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        """`links.next` must not flip https→http on the configured host either."""
+        https_base = httpx.URL(_BASE_URL)
+        assert https_base.scheme == "https"
+        http_next = str(https_base.copy_with(scheme="http")) + "/records"
+
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": [{"id": "1"}], "links": {"next": http_next}},
+            )
+        )
+
+        with pytest.raises(BackstopUntrustedUrlError) as exc_info:
+            await factory.for_credential(_credential()).paginate("/records", schema=_Record)
+
+        assert exc_info.value.url == http_next
 
     @pytest.mark.asyncio
     @respx.mock
