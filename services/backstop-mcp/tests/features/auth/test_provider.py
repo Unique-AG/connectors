@@ -806,7 +806,7 @@ class TestTokenLifecycle:
         assert await provider.load_access_token(tokens.access_token) is None
 
     @pytest.mark.asyncio
-    async def test_revoke_token_family_for_subject(
+    async def test_revoke_all_tokens_for_subject(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
@@ -823,7 +823,7 @@ class TestTokenLifecycle:
         tokens = await provider.exchange_authorization_code(client_info, auth_code)
         assert auth_code.subject is not None
 
-        await provider.revoke_token_family_for_subject(auth_code.subject)
+        await provider.revoke_all_tokens_for_subject(auth_code.subject)
 
         assert await provider.load_access_token(tokens.access_token) is None
 

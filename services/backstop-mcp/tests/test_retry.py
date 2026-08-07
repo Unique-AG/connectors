@@ -74,8 +74,41 @@ class TestRetryPredicate:
         assert retrying.retry(_retry_state(retrying, ValueError("boom"))) is False
 
 
+class TestWaitStrategy:
+    def test_floors_sub_second_retry_after_to_initial_backoff(self) -> None:
+        retrying = build_retry_policy(
+            RetrySettings(max_attempts=5, max_wait_ms=30_000)
+        ).build_retrying()
+        exc = BackstopRateLimitError(
+            429,
+            "Concurrency limit exceeded",
+            limit_kind="concurrency",
+            retry_after_seconds=0.0,
+        )
+
+        assert retrying.wait(_retry_state(retrying, exc)) == 1.0
+
+    def test_honours_retry_after_above_the_floor(self) -> None:
+        retrying = build_retry_policy(
+            RetrySettings(max_attempts=5, max_wait_ms=30_000)
+        ).build_retrying()
+        exc = BackstopRateLimitError(
+            429,
+            "Concurrency limit exceeded",
+            limit_kind="concurrency",
+            retry_after_seconds=5.0,
+        )
+
+        assert retrying.wait(_retry_state(retrying, exc)) == 5.0
+
+
 class TestBuildRetryingIntegration:
-    async def test_succeeds_after_two_concurrency_retries(self) -> None:
+    async def test_succeeds_after_two_concurrency_retries(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Keep the loop fast: the floor under test elsewhere is `_BACKOFF_INITIAL_SECONDS`
+        # (1s); here we only care that two concurrency 429s still recover.
+        monkeypatch.setattr("backstop_mcp.backstop_client.retry._BACKOFF_INITIAL_SECONDS", 0.01)
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
         retrying = build_retry_policy(settings).build_retrying()
         calls = 0

@@ -16,7 +16,8 @@ that must react to it (revoke tokens, re-render the login form) rather than surf
 
 import logging
 import re
-from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Literal, cast
 
 import httpx
@@ -35,8 +36,8 @@ _LIMIT_KIND_KEYWORDS: dict[LimitKind, tuple[str, ...]] = {
 }
 
 
-class _JsonApiError(BaseModel):
-    """One JSON:API error object.
+class BackstopErrorDetail(BaseModel):
+    """One entry from a Backstop JSON:API `errors[]` array.
 
     Backstop is inconsistent: some responses use `detail`, others only `title` (and `code`).
     Both are optional so we can accept either shape.
@@ -46,22 +47,6 @@ class _JsonApiError(BaseModel):
     title: str | None = None
     code: str | None = None
 
-
-class _JsonApiErrorBody(BaseModel):
-    errors: list[_JsonApiError]
-
-
-_ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
-
-
-@dataclass(frozen=True, slots=True)
-class BackstopErrorDetail:
-    """One entry from a Backstop JSON:API `errors[]` array."""
-
-    code: str | None = None
-    title: str | None = None
-    detail: str | None = None
-
     @property
     def message(self) -> str | None:
         """Best available human-readable text, preferring `detail` then `title` then `code`."""
@@ -69,6 +54,13 @@ class BackstopErrorDetail:
             if candidate is not None and (text := candidate.strip()):
                 return text
         return None
+
+
+class _JsonApiErrorBody(BaseModel):
+    errors: list[BackstopErrorDetail]
+
+
+_ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
 
 
 class BackstopAuthError(Exception):
@@ -181,10 +173,6 @@ class BackstopResponseSchemaError(ToolError):
         self.cause = cause
 
 
-def _to_error_detail(error: _JsonApiError) -> BackstopErrorDetail:
-    return BackstopErrorDetail(code=error.code, title=error.title, detail=error.detail)
-
-
 def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail, ...] | None:
     try:
         body = _ERROR_BODY_ADAPTER.validate_json(response.content)
@@ -196,7 +184,7 @@ def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail,
         return None
     if not body.errors:
         return None
-    return tuple(_to_error_detail(error) for error in body.errors)
+    return tuple(body.errors)
 
 
 def _join_messages(errors: tuple[BackstopErrorDetail, ...]) -> str | None:
@@ -222,27 +210,37 @@ def _fallback_message(response: httpx.Response) -> str:
 
 
 def _classify_limit_kind(detail: str, code: str | None) -> LimitKind | None:
-    haystack = f"{detail} {code or ''}".lower()
+    error_text = f"{detail} {code or ''}".lower()
     for kind, keywords in _LIMIT_KIND_KEYWORDS.items():
         if any(
-            re.search(rf"(?<![a-z]){re.escape(keyword)}(?![a-z])", haystack) for keyword in keywords
+            re.search(rf"(?<![a-z]){re.escape(keyword)}(?![a-z])", error_text)
+            for keyword in keywords
         ):
             return kind
     return None
 
 
 def _parse_retry_after(response: httpx.Response) -> float | None:
+    """Parse `Retry-After` as delta-seconds or an HTTP-date (RFC 9110 §10.2.3)."""
     retry_after = cast("str | None", response.headers.get("Retry-After"))
     if retry_after is None:
         return None
     try:
         return float(retry_after)
     except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(retry_after)
+    except (TypeError, ValueError, IndexError):
         logger.warning(
             "backstop.retry_after.unparseable",
             extra={"retry_after": retry_after},
         )
         return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    delay = (when - datetime.now(UTC)).total_seconds()
+    return max(delay, 0.0)
 
 
 def parse_json_api_error(response: httpx.Response) -> BackstopApiError:

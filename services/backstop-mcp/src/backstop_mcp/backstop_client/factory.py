@@ -141,7 +141,7 @@ class BackstopClientFactory:
         """Build a client authenticated as `credential`.
 
         Deliberately *not* an async context manager: there is nothing per-client to release.
-        Concurrency is gated around each individual request inside `BackstopClient._request`,
+        Concurrency is gated around each individual request inside `BackstopClient.raw_request`,
         so a caller can hold a client across an elicitation prompt, or fan several requests
         out of one client, without either starving itself or breaching Backstop's limit.
         """
@@ -175,8 +175,8 @@ class BackstopClientFactory:
 
         Called from the login form's submit handler (see `auth/provider.py`) before minting an
         authorization code — there is no stored credential yet, so the caller builds a
-        throwaway `BackstopCredentialSecret` and goes through the ordinary `BackstopClient` path
-        rather than hand-rolling the request. Returns True/False for a definite valid/invalid
+        throwaway `BackstopCredentialSecret` and probes via `raw_request` (status only; the
+        body is intentionally ignored). Returns True/False for a definite valid/invalid
         answer; raises `BackstopUnreachableError` if Backstop itself couldn't be reached
         (network error, 5xx), which is not the same failure mode as "wrong token" and should be
         shown to the user differently.
@@ -184,7 +184,7 @@ class BackstopClientFactory:
         credential = BackstopCredentialSecret(username=username, api_token=SecretStr(api_token))
         client = self.for_credential(credential)
         try:
-            await client.get(_VERIFICATION_PATH)
+            await client.raw_request("GET", _VERIFICATION_PATH)
         except BackstopAuthError:
             return False
         except BackstopApiError as exc:
@@ -215,16 +215,8 @@ class BackstopClientFactory:
         async with self._http_client_lock:
             if self._http_client is None or self._http_client.is_closed:
                 self._http_client = httpx.AsyncClient(
+                    base_url=self._settings.base_url,
                     headers=_SHARED_CLIENT_HEADERS,
                     limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
                 )
             return self._http_client
-
-
-def create_backstop_client_factory(
-    settings: BackstopTransportSettings,
-    retry_settings: RetrySettings,
-    *,
-    auth: CallerAuthContext | None = None,
-) -> BackstopClientFactory:
-    return BackstopClientFactory(settings, retry_settings, auth=auth)

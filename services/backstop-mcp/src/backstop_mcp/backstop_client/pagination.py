@@ -1,9 +1,9 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Generic
+from typing import ClassVar, Generic
 
 import httpx
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from typing_extensions import TypeVar
 
 FetchPage = Callable[[str, dict[str, object] | None], Awaitable[httpx.Response]]
@@ -16,7 +16,9 @@ class _PageLinks(BaseModel):
 
 
 class _PageMeta(BaseModel):
-    totalResourceCount: int | None = None
+    model_config: ClassVar[ConfigDict] = ConfigDict(populate_by_name=True)
+
+    total_resource_count: int | None = Field(default=None, alias="totalResourceCount")
 
 
 class _Page(BaseModel):
@@ -51,21 +53,13 @@ class PageResult(Generic[T]):
     truncated: bool = False
 
 
-@dataclass
-class PaginationRequest:
-    """Inputs for walking a single JSON:API `links.next` chain.
-
-    `first_page_params` is applied to `first_path` only — every later page is driven
-    entirely by the literal URL Backstop returns, which already encodes its own query params.
-    """
-
-    fetch_page: FetchPage
-    first_path: str
-    max_records: int | None
-    first_page_params: dict[str, object] | None = None
-
-
-async def paginate_all(request: PaginationRequest) -> PageResult:
+async def paginate_all(
+    *,
+    fetch_page: FetchPage,
+    first_path: str,
+    max_records: int | None,
+    first_page_params: dict[str, object] | None = None,
+) -> PageResult:
     """Walk a JSON:API `links.next` chain, accumulating `data` from every page.
 
     `fetch_page` fetches a single page given a path/URL and query params (the caller supplies
@@ -74,15 +68,17 @@ async def paginate_all(request: PaginationRequest) -> PageResult:
     `truncated=True` — the triggering page is kept in full rather than trimmed to the exact
     count, since callers can trim further themselves and this keeps the truncation boundary
     simple to reason about.
+
+    `first_page_params` is applied to `first_path` only — every later page is driven
+    entirely by the literal URL Backstop returns, which already encodes its own query params.
     """
     result = PageResult()
     seen_included: set[tuple[str, str]] = set()
-    path: str | None = request.first_path
-    params = request.first_page_params
-    max_records = request.max_records
+    path: str | None = first_path
+    params = first_page_params
 
     while path is not None:
-        response = await request.fetch_page(path, params)
+        response = await fetch_page(path, params)
         params = None
         page = _PAGE_ADAPTER.validate_json(response.content)
 
@@ -95,7 +91,7 @@ async def paginate_all(request: PaginationRequest) -> PageResult:
             result.included.append(resource)
 
         if result.total_count is None and page.meta is not None:
-            result.total_count = page.meta.totalResourceCount
+            result.total_count = page.meta.total_resource_count
 
         if max_records is not None and len(result.items) >= max_records:
             result.truncated = True
