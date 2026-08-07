@@ -41,6 +41,33 @@ def candidate_for(definition: CustomFieldDefinition) -> FieldCandidate:
     return Candidate(key=definition.definition_id, label=label, value=definition)
 
 
+def _partial_score(query: str, name: str) -> int | None:
+    """Rank a substring hit; higher is better. `None` means no match.
+
+    Prefer starts-with over query-in-name over name-in-query. Reverse containment requires a
+    query of at least two characters so a one-letter field name cannot match every query.
+    Within a tier, shorter names win (subtract length).
+    """
+    if name.startswith(query):
+        return 300 - len(name)
+    if query in name:
+        return 200 - len(name)
+    if len(query) >= 2 and name in query:
+        return 100 - len(name)
+    return None
+
+
+def _best_partial_score(query: str, definition: CustomFieldDefinition) -> int | None:
+    best: int | None = None
+    for name in _searchable_names(definition):
+        score = _partial_score(query, name)
+        if score is None:
+            continue
+        if best is None or score > best:
+            best = score
+    return best
+
+
 def resolve_in_index(
     index: DefinitionIndex,
     *,
@@ -50,10 +77,9 @@ def resolve_in_index(
     """Resolve a field by human name or alias, exact matches outranking partial ones.
 
     Two tiers, and the first non-empty one decides: an exact (normalized) name match, then a
-    substring match either way. Tiering matters because a user's short phrase ("grade") is a
+    scored substring match. Scoring matters because a user's short phrase ("grade") is a
     substring of several instance field names ("Investor Grade", "Grade Review Date") while
-    being an exact match for at most one — without the tiers, the exact hit would be drowned
-    in its own near-misses and every lookup would prompt.
+    being a clear best match for at most one — without ranking, every near-miss prompts.
     """
     entity = normalize_entity_type(entity_type)
     if entity is None:
@@ -69,11 +95,14 @@ def resolve_in_index(
     if exact:
         return from_candidates([candidate_for(d) for d in exact], query=query, scope=entity)
 
-    partial = [
-        d
-        for d in definitions
-        if any(
-            normalized_query in name or name in normalized_query for name in _searchable_names(d)
-        )
-    ]
-    return from_candidates([candidate_for(d) for d in partial], query=query, scope=entity)
+    scored: list[tuple[int, CustomFieldDefinition]] = []
+    for definition in definitions:
+        score = _best_partial_score(normalized_query, definition)
+        if score is not None:
+            scored.append((score, definition))
+    if not scored:
+        return NotFound(query=query, scope=entity)
+
+    best_score = max(score for score, _ in scored)
+    winners = [definition for score, definition in scored if score == best_score]
+    return from_candidates([candidate_for(d) for d in winners], query=query, scope=entity)

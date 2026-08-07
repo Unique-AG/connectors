@@ -26,6 +26,8 @@ type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 type ClientBuilder = Callable[[str], BackstopClient]
 
+SUBJECT = "schema-bob"
+
 
 @pytest.fixture
 async def clients() -> AsyncGenerator[ClientBuilder]:
@@ -85,6 +87,27 @@ class TestInlineAllowedValues:
         """`display` is the field `lov-entries` actually uses (per the swagger)."""
         values = inline_allowed_values(None, [{"id": "1", "display": "Grade A", "name": "ga"}])
         assert [v.label for v in values] == ["Grade A"]
+
+    def test_skips_empty_earlier_collection_for_later_nonempty(self) -> None:
+        values = inline_allowed_values(
+            {"entries": [], "viewableEntries": [{"id": "9", "display": "Open"}]},
+            None,
+        )
+        assert [(v.id, v.label) for v in values] == [("9", "Open")]
+
+    def test_json_api_option_keeps_envelope_id(self) -> None:
+        values = inline_allowed_values(
+            None,
+            [{"id": "42", "attributes": {"display": "Active"}}],
+        )
+        assert [(v.id, v.label) for v in values] == [("42", "Active")]
+
+    def test_skips_blank_earlier_label_for_later_usable(self) -> None:
+        values = inline_allowed_values(
+            None,
+            [{"id": "1", "label": "", "defaultDisplay": "Fallback"}],
+        )
+        assert [(v.id, v.label) for v in values] == [("1", "Fallback")]
 
 
 class TestDefinitionFromResource:
@@ -167,7 +190,7 @@ class TestFetchStoreResolve:
             )
         )
 
-        definitions = await service.refresh(clients(base_url))
+        definitions = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert len(definitions) == 1
         assert definitions[0].display_name == "Investor Status"
@@ -175,7 +198,7 @@ class TestFetchStoreResolve:
         assert definitions[0].allowed_values[0].label == "Active"
 
         async with read_session(session_factory) as session:
-            loaded = await load_snapshot(session, base_url)
+            loaded = await load_snapshot(session, base_url, SUBJECT)
         assert loaded is not None
         assert loaded.definitions[0].definition_id == "99"
 
@@ -186,6 +209,7 @@ class TestFetchStoreResolve:
             clients(base_url),
             entity_type="organizations",
             query="Investor Status",
+            subject=SUBJECT,
         )
         assert isinstance(result, Resolved)
         assert result.value.crm_name == "is1"
@@ -225,8 +249,12 @@ class TestFetchStoreResolve:
         )
 
         client = clients(base_url)
-        await resolve_field(service, client, entity_type="organizations", query="Grade")
-        await resolve_field(service, client, entity_type="organizations", query="Grade")
+        await resolve_field(
+            service, client, entity_type="organizations", query="Grade", subject=SUBJECT
+        )
+        await resolve_field(
+            service, client, entity_type="organizations", query="Grade", subject=SUBJECT
+        )
 
         assert route.call_count == 1
 
@@ -283,7 +311,7 @@ class TestLovSetRelationship:
             )
         )
 
-        definitions = await service.refresh(clients(base_url))
+        definitions = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert definitions[0].lov_set_id == "500"
         # Ordered by `position`, and the other set's entry is not mixed in.
@@ -340,7 +368,7 @@ class TestLovSetRelationship:
             )
         )
 
-        definitions = await service.refresh(clients(base_url))
+        definitions = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert [v.label for v in definitions[0].allowed_values] == ["Visible"]
 
@@ -374,7 +402,7 @@ class TestLovSetRelationship:
             )
         )
 
-        definitions = await service.refresh(clients(base_url))
+        definitions = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert [d.crm_name for d in definitions] == ["Status"]
         assert definitions[0].allowed_values == ()
@@ -418,7 +446,7 @@ class TestLovSetRelationship:
             )
         )
 
-        definitions = await service.refresh(clients(base_url))
+        definitions = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert [v.label for v in definitions[0].allowed_values] == ["Warm", "Hot"]
 
@@ -434,6 +462,7 @@ class TestSnapshotStaleness:
             await save_snapshot(
                 session,
                 base_url,
+                SUBJECT,
                 [
                     CustomFieldDefinition(
                         definition_id="old-1",
@@ -485,8 +514,8 @@ class TestSnapshotStaleness:
         service = create_custom_fields_service(
             session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
-        await service.load_cached()
-        assert service.is_fresh is True
+        await service.load_cached(SUBJECT)
+        assert service.is_fresh(SUBJECT) is True
 
         # Gate the refresh's upstream call so it is provably still in flight — and holding the
         # lock — while the warm read below runs.
@@ -503,11 +532,11 @@ class TestSnapshotStaleness:
         respx.get(f"{base_url}/custom-field-definitions").mock(side_effect=blocked_definitions)
 
         # `refresh()` ignores the TTL, so it takes the lock and holds it across the gated fetch.
-        refresh_task = asyncio.create_task(service.refresh(clients(base_url)))
+        refresh_task = asyncio.create_task(service.refresh(clients(base_url), subject=SUBJECT))
         await asyncio.wait_for(refresh_started.wait(), timeout=5)
 
         # The assertion: this returns rather than deadlocking on the held lock.
-        await asyncio.wait_for(service.load_cached(), timeout=1)
+        await asyncio.wait_for(service.load_cached(SUBJECT), timeout=1)
 
         release_refresh.set()
         _ = await asyncio.wait_for(refresh_task, timeout=5)
@@ -525,10 +554,12 @@ class TestSnapshotStaleness:
         )
         route = self._fresh_definitions_route(base_url)
 
-        await service.ensure_fresh(clients(base_url))
+        await service.ensure_fresh(clients(base_url), subject=SUBJECT)
 
         assert route.call_count == 0
-        assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]
+        assert [
+            d.display_name for d in service.definitions_for("organizations", subject=SUBJECT)
+        ] == ["Stale Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -543,10 +574,12 @@ class TestSnapshotStaleness:
         )
         route = self._fresh_definitions_route(base_url)
 
-        await service.ensure_fresh(clients(base_url))
+        await service.ensure_fresh(clients(base_url), subject=SUBJECT)
 
         assert route.call_count == 1
-        assert [d.display_name for d in service.definitions_for("organizations")] == ["Fresh Field"]
+        assert [
+            d.display_name for d in service.definitions_for("organizations", subject=SUBJECT)
+        ] == ["Fresh Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -560,11 +593,13 @@ class TestSnapshotStaleness:
         )
         route = self._fresh_definitions_route(base_url)
 
-        await service.load_cached()
+        await service.load_cached(SUBJECT)
 
         assert route.call_count == 0
-        assert service.is_fresh is False
-        assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]
+        assert service.is_fresh(SUBJECT) is False
+        assert [
+            d.display_name for d in service.definitions_for("organizations", subject=SUBJECT)
+        ] == ["Stale Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -587,17 +622,19 @@ class TestSnapshotStaleness:
 
         first, second = replica(), replica()
         # Both load the same expired snapshot into memory, as two pods would.
-        await first.load_cached()
-        await second.load_cached()
-        assert first.is_fresh is False
-        assert second.is_fresh is False
+        await first.load_cached(SUBJECT)
+        await second.load_cached(SUBJECT)
+        assert first.is_fresh(SUBJECT) is False
+        assert second.is_fresh(SUBJECT) is False
 
         client = clients(base_url)
-        await first.ensure_fresh(client)
-        await second.ensure_fresh(client)
+        await first.ensure_fresh(client, subject=SUBJECT)
+        await second.ensure_fresh(client, subject=SUBJECT)
 
         assert route.call_count == 1
-        assert [d.display_name for d in second.definitions_for("organizations")] == ["Fresh Field"]
+        assert [
+            d.display_name for d in second.definitions_for("organizations", subject=SUBJECT)
+        ] == ["Fresh Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -616,12 +653,12 @@ class TestSnapshotStaleness:
                 overrides={},
                 ttl_minutes=60,
             )
-            await service.ensure_fresh(clients(base_url))
+            await service.ensure_fresh(clients(base_url), subject=SUBJECT)
 
         await asyncio.gather(warm(), warm(), warm())
 
         async with read_session(session_factory) as session:
-            stored = await load_snapshot(session, base_url)
+            stored = await load_snapshot(session, base_url, SUBJECT)
         assert stored is not None
         assert [d.display_name for d in stored.definitions] == ["Fresh Field"]
 
@@ -647,10 +684,12 @@ class TestSnapshotStaleness:
             side_effect=httpx.ConnectError("backstop down")
         )
 
-        await service.ensure_fresh(clients(base_url))
+        await service.ensure_fresh(clients(base_url), subject=SUBJECT)
 
-        assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]
-        assert service.is_fresh is False
+        assert [
+            d.display_name for d in service.definitions_for("organizations", subject=SUBJECT)
+        ] == ["Stale Field"]
+        assert service.is_fresh(SUBJECT) is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -669,7 +708,7 @@ class TestSnapshotStaleness:
         )
 
         with pytest.raises(httpx.ConnectError):
-            await service.ensure_fresh(clients(base_url))
+            await service.ensure_fresh(clients(base_url), subject=SUBJECT)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -689,7 +728,7 @@ class TestSnapshotStaleness:
         )
 
         with pytest.raises(httpx.ConnectError):
-            await service.refresh(clients(base_url))
+            await service.refresh(clients(base_url), subject=SUBJECT)
 
 
 class TestSnapshotCodec:
@@ -704,6 +743,7 @@ class TestSnapshotCodec:
             session.add(
                 CustomFieldSchemaSnapshot(
                     base_url=base_url,
+                    subject=SUBJECT,
                     payload={"version": 999, "definitions": []},
                     fetched_at=datetime.now(UTC),
                 )
@@ -711,7 +751,7 @@ class TestSnapshotCodec:
             await session.commit()
 
         async with read_session(session_factory) as session:
-            assert await load_snapshot(session, base_url) is None
+            assert await load_snapshot(session, base_url, SUBJECT) is None
 
     @pytest.mark.asyncio
     async def test_round_trips_allowed_values_and_lov_set_id(self, db: DatabaseFixture) -> None:
@@ -729,10 +769,16 @@ class TestSnapshotCodec:
             lov_set_id="500",
         )
         async with transaction(session_factory) as session:
-            await save_snapshot(session, base_url, [definition], datetime.now(UTC))
+            await save_snapshot(
+                session,
+                base_url,
+                SUBJECT,
+                [definition],
+                datetime.now(UTC),
+            )
 
         async with read_session(session_factory) as session:
-            loaded = await load_snapshot(session, base_url)
+            loaded = await load_snapshot(session, base_url, SUBJECT)
 
         assert loaded is not None
         assert loaded.definitions == [definition]
@@ -770,8 +816,8 @@ class TestRefreshFloor:
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
 
-        first = await service.refresh(clients(base_url))
-        second = await service.refresh(clients(base_url))
+        first = await service.refresh(clients(base_url), subject=SUBJECT)
+        second = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert route.call_count == 1
         # The floored call still answers coherently — with what is already indexed, not nothing.
@@ -792,12 +838,12 @@ class TestRefreshFloor:
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
 
-        _ = await service.refresh(clients(base_url))
+        _ = await service.refresh(clients(base_url), subject=SUBJECT)
         # Reach in and age the attempt rather than sleeping out a real minute.
-        service._refresh_attempted_at = (  # pyright: ignore[reportPrivateUsage]
+        service._entry(SUBJECT).refresh_floor.mark(  # pyright: ignore[reportPrivateUsage]
             datetime.now(UTC) - service.MIN_REFRESH_INTERVAL - timedelta(seconds=1)
         )
-        _ = await service.refresh(clients(base_url))
+        _ = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert route.call_count == 2
 
@@ -818,7 +864,7 @@ class TestRefreshFloor:
         )
 
         with pytest.raises(httpx.ConnectError):
-            _ = await service.refresh(clients(base_url))
-        assert await service.refresh(clients(base_url)) == []
+            _ = await service.refresh(clients(base_url), subject=SUBJECT)
+        assert await service.refresh(clients(base_url), subject=SUBJECT) == []
 
         assert route.call_count == 1

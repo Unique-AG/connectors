@@ -72,9 +72,9 @@ class TestWarmCustomFieldSchema:
         )
 
         assert route.call_count == 1
-        assert [d.display_name for d in service.definitions_for("organizations")] == [
-            "Investor Status"
-        ]
+        assert [
+            d.display_name for d in service.definitions_for("organizations", subject="svc-bot")
+        ] == ["Investor Status"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -94,7 +94,7 @@ class TestWarmCustomFieldSchema:
         await warm_custom_field_schema(service, client_factory(base_url), None)
 
         assert route.call_count == 0
-        assert service.definitions_for("organizations") == []
+        assert service.definitions_for("organizations", subject="svc-bot") == []
 
     @pytest.mark.asyncio
     @respx.mock
@@ -116,7 +116,7 @@ class TestWarmCustomFieldSchema:
             service, _service_account_factory(base_url), _service_credential()
         )
 
-        assert service.definitions_for("organizations") == []
+        assert service.definitions_for("organizations", subject="svc-bot") == []
 
 
 class TestWarmupLifespan:
@@ -140,13 +140,13 @@ class TestWarmupLifespan:
             # Startup handed control back before the fetch could even be issued.
             assert route.call_count == 0
             async with asyncio.timeout(10):
-                while not service.definitions_for("organizations"):
+                while not service.definitions_for("organizations", subject="svc-bot"):
                     await asyncio.sleep(0.01)
 
         assert route.call_count == 1
-        assert [d.display_name for d in service.definitions_for("organizations")] == [
-            "Investor Status"
-        ]
+        assert [
+            d.display_name for d in service.definitions_for("organizations", subject="svc-bot")
+        ] == ["Investor Status"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -169,7 +169,7 @@ class TestWarmupLifespan:
             pass
 
         assert route.call_count == 0
-        assert service.definitions_for("organizations") == []
+        assert service.definitions_for("organizations", subject="svc-bot") == []
 
     @pytest.mark.asyncio
     @respx.mock
@@ -192,4 +192,4 @@ class TestWarmupLifespan:
                 while route.call_count == 0:
                     await asyncio.sleep(0.01)
 
-        assert service.definitions_for("organizations") == []
+        assert service.definitions_for("organizations", subject="svc-bot") == []
