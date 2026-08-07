@@ -3,10 +3,10 @@ from typing import Annotated, ClassVar, Self
 from pydantic import (
     AliasChoices,
     BaseModel,
-    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
+    field_validator,
     model_validator,
 )
 
@@ -24,18 +24,10 @@ __all__ = [
 ]
 
 
-def _blank_to_none(value: object) -> object:
-    if isinstance(value, str) and not value.strip():
-        return None
-    return value
-
-
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
-_NonEmptyStr = Annotated[
-    str,
-    BeforeValidator(_blank_to_none),
-    StringConstraints(strip_whitespace=True, min_length=1),
-]
+# Blank/whitespace inputs become `None` via `field_validator` on `PartyResolveItem` — putting
+# a BeforeValidator that returns `None` on `Annotated[str, ...]` alone fails union matching.
+_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class PartyAttributes(BaseModel):
@@ -98,6 +90,13 @@ class PartyResolveItem(BaseModel):
     party_id: _NonEmptyStr | None = None
     search: _NonEmptyStr | None = None
     name: str | None = None
+
+    @field_validator("party_id", "search", mode="before")
+    @classmethod
+    def _blank_selector_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
