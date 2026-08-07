@@ -1,7 +1,7 @@
 """add custom field schema snapshots
 
 Revision ID: a1b2c3d4e5f6
-Revises: 0be78700d2dc
+Revises: b2c3d4e5f6a7
 Create Date: 2026-08-03 16:20:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a1b2c3d4e5f6"
-down_revision: str | Sequence[str] | None = "0be78700d2dc"
+down_revision: str | Sequence[str] | None = "b2c3d4e5f6a7"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

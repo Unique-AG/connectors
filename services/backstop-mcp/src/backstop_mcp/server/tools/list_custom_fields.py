@@ -4,6 +4,7 @@ from fastmcp.tools import tool
 from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import BaseModel, Field
 
+from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields import (
     CustomFieldDefinitionResponse,
     definition_response,
@@ -58,12 +59,13 @@ async def list_custom_fields(
     """
     client = await get_backstop_client()
     service = get_custom_fields_service()
+    subject = current_subject()
     if refresh:
-        await service.refresh(client)
+        await service.refresh(client, subject=subject)
     else:
-        await service.ensure_fresh(client)
+        await service.ensure_fresh(client, subject=subject)
 
-    definitions = service.definitions_for(entity_type.value)
+    definitions = service.definitions_for(entity_type.value, subject=subject)
     return tool_result(
         ListCustomFieldsResponse(
             entity_type=entity_type,
