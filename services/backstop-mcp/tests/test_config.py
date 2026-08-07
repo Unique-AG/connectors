@@ -1,6 +1,7 @@
 import ssl
 
 import pytest
+from pydantic import ValidationError
 
 from backstop_mcp.config import (
     AppConfig,
@@ -46,6 +47,10 @@ class TestNormalizeAsyncpgUrl:
         assert url == "postgresql+asyncpg://user:pass@db:5432/backstop"
         assert connect_args == {}
 
+    def test_rejects_non_postgres_schemes(self) -> None:
+        with pytest.raises(ValueError, match="PostgreSQL"):
+            normalize_asyncpg_url("mysql://user:pass@db:3306/backstop")
+
 
 class TestBackstopConfigDefaults:
     def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -62,6 +67,19 @@ class TestBackstopConfigDefaults:
         config = BackstopConfig()
 
         assert config.base_url == "https://tenant.backstopsolutions.com"
+
+    def test_strips_trailing_slash_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.backstopsolutions.com/")
+
+        config = BackstopConfig()
+
+        assert config.base_url == "https://tenant.backstopsolutions.com"
+
+    def test_rejects_malformed_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_BASE_URL", "not a url")
+
+        with pytest.raises(ValidationError):
+            BackstopConfig()
 
 
 class TestPublicBaseUrl:
@@ -80,17 +98,26 @@ class TestPublicBaseUrl:
             "http://[::1]:9010",
             # A bind address, not somewhere a client can reach this service.
             "http://0.0.0.0:9010",
-            # No host at all — `urlparse` yields None, which is just as unusable.
-            "not-a-url",
         ],
     )
     def test_production_rejects_a_url_no_client_can_reach(self, url: str) -> None:
         with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
             AppConfig(app_env=AppEnv.PRODUCTION, public_base_url=url)
 
+    def test_rejects_malformed_public_base_url(self) -> None:
+        with pytest.raises(ValidationError):
+            AppConfig(app_env=AppEnv.DEVELOPMENT, public_base_url="not-a-url")
+
     def test_production_accepts_a_real_public_url(self) -> None:
         config = AppConfig(
             app_env=AppEnv.PRODUCTION, public_base_url="https://backstop-mcp.example"
+        )
+
+        assert config.public_base_url == "https://backstop-mcp.example"
+
+    def test_strips_trailing_slash_on_public_base_url(self) -> None:
+        config = AppConfig(
+            app_env=AppEnv.PRODUCTION, public_base_url="https://backstop-mcp.example/"
         )
 
         assert config.public_base_url == "https://backstop-mcp.example"
@@ -118,3 +145,24 @@ class TestDatabaseConfigSsl:
         assert config.connection_url == "postgresql+asyncpg://user:pass@db:5432/backstop"
         assert "sslmode" not in config.connection_url
         assert isinstance(config.connect_args.get("ssl"), ssl.SSLContext)
+
+    def test_builds_url_from_discrete_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("DB_URL", raising=False)
+
+        config = DatabaseConfig(
+            host="db",
+            port=5432,
+            name="backstop",
+            user="user",
+            password="p@ss",
+        )
+
+        assert config.connection_url == "postgresql+asyncpg://user:p%40ss@db:5432/backstop"
+
+    def test_missing_parts_list_all_absent_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("DB_URL", raising=False)
+
+        with pytest.raises(ValidationError, match="DB_HOST"):
+            DatabaseConfig()
