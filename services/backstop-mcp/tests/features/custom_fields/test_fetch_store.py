@@ -87,6 +87,44 @@ class TestInlineAllowedValues:
         assert [v.label for v in values] == ["Grade A"]
 
 
+class TestDefinitionFromResource:
+    def test_skips_unknown_entity_type(self) -> None:
+        from backstop_mcp.backstop_client import BackstopApiResource
+        from backstop_mcp.features.custom_fields.fetch import definition_from_resource
+        from backstop_mcp.features.custom_fields.lov import EMPTY_LOV_INDEX
+        from backstop_mcp.features.custom_fields.types import CustomFieldDefinitionAttributes
+
+        resource = BackstopApiResource[CustomFieldDefinitionAttributes].model_validate(
+            {
+                "id": "1",
+                "type": "custom-field-definitions",
+                "attributes": {"name": "Grade", "entityType": "spaceship"},
+            }
+        )
+        assert (
+            definition_from_resource(resource, {}, lov_index=EMPTY_LOV_INDEX, included=[]) is None
+        )
+
+    def test_snapshot_round_trip_without_db(self) -> None:
+        from backstop_mcp.features.custom_fields.snapshot import dump_definitions, load_definitions
+        from backstop_mcp.features.custom_fields.types import AllowedValue
+
+        definitions = [
+            CustomFieldDefinition(
+                definition_id="1",
+                entity_type="organizations",
+                crm_name="Grade",
+                display_name="Investor Grade",
+                aliases=("grade",),
+                allowed_values=(AllowedValue(id="a", label="A"),),
+                lov_set_id="set-1",
+                raw={"id": "1"},
+            )
+        ]
+        loaded = load_definitions(dump_definitions(definitions))
+        assert loaded == definitions
+
+
 class TestFetchStoreResolve:
     @pytest.mark.asyncio
     @respx.mock

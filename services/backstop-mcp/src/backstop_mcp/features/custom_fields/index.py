@@ -23,6 +23,8 @@ def build_index(definitions: list[CustomFieldDefinition]) -> DefinitionIndex:
     index: DefinitionIndex = {}
     for definition in definitions:
         key = normalize_entity_type(definition.entity_type)
+        if key is None:
+            continue
         index.setdefault(key, []).append(definition)
     return index
 
@@ -54,19 +56,24 @@ def resolve_in_index(
     in its own near-misses and every lookup would prompt.
     """
     entity = normalize_entity_type(entity_type)
-    needle = normalize_query(query)
-    if not needle:
+    if entity is None:
+        return NotFound(query=query, scope=entity_type)
+
+    normalized_query = normalize_query(query)
+    if not normalized_query:
         return NotFound(query=query, scope=entity)
 
     definitions = index.get(entity, [])
 
-    exact = [d for d in definitions if needle in _searchable_names(d)]
+    exact = [d for d in definitions if normalized_query in _searchable_names(d)]
     if exact:
         return from_candidates([candidate_for(d) for d in exact], query=query, scope=entity)
 
     partial = [
         d
         for d in definitions
-        if any(needle in name or name in needle for name in _searchable_names(d))
+        if any(
+            normalized_query in name or name in normalized_query for name in _searchable_names(d)
+        )
     ]
     return from_candidates([candidate_for(d) for d in partial], query=query, scope=entity)
