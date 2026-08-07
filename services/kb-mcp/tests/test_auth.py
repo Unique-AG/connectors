@@ -66,8 +66,18 @@ def test_build_auth_passes_required_scopes(durable_settings):
         build_auth(durable_settings)
 
     _, kwargs = mock_create.call_args
-    assert kwargs["required_scopes"]
+    # Identity only — mcp:* must stay advertised, not required (RequireAuthMiddleware).
+    assert kwargs["required_scopes"] == [
+        "openid",
+        "profile",
+        "urn:zitadel:iam:user:resourceowner",
+    ]
     assert kwargs["verify_id_token"] is True
+
+
+def test_build_storage_treats_decryption_errors_as_misses(durable_settings):
+    store = build_storage(durable_settings)
+    assert store.raise_on_decryption_error is False
 
 
 def test_build_auth_passes_storage_even_in_ephemeral_dev_mode(ephemeral_settings):

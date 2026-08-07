@@ -29,9 +29,12 @@ def build_storage(settings: Settings) -> AsyncKeyValue:
             table_name=_OAUTH_TABLE_NAME,
             auto_create=True,
         )
+        # Match FastMCP's own default store: decryption failure = cache miss
+        # so rotating STORAGE_ENCRYPTION_KEY forces re-login, not an error storm.
         return FernetEncryptionWrapper(
             key_value=store,
             fernet=Fernet(settings.storage_encryption_key.get_secret_value().encode()),
+            raise_on_decryption_error=False,
         )
 
     # Only reachable because the settings validator allowed it (dev opt-in).
@@ -42,4 +45,5 @@ def build_storage(settings: Settings) -> AsyncKeyValue:
         key_value=FileTreeStore(data_directory=dev_dir),
         source_material="kb-mcp-local-dev-oauth-storage",
         salt="kb-mcp-local-dev",
+        raise_on_decryption_error=False,
     )

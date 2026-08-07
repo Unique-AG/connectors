@@ -97,7 +97,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _storage_must_be_durable(self) -> "Settings":
-        if self.database_url and self.storage_encryption_key:
+        durable = bool(self.database_url and self.storage_encryption_key)
+        half = bool(self.database_url) ^ bool(self.storage_encryption_key)
+        if half:
+            raise ValueError(
+                "OAuth storage is half-configured: set BOTH DATABASE_URL and "
+                "STORAGE_ENCRYPTION_KEY, or neither (with "
+                "ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev)."
+            )
+        if durable and self.allow_ephemeral_oauth_storage:
+            # Otherwise build_storage() would ignore Postgres and write to /tmp.
+            raise ValueError(
+                "Refuse ALLOW_EPHEMERAL_OAUTH_STORAGE when DATABASE_URL and "
+                "STORAGE_ENCRYPTION_KEY are set — pick durable or ephemeral, not both."
+            )
+        if durable:
             return self
         if self.allow_ephemeral_oauth_storage:
             return self

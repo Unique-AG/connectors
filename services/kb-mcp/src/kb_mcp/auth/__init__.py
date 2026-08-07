@@ -10,10 +10,20 @@ from unique_mcp.auth.zitadel.oidc_proxy import (
     ZitadelOIDCProxySettings,
     create_zitadel_oidc_proxy,
 )
-from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 
 from kb_mcp.auth.storage import build_storage
 from kb_mcp.settings import Settings
+
+# Identity scopes Zitadel reliably grants. Do NOT put mcp:* (or email) here —
+# with verify_id_token=True FastMCP still sets OIDCProxy.required_scopes and
+# RequireAuthMiddleware 403s any request whose upstream-granted scope list
+# lacks them. Advertise mcp:* via the wrapper's valid_scopes / authorize
+# scope string; require only what identity resolution needs.
+_REQUIRED_SCOPES = [
+    "openid",
+    "profile",
+    "urn:zitadel:iam:user:resourceowner",
+]
 
 
 def build_auth(settings: Settings) -> OIDCProxy:
@@ -30,8 +40,5 @@ def build_auth(settings: Settings) -> OIDCProxy:
         # token-swap after /token succeeds; otherwise every /mcp call returns
         # invalid_token despite a successful login.
         verify_id_token=True,
-        # OIDCProxy's docstring warning about an invalid_token loop is stale
-        # for verify_id_token=True: it withholds required_scopes from the JWT
-        # verifier in that case and calls update_default_scopes for us instead.
-        required_scopes=list(ZITADEL_DEFAULT_MCP_SCOPES),
+        required_scopes=list(_REQUIRED_SCOPES),
     )

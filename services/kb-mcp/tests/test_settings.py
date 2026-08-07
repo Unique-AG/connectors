@@ -46,3 +46,19 @@ def test_storage_allowed_with_database_url_and_encryption_key(monkeypatch):
     monkeypatch.setenv("STORAGE_ENCRYPTION_KEY", "a" * 44)
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
     assert settings.database_url is not None
+
+
+def test_storage_rejects_database_url_without_encryption_key(monkeypatch):
+    monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "true")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/kb_mcp")
+    monkeypatch.delenv("STORAGE_ENCRYPTION_KEY", raising=False)
+    with pytest.raises(ValidationError, match="half-configured"):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_storage_rejects_ephemeral_flag_with_durable_pair(monkeypatch):
+    monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "true")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/kb_mcp")
+    monkeypatch.setenv("STORAGE_ENCRYPTION_KEY", "a" * 44)
+    with pytest.raises(ValidationError, match="Refuse ALLOW_EPHEMERAL"):
+        Settings(_env_file=None)  # type: ignore[call-arg]
