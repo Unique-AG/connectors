@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import override
 
 import httpx
 import pytest
@@ -236,6 +237,7 @@ class TestParseJsonApiErrorRateLimit:
 
         class _FixedDatetime(datetime):
             @classmethod
+            @override
             def now(cls, tz: object = None) -> datetime:
                 return now
 

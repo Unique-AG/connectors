@@ -35,7 +35,7 @@ def load_key(config: EncryptionConfig) -> bytes:
         raise ValueError(
             "BACKSTOP_MCP_ENCRYPTION_KEY must be a Fernet key "
             + "(url-safe base64-encoded 32-byte key); generate with: "
-            + "python -c \"from cryptography.fernet import Fernet; "
+            + 'python -c "from cryptography.fernet import Fernet; '
             + 'print(Fernet.generate_key().decode())"'
         ) from exc
     return key

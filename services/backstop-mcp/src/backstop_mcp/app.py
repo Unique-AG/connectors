@@ -79,6 +79,7 @@ def create_app(
     )
     auth_provider = BackstopOAuthProvider(
         base_url=config.issuer,
+        secure_cookies=config.public_base_url.scheme == "https",
         session_factory=session_factory,
         encryption_key=encryption_key,
         backstop_clients=backstop_clients,

@@ -192,7 +192,7 @@ class TestRoutes:
 class TestReadyReportsDatabaseUnreachable:
     def test_ready_is_503_when_postgres_is_unreachable(self) -> None:
         app = create_app(
-            config=AppConfig(public_base_url="https://backstop-mcp.example"),
+            config=AppConfig.model_validate({"public_base_url": "https://backstop-mcp.example"}),
             database_config=DatabaseConfig.model_validate(
                 {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
             ),
