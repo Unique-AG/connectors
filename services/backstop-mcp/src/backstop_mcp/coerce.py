@@ -21,11 +21,3 @@ def as_object_list(value: object) -> list[object]:
     if not isinstance(value, list):
         return []
     return cast("list[object]", value)
-
-
-def as_clean_str(value: object) -> str | None:
-    """A stripped non-empty string, or None for anything else (including blank strings)."""
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None

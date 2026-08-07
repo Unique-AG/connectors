@@ -22,8 +22,9 @@ def postgres_container() -> Generator[PostgresContainer]:
     setting that env var directly (rather than via `Config.set_main_option`, which
     `env.py` would immediately overwrite).
 
-    There are no versions under `db/migrations/versions/` yet, so `upgrade head` is a no-op —
-    kept anyway so the fixture behaves the same way it will once the first migration lands.
+    `db/migrations/versions/` is tracked (via `.gitkeep`) so clones always have the path;
+    with no revision files yet, `upgrade head` is a no-op — kept so the fixture behaves the
+    same way it will once the first migration lands.
 
     The whole environment is snapshotted and restored around the upgrade, not just `DB_URL`:
     `env.py` also calls `load_dotenv()`, which is right for an operator running
@@ -56,7 +57,7 @@ async def db(postgres_container: PostgresContainer) -> AsyncGenerator[DatabaseFi
     from backstop_mcp.db.engine import create_engine, create_session_factory
 
     url = postgres_container.get_connection_url().replace("+psycopg2", "")
-    config = DatabaseConfig(url=url)
+    config = DatabaseConfig.model_validate({"url": url})
     engine = create_engine(config)
     factory = create_session_factory(engine)
     yield engine, factory

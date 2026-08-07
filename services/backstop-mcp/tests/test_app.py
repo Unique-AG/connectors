@@ -37,7 +37,7 @@ def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
     url = postgres_container.get_connection_url().replace("+psycopg2", "")
     app = create_app(
         config=AppConfig(public_base_url="https://backstop-mcp.example"),
-        database_config=DatabaseConfig(url=url),
+        database_config=DatabaseConfig.model_validate({"url": url}),
     )
     with TestClient(app) as client:
         yield client
@@ -78,7 +78,9 @@ class TestReadyReportsDatabaseUnreachable:
     def test_ready_is_503_when_postgres_is_unreachable(self) -> None:
         app = create_app(
             config=AppConfig(public_base_url="https://backstop-mcp.example"),
-            database_config=DatabaseConfig(url="postgresql://user:pass@127.0.0.1:1/nope"),
+            database_config=DatabaseConfig.model_validate(
+                {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
+            ),
         )
         with TestClient(app) as client:
             response = _get(client, "/ready")
