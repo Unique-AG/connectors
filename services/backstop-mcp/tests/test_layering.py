@@ -98,6 +98,21 @@ def _violations(source: pathlib.Path, prefix: str) -> list[str]:
     ]
 
 
+def _declares_dunder_all(node: ast.AST) -> bool:
+    """Both spellings: bare `__all__ = [...]` and annotated `__all__: list[str] = [...]`.
+
+    The annotated form parses as `AnnAssign`, not `Assign`, and a package that starts out
+    deliberately empty is exactly the one that needs the annotation to type-check.
+    """
+    if isinstance(node, ast.Assign):
+        return any(
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
+        )
+    if isinstance(node, ast.AnnAssign):
+        return isinstance(node.target, ast.Name) and node.target.id == "__all__"
+    return False
+
+
 def _package_directory(package: str) -> pathlib.Path:
     """`backstop_mcp.features.party_resolver` → the directory that package's modules live in."""
     return _SRC.joinpath(*package.split(".")[1:])
@@ -262,15 +277,9 @@ class TestPackagesAreEnteredThroughTheirInit:
         for package in _PUBLIC_SURFACE_PACKAGES:
             init = _package_directory(package) / "__init__.py"
             assert init.is_file(), f"no __init__.py for {package}"
-            exported = [
-                node
-                for node in ast.walk(ast.parse(init.read_text()))
-                if isinstance(node, ast.Assign)
-                and any(
-                    isinstance(target, ast.Name) and target.id == "__all__"
-                    for target in node.targets
-                )
-            ]
+            exported = any(
+                _declares_dunder_all(node) for node in ast.walk(ast.parse(init.read_text()))
+            )
             assert exported, f"{package}/__init__.py declares no __all__"
 
     def test_a_package_still_composes_its_own_modules(self) -> None:
