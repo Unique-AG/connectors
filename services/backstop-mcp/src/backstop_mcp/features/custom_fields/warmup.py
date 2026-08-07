@@ -14,29 +14,28 @@ async def warm_custom_field_schema(
     clients: BackstopClientFactory,
     credential: BackstopCredentialSecret | None,
 ) -> None:
-    """Fetch the custom-field schema once using the configured service account.
+    """Probe Backstop with the configured service account at boot.
+
+    Schema snapshots are keyed by MCP OAuth `subject`, so a service-account fill cannot seed
+    end-user catalogs without breaking caller isolation. This warmup only verifies the account
+    can reach Backstop; each caller's first authenticated `tools/list` or `list_custom_fields`
+    fills their own cache via `ensure_fresh`.
 
     `credential` is assembled by `create_app` (see `_service_account_credential`) rather than
-    read back off the client factory: whether a service account exists is a configuration
-    question, and this module has no business holding a config object to answer it. `None` is
-    the normal case, not a failure.
-
-    Errors are logged and swallowed: a Backstop outage at boot must not stop this service from
-    serving, and the schema will be fetched lazily by the first authenticated caller instead.
+    read back off the client factory. `None` is the normal case, not a failure. Errors are
+    logged and swallowed: a Backstop outage at boot must not stop this service from serving.
     """
+    del service  # retained for call-site compatibility with `create_app` wiring
     if credential is None:
         logger.info("custom_fields.warmup.skipped", extra={"reason": "no_service_account"})
         return
 
     try:
-        await service.ensure_fresh(
-            clients.for_credential(credential),
-            subject=credential.username,
-        )
+        await clients.for_credential(credential).raw_request("GET", "/system-info")
     except Exception:
         logger.exception("custom_fields.warmup.failed")
         return
-    logger.info("custom_fields.warmup.completed")
+    logger.info("custom_fields.warmup.completed", extra={"mode": "connectivity_probe"})
 
 
 @asynccontextmanager
@@ -45,11 +44,10 @@ async def warmup_lifespan(
     clients: BackstopClientFactory,
     credential: BackstopCredentialSecret | None,
 ) -> AsyncGenerator[None, None]:
-    """Run schema warming in the background for the lifetime of the app.
+    """Run the service-account connectivity probe in the background for the app lifetime.
 
-    Detached rather than awaited so `/ready` and `/health` come up immediately — a full
-    `/custom-field-definitions` pagination can take seconds, and readiness shouldn't wait on
-    an optional cache fill. Cancelled on shutdown if still in flight.
+    Detached rather than awaited so `/ready` and `/health` come up immediately. Cancelled on
+    shutdown if still in flight.
     """
     task = asyncio.create_task(warm_custom_field_schema(service, clients, credential))
     try:
