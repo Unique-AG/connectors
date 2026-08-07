@@ -52,16 +52,6 @@ def deserialize(content: bytes, adapter: TypeAdapter[T], *, path: str, schema_na
         raise BackstopResponseSchemaError(path, schema_name, exc) from exc
 
 
-# /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
-# slow (up to ~30s per 500 records) — they get the extended timeout and the larger
-# report-sized page default; everything else gets the ordinary CRUD profile.
-_SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
-
-
-def is_slow_endpoint(path: str) -> bool:
-    return any(marker in path for marker in _SLOW_ENDPOINT_MARKERS)
-
-
 def resolve_request_url(base_url: str, path: str) -> str:
     """Return a URL/path safe for an `AsyncClient` that already has `base_url` set.
 

@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field, StringConstraints, TypeAdapter, Validatio
 # `BackstopApiResource[SomeModel]` to a concrete model at runtime either way, but this form
 # is what basedpyright's strict mode type-checks cleanly for a generic pydantic BaseModel.
 
-_CleanStr = TypeAdapter(Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)])
+_CleanStr: TypeAdapter[str] = TypeAdapter(
+    Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+)
 
 
 def _clean_str(value: object) -> str | None:

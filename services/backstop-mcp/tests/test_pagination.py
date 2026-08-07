@@ -36,9 +36,7 @@ class TestPaginateAll:
             return_value=httpx.Response(200, json=_page([{"id": "1"}, {"id": "2"}]))
         )
 
-        result = await paginate_all(
-            fetch_page=_fetch_page, first_path="/records", max_records=None
-        )
+        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
 
         assert result == PageResult(
             items=[{"id": "1"}, {"id": "2"}], total_count=None, truncated=False
@@ -64,9 +62,7 @@ class TestPaginateAll:
             ]
         )
 
-        result = await paginate_all(
-            fetch_page=_fetch_page, first_path="/records", max_records=None
-        )
+        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
 
         assert result.items == [{"id": "1"}, {"id": "2"}, {"id": "3"}]
         assert result.truncated is False
@@ -93,9 +89,7 @@ class TestPaginateAll:
             ]
         )
 
-        result = await paginate_all(
-            fetch_page=_fetch_page, first_path="/records", max_records=3
-        )
+        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=3)
 
         # max_records=3 is reached mid-second-page (4 accumulated) — the page that crosses
         # the threshold is kept in full rather than trimmed, so 4 items come back, not 3.
@@ -112,8 +106,6 @@ class TestPaginateAll:
             return_value=httpx.Response(200, json=_page([{"id": "1"}], total_count=1234))
         )
 
-        result = await paginate_all(
-            fetch_page=_fetch_page, first_path="/records", max_records=None
-        )
+        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
 
         assert result.total_count == 1234

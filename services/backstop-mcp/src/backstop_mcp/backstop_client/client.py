@@ -23,7 +23,6 @@ from backstop_mcp.backstop_client.settings import BackstopTransportSettings
 from backstop_mcp.backstop_client.utils import (
     T,
     deserialize,
-    is_slow_endpoint,
     metric_route,
     resolve_request_url,
     schema_label,
@@ -35,6 +34,11 @@ from backstop_mcp.metrics import (
 )
 
 logger = logging.getLogger(__name__)
+
+# /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
+# slow (up to ~30s per 500 records) — they get the extended timeout and the larger
+# report-sized page default; everything else gets the ordinary CRUD profile.
+_SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
 
 
 def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
@@ -94,9 +98,7 @@ class BackstopClient:
         response = await self.raw_request("GET", path, params=params)
         return self._deserialize(response.content, schema, path=path)
 
-    async def post(
-        self, path: str, *, schema: type[T], json: dict[str, object] | None = None
-    ) -> T:
+    async def post(self, path: str, *, schema: type[T], json: dict[str, object] | None = None) -> T:
         response = await self.raw_request("POST", path, json=json)
         return self._deserialize(response.content, schema, path=path)
 
@@ -189,7 +191,7 @@ class BackstopClient:
         )
 
     def _default_page_size(self, path: str) -> int:
-        if is_slow_endpoint(path):
+        if any(marker in path for marker in _SLOW_ENDPOINT_MARKERS):
             return self._settings.report_page_size
         return self._settings.default_page_size
 
@@ -213,7 +215,7 @@ class BackstopClient:
         )
         timeout = (
             self._settings.reports_timeout_seconds
-            if is_slow_endpoint(path)
+            if any(marker in path for marker in _SLOW_ENDPOINT_MARKERS)
             else self._settings.default_timeout_seconds
         )
         url = resolve_request_url(self._settings.base_url, path)
@@ -266,6 +268,15 @@ class BackstopClient:
         logger.debug("backstop.request.start", extra={"method": method, "path": path})
         try:
             response: httpx.Response = await retrying(make_request)
+        except BackstopAuthError:
+            # A rejected credential is an ordinary outcome rather than a fault — the login form
+            # runs this against every password a user types. Logged without a traceback so a
+            # typo doesn't read like a transport failure in the console.
+            logger.info(
+                "backstop.request.unauthorized",
+                extra={"method": method, "path": path},
+            )
+            raise
         except BackstopApiError as exc:
             # Expected upstream failures — surface the full JSON:API `errors[]` in the
             # console without a traceback. Unexpected transport errors still use
