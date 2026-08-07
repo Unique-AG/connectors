@@ -11,7 +11,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationError
 
-from backstop_mcp.features.custom_fields.types import AllowedValue, CustomFieldDefinition
+from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -19,56 +19,15 @@ logger = logging.getLogger(__name__)
 SNAPSHOT_VERSION = 1
 
 
-class _AllowedValuePayload(BaseModel):
-    id: str | None = None
-    label: str
-
-
-class _DefinitionPayload(BaseModel):
-    definition_id: str
-    entity_type: str
-    crm_name: str
-    display_name: str
-    aliases: list[str] = Field(default_factory=list)
-    description: str | None = None
-    field_type: str | None = None
-    field_type_display: str | None = None
-    is_time_series: bool = False
-    allowed_values: list[_AllowedValuePayload] = Field(default_factory=list)
-    lov_set_id: str | None = None
-    raw: dict[str, object] = Field(default_factory=dict)
-
-
 class SnapshotPayload(BaseModel):
     version: int = SNAPSHOT_VERSION
-    definitions: list[_DefinitionPayload] = Field(default_factory=list)
+    definitions: list[CustomFieldDefinition] = Field(default_factory=list)
 
 
 def dump_definitions(definitions: list[CustomFieldDefinition]) -> dict[str, object]:
-    payload = SnapshotPayload(
-        version=SNAPSHOT_VERSION,
-        definitions=[
-            _DefinitionPayload(
-                definition_id=definition.definition_id,
-                entity_type=definition.entity_type,
-                crm_name=definition.crm_name,
-                display_name=definition.display_name,
-                aliases=list(definition.aliases),
-                description=definition.description,
-                field_type=definition.field_type,
-                field_type_display=definition.field_type_display,
-                is_time_series=definition.is_time_series,
-                allowed_values=[
-                    _AllowedValuePayload(id=value.id, label=value.label)
-                    for value in definition.allowed_values
-                ],
-                lov_set_id=definition.lov_set_id,
-                raw=definition.raw,
-            )
-            for definition in definitions
-        ],
+    return SnapshotPayload(version=SNAPSHOT_VERSION, definitions=definitions).model_dump(
+        mode="json"
     )
-    return payload.model_dump(mode="json")
 
 
 def load_definitions(payload: object) -> list[CustomFieldDefinition] | None:
@@ -86,25 +45,7 @@ def load_definitions(payload: object) -> list[CustomFieldDefinition] | None:
         )
         return None
 
-    return [
-        CustomFieldDefinition(
-            definition_id=item.definition_id,
-            entity_type=item.entity_type,
-            crm_name=item.crm_name,
-            display_name=item.display_name,
-            aliases=tuple(item.aliases),
-            description=item.description,
-            field_type=item.field_type,
-            field_type_display=item.field_type_display,
-            is_time_series=item.is_time_series,
-            allowed_values=tuple(
-                AllowedValue(id=value.id, label=value.label) for value in item.allowed_values
-            ),
-            lov_set_id=item.lov_set_id,
-            raw=item.raw,
-        )
-        for item in parsed.definitions
-    ]
+    return list(parsed.definitions)
 
 
 @dataclass(frozen=True)

@@ -5,28 +5,32 @@ feature's own wire vocabulary, so every tool that resolves a field returns the s
 They lived next to tool handlers until multiple tools needed them and had to share shapes.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.custom_fields.index import FieldCandidate
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
-    CandidateEcho,
+    CandidateResponse,
     NotFoundResponse,
     Unresolved,
     unresolved_response,
 )
 
 
-class AllowedValueEcho(BaseModel):
-    """One picklist option, echoed so a caller can validate a write before attempting it."""
+class AllowedValueResponse(BaseModel):
+    """One picklist option, returned so a caller can validate a write before attempting it."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: str | None = None
     label: str
 
 
-class CustomFieldDefinitionEcho(BaseModel):
-    """A resolved field definition, echoed so a wrong resolution is visible rather than silent."""
+class CustomFieldDefinitionResponse(BaseModel):
+    """A resolved field definition, returned so a wrong resolution is visible rather than silent."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     definition_id: str
     entity_type: str
@@ -37,11 +41,11 @@ class CustomFieldDefinitionEcho(BaseModel):
     field_type: str | None = None
     field_type_display: str | None = None
     is_time_series: bool
-    allowed_values: list[AllowedValueEcho] = Field(default_factory=list)
+    allowed_values: list[AllowedValueResponse] = Field(default_factory=list)
 
 
-class FieldCandidateEcho(CandidateEcho):
-    """One ambiguous field match, echoed so the model can ask the user to pick one."""
+class FieldCandidateResponse(CandidateResponse):
+    """One ambiguous field match, returned so the model can ask the user to pick one."""
 
     definition_id: str
     display_name: str
@@ -51,29 +55,16 @@ class FieldCandidateEcho(CandidateEcho):
 
 # Concrete parameterization of the shared model. A plain assignment, not a subclass: pydantic
 # resolves the subscript to a real model class, which is what FastMCP needs for output schemas.
-FieldAmbiguousResponse = AmbiguousResponse[FieldCandidateEcho]
+FieldAmbiguousResponse = AmbiguousResponse[FieldCandidateResponse]
 
 
-def definition_echo(definition: CustomFieldDefinition) -> CustomFieldDefinitionEcho:
-    return CustomFieldDefinitionEcho(
-        definition_id=definition.definition_id,
-        entity_type=definition.entity_type,
-        crm_name=definition.crm_name,
-        display_name=definition.display_name,
-        aliases=list(definition.aliases),
-        description=definition.description,
-        field_type=definition.field_type,
-        field_type_display=definition.field_type_display,
-        is_time_series=definition.is_time_series,
-        allowed_values=[
-            AllowedValueEcho(id=v.id, label=v.label) for v in definition.allowed_values
-        ],
-    )
+def definition_response(definition: CustomFieldDefinition) -> CustomFieldDefinitionResponse:
+    return CustomFieldDefinitionResponse.model_validate(definition)
 
 
-def field_candidate_echo(candidate: FieldCandidate) -> FieldCandidateEcho:
+def field_candidate_response(candidate: FieldCandidate) -> FieldCandidateResponse:
     definition = candidate.value
-    return FieldCandidateEcho(
+    return FieldCandidateResponse(
         key=candidate.key,
         label=candidate.label,
         definition_id=definition.definition_id,
@@ -90,16 +81,16 @@ def unresolved_field_response(
     return unresolved_response(
         result,
         ambiguous_model=FieldAmbiguousResponse,
-        to_echo=field_candidate_echo,
+        to_candidate=field_candidate_response,
     )
 
 
 __all__ = [
-    "AllowedValueEcho",
-    "CustomFieldDefinitionEcho",
+    "AllowedValueResponse",
+    "CustomFieldDefinitionResponse",
     "FieldAmbiguousResponse",
-    "FieldCandidateEcho",
-    "definition_echo",
-    "field_candidate_echo",
+    "FieldCandidateResponse",
+    "definition_response",
+    "field_candidate_response",
     "unresolved_field_response",
 ]

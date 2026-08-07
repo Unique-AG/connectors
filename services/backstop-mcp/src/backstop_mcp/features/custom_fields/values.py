@@ -131,6 +131,8 @@ async def read_custom_field_value(
     is honoured rather than guessed at.
     """
     entity = normalize_entity_type(entity_type)
+    if entity is None:
+        raise ValueError(f"Unknown entity type: {entity_type!r}")
     safe_id = quote(entity_id, safe="")
 
     if definition.is_time_series:

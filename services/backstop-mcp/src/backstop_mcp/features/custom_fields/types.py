@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -48,17 +47,19 @@ class LovEntryAttributes(BaseModel):
     viewable: bool | None = None
 
 
-@dataclass(frozen=True)
-class AllowedValue:
+class AllowedValue(BaseModel):
     """One picklist / LOV entry, usable to validate a write before attempting it."""
 
-    id: str | None
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str | None = None
     label: str
 
 
-@dataclass(frozen=True)
-class CustomFieldDefinition:
+class CustomFieldDefinition(BaseModel):
     """Merged CRM definition + optional human override."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     definition_id: str
     entity_type: str
@@ -73,4 +74,4 @@ class CustomFieldDefinition:
     # The `lovSet` id this definition points at, when it uses the relationship form. Kept so a
     # snapshot can be re-joined against LOV entries without re-reading the raw payload.
     lov_set_id: str | None = None
-    raw: dict[str, object] = field(default_factory=dict)
+    raw: dict[str, object] = Field(default_factory=dict)

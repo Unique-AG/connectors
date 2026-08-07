@@ -34,14 +34,17 @@ def definition_from_resource(
     and an unnameable field can't be resolved by name anyway.
     """
     attrs = resource.attributes
-    crm_name = (attrs.name or "").strip()
+    # `name` / `entity_type` are already stripped by `CustomFieldDefinitionAttributes`.
+    crm_name = attrs.name
     if not crm_name:
         return None
 
-    entity_raw = (attrs.entity_type or "").strip()
+    entity_raw = attrs.entity_type
     if not entity_raw:
         return None
     entity_type = normalize_entity_type(entity_raw)
+    if entity_type is None:
+        return None
 
     override = overrides.get((entity_type, crm_name))
 

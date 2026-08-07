@@ -22,10 +22,19 @@ So allowed values are assembled from three sources, in order of reliability:
 """
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import StringConstraints, TypeAdapter, ValidationError
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    TypeAdapter,
+    ValidationError,
+)
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.coerce import as_object_dict, as_object_list
@@ -37,6 +46,37 @@ _CleanStr: TypeAdapter[str] = TypeAdapter(
     Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 )
 
+_LOV_ENTRIES_PATH = "/lov-entries"
+
+_LABEL_KEYS = ("display", "defaultDisplay", "label", "name", "value", "displayName", "display_name")
+_ENTRY_COLLECTION_KEYS = ("entries", "lovEntries", "viewableEntries", "options", "values")
+
+_NonEmptyLabel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class _InlineOption(BaseModel):
+    """One inlined picklist option object (or a JSON:API resource/attributes wrapper)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    id: object | None = None
+    label: _NonEmptyLabel | None = Field(
+        default=None,
+        validation_alias=AliasChoices(*_LABEL_KEYS),
+    )
+
+
+class _InlineSet(BaseModel):
+    """An inlined LOV set object carrying options under one of several collection keys."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    entries: list[object] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices(*_ENTRY_COLLECTION_KEYS),
+    )
+    data: object | None = None
+
 
 def _clean_str(value: object) -> str | None:
     try:
@@ -44,100 +84,84 @@ def _clean_str(value: object) -> str | None:
     except ValidationError:
         return None
 
-_LOV_ENTRIES_PATH = "/lov-entries"
 
-# Keys an inlined option object may use for its human label, most specific first.
-_LABEL_KEYS = ("display", "defaultDisplay", "label", "name", "value", "displayName", "display_name")
-# Keys under which an inlined set object may nest its entries.
-_ENTRY_COLLECTION_KEYS = ("entries", "lovEntries", "viewableEntries", "options", "values")
+def _option_from_raw(option: object) -> AllowedValue | None:
+    label = _clean_str(option)
+    if label is not None:
+        return AllowedValue(id=None, label=label)
 
-
-def _label_from_option(option: object) -> str | None:
-    text = _clean_str(option)
-    if text is not None:
-        return text
+    payload = option
     option_dict = as_object_dict(option)
-    if option_dict is None:
+    if option_dict is not None:
+        attributes = as_object_dict(option_dict.get("attributes"))
+        if attributes is not None:
+            payload = attributes
+
+    try:
+        parsed = _InlineOption.model_validate(payload)
+    except ValidationError:
         return None
-    for key in _LABEL_KEYS:
-        label = _clean_str(option_dict.get(key))
-        if label is not None:
-            return label
-    option_id = option_dict.get("id")
-    return str(option_id) if option_id is not None else None
+
+    if parsed.label is None:
+        if parsed.id is None:
+            return None
+        return AllowedValue(id=str(parsed.id), label=str(parsed.id))
+    option_id = str(parsed.id) if parsed.id is not None else None
+    return AllowedValue(id=option_id, label=parsed.label)
 
 
-def _id_from_option(option: object) -> str | None:
-    option_dict = as_object_dict(option)
-    if option_dict is None or option_dict.get("id") is None:
-        return None
-    return str(option_dict["id"])
-
-
-class _AllowedValueBuilder:
-    """Accumulates allowed values, deduplicating by label and preserving insertion order."""
-
-    def __init__(self) -> None:
-        self._values: list[AllowedValue] = []
-        self._seen: set[str] = set()
-
-    def add(self, option: object) -> None:
-        label = _label_from_option(option)
-        if label is None or label in self._seen:
-            return
-        self._seen.add(label)
-        self._values.append(AllowedValue(id=_id_from_option(option), label=label))
-
-    def add_entry(self, entry_id: str | None, label: str) -> None:
-        if label in self._seen:
-            return
-        self._seen.add(label)
-        self._values.append(AllowedValue(id=entry_id, label=label))
-
-    def build(self) -> tuple[AllowedValue, ...]:
-        return tuple(self._values)
+def _dedupe_by_label(values: Iterable[AllowedValue]) -> tuple[AllowedValue, ...]:
+    by_label: dict[str, AllowedValue] = {}
+    for value in values:
+        by_label.setdefault(value.label, value)
+    return tuple(by_label.values())
 
 
 def inline_allowed_values(
     lov_set: object | None, select_options: object | None
 ) -> tuple[AllowedValue, ...]:
     """Source 3: options inlined on the definition's own attributes."""
-    builder = _AllowedValueBuilder()
+    collected: list[AllowedValue] = []
 
     for option in as_object_list(select_options):
-        builder.add(option)
+        value = _option_from_raw(option)
+        if value is not None:
+            collected.append(value)
 
     lov_dict = as_object_dict(lov_set)
     if lov_dict is None:
         for option in as_object_list(lov_set):
-            builder.add(option)
-        return builder.build()
+            value = _option_from_raw(option)
+            if value is not None:
+                collected.append(value)
+        return _dedupe_by_label(collected)
 
-    for key in _ENTRY_COLLECTION_KEYS:
-        for option in as_object_list(lov_dict.get(key)):
-            builder.add(option)
+    try:
+        parsed_set = _InlineSet.model_validate(lov_dict)
+    except ValidationError:
+        return _dedupe_by_label(collected)
+
+    for option in parsed_set.entries:
+        value = _option_from_raw(option)
+        if value is not None:
+            collected.append(value)
 
     # A side-loaded set arrives as a JSON:API resource, so the useful fields are one level
-    # down under `attributes`.
-    data = lov_dict.get("data")
-    data_list = as_object_list(data)
+    # down under `attributes` (handled inside `_option_from_raw`) or nested under `data`.
+    data_list = as_object_list(parsed_set.data)
     if data_list:
         for item in data_list:
-            builder.add(_attributes_or_self(item))
-        return builder.build()
+            value = _option_from_raw(item)
+            if value is not None:
+                collected.append(value)
+        return _dedupe_by_label(collected)
 
-    data_dict = as_object_dict(data)
+    data_dict = as_object_dict(parsed_set.data)
     if data_dict is not None:
-        builder.add(_attributes_or_self(data_dict))
-    return builder.build()
-
-
-def _attributes_or_self(item: object) -> object:
-    item_dict = as_object_dict(item)
-    if item_dict is None:
-        return item
-    attributes = item_dict.get("attributes")
-    return attributes if as_object_dict(attributes) is not None else item
+        value = _option_from_raw(data_dict)
+        if value is not None:
+            collected.append(value)
+    return _dedupe_by_label(collected)
 
 
 @dataclass(frozen=True)
@@ -184,16 +208,16 @@ def build_lov_entry_index(
 
     by_set_id: dict[str, tuple[AllowedValue, ...]] = {}
     for set_id, set_entries in grouped.items():
-        builder = _AllowedValueBuilder()
+        values: list[AllowedValue] = []
         for entry in sorted(set_entries, key=_entry_sort_key):
             attributes = entry.attributes
             label = attributes.display or attributes.default_display or attributes.code
             if label is None:
                 continue
-            builder.add_entry(entry.id, label)
-        values = builder.build()
-        if values:
-            by_set_id[set_id] = values
+            values.append(AllowedValue(id=entry.id, label=label))
+        deduped = _dedupe_by_label(values)
+        if deduped:
+            by_set_id[set_id] = deduped
     return LovEntryIndex(by_set_id=by_set_id)
 
 
