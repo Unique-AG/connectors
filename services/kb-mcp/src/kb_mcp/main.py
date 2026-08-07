@@ -13,17 +13,11 @@ from kb_mcp.settings import ENV_FILE, get_settings
 
 
 def main() -> None:
-    # Settings only feeds Settings' own fields from .env. configure_logging,
-    # configure_tracing, and unique_toolkit's settings read raw os.environ
-    # (and unique_toolkit looks for a file named unique.env, not .env), so
-    # populate the process env too — same file Settings resolved, same
-    # env-wins-over-file precedence (override=False). Skip entirely rather
-    # than pass None: load_dotenv(None) falls back to its own find_dotenv()
-    # search, which could load an unrelated .env (e.g. a monorepo root file).
+    # unique_toolkit and the logging/tracing setup read os.environ directly.
+    # None would make load_dotenv fall back to searching for any .env.
     if ENV_FILE is not None:
         load_dotenv(ENV_FILE, override=False)
 
-    # Config errors fail fast at boot, before any other setup.
     settings = get_settings()
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
@@ -38,20 +32,14 @@ def main() -> None:
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
     )
 
-    # /mcp is called server-side (not from a browser) and OAuth redirects are
-    # top-level navigation, not XHR — CORS never applies here.
+    # No CORS: /mcp is server-side and OAuth redirects are top-level navigation.
     middleware = [
         # HTTP Prometheus metrics; MCP tool spans come from FastMCP + configure_tracing.
         setup_ops(mcp),
     ]
 
-    # Host/Origin DNS-rebinding guard is opt-in in FastMCP 3.4.x
-    # (host_origin_protection defaults to False). Passing allowed_hosts alone
-    # is a no-op. Enabling protection in-cluster also needs probe Host headers
-    # (kubelet Host is the pod IP, not PUBLIC), e.g.
-    # FASTMCP_HTTP_HOST_ORIGIN_PROTECTION=auto + chart probe httpHeaders.
-    # OAuth redirect / token-swap base still comes from UNIQUE_MCP_PUBLIC_BASE_URL
-    # via Settings — not from this Host allowlist.
+    # No allowed_hosts: the DNS-rebinding guard is off by default in FastMCP
+    # 3.4.x, so passing it alone does nothing.
     mcp.run(
         transport=settings.transport_scheme,
         host=settings.local_base_url.host,

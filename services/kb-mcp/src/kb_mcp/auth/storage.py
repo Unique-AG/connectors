@@ -29,8 +29,7 @@ def build_storage(settings: Settings) -> AsyncKeyValue:
             table_name=_OAUTH_TABLE_NAME,
             auto_create=True,
         )
-        # Match FastMCP's own default store: decryption failure = cache miss
-        # so rotating STORAGE_ENCRYPTION_KEY forces re-login, not an error storm.
+        # Decryption failure = cache miss, so key rotation costs one re-login.
         return FernetEncryptionWrapper(
             key_value=store,
             fernet=Fernet(settings.storage_encryption_key.get_secret_value().encode()),

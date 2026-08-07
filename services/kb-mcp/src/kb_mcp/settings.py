@@ -11,16 +11,13 @@ from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from unique_mcp.util.find_env_file import find_env_file
 
-# Shared with main.py, which also loads this file into the process env for
-# libraries (unique-toolkit, configure_logging, configure_tracing) that read
-# os.environ directly instead of going through Settings.
+# main.py also loads this into the process env for libraries that bypass Settings.
 ENV_FILE: Path | None = find_env_file(filenames=["kb_mcp.env", ".env"], required=False)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        # Env vars win over the file here — unlike the old load_dotenv(override=True),
-        # which let a stray .env beat K8s secrets.
+        # Env vars win over the file, unlike load_dotenv(override=True).
         env_file=ENV_FILE,
         env_file_encoding="utf-8",
         frozen=True,

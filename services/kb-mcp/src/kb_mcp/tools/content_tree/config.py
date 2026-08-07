@@ -8,11 +8,8 @@ from unique_toolkit.content.smart_rules import Operator, Statement, UniqueQLFiel
 
 MatchTarget = Literal["key", "path", "both"]
 
-# Applied when metadata_filter is unset. Not the field's own default:
-# UniqueQLField's schema declares string|null but its serializer returns
-# dict|None, so any non-None default breaks admin-UI rendering. Kept as a
-# Statement (`.to_dict()` per call) so no shared mutable dict is handed to
-# downstream service calls.
+# Not the field default: UniqueQLField serialises to dict|None against a
+# string|null schema, which breaks admin-UI rendering.
 DEFAULT_METADATA_FILTER_STATEMENT = Statement(
     operator=Operator.NOT_CONTAINS,
     path=["folderIdPath"],

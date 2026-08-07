@@ -2,9 +2,8 @@
 
 from collections.abc import Sequence
 
-# Toolkit path helpers emit this sentinel when content has no folderIdPath
-# (chat uploads, loose files). Strip it from display labels only — do not
-# change toolkit emission; other callers may rely on the literal value.
+# Toolkit sentinel for content with no folderIdPath. Strip from labels only;
+# other callers rely on the literal value.
 NO_FOLDER_PATH_SENTINEL = "_no_folder_path"
 
 
