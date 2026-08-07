@@ -88,7 +88,7 @@ class TestPublicBaseUrl:
     def test_the_local_default_is_allowed_outside_production(self) -> None:
         config = AppConfig(app_env=AppEnv.DEVELOPMENT)
 
-        assert config.public_base_url == "http://localhost:9010"
+        assert config.issuer == "http://localhost:9010"
 
     @pytest.mark.parametrize(
         "url",
@@ -102,25 +102,35 @@ class TestPublicBaseUrl:
     )
     def test_production_rejects_a_url_no_client_can_reach(self, url: str) -> None:
         with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
-            AppConfig(app_env=AppEnv.PRODUCTION, public_base_url=url)
+            AppConfig.model_validate({"app_env": AppEnv.PRODUCTION, "public_base_url": url})
 
     def test_rejects_malformed_public_base_url(self) -> None:
         with pytest.raises(ValidationError):
-            AppConfig(app_env=AppEnv.DEVELOPMENT, public_base_url="not-a-url")
+            AppConfig.model_validate(
+                {"app_env": AppEnv.DEVELOPMENT, "public_base_url": "not-a-url"}
+            )
 
     def test_production_accepts_a_real_public_url(self) -> None:
-        config = AppConfig(
-            app_env=AppEnv.PRODUCTION, public_base_url="https://backstop-mcp.example"
+        config = AppConfig.model_validate(
+            {"app_env": AppEnv.PRODUCTION, "public_base_url": "https://backstop-mcp.example"}
         )
 
-        assert config.public_base_url == "https://backstop-mcp.example"
+        assert config.issuer == "https://backstop-mcp.example"
 
-    def test_strips_trailing_slash_on_public_base_url(self) -> None:
-        config = AppConfig(
-            app_env=AppEnv.PRODUCTION, public_base_url="https://backstop-mcp.example/"
+    def test_the_issuer_never_carries_a_trailing_slash(self) -> None:
+        config = AppConfig.model_validate(
+            {"app_env": AppEnv.PRODUCTION, "public_base_url": "https://backstop-mcp.example/"}
         )
 
-        assert config.public_base_url == "https://backstop-mcp.example"
+        assert config.issuer == "https://backstop-mcp.example"
+
+    def test_the_parsed_url_is_available_for_host_and_scheme_checks(self) -> None:
+        config = AppConfig.model_validate(
+            {"app_env": AppEnv.PRODUCTION, "public_base_url": "https://backstop-mcp.example"}
+        )
+
+        assert config.public_base_url.scheme == "https"
+        assert config.public_base_url.host == "backstop-mcp.example"
 
     def test_production_is_the_default_env_so_the_bare_default_is_rejected(
         self, monkeypatch: pytest.MonkeyPatch

@@ -12,7 +12,6 @@ from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.app import create_app
-from backstop_mcp.coerce import as_object_dict
 from backstop_mcp.config import AppConfig, DatabaseConfig
 
 
@@ -31,12 +30,19 @@ def _get(client: TestClient, path: str) -> _HttpResponse:
     return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
 
 
+def _checks(body: dict[str, object]) -> dict[str, object]:
+    """The `checks` sub-object of a `/ready` body, narrowed for assertion."""
+    checks = body["checks"]
+    assert isinstance(checks, dict), f"expected a checks object, got {checks!r}"
+    return cast("dict[str, object]", checks)
+
+
 @pytest.fixture
 def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
     """The real app, with its lifespan run."""
     url = postgres_container.get_connection_url().replace("+psycopg2", "")
     app = create_app(
-        config=AppConfig(public_base_url="https://backstop-mcp.example"),
+        config=AppConfig.model_validate({"public_base_url": "https://backstop-mcp.example"}),
         database_config=DatabaseConfig.model_validate({"url": url}),
     )
     with TestClient(app) as client:
@@ -63,10 +69,7 @@ class TestRoutes:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "healthy"
-
-        checks = as_object_dict(body["checks"])
-        assert checks is not None
-        assert checks["database"] is True
+        assert _checks(body)["database"] is True
 
     def test_metrics_is_served(self, app_client: TestClient) -> None:
         response = _get(app_client, "/metrics")
@@ -77,7 +80,7 @@ class TestRoutes:
 class TestReadyReportsDatabaseUnreachable:
     def test_ready_is_503_when_postgres_is_unreachable(self) -> None:
         app = create_app(
-            config=AppConfig(public_base_url="https://backstop-mcp.example"),
+            config=AppConfig.model_validate({"public_base_url": "https://backstop-mcp.example"}),
             database_config=DatabaseConfig.model_validate(
                 {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
             ),
@@ -88,6 +91,4 @@ class TestReadyReportsDatabaseUnreachable:
         assert response.status_code == 503
         body = response.json()
         assert body["status"] == "unhealthy"
-        checks = as_object_dict(body["checks"])
-        assert checks is not None
-        assert checks["database"] is False
+        assert _checks(body)["database"] is False
