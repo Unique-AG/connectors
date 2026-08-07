@@ -69,11 +69,15 @@ class TestGetOrganization:
 
         # `organization` is the record's own fields, not the enclosing JSON:API document —
         # `type`/`id` are already echoed under `resolved`.
-        assert result.organization == OrganizationAttributes(
-            name="Capstone",
-            status="active",
-            modified_timestamp="2025-03-01T10:00:00Z",
-            modified_by="ops",
+        # `model_validate`, not kwargs: `status` is an `extra="allow"` passthrough and the
+        # provenance fields bind by alias, neither of which the synthesized `__init__` knows.
+        assert result.organization == OrganizationAttributes.model_validate(
+            {
+                "name": "Capstone",
+                "status": "active",
+                "modified_timestamp": "2025-03-01T10:00:00Z",
+                "modified_by": "ops",
+            }
         )
         assert result.resolved == ResolvedPartyResponse(
             id="o42", search_type="organizations", name="Capstone"
