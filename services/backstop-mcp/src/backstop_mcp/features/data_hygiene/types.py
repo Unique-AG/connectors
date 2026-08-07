@@ -1,11 +1,13 @@
 """Internal types for read-response provenance and departed-contact detection."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from enum import StrEnum
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from backstop_mcp.dates import LenientDate
 
 # Which resource types can hold an employment relationship, as the canonical plurals that
 # `entity_types.normalize_entity_type` maps to — `employment.py` compares through it. Backstop
@@ -14,32 +16,6 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 # a deployment cannot know the strings, and a typo would silently disable detection.
 PERSON_SIDE_TYPES: frozenset[str] = frozenset({"people", "contacts", "employees"})
 ORG_SIDE_TYPES: frozenset[str] = frozenset({"organizations"})
-
-
-def _lenient_date(value: object) -> date | None:
-    """Coerce Backstop date/timestamp spellings to a calendar day, or None if unparseable."""
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    if not isinstance(value, str):
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    try:
-        return date.fromisoformat(text[:10])
-    except ValueError:
-        pass
-    try:
-        return datetime.fromisoformat(text).date()
-    except ValueError:
-        return None
-
-
-_LenientDate = Annotated[date | None, BeforeValidator(_lenient_date)]
 
 
 class EntityRelationshipInclude(StrEnum):
@@ -77,9 +53,9 @@ class EntityRelationshipAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    end_date: _LenientDate = Field(default=None, alias="endDate")
-    start_date: _LenientDate = Field(default=None, alias="startDate")
-    created_timestamp: _LenientDate = Field(default=None, alias="createdTimestamp")
+    end_date: LenientDate = Field(default=None, alias="endDate")
+    start_date: LenientDate = Field(default=None, alias="startDate")
+    created_timestamp: LenientDate = Field(default=None, alias="createdTimestamp")
     source_entity: EntityRefAttributes | None = Field(default=None, alias="sourceEntity")
     destination_entity: EntityRefAttributes | None = Field(default=None, alias="destinationEntity")
 
