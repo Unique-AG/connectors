@@ -7,7 +7,6 @@ testing `create_app` itself, which is where the wiring lives that is easiest to 
 These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
 """
 
-import dataclasses
 from collections.abc import Iterator
 from typing import Protocol, cast
 
@@ -94,7 +93,7 @@ def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
 class TestWiring:
     @pytest.mark.asyncio
     async def test_the_auth_cycle_is_closed(
-        self, app_client: TestClient, monkeypatch: pytest.MonkeyPatch
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """`attach_auth` must have run: without it `for_current_caller` asserts instead of working.
 
@@ -103,8 +102,15 @@ class TestWiring:
         that can't be expressed by constructor order alone. If the cycle were open,
         `for_current_caller` would raise an `AssertionError` from the factory itself rather than
         reaching the credential lookup that raises `NotConnectedError` below.
+
+        Deliberately built with `create_app` rather than taking `app_client`: `TestClient` runs
+        the lifespan on its own portal thread and loop, and `cleanup_lifespan`'s sweep-on-start
+        immediately queries the database, binding the engine's asyncpg pool to that loop. The
+        credential lookup below runs on pytest-asyncio's function-scoped loop, so it would block
+        forever waiting to check out a connection owned by the other one. `create_app` is what
+        closes the cycle, so no running server is needed to assert that it did.
         """
-        _ = app_client  # the app is built and started by the fixture
+        _ = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
         monkeypatch.setattr(
             "backstop_mcp.features.auth.context.get_access_token",
             lambda: AccessToken(
@@ -186,7 +192,10 @@ class TestRoutes:
         assert response.status_code == 200
         issuer = _as_str(response.json()["issuer"])
         assert issuer is not None
-        assert issuer == "https://backstop-mcp.example"
+        # The SDK models the issuer as `AnyHttpUrl`, which renders a bare origin with a trailing
+        # slash (and itself strips it again to build the authorize/token URLs). What this asserts
+        # is that the advertised issuer is our configured public URL rather than localhost.
+        assert issuer.rstrip("/") == "https://backstop-mcp.example"
 
 
 class TestReadyReportsDatabaseUnreachable:
@@ -255,8 +264,8 @@ class TestConfigTranslation:
 
         # Every field of the settings type is named after the config field it comes from, so the
         # whole mapping can be checked at once — and a newly-added field is covered automatically.
-        for field in dataclasses.fields(settings):
-            assert getattr(settings, field.name) == getattr(config, field.name), field.name
+        for name in type(settings).model_fields:
+            assert getattr(settings, name) == getattr(config, name), name
 
     def test_retry_settings_carry_the_configured_values(self) -> None:
         """Checked by hand because these two are the only renamed pair."""
