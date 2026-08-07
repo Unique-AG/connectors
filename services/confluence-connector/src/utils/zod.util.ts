@@ -21,13 +21,16 @@ const envResolvableStringSchema = z.string().transform((val) => {
   return process.env[varName] ?? '';
 });
 
+// Secrets injected through Kubernetes secrets or `.env` files routinely carry a trailing newline,
+// which is invisible in config but makes Confluence reject the credentials with a bare 401.
 export const envRequiredSecretSchema = envResolvableStringSchema
-  .pipe(z.string().nonempty())
+  .pipe(z.string().trim().nonempty())
   .transform((val) => new Redacted(val));
 
-export const envRequiredPlainSchema = envResolvableStringSchema.pipe(z.string().nonempty());
+export const envRequiredPlainSchema = envResolvableStringSchema.pipe(z.string().trim().nonempty());
 
 export const redactedNonEmptyStringSchema = z
   .string()
+  .trim()
   .nonempty()
   .transform((val) => new Redacted(val));
