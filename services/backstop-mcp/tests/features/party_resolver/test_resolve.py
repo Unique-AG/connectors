@@ -556,3 +556,12 @@ class TestInvalidArgs:
     def test_party_resolve_item_rejects_neither(self) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
             PartyResolveItem()
+
+    def test_party_resolve_item_treats_blank_selectors_as_unset(self) -> None:
+        item = PartyResolveItem(party_id="  ", search="Capstone")
+        assert item.party_id is None
+        assert item.search == "Capstone"
+
+        item = PartyResolveItem(party_id="o1", search="")
+        assert item.party_id == "o1"
+        assert item.search is None
