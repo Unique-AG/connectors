@@ -67,16 +67,17 @@ def resolve_request_url(base_url: str, path: str) -> str:
 
     Relative paths are returned as-is (httpx joins them onto the client base). Absolute URLs
     arrive from `links.next` while walking a pagination chain and are pinned to the configured
-    host: an authenticated client following an arbitrary upstream-supplied origin would send
-    `Authorization: Basic ...` wherever that origin points.
+    scheme + host: an authenticated client following an arbitrary upstream-supplied origin
+    (or a same-host scheme downgrade) would send `Authorization: Basic ...` wherever that
+    origin points.
     """
     if not path.startswith(("http://", "https://")):
         return path if path.startswith("/") else f"/{path}"
 
-    expected = httpx.URL(base_url).netloc
-    actual = httpx.URL(path).netloc
-    if actual != expected:
-        raise BackstopUntrustedUrlError(path, expected.decode("ascii", "replace"))
+    expected = httpx.URL(base_url)
+    actual = httpx.URL(path)
+    if actual.netloc != expected.netloc or actual.scheme != expected.scheme:
+        raise BackstopUntrustedUrlError(path, expected.netloc.decode("ascii", "replace"))
     return path
 
 
