@@ -1,6 +1,5 @@
-import os
-
 import pytest
+from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -25,7 +24,7 @@ def _auth(
 ) -> BackstopAuthContext:
     return BackstopAuthContext(
         session_factory=session_factory,
-        encryption_key=key if key is not None else os.urandom(32),
+        encryption_key=key if key is not None else Fernet.generate_key(),
         revoke_tokens_for_subject=_noop_revoke,
     )
 
@@ -38,7 +37,7 @@ class TestCurrentCredential:
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, session_factory = db
-        key = os.urandom(32)
+        key = Fernet.generate_key()
         auth = _auth(session_factory, key)
         async with session_factory() as session:
             await save_credential(
@@ -107,7 +106,7 @@ class TestRevokeCurrentSubjectTokens:
 
         auth = BackstopAuthContext(
             session_factory=session_factory,
-            encryption_key=os.urandom(32),
+            encryption_key=Fernet.generate_key(),
             revoke_tokens_for_subject=record,
         )
         monkeypatch.setattr(
@@ -130,7 +129,7 @@ class TestRevokeCurrentSubjectTokens:
 
         auth = BackstopAuthContext(
             session_factory=session_factory,
-            encryption_key=os.urandom(32),
+            encryption_key=Fernet.generate_key(),
             revoke_tokens_for_subject=record,
         )
         monkeypatch.setattr("backstop_mcp.features.auth.context.get_access_token", lambda: None)

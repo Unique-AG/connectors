@@ -171,7 +171,7 @@ class BackstopOAuthProvider(OAuthProvider):
             row = await session.get(OAuthClientRow, client_id)
         if row is None:
             return None
-        return OAuthClientInformationFull.model_validate_json(row.client_metadata_json)
+        return OAuthClientInformationFull.model_validate(row.client_metadata)
 
     @override
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
@@ -180,7 +180,7 @@ class BackstopOAuthProvider(OAuthProvider):
             session.add(
                 OAuthClientRow(
                     client_id=client_info.client_id,
-                    client_metadata_json=client_info.model_dump_json(),
+                    client_metadata=client_info.model_dump(mode="json"),
                 )
             )
 
@@ -267,9 +267,7 @@ class BackstopOAuthProvider(OAuthProvider):
         async with read_session(self._session_factory) as session:
             client_row = await session.get(OAuthClientRow, pending.client_id)
         if client_row is not None:
-            client_info = OAuthClientInformationFull.model_validate_json(
-                client_row.client_metadata_json
-            )
+            client_info = OAuthClientInformationFull.model_validate(client_row.client_metadata)
             client_name = client_info.client_name
 
         return self._form_response(request_id, client_name=client_name)

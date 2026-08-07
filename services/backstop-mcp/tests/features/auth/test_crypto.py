@@ -1,7 +1,5 @@
-import base64
-import os
-
 import pytest
+from cryptography.fernet import Fernet
 from pydantic import SecretStr
 
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
@@ -15,22 +13,20 @@ from backstop_mcp.features.auth.crypto import (
 
 
 def _random_key() -> bytes:
-    return os.urandom(32)
+    return Fernet.generate_key()
 
 
 class TestLoadKey:
-    def test_decodes_base64_32_byte_key(self) -> None:
-        raw_key = os.urandom(32)
-        config = EncryptionConfig(encryption_key=SecretStr(base64.b64encode(raw_key).decode()))
+    def test_accepts_fernet_key(self) -> None:
+        key = Fernet.generate_key()
+        config = EncryptionConfig(encryption_key=SecretStr(key.decode()))
 
-        assert load_key(config) == raw_key
+        assert load_key(config) == key
 
-    def test_rejects_wrong_length_key(self) -> None:
-        config = EncryptionConfig(
-            encryption_key=SecretStr(base64.b64encode(os.urandom(16)).decode())
-        )
+    def test_rejects_non_fernet_key(self) -> None:
+        config = EncryptionConfig(encryption_key=SecretStr("not-a-fernet-key"))
 
-        with pytest.raises(ValueError, match="32 bytes"):
+        with pytest.raises(ValueError, match="Fernet key"):
             load_key(config)
 
 
@@ -55,7 +51,7 @@ class TestEncryptDecryptRoundTrip:
         assert "p@55W0rd321!" not in repr(credential)
         assert "p@55W0rd321!" not in str(credential)
 
-    def test_nonce_is_unique_per_encryption(self) -> None:
+    def test_ciphertext_is_unique_per_encryption(self) -> None:
         key = _random_key()
         credential = BackstopCredentialSecret(username="bob.smith", api_token=SecretStr("token"))
 
@@ -82,15 +78,6 @@ class TestTamperDetection:
         with pytest.raises(InvalidCredentialEnvelopeError):
             decrypt_credential(blob, _random_key())
 
-    def test_rejects_unsupported_envelope_version(self) -> None:
-        key = _random_key()
-        credential = BackstopCredentialSecret(username="bob.smith", api_token=SecretStr("token"))
-        blob = encrypt_credential(credential, key)
-        tampered = b"\x99" + blob[1:]
-
-        with pytest.raises(InvalidCredentialEnvelopeError, match="version"):
-            decrypt_credential(tampered, key)
-
-    def test_rejects_too_short_blob(self) -> None:
-        with pytest.raises(InvalidCredentialEnvelopeError, match="too short"):
-            decrypt_credential(b"\x01short", _random_key())
+    def test_rejects_malformed_blob(self) -> None:
+        with pytest.raises(InvalidCredentialEnvelopeError):
+            decrypt_credential(b"not-a-fernet-token", _random_key())
