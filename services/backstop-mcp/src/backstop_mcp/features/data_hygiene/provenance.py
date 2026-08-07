@@ -1,7 +1,12 @@
 """Extract plain `as_of` provenance from Backstop resource attributes."""
 
-from backstop_mcp.coerce import as_clean_str, as_object_dict
+from collections.abc import Mapping
+from typing import cast
+
 from backstop_mcp.features.data_hygiene.types import AsOf, ProvenanceFields
+
+# Where an instance nests the actor object rather than sending a bare string.
+_ACTOR_NAME_KEYS = ("name", "displayName", "display_name", "id")
 
 
 def extract_as_of(attributes: ProvenanceFields | None) -> AsOf | None:
@@ -12,23 +17,28 @@ def extract_as_of(attributes: ProvenanceFields | None) -> AsOf | None:
     """
     if attributes is None:
         return None
-    modified_timestamp = as_clean_str(attributes.modified_timestamp)
     modified_by = _modified_by(attributes.modified_by)
-    if modified_timestamp is None and modified_by is None:
+    if attributes.modified_timestamp is None and modified_by is None:
         return None
-    return AsOf(modified_timestamp=modified_timestamp, modified_by=modified_by)
+    return AsOf(modified_timestamp=attributes.modified_timestamp, modified_by=modified_by)
 
 
 def _modified_by(value: object) -> str | None:
-    text = as_clean_str(value)
-    if text is not None:
-        return text
-    # Some instances nest the actor as `{name}` / `{id}` rather than a bare string.
-    nested = as_object_dict(value)
-    if nested is None:
+    """The actor as a name, whether Backstop sent a string or an object.
+
+    `AsOf.modified_by` cleans whatever this returns, so blank strings pulled out of a nested
+    actor are absence there rather than a check here.
+    """
+    if isinstance(value, str):
+        return value.strip() or None
+    if not isinstance(value, Mapping):
         return None
-    for key in ("name", "displayName", "display_name", "id"):
-        label = as_clean_str(nested.get(key))
-        if label is not None:
-            return label
-    return None
+    actor = cast("Mapping[str, object]", value)
+    return next(
+        (
+            text.strip()
+            for key in _ACTOR_NAME_KEYS
+            if isinstance(text := actor.get(key), str) and text.strip()
+        ),
+        None,
+    )

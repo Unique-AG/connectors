@@ -1,9 +1,9 @@
-import os
 from collections.abc import Callable
 
 import httpx
 import pytest
 import respx
+from cryptography.fernet import Fernet
 from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -52,7 +52,7 @@ class TestGetSystemInfo:
             BASE_URL,
             auth=BackstopAuthContext(
                 session_factory=session_factory,
-                encryption_key=os.urandom(32),
+                encryption_key=Fernet.generate_key(),
                 revoke_tokens_for_subject=_noop_revoke,
             ),
         )
@@ -80,7 +80,7 @@ class TestGetSystemInfo:
             revoked_subjects.append(subject)
 
         _, session_factory = db
-        key = os.urandom(32)
+        key = Fernet.generate_key()
         async with session_factory() as session:
             await save_credential(
                 session,
