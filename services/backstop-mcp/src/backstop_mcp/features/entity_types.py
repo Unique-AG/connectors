@@ -8,7 +8,7 @@ schema index and party tools use.
 
 import re
 from enum import StrEnum
-from typing import Final, Literal, TypeGuard
+from typing import Final, Literal, cast
 
 
 class EntityType(StrEnum):
@@ -65,7 +65,18 @@ def normalize_entity_type(entity_type: str) -> EntityType | None:
         return None
 
 
-def is_party_search_type(entity_type: str) -> TypeGuard[SearchType]:
-    """Whether `entity_type` normalizes to a party-searchable resource type."""
+def party_search_type(entity_type: str) -> SearchType | None:
+    """Return the canonical party `SearchType` when `entity_type` normalizes to one.
+
+    Prefer this over a `TypeGuard` on the raw input: singular CRM forms like `organization`
+    normalize successfully but are not themselves `SearchType` literals.
+    """
     normalized = normalize_entity_type(entity_type)
-    return normalized is not None and normalized in PARTY_SEARCH_TYPES
+    if normalized is None or normalized not in PARTY_SEARCH_TYPES:
+        return None
+    return cast(SearchType, normalized.value)
+
+
+def is_party_search_type(entity_type: str) -> bool:
+    """Whether `entity_type` normalizes to a party-searchable resource type."""
+    return party_search_type(entity_type) is not None
