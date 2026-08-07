@@ -155,7 +155,7 @@ def create_app(
     async def ready(_request: Request) -> JSONResponse:
         """Postgres readiness — stock `setup_ops` `/probe` is process-up only."""
         return await _ready_response(
-            engine, custom_fields_schema_loaded=custom_fields_service.has_definitions
+            engine, custom_fields_schema_loaded=custom_fields_service.has_definitions()
         )
 
     @mcp.custom_route(auth_provider.login_path, methods=["GET"])

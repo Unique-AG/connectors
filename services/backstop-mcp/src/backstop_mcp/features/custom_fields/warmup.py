@@ -29,7 +29,10 @@ async def warm_custom_field_schema(
         return
 
     try:
-        await service.ensure_fresh(clients.for_credential(credential))
+        await service.ensure_fresh(
+            clients.for_credential(credential),
+            subject=credential.username,
+        )
     except Exception:
         logger.exception("custom_fields.warmup.failed")
         return

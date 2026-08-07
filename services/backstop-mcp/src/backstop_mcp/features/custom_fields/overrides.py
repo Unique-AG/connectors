@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
+from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 
 # Key format: `{entityType}:{crmName}`. crmName is the CRM's own field identifier (e.g.
 # `is1`) — unique per entity type and stable across tenants, unlike the numeric
@@ -23,6 +24,57 @@ class FieldOverride:
 
 
 type OverrideIndex = dict[tuple[str, str], FieldOverride]
+
+
+def apply_overrides(
+    definitions: list[CustomFieldDefinition],
+    overrides: OverrideIndex,
+) -> list[CustomFieldDefinition]:
+    """Re-merge current overrides onto definitions from CRM-native fields.
+
+    Snapshots may have been written under an older override map. Always rebuild
+    `display_name` / `aliases` / `description` from `crm_name` + `raw` attributes so config
+    drift applies without waiting for the next Backstop fetch. Does not invent fields that
+    are not already in `definitions`.
+    """
+    applied: list[CustomFieldDefinition] = []
+    for definition in definitions:
+        override = overrides.get((definition.entity_type, definition.crm_name))
+        crm_description = _crm_description(definition)
+        if override is None:
+            applied.append(
+                definition.model_copy(
+                    update={
+                        "display_name": definition.crm_name,
+                        "aliases": (),
+                        "description": crm_description,
+                    }
+                )
+            )
+            continue
+        display_name = (
+            override.display_name.strip() if override.display_name else definition.crm_name
+        )
+        aliases = tuple(a.strip() for a in override.aliases if a.strip())
+        description = override.description if override.description else crm_description
+        applied.append(
+            definition.model_copy(
+                update={
+                    "display_name": display_name,
+                    "aliases": aliases,
+                    "description": description,
+                }
+            )
+        )
+    return applied
+
+
+def _crm_description(definition: CustomFieldDefinition) -> str | None:
+    attributes = definition.raw.get("attributes")
+    if not isinstance(attributes, dict):
+        return None
+    description = attributes.get("description")
+    return description.strip() if isinstance(description, str) and description.strip() else None
 
 
 def parse_override_key(key: str) -> tuple[str, str]:

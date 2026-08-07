@@ -66,18 +66,6 @@ class _InlineOption(BaseModel):
     )
 
 
-class _InlineSet(BaseModel):
-    """An inlined LOV set object carrying options under one of several collection keys."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    entries: list[object] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices(*_ENTRY_COLLECTION_KEYS),
-    )
-    data: object | None = None
-
-
 def _clean_str(value: object) -> str | None:
     try:
         return _CleanStr.validate_python(value)
@@ -85,17 +73,61 @@ def _clean_str(value: object) -> str | None:
         return None
 
 
+def _first_nonempty_list(payload: dict[str, object]) -> list[object]:
+    """First collection among `_ENTRY_COLLECTION_KEYS` that is a non-empty list.
+
+    `AliasChoices` binds the first *present* key, so a null/empty `entries` would block a
+    later usable `viewableEntries` — walk the keys ourselves instead.
+    """
+    for key in _ENTRY_COLLECTION_KEYS:
+        if key not in payload:
+            continue
+        items = as_object_list(payload.get(key))
+        if items:
+            return items
+    return []
+
+
+def _usable_label(payload: dict[str, object]) -> str | None:
+    """First non-blank label among the known keys (skips null/blank earlier aliases)."""
+    for key in _LABEL_KEYS:
+        if key not in payload:
+            continue
+        label = _clean_str(payload.get(key))
+        if label is not None:
+            return label
+    return None
+
+
 def _option_from_raw(option: object) -> AllowedValue | None:
     label = _clean_str(option)
     if label is not None:
         return AllowedValue(id=None, label=label)
 
-    payload = option
     option_dict = as_object_dict(option)
+    resource_id: object | None = None
+    payload: object = option
     if option_dict is not None:
+        resource_id = option_dict.get("id")
         attributes = as_object_dict(option_dict.get("attributes"))
         if attributes is not None:
+            # Keep the JSON:API envelope id — attributes alone often omit it.
             payload = attributes
+
+    option_payload = as_object_dict(payload)
+    if option_payload is not None:
+        label = _usable_label(option_payload)
+        option_id = option_payload.get("id")
+        if option_id is None:
+            option_id = resource_id
+        if label is not None:
+            return AllowedValue(
+                id=str(option_id) if option_id is not None else None,
+                label=label,
+            )
+        if option_id is not None:
+            return AllowedValue(id=str(option_id), label=str(option_id))
+        return None
 
     try:
         parsed = _InlineOption.model_validate(payload)
@@ -103,11 +135,15 @@ def _option_from_raw(option: object) -> AllowedValue | None:
         return None
 
     if parsed.label is None:
-        if parsed.id is None:
+        if parsed.id is None and resource_id is None:
             return None
-        return AllowedValue(id=str(parsed.id), label=str(parsed.id))
-    option_id = str(parsed.id) if parsed.id is not None else None
-    return AllowedValue(id=option_id, label=parsed.label)
+        fallback_id = parsed.id if parsed.id is not None else resource_id
+        return AllowedValue(id=str(fallback_id), label=str(fallback_id))
+    option_id = parsed.id if parsed.id is not None else resource_id
+    return AllowedValue(
+        id=str(option_id) if option_id is not None else None,
+        label=parsed.label,
+    )
 
 
 def _dedupe_by_label(values: Iterable[AllowedValue]) -> tuple[AllowedValue, ...]:
@@ -136,19 +172,14 @@ def inline_allowed_values(
                 collected.append(value)
         return _dedupe_by_label(collected)
 
-    try:
-        parsed_set = _InlineSet.model_validate(lov_dict)
-    except ValidationError:
-        return _dedupe_by_label(collected)
-
-    for option in parsed_set.entries:
+    for option in _first_nonempty_list(lov_dict):
         value = _option_from_raw(option)
         if value is not None:
             collected.append(value)
 
     # A side-loaded set arrives as a JSON:API resource, so the useful fields are one level
     # down under `attributes` (handled inside `_option_from_raw`) or nested under `data`.
-    data_list = as_object_list(parsed_set.data)
+    data_list = as_object_list(lov_dict.get("data"))
     if data_list:
         for item in data_list:
             value = _option_from_raw(item)
@@ -156,7 +187,7 @@ def inline_allowed_values(
                 collected.append(value)
         return _dedupe_by_label(collected)
 
-    data_dict = as_object_dict(parsed_set.data)
+    data_dict = as_object_dict(lov_dict.get("data"))
     if data_dict is not None:
         value = _option_from_raw(data_dict)
         if value is not None:

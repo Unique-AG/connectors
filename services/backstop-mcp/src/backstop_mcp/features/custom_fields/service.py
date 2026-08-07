@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
@@ -7,25 +8,41 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.db import read_session, transaction
+from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
 from backstop_mcp.features.custom_fields.glossary import format_glossary
 from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
-from backstop_mcp.features.custom_fields.overrides import FieldOverride
+from backstop_mcp.features.custom_fields.overrides import (
+    FieldOverride,
+    apply_overrides,
+    index_overrides,
+)
 from backstop_mcp.features.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
+from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class _SubjectSchema:
+    """In-memory schema state for one `(base_url, subject)` cache entry."""
+
+    index: DefinitionIndex = field(default_factory=dict)
+    freshness: TimedGate = field(default_factory=lambda: TimedGate(duration=timedelta(0)))
+    refresh_floor: TimedGate = field(default_factory=lambda: TimedGate(duration=timedelta(0)))
+
+
 class CustomFieldsService:
-    """Process-wide custom-field schema cache.
+    """Per-caller custom-field schema cache.
 
     Definitions only ever come from a real Backstop fetch, persisted as a snapshot keyed by
-    `base_url` (so one instance's schema is shared across every user of it). `overrides` are
-    a display overlay applied to fetched fields — never a source of fields on their own, so
-    until a fetch succeeds this service serves nothing and the glossary stays absent.
+    `(base_url, subject)` so one caller's refresh cannot populate another's catalog.
+    `overrides` are a display overlay reapplied on every load — never a source of fields on
+    their own, so until a fetch succeeds this service serves nothing and the glossary stays
+    absent.
 
     Name → definition resolution (including elicitation) lives in `resolve.py`, mirroring
     `party_resolver.resolve`. Constructed by `create_app()` and reached via
@@ -52,101 +69,132 @@ class CustomFieldsService:
         self._session_factory: async_sessionmaker[AsyncSession] = session_factory
         self._base_url: str = base_url.rstrip("/")
         self._overrides: dict[str, FieldOverride] = overrides
+        self._override_index = index_overrides(overrides)
         self._ttl: timedelta = ttl
-        self._index: DefinitionIndex = {}
+        self._by_subject: dict[str, _SubjectSchema] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
-        self._fetched_at: datetime | None = None
-        # When an upstream fetch was last *attempted*, as opposed to when the index was last
-        # successfully filled (`_fetched_at`, which a snapshot read also sets). Tracked
-        # separately so a failing Backstop can't be hammered either.
-        self._refresh_attempted_at: datetime | None = None
 
-    @property
-    def is_fresh(self) -> bool:
-        """Whether the in-memory schema came from a fetch recent enough to trust.
+    def _resolve_subject(self, subject: str | None) -> str | None:
+        return subject if subject is not None else current_subject()
 
-        False both when nothing has ever been fetched and when the snapshot has aged past
-        `ttl`. Lets callers decide whether it's worth acquiring a client — which costs a DB
-        read plus a credential decrypt — before asking for a refresh.
+    def _entry(self, subject: str) -> _SubjectSchema:
+        entry = self._by_subject.get(subject)
+        if entry is not None:
+            return entry
+        entry = _SubjectSchema(
+            freshness=TimedGate(duration=self._ttl),
+            refresh_floor=TimedGate(duration=self.MIN_REFRESH_INTERVAL),
+        )
+        self._by_subject[subject] = entry
+        return entry
+
+    def is_fresh(self, subject: str | None = None) -> bool:
+        """Whether this subject's in-memory schema came from a fetch recent enough to trust."""
+        resolved = self._resolve_subject(subject)
+        if resolved is None:
+            return False
+        entry = self._by_subject.get(resolved)
+        return entry is not None and entry.freshness.within()
+
+    def has_definitions(self, subject: str | None = None) -> bool:
+        """Whether anything is loaded for this subject (or any subject, when unscoped).
+
+        An unscoped call is for readiness probes: True if at least one caller's schema is in
+        memory. Scoped calls never fall back to another subject's catalog.
         """
-        return self._fetched_at is not None and datetime.now(UTC) - self._fetched_at < self._ttl
+        resolved = self._resolve_subject(subject)
+        if resolved is not None:
+            entry = self._by_subject.get(resolved)
+            return entry is not None and bool(entry.index)
+        return any(bool(entry.index) for entry in self._by_subject.values())
 
-    @property
-    def has_definitions(self) -> bool:
-        """Whether anything is loaded at all, fresh or stale."""
-        return bool(self._index)
+    def index_for(self, subject: str | None = None) -> DefinitionIndex:
+        """The in-memory schema index for one subject. Empty when unknown / unauthenticated."""
+        resolved = self._resolve_subject(subject)
+        if resolved is None:
+            return {}
+        entry = self._by_subject.get(resolved)
+        return entry.index if entry is not None else {}
 
-    @property
-    def index(self) -> DefinitionIndex:
-        """The in-memory schema index. Read-only for resolvers; mutated only by this service."""
-        return self._index
-
-    def glossary_for(self, entity_type: str) -> str:
+    def glossary_for(self, entity_type: str, *, subject: str | None = None) -> str:
         entity = normalize_entity_type(entity_type)
         if entity is None:
             return ""
-        return format_glossary(self._index.get(entity, []), entity_type=entity)
+        return format_glossary(self.definitions_for(entity, subject=subject), entity_type=entity)
 
-    def definitions_for(self, entity_type: str) -> list[CustomFieldDefinition]:
+    def definitions_for(
+        self, entity_type: str, *, subject: str | None = None
+    ) -> list[CustomFieldDefinition]:
+        resolved = self._resolve_subject(subject)
+        if resolved is None:
+            return []
+        entry = self._by_subject.get(resolved)
+        if entry is None:
+            return []
         entity = normalize_entity_type(entity_type)
         if entity is None:
             return []
-        return list(self._index.get(entity, []))
+        return list(entry.index.get(entity, []))
 
-    async def load_cached(self) -> None:
-        """Populate the index from the persisted snapshot. Never contacts Backstop.
+    async def load_cached(self, subject: str | None = None) -> None:
+        """Populate this subject's index from the persisted snapshot. Never contacts Backstop.
 
-        Safe for callers with no credential (e.g. enriching a tool listing). Re-reads the row
-        whenever the in-memory copy isn't fresh, so a replica picks up a sibling's refresh
-        instead of trusting its own aged copy; once fresh it's a pure memory read.
+        Safe for callers with no credential when `subject` is known (e.g. enriching a tool
+        listing for the active MCP user). Re-reads the row whenever the in-memory copy isn't
+        fresh; once fresh it's a pure memory read. No-ops when no subject is available —
+        never falls back to another caller's catalog.
         """
-        # Checked before acquiring, not inside: the lock is also held across `_refresh_unlocked`'s
-        # two full paginations, so taking it merely to read `is_fresh` would park every warm
-        # `tools/list` behind whichever caller happens to be doing a cold refresh. `is_fresh`
-        # reads two attributes and can't tear, and a false negative here costs one extra
-        # primary-key lookup after the re-check below — never a wrong answer.
-        if self.is_fresh:
+        resolved = self._resolve_subject(subject)
+        if resolved is None:
+            return
+        if self.is_fresh(resolved):
             return
         async with self._lock:
-            if not self.is_fresh:
-                await self._load_from_db_unlocked()
+            if not self.is_fresh(resolved):
+                await self._load_from_db_unlocked(resolved)
 
-    async def ensure_fresh(self, client: BackstopClient) -> None:
-        """Bring the schema within `ttl`, tolerating a failed refresh when a copy exists.
+    async def ensure_fresh(self, client: BackstopClient, *, subject: str | None = None) -> None:
+        """Bring this subject's schema within `ttl`, tolerating a failed refresh when a copy exists.
 
         A stale schema is far more useful than none: definitions change when an admin adds a
         field, so a copy from last week almost certainly still resolves the caller's query.
         Letting a Backstop hiccup propagate here would fail every field lookup outright, so a
         refresh failure is logged and the existing index kept. `refresh()` is the loud path.
         """
-        # Same pre-check as `load_cached`, for the same reason. The authoritative check is the
-        # one inside the lock: it's what collapses a thundering herd of cold callers into one
-        # fetch, since everyone queued behind the winner finds the schema already fresh.
-        if self.is_fresh:
+        resolved = self._resolve_subject(subject)
+        if resolved is None:
+            raise ValueError("custom-field schema ensure_fresh requires a subject")
+        if self.is_fresh(resolved):
             return
         async with self._lock:
-            if self.is_fresh:
+            if self.is_fresh(resolved):
                 return
-            # Another replica may have refreshed since this process last looked; a primary-key
-            # lookup is far cheaper than re-paginating the whole schema.
-            await self._load_from_db_unlocked()
-            if self.is_fresh:
+            await self._load_from_db_unlocked(resolved)
+            if self.is_fresh(resolved):
                 return
             try:
-                await self._refresh_unlocked(client)
+                await self._refresh_unlocked(client, resolved)
             except Exception:
-                if not self.has_definitions:
+                if not self.has_definitions(resolved):
                     raise
+                entry = self._entry(resolved)
                 logger.warning(
                     "custom_fields.schema.refresh_failed_serving_stale",
                     extra={
-                        "fetched_at": (self._fetched_at.isoformat() if self._fetched_at else None),
+                        "subject": resolved,
+                        "fetched_at": (
+                            entry.freshness.marked_at.isoformat()
+                            if entry.freshness.marked_at
+                            else None
+                        ),
                     },
                     exc_info=True,
                 )
                 CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "stale"})
 
-    async def refresh(self, client: BackstopClient) -> list[CustomFieldDefinition]:
+    async def refresh(
+        self, client: BackstopClient, *, subject: str | None = None
+    ) -> list[CustomFieldDefinition]:
         """Fetch from Backstop, ignoring `ttl` but not `MIN_REFRESH_INTERVAL`. Raises on failure.
 
         The loud path: unlike `ensure_fresh` a failure propagates, because the caller explicitly
@@ -154,55 +202,61 @@ class CustomFieldsService:
         Inside the floor the fetch is skipped and the current definitions are returned — the
         caller still gets a coherent answer, just not a newer one.
         """
+        resolved = self._resolve_subject(subject)
+        if resolved is None:
+            raise ValueError("custom-field schema refresh requires a subject")
         async with self._lock:
-            if self._within_refresh_floor():
+            entry = self._entry(resolved)
+            if entry.refresh_floor.within():
                 logger.info(
                     "custom_fields.schema.refresh_floored",
                     extra={
+                        "subject": resolved,
                         "attempted_at": (
-                            self._refresh_attempted_at.isoformat()
-                            if self._refresh_attempted_at
+                            entry.refresh_floor.marked_at.isoformat()
+                            if entry.refresh_floor.marked_at
                             else None
                         ),
                         "min_interval_seconds": self.MIN_REFRESH_INTERVAL.total_seconds(),
                     },
                 )
-                return self._all_definitions()
-            return await self._refresh_unlocked(client)
+                return self._all_definitions(entry)
+            return await self._refresh_unlocked(client, resolved)
 
-    def _within_refresh_floor(self) -> bool:
-        if self._refresh_attempted_at is None:
-            return False
-        return datetime.now(UTC) - self._refresh_attempted_at < self.MIN_REFRESH_INTERVAL
+    def _all_definitions(self, entry: _SubjectSchema) -> list[CustomFieldDefinition]:
+        return [definition for group in entry.index.values() for definition in group]
 
-    def _all_definitions(self) -> list[CustomFieldDefinition]:
-        return [definition for group in self._index.values() for definition in group]
-
-    async def _load_from_db_unlocked(self) -> None:
+    async def _load_from_db_unlocked(self, subject: str) -> None:
         async with read_session(self._session_factory) as session:
-            snapshot = await load_snapshot(session, self._base_url)
+            snapshot = await load_snapshot(session, self._base_url, subject)
         if snapshot is None:
             # Keep whatever is already in memory: an absent or unreadable row is not evidence
-            # that this process's own definitions are wrong.
+            # that this subject's own definitions are wrong.
             return
-        self._index = build_index(snapshot.definitions)
-        self._fetched_at = snapshot.fetched_at
+        definitions = apply_overrides(snapshot.definitions, self._override_index)
+        entry = self._entry(subject)
+        entry.index = build_index(definitions)
+        entry.freshness.mark(snapshot.fetched_at)
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "snapshot"})
 
-    async def _refresh_unlocked(self, client: BackstopClient) -> list[CustomFieldDefinition]:
+    async def _refresh_unlocked(
+        self, client: BackstopClient, subject: str
+    ) -> list[CustomFieldDefinition]:
+        entry = self._entry(subject)
         # Stamped before the call, not after, so a fetch that fails or hangs still counts against
         # the floor — otherwise an unreachable Backstop would be retried on every request.
-        self._refresh_attempted_at = datetime.now(UTC)
+        entry.refresh_floor.mark()
         definitions = await fetch_custom_field_definitions(client, self._overrides)
+        definitions = apply_overrides(definitions, self._override_index)
         fetched_at = datetime.now(UTC)
         async with transaction(self._session_factory) as session:
-            await save_snapshot(session, self._base_url, definitions, fetched_at)
-        self._index = build_index(definitions)
-        self._fetched_at = fetched_at
+            await save_snapshot(session, self._base_url, subject, definitions, fetched_at)
+        entry.index = build_index(definitions)
+        entry.freshness.mark(fetched_at)
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "backstop"})
         logger.info(
             "custom_fields.schema.refreshed",
-            extra={"definitions": len(definitions)},
+            extra={"subject": subject, "definitions": len(definitions)},
         )
         return definitions
 
