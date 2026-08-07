@@ -20,7 +20,7 @@ env:
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
-# - BACKSTOP_MCP_ENCRYPTION_KEY: 32-byte AES-256 key (base64) for credential encryption
+# - BACKSTOP_MCP_ENCRYPTION_KEY: Fernet key for credential encryption
 # - DB_URL (or rely on base-chart DATABASE_URL when postgresql.enabled — app accepts both)
 
 image:

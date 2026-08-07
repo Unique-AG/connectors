@@ -10,6 +10,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0be78700d2dc"
@@ -49,7 +50,7 @@ def upgrade() -> None:
     op.create_table(
         "oauth_clients",
         sa.Column("client_id", sa.String(), nullable=False),
-        sa.Column("client_metadata_json", sa.Text(), nullable=False),
+        sa.Column("client_metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

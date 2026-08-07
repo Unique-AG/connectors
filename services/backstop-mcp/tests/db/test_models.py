@@ -17,7 +17,7 @@ class TestOAuthClient:
             session.add(
                 OAuthClient(
                     client_id="client-1",
-                    client_metadata_json='{"redirect_uris": ["https://client.example/callback"]}',
+                    client_metadata={"redirect_uris": ["https://client.example/callback"]},
                 )
             )
             await session.commit()
@@ -25,7 +25,9 @@ class TestOAuthClient:
         async with factory() as session:
             client = await session.get(OAuthClient, "client-1")
             assert client is not None
-            assert "client.example" in client.client_metadata_json
+            assert client.client_metadata["redirect_uris"] == [
+                "https://client.example/callback"
+            ]
 
 
 class TestPendingAuthorization:
@@ -37,7 +39,7 @@ class TestPendingAuthorization:
         now = datetime.now(UTC)
 
         async with factory() as session:
-            session.add(OAuthClient(client_id="client-3", client_metadata_json="{}"))
+            session.add(OAuthClient(client_id="client-3", client_metadata={}))
             await session.commit()
 
         async with factory() as session:
@@ -71,7 +73,7 @@ class TestAuthorizationCode:
         now = datetime.now(UTC)
 
         async with factory() as session:
-            session.add(OAuthClient(client_id="client-4", client_metadata_json="{}"))
+            session.add(OAuthClient(client_id="client-4", client_metadata={}))
             await session.commit()
 
         async with factory() as session:
@@ -108,7 +110,7 @@ class TestOAuthTokenRotation:
         family_id = uuid.uuid4()
 
         async with factory() as session:
-            session.add(OAuthClient(client_id="client-2", client_metadata_json="{}"))
+            session.add(OAuthClient(client_id="client-2", client_metadata={}))
             await session.commit()
 
         async with factory() as session:

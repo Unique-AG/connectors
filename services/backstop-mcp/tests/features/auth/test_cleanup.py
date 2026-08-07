@@ -28,7 +28,7 @@ async def _register_client(
     session_factory: async_sessionmaker[AsyncSession], client_id: str
 ) -> None:
     async with transaction(session_factory) as session:
-        session.add(OAuthClient(client_id=client_id, client_metadata_json="{}"))
+        session.add(OAuthClient(client_id=client_id, client_metadata={}))
 
 
 def _token(
