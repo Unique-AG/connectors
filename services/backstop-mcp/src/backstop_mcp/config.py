@@ -35,10 +35,6 @@ def _http_url_str(value: object) -> str:
     return str(_HTTP_URL.validate_python(value)).rstrip("/")
 
 
-def _http_url_host(url: str) -> str | None:
-    return _HTTP_URL.validate_python(url).host
-
-
 HttpUrlStr = Annotated[str, BeforeValidator(_http_url_str)]
 
 
@@ -126,7 +122,10 @@ class AppConfig(BaseSettings):
     # (discovery metadata, /authorize, /token, and the Backstop login form all hang off it).
     # The local default is only usable in development; `_reject_local_base_url_in_production`
     # below enforces that.
-    public_base_url: HttpUrlStr = "http://localhost:9010"
+    # Kept as the validated `HttpUrl` rather than a string: `host` and `scheme` are both read
+    # downstream (here, and for the login cookie's `Secure` flag in `auth/provider.py`), and one
+    # parse serving all of them is why none of those places re-parse it.
+    public_base_url: HttpUrl = HttpUrl("http://localhost:9010")
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
@@ -139,14 +138,27 @@ class AppConfig(BaseSettings):
         """
         if self.app_env != AppEnv.PRODUCTION:
             return self
-        host = _http_url_host(self.public_base_url)
-        if host is None or host in _NON_PUBLIC_HOSTS:
+        host = self.public_base_url.host
+        assert host is not None, f"validated HttpUrl without a host: {self.public_base_url}"
+        if host in _NON_PUBLIC_HOSTS:
             raise ValueError(
                 "PUBLIC_BASE_URL must be this service's externally-reachable URL in "
-                + f"{AppEnv.PRODUCTION} (got {self.public_base_url!r}); it is the OAuth issuer "
+                + f"{AppEnv.PRODUCTION} (got {self.public_base_url}); it is the OAuth issuer "
                 + "clients are redirected to"
             )
         return self
+
+    @property
+    def issuer(self) -> str:
+        """`public_base_url` as a string with no trailing slash, for joining paths onto.
+
+        `HttpUrl` renders a bare origin with a trailing `/`, so interpolating a path straight
+        onto it yields `https://host//backstop/login`. The provider builds its login redirect
+        that way, so the slash is stripped once here rather than at each call site. Note the
+        OAuth discovery document is not this value: the MCP SDK re-parses the issuer into an
+        `AnyHttpUrl` and advertises it with the slash restored.
+        """
+        return str(self.public_base_url).rstrip("/")
 
 
 class BackstopConfig(BaseSettings):

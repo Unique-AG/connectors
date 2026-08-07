@@ -14,7 +14,7 @@ feature packages and tools that use it.
 src/backstop_mcp/
   app.py                 composition root — every config and collaborator is built here, once
   config.py              one BaseSettings class per concern, read only at the root
-  logging.py metrics.py coerce.py    cross-cutting, used by both sides below
+  logging.py metrics.py  cross-cutting, used by both sides below
   features/              what the connector does — empty until the first feature lands
   server/                how it's exposed over MCP — empty until the first tool lands
   db/                    SQLAlchemy engine/session helpers, alembic migrations
