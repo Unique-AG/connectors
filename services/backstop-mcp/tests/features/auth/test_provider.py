@@ -603,6 +603,29 @@ class TestTokenLifecycle:
         assert await provider.load_authorization_code(client_info, code) is None
 
     @pytest.mark.asyncio
+    async def test_expired_authorization_code_cannot_be_loaded(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_info = await _register_client(provider, "provider-client-expired-code")
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
+        login_response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-expired.code", "token-abc")
+        )
+        code = parse_qs(urlparse(login_response.headers["location"]).query)["code"][0]
+
+        _, session_factory = db
+        async with session_factory() as session:
+            row = await session.get(AuthorizationCodeRow, code)
+            assert row is not None
+            row.expires_at = (datetime.now(UTC) - timedelta(seconds=1)).timestamp()
+            await session.commit()
+
+        assert await provider.load_authorization_code(client_info, code) is None
+
+    @pytest.mark.asyncio
     async def test_refresh_token_rotates_and_detects_reuse(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:

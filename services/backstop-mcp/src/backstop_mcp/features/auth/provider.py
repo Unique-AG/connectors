@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import secrets
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -414,6 +415,9 @@ class BackstopOAuthProvider(OAuthProvider):
         async with read_session(self._session_factory) as session:
             row = await session.get(AuthorizationCodeRow, authorization_code)
         if row is None or row.client_id != client.client_id:
+            return None
+        # `expires_at` is a POSIX timestamp (same shape as the MCP SDK's AuthorizationCode).
+        if row.expires_at < time.time():
             return None
         return AuthorizationCode(
             code=row.code,

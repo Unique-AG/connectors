@@ -133,8 +133,9 @@ class BackstopUntrustedUrlError(ToolError):
     """Raised when an upstream-supplied absolute URL points somewhere other than Backstop.
 
     Pagination follows `links.next` verbatim. Since every request carries
-    `Authorization: Basic ...`, a `links.next` pointing at another origin would leak the
-    caller's Backstop credential there — so the host is pinned to the configured `base_url`.
+    `Authorization: Basic ...`, a `links.next` pointing at another origin — or the same
+    host over a different scheme — would leak the caller's Backstop credential there, so
+    scheme and host are pinned to the configured `base_url`.
     """
 
     url: str

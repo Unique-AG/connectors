@@ -247,8 +247,13 @@ class BackstopClient:
                 1, {"method": method, "route": route, "status": response.status_code}
             )
             if response.status_code == 401:
+                # Always surface BackstopAuthError for 401 — a failing revoke hook must not
+                # mask the credential rejection callers need to handle (reconnect).
                 if self._on_auth_failure is not None:
-                    await self._on_auth_failure()
+                    try:
+                        await self._on_auth_failure()
+                    except Exception:
+                        logger.exception("backstop.auth_failure_hook.failed")
                 raise BackstopAuthError(
                     "Backstop rejected the stored credential — please reconnect."
                 )
