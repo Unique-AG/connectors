@@ -18,7 +18,6 @@ from backstop_mcp.backstop_client import (
     BackstopUnreachableError,
     BackstopUntrustedUrlError,
     PageResult,
-    build_auth_headers,
 )
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig
@@ -26,6 +25,16 @@ from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential
 
 _BASIC_AUTH = "Basic " + base64.b64encode(b"bob.smith:p@55W0rd321!").decode()
+
+
+class _Record(BaseModel):
+    id: str
+
+
+class _Widget(BaseModel):
+    id: str
+    label: str
+
 
 
 def _credential(
@@ -51,13 +60,6 @@ def _read_timeout(route: respx.Route) -> float:
     return extensions["timeout"]["read"]
 
 
-class TestBuildAuthHeaders:
-    def test_builds_basic_auth_and_token_header(self) -> None:
-        headers = build_auth_headers("bob.smith", "p@55W0rd321!")
-
-        assert headers == {"authorization": _BASIC_AUTH, "token": "true"}
-
-
 class TestForCredential:
     @pytest.mark.asyncio
     @respx.mock
@@ -68,7 +70,7 @@ class TestForCredential:
             return_value=httpx.Response(200, json={})
         )
 
-        await factory.for_credential(_credential()).get("/system-info")
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
         sent_request = route.calls.last.request
         assert sent_request.headers["authorization"] == _BASIC_AUTH
@@ -97,7 +99,7 @@ class TestBackstopClientAutoRaises:
         respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
 
         with pytest.raises(BackstopAuthError):
-            await factory.for_credential(_credential()).get("/system-info")
+            await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
     @pytest.mark.asyncio
     @respx.mock
@@ -110,7 +112,7 @@ class TestBackstopClientAutoRaises:
 
         client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
         with pytest.raises(BackstopAuthError):
-            await client.get("/system-info")
+            await client.raw_request("GET", "/system-info")
 
         assert revoked == [True]
 
@@ -124,7 +126,7 @@ class TestBackstopClientAutoRaises:
         )
 
         with pytest.raises(BackstopApiError) as exc_info:
-            await factory.for_credential(_credential()).get("/system-info")
+            await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
         assert exc_info.value.detail == "Something broke"
 
@@ -135,9 +137,9 @@ class TestBackstopClientAutoRaises:
             return_value=httpx.Response(200, json={"version": "1.0"})
         )
 
-        result = await factory.for_credential(_credential()).get("/system-info")
+        result = await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
-        assert result == {"version": "1.0"}
+        assert result.json() == {"version": "1.0"}
 
 
 class TestHeaders:
@@ -150,7 +152,7 @@ class TestHeaders:
             return_value=httpx.Response(200, json={})
         )
 
-        await factory.for_credential(_credential()).get("/system-info")
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
         sent_request = route.calls.last.request
         assert sent_request.headers["token"] == "true"
@@ -165,7 +167,7 @@ class TestTimeoutProfiles:
     async def test_reports_path_uses_extended_timeout(self, factory: BackstopClientFactory) -> None:
         route = respx.get(f"{_BASE_URL}/reports").mock(return_value=httpx.Response(200, json={}))
 
-        await factory.for_credential(_credential()).get("/reports")
+        await factory.for_credential(_credential()).raw_request("GET", "/reports")
 
         assert _read_timeout(route) == BackstopConfig().reports_timeout_seconds
 
@@ -174,7 +176,7 @@ class TestTimeoutProfiles:
     async def test_crud_path_uses_default_timeout(self, factory: BackstopClientFactory) -> None:
         route = respx.get(f"{_BASE_URL}/deals/1").mock(return_value=httpx.Response(200, json={}))
 
-        await factory.for_credential(_credential()).get("/deals/1")
+        await factory.for_credential(_credential()).raw_request("GET", "/deals/1")
 
         assert _read_timeout(route) == BackstopConfig().default_timeout_seconds
 
@@ -209,8 +211,8 @@ class TestConcurrencyGate:
         respx.get(f"{_BASE_URL}/system-info").mock(side_effect=tracker.handle)
         cred = _credential(username="concurrency.user")
 
-        async def call() -> dict[str, object]:
-            return await factory.for_credential(cred).get("/system-info")
+        async def call() -> httpx.Response:
+            return await factory.for_credential(cred).raw_request("GET", "/system-info")
 
         tasks = [asyncio.create_task(call()) for _ in range(6)]
         await asyncio.sleep(0.05)
@@ -237,8 +239,10 @@ class TestConcurrencyGate:
         respx.get(f"{_BASE_URL}/system-info").mock(side_effect=tracker.handle)
         client = factory.for_credential(_credential(username="fanout.user"))
 
-        async def fan_out() -> list[dict[str, object]]:
-            return await asyncio.gather(*(client.get("/system-info") for _ in range(12)))
+        async def fan_out() -> list[httpx.Response]:
+            return await asyncio.gather(
+                *(client.raw_request("GET", "/system-info") for _ in range(12))
+            )
 
         task = asyncio.create_task(fan_out())
         await asyncio.sleep(0.05)
@@ -257,8 +261,10 @@ class TestConcurrencyGate:
         tracker = _InFlightTracker()
         respx.get(f"{_BASE_URL}/system-info").mock(side_effect=tracker.handle)
 
-        async def call(username: str) -> dict[str, object]:
-            return await factory.for_credential(_credential(username=username)).get("/system-info")
+        async def call(username: str) -> httpx.Response:
+            return await factory.for_credential(_credential(username=username)).raw_request(
+                "GET", "/system-info"
+            )
 
         tasks = [asyncio.create_task(call("user.a")) for _ in range(5)]
         tasks += [asyncio.create_task(call("user.b")) for _ in range(5)]
@@ -285,7 +291,9 @@ class TestConcurrencyGate:
         clients = [factory.for_credential(cred) for _ in range(10)]
 
         # All ten clients exist simultaneously and none has consumed a slot yet.
-        results = await asyncio.gather(*(client.get("/system-info") for client in clients))
+        results = await asyncio.gather(
+            *(client.raw_request("GET", "/system-info") for client in clients)
+        )
 
         assert len(results) == 10
 
@@ -301,8 +309,8 @@ class TestGateRegistryEviction:
         registry.max_entries = 4
         try:
             for index in range(10):
-                await built.for_credential(_credential(username=f"user.{index}")).get(
-                    "/system-info"
+                await built.for_credential(_credential(username=f"user.{index}")).raw_request(
+                    "GET", "/system-info"
                 )
             assert len(registry._gates) <= 4  # pyright: ignore[reportPrivateUsage]
         finally:
@@ -313,8 +321,9 @@ class TestRetryIntegration:
     @pytest.mark.asyncio
     @respx.mock
     async def test_succeeds_after_two_concurrency_retries(
-        self, factory: BackstopClientFactory
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.retry._BACKOFF_INITIAL_SECONDS", 0.01)
         route = respx.get(f"{_BASE_URL}/system-info").mock(
             side_effect=[
                 httpx.Response(
@@ -335,9 +344,9 @@ class TestRetryIntegration:
             ]
         )
 
-        result = await factory.for_credential(_credential()).get("/system-info")
+        result = await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
-        assert result == {"version": "1.0"}
+        assert result.json() == {"version": "1.0"}
         assert route.call_count == 3
 
     @pytest.mark.asyncio
@@ -350,7 +359,7 @@ class TestRetryIntegration:
         )
 
         with pytest.raises(BackstopRateLimitError) as exc_info:
-            await factory.for_credential(_credential()).get("/system-info")
+            await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
         assert exc_info.value.limit_kind == "day"
         assert route.call_count == 1
@@ -372,7 +381,7 @@ class TestRetryIntegration:
         start = time.monotonic()
         try:
             with pytest.raises(BackstopRateLimitError):
-                await built.for_credential(_credential()).get("/system-info")
+                await built.for_credential(_credential()).raw_request("GET", "/system-info")
         finally:
             await built.aclose()
         elapsed = time.monotonic() - start
@@ -382,12 +391,15 @@ class TestRetryIntegration:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_gate_is_released_while_backing_off(self, factory: BackstopClientFactory) -> None:
+    async def test_gate_is_released_while_backing_off(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A retry must not hold the slot it is waiting for.
 
         With five concurrent 429-then-200 calls, holding the gate across the backoff sleep would
         deadlock the sixth caller behind sleeping retries rather than letting it through.
         """
+        monkeypatch.setattr("backstop_mcp.backstop_client.retry._BACKOFF_INITIAL_SECONDS", 0.01)
         responses = [
             httpx.Response(
                 429,
@@ -401,7 +413,9 @@ class TestRetryIntegration:
         cred = _credential(username="backoff.user")
 
         results = await asyncio.wait_for(
-            asyncio.gather(*(factory.for_credential(cred).get("/system-info") for _ in range(6))),
+            asyncio.gather(
+                *(factory.for_credential(cred).raw_request("GET", "/system-info") for _ in range(6))
+            ),
             timeout=5,
         )
 
@@ -427,10 +441,15 @@ class TestPaginate:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate("/records")
+        result = await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
         assert result == PageResult(
-            items=[{"id": "1"}, {"id": "2"}], included=[], total_count=None, truncated=False
+            items=[_Record(id="1"), _Record(id="2")],
+            included=[],
+            total_count=None,
+            truncated=False,
         )
 
     @pytest.mark.asyncio
@@ -447,7 +466,9 @@ class TestPaginate:
             return_value=httpx.Response(200, json={"data": [], "links": {}})
         )
 
-        await factory.for_credential(_credential()).paginate("/records")
+        await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
         params = route.calls.last.request.url.params
         assert params["page[limit]"] == str(BackstopConfig().default_page_size)
@@ -462,7 +483,9 @@ class TestPaginate:
             return_value=httpx.Response(200, json={"data": [], "links": {}})
         )
 
-        await factory.for_credential(_credential()).paginate("/reports")
+        await factory.for_credential(_credential()).paginate(
+            "/reports", schema=_Record
+        )
 
         assert route.calls.last.request.url.params["page[limit]"] == str(
             BackstopConfig().report_page_size
@@ -476,7 +499,9 @@ class TestPaginate:
         )
         built = client_factory(page_limit_param="limit", page_offset_param="offset")
         try:
-            await built.for_credential(_credential()).paginate("/records", page_size=25)
+            await built.for_credential(_credential()).paginate(
+                "/records", schema=_Record, page_size=25
+            )
         finally:
             await built.aclose()
 
@@ -493,7 +518,9 @@ class TestPaginate:
         )
 
         await factory.for_credential(_credential()).paginate(
-            "/records", params={"page[limit]": 3, "page[offset]": 9}
+            "/records",
+            schema=_Record,
+            params={"page[limit]": 3, "page[offset]": 9},
         )
 
         params = route.calls.last.request.url.params
@@ -517,9 +544,11 @@ class TestPaginate:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate("/records", max_records=None)
+        result = await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record, max_records=None
+        )
 
-        assert [item["id"] for item in result.items] == ["1", "2", "3"]
+        assert [item.id for item in result.items] == ["1", "2", "3"]
         assert result.truncated is False
 
     @pytest.mark.asyncio
@@ -554,7 +583,9 @@ class TestPaginate:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate("/records")
+        result = await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
         assert [item["id"] for item in result.included] == ["9", "10"]
 
@@ -574,7 +605,9 @@ class TestUntrustedNextLink:
         )
 
         with pytest.raises(BackstopUntrustedUrlError) as exc_info:
-            await factory.for_credential(_credential()).paginate("/records")
+            await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
         assert exc_info.value.url == "https://evil.example.com/records"
         assert exc_info.value.expected_host == httpx.URL(_BASE_URL).netloc.decode("ascii")
@@ -594,62 +627,17 @@ class TestUntrustedNextLink:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate("/records")
+        result = await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
-        assert [item["id"] for item in result.items] == ["1", "2"]
-
-
-class _Record(BaseModel):
-    id: str
-
-
-class _Widget(BaseModel):
-    id: str
-    label: str
+        assert [item.id for item in result.items] == ["1", "2"]
 
 
 class TestSchemaAwareDeserialization:
     """`get`/`post`/`patch`/`delete` all funnel through the same `deserialize` helper, so each
-    verb gets the same three cases: `schema=None` returns a plain dict unchanged, a schema with
-    a matching body returns a parsed model, and a schema with a mismatched body raises
-    `BackstopResponseSchemaError` wrapping the underlying `pydantic.ValidationError`.
-
-    `schema=None` regression coverage for GET already exists in
-    `TestBackstopClientAutoRaises.test_does_not_raise_on_200` — not duplicated here.
+    verb gets matching-body and mismatch cases for a required `schema`.
     """
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_post_without_schema_returns_dict(self, factory: BackstopClientFactory) -> None:
-        respx.post(f"{_BASE_URL}/widgets").mock(
-            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
-        )
-
-        result = await factory.for_credential(_credential()).post("/widgets")
-
-        assert result == {"id": "1", "label": "Widget One"}
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_patch_without_schema_returns_dict(self, factory: BackstopClientFactory) -> None:
-        respx.patch(f"{_BASE_URL}/widgets/1").mock(
-            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
-        )
-
-        result = await factory.for_credential(_credential()).patch("/widgets/1")
-
-        assert result == {"id": "1", "label": "Widget One"}
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_delete_without_schema_returns_dict(self, factory: BackstopClientFactory) -> None:
-        respx.delete(f"{_BASE_URL}/widgets/1").mock(
-            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
-        )
-
-        result = await factory.for_credential(_credential()).delete("/widgets/1")
-
-        assert result == {"id": "1", "label": "Widget One"}
 
     @pytest.mark.asyncio
     @respx.mock
@@ -772,9 +760,7 @@ class TestSchemaAwareDeserialization:
 
 
 class TestPaginateSchemaAwareDeserialization:
-    """`schema=None` regression coverage for `paginate` already exists in
-    `TestPaginate.test_delegates_to_paginate_all_across_multiple_pages` — not duplicated here.
-    """
+    """Typed `paginate` validates every accumulated item against the required `schema`."""
 
     @pytest.mark.asyncio
     @respx.mock
@@ -792,7 +778,9 @@ class TestPaginateSchemaAwareDeserialization:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate("/records", schema=_Record)
+        result = await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
         assert [item.id for item in result.items] == ["1", "2", "3"]
         assert all(isinstance(item, _Record) for item in result.items)
@@ -815,7 +803,9 @@ class TestPaginateSchemaAwareDeserialization:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await factory.for_credential(_credential()).paginate("/records", schema=_Record)
+            await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record
+        )
 
         assert route.call_count == 2
         assert exc_info.value.path == "/records"
@@ -828,7 +818,7 @@ class TestDeleteEmptyBody:
     async def test_returns_none_for_204_with_no_body(self, factory: BackstopClientFactory) -> None:
         respx.delete(f"{_BASE_URL}/records/1").mock(return_value=httpx.Response(204))
 
-        result = await factory.for_credential(_credential()).delete("/records/1")
+        result = await factory.for_credential(_credential()).delete("/records/1", schema=_Record)
 
         assert result is None
 

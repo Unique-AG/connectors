@@ -55,7 +55,10 @@ def _computed_wait_seconds(exc: BackstopRateLimitError, attempt_number: int) -> 
     # `_BACKOFF_JITTER_SECONDS` more on top, meaning an "approved" wait can sleep up to that
     # much longer than `max_wait_ms`. Accepted tradeoff — see `_next_backoff_seconds`.
     if exc.retry_after_seconds is not None:
-        return exc.retry_after_seconds
+        # Floor at the same initial backoff used when the header is absent: a past/zero
+        # HTTP-date (or explicit `Retry-After: 0`) would otherwise retry immediately, which is
+        # more aggressive than no header at all and rarely helps against a concurrency gate.
+        return max(exc.retry_after_seconds, _BACKOFF_INITIAL_SECONDS)
     return _next_backoff_seconds(attempt_number)
 
 
@@ -110,7 +113,7 @@ def _build_wait_strategy() -> WaitStrategy:
         outcome = retry_state.outcome
         exc = outcome.exception() if outcome is not None and outcome.failed else None
         if isinstance(exc, BackstopRateLimitError) and exc.retry_after_seconds is not None:
-            return exc.retry_after_seconds
+            return max(exc.retry_after_seconds, _BACKOFF_INITIAL_SECONDS)
         return backoff(retry_state)
 
     return wait

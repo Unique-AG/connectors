@@ -27,7 +27,6 @@ from backstop_mcp.backstop_client.errors import (
 )
 from backstop_mcp.backstop_client.factory import (
     BackstopClientFactory,
-    create_backstop_client_factory,
 )
 from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
@@ -38,7 +37,6 @@ from backstop_mcp.backstop_client.json_api import (
 )
 from backstop_mcp.backstop_client.pagination import PageResult
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
-from backstop_mcp.backstop_client.utils import build_auth_headers
 
 __all__ = [
     "BackstopApiCollectionDocument",
@@ -59,8 +57,6 @@ __all__ = [
     "CallerClientProvider",
     "PageResult",
     "RetrySettings",
-    "build_auth_headers",
-    "create_backstop_client_factory",
     "follow_included",
     "included_by_type",
 ]

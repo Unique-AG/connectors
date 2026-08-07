@@ -667,7 +667,7 @@ class BackstopOAuthProvider(OAuthProvider):
             if row is not None:
                 row.revoked_at = datetime.now(UTC)
 
-    async def revoke_token_family_for_subject(self, subject: str) -> None:
+    async def revoke_all_tokens_for_subject(self, subject: str) -> None:
         """Revoke every non-revoked token belonging to `subject`.
 
         Called when a Backstop call comes back 401 mid-session (see `auth/context.py`) — the
