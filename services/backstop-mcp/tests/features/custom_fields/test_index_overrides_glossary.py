@@ -108,6 +108,13 @@ class TestResolveInIndex:
         result = resolve_in_index(index, entity_type="organizations", query="grade")
         assert isinstance(result, Resolved)
 
+    def test_unknown_entity_type_returns_not_found(self) -> None:
+        index = build_index([_def(definition_id="1", crm_name="Investor Status")])
+        result = resolve_in_index(index, entity_type="spaceships", query="status")
+        assert isinstance(result, NotFound)
+        assert result.scope == "spaceships"
+        assert result.query == "status"
+
     def test_ambiguous(self) -> None:
         index = build_index(
             [

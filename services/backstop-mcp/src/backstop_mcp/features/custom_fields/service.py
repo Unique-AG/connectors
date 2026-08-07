@@ -83,10 +83,15 @@ class CustomFieldsService:
 
     def glossary_for(self, entity_type: str) -> str:
         entity = normalize_entity_type(entity_type)
+        if entity is None:
+            return ""
         return format_glossary(self._index.get(entity, []), entity_type=entity)
 
     def definitions_for(self, entity_type: str) -> list[CustomFieldDefinition]:
-        return list(self._index.get(normalize_entity_type(entity_type), []))
+        entity = normalize_entity_type(entity_type)
+        if entity is None:
+            return []
+        return list(self._index.get(entity, []))
 
     async def load_cached(self) -> None:
         """Populate the index from the persisted snapshot. Never contacts Backstop.

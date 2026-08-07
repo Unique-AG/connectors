@@ -44,5 +44,8 @@ def index_overrides(overrides: dict[str, FieldOverride]) -> OverrideIndex:
     indexed: OverrideIndex = {}
     for key, override in overrides.items():
         entity_type, crm_name = parse_override_key(key)
-        indexed[(normalize_entity_type(entity_type), crm_name)] = override
+        normalized = normalize_entity_type(entity_type)
+        if normalized is None:
+            raise ValueError(f"Override key {key!r} has unknown entityType {entity_type!r}")
+        indexed[(normalized, crm_name)] = override
     return indexed
