@@ -4,7 +4,10 @@ from fastmcp.tools import tool
 from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import BaseModel, Field
 
-from backstop_mcp.features.custom_fields import CustomFieldDefinitionEcho, definition_echo
+from backstop_mcp.features.custom_fields import (
+    CustomFieldDefinitionResponse,
+    definition_response,
+)
 from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
 from backstop_mcp.server.tools.results import tool_result
@@ -16,7 +19,7 @@ class ListCustomFieldsResponse(BaseModel):
     status: Literal["ok"] = "ok"
     entity_type: EntityType
     count: int
-    definitions: list[CustomFieldDefinitionEcho] = Field(default_factory=list)
+    definitions: list[CustomFieldDefinitionResponse] = Field(default_factory=list)
 
 
 @tool(
@@ -65,6 +68,6 @@ async def list_custom_fields(
         ListCustomFieldsResponse(
             entity_type=entity_type,
             count=len(definitions),
-            definitions=[definition_echo(definition) for definition in definitions],
+            definitions=[definition_response(definition) for definition in definitions],
         )
     )

@@ -5,20 +5,12 @@ any of it directly — they go through `service.EmploymentIndexFactory`, which o
 vocabulary. List/org-contact tools should use that verdict to exclude departed people
 from "who do we contact at X" answers unless the user asked for historical contacts; a by-id
 person fetch returns the person with the flag set rather than hiding the record.
-
-`_employment_edges` is the shared building block for reading employment off *either* side of a
-relationship — a person's own GET or an organization's own GET — with `person_side` as the only
-difference between the two directions. It is one step below `EmploymentIndex` (a later addition):
-it normalises the raw payload into edges, but does not yet reduce several edges for the same pair
-down to one winner.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import TypeGuard
-
-from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.coerce import as_clean_str
@@ -37,6 +29,9 @@ from backstop_mcp.features.data_hygiene.types import (
     RelationshipTypeAttributes,
 )
 from backstop_mcp.features.entity_types import normalize_entity_type
+
+type RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
+type RelationshipTypeResource = BackstopApiResource[RelationshipTypeAttributes]
 
 
 @dataclass(frozen=True)
@@ -112,8 +107,7 @@ def _rank(edge: EmploymentEdge) -> tuple[bool, date, bool]:
 
 
 def _to_record(edge: EmploymentEdge) -> EmploymentRecord:
-    departure = edge.evidence if edge.status is EmploymentStatus.FORMER else None
-    return EmploymentRecord(status=edge.status, departure=departure)
+    return EmploymentRecord(status=edge.status, departure=edge.departure)
 
 
 def classify_employment(
@@ -129,8 +123,9 @@ def classify_employment(
       employee of` contains `employee`); an employment-first test would call it `CURRENT` and
       report someone who has left as a live contact.
     * `IRRELEVANT` — employment vocabulary is configured, the type has a name to judge, and it
-      matches nothing.
-    * `CURRENT` — otherwise.
+      matches nothing — or the type id is present but its name did not side-load, so we cannot
+      treat it as employment evidence (a portal-style edge must not clear a real departure).
+    * `CURRENT` — otherwise (including truly untyped relationships, so `endDate` still applies).
     """
     if rules.former.matches(type_id=type_id, type_name=type_name):
         return EmploymentStatus.FORMER
@@ -140,42 +135,21 @@ def classify_employment(
         return EmploymentStatus.CURRENT
     if rules.employment.matches(type_id=type_id, type_name=type_name):
         return EmploymentStatus.CURRENT
-    if type_name is None:
-        # Nothing to judge: either the record carries no type, or its type resource did not
-        # side-load. Both leave the person→org gate below as the only evidence, so read it as
-        # current — that keeps `endDate` in play and never invents a departure out of a record we
-        # could not classify.
+    if type_name is None and type_id is None:
+        # Truly untyped: leave the person→org gate as the only evidence and read it as current
+        # so `endDate` stays in play.
         return EmploymentStatus.CURRENT
     return EmploymentStatus.IRRELEVANT
 
 
-def _relationship_type_names(*, resources: list[dict[str, object]]) -> dict[str, str]:
-    """`id → name` for the side-loaded relationship types. Unnamed and malformed ones are dropped.
-
-    A type we cannot read leaves its relationships with no name to match, which
-    `classify_employment` treats as no type signal — never as a positive finding.
-    """
+def _relationship_type_names(*, resources: Sequence[RelationshipTypeResource]) -> dict[str, str]:
+    """`id → name` for the side-loaded relationship types. Unnamed ones are dropped."""
     names: dict[str, str] = {}
-    for raw in resources:
-        try:
-            resource = BackstopApiResource[RelationshipTypeAttributes].model_validate(raw)
-        except ValidationError:
-            continue
+    for resource in resources:
         name = as_clean_str(resource.attributes.name)
         if name is not None:
             names[resource.id] = name
     return names
-
-
-def _safe_parse_relationship(
-    *, raw: dict[str, object]
-) -> tuple[EntityRelationshipAttributes, str | None] | None:
-    try:
-        resource = BackstopApiResource[EntityRelationshipAttributes].model_validate(raw)
-    except ValidationError:
-        return None
-    type_ids = resource.related_ids(EntityRelationshipRef.TYPE)
-    return resource.attributes, type_ids[0] if type_ids else None
 
 
 def _side_type(*, side: EntityRefAttributes) -> str | None:
@@ -218,61 +192,30 @@ def _is_organization(side_type: str | None) -> TypeGuard[str]:
     return side_type in ORG_SIDE_TYPES
 
 
-def _safe_parse_date(*, raw: str | None) -> date | None:
-    """The calendar day an `endDate` (or `startDate` / `createdTimestamp`) names, however the
-    instance spelled it.
-
-    The leading ten characters cover both a plain `YYYY-MM-DD` and the full timestamp Backstop
-    actually writes into this date field; the second attempt is for compact ISO forms
-    (`20221231T101530`), whose date part is not ten characters long.
-    """
-    if raw is None:
-        return None
-    text = raw.strip()
-    if not text:
-        return None
-    try:
-        return date.fromisoformat(text[:10])
-    except ValueError:
-        pass
-    try:
-        return datetime.fromisoformat(text).date()
-    except ValueError:
-        return None
-
-
 def _employment_edges(
     *,
-    relationships: list[dict[str, object]],
-    relationship_types: list[dict[str, object]],
+    relationships: Sequence[RelationshipResource],
+    relationship_types: Sequence[RelationshipTypeResource],
     rules: EmploymentRules,
     today: date,
-    person_side: bool,
 ) -> list[EmploymentEdge]:
     """Every person↔organization relationship, normalised into one `EmploymentEdge` each.
 
-    `person_side` names which literal JSON side is "self" when the payload came from the
-    person's own GET (`sourceEntity`) versus the organization's own GET (`destinationEntity`).
-    Structural matching itself stays direction-agnostic: `_employer_side`'s type-based check
-    already tells the organization side from the person side regardless of which literal key
-    each landed on, so both `person_id` and `organization_id` are pulled from whichever side
-    matched — `person_side` only needs to be threaded through for callers building an index (a
-    later addition) that must record which id belongs to which entity type.
+    Structural matching is direction-agnostic: `_employer_side`'s type-based check already tells
+    the organization side from the person side regardless of which literal key each landed on.
 
     `IRRELEVANT` edges are dropped — they neither vouch for the person nor speak against them, so
     they carry no employment signal for `EmploymentIndex` to fold. An edge with no usable date at
     all (`effective_date=None`) is kept: it sorts last downstream rather than being dropped
     outright, so it still wins when it is the only edge for its pair.
     """
-    _ = person_side
     type_names = _relationship_type_names(resources=relationship_types)
     edges: list[EmploymentEdge] = []
 
-    for raw in relationships:
-        parsed = _safe_parse_relationship(raw=raw)
-        if parsed is None:
-            continue
-        attrs, type_id = parsed
+    for resource in relationships:
+        attrs = resource.attributes
+        type_ids = resource.related_ids(EntityRelationshipRef.TYPE)
+        type_id = type_ids[0] if type_ids else None
         employer = _employer_side(attrs=attrs)
         if employer is None:
             continue
@@ -285,17 +228,18 @@ def _employment_edges(
         if status is EmploymentStatus.IRRELEVANT:
             continue
 
-        created = _safe_parse_date(raw=attrs.created_timestamp)
-        started = _safe_parse_date(raw=attrs.start_date)
-        ended = _safe_parse_date(raw=attrs.end_date)
+        created = attrs.created_timestamp
+        started = attrs.start_date
+        ended = attrs.end_date
 
+        departure: DepartedEmployment | None = None
         if status is EmploymentStatus.FORMER:
             effective_date = ended if ended is not None else created
-            evidence = DepartedEmployment(
+            departure = DepartedEmployment(
                 signal=DepartureSignal.FORMER_TYPE,
                 organization_id=employer.organization_id,
                 organization_type=employer.organization_type,
-                end_date=ended.isoformat() if ended is not None else None,
+                end_date=ended,
                 relationship_type_id=type_id,
                 relationship_type_name=type_name,
             )
@@ -304,36 +248,27 @@ def _employment_edges(
             # departure dated at that `endDate`.
             status = EmploymentStatus.FORMER
             effective_date = ended
-            evidence = DepartedEmployment(
+            departure = DepartedEmployment(
                 signal=DepartureSignal.END_DATE,
                 organization_id=employer.organization_id,
                 organization_type=employer.organization_type,
-                end_date=ended.isoformat(),
+                end_date=ended,
                 relationship_type_id=type_id,
                 relationship_type_name=type_name,
             )
         else:
             effective_date = started if started is not None else created
-            # `evidence` is only ever read by the resolver (a later addition) for a `FORMER`
-            # edge; a plain `CURRENT` edge has no departure to describe, so `signal`/`end_date`
-            # here are a placeholder to satisfy the required field, not a claim about anything.
-            evidence = DepartedEmployment(
-                signal=DepartureSignal.END_DATE,
-                organization_id=employer.organization_id,
-                organization_type=employer.organization_type,
-                end_date=None,
-                relationship_type_id=type_id,
-                relationship_type_name=type_name,
-            )
 
         edges.append(
             EmploymentEdge(
                 person_id=person_id,
                 organization_id=employer.organization_id,
                 organization_type=employer.organization_type,
+                relationship_type_id=type_id,
+                relationship_type_name=type_name,
                 status=status,
                 effective_date=effective_date,
-                evidence=evidence,
+                departure=departure,
             )
         )
 
@@ -344,10 +279,9 @@ def _person_id(*, attrs: EntityRelationshipAttributes) -> str | None:
     """The person side's id, whichever literal JSON key (`sourceEntity`/`destinationEntity`) it
     landed on.
 
-    Mirrors `_employer_side`'s type-based matching rather than trusting a `person_side` flag for
-    structural matching, so the two functions never disagree about which side is which. A person
-    side with no `resourceId` is skipped for the same reason an unidentified organization is: an
-    id-less side would collide every such relationship into one bucket.
+    Mirrors `_employer_side`'s type-based matching. A person side with no `resourceId` is skipped
+    for the same reason an unidentified organization is: an id-less side would collide every such
+    relationship into one bucket.
     """
     sides = [
         (side, _side_type(side=side))
@@ -366,47 +300,19 @@ def _person_id(*, attrs: EntityRelationshipAttributes) -> str | None:
     return as_clean_str(person.resource_id)
 
 
-def build_person_employment_index(
+def build_employment_index(
     *,
-    relationships: list[dict[str, object]],
-    relationship_types: list[dict[str, object]],
+    relationships: Sequence[RelationshipResource],
+    relationship_types: Sequence[RelationshipTypeResource],
     rules: EmploymentRules,
     today: date,
 ) -> EmploymentIndex:
-    """The `EmploymentIndex` for `entityRelationships` side-loaded off a person's own GET.
-
-    A person's own GET puts the person at `sourceEntity`, so `person_side=True`. The rest is
-    exactly `build_organization_employment_index`'s work: `person_side` carries no behavior yet
-    (see `_employment_edges`), so the only real difference between the two builders is which
-    literal value they pass.
-    """
-    edges = _employment_edges(
-        relationships=relationships,
-        relationship_types=relationship_types,
-        rules=rules,
-        today=today,
-        person_side=True,
+    """The `EmploymentIndex` for `entityRelationships` side-loaded off a person or organization."""
+    return EmploymentIndex(
+        _employment_edges(
+            relationships=relationships,
+            relationship_types=relationship_types,
+            rules=rules,
+            today=today,
+        )
     )
-    return EmploymentIndex(edges)
-
-
-def build_organization_employment_index(
-    *,
-    relationships: list[dict[str, object]],
-    relationship_types: list[dict[str, object]],
-    rules: EmploymentRules,
-    today: date,
-) -> EmploymentIndex:
-    """The `EmploymentIndex` for `entityRelationships` side-loaded off an organization's own GET.
-
-    An organization's own GET puts the person at `destinationEntity`, so `person_side=False` —
-    the mirror image of `build_person_employment_index`.
-    """
-    edges = _employment_edges(
-        relationships=relationships,
-        relationship_types=relationship_types,
-        rules=rules,
-        today=today,
-        person_side=False,
-    )
-    return EmploymentIndex(edges)

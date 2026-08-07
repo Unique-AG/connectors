@@ -24,6 +24,7 @@ src/backstop_mcp/
     auth/                  Backstop credential bridging: login form, encryption, token rotation
     custom_fields/         CRM custom-field schema discovery, caching and resolution
     party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
+    data_hygiene/          employment edges, departed contacts, as-of provenance
   server/                how it's exposed over MCP
     runtime.py             the process-wide service holder tools reach through
     tools/                 tool functions + the single registry declaring them
@@ -48,7 +49,7 @@ uv run backstop-mcp
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
-- Ready: `GET /ready` — 503 when Postgres is unreachable
+- Ready: `GET /ready` — 503 when Postgres is unreachable or custom-field schema is not loaded
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
 Generate an encryption key with:

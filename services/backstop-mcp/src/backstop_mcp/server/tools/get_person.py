@@ -9,20 +9,21 @@ from pydantic import BaseModel, ConfigDict, Field
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.custom_fields import glossary_meta
 from backstop_mcp.features.data_hygiene import (
-    AsOfEcho,
-    DepartedContactEcho,
+    AsOf,
+    DepartedContactResponse,
     EmploymentStatus,
     EntityRelationshipInclude,
-    as_of_echo,
-    departed_echo,
+    ProvenanceFields,
+    as_of_response,
+    departed_response,
     entity_relationships,
     extract_as_of,
 )
 from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    ResolvedPartyEcho,
-    party_echo,
+    ResolvedPartyResponse,
+    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -31,10 +32,10 @@ from backstop_mcp.server.runtime import get_backstop_client, get_employment_inde
 from backstop_mcp.server.tools.results import tool_result
 
 
-class PersonAttributes(BaseModel):
-    """Person resource attributes; extras preserved for the tool payload dump."""
+class PersonAttributes(ProvenanceFields):
+    """Person resource attributes; extras preserved for the tool payload."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str | None = None
 
@@ -50,11 +51,11 @@ class PersonResolvedResponse(BaseModel):
     """
 
     status: Literal["resolved"] = "resolved"
-    person: dict[str, object]
-    resolved: ResolvedPartyEcho
-    as_of: AsOfEcho | None = None
+    person: PersonAttributes
+    resolved: ResolvedPartyResponse
+    as_of: AsOf | None = None
     departed: bool = False
-    departures: list[DepartedContactEcho] = Field(default_factory=list)
+    departures: list[DepartedContactResponse] = Field(default_factory=list)
 
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -76,7 +77,7 @@ async def get_person(
         Field(
             description=(
                 "Trusted Backstop person Party ID from a prior resolve echo "
-                "(`id` / `type` / `name`). Never invent or guess. Exactly one of "
+                "(`id` / `search_type` / `name`). Never invent or guess. Exactly one of "
                 "`party_id` or `search` must be provided."
             ),
         ),
@@ -94,7 +95,7 @@ async def get_person(
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
-    by this server's resolve echo (`id` / `type` / `name`). Otherwise pass `search`
+    by this server's resolve echo (`id` / `search_type` / `name`). Otherwise pass `search`
     (person name or email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
 
@@ -128,24 +129,26 @@ async def get_person(
         params={"include": EntityRelationshipInclude.for_employment()},
         schema=BackstopApiResourceDocument[PersonAttributes],
     )
-    attributes = document.data.attributes.model_dump(exclude_none=True)
+    attributes = document.data.attributes
     index = get_employment_index_factory().index_for_person(
         **entity_relationships(document),
     )
-    departures: list[DepartedContactEcho] = []
+    departures: list[DepartedContactResponse] = []
     for record in index.pairs(status=EmploymentStatus.FORMER):
         assert record.departure is not None, (
             "EmploymentIndex invariant: a FORMER record always carries departure evidence"
         )
-        echo = departed_echo(record.departure)
-        assert echo is not None
-        departures.append(echo)
+        response = departed_response(record.departure)
+        assert response is not None
+        departures.append(response)
 
     return tool_result(
         PersonResolvedResponse(
             person=attributes,
-            resolved=party_echo(party, attributes=attributes),
-            as_of=as_of_echo(extract_as_of(attributes)),
+            resolved=party_response(
+                party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
+            ),
+            as_of=as_of_response(extract_as_of(attributes)),
             departed=bool(departures),
             departures=departures,
         )

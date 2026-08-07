@@ -7,10 +7,17 @@ The scan and classifier it delegates to are covered in `test_employment.py`.
 from collections.abc import Sequence
 from datetime import date, timedelta
 
+from pydantic import ValidationError
+
+from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.data_hygiene import (
     DepartureSignal,
     EmploymentIndexFactory,
     create_employment_index_factory,
+)
+from backstop_mcp.features.data_hygiene.types import (
+    EntityRelationshipAttributes,
+    RelationshipTypeAttributes,
 )
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
@@ -18,6 +25,30 @@ from tests.features.data_hygiene.helpers import (
     person_org,
     relationship_types,
 )
+
+
+def _typed_relationships(
+    relationships: list[dict[str, object]],
+) -> list[BackstopApiResource[EntityRelationshipAttributes]]:
+    parsed: list[BackstopApiResource[EntityRelationshipAttributes]] = []
+    for raw in relationships:
+        try:
+            parsed.append(BackstopApiResource[EntityRelationshipAttributes].model_validate(raw))
+        except ValidationError:
+            continue
+    return parsed
+
+
+def _typed_types(
+    types: list[dict[str, object]],
+) -> list[BackstopApiResource[RelationshipTypeAttributes]]:
+    parsed: list[BackstopApiResource[RelationshipTypeAttributes]] = []
+    for raw in types:
+        try:
+            parsed.append(BackstopApiResource[RelationshipTypeAttributes].model_validate(raw))
+        except ValidationError:
+            continue
+    return parsed
 
 
 def _factory(
@@ -38,8 +69,8 @@ def _factory(
 class TestCreateEmploymentIndexFactory:
     def test_configured_markers_reach_the_verdict(self) -> None:
         index = _factory().index_for_person(
-            relationships=[person_org("er1", type_id=FORMER_TYPE)],
-            relationship_types=relationship_types(FORMER_TYPE),
+            relationships=_typed_relationships([person_org("er1", type_id=FORMER_TYPE)]),
+            relationship_types=_typed_types(relationship_types(FORMER_TYPE)),
         )
         departed = index.departure(person_id="p1", organization_id="o1")
 
@@ -51,7 +82,8 @@ class TestCreateEmploymentIndexFactory:
         factory = _factory(former_type_ids=("custom-7",), former_type_markers=())
 
         index = factory.index_for_person(
-            relationships=[person_org("er1", type_id="custom-7")], relationship_types=[]
+            relationships=_typed_relationships([person_org("er1", type_id="custom-7")]),
+            relationship_types=[],
         )
         departed = index.departure(person_id="p1", organization_id="o1")
 
@@ -67,15 +99,16 @@ class TestCreateEmploymentIndexFactory:
 class TestIndexForPerson:
     def test_a_person_with_no_relationships_is_not_departed(self) -> None:
         index = _factory().index_for_person(
-            relationships=[], relationship_types=relationship_types(FORMER_TYPE)
+            relationships=[],
+            relationship_types=_typed_types(relationship_types(FORMER_TYPE)),
         )
 
         assert index.departure(person_id="p1", organization_id="o1") is None
 
     def test_a_current_employee_is_not_departed(self) -> None:
         index = _factory().index_for_person(
-            relationships=[person_org("er1", type_id=EMPLOYEE_TYPE)],
-            relationship_types=relationship_types(EMPLOYEE_TYPE),
+            relationships=_typed_relationships([person_org("er1", type_id=EMPLOYEE_TYPE)]),
+            relationship_types=_typed_types(relationship_types(EMPLOYEE_TYPE)),
         )
 
         assert index.departure(person_id="p1", organization_id="o1") is None
@@ -83,34 +116,41 @@ class TestIndexForPerson:
     def test_the_clock_defaults_to_today(self) -> None:
         """A real deployment gets `date.today`; only tests pin it."""
         index = _factory().index_for_person(
-            relationships=[person_org("er1", type_id=None, end_date="2000-01-01")],
+            relationships=_typed_relationships(
+                [person_org("er1", type_id=None, end_date="2000-01-01")]
+            ),
             relationship_types=[],
         )
         departed = index.departure(person_id="p1", organization_id="o1")
 
         assert departed is not None
-        assert departed.end_date == "2000-01-01"
+        assert departed.end_date == date(2000, 1, 1)
 
     def test_an_end_date_after_today_is_not_departed(self) -> None:
         # Days rather than `replace(year=...)`, which raises on a leap day.
         next_year = (date.today() + timedelta(days=366)).isoformat()
 
         index = _factory().index_for_person(
-            relationships=[person_org("er1", type_id=None, end_date=next_year)],
+            relationships=_typed_relationships(
+                [person_org("er1", type_id=None, end_date=next_year)]
+            ),
             relationship_types=[],
         )
 
         assert index.departure(person_id="p1", organization_id="o1") is None
 
     def test_an_injected_clock_decides_whether_an_end_date_has_passed(self) -> None:
-        rules = _factory().rules
-        relationships = [person_org("er1", type_id=None, end_date="2026-08-05")]
+        factory = EmploymentIndexFactory(
+            rules=_factory().rules,
+            clock=lambda: date(2020, 1, 1),
+        )
+        index = factory.index_for_person(
+            relationships=_typed_relationships(
+                [person_org("er1", type_id=None, end_date="2019-12-31")]
+            ),
+            relationship_types=[],
+        )
+        departed = index.departure(person_id="p1", organization_id="o1")
 
-        before = EmploymentIndexFactory(rules=rules, clock=lambda: date(2026, 8, 4))
-        after = EmploymentIndexFactory(rules=rules, clock=lambda: date(2026, 8, 6))
-
-        before_index = before.index_for_person(relationships=relationships, relationship_types=[])
-        after_index = after.index_for_person(relationships=relationships, relationship_types=[])
-
-        assert before_index.departure(person_id="p1", organization_id="o1") is None
-        assert after_index.departure(person_id="p1", organization_id="o1") is not None
+        assert departed is not None
+        assert departed.signal is DepartureSignal.END_DATE

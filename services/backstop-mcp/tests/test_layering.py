@@ -24,7 +24,7 @@
 4. **A package is entered through its `__init__`, never through its modules.** From outside,
    `from backstop_mcp.features.data_hygiene import EmploymentIndexFactory` — not
    `...data_hygiene.service import ...`, and certainly not `...data_hygiene.employment import
-   build_person_employment_index`. Each package's `__all__` is then the whole of what it promises,
+   build_employment_index`. Each package's `__all__` is then the whole of what it promises,
    and everything else is free to move.
 
    This is what makes a package able to say "call it this way". `data_hygiene/employment.py`

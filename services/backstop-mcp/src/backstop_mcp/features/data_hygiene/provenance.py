@@ -1,19 +1,19 @@
 """Extract plain `as_of` provenance from Backstop resource attributes."""
 
 from backstop_mcp.coerce import as_clean_str, as_object_dict
-from backstop_mcp.features.data_hygiene.types import AsOf
+from backstop_mcp.features.data_hygiene.types import AsOf, ProvenanceFields
 
 
-def extract_as_of(attributes: dict[str, object] | None) -> AsOf | None:
-    """Build provenance from `modifiedTimestamp` / `modifiedBy` when either is present.
+def extract_as_of(attributes: ProvenanceFields | None) -> AsOf | None:
+    """Build provenance from `modified_timestamp` / `modified_by` when either is present.
 
     Returns `None` when both are missing so callers can omit an empty envelope rather than
     echo `{null, null}`. No verdict is attached — age is left for the user to interpret.
     """
-    if not attributes:
+    if attributes is None:
         return None
-    modified_timestamp = as_clean_str(attributes.get("modifiedTimestamp"))
-    modified_by = _modified_by(attributes.get("modifiedBy"))
+    modified_timestamp = as_clean_str(attributes.modified_timestamp)
+    modified_by = _modified_by(attributes.modified_by)
     if modified_timestamp is None and modified_by is None:
         return None
     return AsOf(modified_timestamp=modified_timestamp, modified_by=modified_by)
