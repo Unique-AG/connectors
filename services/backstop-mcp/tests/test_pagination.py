@@ -3,7 +3,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import PageResult
-from backstop_mcp.backstop_client.pagination import PaginationRequest, paginate_all
+from backstop_mcp.backstop_client.pagination import paginate_all
 
 _BASE_URL = "https://example.backstopsolutions.com"
 
@@ -37,7 +37,7 @@ class TestPaginateAll:
         )
 
         result = await paginate_all(
-            PaginationRequest(fetch_page=_fetch_page, first_path="/records", max_records=None)
+            fetch_page=_fetch_page, first_path="/records", max_records=None
         )
 
         assert result == PageResult(
@@ -65,7 +65,7 @@ class TestPaginateAll:
         )
 
         result = await paginate_all(
-            PaginationRequest(fetch_page=_fetch_page, first_path="/records", max_records=None)
+            fetch_page=_fetch_page, first_path="/records", max_records=None
         )
 
         assert result.items == [{"id": "1"}, {"id": "2"}, {"id": "3"}]
@@ -94,7 +94,7 @@ class TestPaginateAll:
         )
 
         result = await paginate_all(
-            PaginationRequest(fetch_page=_fetch_page, first_path="/records", max_records=3)
+            fetch_page=_fetch_page, first_path="/records", max_records=3
         )
 
         # max_records=3 is reached mid-second-page (4 accumulated) — the page that crosses
@@ -113,7 +113,7 @@ class TestPaginateAll:
         )
 
         result = await paginate_all(
-            PaginationRequest(fetch_page=_fetch_page, first_path="/records", max_records=None)
+            fetch_page=_fetch_page, first_path="/records", max_records=None
         )
 
         assert result.total_count == 1234

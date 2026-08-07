@@ -13,9 +13,9 @@ from starlette.responses import JSONResponse, Response
 from unique_mcp.monitoring import setup_ops
 
 from backstop_mcp.backstop_client import (
+    BackstopClientFactory,
     BackstopTransportSettings,
     RetrySettings,
-    create_backstop_client_factory,
 )
 from backstop_mcp.config import (
     AppConfig,
@@ -74,7 +74,7 @@ def create_app(
     # One factory, therefore one connection pool. The provider needs it (to verify credentials
     # at login) and it needs the provider (for the token-revocation hook inside the auth
     # context), so the cycle is closed with a single `attach_auth` step.
-    backstop_clients = create_backstop_client_factory(
+    backstop_clients = BackstopClientFactory(
         transport_settings(backstop_config), retry_settings(backstop_config)
     )
     auth_provider = BackstopOAuthProvider(
@@ -91,7 +91,7 @@ def create_app(
         BackstopAuthContext(
             session_factory=session_factory,
             encryption_key=encryption_key,
-            revoke_tokens_for_subject=auth_provider.revoke_token_family_for_subject,
+            revoke_tokens_for_subject=auth_provider.revoke_all_tokens_for_subject,
         )
     )
 

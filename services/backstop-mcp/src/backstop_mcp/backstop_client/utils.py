@@ -5,7 +5,6 @@ Kept separate from `client.py` because none of these need `BackstopClient`'s col
 credentials.
 """
 
-import base64
 import logging
 import re
 
@@ -20,64 +19,59 @@ from backstop_mcp.backstop_client.errors import (
 
 logger = logging.getLogger(__name__)
 
-_DICT_ADAPTER = TypeAdapter(dict[str, object])
-
 # `typing_extensions.TypeVar` (not stdlib) so `T` can carry a PEP 696 default: native PEP 695
 # generic-method syntax can't express a default until Python 3.13, but this repo targets 3.12.
-# The default lets every schema-less call site (e.g. `client.get("/system-info")`) infer
-# `dict[str, object]` without an explicit subscript.
 T = TypeVar("T", default=dict[str, object])
 
 
-def deserialize(content: bytes, schema: type[T] | None, *, path: str) -> T:
-    """Parse a response body, validating against `schema` if given, else the generic dict shape.
+def schema_label(schema: type[object]) -> str:
+    """Stable name for logs/errors — works for classes and `dict[str, object]`-style aliases."""
+    name = getattr(schema, "__name__", None)
+    if isinstance(name, str):
+        return name
+    origin = getattr(schema, "__origin__", None)
+    if isinstance(origin, type):
+        return origin.__name__
+    return str(schema)
 
-    Only the schema-given case is wrapped as `BackstopResponseSchemaError`: a caller that asked
-    for a shape gets told which shape failed and where, while the schema-less path keeps
-    propagating pydantic's own error.
+
+def deserialize(content: bytes, adapter: TypeAdapter[T], *, path: str, schema_name: str) -> T:
+    """Parse a response body with a caller-supplied `TypeAdapter`.
+
+    `ValidationError` is always wrapped as `BackstopResponseSchemaError` — every Backstop call
+    names the shape it expects, so a mismatch is a typed tool failure rather than a raw pydantic
+    error.
     """
-    if schema is None:
-        return _DICT_ADAPTER.validate_json(content)  # pyright: ignore[reportReturnType]
     try:
-        return TypeAdapter(schema).validate_json(content)
+        return adapter.validate_json(content)
     except ValidationError as exc:
         logger.error(
             "backstop.response.schema_error",
-            extra={"path": path, "schema": schema.__name__},
+            extra={"path": path, "schema": schema_name},
         )
-        raise BackstopResponseSchemaError(path, schema.__name__, exc) from exc
+        raise BackstopResponseSchemaError(path, schema_name, exc) from exc
 
 
 # /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
 # slow (up to ~30s per 500 records) — they get the extended timeout and the larger
 # report-sized page default; everything else gets the ordinary CRUD profile.
-_EXTENDED_PROFILE_MARKERS = ("/reports", "/analytics")
+_SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
 
 
-def build_auth_headers(username: str, api_token: str) -> dict[str, str]:
-    """Build the `Authorization: Basic ...` + `token: true` headers Backstop expects.
-
-    Every user connects with a personal API token (not a password), so `token: true` is
-    always sent — see https://backstopsolutions.elevio.help/en/articles/1018 and .../236.
-    """
-    basic_auth = base64.b64encode(f"{username}:{api_token}".encode()).decode()
-    return {"authorization": f"Basic {basic_auth}", "token": "true"}
+def is_slow_endpoint(path: str) -> bool:
+    return any(marker in path for marker in _SLOW_ENDPOINT_MARKERS)
 
 
-def is_extended_profile_path(path: str) -> bool:
-    return any(marker in path for marker in _EXTENDED_PROFILE_MARKERS)
+def resolve_request_url(base_url: str, path: str) -> str:
+    """Return a URL/path safe for an `AsyncClient` that already has `base_url` set.
 
-
-def build_url(base_url: str, path: str) -> str:
-    """Resolve a path (or an absolute `links.next` URL) against the configured base URL.
-
-    Absolute URLs arrive from `links.next` while walking a pagination chain. They are pinned
-    to the configured host: an authenticated client following an arbitrary upstream-supplied
-    origin would send `Authorization: Basic ...` wherever that origin points.
+    Relative paths are returned as-is (httpx joins them onto the client base). Absolute URLs
+    arrive from `links.next` while walking a pagination chain and are pinned to the configured
+    host: an authenticated client following an arbitrary upstream-supplied origin would send
+    `Authorization: Basic ...` wherever that origin points.
     """
     if not path.startswith(("http://", "https://")):
-        separator = "" if path.startswith("/") else "/"
-        return base_url.rstrip("/") + separator + path
+        return path if path.startswith("/") else f"/{path}"
 
     expected = httpx.URL(base_url).netloc
     actual = httpx.URL(path).netloc
@@ -105,13 +99,7 @@ def metric_route(path: str) -> str:
     the metric's cardinality unbounded, so each one is replaced with `:id` rather than dropped;
     the surrounding segments (e.g. `/contacts/:id/analytics` vs `/contacts/:id`) still matter.
     """
-    without_query = path.split("?", 1)[0]
-    is_absolute = without_query.startswith(("http://", "https://"))
-    stripped = without_query.removeprefix("http://").removeprefix("https://")
-    segments = [segment for segment in stripped.split("/") if segment]
-    if is_absolute:
-        # The leading segment of an absolute URL is the host, not part of the route.
-        segments = segments[1:]
+    segments = [segment for segment in httpx.URL(path).path.split("/") if segment]
     if not segments:
         return "/"
     labeled = [":id" if _is_id_segment(segment) else segment for segment in segments]

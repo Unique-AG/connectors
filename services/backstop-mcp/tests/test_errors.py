@@ -1,4 +1,7 @@
+from datetime import UTC, datetime
+
 import httpx
+import pytest
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client.errors import (
@@ -227,3 +230,24 @@ class TestParseJsonApiErrorRateLimit:
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds is None
+
+    def test_retry_after_http_date(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        now = datetime(2026, 8, 7, 12, 0, 0, tzinfo=UTC)
+
+        class _FixedDatetime(datetime):
+            @classmethod
+            def now(cls, tz: object = None) -> datetime:
+                return now
+
+        monkeypatch.setattr("backstop_mcp.backstop_client.errors.datetime", _FixedDatetime)
+
+        response = httpx.Response(
+            429,
+            headers={"Retry-After": "Fri, 07 Aug 2026 12:00:30 GMT"},
+            json={"errors": [{"detail": "Too many requests"}]},
+        )
+
+        error = parse_json_api_error(response)
+
+        assert isinstance(error, BackstopRateLimitError)
+        assert error.retry_after_seconds == 30.0

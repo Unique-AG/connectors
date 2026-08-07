@@ -16,18 +16,17 @@ from backstop_mcp.backstop_client.errors import (
 )
 from backstop_mcp.backstop_client.pagination import (
     PageResult,
-    PaginationRequest,
     paginate_all,
 )
 from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings
 from backstop_mcp.backstop_client.utils import (
     T,
-    build_auth_headers,
-    build_url,
     deserialize,
-    is_extended_profile_path,
+    is_slow_endpoint,
     metric_route,
+    resolve_request_url,
+    schema_label,
 )
 from backstop_mcp.metrics import (
     BACKSTOP_CONCURRENCY_WAIT,
@@ -39,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
-    return [{"code": error.code, "title": error.title, "detail": error.detail} for error in errors]
+    return [error.model_dump() for error in errors]
 
 
 type AuthFailureHook = Callable[[], Awaitable[None]]
@@ -51,7 +50,7 @@ type HttpClientProvider = Callable[[], Awaitable[httpx.AsyncClient]]
 # collaborators. It resolves the caller's stored credential, so calling it costs a DB read plus
 # a decrypt: acquire one only on a path that will actually make a request.
 type CallerClientProvider = Callable[[], Awaitable["BackstopClient"]]
-# Acquired around a *single* upstream request (see `BackstopClient._request`), never around a
+# Acquired around a *single* upstream request (see `BackstopClient.raw_request`), never around a
 # whole tool invocation — Backstop's limit is on concurrent requests, and a caller that holds
 # a slot across an elicitation prompt or a batch of gathered calls either starves itself or
 # breaches the limit. See `BackstopClientFactory`.
@@ -65,7 +64,11 @@ class BackstopClient:
     and never construct settings either (the factory owns the one set translated from config by
     `create_app`). All cross-cutting concerns — auth headers, the per-user concurrency gate,
     endpoint-aware timeouts, 401/429/error mapping, rate-limit-aware retry, metrics — live in
-    `_request()`, which every public method funnels through.
+    `raw_request()`, which every public method funnels through.
+
+    Typed verbs always take a response `schema`. Prefer those for tool/feature code. Use
+    `raw_request` only when the body is intentionally ignored (e.g. credential verification) —
+    it is not a type-safe substitute for `.get`/`.post`/….
     """
 
     def __init__(
@@ -86,37 +89,37 @@ class BackstopClient:
         self._on_auth_failure: AuthFailureHook | None = on_auth_failure
 
     async def get(
-        self, path: str, *, params: dict[str, object] | None = None, schema: type[T] | None = None
+        self, path: str, *, schema: type[T], params: dict[str, object] | None = None
     ) -> T:
-        response = await self._request("GET", path, params=params)
-        return deserialize(response.content, schema, path=path)
+        response = await self.raw_request("GET", path, params=params)
+        return self._deserialize(response.content, schema, path=path)
 
     async def post(
-        self, path: str, *, json: dict[str, object] | None = None, schema: type[T] | None = None
+        self, path: str, *, schema: type[T], json: dict[str, object] | None = None
     ) -> T:
-        response = await self._request("POST", path, json=json)
-        return deserialize(response.content, schema, path=path)
+        response = await self.raw_request("POST", path, json=json)
+        return self._deserialize(response.content, schema, path=path)
 
     async def patch(
-        self, path: str, *, json: dict[str, object] | None = None, schema: type[T] | None = None
+        self, path: str, *, schema: type[T], json: dict[str, object] | None = None
     ) -> T:
-        response = await self._request("PATCH", path, json=json)
-        return deserialize(response.content, schema, path=path)
+        response = await self.raw_request("PATCH", path, json=json)
+        return self._deserialize(response.content, schema, path=path)
 
-    async def delete(self, path: str, *, schema: type[T] | None = None) -> T | None:
-        response = await self._request("DELETE", path)
+    async def delete(self, path: str, *, schema: type[T]) -> T | None:
+        response = await self.raw_request("DELETE", path)
         if not response.content:
             return None
-        return deserialize(response.content, schema, path=path)
+        return self._deserialize(response.content, schema, path=path)
 
     async def paginate(
         self,
         path: str,
         *,
+        schema: type[T],
         params: dict[str, object] | None = None,
         max_records: int | None = 10_000,
         page_size: int | None = None,
-        schema: type[T] | None = None,
     ) -> PageResult[T]:
         """Walk a `links.next` chain, applying `params` (plus a default page size and a zero
         offset) to the first page only — every later page is driven entirely by the literal
@@ -130,8 +133,8 @@ class BackstopClient:
         `max_records=None` walks the chain to the end, which is what callers reading a
         complete series (rather than a preview) need. `paginate_all` keeps producing raw
         `dict[str, object]` items after validating the envelope (`links`/`meta`/`included`);
-        each accumulated item is re-validated against `schema` here — only if one was given —
-        so a malformed item on any page fails the whole call rather than silently skipping it.
+        each accumulated item is then validated against `schema`, so a malformed item on any
+        page fails the whole call rather than silently skipping it.
         """
         first_page_params = dict(params) if params is not None else {}
         limit_param = self._settings.page_limit_param
@@ -148,28 +151,27 @@ class BackstopClient:
         async def fetch_page(
             page_path: str, page_params: dict[str, object] | None
         ) -> httpx.Response:
-            return await self._request("GET", page_path, params=page_params)
+            return await self.raw_request("GET", page_path, params=page_params)
 
         raw_result = await paginate_all(
-            PaginationRequest(
-                fetch_page=fetch_page,
-                first_path=path,
-                max_records=max_records,
-                first_page_params=first_page_params,
-            )
+            fetch_page=fetch_page,
+            first_path=path,
+            max_records=max_records,
+            first_page_params=first_page_params,
         )
 
-        if schema is None:
-            return raw_result  # pyright: ignore[reportReturnType]
-
+        # One adapter for the whole walk — building inside the comprehension would redo the
+        # expensive schema compile once per item (see PR review on paginate).
+        adapter = TypeAdapter(schema)
+        label = schema_label(schema)
         try:
-            items = [TypeAdapter(schema).validate_python(item) for item in raw_result.items]
+            items = [adapter.validate_python(item) for item in raw_result.items]
         except ValidationError as exc:
             logger.error(
                 "backstop.response.schema_error",
-                extra={"path": path, "schema": schema.__name__},
+                extra={"path": path, "schema": label},
             )
-            raise BackstopResponseSchemaError(path, schema.__name__, exc) from exc
+            raise BackstopResponseSchemaError(path, label, exc) from exc
 
         return PageResult(
             items=items,
@@ -178,12 +180,20 @@ class BackstopClient:
             truncated=raw_result.truncated,
         )
 
+    def _deserialize(self, content: bytes, schema: type[T], *, path: str) -> T:
+        return deserialize(
+            content,
+            TypeAdapter(schema),
+            path=path,
+            schema_name=schema_label(schema),
+        )
+
     def _default_page_size(self, path: str) -> int:
-        if is_extended_profile_path(path):
+        if is_slow_endpoint(path):
             return self._settings.report_page_size
         return self._settings.default_page_size
 
-    async def _request(
+    async def raw_request(
         self,
         method: str,
         path: str,
@@ -191,15 +201,22 @@ class BackstopClient:
         json: dict[str, object] | None = None,
         params: dict[str, object] | None = None,
     ) -> httpx.Response:
-        headers = build_auth_headers(
+        """Issue a request without deserializing the body.
+
+        Same transport stack as the typed verbs (auth, gate, timeouts, retries, error mapping),
+        but returns the raw `httpx.Response`. Do **not** use this for tool/feature code that
+        should be type-safe — pass a `schema` to `.get`/`.post`/`.patch`/`.delete`/`.paginate`
+        instead. Intended for status-only checks such as credential verification.
+        """
+        auth = httpx.BasicAuth(
             self._credential.username, self._credential.api_token.get_secret_value()
         )
         timeout = (
             self._settings.reports_timeout_seconds
-            if is_extended_profile_path(path)
+            if is_slow_endpoint(path)
             else self._settings.default_timeout_seconds
         )
-        url = build_url(self._settings.base_url, path)
+        url = resolve_request_url(self._settings.base_url, path)
         shared_client = await self._http_client()
         retrying = self._retry_policy.build_retrying()
         route = metric_route(path)
@@ -218,7 +235,7 @@ class BackstopClient:
                         url,
                         json=json,
                         params=params,  # pyright: ignore[reportArgumentType]
-                        headers=headers,
+                        auth=auth,
                         timeout=timeout,
                     )
                 finally:
