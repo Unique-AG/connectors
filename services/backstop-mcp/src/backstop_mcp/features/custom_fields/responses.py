@@ -5,6 +5,8 @@ feature's own wire vocabulary, so every tool that resolves a field returns the s
 They lived next to tool handlers until multiple tools needed them and had to share shapes.
 """
 
+from typing import ClassVar
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.custom_fields.index import FieldCandidate
@@ -21,7 +23,7 @@ from backstop_mcp.features.resolution import (
 class AllowedValueResponse(BaseModel):
     """One picklist option, returned so a caller can validate a write before attempting it."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: str | None = None
     label: str
@@ -30,7 +32,7 @@ class AllowedValueResponse(BaseModel):
 class CustomFieldDefinitionResponse(BaseModel):
     """A resolved field definition, returned so a wrong resolution is visible rather than silent."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     definition_id: str
     entity_type: str

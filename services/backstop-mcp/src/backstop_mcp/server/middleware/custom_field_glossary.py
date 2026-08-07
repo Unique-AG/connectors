@@ -54,7 +54,8 @@ class CustomFieldGlossaryMiddleware(Middleware):
         self._client_for_caller: CallerClientProvider = client_for_caller
         self._glossary_budget_chars: int = glossary_budget_chars
         self._tools_list_description_budget_chars: int = tools_list_description_budget_chars
-        self._warm_failure = TimedGate(duration=self.WARM_FAILURE_COOLDOWN)
+        # Keyed by subject: catalogs are per caller, so a failure cooldown must be too.
+        self._warm_failures: dict[str, TimedGate] = {}
 
     @override
     async def on_list_tools(
@@ -118,13 +119,25 @@ class CustomFieldGlossaryMiddleware(Middleware):
         Any failure is swallowed: the glossary is advisory, and no listing should break because
         schema enrichment couldn't run. Callers fall back to `list_custom_fields` when the
         glossary is missing or truncated.
+
+        The cooldown is per subject, matching the catalogs: one caller's expired Backstop
+        credential is their problem, and must not stop everyone else warming for five minutes.
         """
-        self._warm_failure.clear_if_expired()
-        if self._warm_failure.within():
-            return
+        gate = self._warm_failures.get(subject)
+        if gate is not None:
+            gate.clear_if_expired()
+            if gate.within():
+                return
         try:
             client = await self._client_for_caller()
             await self._service.ensure_fresh(client, subject=subject)
         except Exception:
-            self._warm_failure.mark()
-            logger.warning("custom_fields.glossary.warm_failed", exc_info=True)
+            self._warm_failures.setdefault(
+                subject, TimedGate(duration=self.WARM_FAILURE_COOLDOWN)
+            ).mark()
+            logger.warning(
+                "custom_fields.glossary.warm_failed", extra={"subject": subject}, exc_info=True
+            )
+        else:
+            # Success clears the record rather than leaving a spent gate per subject forever.
+            _ = self._warm_failures.pop(subject, None)
