@@ -1,4 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
@@ -71,10 +73,12 @@ def apply_overrides(
 
 def _crm_description(definition: CustomFieldDefinition) -> str | None:
     attributes = definition.raw.get("attributes")
-    if not isinstance(attributes, dict):
+    if not isinstance(attributes, Mapping):
         return None
-    description = attributes.get("description")
-    return description.strip() if isinstance(description, str) and description.strip() else None
+    description = cast("Mapping[str, object]", attributes).get("description")
+    if not isinstance(description, str):
+        return None
+    return description.strip() or None
 
 
 def parse_override_key(key: str) -> tuple[str, str]:

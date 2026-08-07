@@ -283,9 +283,7 @@ class TestConfigTranslation:
 
     def test_the_transport_is_not_handed_the_service_account(self) -> None:
         """The knobs it has no business seeing must not have leaked in with the rest."""
-        field_names = {
-            field.name for field in dataclasses.fields(transport_settings(BackstopConfig()))
-        }
+        field_names = set(type(transport_settings(BackstopConfig())).model_fields)
 
         assert not field_names & {
             "service_username",

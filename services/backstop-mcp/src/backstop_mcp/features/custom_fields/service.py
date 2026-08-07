@@ -15,6 +15,7 @@ from backstop_mcp.features.custom_fields.glossary import format_glossary
 from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
 from backstop_mcp.features.custom_fields.overrides import (
     FieldOverride,
+    OverrideIndex,
     apply_overrides,
     index_overrides,
 )
@@ -67,9 +68,11 @@ class CustomFieldsService:
         ttl: timedelta,
     ) -> None:
         self._session_factory: async_sessionmaker[AsyncSession] = session_factory
-        self._base_url: str = base_url.rstrip("/")
+        # Already normalised by `BackstopConfig.base_url` (`HttpUrlStr`), and it is half of the
+        # snapshot key, so re-trimming here would only hide a base URL that disagreed with it.
+        self._base_url: str = base_url
         self._overrides: dict[str, FieldOverride] = overrides
-        self._override_index = index_overrides(overrides)
+        self._override_index: OverrideIndex = index_overrides(overrides)
         self._ttl: timedelta = ttl
         self._by_subject: dict[str, _SubjectSchema] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -160,6 +163,11 @@ class CustomFieldsService:
         field, so a copy from last week almost certainly still resolves the caller's query.
         Letting a Backstop hiccup propagate here would fail every field lookup outright, so a
         refresh failure is logged and the existing index kept. `refresh()` is the loud path.
+
+        The refresh floor applies here too, and this is the path that needs it most: a failed
+        refresh leaves `is_fresh` false, so without the floor every subsequent call — every
+        `tools/list`, every resolution — would attempt the fetch again and hammer a Backstop
+        that is already struggling.
         """
         resolved = self._resolve_subject(subject)
         if resolved is None:
@@ -171,6 +179,8 @@ class CustomFieldsService:
                 return
             await self._load_from_db_unlocked(resolved)
             if self.is_fresh(resolved):
+                return
+            if self._entry(resolved).refresh_floor.within():
                 return
             try:
                 await self._refresh_unlocked(client, resolved)

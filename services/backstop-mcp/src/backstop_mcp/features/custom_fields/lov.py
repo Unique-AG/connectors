@@ -22,128 +22,131 @@ So allowed values are assembled from three sources, in order of reliability:
 """
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Annotated, ClassVar
+from typing import ClassVar, cast
 
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    TypeAdapter,
-    ValidationError,
-)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.coerce import as_object_dict, as_object_list
 from backstop_mcp.features.custom_fields.types import AllowedValue, LovEntryAttributes
 
 logger = logging.getLogger(__name__)
-
-_CleanStr: TypeAdapter[str] = TypeAdapter(
-    Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-)
 
 _LOV_ENTRIES_PATH = "/lov-entries"
 
 _LABEL_KEYS = ("display", "defaultDisplay", "label", "name", "value", "displayName", "display_name")
 _ENTRY_COLLECTION_KEYS = ("entries", "lovEntries", "viewableEntries", "options", "values")
 
-_NonEmptyLabel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+def _clean(value: object) -> str | None:
+    """A stripped non-empty string, or None — the rule these payloads are read under."""
+    return (value.strip() or None) if isinstance(value, str) else None
+
+
+def _first_label(payload: Mapping[str, object]) -> str | None:
+    """First non-blank label among the known keys.
+
+    Not `AliasChoices`: that binds the first key that is *present*, so a null or blank
+    `display` would shadow a perfectly good `defaultDisplay` underneath it.
+    """
+    return next(
+        (label for key in _LABEL_KEYS if (label := _clean(payload.get(key))) is not None), None
+    )
 
 
 class _InlineOption(BaseModel):
-    """One inlined picklist option object (or a JSON:API resource/attributes wrapper)."""
+    """One picklist option, in any of the three shapes Backstop inlines it in.
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    id: object | None = None
-    label: _NonEmptyLabel | None = Field(
-        default=None,
-        validation_alias=AliasChoices(*_LABEL_KEYS),
-    )
-
-
-def _clean_str(value: object) -> str | None:
-    try:
-        return _CleanStr.validate_python(value)
-    except ValidationError:
-        return None
-
-
-def _first_nonempty_list(payload: dict[str, object]) -> list[object]:
-    """First collection among `_ENTRY_COLLECTION_KEYS` that is a non-empty list.
-
-    `AliasChoices` binds the first *present* key, so a null/empty `entries` would block a
-    later usable `viewableEntries` — walk the keys ourselves instead.
+    A bare label string; a flat object carrying one of `_LABEL_KEYS`; or a JSON:API resource
+    whose label sits under `attributes` while its id stays on the envelope. Normalising all
+    three here is what lets the callers below stay free of hand-rolled narrowing.
     """
-    for key in _ENTRY_COLLECTION_KEYS:
-        if key not in payload:
-            continue
-        items = as_object_list(payload.get(key))
-        if items:
-            return items
-    return []
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-def _usable_label(payload: dict[str, object]) -> str | None:
-    """First non-blank label among the known keys (skips null/blank earlier aliases)."""
-    for key in _LABEL_KEYS:
-        if key not in payload:
-            continue
-        label = _clean_str(payload.get(key))
-        if label is not None:
-            return label
-    return None
+    id: str | None = None
+    label: str | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize(cls, value: object) -> object:
+        if isinstance(value, str):
+            return {"label": _clean(value)}
+        if not isinstance(value, Mapping):
+            # Carries neither a label nor an id, so it drops out in `as_allowed_value` rather
+            # than failing the whole list it arrived in.
+            return {}
+        payload = cast("Mapping[str, object]", value)
+        attributes = payload.get("attributes")
+        inner = (
+            cast("Mapping[str, object]", attributes) if isinstance(attributes, Mapping) else payload
+        )
+        # A side-loaded resource keeps its id on the envelope; `attributes` alone often omits it.
+        option_id = inner.get("id", payload.get("id"))
+        return {
+            "id": str(option_id) if option_id is not None else None,
+            "label": _first_label(inner),
+        }
 
-def _option_from_raw(option: object) -> AllowedValue | None:
-    label = _clean_str(option)
-    if label is not None:
-        return AllowedValue(id=None, label=label)
-
-    option_dict = as_object_dict(option)
-    resource_id: object | None = None
-    payload: object = option
-    if option_dict is not None:
-        resource_id = option_dict.get("id")
-        attributes = as_object_dict(option_dict.get("attributes"))
-        if attributes is not None:
-            # Keep the JSON:API envelope id — attributes alone often omit it.
-            payload = attributes
-
-    option_payload = as_object_dict(payload)
-    if option_payload is not None:
-        label = _usable_label(option_payload)
-        option_id = option_payload.get("id")
-        if option_id is None:
-            option_id = resource_id
-        if label is not None:
-            return AllowedValue(
-                id=str(option_id) if option_id is not None else None,
-                label=label,
-            )
-        if option_id is not None:
-            return AllowedValue(id=str(option_id), label=str(option_id))
+    def as_allowed_value(self) -> AllowedValue | None:
+        """`None` when the option carries neither a label nor an id to fall back on."""
+        if self.label is not None:
+            return AllowedValue(id=self.id, label=self.label)
+        if self.id is not None:
+            return AllowedValue(id=self.id, label=self.id)
         return None
 
-    try:
-        parsed = _InlineOption.model_validate(payload)
-    except ValidationError:
-        return None
 
-    if parsed.label is None:
-        if parsed.id is None and resource_id is None:
-            return None
-        fallback_id = parsed.id if parsed.id is not None else resource_id
-        return AllowedValue(id=str(fallback_id), label=str(fallback_id))
-    option_id = parsed.id if parsed.id is not None else resource_id
-    return AllowedValue(
-        id=str(option_id) if option_id is not None else None,
-        label=parsed.label,
-    )
+class _InlineOptionSet(BaseModel):
+    """A `lovSet`/`selectOptions` attribute, whether it arrives as a list or as an object.
+
+    As an object the options hide under one of several collection keys, or under a JSON:API
+    `data` that is itself either a list or a single resource. Each of those is resolved here,
+    so `inline_allowed_values` reads as a concatenation instead of a shape probe.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    options: list[_InlineOption] = Field(default_factory=list)
+    select_options: list[_InlineOption] = Field(default_factory=list)
+    data: list[_InlineOption] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _collect(cls, value: object) -> object:
+        if isinstance(value, list):
+            return {"options": cast("list[object]", value)}
+        if not isinstance(value, Mapping):
+            return {}
+        payload = cast("Mapping[str, object]", value)
+        options: list[object] = []
+        for key in _ENTRY_COLLECTION_KEYS:
+            items = payload.get(key)
+            if isinstance(items, list) and items:
+                options = cast("list[object]", items)
+                break
+        raw_data = payload.get("data")
+        data: list[object] = []
+        if isinstance(raw_data, list):
+            data = cast("list[object]", raw_data)
+        elif isinstance(raw_data, Mapping):
+            data = [cast("Mapping[str, object]", raw_data)]
+        raw_select = payload.get("selectOptions")
+        return {
+            "options": options,
+            "select_options": (
+                cast("list[object]", raw_select) if isinstance(raw_select, list) else []
+            ),
+            "data": data,
+        }
+
+    def allowed_values(self) -> list[AllowedValue]:
+        return [
+            value
+            for option in (*self.options, *self.select_options, *self.data)
+            if (value := option.as_allowed_value()) is not None
+        ]
 
 
 def _dedupe_by_label(values: Iterable[AllowedValue]) -> tuple[AllowedValue, ...]:
@@ -157,42 +160,10 @@ def inline_allowed_values(
     lov_set: object | None, select_options: object | None
 ) -> tuple[AllowedValue, ...]:
     """Source 3: options inlined on the definition's own attributes."""
-    collected: list[AllowedValue] = []
-
-    for option in as_object_list(select_options):
-        value = _option_from_raw(option)
-        if value is not None:
-            collected.append(value)
-
-    lov_dict = as_object_dict(lov_set)
-    if lov_dict is None:
-        for option in as_object_list(lov_set):
-            value = _option_from_raw(option)
-            if value is not None:
-                collected.append(value)
-        return _dedupe_by_label(collected)
-
-    for option in _first_nonempty_list(lov_dict):
-        value = _option_from_raw(option)
-        if value is not None:
-            collected.append(value)
-
-    # A side-loaded set arrives as a JSON:API resource, so the useful fields are one level
-    # down under `attributes` (handled inside `_option_from_raw`) or nested under `data`.
-    data_list = as_object_list(lov_dict.get("data"))
-    if data_list:
-        for item in data_list:
-            value = _option_from_raw(item)
-            if value is not None:
-                collected.append(value)
-        return _dedupe_by_label(collected)
-
-    data_dict = as_object_dict(lov_dict.get("data"))
-    if data_dict is not None:
-        value = _option_from_raw(data_dict)
-        if value is not None:
-            collected.append(value)
-    return _dedupe_by_label(collected)
+    return _dedupe_by_label(
+        _InlineOptionSet.model_validate(select_options).allowed_values()
+        + _InlineOptionSet.model_validate(lov_set).allowed_values()
+    )
 
 
 @dataclass(frozen=True)
@@ -286,10 +257,8 @@ def included_set_entries(
     for resource in included:
         if str(resource.get("id", "")) != lov_set_id:
             continue
-        attributes = as_object_dict(resource.get("attributes"))
-        if attributes is None:
-            continue
-        values = inline_allowed_values(attributes, attributes.get("selectOptions"))
+        # `_InlineOptionSet` reads `selectOptions` off the attributes itself.
+        values = inline_allowed_values(resource.get("attributes"), None)
         if values:
             return values
     return ()
