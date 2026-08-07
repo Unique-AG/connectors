@@ -200,6 +200,16 @@ networkPolicy:
       enabled: false
     ephemeralPorts:
       enabled: false
+    # Zitadel OIDC + Unique API gateway — same idea as teams-mcp's microsoft block.
+    # Overlay hostnames (id.qa / gateway.qa) match *.unique.app.
+    egress:
+      unique:
+        toFQDNs:
+          - matchPattern: "*.unique.app"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
 
 # Do NOT set UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID in production —
 # those are local unauthenticated-dev fallbacks only (identity comes from OIDC / _meta).
