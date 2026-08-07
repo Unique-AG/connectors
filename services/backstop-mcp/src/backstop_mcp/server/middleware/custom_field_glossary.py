@@ -7,7 +7,7 @@ and across the whole tools/list payload.
 
 import logging
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import ClassVar, override
 
 import mcp.types as mt
@@ -15,12 +15,14 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import Tool
 
 from backstop_mcp.backstop_client import CallerClientProvider
+from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields import (
     DEFAULT_GLOSSARY_BUDGET_CHARS,
     CustomFieldsService,
     format_glossaries,
     parse_glossary_entities,
 )
+from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ class CustomFieldGlossaryMiddleware(Middleware):
         self._client_for_caller: CallerClientProvider = client_for_caller
         self._glossary_budget_chars: int = glossary_budget_chars
         self._tools_list_description_budget_chars: int = tools_list_description_budget_chars
-        self._warm_failed_at: datetime | None = None
+        self._warm_failure = TimedGate(duration=self.WARM_FAILURE_COOLDOWN)
 
     @override
     async def on_list_tools(
@@ -62,10 +64,12 @@ class CustomFieldGlossaryMiddleware(Middleware):
     ) -> Sequence[Tool]:
         tools = await call_next(context)
         service = self._service
+        subject = current_subject()
 
-        await service.load_cached()
-        if not service.is_fresh:
-            await self._warm()
+        if subject is not None:
+            await service.load_cached(subject)
+            if not service.is_fresh(subject):
+                await self._warm(subject)
 
         enriched: list[Tool] = []
         remaining_total = self._tools_list_description_budget_chars
@@ -90,10 +94,13 @@ class CustomFieldGlossaryMiddleware(Middleware):
                 remaining_total - len(base),
             )
             glossary = ""
-            if glossary_budget > 0:
+            if glossary_budget > 0 and subject is not None:
                 glossary = format_glossaries(
                     [
-                        (entity.value, service.definitions_for(entity.value))
+                        (
+                            entity.value,
+                            service.definitions_for(entity.value, subject=subject),
+                        )
                         for entity in entity_types
                     ],
                     budget_chars=glossary_budget,
@@ -105,26 +112,19 @@ class CustomFieldGlossaryMiddleware(Middleware):
             remaining_total -= len(description)
         return enriched
 
-    async def _warm(self) -> None:
+    async def _warm(self, subject: str) -> None:
         """Fetch the schema using the listing caller's own credential.
 
         Any failure is swallowed: the glossary is advisory, and no listing should break because
         schema enrichment couldn't run. Callers fall back to `list_custom_fields` when the
         glossary is missing or truncated.
         """
-        if self._in_failure_cooldown():
+        self._warm_failure.clear_if_expired()
+        if self._warm_failure.within():
             return
         try:
             client = await self._client_for_caller()
-            await self._service.ensure_fresh(client)
+            await self._service.ensure_fresh(client, subject=subject)
         except Exception:
-            self._warm_failed_at = datetime.now(UTC)
+            self._warm_failure.mark()
             logger.warning("custom_fields.glossary.warm_failed", exc_info=True)
-
-    def _in_failure_cooldown(self) -> bool:
-        if self._warm_failed_at is None:
-            return False
-        if datetime.now(UTC) - self._warm_failed_at < self.WARM_FAILURE_COOLDOWN:
-            return True
-        self._warm_failed_at = None
-        return False

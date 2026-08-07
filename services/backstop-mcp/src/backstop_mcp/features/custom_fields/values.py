@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import ClassVar
 from urllib.parse import quote
 
@@ -11,6 +11,7 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
+from backstop_mcp.dates import parse_lenient_date
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 
@@ -70,32 +71,13 @@ type TimeSeriesResource = BackstopApiResource[TimeSeriesCustomFieldValueAttribut
 
 def parse_effective_date(raw: str | None) -> date | None:
     """Parse an `effectiveDate`, tolerating the datetime form and non-padded month/day."""
-    if raw is None:
-        return None
-    text = raw.strip()
-    if not text:
-        return None
-    try:
-        return date.fromisoformat(text)
-    except ValueError:
-        pass
-    try:
-        return datetime.fromisoformat(text).date()
-    except ValueError:
-        pass
-    # Last resort for the non-zero-padded forms `date.fromisoformat` rejects (e.g. `2026-9-1`).
-    parts = text.split("-")
-    if len(parts) == 3 and all(part.isdigit() for part in parts):
-        year, month, day = (int(part) for part in parts)
-        try:
-            return date(year, month, day)
-        except ValueError:
-            pass
-    logger.warning(
-        "custom_fields.time_series.unparseable_effective_date",
-        extra={"effective_date": raw},
-    )
-    return None
+    parsed = parse_lenient_date(raw)
+    if parsed is None and raw is not None and str(raw).strip():
+        logger.warning(
+            "custom_fields.time_series.unparseable_effective_date",
+            extra={"effective_date": raw},
+        )
+    return parsed
 
 
 def _effective_date_key(resource: TimeSeriesResource) -> tuple[int, date, str]:

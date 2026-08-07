@@ -118,13 +118,25 @@ class TestResolveInIndex:
     def test_ambiguous(self) -> None:
         index = build_index(
             [
-                _def(definition_id="1", crm_name="Investor Status"),
-                _def(definition_id="2", crm_name="Account Status"),
+                _def(definition_id="1", crm_name="North Status"),
+                _def(definition_id="2", crm_name="South Status"),
             ]
         )
         result = resolve_in_index(index, entity_type="organizations", query="status")
         assert isinstance(result, Ambiguous)
         assert len(result.candidates) == 2
+
+    def test_partial_scoring_prefers_clear_best_match(self) -> None:
+        index = build_index(
+            [
+                _def(definition_id="1", crm_name="Investor Grade"),
+                _def(definition_id="2", crm_name="Grade Review Date"),
+            ]
+        )
+        result = resolve_in_index(index, entity_type="organizations", query="grade")
+        assert isinstance(result, Resolved)
+        # starts-with on "grade review date" outranks query-in-name on "investor grade"
+        assert result.value.definition_id == "2"
 
     def test_not_found(self) -> None:
         index = build_index([_def(definition_id="1", crm_name="Grade")])

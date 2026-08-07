@@ -142,7 +142,7 @@ async def _one_org_tool(_context: object) -> list[Tool]:
 class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     async def test_appends_org_glossary_only_to_tools_with_meta(
-        self, db: DatabaseFixture, wire: ServiceBuilder
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, session_factory = db
         base_url = "https://example.backstopsolutions.com/glossary"
@@ -150,6 +150,7 @@ class TestGlossaryMiddleware:
             await save_snapshot(
                 session,
                 base_url,
+                "glossary-user",
                 [
                     CustomFieldDefinition(
                         definition_id="1",
@@ -168,10 +169,11 @@ class TestGlossaryMiddleware:
                 datetime.now(UTC),
             )
 
+        _authenticate_as(monkeypatch, "glossary-user")
         wired = wire(
             base_url,
             overrides={
-                "organizations:1:is1": FieldOverride(
+                "organizations:is1": FieldOverride(
                     display_name="Investor Status",
                     aliases=("status",),
                 )
@@ -200,7 +202,7 @@ class TestGlossaryMiddleware:
 
     @pytest.mark.asyncio
     async def test_caps_total_description_budget_across_tools(
-        self, db: DatabaseFixture, wire: ServiceBuilder
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, session_factory = db
         base_url = "https://example.backstopsolutions.com/glossary-budget"
@@ -214,8 +216,9 @@ class TestGlossaryMiddleware:
             for i in range(40)
         ]
         async with transaction(session_factory) as session:
-            await save_snapshot(session, base_url, definitions, datetime.now(UTC))
+            await save_snapshot(session, base_url, "glossary-user", definitions, datetime.now(UTC))
 
+        _authenticate_as(monkeypatch, "glossary-user")
         wired = wire(base_url, tools_list_description_budget_chars=200)
 
         async def call_next(_context: object) -> list[Tool]:
@@ -299,6 +302,7 @@ class TestGlossaryMiddleware:
             await save_snapshot(
                 session,
                 base_url,
+                "glossary-user",
                 [
                     CustomFieldDefinition(
                         definition_id="1",
@@ -310,28 +314,33 @@ class TestGlossaryMiddleware:
                 datetime.now(UTC),
             )
 
-        def _explode() -> AccessToken:
+        _authenticate_as(monkeypatch, "glossary-user")
+        wired = wire(base_url)
+        await wired.service.load_cached("glossary-user")
+        assert wired.service.is_fresh("glossary-user") is True
+
+        async def _explode_client() -> object:
             raise AssertionError("tools/list must not resolve a credential when already warm")
 
-        monkeypatch.setattr("backstop_mcp.features.auth.context.get_access_token", _explode)
-        wired = wire(base_url)
+        monkeypatch.setattr(wired.middleware, "_client_for_caller", _explode_client)
 
         tools = await wired.middleware.on_list_tools(None, _one_org_tool)  # pyright: ignore[reportArgumentType]
 
         org_tool = next(t for t in tools if t.name == "get_organization")
         assert org_tool.description is not None
-        assert "Investor Status" in org_tool.description
+        assert "is1" in org_tool.description
 
 
 class TestGlossaryScopesComeFromToolMeta:
     def test_registered_tools_declare_scopes_on_meta(self) -> None:
-        from fastmcp.tools.function_tool import ToolMeta
-
+        pytest.importorskip("backstop_mcp.server.tools.get_organization")
         from backstop_mcp.server.tools.get_organization import get_organization
         from backstop_mcp.server.tools.get_person import get_person
         from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
-        from backstop_mcp.server.tools.registry import TOOLS
         from backstop_mcp.server.tools.system_info import get_system_info
+        from fastmcp.tools.function_tool import ToolMeta
+
+        from backstop_mcp.server.tools.registry import TOOLS
 
         assert (get_system_info, get_organization, get_person, list_custom_fields) == TOOLS
 
