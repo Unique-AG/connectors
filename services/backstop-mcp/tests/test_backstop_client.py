@@ -36,7 +36,6 @@ class _Widget(BaseModel):
     label: str
 
 
-
 def _credential(
     username: str = "bob.smith", api_token: str = "p@55W0rd321!"
 ) -> BackstopCredentialSecret:
@@ -455,9 +454,7 @@ class TestPaginate:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+        result = await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert result == PageResult(
             items=[_Record(id="1"), _Record(id="2")],
@@ -480,9 +477,7 @@ class TestPaginate:
             return_value=httpx.Response(200, json={"data": [], "links": {}})
         )
 
-        await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+        await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         params = route.calls.last.request.url.params
         assert params["page[limit]"] == str(BackstopConfig().default_page_size)
@@ -497,9 +492,7 @@ class TestPaginate:
             return_value=httpx.Response(200, json={"data": [], "links": {}})
         )
 
-        await factory.for_credential(_credential()).paginate(
-            "/reports", schema=_Record
-        )
+        await factory.for_credential(_credential()).paginate("/reports", schema=_Record)
 
         assert route.calls.last.request.url.params["page[limit]"] == str(
             BackstopConfig().report_page_size
@@ -597,9 +590,7 @@ class TestPaginate:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+        result = await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert [item["id"] for item in result.included] == ["9", "10"]
 
@@ -619,18 +610,14 @@ class TestUntrustedNextLink:
         )
 
         with pytest.raises(BackstopUntrustedUrlError) as exc_info:
-            await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+            await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert exc_info.value.url == "https://evil.example.com/records"
         assert exc_info.value.expected_host == httpx.URL(_BASE_URL).netloc.decode("ascii")
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_refuses_same_host_scheme_downgrade(
-        self, factory: BackstopClientFactory
-    ) -> None:
+    async def test_refuses_same_host_scheme_downgrade(self, factory: BackstopClientFactory) -> None:
         """`links.next` must not flip https→http on the configured host either."""
         https_base = httpx.URL(_BASE_URL)
         assert https_base.scheme == "https"
@@ -663,9 +650,7 @@ class TestUntrustedNextLink:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+        result = await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert [item.id for item in result.items] == ["1", "2"]
 
@@ -814,9 +799,7 @@ class TestPaginateSchemaAwareDeserialization:
             ]
         )
 
-        result = await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+        result = await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert [item.id for item in result.items] == ["1", "2", "3"]
         assert all(isinstance(item, _Record) for item in result.items)
@@ -839,9 +822,7 @@ class TestPaginateSchemaAwareDeserialization:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await factory.for_credential(_credential()).paginate(
-            "/records", schema=_Record
-        )
+            await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert route.call_count == 2
         assert exc_info.value.path == "/records"

@@ -38,6 +38,7 @@ def _make_provider(
     # reuses the same pool, base URL and timeout profile as every tool call.
     return BackstopOAuthProvider(
         base_url="https://backstop-mcp.example",
+        secure_cookies=True,
         session_factory=factory,
         encryption_key=Fernet.generate_key(),
         backstop_clients=client_factory("https://api.backstopsolutions.com"),

@@ -6,7 +6,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal, override
-from urllib.parse import urlparse
 
 from fastmcp.server.auth import AccessToken, OAuthProvider
 from mcp.server.auth.provider import (
@@ -140,6 +139,7 @@ class BackstopOAuthProvider(OAuthProvider):
         self,
         *,
         base_url: str,
+        secure_cookies: bool,
         session_factory: async_sessionmaker[AsyncSession],
         encryption_key: bytes,
         backstop_clients: BackstopClientFactory,
@@ -158,10 +158,15 @@ class BackstopOAuthProvider(OAuthProvider):
         self._backstop_clients = backstop_clients
         self._throttle = throttle
         self.login_path = login_path
-        # Drives the CSRF cookie's `Secure` flag. Derived from the configured public base URL
-        # rather than hardcoded so a local http:// development deploy still has a working form,
-        # while every real deploy (https, enforced for production by `AppConfig`) gets the flag.
-        self._secure_cookies: bool = urlparse(base_url).scheme == "https"
+        # `base_url` arrives already validated and trailing-slash-free (`AppConfig.issuer`), so
+        # it is kept verbatim rather than read back off `self.base_url` — the SDK re-parses it
+        # into an `AnyHttpUrl`, which renders the slash straight back on.
+        self._issuer: str = base_url
+        # Drives the CSRF cookie's `Secure` flag. Passed in rather than re-parsed here so the
+        # public URL is parsed exactly once, in `AppConfig`. A local http:// development deploy
+        # still gets a working form; every real deploy (https, enforced for production by
+        # `AppConfig`) gets the flag.
+        self._secure_cookies: bool = secure_cookies
 
     # -- Dynamic client registration -----------------------------------------------------
 
@@ -209,8 +214,7 @@ class BackstopOAuthProvider(OAuthProvider):
                 )
             )
 
-        base = str(self.base_url).rstrip("/")
-        return f"{base}{self.login_path}?request_id={request_id}"
+        return f"{self._issuer}{self.login_path}?request_id={request_id}"
 
     # -- Login form: our replacement for the third-party OAuth redirect ---------------------
 

@@ -22,7 +22,7 @@ class BackstopTransportSettings(BaseModel):
     base_url: str
 
     # Ordinary CRUD calls vs the /reports and /{entity}/{id}/analytics endpoints Backstop
-    # documents as legitimately slow. See `utils.is_slow_endpoint`.
+    # documents as legitimately slow. See `_SLOW_ENDPOINT_MARKERS` in `client.py`.
     default_timeout_seconds: float = Field(gt=0)
     reports_timeout_seconds: float = Field(gt=0)
 

@@ -25,9 +25,7 @@ class TestOAuthClient:
         async with factory() as session:
             client = await session.get(OAuthClient, "client-1")
             assert client is not None
-            assert client.client_metadata["redirect_uris"] == [
-                "https://client.example/callback"
-            ]
+            assert client.client_metadata["redirect_uris"] == ["https://client.example/callback"]
 
 
 class TestPendingAuthorization:
