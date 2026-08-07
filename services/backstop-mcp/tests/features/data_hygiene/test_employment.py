@@ -8,7 +8,7 @@ Each test below is meant to read as a mini walkthrough:
    employment (`EmploymentRules` / `TypeVocabulary`).
 2. **Prepare the side-loaded record** — `entityRelationships` plus their types, via
    `helpers.person_org` / `helpers.relationship_types`.
-3. **Run verification** — `build_person_employment_index` / `build_organization_employment_index`
+3. **Run verification** — `build_employment_index` / `build_employment_index`
    (what `EmploymentIndexFactory.index_for_person` / `index_for_organization` delegate to), then
    query `status` / `departure` / `pairs` — or `classify_employment` directly for a single type.
 
@@ -21,15 +21,20 @@ single-winner-per-pair fold.
 from datetime import date
 
 import pytest
+from pydantic import ValidationError
 
+from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.data_hygiene import DepartureSignal, EmploymentRules, TypeVocabulary
 from backstop_mcp.features.data_hygiene.employment import (
     EmploymentIndex,
-    build_organization_employment_index,
-    build_person_employment_index,
+    build_employment_index,
     classify_employment,
 )
-from backstop_mcp.features.data_hygiene.types import EmploymentStatus
+from backstop_mcp.features.data_hygiene.types import (
+    EmploymentStatus,
+    EntityRelationshipAttributes,
+    RelationshipTypeAttributes,
+)
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_MIRROR_TYPE,
     EMPLOYEE_TYPE,
@@ -48,6 +53,30 @@ TODAY = date(2026, 8, 5)
 EMPTY_TYPE_IDS: frozenset[str] = frozenset()
 DEFAULT_EMPLOYMENT_MARKERS: frozenset[str] = frozenset({"employ"})
 DEFAULT_FORMER_MARKERS: frozenset[str] = frozenset({"former", "previous", "ex-", "no longer"})
+
+
+def _typed_relationships(
+    relationships: list[dict[str, object]],
+) -> list[BackstopApiResource[EntityRelationshipAttributes]]:
+    parsed: list[BackstopApiResource[EntityRelationshipAttributes]] = []
+    for raw in relationships:
+        try:
+            parsed.append(BackstopApiResource[EntityRelationshipAttributes].model_validate(raw))
+        except ValidationError:
+            continue
+    return parsed
+
+
+def _typed_types(
+    types: list[dict[str, object]],
+) -> list[BackstopApiResource[RelationshipTypeAttributes]]:
+    parsed: list[BackstopApiResource[RelationshipTypeAttributes]] = []
+    for raw in types:
+        try:
+            parsed.append(BackstopApiResource[RelationshipTypeAttributes].model_validate(raw))
+        except ValidationError:
+            continue
+    return parsed
 
 
 def configure_checks(
@@ -71,9 +100,11 @@ def person_index(
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> EmploymentIndex:
-    return build_person_employment_index(
-        relationships=relationships,
-        relationship_types=types if types is not None else relationship_types(*TYPE_NAMES),
+    return build_employment_index(
+        relationships=_typed_relationships(relationships),
+        relationship_types=_typed_types(
+            types if types is not None else relationship_types(*TYPE_NAMES)
+        ),
         rules=checks,
         today=today,
     )
@@ -86,9 +117,11 @@ def organization_index(
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> EmploymentIndex:
-    return build_organization_employment_index(
-        relationships=relationships,
-        relationship_types=types if types is not None else relationship_types(*TYPE_NAMES),
+    return build_employment_index(
+        relationships=_typed_relationships(relationships),
+        relationship_types=_typed_types(
+            types if types is not None else relationship_types(*TYPE_NAMES)
+        ),
         rules=checks,
         today=today,
     )
@@ -181,7 +214,7 @@ class TestTwoFormerEdgesForTheSamePair:
         departed = index.departure(person_id="p1", organization_id="oA")
         assert departed is not None
         assert departed.signal is DepartureSignal.END_DATE
-        assert departed.end_date == "2020-01-01"
+        assert departed.end_date == date(2020, 1, 1)
 
 
 class TestElapsedEndDateOnACurrentType:
@@ -201,7 +234,7 @@ class TestElapsedEndDateOnACurrentType:
         departed = index.departure(person_id="p1", organization_id="o1")
         assert departed is not None
         assert departed.signal is DepartureSignal.END_DATE
-        assert departed.end_date == "2022-12-31"
+        assert departed.end_date == date(2022, 12, 31)
 
     def test_a_future_end_date_stays_current(self) -> None:
         checks = configure_checks()
@@ -429,15 +462,15 @@ class TestMalformedInput:
         # No usable date anywhere on the edge: it still counts, as the sole edge for its pair.
         assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.CURRENT
 
-    def test_unsideloaded_type_is_treated_as_untyped_and_stays_current(self) -> None:
+    def test_unsideloaded_type_is_dropped_as_irrelevant(self) -> None:
         checks = configure_checks()
         relationships = [person_org("1", type_id=FORMER_TYPE)]
 
         index = person_index(relationships, checks=checks, types=[])
 
-        # The type resource never side-loaded, so `type_name` is None; `classify_employment`
-        # reads that as no signal at all, i.e. CURRENT, never an invented departure.
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.CURRENT
+        # Type id present but name never side-loaded: not employment evidence (must not clear a
+        # real departure elsewhere). Edge is dropped before indexing.
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
         assert index.departure(person_id="p1", organization_id="o1") is None
 
     def test_no_relationships_at_all(self) -> None:
@@ -489,10 +522,10 @@ class TestMalformedInput:
 
         index = person_index(relationships, checks=checks, types=types)
 
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.CURRENT
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
 
     def test_unreadable_type_resource_is_dropped(self) -> None:
-        """No id to key the name under, so the relationship is left with no type signal."""
+        """No id to key the name under, so the relationship is left with no type name."""
         checks = configure_checks()
         relationships = [person_org("1", type_id=FORMER_TYPE)]
         types: list[dict[str, object]] = [
@@ -501,7 +534,7 @@ class TestMalformedInput:
 
         index = person_index(relationships, checks=checks, types=types)
 
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.CURRENT
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
 
 
 class TestFormerRelationshipType:
@@ -568,7 +601,7 @@ class TestFormerRelationshipType:
         departed = index.departure(person_id="p1", organization_id="o1")
         assert departed is not None
         assert departed.signal is DepartureSignal.FORMER_TYPE
-        assert departed.end_date == "2022-12-31"
+        assert departed.end_date == date(2022, 12, 31)
 
     def test_no_former_vocabulary_leaves_only_end_date(self) -> None:
         checks = configure_checks(former_markers=frozenset())
@@ -630,7 +663,7 @@ class TestEndDateParsing:
         assert departed is not None
         assert departed.signal is DepartureSignal.END_DATE
         # Normalised: the CRM writes a full timestamp for what the API documents as a date.
-        assert departed.end_date == "2022-12-31"
+        assert departed.end_date == date(2022, 12, 31)
 
     def test_future_end_date_is_not(self) -> None:
         checks = configure_checks()
@@ -673,7 +706,7 @@ class TestEndDateParsing:
 
         departed = index.departure(person_id="p1", organization_id="o1")
         assert departed is not None
-        assert departed.end_date == "2022-12-31"
+        assert departed.end_date == date(2022, 12, 31)
 
 
 class TestPersonToOrgGate:
@@ -840,9 +873,12 @@ class TestClassifyEmployment:
 
         assert status is EmploymentStatus.CURRENT
 
-    def test_an_id_whose_type_did_not_side_load_is_also_no_signal(self) -> None:
-        """Same fallback as a record with no type at all — not a positive `IRRELEVANT` finding,
-        which would drop the record and lose its `endDate`."""
+    def test_an_id_whose_type_did_not_side_load_is_irrelevant(self) -> None:
+        """Id known but name missing: not employment evidence when vocabulary is configured.
+
+        A portal-style edge must not classify as CURRENT and clear a real FORMER winner.
+        Truly untyped (`type_id is None`) still falls back to CURRENT so `endDate` applies.
+        """
         checks = configure_checks(
             employment_markers=frozenset({"employ"}),
             former_markers=frozenset({"former"}),
@@ -850,7 +886,7 @@ class TestClassifyEmployment:
 
         status = classify_employment(type_id="9", type_name=None, rules=checks)
 
-        assert status is EmploymentStatus.CURRENT
+        assert status is EmploymentStatus.IRRELEVANT
 
     def test_empty_employment_vocabulary_admits_every_person_to_org_type(self) -> None:
         checks = configure_checks(

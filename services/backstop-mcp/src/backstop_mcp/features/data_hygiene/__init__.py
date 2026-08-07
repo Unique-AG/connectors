@@ -6,18 +6,13 @@ side-loads those methods take, and `extract_as_of` for provenance. `employment.p
 scan the factory composes — importable for tests, not part of what tools are handed.
 """
 
-from backstop_mcp.features.data_hygiene.employment import (
-    EmploymentIndex,
-    build_organization_employment_index,
-    build_person_employment_index,
-)
+from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
 from backstop_mcp.features.data_hygiene.entity_relationships import entity_relationships
 from backstop_mcp.features.data_hygiene.provenance import extract_as_of
 from backstop_mcp.features.data_hygiene.responses import (
-    AsOfEcho,
-    DepartedContactEcho,
-    as_of_echo,
-    departed_echo,
+    DepartedContactResponse,
+    as_of_response,
+    departed_response,
 )
 from backstop_mcp.features.data_hygiene.service import (
     EmploymentIndexFactory,
@@ -31,13 +26,13 @@ from backstop_mcp.features.data_hygiene.types import (
     EmploymentStatus,
     EntityRelationshipInclude,
     EntityRelationshipRef,
+    ProvenanceFields,
     TypeVocabulary,
 )
 
 __all__ = [
     "AsOf",
-    "AsOfEcho",
-    "DepartedContactEcho",
+    "DepartedContactResponse",
     "DepartedEmployment",
     "DepartureSignal",
     "EmploymentIndex",
@@ -46,12 +41,12 @@ __all__ = [
     "EmploymentStatus",
     "EntityRelationshipInclude",
     "EntityRelationshipRef",
+    "ProvenanceFields",
     "TypeVocabulary",
-    "as_of_echo",
-    "build_organization_employment_index",
-    "build_person_employment_index",
+    "as_of_response",
+    "build_employment_index",
     "create_employment_index_factory",
-    "departed_echo",
+    "departed_response",
     "entity_relationships",
     "extract_as_of",
 ]

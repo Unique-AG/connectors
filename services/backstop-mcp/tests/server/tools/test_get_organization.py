@@ -5,15 +5,16 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopResponseSchemaError
-from backstop_mcp.features.data_hygiene import AsOfEcho
+from backstop_mcp.features.data_hygiene import AsOf
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    PartyCandidateEcho,
-    ResolvedPartyEcho,
+    PartyCandidateResponse,
+    ResolvedPartyResponse,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools.get_organization import (
     GetOrganizationResponse,
+    OrganizationAttributes,
     OrganizationResolvedResponse,
     get_organization,
 )
@@ -68,16 +69,16 @@ class TestGetOrganization:
 
         # `organization` is the record's own fields, not the enclosing JSON:API document —
         # `type`/`id` are already echoed under `resolved`.
-        assert result.organization == {
-            "name": "Capstone",
-            "status": "active",
-            "modifiedTimestamp": "2025-03-01T10:00:00Z",
-            "modifiedBy": "ops",
-        }
-        assert result.resolved == ResolvedPartyEcho(id="o42", type="organizations", name="Capstone")
-        assert result.as_of == AsOfEcho(
-            modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"
+        assert result.organization == OrganizationAttributes(
+            name="Capstone",
+            status="active",
+            modified_timestamp="2025-03-01T10:00:00Z",
+            modified_by="ops",
         )
+        assert result.resolved == ResolvedPartyResponse(
+            id="o42", search_type="organizations", name="Capstone"
+        )
+        assert result.as_of == AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops")
 
     @pytest.mark.asyncio
     @respx.mock
@@ -108,8 +109,8 @@ class TestGetOrganization:
             query="Capstone",
             scope="organizations",
             candidates=[
-                PartyCandidateEcho(key="o1", label="Capstone A", id="o1", name="Capstone A"),
-                PartyCandidateEcho(key="o2", label="Capstone B", id="o2", name="Capstone B"),
+                PartyCandidateResponse(key="o1", label="Capstone A", id="o1", name="Capstone A"),
+                PartyCandidateResponse(key="o2", label="Capstone B", id="o2", name="Capstone B"),
             ],
         )
         assert org_get.call_count == 0
@@ -142,8 +143,8 @@ class TestGetOrganization:
 
         # The name is backfilled from the organization fetch this tool makes anyway, so no
         # extra `confirm_name` request is needed to satisfy the echo requirement.
-        assert result.resolved == ResolvedPartyEcho(
-            id="trusted-9", type="organizations", name="From Body"
+        assert result.resolved == ResolvedPartyResponse(
+            id="trusted-9", search_type="organizations", name="From Body"
         )
         assert quick.call_count == 0
 

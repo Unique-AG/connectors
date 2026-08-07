@@ -4,11 +4,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.data_hygiene import AsOfEcho
+from backstop_mcp.features.data_hygiene import AsOf
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    PartyCandidateEcho,
-    ResolvedPartyEcho,
+    PartyCandidateResponse,
+    ResolvedPartyResponse,
 )
 from backstop_mcp.server.tools.get_person import PersonResolvedResponse, get_person
 from tests.features.data_hygiene.helpers import (
@@ -87,7 +87,9 @@ class TestGetPerson:
             PersonResolvedResponse,
         )
 
-        assert result.resolved == ResolvedPartyEcho(id="p9", type="people", name="Jane Doe")
+        assert result.resolved == ResolvedPartyResponse(
+            id="p9", search_type="people", name="Jane Doe"
+        )
         assert result.departed is True
         assert len(result.departures) == 1
         departure = result.departures[0]
@@ -96,7 +98,7 @@ class TestGetPerson:
         assert departure.organization_id == "o1"
         # The type carried the signal; this tenant recorded no date.
         assert departure.end_date is None
-        assert result.as_of == AsOfEcho(
+        assert result.as_of == AsOf(
             modified_timestamp="2023-01-01T00:00:00Z", modified_by="crm-admin"
         )
         # The nested hop is what populates each relationship's own type linkage, and it has to
@@ -161,8 +163,8 @@ class TestGetPerson:
             query="Jane",
             scope="people",
             candidates=[
-                PartyCandidateEcho(key="p1", label="Jane A", id="p1", name="Jane A"),
-                PartyCandidateEcho(key="p2", label="Jane B", id="p2", name="Jane B"),
+                PartyCandidateResponse(key="p1", label="Jane A", id="p1", name="Jane A"),
+                PartyCandidateResponse(key="p2", label="Jane B", id="p2", name="Jane B"),
             ],
         )
         assert person_get.call_count == 0

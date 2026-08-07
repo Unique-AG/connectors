@@ -1,19 +1,45 @@
 """Internal types for read-response provenance and departed-contact detection."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 # Which resource types can hold an employment relationship, as the canonical plurals that
-# `entity_types.normalize_entity_type` maps to — `departed.py` compares through it. Backstop
+# `entity_types.normalize_entity_type` maps to — `employment.py` compares through it. Backstop
 # emits the API path segment (`people`, `organizations`) and an admin cannot rename those, so
 # this is product schema rather than tenant vocabulary and has no business being configurable:
 # a deployment cannot know the strings, and a typo would silently disable detection.
 PERSON_SIDE_TYPES: frozenset[str] = frozenset({"people", "contacts", "employees"})
 ORG_SIDE_TYPES: frozenset[str] = frozenset({"organizations"})
+
+
+def _lenient_date(value: object) -> date | None:
+    """Coerce Backstop date/timestamp spellings to a calendar day, or None if unparseable."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        pass
+    try:
+        return datetime.fromisoformat(text).date()
+    except ValueError:
+        return None
+
+
+_LenientDate = Annotated[date | None, BeforeValidator(_lenient_date)]
 
 
 class EntityRelationshipInclude(StrEnum):
@@ -51,9 +77,9 @@ class EntityRelationshipAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    end_date: str | None = Field(default=None, alias="endDate")
-    start_date: str | None = Field(default=None, alias="startDate")
-    created_timestamp: str | None = Field(default=None, alias="createdTimestamp")
+    end_date: _LenientDate = Field(default=None, alias="endDate")
+    start_date: _LenientDate = Field(default=None, alias="startDate")
+    created_timestamp: _LenientDate = Field(default=None, alias="createdTimestamp")
     source_entity: EntityRefAttributes | None = Field(default=None, alias="sourceEntity")
     destination_entity: EntityRefAttributes | None = Field(default=None, alias="destinationEntity")
 
@@ -64,9 +90,22 @@ class RelationshipTypeAttributes(BaseModel):
     name: str | None = None
 
 
-@dataclass(frozen=True)
-class AsOf:
+class ProvenanceFields(BaseModel):
+    """Shared `modifiedTimestamp` / `modifiedBy` attributes for as-of provenance."""
+
+    # `populate_by_name` so camelCase wire payloads and snake_case tool dumps both bind;
+    # without it, `tool_result`'s `by_alias=False` JSON leaves these fields at None and
+    # parks the keys in `extra` when a subclass uses `extra="allow"`.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    modified_timestamp: str | None = Field(default=None, alias="modifiedTimestamp")
+    modified_by: object | None = Field(default=None, alias="modifiedBy")
+
+
+class AsOf(BaseModel):
     """Plain provenance from a Backstop record. No staleness verdict attached."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     modified_timestamp: str | None = None
     modified_by: str | None = None
@@ -102,13 +141,13 @@ class DepartedEmployment:
 
     The organization is always identified: a relationship whose organization side carries no
     `resourceId` is skipped rather than reported, because a departure nobody can attribute to a
-    company is not a usable answer — see `departed._employer_side`.
+    company is not a usable answer — see `employment._employer_side`.
     """
 
     signal: DepartureSignal
     organization_id: str
     organization_type: str
-    end_date: str | None = None
+    end_date: date | None = None
     relationship_type_id: str | None = None
     relationship_type_name: str | None = None
 
@@ -148,17 +187,18 @@ class EmploymentEdge:
     `status` comes from `classify_employment` (`CURRENT` / `FORMER`; `IRRELEVANT` edges never
     reach this shape at all). `effective_date` is whichever date on the relationship is
     comparable across edges — a `None` here means the edge has no usable date and must sort
-    last rather than being mistaken for the oldest or newest edge. `evidence` reuses the
-    existing `DepartedEmployment` payload so tool responses keep their current shape even for a
-    `CURRENT` edge, where the payload describes the relationship rather than an actual departure.
+    last rather than being mistaken for the oldest or newest edge. `departure` is set only when
+    status is `FORMER`.
     """
 
     person_id: str
     organization_id: str
     organization_type: str
+    relationship_type_id: str | None
+    relationship_type_name: str | None
     status: EmploymentStatus
     effective_date: date | None
-    evidence: DepartedEmployment
+    departure: DepartedEmployment | None
 
 
 @dataclass(frozen=True)
