@@ -6,16 +6,19 @@ the Unique FastMCP pattern (`CallToolResult` + `TextContent`).
 
 from __future__ import annotations
 
-import json
-
 from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel
 
 
-def tool_result(payload: BaseModel | dict[str, object]) -> CallToolResult:
-    """Serialize a domain payload as a single JSON text content block."""
-    text = payload.model_dump_json() if isinstance(payload, BaseModel) else json.dumps(payload)
-    return CallToolResult(content=[TextContent(type="text", text=text)])
+def tool_result(payload: BaseModel) -> CallToolResult:
+    """Serialize a domain payload as a single JSON text content block.
+
+    Uses Python field names (`by_alias=False`) so tool JSON matches the pydantic models the
+    server types against, not Backstop's camelCase wire aliases.
+    """
+    return CallToolResult(
+        content=[TextContent(type="text", text=payload.model_dump_json(by_alias=False))]
+    )
 
 
 def tool_error(message: str) -> CallToolResult:

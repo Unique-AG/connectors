@@ -8,12 +8,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.custom_fields import glossary_meta
-from backstop_mcp.features.data_hygiene import AsOfEcho, as_of_echo, extract_as_of
+from backstop_mcp.features.data_hygiene import (
+    AsOf,
+    ProvenanceFields,
+    as_of_response,
+    extract_as_of,
+)
 from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    ResolvedPartyEcho,
-    party_echo,
+    ResolvedPartyResponse,
+    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -22,15 +27,14 @@ from backstop_mcp.server.runtime import get_backstop_client
 from backstop_mcp.server.tools.results import tool_result
 
 
-class OrganizationAttributes(BaseModel):
+class OrganizationAttributes(ProvenanceFields):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
-    `extra="allow"` so unrecognized Backstop fields (e.g. `status`, `modifiedTimestamp`)
-    survive the `model_dump(exclude_none=True)` round-trip that rebuilds the `organization`
-    dict — and so `extract_as_of` can read provenance from the same dump.
+    `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
+    `extract_as_of` can read provenance from the model rather than string keys on a dump.
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str | None = None
 
@@ -45,9 +49,9 @@ class OrganizationResolvedResponse(BaseModel):
     """
 
     status: Literal["resolved"] = "resolved"
-    organization: dict[str, object]
-    resolved: ResolvedPartyEcho
-    as_of: AsOfEcho | None = None
+    organization: OrganizationAttributes
+    resolved: ResolvedPartyResponse
+    as_of: AsOf | None = None
 
 
 type GetOrganizationResponse = (
@@ -71,7 +75,7 @@ async def get_organization(
         Field(
             description=(
                 "Trusted Backstop organization Party ID from a prior resolve echo "
-                "(`id` / `type` / `name`). Never invent or guess. Exactly one of "
+                "(`id` / `search_type` / `name`). Never invent or guess. Exactly one of "
                 "`party_id` or `search` must be provided."
             ),
         ),
@@ -89,7 +93,7 @@ async def get_organization(
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
-    by this server's resolve echo (`id` / `type` / `name`). Otherwise pass `search`
+    by this server's resolve echo (`id` / `search_type` / `name`). Otherwise pass `search`
     (organization name or email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
 
@@ -113,11 +117,13 @@ async def get_organization(
     party = result.value
     path = f"/organizations/{quote(party.id, safe='')}"
     document = await client.get(path, schema=BackstopApiResourceDocument[OrganizationAttributes])
-    attributes = document.data.attributes.model_dump(exclude_none=True)
+    attributes = document.data.attributes
     return tool_result(
         OrganizationResolvedResponse(
             organization=attributes,
-            resolved=party_echo(party, attributes=attributes),
-            as_of=as_of_echo(extract_as_of(attributes)),
+            resolved=party_response(
+                party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
+            ),
+            as_of=as_of_response(extract_as_of(attributes)),
         )
     )

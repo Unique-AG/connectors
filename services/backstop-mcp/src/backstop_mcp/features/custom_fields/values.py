@@ -14,7 +14,7 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.dates import parse_lenient_date
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
-from backstop_mcp.features.data_hygiene import AsOf, extract_as_of
+from backstop_mcp.features.data_hygiene import AsOf, ProvenanceFields, extract_as_of
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +36,12 @@ class RegularCustomFieldValueAttributes(BaseModel):
     value: object | None = None
 
 
-class EntityWithRegularCustomFieldsAttributes(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+class EntityWithRegularCustomFieldsAttributes(ProvenanceFields):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     regular_custom_field_values: list[RegularCustomFieldValueAttributes] | None = Field(
         default=None, alias="regularCustomFieldValues"
     )
-    modified_timestamp: str | None = Field(default=None, alias="modifiedTimestamp")
-    modified_by: object | None = Field(default=None, alias="modifiedBy")
 
 
 class TimeSeriesCustomFieldValueAttributes(BaseModel):
@@ -165,12 +163,7 @@ async def _read_regular_value(
         schema=BackstopApiResourceDocument[EntityWithRegularCustomFieldsAttributes],
     )
     attrs = document.data.attributes
-    as_of = extract_as_of(
-        {
-            "modifiedTimestamp": attrs.modified_timestamp,
-            "modifiedBy": attrs.modified_by,
-        }
-    )
+    as_of = extract_as_of(attrs)
     values = attrs.regular_custom_field_values or []
     for entry in values:
         if entry.definition_id == definition.definition_id:

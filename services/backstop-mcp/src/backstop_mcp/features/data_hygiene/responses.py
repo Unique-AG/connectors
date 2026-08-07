@@ -1,19 +1,16 @@
-"""Tool-facing echoes for provenance and departed-contact signals."""
+"""Tool-facing responses for provenance and departed-contact signals."""
 
-from pydantic import BaseModel, Field
+from datetime import date
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
 
 
-class AsOfEcho(BaseModel):
-    """Plain provenance. Relay to the user; do not treat age as a staleness verdict."""
-
-    modified_timestamp: str | None = Field(default=None, description="Backstop modifiedTimestamp")
-    modified_by: str | None = Field(default=None, description="Backstop modifiedBy")
-
-
-class DepartedContactEcho(BaseModel):
+class DepartedContactResponse(BaseModel):
     """Hard signal that employment at an organization has ended. Always relay this flag."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     # Typed as the enum, not `str`, so the tool schema publishes the two possible values instead
     # of a free-form string the caller has to read a description to interpret.
@@ -25,30 +22,18 @@ class DepartedContactEcho(BaseModel):
     )
     organization_id: str
     organization_type: str
-    end_date: str | None = Field(
+    end_date: date | None = Field(
         default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
     )
     relationship_type_id: str | None = None
     relationship_type_name: str | None = None
 
 
-def as_of_echo(value: AsOf | None) -> AsOfEcho | None:
-    if value is None:
-        return None
-    return AsOfEcho(
-        modified_timestamp=value.modified_timestamp,
-        modified_by=value.modified_by,
-    )
+def as_of_response(as_of: AsOf | None) -> AsOf | None:
+    return as_of
 
 
-def departed_echo(value: DepartedEmployment | None) -> DepartedContactEcho | None:
-    if value is None:
+def departed_response(departure: DepartedEmployment | None) -> DepartedContactResponse | None:
+    if departure is None:
         return None
-    return DepartedContactEcho(
-        signal=value.signal,
-        organization_id=value.organization_id,
-        organization_type=value.organization_type,
-        end_date=value.end_date,
-        relationship_type_id=value.relationship_type_id,
-        relationship_type_name=value.relationship_type_name,
-    )
+    return DepartedContactResponse.model_validate(departure)

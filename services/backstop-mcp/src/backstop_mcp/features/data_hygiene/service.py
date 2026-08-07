@@ -1,15 +1,17 @@
 from collections.abc import Callable, Sequence
 from datetime import date
 
-from backstop_mcp.features.data_hygiene.employment import (
-    EmploymentIndex,
-    build_organization_employment_index,
-    build_person_employment_index,
-)
+from backstop_mcp.backstop_client import BackstopApiResource
+from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
 from backstop_mcp.features.data_hygiene.types import (
     EmploymentRules,
+    EntityRelationshipAttributes,
+    RelationshipTypeAttributes,
     TypeVocabulary,
 )
+
+type RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
+type RelationshipTypeResource = BackstopApiResource[RelationshipTypeAttributes]
 
 
 class EmploymentIndexFactory:
@@ -40,8 +42,8 @@ class EmploymentIndexFactory:
     def index_for_person(
         self,
         *,
-        relationships: list[dict[str, object]],
-        relationship_types: list[dict[str, object]],
+        relationships: list[RelationshipResource],
+        relationship_types: list[RelationshipTypeResource],
     ) -> EmploymentIndex:
         """The `EmploymentIndex` for `entityRelationships` side-loaded off a person's own GET.
 
@@ -49,7 +51,7 @@ class EmploymentIndexFactory:
         and no per-relationship fetch of its type. Keyword-only because the two are the same type
         and transposing them would silently misclassify every relationship.
         """
-        return build_person_employment_index(
+        return build_employment_index(
             relationships=relationships,
             relationship_types=relationship_types,
             rules=self._rules,
@@ -59,13 +61,13 @@ class EmploymentIndexFactory:
     def index_for_organization(
         self,
         *,
-        relationships: list[dict[str, object]],
-        relationship_types: list[dict[str, object]],
+        relationships: list[RelationshipResource],
+        relationship_types: list[RelationshipTypeResource],
     ) -> EmploymentIndex:
         """The `EmploymentIndex` for `entityRelationships` side-loaded off an organization's own
         GET. Mirrors `index_for_person`; see there for why both arguments are keyword-only.
         """
-        return build_organization_employment_index(
+        return build_employment_index(
             relationships=relationships,
             relationship_types=relationship_types,
             rules=self._rules,

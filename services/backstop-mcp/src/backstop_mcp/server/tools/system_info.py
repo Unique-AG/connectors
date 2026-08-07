@@ -1,8 +1,17 @@
+from typing import ClassVar
+
 from fastmcp.tools import tool
 from mcp.types import CallToolResult, ToolAnnotations
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.server.runtime import get_backstop_client
 from backstop_mcp.server.tools.results import tool_result
+
+
+class SystemInfoResponse(BaseModel):
+    """Opaque Backstop `/system-info` payload; extras preserved for the instance's fields."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
 
 
 @tool(
@@ -24,6 +33,5 @@ async def get_system_info() -> CallToolResult:
     `BackstopRateLimitError`), so this tool doesn't need to check status codes itself.
     """
     client = await get_backstop_client()
-    payload = await client.get("/system-info")
-    assert isinstance(payload, dict), "Backstop /system-info returns a JSON object"
+    payload = await client.get("/system-info", schema=SystemInfoResponse)
     return tool_result(payload)
