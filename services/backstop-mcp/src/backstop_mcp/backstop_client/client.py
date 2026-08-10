@@ -2,16 +2,15 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
+from typing import cast
 
 import httpx
-from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopAuthError,
     BackstopErrorDetail,
-    BackstopResponseSchemaError,
     parse_json_api_error,
 )
 from backstop_mcp.backstop_client.pagination import (
@@ -25,7 +24,6 @@ from backstop_mcp.backstop_client.utils import (
     deserialize,
     metric_route,
     resolve_request_url,
-    schema_label,
 )
 from backstop_mcp.metrics import (
     BACKSTOP_CONCURRENCY_WAIT,
@@ -133,10 +131,9 @@ class BackstopClient:
         silently — Backstop just ignores it and picks its own page size.
 
         `max_records=None` walks the chain to the end, which is what callers reading a
-        complete series (rather than a preview) need. `paginate_all` keeps producing raw
-        `dict[str, object]` items after validating the envelope (`links`/`meta`/`included`);
-        each accumulated item is then validated against `schema`, so a malformed item on any
-        page fails the whole call rather than silently skipping it.
+        complete series (rather than a preview) need. Each page is deserialized as
+        `_Page[schema]` in one pass, so a malformed envelope or item on any page fails the
+        whole call rather than silently skipping it.
         """
         first_page_params = dict(params) if params is not None else {}
         limit_param = self._settings.page_limit_param
@@ -155,40 +152,16 @@ class BackstopClient:
         ) -> httpx.Response:
             return await self.raw_request("GET", page_path, params=page_params)
 
-        raw_result = await paginate_all(
+        return await paginate_all(
             fetch_page=fetch_page,
             first_path=path,
+            schema=schema,
             max_records=max_records,
             first_page_params=first_page_params,
         )
 
-        # One adapter for the whole walk — building inside the comprehension would redo the
-        # expensive schema compile once per item (see PR review on paginate).
-        adapter = TypeAdapter(schema)
-        label = schema_label(schema)
-        try:
-            items = [adapter.validate_python(item) for item in raw_result.items]
-        except ValidationError as exc:
-            logger.error(
-                "backstop.response.schema_error",
-                extra={"path": path, "schema": label},
-            )
-            raise BackstopResponseSchemaError(path, label, exc) from exc
-
-        return PageResult(
-            items=items,
-            included=raw_result.included,
-            total_count=raw_result.total_count,
-            truncated=raw_result.truncated,
-        )
-
     def _deserialize(self, content: bytes, schema: type[T], *, path: str) -> T:
-        return deserialize(
-            content,
-            TypeAdapter(schema),
-            path=path,
-            schema_name=schema_label(schema),
-        )
+        return cast(T, deserialize(content, schema, path=path))
 
     def _default_page_size(self, path: str) -> int:
         if any(marker in path for marker in _SLOW_ENDPOINT_MARKERS):

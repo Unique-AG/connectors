@@ -5,8 +5,11 @@ Kept separate from `client.py` because none of these need `BackstopClient`'s col
 credentials.
 """
 
+import functools
 import logging
 import re
+from types import GenericAlias
+from typing import cast
 
 import httpx
 from pydantic import TypeAdapter, ValidationError
@@ -23,33 +26,57 @@ logger = logging.getLogger(__name__)
 # generic-method syntax can't express a default until Python 3.13, but this repo targets 3.12.
 T = TypeVar("T", default=dict[str, object])
 
+# Ordinary classes (including pydantic's parameterized models like `_Page[Record]`) plus
+# typing constructs such as `dict[str, object]` that feed `TypeAdapter`.
+type SchemaInput = type[object] | GenericAlias
 
-def schema_label(schema: type[object]) -> str:
-    """Stable name for logs/errors — works for classes and `dict[str, object]`-style aliases."""
+
+def schema_label(schema: SchemaInput) -> str:
+    """Stable name for logs/errors — works for classes and parameterized generics."""
     name = getattr(schema, "__name__", None)
     if isinstance(name, str):
         return name
     origin = getattr(schema, "__origin__", None)
+    raw_args = getattr(schema, "__args__", None)
     if isinstance(origin, type):
+        if isinstance(raw_args, tuple) and raw_args:
+            rendered_args: list[str] = []
+            for arg in cast(tuple[object, ...], raw_args):
+                if isinstance(arg, (type, GenericAlias)):
+                    rendered_args.append(schema_label(arg))
+                else:
+                    rendered_args.append(str(arg))
+            return f"{origin.__name__}[{', '.join(rendered_args)}]"
         return origin.__name__
     return str(schema)
 
 
-def deserialize(content: bytes, adapter: TypeAdapter[T], *, path: str, schema_name: str) -> T:
-    """Parse a response body with a caller-supplied `TypeAdapter`.
+@functools.cache
+def adapter_for(schema: SchemaInput) -> TypeAdapter[object]:
+    """Process-wide `TypeAdapter` cache — building one is expensive; validating with it is cheap.
+
+    Accepts ordinary classes and parameterized generics (`BackstopApiResource[Attrs]`,
+    `_Page[Record]`, `dict[str, object]`, …) so every call site can share one compiled adapter.
+    """
+    return TypeAdapter(schema)
+
+
+def deserialize(content: bytes, schema: SchemaInput, *, path: str) -> object:
+    """Parse a response body against `schema`, via the process-wide adapter cache.
 
     `ValidationError` is always wrapped as `BackstopResponseSchemaError` — every Backstop call
     names the shape it expects, so a mismatch is a typed tool failure rather than a raw pydantic
     error.
     """
     try:
-        return adapter.validate_json(content)
+        return adapter_for(schema).validate_json(content)
     except ValidationError as exc:
+        name = schema_label(schema)
         logger.error(
             "backstop.response.schema_error",
-            extra={"path": path, "schema": schema_name},
+            extra={"path": path, "schema": name},
         )
-        raise BackstopResponseSchemaError(path, schema_name, exc) from exc
+        raise BackstopResponseSchemaError(path, name, exc) from exc
 
 
 def resolve_request_url(base_url: str, path: str) -> str:
