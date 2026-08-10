@@ -28,9 +28,9 @@ mcpConfig:
 
 # -- Secrets. The Unique QA overlay uses extraEnvSecrets + external-secrets
 # instead; the envVars + secretKeyRef pattern below is a portable fallback
-# for third-party installs. STORAGE_ENCRYPTION_KEY is the Fernet key
-# protecting OAuth proxy state in Postgres — generate with:
-#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# for third-party installs. ENCRYPTION_KEY protects OAuth proxy state in
+# Postgres — generate with:
+#   openssl rand -hex 32
 #
 # Example for loading secrets (uncomment and customize as needed):
 #   envVars:
@@ -69,11 +69,11 @@ mcpConfig:
 #         secretKeyRef:
 #           name: kb-mcp-zitadel-secret
 #           key: ZITADEL_CLIENT_SECRET
-#     - name: STORAGE_ENCRYPTION_KEY
+#     - name: ENCRYPTION_KEY
 #       valueFrom:
 #         secretKeyRef:
 #           name: kb-mcp-oauth-storage-secret
-#           key: STORAGE_ENCRYPTION_KEY
+#           key: ENCRYPTION_KEY
 envVars: []
 
 image:
@@ -130,7 +130,7 @@ volumeMounts:
     mountPath: /tmp
 
 # OAuth proxy storage. Required — Settings refuses to boot without a durable
-# DATABASE_URL (from this block) + STORAGE_ENCRYPTION_KEY (envVars above).
+# DATABASE_URL (from this block) + ENCRYPTION_KEY (envVars above).
 postgresql:
   enabled: true
   connection:

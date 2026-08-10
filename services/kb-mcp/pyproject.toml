@@ -10,9 +10,9 @@ dependencies = [
     # this adds the postgresql extra (asyncpg) for durable OAuth storage.
     "py-key-value-aio[postgresql]==0.4.5",
     "tiktoken==0.12.0",
-    "unique-mcp==2026.34.0.dev3",
-    "unique-toolkit[monitoring,otel]==2026.34.0.dev5",
-    "unique-sdk==2026.34.0.dev2",
+    "unique-mcp==2026.34.0.dev5",
+    "unique-toolkit[monitoring,otel]==2026.34.0.dev8",
+    "unique-sdk==2026.34.0.dev4",
 ]
 
 [project.scripts]

@@ -7,6 +7,7 @@ boot without a durable config or an explicit ephemeral opt-in, so exactly one
 of the two branches below is valid by the time this runs.
 """
 
+import base64
 import tempfile
 from pathlib import Path
 
@@ -21,9 +22,16 @@ from kb_mcp.settings import Settings
 _OAUTH_TABLE_NAME = "oauth_kv"
 
 
+def _fernet_key_from_hex(hex_key: str) -> bytes:
+    """ENCRYPTION_KEY is raw hex (openssl rand -hex 32); Fernet needs those
+    same 32 bytes urlsafe-base64-encoded.
+    """
+    return base64.urlsafe_b64encode(bytes.fromhex(hex_key))
+
+
 def build_storage(settings: Settings) -> AsyncKeyValue:
     """Durable, encrypted OAuth state. Fails closed — never silently ephemeral."""
-    if settings.database_url and settings.storage_encryption_key:
+    if settings.database_url and settings.encryption_key:
         store = PostgreSQLStore(
             url=str(settings.database_url),
             table_name=_OAUTH_TABLE_NAME,
@@ -32,7 +40,7 @@ def build_storage(settings: Settings) -> AsyncKeyValue:
         # Decryption failure = cache miss, so key rotation costs one re-login.
         return FernetEncryptionWrapper(
             key_value=store,
-            fernet=Fernet(settings.storage_encryption_key.get_secret_value().encode()),
+            fernet=Fernet(_fernet_key_from_hex(settings.encryption_key.get_secret_value())),
             raise_on_decryption_error=False,
         )
 

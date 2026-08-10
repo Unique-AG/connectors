@@ -43,15 +43,15 @@ class Settings(BaseSettings):
     )
 
     # ── Zitadel ──
-    zitadel_base_url: str = Field(validation_alias="ZITADEL_BASE_URL")
-    zitadel_client_id: str = Field(validation_alias="ZITADEL_CLIENT_ID")
-    zitadel_client_secret: SecretStr = Field(validation_alias="ZITADEL_CLIENT_SECRET")
+    zitadel_base_url: str
+    zitadel_client_id: str
+    zitadel_client_secret: SecretStr
 
     # ── OAuth storage (see auth/storage.py) ──
-    database_url: PostgresDsn | None = Field(
-        default=None, validation_alias="DATABASE_URL"
-    )
-    storage_encryption_key: SecretStr | None = Field(default=None, min_length=44)
+    database_url: PostgresDsn | None = Field(default=None)
+    # Raw hex (openssl rand -hex 32) — auth/storage.py derives the Fernet
+    # key kb-mcp actually needs from these bytes.
+    encryption_key: SecretStr | None = Field(default=None, min_length=64, max_length=64)
     allow_ephemeral_oauth_storage: bool = Field(
         default=False,
         description=("DEV ONLY. Per-pod storage that loses all sessions on restart."),
@@ -94,26 +94,34 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _storage_must_be_durable(self) -> "Settings":
-        durable = bool(self.database_url and self.storage_encryption_key)
-        half = bool(self.database_url) ^ bool(self.storage_encryption_key)
+        durable = bool(self.database_url and self.encryption_key)
+        half = bool(self.database_url) ^ bool(self.encryption_key)
         if half:
             raise ValueError(
                 "OAuth storage is half-configured: set BOTH DATABASE_URL and "
-                "STORAGE_ENCRYPTION_KEY, or neither (with "
+                "ENCRYPTION_KEY, or neither (with "
                 "ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev)."
             )
         if durable and self.allow_ephemeral_oauth_storage:
             # Otherwise build_storage() would ignore Postgres and write to /tmp.
             raise ValueError(
                 "Refuse ALLOW_EPHEMERAL_OAUTH_STORAGE when DATABASE_URL and "
-                "STORAGE_ENCRYPTION_KEY are set — pick durable or ephemeral, not both."
+                "ENCRYPTION_KEY are set — pick durable or ephemeral, not both."
             )
         if durable:
+            assert self.encryption_key is not None
+            try:
+                bytes.fromhex(self.encryption_key.get_secret_value())
+            except ValueError as exc:
+                raise ValueError(
+                    "ENCRYPTION_KEY is the right length but not valid hex. "
+                    "Generate one with: openssl rand -hex 32"
+                ) from exc
             return self
         if self.allow_ephemeral_oauth_storage:
             return self
         raise ValueError(
-            "OAuth storage is not durable: set DATABASE_URL + STORAGE_ENCRYPTION_KEY, "
+            "OAuth storage is not durable: set DATABASE_URL + ENCRYPTION_KEY, "
             "or set ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev. "
             "Ephemeral storage logs out every user on pod restart."
         )

@@ -8,10 +8,10 @@ not survive a rollout or a second replica. These tests assert kb-mcp never
 lets that fallback trigger.
 """
 
+import secrets
 from unittest.mock import MagicMock, patch
 
 import pytest
-from cryptography.fernet import Fernet
 
 from kb_mcp.auth import build_auth
 from kb_mcp.auth.storage import build_storage
@@ -23,8 +23,10 @@ pytestmark = pytest.mark.ai
 @pytest.fixture
 def durable_settings(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/kb_mcp")
-    monkeypatch.setenv("STORAGE_ENCRYPTION_KEY", Fernet.generate_key().decode())
-    monkeypatch.delenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", raising=False)
+    monkeypatch.setenv("ENCRYPTION_KEY", secrets.token_hex(32))
+    # setenv, not delenv: a local .env's ALLOW_EPHEMERAL_OAUTH_STORAGE=true would
+    # otherwise leak through Settings' dotenv fallback.
+    monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "false")
     get_settings.cache_clear()
     settings = get_settings()
     get_settings.cache_clear()
@@ -35,7 +37,7 @@ def durable_settings(monkeypatch):
 def ephemeral_settings(monkeypatch, tmp_path):
     monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "true")
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.delenv("STORAGE_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
     monkeypatch.setattr("tempfile.gettempdir", lambda: str(tmp_path))
     get_settings.cache_clear()
     settings = get_settings()
@@ -91,8 +93,9 @@ def test_build_auth_passes_storage_even_in_ephemeral_dev_mode(ephemeral_settings
 
 def test_missing_database_url_raises_instead_of_falling_back(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.delenv("STORAGE_ENCRYPTION_KEY", raising=False)
-    monkeypatch.delenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", raising=False)
+    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
+    # setenv, not delenv: see durable_settings fixture above for why.
+    monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "false")
     get_settings.cache_clear()
     with pytest.raises(Exception, match="OAuth storage is not durable"):
         get_settings()
