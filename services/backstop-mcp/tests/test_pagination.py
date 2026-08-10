@@ -1,5 +1,3 @@
-from typing import Any
-
 import httpx
 import pytest
 import respx
@@ -193,7 +191,7 @@ class TestPaginateAll:
         result = await paginate_all(
             fetch_page=_fetch_page,
             first_path="/records",
-            schema=dict[str, Any],
+            schema=dict[str, object],
             max_records=None,
         )
 
