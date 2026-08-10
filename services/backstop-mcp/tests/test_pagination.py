@@ -1,8 +1,10 @@
 import httpx
 import pytest
 import respx
+from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import PageResult
+from backstop_mcp.backstop_client.errors import BackstopResponseSchemaError
 from backstop_mcp.backstop_client.pagination import paginate_all
 
 _BASE_URL = "https://example.backstopsolutions.com"
@@ -109,3 +111,19 @@ class TestPaginateAll:
         result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
 
         assert result.total_count == 1234
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_malformed_page_envelope_raises_backstop_response_schema_error(
+        self,
+    ) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": "not-a-list"})
+        )
+
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
+
+        assert exc_info.value.path == "/records"
+        assert exc_info.value.schema_name == "_Page"
+        assert isinstance(exc_info.value.cause, ValidationError)
