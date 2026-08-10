@@ -130,7 +130,7 @@ async def get_person(
         schema=BackstopApiResourceDocument[PersonAttributes],
     )
     attributes = document.data.attributes
-    index = get_employment_index_factory().index_for_person(
+    index = get_employment_index_factory().index(
         **entity_relationships(document),
     )
     departures: list[DepartedContactResponse] = []
