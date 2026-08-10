@@ -2,6 +2,9 @@ import asyncio
 from collections.abc import Mapping, Sequence
 from urllib.parse import quote
 
+from pydantic import validate_email
+from pydantic_core import PydanticCustomError
+
 from backstop_mcp.backstop_client import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
@@ -32,9 +35,13 @@ _EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
 
 
 def looks_like_email(value: str) -> bool:
-    """Return True when `value` has a non-empty local and domain around `@`."""
-    local, separator, domain = value.strip().partition("@")
-    return separator == "@" and bool(local) and bool(domain)
+    """Return True when `value` is a valid email (pydantic / email-validator)."""
+    try:
+        validate_email(value)
+    except PydanticCustomError:
+        return False
+    return True
+
 
 
 async def search_by_email(

@@ -26,6 +26,15 @@ class TestLooksLikeEmail:
     def test_rejects_empty_string(self) -> None:
         assert looks_like_email("") is False
 
+    def test_rejects_double_at(self) -> None:
+        assert looks_like_email("a@@b") is False
+
+    def test_rejects_at_with_spaces(self) -> None:
+        assert looks_like_email("@ @") is False
+
+    def test_rejects_domain_without_period(self) -> None:
+        assert looks_like_email("bob@example") is False
+
 
 class TestSearchByEmailSchemaValidation:
     @pytest.mark.asyncio
