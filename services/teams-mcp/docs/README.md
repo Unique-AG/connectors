@@ -91,6 +91,8 @@ When `UNIQUE_INTEGRATION=enabled`, the server additionally captures meeting tran
 
 This capability, its infrastructure requirements, its Microsoft Graph limitations, and the Recordings area in Unique that presents the captured meetings are documented in [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
 
+Transcript capture and the chat/messaging tools are independent: setting `CHAT_INTEGRATION=disabled` alongside `UNIQUE_INTEGRATION=enabled` gives an **ingestion-only** deployment that captures meetings but exposes no chat tools and requests no messaging permissions. See [Configuration — Chat Integration](./operator/configuration.md#chat-integration).
+
 ### Cross-Cutting Capabilities
 
 **Self-Service User Connection**

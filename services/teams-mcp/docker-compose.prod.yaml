@@ -39,6 +39,8 @@ services:
       # Auth configuration
       - AUTH_HMAC_SECRET=${AUTH_HMAC_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # Chat integration (independent of UNIQUE_INTEGRATION)
+      - CHAT_INTEGRATION=${CHAT_INTEGRATION:-enabled}
       # Unique API configuration
       - UNIQUE_INTEGRATION=${UNIQUE_INTEGRATION:-enabled}
       - UNIQUE_SERVICE_AUTH_MODE=${UNIQUE_SERVICE_AUTH_MODE:-external}

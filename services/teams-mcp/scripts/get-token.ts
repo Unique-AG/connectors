@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
+import { resolveMicrosoftScopes } from '../src/auth/microsoft.provider';
 
 function loadEnv() {
   const envPath = resolve(__dirname, '../.env');
@@ -35,32 +36,14 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 const PORT = 9542;
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
 const TENANT = 'common';
-const UNIQUE_INTEGRATION =
-  process.env.UNIQUE_INTEGRATION === 'disabled' ? 'disabled' : 'enabled';
+// Keep the dev token consistent with the server's runtime scope resolution.
+const CHAT_INTEGRATION = process.env.CHAT_INTEGRATION === 'disabled' ? 'disabled' : 'enabled';
+const UNIQUE_INTEGRATION = process.env.UNIQUE_INTEGRATION === 'enabled' ? 'enabled' : 'disabled';
 
-const CHAT_SCOPES = [
-  'openid',
-  'profile',
-  'email',
-  'offline_access',
-  'User.Read',
-  'ChannelMessage.Send',
-  'ChatMessage.Send',
-  'Chat.ReadBasic',
-  'Chat.Read',
-  'Team.ReadBasic.All',
-  'Channel.ReadBasic.All',
-  'ChannelMessage.Read.All',
-];
-const KB_SCOPES = [
-  'Calendars.Read',
-  'OnlineMeetings.Read',
-  'OnlineMeetingRecording.Read.All',
-  'OnlineMeetingTranscript.Read.All',
-];
-const SCOPES = (
-  UNIQUE_INTEGRATION === 'enabled' ? [...CHAT_SCOPES, ...KB_SCOPES] : CHAT_SCOPES
-).join(' ');
+const SCOPES = resolveMicrosoftScopes({
+  chat: CHAT_INTEGRATION,
+  ingestion: UNIQUE_INTEGRATION,
+}).join(' ');
 
 async function exchangeCode(code: string): Promise<string> {
   const res = await fetch(`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`, {

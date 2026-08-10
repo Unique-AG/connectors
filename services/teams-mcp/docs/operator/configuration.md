@@ -35,13 +35,23 @@ Set via `mcpConfig.microsoft` in Helm values:
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL. Only used by transcript capture |
 
+### Chat Integration
+
+Set via `mcpConfig.chat` in Helm values.
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `CHAT_INTEGRATION` | `mcpConfig.chat.integration` | `enabled` | `enabled` or `disabled`. Toggles the Teams chat/channel messaging tools **independently** of `UNIQUE_INTEGRATION`. When `disabled`, the eight chat tools are not registered and the messaging Graph scopes are not requested |
+
+`CHAT_INTEGRATION` and `UNIQUE_INTEGRATION` are two independent capability axes. Setting `CHAT_INTEGRATION=disabled` together with `UNIQUE_INTEGRATION=enabled` gives an **ingestion-only** deployment: meeting transcript capture with a least-privilege app registration that carries no chat/messaging permissions. At least one of the two must be enabled — a deployment with both disabled fails fast at startup.
+
 ### Unique API Configuration
 
 Set via `mcpConfig.unique` in Helm values.
 
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
-| `UNIQUE_INTEGRATION` | `mcpConfig.unique.integration` | (required) | `enabled` or `disabled`. `disabled` is chat-only: no knowledge-base tools, no ingestion pipeline, and no other Unique or Zitadel configuration required |
+| `UNIQUE_INTEGRATION` | `mcpConfig.unique.integration` | (required) | `enabled` or `disabled`. `disabled` turns off the knowledge-base tools, the ingestion pipeline, and removes the need for any other Unique or Zitadel configuration |
 
 Setting this to `enabled` turns on meeting transcript capture and makes a further set of variables mandatory — the Unique API endpoint, a root scope, and Zitadel service account headers. Those variables, the service account roles, and the root scope setup are documented in the [Recordings & Transcripts Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
@@ -109,6 +119,11 @@ mcpConfig:
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
     # publicWebhookUrl: https://teams.mcp.example.com  # optional
+
+  chat:
+    # Teams chat/channel messaging tools. Defaults to "enabled".
+    # Set to "disabled" for an ingestion-only deployment (with unique.integration: enabled).
+    integration: enabled
 
   unique:
     # Chat-only. Set to "enabled" only to add meeting transcript capture,

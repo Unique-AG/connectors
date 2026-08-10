@@ -27,6 +27,8 @@ All mcpConfig environment variables, shared by deployment and hook job container
 - name: MICROSOFT_PUBLIC_WEBHOOK_URL
   value: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
 {{- end }}
+- name: CHAT_INTEGRATION
+  value: {{ .Values.mcpConfig.chat.integration | quote }}
 - name: UNIQUE_INTEGRATION
   value: {{ .Values.mcpConfig.unique.integration | quote }}
 {{- if eq .Values.mcpConfig.unique.integration "enabled" }}

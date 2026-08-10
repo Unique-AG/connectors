@@ -290,6 +290,14 @@ mcpConfig:
     # clientSecret is loaded from a secret, see envVars
     # webhookSecret is loaded from a secret, see envVars
 
+  # -- Teams chat integration configuration
+  chat:
+    # -- Enable Teams chat/channel messaging tools (independent of unique.integration).
+    # When disabled, the chat tools are not registered and the messaging Graph scopes
+    # are not requested (e.g. for ingestion-only deployments).
+    # possible values: enabled, disabled
+    integration: enabled
+
   # -- Unique API configuration
   unique:
     # -- Enable Unique knowledge-base integration (transcript ingestion).
