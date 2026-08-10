@@ -33,7 +33,7 @@ it (accepted, count unchanged, wrong answer, no error).
 from datetime import date, datetime
 from typing import ClassVar, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.dates import LenientDate
@@ -171,8 +171,12 @@ class ActivityItem(BaseModel):
     title: str | None
     description: str | None
     effective_date: date | None
-    resource_type: str | None
-    resource_id: str | None
+    resource_type: str | None = Field(
+        default=None, validation_alias=AliasPath("specific_resource", "resource_type")
+    )
+    resource_id: str | None = Field(
+        default=None, validation_alias=AliasPath("specific_resource", "resource_id")
+    )
     created_timestamp: datetime | None
     modified_timestamp: datetime | None
 
@@ -220,33 +224,13 @@ class EmailPage(BaseModel):
 def _activity_from_resource(
     resource: BackstopApiResource[_ActivityAttributes], *, stream: ActivityStreamKind
 ) -> ActivityItem:
-    attrs = resource.attributes
-    specific = attrs.specific_resource
-    return ActivityItem(
-        id=resource.id,
-        stream=stream,
-        title=attrs.title,
-        description=attrs.description,
-        effective_date=attrs.effective_date,
-        resource_type=specific.resource_type if specific is not None else None,
-        resource_id=specific.resource_id if specific is not None else None,
-        created_timestamp=attrs.created_timestamp,
-        modified_timestamp=attrs.modified_timestamp,
+    return ActivityItem.model_validate(
+        {**resource.attributes.model_dump(), "id": resource.id, "stream": stream}
     )
 
 
 def _email_from_resource(resource: BackstopApiResource[_EmailAttributes]) -> EmailItem:
-    attrs = resource.attributes
-    return EmailItem(
-        id=resource.id,
-        subject=attrs.subject,
-        sent_timestamp=attrs.sent_timestamp,
-        from_email=attrs.from_email,
-        to_emails=tuple(attrs.to_emails),
-        cc_emails=tuple(attrs.cc_emails),
-        has_attachments=attrs.has_attachments,
-        content_url=attrs.content_url,
-    )
+    return EmailItem.model_validate({**resource.attributes.model_dump(), "id": resource.id})
 
 
 def _activity_date_filter_params(*, since: date | None, until: date | None) -> dict[str, object]:
