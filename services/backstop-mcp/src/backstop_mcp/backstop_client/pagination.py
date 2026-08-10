@@ -6,6 +6,8 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from typing_extensions import TypeVar
 
+from backstop_mcp.backstop_client.utils import deserialize, schema_label
+
 FetchPage = Callable[[str, dict[str, object] | None], Awaitable[httpx.Response]]
 
 T = TypeVar("T", default=dict[str, object])
@@ -80,7 +82,14 @@ async def paginate_all(
     while path is not None:
         response = await fetch_page(path, params)
         params = None
-        page = _PAGE_ADAPTER.validate_json(response.content)
+        # Same typed failure as item validation in `BackstopClient.paginate` — a malformed
+        # 200 envelope must not escape as a raw pydantic `ValidationError`.
+        page = deserialize(
+            response.content,
+            _PAGE_ADAPTER,
+            path=path,
+            schema_name=schema_label(_Page),
+        )
 
         result.items.extend(page.data)
         for resource in page.included:
