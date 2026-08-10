@@ -19,6 +19,8 @@
 
 **Optional: meeting transcript capture.** Deployments that set `UNIQUE_INTEGRATION=enabled` additionally capture meeting transcripts and recordings into the Unique knowledge base and register four more tools. That is a separate, opt-in capability — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts). Most deployments do not enable it.
 
+The chat tools can also be turned off independently: `CHAT_INTEGRATION=disabled` with `UNIQUE_INTEGRATION=enabled` produces an **ingestion-only** deployment (transcript capture, no chat tools, no messaging permissions). See [Configuration — Chat Integration](./operator/configuration.md#chat-integration).
+
 **See also:** [Technical Reference — Tools](./technical/tools.md)
 
 ## Authentication & Permissions

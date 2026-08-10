@@ -33,6 +33,9 @@ No calendar, meeting, transcript, or recording scope is requested. For full just
 !!! note "Transcript capture adds four scopes"
     A deployment with `UNIQUE_INTEGRATION=enabled` additionally requests `Calendars.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All`, and `OnlineMeetingRecording.Read.All`, the last two of which require admin consent. Only enable that mode if you intend to store meeting content in the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
 
+!!! note "Ingestion-only omits the messaging scopes"
+    The messaging scopes above are requested only when `CHAT_INTEGRATION=enabled` (the default). Setting `CHAT_INTEGRATION=disabled` together with `UNIQUE_INTEGRATION=enabled` yields an **ingestion-only** deployment whose app registration requests only the identity and transcript scopes — none of the chat/messaging permissions. See [Configuration — Chat Integration](./configuration.md#chat-integration).
+
 ## Unique SaaS
 
 **Recommended for most clients.** When Unique runs Teams MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:

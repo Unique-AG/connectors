@@ -68,7 +68,7 @@ spec:
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
 | image.repository | string | `"unique-ag/connectors/services/teams-mcp"` |  |
-| image.tag | string | `"0.3.5"` |  |
+| image.tag | string | `"0.4.2"` |  |
 | ingress.additionalLabels | object | `{}` | Additional labels for the ingress resource |
 | ingress.annotations | object | `{"konghq.com/plugins":"unique-route-metrics"}` | Annotations for the ingress resource |
 | ingress.enabled | bool | `false` | Enable ingress resource creation |
@@ -83,12 +83,14 @@ spec:
 | internalServices.dependencies.ingestion.servicePort | int | `8091` |  |
 | internalServices.dependents.ingressGateway.name | string | `"gateway"` |  |
 | internalServices.dependents.ingressGateway.namespace | string | `"system"` |  |
-| mcpConfig | object | `{"app":{"selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"},"auth":{"accessTokenExpiresInSeconds":60,"refreshTokenExpiresInSeconds":2592000},"enabled":true,"microsoft":{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"},"unique":{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","autoStartIngestion":false,"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","integration":"enabled","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}}` | Configuration for the deployed Teams MCP Server, will be mapped to environment variables |
+| mcpConfig | object | `{"app":{"selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"},"auth":{"accessTokenExpiresInSeconds":60,"refreshTokenExpiresInSeconds":2592000},"chat":{"integration":"enabled"},"enabled":true,"microsoft":{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"},"unique":{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","autoStartIngestion":false,"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","integration":"enabled","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}}` | Configuration for the deployed Teams MCP Server, will be mapped to environment variables |
 | mcpConfig.app | object | `{"selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"}` | Application configuration |
 | mcpConfig.app.selfUrl | string | `"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"` | The URL of the MCP Server. Used for OAuth callbacks. The URL must be reachable from the redirect location, e.g. must be publicly accessible. example: https://teams.mcp.unique.app |
 | mcpConfig.auth | object | `{"accessTokenExpiresInSeconds":60,"refreshTokenExpiresInSeconds":2592000}` | Authentication configuration for the MCP server |
 | mcpConfig.auth.accessTokenExpiresInSeconds | int | `60` | Access token expiration time in seconds |
 | mcpConfig.auth.refreshTokenExpiresInSeconds | int | `2592000` | Refresh token expiration time in seconds (default: 30 days) |
+| mcpConfig.chat | object | `{"integration":"enabled"}` | Teams chat integration configuration |
+| mcpConfig.chat.integration | string | `"enabled"` | Enable Teams chat/channel messaging tools (independent of unique.integration). When disabled, the chat tools are not registered and the messaging Graph scopes are not requested (e.g. for ingestion-only deployments). possible values: enabled, disabled |
 | mcpConfig.microsoft | object | `{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"}` | Microsoft Graph API configuration |
 | mcpConfig.microsoft.clientId | string | `"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"` | The client ID of the Microsoft App Registration example: 12345678-1234-1234-1234-123456789012 |
 | mcpConfig.unique | object | `{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","autoStartIngestion":false,"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","integration":"enabled","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}` | Unique API configuration |

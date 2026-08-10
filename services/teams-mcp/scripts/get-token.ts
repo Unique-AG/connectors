@@ -35,15 +35,15 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 const PORT = 9542;
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
 const TENANT = 'common';
-const UNIQUE_INTEGRATION =
-  process.env.UNIQUE_INTEGRATION === 'disabled' ? 'disabled' : 'enabled';
+// Standalone dev helper: scopes are inlined here (no ../src imports). Keep these
+// in sync with resolveMicrosoftScopes in src/auth/microsoft.provider.ts.
+const CHAT_INTEGRATION = process.env.CHAT_INTEGRATION === 'disabled' ? 'disabled' : 'enabled';
+const UNIQUE_INTEGRATION = process.env.UNIQUE_INTEGRATION === 'enabled' ? 'enabled' : 'disabled';
 
-const CHAT_SCOPES = [
-  'openid',
-  'profile',
-  'email',
-  'offline_access',
-  'User.Read',
+// Always requested.
+const IDENTITY_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'User.Read'];
+// Requested only when CHAT_INTEGRATION is enabled.
+const MESSAGING_SCOPES = [
   'ChannelMessage.Send',
   'ChatMessage.Send',
   'Chat.ReadBasic',
@@ -52,15 +52,19 @@ const CHAT_SCOPES = [
   'Channel.ReadBasic.All',
   'ChannelMessage.Read.All',
 ];
+// Requested only when UNIQUE_INTEGRATION is enabled.
 const KB_SCOPES = [
   'Calendars.Read',
   'OnlineMeetings.Read',
   'OnlineMeetingRecording.Read.All',
   'OnlineMeetingTranscript.Read.All',
 ];
-const SCOPES = (
-  UNIQUE_INTEGRATION === 'enabled' ? [...CHAT_SCOPES, ...KB_SCOPES] : CHAT_SCOPES
-).join(' ');
+
+const SCOPES = [
+  ...IDENTITY_SCOPES,
+  ...(CHAT_INTEGRATION === 'enabled' ? MESSAGING_SCOPES : []),
+  ...(UNIQUE_INTEGRATION === 'enabled' ? KB_SCOPES : []),
+].join(' ');
 
 async function exchangeCode(code: string): Promise<string> {
   const res = await fetch(`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`, {

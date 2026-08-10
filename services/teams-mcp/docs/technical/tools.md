@@ -1,7 +1,10 @@
 <!-- confluence-page-id: 2398519349 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Teams MCP Server always exposes **8 chat & messaging tools**, which interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
+The Teams MCP Server exposes **8 chat & messaging tools**, which interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
+
+!!! note "Chat tools can be turned off"
+    The eight chat & messaging tools are registered by default (`CHAT_INTEGRATION=enabled`). Setting `CHAT_INTEGRATION=disabled` — used for an **ingestion-only** deployment — leaves none of them registered, and the messaging Graph scopes are not requested. The four transcript tools below are governed separately by `UNIQUE_INTEGRATION`.
 
 Four further tools exist only in deployments with meeting-transcript capture enabled — see [Transcript & Knowledge-Base Management](#Transcript-&-Knowledge-Base-Management) below.
 

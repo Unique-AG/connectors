@@ -18,7 +18,7 @@ import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
-import { ChatModule } from './chat/chat.module';
+import { registerChatModule } from './chat/chat.module';
 import {
   type AppConfig,
   type AppConfigNamespaced,
@@ -26,6 +26,8 @@ import {
   amqpConfig,
   appConfig,
   authConfig,
+  type ChatConfigNamespaced,
+  chatConfig,
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
@@ -52,6 +54,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         amqpConfig,
         appConfig,
         authConfig,
+        chatConfig,
         databaseConfig,
         encryptionConfig,
         healthConfig,
@@ -111,6 +114,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           AppConfigNamespaced &
             MicrosoftConfigNamespaced &
             AuthConfigNamespaced &
+            ChatConfigNamespaced &
             UniqueConfigNamespaced,
           true
         >,
@@ -120,9 +124,10 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         metricService: MetricService,
         amqpConnection: AmqpConnection,
       ) => ({
-        provider: createMicrosoftOAuthProvider(
-          configService.get('unique.integration', { infer: true }),
-        ),
+        provider: createMicrosoftOAuthProvider({
+          chat: configService.get('chat.integration', { infer: true }),
+          ingestion: configService.get('unique.integration', { infer: true }),
+        }),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
         clientSecret: configService.get('microsoft.clientSecret', { infer: true }).value,
@@ -157,7 +162,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     MsGraphModule,
     AMQPModule,
     ...registerKbIntegrationModule(),
-    ChatModule,
+    ...registerChatModule(),
     HealthModule,
   ],
   controllers: [ManifestController],
