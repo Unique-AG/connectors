@@ -44,7 +44,6 @@ def main() -> None:
         transport=settings.transport_scheme,
         host=settings.local_base_url.host,
         port=settings.local_base_url.port,
-        log_level="info",
         middleware=middleware,
     )
 
