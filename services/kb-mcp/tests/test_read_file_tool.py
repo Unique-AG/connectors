@@ -75,6 +75,27 @@ async def test_unsupported_extension_returns_error_without_downstream_calls():
 
 
 @pytest.mark.asyncio
+async def test_no_content_found_returns_error_without_downstream_calls():
+    with (
+        patch(
+            "kb_mcp.tools.read_file.tool.search_contents_async",
+            AsyncMock(return_value=[]),
+        ),
+        patch(
+            "kb_mcp.tools.read_file.tool.download_content_to_bytes_async"
+        ) as mock_download,
+    ):
+        result = await read_file(
+            content_id="cont_missing",
+            config=ReadFileToolConfig(),
+        )
+
+    assert result.isError is True
+    assert "no content found for content_id=cont_missing" in result.content[0].text  # type: ignore[union-attr]
+    mock_download.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_logs_never_contain_raw_user_or_company_id(caplog):
     """user_id/company_id are confidential; logs must carry a correlation
     id derived from them, never the raw values."""

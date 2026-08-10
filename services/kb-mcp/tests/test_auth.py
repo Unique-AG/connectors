@@ -24,8 +24,7 @@ pytestmark = pytest.mark.ai
 def durable_settings(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/kb_mcp")
     monkeypatch.setenv("ENCRYPTION_KEY", secrets.token_hex(32))
-    # setenv, not delenv: a local .env's ALLOW_EPHEMERAL_OAUTH_STORAGE=true would
-    # otherwise leak through Settings' dotenv fallback.
+    # .env.test defaults this to true; override it for the durable case.
     monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "false")
     get_settings.cache_clear()
     settings = get_settings()
@@ -94,7 +93,7 @@ def test_build_auth_passes_storage_even_in_ephemeral_dev_mode(ephemeral_settings
 def test_missing_database_url_raises_instead_of_falling_back(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
-    # setenv, not delenv: see durable_settings fixture above for why.
+    # .env.test defaults this to true; override it to hit the "not durable" branch.
     monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "false")
     get_settings.cache_clear()
     with pytest.raises(Exception, match="OAuth storage is not durable"):

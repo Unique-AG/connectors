@@ -91,8 +91,8 @@ def _with_reference_header(
         frontend_base_url=settings.frontend_base_url_str(),
     )
     header = markdown_citation_link(content.title or content.key, url)
-    first.text = f"{header}\n\n{first.text}"
-    return result
+    prefixed = TextContent(type="text", text=f"{header}\n\n{first.text}")
+    return result.model_copy(update={"content": [prefixed, *result.content[1:]]})
 
 
 def _ok(text: str) -> CallToolResult:

@@ -40,7 +40,9 @@ def build_storage(settings: Settings) -> AsyncKeyValue:
         # Decryption failure = cache miss, so key rotation costs one re-login.
         return FernetEncryptionWrapper(
             key_value=store,
-            fernet=Fernet(_fernet_key_from_hex(settings.encryption_key.get_secret_value())),
+            fernet=Fernet(
+                _fernet_key_from_hex(settings.encryption_key.get_secret_value())
+            ),
             raise_on_decryption_error=False,
         )
 

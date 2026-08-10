@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Knowledge Base Search MCP — Unique KB search, content tree, and read_file tools"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography==50.0.0",
     "fastmcp==3.4.5",
     "pydantic==2.12.5",
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory];

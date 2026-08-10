@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     )
 
     # ── Search scope lookups ──
-    scope_lookup_concurrency: int = 8
+    scope_lookup_concurrency: int = Field(default=8, ge=1)
 
     @property
     def base_url(self) -> HttpUrl:

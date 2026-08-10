@@ -1120,6 +1120,7 @@ name = "kb-mcp"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "fastmcp" },
     { name = "py-key-value-aio", extra = ["postgresql"] },
     { name = "pydantic" },
@@ -1140,6 +1141,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = "==50.0.0" },
     { name = "fastmcp", specifier = "==3.4.5" },
     { name = "py-key-value-aio", extras = ["postgresql"], specifier = "==0.4.5" },
     { name = "pydantic", specifier = "==2.12.5" },

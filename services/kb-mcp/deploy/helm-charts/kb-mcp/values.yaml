@@ -141,7 +141,6 @@ postgresql:
     #   fromKubernetesService:
     #     name: <release-name>-pg-cluster-rw
     #     namespace: <namespace>
-    #     port: 5432
     #     podPort: 5432
     #     podSelectorLabels:
     #       cnpg.io/cluster: <release-name>-pg-cluster
