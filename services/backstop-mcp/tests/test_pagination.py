@@ -1,13 +1,19 @@
+from typing import Any
+
 import httpx
 import pytest
 import respx
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client import PageResult
 from backstop_mcp.backstop_client.errors import BackstopResponseSchemaError
 from backstop_mcp.backstop_client.pagination import paginate_all
 
 _BASE_URL = "https://example.backstopsolutions.com"
+
+
+class _Record(BaseModel):
+    id: str
 
 
 def _page(
@@ -38,10 +44,15 @@ class TestPaginateAll:
             return_value=httpx.Response(200, json=_page([{"id": "1"}, {"id": "2"}]))
         )
 
-        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
+        result = await paginate_all(
+            fetch_page=_fetch_page,
+            first_path="/records",
+            schema=_Record,
+            max_records=None,
+        )
 
         assert result == PageResult(
-            items=[{"id": "1"}, {"id": "2"}], total_count=None, truncated=False
+            items=[_Record(id="1"), _Record(id="2")], total_count=None, truncated=False
         )
 
     @pytest.mark.asyncio
@@ -64,9 +75,14 @@ class TestPaginateAll:
             ]
         )
 
-        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
+        result = await paginate_all(
+            fetch_page=_fetch_page,
+            first_path="/records",
+            schema=_Record,
+            max_records=None,
+        )
 
-        assert result.items == [{"id": "1"}, {"id": "2"}, {"id": "3"}]
+        assert result.items == [_Record(id="1"), _Record(id="2"), _Record(id="3")]
         assert result.truncated is False
 
     @pytest.mark.asyncio
@@ -91,11 +107,21 @@ class TestPaginateAll:
             ]
         )
 
-        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=3)
+        result = await paginate_all(
+            fetch_page=_fetch_page,
+            first_path="/records",
+            schema=_Record,
+            max_records=3,
+        )
 
         # max_records=3 is reached mid-second-page (4 accumulated) — the page that crosses
         # the threshold is kept in full rather than trimmed, so 4 items come back, not 3.
-        assert result.items == [{"id": "1"}, {"id": "2"}, {"id": "3"}, {"id": "4"}]
+        assert result.items == [
+            _Record(id="1"),
+            _Record(id="2"),
+            _Record(id="3"),
+            _Record(id="4"),
+        ]
         assert result.truncated is True
         # Only the first two responses should have been consumed — the third page must not
         # be fetched once max_records is reached.
@@ -108,7 +134,12 @@ class TestPaginateAll:
             return_value=httpx.Response(200, json=_page([{"id": "1"}], total_count=1234))
         )
 
-        result = await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
+        result = await paginate_all(
+            fetch_page=_fetch_page,
+            first_path="/records",
+            schema=_Record,
+            max_records=None,
+        )
 
         assert result.total_count == 1234
 
@@ -122,8 +153,48 @@ class TestPaginateAll:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await paginate_all(fetch_page=_fetch_page, first_path="/records", max_records=None)
+            await paginate_all(
+                fetch_page=_fetch_page,
+                first_path="/records",
+                schema=_Record,
+                max_records=None,
+            )
 
         assert exc_info.value.path == "/records"
-        assert exc_info.value.schema_name == "_Page"
+        assert exc_info.value.schema_name == "_Page[_Record]"
         assert isinstance(exc_info.value.cause, ValidationError)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_malformed_item_raises_backstop_response_schema_error(self) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json=_page([{"not_id": "1"}]))
+        )
+
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            await paginate_all(
+                fetch_page=_fetch_page,
+                first_path="/records",
+                schema=_Record,
+                max_records=None,
+            )
+
+        assert exc_info.value.path == "/records"
+        assert exc_info.value.schema_name == "_Page[_Record]"
+        assert isinstance(exc_info.value.cause, ValidationError)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dict_schema_keeps_raw_item_dicts(self) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json=_page([{"id": "1", "extra": True}]))
+        )
+
+        result = await paginate_all(
+            fetch_page=_fetch_page,
+            first_path="/records",
+            schema=dict[str, Any],
+            max_records=None,
+        )
+
+        assert result.items == [{"id": "1", "extra": True}]

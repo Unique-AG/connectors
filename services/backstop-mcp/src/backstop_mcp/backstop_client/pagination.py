@@ -1,12 +1,12 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import ClassVar, Generic
+from typing import ClassVar, Generic, cast
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import TypeVar
 
-from backstop_mcp.backstop_client.utils import deserialize, schema_label
+from backstop_mcp.backstop_client.utils import deserialize
 
 FetchPage = Callable[[str, dict[str, object] | None], Awaitable[httpx.Response]]
 
@@ -23,8 +23,8 @@ class _PageMeta(BaseModel):
     total_resource_count: int | None = Field(default=None, alias="totalResourceCount")
 
 
-class _Page(BaseModel):
-    data: list[dict[str, object]]
+class _Page(BaseModel, Generic[T]):
+    data: list[T]
     # JSON:API puts `?include=`d resources in a top-level `included` array, *not* inside the
     # primary resource's `attributes`. Backstop's `include` targets are relationships (the
     # only value custom-field-definitions accepts is `lovSet`), so dropping this array would
@@ -32,9 +32,6 @@ class _Page(BaseModel):
     included: list[dict[str, object]] = Field(default_factory=list)
     links: _PageLinks = _PageLinks()
     meta: _PageMeta | None = None
-
-
-_PAGE_ADAPTER = TypeAdapter(_Page)
 
 
 def _resource_identity(resource: dict[str, object]) -> tuple[str, str]:
@@ -59,37 +56,34 @@ async def paginate_all(
     *,
     fetch_page: FetchPage,
     first_path: str,
+    schema: type[T],
     max_records: int | None,
     first_page_params: dict[str, object] | None = None,
-) -> PageResult:
+) -> PageResult[T]:
     """Walk a JSON:API `links.next` chain, accumulating `data` from every page.
 
     `fetch_page` fetches a single page given a path/URL and query params (the caller supplies
-    auth, retries, and the shared client); this function only parses responses and follows
-    `links.next`. Stops once accumulated items reach `max_records` (if given), setting
-    `truncated=True` — the triggering page is kept in full rather than trimmed to the exact
-    count, since callers can trim further themselves and this keeps the truncation boundary
-    simple to reason about.
+    auth, retries, and the shared client); this function parses each response as `_Page[schema]`
+    (envelope + typed items in one pass) and follows `links.next`. Stops once accumulated items
+    reach `max_records` (if given), setting `truncated=True` — the triggering page is kept in
+    full rather than trimmed to the exact count, since callers can trim further themselves and
+    this keeps the truncation boundary simple to reason about.
 
     `first_page_params` is applied to `first_path` only — every later page is driven
     entirely by the literal URL Backstop returns, which already encodes its own query params.
     """
-    result = PageResult()
+    result: PageResult[T] = PageResult()
     seen_included: set[tuple[str, str]] = set()
     path: str | None = first_path
     params = first_page_params
+    # Parameterized page model — `adapter_for` caches the compiled adapter process-wide under
+    # this GenericAlias key, so a 10k-record walk does not rebuild schemas per page/item.
+    page_schema = _Page[schema]
 
     while path is not None:
         response = await fetch_page(path, params)
         params = None
-        # Same typed failure as item validation in `BackstopClient.paginate` — a malformed
-        # 200 envelope must not escape as a raw pydantic `ValidationError`.
-        page = deserialize(
-            response.content,
-            _PAGE_ADAPTER,
-            path=path,
-            schema_name=schema_label(_Page),
-        )
+        page = cast(_Page[T], deserialize(response.content, page_schema, path=path))
 
         result.items.extend(page.data)
         for resource in page.included:

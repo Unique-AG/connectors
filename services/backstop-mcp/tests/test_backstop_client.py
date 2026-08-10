@@ -825,8 +825,8 @@ class TestPaginateSchemaAwareDeserialization:
             await factory.for_credential(_credential()).paginate("/records", schema=_Record)
 
         assert route.call_count == 2
-        assert exc_info.value.path == "/records"
-        assert exc_info.value.schema_name == "_Record"
+        assert exc_info.value.path == "/records?page[cursor]=abc"
+        assert exc_info.value.schema_name == "_Page[_Record]"
 
 
 class TestDeleteEmptyBody:
