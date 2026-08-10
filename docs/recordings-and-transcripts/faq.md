@@ -25,6 +25,25 @@ If your organisation cannot store meeting content in Unique, deploy Teams MCP in
 
 ## Setup & Configuration
 
+### Why do transcript Graph calls return 403 after admin consent?
+
+**Answer:** Microsoft rejects transcript subscription create/renew and transcript fetches with **403** (`GraphAccessToTranscriptsDisabled`) when the tenant-wide Teams meeting setting **Microsoft Graph access** under Transcript API access is off. By default this setting is off, regardless of Entra app permissions.
+
+This is **not** fixed by re-consent, reconnecting with a different app, or changing subscription IDs. Entra admin consent grants `OnlineMeetingTranscript.Read.All`; `EnableGraphTranscriptAccess` is a separate Teams control. Unique cannot enable it via OAuth or Graph.
+
+**What to do (Teams / Global admin):**
+
+1. Teams admin center → **Meetings → Meeting settings** → under **Transcript API access**, set **Microsoft Graph access → On**
+2. Optionally enable **Include speaker attribution** (Unique expects attributed VTT)
+3. Or via PowerShell:
+   ```powershell
+   Set-CsTeamsMeetingConfiguration -Identity Global -EnableGraphTranscriptAccess $true
+   Set-CsTeamsMeetingConfiguration -Identity Global -EnableAttributedTranscripts $true
+   ```
+4. Wait a few minutes, then have the user call `start_kb_integration` again and confirm with `verify_kb_integration_status` → `active`
+
+**See also:** [Teams Graph transcript API access](./operator.md#teams-graph-transcript-api-access) · [Meeting transcript API access (Microsoft)](https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access)
+
 ### Why do I need a Zitadel service account?
 
 **Answer:** Ingestion happens on behalf of the server rather than an end user, so the Teams MCP Server needs its own identity against the Unique Public API. It uses that identity to resolve meeting participants to Unique accounts, create the scopes that hold each meeting, grant the organiser and participants access, and upload the transcript and recording.
@@ -109,7 +128,7 @@ To minimise the risk:
 
 ### What happens if a subscription renewal fails?
 
-**Answer:** The subscription is deleted and the user must reconnect and call `start_kb_integration` again. Common causes are an expired Microsoft refresh token (roughly 90 days of inactivity), revoked consent, or network problems reaching Microsoft. Transcripts produced between the failed renewal and re-subscription are lost.
+**Answer:** The subscription is deleted and the user must reconnect and call `start_kb_integration` again. Common causes are an expired Microsoft refresh token (roughly 90 days of inactivity), revoked consent, network problems reaching Microsoft, or tenant Graph transcript API access being disabled (`EnableGraphTranscriptAccess` off) — renewals return 403 and re-consent will not help (see [Why do transcript Graph calls return 403 after admin consent?](#why-do-transcript-graph-calls-return-403-after-admin-consent)). Transcripts produced between the failed renewal and re-subscription are lost.
 
 **See also:** [Subscription failure handling](./technical.md#subscription-failure-handling)
 
@@ -117,12 +136,13 @@ To minimise the risk:
 
 **Answer:** Work through the chain in order:
 
-1. **Is capture enabled for that user?** `verify_kb_integration_status` should report `active`
-2. **Was the meeting transcribed?** Only meetings with transcription enabled produce anything to capture
-3. **Are notifications arriving?** Check that Microsoft can reach the public webhook URL
-4. **Is the queue draining?** Check RabbitMQ, including the dead-letter queue
-5. **Did ingestion fail?** Check the server logs for errors during participant resolution or upload
-6. **Are you looking at the right scope?** Content lands under `UNIQUE_ROOT_SCOPE_ID`
+1. **Is Graph transcript API access on?** Confirm `EnableGraphTranscriptAccess` — see [403 after admin consent](#why-do-transcript-graph-calls-return-403-after-admin-consent)
+2. **Is capture enabled for that user?** `verify_kb_integration_status` should report `active`
+3. **Was the meeting transcribed?** Only meetings with transcription enabled produce anything to capture
+4. **Are notifications arriving?** Check that Microsoft can reach the public webhook URL
+5. **Is the queue draining?** Check RabbitMQ, including the dead-letter queue
+6. **Did ingestion fail?** Check the server logs for errors during participant resolution or upload
+7. **Are you looking at the right scope?** Content lands under `UNIQUE_ROOT_SCOPE_ID`
 
 **See also:** [Troubleshooting](./operator.md#troubleshooting)
 
