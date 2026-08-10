@@ -142,9 +142,13 @@ class TestEncodeCursor:
             consumed={"meeting": 25, "call": 50, "note": 5},
         )
         assert cursor is not None
-        # Not a strict byte-count assertion — a sanity check that this stays "short", per the
-        # design doc's ~30-40 char target for typical inputs.
-        assert len(cursor) < 80
+        # Not a strict byte-count assertion — a sanity check that this stays "reasonably
+        # compact" for a named-JSON-object wire format (measured ~183 chars for this example;
+        # segment/stream names and field names are spelled out, unlike a positional-tuple
+        # encoding, so this is a looser bound than a code-based format would need). Tight enough
+        # to catch a regression to plain `json.dumps` (adds spaces after `:`/`,`, ~203 chars for
+        # this example) rather than `model_dump_json`'s compact separators.
+        assert len(cursor) < 195
 
 
 class TestCursorAuthority:
@@ -170,6 +174,16 @@ class TestCursorAuthority:
         )
         assert cursor is not None
         return cursor
+
+    def _decode_payload(self, cursor: str) -> dict[str, object]:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = cast("object", json.loads(base64.urlsafe_b64decode(padded)))
+        assert isinstance(payload, dict)
+        return cast("dict[str, object]", payload)
+
+    def _encode_payload(self, payload: dict[str, object]) -> str:
+        raw = json.dumps(payload).encode()
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
     def test_conflicting_entity_id_raises_cursor_conflict(self) -> None:
         cursor = self._cursor(entity_id="42")
@@ -270,7 +284,7 @@ class TestCursorAuthority:
         # JSON strings (including `entity_id`) are always valid Unicode text by construction, so
         # a decoded field with invalid UTF-8 bytes can't arise from otherwise well-formed JSON.
         # The decode failure this scenario targets instead is bytes that are valid base64 but
-        # aren't syntactically valid JSON at all — `TypeAdapter.validate_json` raises its own
+        # aren't syntactically valid JSON at all — `model_validate_json` raises its own
         # `ValidationError` on those, which must surface as `InvalidCursor`, not propagate.
         raw = bytes([0xFF, 0xFE, 0x00, 0x01, 0x02, 0x03])
         cursor = base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
@@ -286,11 +300,80 @@ class TestCursorAuthority:
             )
 
     def test_unrecognized_shape_raises_invalid_cursor(self) -> None:
-        # A well-formed JSON array (3 elements) that doesn't match the 6-element cursor tuple
-        # type at all — valid JSON, but the `TypeAdapter`'s fixed-length tuple type rejects the
-        # wrong arity on its own.
-        raw = json.dumps([1, 2, 3]).encode()
+        # A well-formed JSON object that is missing every field `_DecodedCursor` requires —
+        # valid JSON, but pydantic's required-field validation rejects it on its own.
+        raw = json.dumps({"unrelated": True}).encode()
         cursor = base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+        with pytest.raises(InvalidCursor):
+            decode_and_validate_cursor(
+                cursor,
+                segment="organizations",
+                entity_id="42",
+                limit=10,
+                activity_types=None,
+                since=None,
+                until=None,
+            )
+
+    def test_missing_required_field_raises_invalid_cursor(self) -> None:
+        # A well-formed JSON object with `consumed` dropped entirely — valid JSON, but
+        # `_DecodedCursor.consumed` is required, so pydantic rejects the omission on its own.
+        payload = self._decode_payload(self._cursor())
+        del payload["consumed"]
+        cursor = self._encode_payload(payload)
+        with pytest.raises(InvalidCursor):
+            decode_and_validate_cursor(
+                cursor,
+                segment="organizations",
+                entity_id="42",
+                limit=10,
+                activity_types=None,
+                since=None,
+                until=None,
+            )
+
+    def test_wrong_field_type_raises_invalid_cursor(self) -> None:
+        # `limit` as a string instead of an int — pydantic's strict-enough int coercion rejects
+        # a non-numeric string on its own.
+        payload = self._decode_payload(self._cursor())
+        payload["limit"] = "not-a-number"
+        cursor = self._encode_payload(payload)
+        with pytest.raises(InvalidCursor):
+            decode_and_validate_cursor(
+                cursor,
+                segment="organizations",
+                entity_id="42",
+                limit=10,
+                activity_types=None,
+                since=None,
+                until=None,
+            )
+
+    def test_unrecognized_segment_value_raises_invalid_cursor(self) -> None:
+        # `segment` outside `Segment`'s `Literal["organizations", "people"]` membership —
+        # pydantic rejects this on its own, the same way an out-of-range segment code did
+        # before segment travelled on the wire as its own string.
+        payload = self._decode_payload(self._cursor())
+        payload["segment"] = "not_a_real_segment"
+        cursor = self._encode_payload(payload)
+        with pytest.raises(InvalidCursor):
+            decode_and_validate_cursor(
+                cursor,
+                segment="organizations",
+                entity_id="42",
+                limit=10,
+                activity_types=None,
+                since=None,
+                until=None,
+            )
+
+    def test_unrecognized_stream_key_raises_invalid_cursor(self) -> None:
+        # A `consumed` key outside `StreamKind`'s five valid values — pydantic rejects this on
+        # its own, the same way an out-of-range stream code did before streams travelled on the
+        # wire as their own strings.
+        payload = self._decode_payload(self._cursor())
+        payload["consumed"] = {"not_a_real_stream": 1}
+        cursor = self._encode_payload(payload)
         with pytest.raises(InvalidCursor):
             decode_and_validate_cursor(
                 cursor,
@@ -305,16 +388,13 @@ class TestCursorAuthority:
     def test_unsupported_schema_version_raises_invalid_cursor(self) -> None:
         # Same shape as a valid cursor, but with the version field bumped past what's supported.
         # `Literal[1]` rejects this on its own (no manual version check left to name the failure
-        # specifically), so this now surfaces as the same generic "unrecognized shape" message as
-        # any other `TypeAdapter` validation failure.
-        cursor = self._cursor()
-        padded = cursor + "=" * (-len(cursor) % 4)
-        payload = cast("list[object]", json.loads(base64.urlsafe_b64decode(padded)))
-        version = payload[0]
+        # specifically), so this surfaces as the same generic "unrecognized shape" message as any
+        # other pydantic validation failure.
+        payload = self._decode_payload(self._cursor())
+        version = payload["version"]
         assert isinstance(version, int)
-        payload[0] = version + 1
-        bumped_raw = json.dumps(payload).encode()
-        bumped = base64.urlsafe_b64encode(bumped_raw).rstrip(b"=").decode("ascii")
+        payload["version"] = version + 1
+        bumped = self._encode_payload(payload)
         with pytest.raises(InvalidCursor, match="unrecognized shape"):
             decode_and_validate_cursor(
                 bumped,

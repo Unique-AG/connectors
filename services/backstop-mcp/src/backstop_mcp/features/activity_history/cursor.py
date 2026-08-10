@@ -1,5 +1,5 @@
-"""Compact pagination cursor: a JSON-array payload validated by a pydantic `TypeAdapter`, plus a
-filter-set digest.
+"""Compact pagination cursor: a `_DecodedCursor` pydantic model serialized directly as JSON, plus
+a filter-set digest.
 
 The cursor is authoritative, not a hint: a caller supplying one alongside contradicting plain
 filter arguments (`segment`, `entity_id`, `limit`) gets a `CursorConflict` naming the mismatch,
@@ -10,24 +10,24 @@ can't be explained — it's reported as `InvalidCursor` with a restart instructi
 It is not signed: it carries no secret, only ids the caller already holds. The digest exists to
 detect misuse, not to authenticate.
 
-Wire payload: a pydantic `TypeAdapter` over a fixed-length, heterogeneous `tuple[...]` — dumped as
-JSON, which renders a tuple type as a JSON *array* (not an object with repeated field names) —
-then base64url-encoded (no padding):
+Wire payload: `_DecodedCursor.model_dump_json()` — a JSON *object* with named fields —
 
-    (
-        schema_version,      # Literal[1]
-        segment_code,        # Literal[0, 1], see `_SEGMENT_CODE`
-        entity_id,           # str
-        limit,               # int
-        filter_digest,       # bytes, exactly `_DIGEST_LENGTH` long
-        ((stream_code, consumed), ...),  # one pair per active stream
-    )
+    {
+        "version": 1,
+        "segment": "organizations" | "people",
+        "entity_id": "...",
+        "limit": ...,
+        "digest": "...",       # base64, exactly `_DIGEST_LENGTH` bytes decoded
+        "consumed": {"meeting": ..., "call": ..., ...}   # one entry per active stream
+    }
 
-Each element's type is deliberately as tight as pydantic allows, so a structurally- or
-semantically-invalid payload fails `TypeAdapter.validate_json`'s own `ValidationError`
-automatically: an unsupported schema version, an unrecognized segment/stream code, a
-wrong-length digest, or a wrong tuple arity (outer or per-pair) are all rejected by the type
-itself — nothing here re-checks any of that by hand.
+then base64url-encoded (no padding).
+
+Each field's type is deliberately as tight as pydantic allows, so a structurally- or
+semantically-invalid payload fails `model_validate_json`'s own `ValidationError` automatically:
+an unsupported schema version, an unrecognized segment/stream name, a wrong-length digest, or a
+missing/mistyped field are all rejected by the type itself — nothing here re-checks any of that
+by hand.
 """
 
 import base64
@@ -35,9 +35,9 @@ import binascii
 import hashlib
 from collections.abc import Collection, Mapping
 from datetime import date
-from typing import Annotated, ClassVar, Literal, cast
+from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backstop_mcp.features.activity_history.streams import ActivityStreamKind, Segment, StreamKind
 
@@ -48,36 +48,7 @@ _DIGEST_LENGTH = 6  # bytes — a handful, not a full sha256, to keep the cursor
 
 _RESTART_INSTRUCTION = "restart from page one without a cursor"
 
-_SEGMENT_ORDER: tuple[Segment, ...] = ("organizations", "people")
-_SEGMENT_CODE: dict[Segment, int] = {segment: code for code, segment in enumerate(_SEGMENT_ORDER)}
-_SEGMENT_BY_CODE: dict[int, Segment] = dict(enumerate(_SEGMENT_ORDER))
-
-_STREAM_ORDER: tuple[StreamKind, ...] = ("meeting", "call", "note", "document", "email")
-_STREAM_CODE: dict[StreamKind, int] = {stream: code for code, stream in enumerate(_STREAM_ORDER)}
-_STREAM_BY_CODE: dict[int, StreamKind] = dict(enumerate(_STREAM_ORDER))
-
-# Mirrors `_SEGMENT_CODE`'s two values and `_STREAM_CODE`'s five values respectively: an
-# out-of-range code then fails `TypeAdapter` validation on its own, no manual lookup-miss check
-# needed.
-_SegmentCode = Literal[0, 1]
-_StreamCode = Literal[0, 1, 2, 3, 4]
 _Digest = Annotated[bytes, Field(min_length=_DIGEST_LENGTH, max_length=_DIGEST_LENGTH)]
-
-_CursorPayload = tuple[
-    Literal[1],  # `_SCHEMA_VERSION` — the one currently-supported schema version.
-    _SegmentCode,
-    str,
-    int,
-    _Digest,
-    tuple[tuple[_StreamCode, int], ...],
-]
-# `ser_json_bytes`/`val_json_bytes="base64"` is required for the digest slot: pydantic's default
-# JSON handling of raw `bytes` expects valid UTF-8, which a sha256-derived digest isn't. Confirmed
-# empirically (round-tripping an arbitrary non-UTF8 6-byte value through `dump_json`/
-# `validate_json` before relying on it here).
-_cursor_type_adapter: TypeAdapter[_CursorPayload] = TypeAdapter(
-    _CursorPayload, config=ConfigDict(ser_json_bytes="base64", val_json_bytes="base64")
-)
 
 
 class CursorConflict(Exception):
@@ -99,14 +70,26 @@ class InvalidCursor(Exception):
 
 
 class _DecodedCursor(BaseModel):
-    """The result of parsing a cursor's bytes, before it is validated against the current call."""
+    """The cursor's wire payload — encoded directly to JSON and decoded directly from it — and
+    also the result of parsing a cursor's bytes, before it is validated against the current call.
+    """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        frozen=True, ser_json_bytes="base64", val_json_bytes="base64"
+    )
+    # `ser_json_bytes`/`val_json_bytes="base64"` is required for the digest field: pydantic's
+    # default JSON handling of raw `bytes` expects valid UTF-8, which a sha256-derived digest
+    # isn't. Confirmed empirically (round-tripping an arbitrary non-UTF8 6-byte value through
+    # `model_dump_json`/`model_validate_json` before relying on it here).
 
+    # Mirrors `_SCHEMA_VERSION` by hand: `Literal[...]` requires an actual literal, not a
+    # reference to a module-level variable, even one holding a literal value — basedpyright
+    # rejects `Literal[_SCHEMA_VERSION]`.
+    version: Literal[1] = 1
     segment: Segment
     entity_id: str
     limit: int
-    digest: bytes
+    digest: _Digest
     consumed: Mapping[StreamKind, int]
 
 
@@ -128,28 +111,17 @@ def _filter_digest(
 
 
 def _parse_cursor(raw: bytes) -> _DecodedCursor:
-    """Validate `raw` against `_CursorPayload` and translate any `ValidationError` to
+    """Validate `raw` against `_DecodedCursor` and translate any `ValidationError` to
     `InvalidCursor`.
 
-    `_CursorPayload`'s element types already police shape and semantics — outer/inner tuple
-    arity, schema version, segment/stream codes, and digest length — so there is nothing left to
-    check by hand here beyond mapping the validated codes back to their string forms.
+    `_DecodedCursor`'s field types already police shape and semantics — schema version,
+    segment/stream membership, and digest length — so there is nothing left to check by hand
+    here.
     """
     try:
-        payload = _cursor_type_adapter.validate_json(raw)
+        return _DecodedCursor.model_validate_json(raw)
     except ValidationError as exc:
         raise InvalidCursor(f"Cursor has an unrecognized shape; {_RESTART_INSTRUCTION}.") from exc
-
-    # `payload[0]` (the schema version) is unpacked but unused: `Literal[1]` already guarantees
-    # it's the one supported version, so there's nothing left to branch on.
-    _version, segment_code, entity_id, limit, digest, pairs = payload
-    return _DecodedCursor(
-        segment=_SEGMENT_BY_CODE[segment_code],
-        entity_id=entity_id,
-        limit=limit,
-        digest=digest,
-        consumed={_STREAM_BY_CODE[stream_code]: count for stream_code, count in pairs},
-    )
 
 
 def encode_cursor(
@@ -170,23 +142,18 @@ def encode_cursor(
     if not consumed:
         return None
 
-    # `_STREAM_CODE`/`_SEGMENT_CODE` are derived from `_STREAM_ORDER`/`_SEGMENT_ORDER`, the same
-    # fixed sequences `_StreamCode`/`_SegmentCode` mirror as `Literal`s, so this narrowing cast is
-    # safe — it's just `dict[..., int]`'s lookup type, not a real widening anywhere upstream.
-    pairs: list[tuple[_StreamCode, int]] = []
     for stream, count in consumed.items():
         assert count >= 0, f"cursor invariant violated: negative consumed count for {stream!r}"
-        pairs.append((cast(_StreamCode, _STREAM_CODE[stream]), count))
 
-    payload: _CursorPayload = (
-        _SCHEMA_VERSION,
-        cast(_SegmentCode, _SEGMENT_CODE[segment]),
-        entity_id,
-        limit,
-        _filter_digest(activity_types, since, until),
-        tuple(pairs),
+    decoded = _DecodedCursor(
+        version=_SCHEMA_VERSION,
+        segment=segment,
+        entity_id=entity_id,
+        limit=limit,
+        digest=_filter_digest(activity_types, since, until),
+        consumed=consumed,
     )
-    dumped = _cursor_type_adapter.dump_json(payload)
+    dumped = decoded.model_dump_json().encode()
     return base64.urlsafe_b64encode(dumped).rstrip(b"=").decode("ascii")
 
 

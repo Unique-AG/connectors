@@ -18,7 +18,7 @@ into a deterministically-ordered slice plus the updated `consumed` mapping. Fetc
 docstring for the `consumed -> (offset, skip)` alignment and the exact sort key.
 
 `encode_cursor`/`decode_and_validate_cursor`: the compact pagination cursor built on top of
-`consumed` — a JSON-array wire payload validated by a pydantic `TypeAdapter`, base64url-encoded —
+`consumed` — a pydantic model serialized directly as a named JSON object, base64url-encoded —
 with digest-based detection of a stale/conflicting cursor. See `cursor.py`'s module docstring for
 the wire payload and the conflict-vs-invalid error split.
 
