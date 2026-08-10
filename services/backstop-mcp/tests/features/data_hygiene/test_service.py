@@ -1,4 +1,4 @@
-"""`EmploymentIndexFactory`: what the composition root hands it, and what `index_for_person` no
+"""`EmploymentIndexFactory`: what the composition root hands it, and what `index` no
 longer needs to be passed.
 
 The scan and classifier it delegates to are covered in `test_employment.py`.
@@ -68,7 +68,7 @@ def _factory(
 
 class TestCreateEmploymentIndexFactory:
     def test_configured_markers_reach_the_verdict(self) -> None:
-        index = _factory().index_for_person(
+        index = _factory().index(
             relationships=_typed_relationships([person_org("er1", type_id=FORMER_TYPE)]),
             relationship_types=_typed_types(relationship_types(FORMER_TYPE)),
         )
@@ -81,7 +81,7 @@ class TestCreateEmploymentIndexFactory:
     def test_configured_ids_decide_when_no_type_side_loaded(self) -> None:
         factory = _factory(former_type_ids=("custom-7",), former_type_markers=())
 
-        index = factory.index_for_person(
+        index = factory.index(
             relationships=_typed_relationships([person_org("er1", type_id="custom-7")]),
             relationship_types=[],
         )
@@ -96,9 +96,9 @@ class TestCreateEmploymentIndexFactory:
         assert factory.rules.former.type_ids == frozenset({"x"})
 
 
-class TestIndexForPerson:
+class TestIndex:
     def test_a_person_with_no_relationships_is_not_departed(self) -> None:
-        index = _factory().index_for_person(
+        index = _factory().index(
             relationships=[],
             relationship_types=_typed_types(relationship_types(FORMER_TYPE)),
         )
@@ -106,7 +106,7 @@ class TestIndexForPerson:
         assert index.departure(person_id="p1", organization_id="o1") is None
 
     def test_a_current_employee_is_not_departed(self) -> None:
-        index = _factory().index_for_person(
+        index = _factory().index(
             relationships=_typed_relationships([person_org("er1", type_id=EMPLOYEE_TYPE)]),
             relationship_types=_typed_types(relationship_types(EMPLOYEE_TYPE)),
         )
@@ -115,7 +115,7 @@ class TestIndexForPerson:
 
     def test_the_clock_defaults_to_today(self) -> None:
         """A real deployment gets `date.today`; only tests pin it."""
-        index = _factory().index_for_person(
+        index = _factory().index(
             relationships=_typed_relationships(
                 [person_org("er1", type_id=None, end_date="2000-01-01")]
             ),
@@ -130,7 +130,7 @@ class TestIndexForPerson:
         # Days rather than `replace(year=...)`, which raises on a leap day.
         next_year = (date.today() + timedelta(days=366)).isoformat()
 
-        index = _factory().index_for_person(
+        index = _factory().index(
             relationships=_typed_relationships(
                 [person_org("er1", type_id=None, end_date=next_year)]
             ),
@@ -144,7 +144,7 @@ class TestIndexForPerson:
             rules=_factory().rules,
             clock=lambda: date(2020, 1, 1),
         )
-        index = factory.index_for_person(
+        index = factory.index(
             relationships=_typed_relationships(
                 [person_org("er1", type_id=None, end_date="2019-12-31")]
             ),

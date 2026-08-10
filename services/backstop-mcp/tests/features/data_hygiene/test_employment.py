@@ -8,8 +8,8 @@ Each test below is meant to read as a mini walkthrough:
    employment (`EmploymentRules` / `TypeVocabulary`).
 2. **Prepare the side-loaded record** — `entityRelationships` plus their types, via
    `helpers.person_org` / `helpers.relationship_types`.
-3. **Run verification** — `build_employment_index` / `build_employment_index`
-   (what `EmploymentIndexFactory.index_for_person` / `index_for_organization` delegate to), then
+3. **Run verification** — `build_employment_index`
+   (what `EmploymentIndexFactory.index` delegates to), then
    query `status` / `departure` / `pairs` — or `classify_employment` directly for a single type.
 
 Numbered classes below cover the nine behavioural cases for `EmploymentIndex`. The remaining
