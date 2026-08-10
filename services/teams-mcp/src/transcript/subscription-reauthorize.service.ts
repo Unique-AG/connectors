@@ -7,6 +7,10 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import {
+  GraphTranscriptAccessDisabledException,
+  isGraphAccessToTranscriptsDisabled,
+} from '~/utils/graph-transcript-access';
+import {
   ReauthorizationRequiredEventDto,
   Subscription,
   UpdateSubscriptionRequestSchema,
@@ -121,9 +125,17 @@ export class SubscriptionReauthorizeService {
     );
 
     const client = this.graphClientFactory.createClientForUser(subscription.userProfileId);
-    const graphResponse = (await client
-      .api(`/subscriptions/${subscriptionId}`)
-      .patch(payload)) as unknown;
+    let graphResponse: unknown;
+    try {
+      graphResponse = (await client.api(`/subscriptions/${subscriptionId}`).patch(payload)) as unknown;
+    } catch (error) {
+      if (isGraphAccessToTranscriptsDisabled(error)) {
+        throw new GraphTranscriptAccessDisabledException(
+          error instanceof Error ? error.message : undefined,
+        );
+      }
+      throw error;
+    }
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
     span?.addEvent('Graph API subscription updated', {
