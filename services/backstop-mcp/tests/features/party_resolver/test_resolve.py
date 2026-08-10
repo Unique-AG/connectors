@@ -13,6 +13,7 @@ from backstop_mcp.features.party_resolver import (
     unresolved_parties_response,
     unresolved_party_response,
 )
+from backstop_mcp.features.party_resolver.search import quick_search
 from backstop_mcp.features.resolution import (
     Ambiguous,
     BatchAmbiguous,
@@ -193,7 +194,7 @@ class TestQuickSearch:
         assert result.value.id == "o1"
         params = route.calls.last.request.url.params
         assert params["filter[searchText][eq]"] == "Capstone"
-        assert params["filter[searchTypes][eq]"] == "organizations"
+        assert params["filter[searchTypes][eq]"] == "ORGANIZATION"
         assert params["filter[limit][eq]"] == "10"
         assert params["filter[showAll][eq]"] == "false"
         assert params["filter[enhanceSearchTypes][eq]"] == "false"
@@ -377,6 +378,200 @@ class TestQuickSearch:
 
         assert exc_info.value.path == "/quick-search"
         assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"
+
+
+class TestSearchTypeMapping:
+    """`/quick-search` rejects our lowercase `SearchType` outright (400 InvalidParameterException);
+    it wants its own uppercase enum. Exercised via `quick_search` directly (not `resolve_party`)
+    since `_resolve_one` routes email-looking `search` values to `search_by_email` instead,
+    never reaching `quick_search`.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_organizations_maps_to_organization(self, client: BackstopClient) -> None:
+        route = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await quick_search(client, search_type="organizations", search="Capstone")
+
+        assert route.calls.last.request.url.params["filter[searchTypes][eq]"] == "ORGANIZATION"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_people_maps_to_first_and_last_name(self, client: BackstopClient) -> None:
+        route = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await quick_search(client, search_type="people", search="Ada Lovelace")
+
+        params = route.calls.last.request.url.params
+        assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_contacts_maps_to_first_and_last_name(self, client: BackstopClient) -> None:
+        route = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await quick_search(client, search_type="contacts", search="Ada Lovelace")
+
+        params = route.calls.last.request.url.params
+        assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_employees_maps_to_first_and_last_name(self, client: BackstopClient) -> None:
+        route = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await quick_search(client, search_type="employees", search="Ada Lovelace")
+
+        params = route.calls.last.request.url.params
+        assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_email_shaped_search_adds_email_address_for_people(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await quick_search(client, search_type="people", search="ada@example.com")
+
+        params = route.calls.last.request.url.params
+        assert (
+            params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME,EMAIL_ADDRESS"
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_email_shaped_search_does_not_add_email_address_for_organizations(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await quick_search(client, search_type="organizations", search="ops@capstone.com")
+
+        assert route.calls.last.request.url.params["filter[searchTypes][eq]"] == "ORGANIZATION"
+
+
+class TestPartyIdFromResourceId:
+    """UN-23680: quick-search's `id` (e.g. `organizations_341208613`) is not a usable party id —
+    the follow-up `GET /organizations/{id}` needs the raw id from `attributes.resourceId`.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_prefers_resource_id_attribute_over_prefixed_id(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource(
+                        "organizations_341208613",
+                        "organizations",
+                        name="Capstone",
+                        resourceId="341208613",
+                    )
+                ),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "341208613"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_falls_back_to_stripping_type_prefix_when_resource_id_is_absent(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("organizations_341208613", "organizations", name="Capstone")
+                ),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "341208613"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_id_without_type_prefix_is_used_as_is_when_resource_id_is_absent(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("o1", "organizations", name="Capstone")),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "o1"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_falls_back_to_stripping_type_prefix_when_resource_id_is_blank(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource(
+                        "organizations_341208613",
+                        "organizations",
+                        name="Capstone",
+                        resourceId="   ",
+                    )
+                ),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "341208613"
 
 
 class TestHitCounts:

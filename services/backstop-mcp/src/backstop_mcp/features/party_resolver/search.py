@@ -34,6 +34,19 @@ _EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
     "employees": ("email", "email2", "email3"),
 }
 
+# Backstop's `/quick-search` rejects our lowercase `SearchType` outright (400
+# InvalidParameterException: valid options are [ALL, ACCOUNT, ..., ORGANIZATION,
+# PERSON_FIRST_NAME, PERSON_LAST_NAME, ..., EMAIL_ADDRESS, ...]) — these are the mapped values.
+# A name query might land in either the first- or last-name field, so people/contacts/employees
+# search both; `filter[searchTypes][eq]` takes a comma-joined multi-value the same way
+# `activityType` does elsewhere in this API.
+_BACKSTOP_SEARCH_TYPES: Mapping[SearchType, str] = {
+    "organizations": "ORGANIZATION",
+    "contacts": "PERSON_FIRST_NAME,PERSON_LAST_NAME",
+    "people": "PERSON_FIRST_NAME,PERSON_LAST_NAME",
+    "employees": "PERSON_FIRST_NAME,PERSON_LAST_NAME",
+}
+
 
 def normalized_email(value: str) -> str | None:
     """Return pydantic's normalized address, or `None` when `value` is not an email.
@@ -136,7 +149,7 @@ def _quick_search_params(
 ) -> dict[str, object]:
     params: dict[str, object] = {
         "filter[searchText][eq]": search,
-        "filter[searchTypes][eq]": search_type,
+        "filter[searchTypes][eq]": _backstop_search_types(search_type=search_type, search=search),
         "filter[limit][eq]": options.limit,
         "filter[showAll][eq]": options.show_all,
         "filter[enhanceSearchTypes][eq]": options.enhance_search_types,
@@ -154,6 +167,19 @@ def _quick_search_params(
         params["filter[filterType][eq]"] = options.filter_type
 
     return params
+
+
+def _backstop_search_types(*, search_type: SearchType, search: str) -> str:
+    """Map `search_type` to Backstop's uppercase `searchTypes` enum value(s).
+
+    When `search` itself looks like an email, `EMAIL_ADDRESS` is added to the person-shaped
+    mapping so a quick-search direct caller (unlike `resolve.py`'s `_resolve_one`, which routes
+    email-looking input to `search_by_email` instead) still matches on it.
+    """
+    base = _BACKSTOP_SEARCH_TYPES[search_type]
+    if search_type != "organizations" and looks_like_email(search):
+        return f"{base},EMAIL_ADDRESS"
+    return base
 
 
 def _merge_candidates(
@@ -174,6 +200,22 @@ def _candidates_from_document(
     )
 
 
+def _party_id(resource: _PartyResource) -> str:
+    """Extract the id usable in a follow-up `GET /{search_type}/{id}`.
+
+    Quick-search hits come back with a prefixed `id` (`organizations_341208613`), which
+    `NumberFormatException`s against the live API when interpolated as-is. `attributes.resourceId`
+    carries the real id when present; other party endpoints don't send that attribute, so fall
+    back to stripping the `{type}_` prefix off `id` (only when it's actually there).
+    """
+    if resource.attributes.resource_id is not None:
+        return resource.attributes.resource_id
+    prefix = f"{resource.type}_"
+    if resource.id.startswith(prefix):
+        return resource.id.removeprefix(prefix)
+    return resource.id
+
+
 def _candidate_from_resource(
     resource: _PartyResource, *, search_type: SearchType
 ) -> PartyCandidate:
@@ -189,10 +231,11 @@ def _candidate_from_resource(
     resolved_search_type = party_search_type(resource_type) or search_type
     name = resource.attributes.display_name()
     label = name if name is not None else f"{resource_type} #{resource.id}"
+    party_id = _party_id(resource)
     # Backstop ids are not unique across collections. Namespace the elicit key by
     # search_type so `enhance_search_types` hits that share an id stay distinct options.
     return Candidate(
-        key=f"{resolved_search_type}:{resource.id}",
+        key=f"{resolved_search_type}:{party_id}",
         label=label,
-        value=ResolvedParty(id=resource.id, search_type=resolved_search_type, name=name),
+        value=ResolvedParty(id=party_id, search_type=resolved_search_type, name=name),
     )
