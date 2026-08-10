@@ -31,7 +31,7 @@ class TestActivityRequestShape:
         )
 
         await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="meeting", limit=10, offset=0
+            client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
         )
 
         params = route.calls.last.request.url.params
@@ -51,7 +51,7 @@ class TestActivityRequestShape:
         )
 
         await fetch_activity_page(
-            client, segment="people", party_id="7", stream="call", limit=10, offset=0
+            client, segment="people", entity_id="7", stream="call", limit=10, offset=0
         )
 
         assert route.calls.last.request.url.params["filter[activityType][eq]"] == "calls"
@@ -64,7 +64,7 @@ class TestActivityRequestShape:
         )
 
         await fetch_activity_page(
-            client, segment="people", party_id="7", stream="note", limit=10, offset=0
+            client, segment="people", entity_id="7", stream="note", limit=10, offset=0
         )
 
         assert route.calls.last.request.url.params["filter[activityType][eq]"] == "notes"
@@ -79,7 +79,7 @@ class TestActivityRequestShape:
         )
 
         await fetch_activity_page(
-            client, segment="people", party_id="7", stream="document", limit=10, offset=0
+            client, segment="people", entity_id="7", stream="document", limit=10, offset=0
         )
 
         assert route.calls.last.request.url.params["filter[activityType][eq]"] == "documents"
@@ -92,7 +92,7 @@ class TestActivityRequestShape:
         )
 
         await fetch_activity_page(
-            client, segment="people", party_id="99", stream="meeting", limit=10, offset=0
+            client, segment="people", entity_id="99", stream="meeting", limit=10, offset=0
         )
 
         assert route.called
@@ -111,7 +111,7 @@ class TestActivityRequestShape:
             await fetch_activity_page(
                 client,
                 segment="organizations",
-                party_id="42",
+                entity_id="42",
                 stream="meeting",
                 limit=25,
                 offset=50,
@@ -137,7 +137,7 @@ class TestActivityDateDialect:
         await fetch_activity_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             stream="meeting",
             limit=10,
             offset=0,
@@ -158,7 +158,7 @@ class TestActivityDateDialect:
         await fetch_activity_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             stream="meeting",
             limit=10,
             offset=0,
@@ -182,7 +182,7 @@ class TestActivityDateDialect:
         await fetch_activity_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             stream="meeting",
             limit=10,
             offset=0,
@@ -202,7 +202,7 @@ class TestActivityDateDialect:
         )
 
         await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="meeting", limit=10, offset=0
+            client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
         )
 
         params = route.calls.last.request.url.params
@@ -225,7 +225,7 @@ class TestActivityExhaustion:
         )
 
         page = await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="meeting", limit=5, offset=0
+            client, segment="organizations", entity_id="42", stream="meeting", limit=5, offset=0
         )
 
         assert len(page.items) == 1
@@ -247,7 +247,7 @@ class TestActivityExhaustion:
         )
 
         page = await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="meeting", limit=2, offset=0
+            client, segment="organizations", entity_id="42", stream="meeting", limit=2, offset=0
         )
 
         assert len(page.items) == 2
@@ -277,7 +277,7 @@ class TestActivityExhaustion:
         page = await fetch_activity_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             stream="meeting",
             limit=4,
             offset=0,
@@ -305,7 +305,7 @@ class TestActivityExhaustion:
         page = await fetch_activity_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             stream="meeting",
             limit=5,
             offset=0,
@@ -330,7 +330,7 @@ class TestActivityExhaustion:
         )
 
         page = await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="meeting", limit=5, offset=0
+            client, segment="organizations", entity_id="42", stream="meeting", limit=5, offset=0
         )
 
         assert [item.id for item in page.items] == ["meeting-or-calls_1", "meeting-or-calls_2"]
@@ -365,7 +365,7 @@ class TestActivityParsing:
         )
 
         page = await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="call", limit=5, offset=0
+            client, segment="organizations", entity_id="42", stream="call", limit=5, offset=0
         )
 
         assert len(page.items) == 1
@@ -399,7 +399,7 @@ class TestActivityParsing:
         )
 
         page = await fetch_activity_page(
-            client, segment="organizations", party_id="42", stream="meeting", limit=5, offset=0
+            client, segment="organizations", entity_id="42", stream="meeting", limit=5, offset=0
         )
 
         assert len(page.items) == 1
@@ -420,7 +420,7 @@ class TestEmailRequestShape:
         )
 
         await fetch_email_page(
-            client, segment="organizations", party_id="42", limit=10, offset=0
+            client, segment="organizations", entity_id="42", limit=10, offset=0
         )
 
         params = route.calls.last.request.url.params
@@ -438,7 +438,7 @@ class TestEmailRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(client, segment="people", party_id="7", limit=10, offset=0)
+        await fetch_email_page(client, segment="people", entity_id="7", limit=10, offset=0)
 
         assert route.called
 
@@ -454,7 +454,7 @@ class TestEmailRequestShape:
         try:
             client = built.for_credential(credential())
             await fetch_email_page(
-                client, segment="organizations", party_id="42", limit=25, offset=50
+                client, segment="organizations", entity_id="42", limit=25, offset=50
             )
         finally:
             await built.aclose()
@@ -476,7 +476,7 @@ class TestEmailDateDialect:
         await fetch_email_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             limit=10,
             offset=0,
             since=date(2026, 1, 1),
@@ -496,7 +496,7 @@ class TestEmailDateDialect:
         await fetch_email_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             limit=10,
             offset=0,
             until=date(2026, 2, 1),
@@ -516,7 +516,7 @@ class TestEmailDateDialect:
         await fetch_email_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             limit=10,
             offset=0,
             since=date(2026, 1, 1),
@@ -535,7 +535,7 @@ class TestEmailDateDialect:
         )
 
         await fetch_email_page(
-            client, segment="organizations", party_id="42", limit=10, offset=0
+            client, segment="organizations", entity_id="42", limit=10, offset=0
         )
 
         params = route.calls.last.request.url.params
@@ -555,7 +555,7 @@ class TestEmailDateDialect:
         await fetch_email_page(
             client,
             segment="organizations",
-            party_id="42",
+            entity_id="42",
             limit=10,
             offset=0,
             since=date(2026, 1, 1),
@@ -578,7 +578,7 @@ class TestEmailExhaustion:
         )
 
         page = await fetch_email_page(
-            client, segment="organizations", party_id="42", limit=5, offset=0
+            client, segment="organizations", entity_id="42", limit=5, offset=0
         )
 
         assert len(page.items) == 1
@@ -598,7 +598,7 @@ class TestEmailExhaustion:
         )
 
         page = await fetch_email_page(
-            client, segment="organizations", party_id="42", limit=2, offset=0
+            client, segment="organizations", entity_id="42", limit=2, offset=0
         )
 
         assert len(page.items) == 2
@@ -629,7 +629,7 @@ class TestEmailParsing:
         )
 
         page = await fetch_email_page(
-            client, segment="organizations", party_id="42", limit=5, offset=0
+            client, segment="organizations", entity_id="42", limit=5, offset=0
         )
 
         assert len(page.items) == 1
@@ -659,7 +659,7 @@ class TestEmailParsing:
         )
 
         page = await fetch_email_page(
-            client, segment="organizations", party_id="42", limit=5, offset=0
+            client, segment="organizations", entity_id="42", limit=5, offset=0
         )
 
         assert len(page.items) == 1

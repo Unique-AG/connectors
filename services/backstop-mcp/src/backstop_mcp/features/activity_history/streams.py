@@ -1,6 +1,6 @@
 """Per-stream single-page fetch for the four activity types plus email.
 
-This is only the per-stream single-page fetch primitive: given a stream kind, a party, a
+This is only the per-stream single-page fetch primitive: given a stream kind, an entity, a
 `limit`/`offset`, and optional `since`/`until` bounds, fetch exactly one page and report typed
 items plus whether the stream is now exhausted. The k-way merge across streams, the response/wire
 models for a tool payload, and config-driven page sizing all live in later modules — see the
@@ -44,7 +44,7 @@ __all__ = [
     "ActivityStreamKind",
     "EmailItem",
     "EmailPage",
-    "PartySegment",
+    "Segment",
     "StreamKind",
     "fetch_activity_page",
     "fetch_email_page",
@@ -57,10 +57,10 @@ __all__ = [
 ActivityStreamKind = Literal["meeting", "call", "note", "document"]
 StreamKind = ActivityStreamKind | Literal["email"]
 
-# `{segment}` in `/{segment}/{id}/activities|emails` — organizations for an organization party,
-# people for a person party. Party resolution itself (mapping a resolved party to a segment) is a
+# `{segment}` in `/{segment}/{id}/activities|emails` — organizations for an organization entity,
+# people for a person entity. Party resolution itself (mapping a resolved party to a segment) is a
 # later task; this layer just takes the segment it's told.
-PartySegment = Literal["organizations", "people"]
+Segment = Literal["organizations", "people"]
 
 _ACTIVITY_TYPE_FILTER: dict[ActivityStreamKind, str] = {
     "meeting": "meetings",
@@ -279,8 +279,8 @@ def _truncate_since(
 async def fetch_activity_page(
     client: BackstopClient,
     *,
-    segment: PartySegment,
-    party_id: str,
+    segment: Segment,
+    entity_id: str,
     stream: ActivityStreamKind,
     limit: int,
     offset: int,
@@ -305,7 +305,7 @@ async def fetch_activity_page(
         **_activity_date_filter_params(since=since, until=until),
     }
     page = await client.fetch_page(
-        f"/{segment}/{party_id}/activities",
+        f"/{segment}/{entity_id}/activities",
         schema=_ActivityResource,
         params=params,
         page_size=limit,
@@ -323,8 +323,8 @@ async def fetch_activity_page(
 async def fetch_email_page(
     client: BackstopClient,
     *,
-    segment: PartySegment,
-    party_id: str,
+    segment: Segment,
+    entity_id: str,
     limit: int,
     offset: int,
     since: date | None = None,
@@ -343,7 +343,7 @@ async def fetch_email_page(
         **_email_date_filter_params(since=since, until=until),
     }
     page = await client.fetch_page(
-        f"/{segment}/{party_id}/emails",
+        f"/{segment}/{entity_id}/emails",
         schema=_EmailResource,
         params=params,
         page_size=limit,
