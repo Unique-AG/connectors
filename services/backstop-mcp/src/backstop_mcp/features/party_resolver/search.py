@@ -11,6 +11,7 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
+from backstop_mcp.features.entity_types import party_search_type
 from backstop_mcp.features.party_resolver.types import (
     PartyAttributes,
     PartyCandidate,
@@ -41,7 +42,6 @@ def looks_like_email(value: str) -> bool:
     except PydanticCustomError:
         return False
     return True
-
 
 
 async def search_by_email(
@@ -168,11 +168,17 @@ def _candidate_from_resource(
     # `resource.id` is already stripped and guaranteed non-blank by `BackstopApiResource`'s
     # schema validation; a blank `type` still falls back to "resource" here since that's a
     # caller-side display concern, not a structural defect the schema should reject.
+    #
+    # Prefer the resource's own type when `enhance_search_types` returns a different party
+    # kind — stamping the requested scope would send a later trusted-id fetch to the wrong
+    # collection. Fall back to the requested scope only when the wire type isn't a party
+    # SearchType (shouldn't happen for `/quick-search` hits, but keep a usable candidate).
     resource_type = resource.type or "resource"
+    resolved_search_type = party_search_type(resource_type) or search_type
     name = resource.attributes.display_name()
     label = name if name is not None else f"{resource_type} #{resource.id}"
     return Candidate(
         key=resource.id,
         label=label,
-        value=ResolvedParty(id=resource.id, search_type=search_type, name=name),
+        value=ResolvedParty(id=resource.id, search_type=resolved_search_type, name=name),
     )
