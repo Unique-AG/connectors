@@ -2,7 +2,7 @@
 
 Relationships are followed from the primary resource's linkage; types are selected by resource
 type because a nested include leaves nothing on the primary pointing at them. Callers unpack the
-result into `EmploymentIndexFactory.index_for_person` / `index_for_organization`.
+result into `EmploymentIndexFactory.index`.
 """
 
 import logging

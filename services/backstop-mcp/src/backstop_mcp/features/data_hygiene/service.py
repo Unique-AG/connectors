@@ -39,33 +39,18 @@ class EmploymentIndexFactory:
         """The vocabulary this factory was built with. Read-only; set once at composition."""
         return self._rules
 
-    def index_for_person(
+    def index(
         self,
         *,
         relationships: list[RelationshipResource],
         relationship_types: list[RelationshipTypeResource],
     ) -> EmploymentIndex:
-        """The `EmploymentIndex` for `entityRelationships` side-loaded off a person's own GET.
+        """Build an `EmploymentIndex` from `entityRelationships` side-loaded off a person or
+        organization GET.
 
-        Both arguments are side-loaded from the person's own GET — no second fetch of the person
-        and no per-relationship fetch of its type. Keyword-only because the two are the same type
-        and transposing them would silently misclassify every relationship.
-        """
-        return build_employment_index(
-            relationships=relationships,
-            relationship_types=relationship_types,
-            rules=self._rules,
-            today=self._clock(),
-        )
-
-    def index_for_organization(
-        self,
-        *,
-        relationships: list[RelationshipResource],
-        relationship_types: list[RelationshipTypeResource],
-    ) -> EmploymentIndex:
-        """The `EmploymentIndex` for `entityRelationships` side-loaded off an organization's own
-        GET. Mirrors `index_for_person`; see there for why both arguments are keyword-only.
+        Both arguments come from that GET's includes — no second fetch of the subject and no
+        per-relationship fetch of its type. Keyword-only because the two lists share a resource
+        shape and transposing them would silently misclassify every relationship.
         """
         return build_employment_index(
             relationships=relationships,
