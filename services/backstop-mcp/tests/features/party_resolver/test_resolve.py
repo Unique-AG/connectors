@@ -200,6 +200,34 @@ class TestQuickSearch:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_enhanced_quick_search_preserves_resource_search_type(
+        self, client: BackstopClient
+    ) -> None:
+        # With enhance_search_types, /quick-search can return other party kinds. The
+        # candidate's search_type must follow the resource, not the requested scope —
+        # otherwise a later trusted-id fetch hits the wrong collection.
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p1", "people", name="Jane Doe")),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Jane",
+            quick_search_options=QuickSearchOptions(enhance_search_types=True),
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "p1"
+        assert result.value.search_type == "people"
+        assert result.value.name == "Jane Doe"
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_blank_id_in_response_fails_schema_validation(
         self, client: BackstopClient
     ) -> None:
@@ -499,6 +527,28 @@ class TestConfirmName:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_confirm_name_fetches_when_name_is_blank(self, client: BackstopClient) -> None:
+        route = respx.get(f"{BASE_URL}/organizations/org-7").mock(
+            return_value=httpx.Response(
+                200, json={"data": resource("org-7", "organizations", name="Capstone LP")}
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            party_id="org-7",
+            name="   ",
+            confirm_name=True,
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.name == "Capstone LP"
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_default_leaves_the_trusted_id_path_request_free(
         self, client: BackstopClient
     ) -> None:
@@ -565,3 +615,11 @@ class TestInvalidArgs:
         item = PartyResolveItem(party_id="o1", search="")
         assert item.party_id == "o1"
         assert item.search is None
+
+    def test_party_resolve_item_treats_blank_name_as_unset(self) -> None:
+        item = PartyResolveItem(party_id="o1", name="   ")
+        assert item.name is None
+        item = PartyResolveItem(party_id="o1", name="")
+        assert item.name is None
+        item = PartyResolveItem(party_id="o1", name=" Capstone ")
+        assert item.name == "Capstone"

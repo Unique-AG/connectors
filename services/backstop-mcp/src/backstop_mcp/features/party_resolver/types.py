@@ -89,11 +89,13 @@ class PartyResolveItem(BaseModel):
 
     party_id: _NonEmptyStr | None = None
     search: _NonEmptyStr | None = None
-    name: str | None = None
+    # Same blank→None coercion as the selectors: whitespace-only must not count as "known"
+    # and skip `confirm_name` / attribute backfill.
+    name: _NonEmptyStr | None = None
 
-    @field_validator("party_id", "search", mode="before")
+    @field_validator("party_id", "search", "name", mode="before")
     @classmethod
-    def _blank_selector_to_none(cls, value: object) -> object:
+    def _blank_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value
