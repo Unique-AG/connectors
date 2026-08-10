@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.2...teams-mcp@0.4.3) (2026-08-10)
+
+
+### Features
+
+* **teams-mcp:** add independent CHAT_INTEGRATION toggle for composable capabilities ([#757](https://github.com/Unique-AG/connectors/issues/757)) ([4d9e5b1](https://github.com/Unique-AG/connectors/commit/4d9e5b12c1464c7f8b7004fc7d2209d4cd26c556))
+
 ## [0.4.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.1...teams-mcp@0.4.2) (2026-07-28)
 
 
