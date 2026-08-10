@@ -127,7 +127,9 @@ export class SubscriptionReauthorizeService {
     const client = this.graphClientFactory.createClientForUser(subscription.userProfileId);
     let graphResponse: unknown;
     try {
-      graphResponse = (await client.api(`/subscriptions/${subscriptionId}`).patch(payload)) as unknown;
+      graphResponse = (await client
+        .api(`/subscriptions/${subscriptionId}`)
+        .patch(payload)) as unknown;
     } catch (error) {
       if (isGraphAccessToTranscriptsDisabled(error)) {
         throw new GraphTranscriptAccessDisabledException(
