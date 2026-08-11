@@ -28,6 +28,18 @@ class TestNormalizeAsyncpgUrl:
         ssl_ctx = connect_args.get("ssl")
         assert isinstance(ssl_ctx, ssl.SSLContext)
         assert ssl_ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ssl_ctx.check_hostname is True
+
+    def test_strips_sslmode_verify_ca_without_hostname_check(self) -> None:
+        url, connect_args = normalize_asyncpg_url(
+            "postgresql://user:pass@db:5432/backstop?sslmode=verify-ca"
+        )
+
+        assert url == "postgresql+asyncpg://user:pass@db:5432/backstop"
+        ssl_ctx = connect_args.get("ssl")
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ssl_ctx.check_hostname is False
 
     def test_strips_sslmode_require_without_cert_verification(self) -> None:
         url, connect_args = normalize_asyncpg_url(

@@ -47,7 +47,12 @@ def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
-    if sslmode in ("verify", "verify-ca", "verify-full"):
+    if sslmode == "verify-ca":
+        # Libpq verify-ca checks the CA chain only — not the hostname (that is verify-full).
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        return ctx
+    if sslmode in ("verify", "verify-full"):
         return ssl.create_default_context()
     raise ValueError(f"Unsupported sslmode={sslmode!r} in database URL")
 
