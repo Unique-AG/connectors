@@ -3,8 +3,26 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
-from backstop_mcp.features.party_resolver.search import looks_like_email, search_by_email
+from backstop_mcp.features.party_resolver.search import (
+    looks_like_email,
+    normalized_email,
+    search_by_email,
+)
 from tests.features.party_resolver.helpers import BASE_URL
+
+
+class TestNormalizedEmail:
+    def test_returns_normalized_simple_email(self) -> None:
+        assert normalized_email("bob@example.com") == "bob@example.com"
+
+    def test_strips_surrounding_whitespace(self) -> None:
+        assert normalized_email("  bob@example.com  ") == "bob@example.com"
+
+    def test_extracts_address_from_display_name_form(self) -> None:
+        assert normalized_email('"Bob Smith" <bob@example.com>') == "bob@example.com"
+
+    def test_returns_none_for_plain_name(self) -> None:
+        assert normalized_email("Capstone Partners") is None
 
 
 class TestLooksLikeEmail:
@@ -13,6 +31,9 @@ class TestLooksLikeEmail:
 
     def test_accepts_email_with_surrounding_whitespace(self) -> None:
         assert looks_like_email("  bob@example.com  ") is True
+
+    def test_accepts_display_name_form(self) -> None:
+        assert looks_like_email('"Bob Smith" <bob@example.com>') is True
 
     def test_rejects_missing_local_part(self) -> None:
         assert looks_like_email("@example.com") is False
