@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.data_hygiene import AsOf
+from backstop_mcp.features.data_hygiene import AsOf, DepartureSignal, EmploymentLinkResponse
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,
@@ -64,7 +64,7 @@ def _person_document(*type_ids: str) -> dict[str, object]:
 class TestGetPerson:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unique_search_fetches_person_and_flags_departed(
+    async def test_unique_search_fetches_person_and_employment_links(
         self, connect_user: ConnectUser
     ) -> None:
         await connect_user("user-person-1", "person-bob")  # pyright: ignore[reportGeneralTypeIssues]
@@ -90,14 +90,19 @@ class TestGetPerson:
         assert result.resolved == ResolvedPartyResponse(
             id="p9", search_type="people", name="Jane Doe"
         )
-        assert result.departed is True
-        assert len(result.departures) == 1
-        departure = result.departures[0]
-        assert departure.signal == "former_relationship_type"
-        assert departure.relationship_type_name == "is a former employee of"
-        assert departure.organization_id == "o1"
-        # The type carried the signal; this tenant recorded no date.
-        assert departure.end_date is None
+        assert result.employments == [
+            EmploymentLinkResponse(
+                status="former",
+                person_id="p9",
+                person_type="people",
+                organization_id="o1",
+                organization_type="organizations",
+                signal=DepartureSignal.FORMER_TYPE,
+                end_date=None,
+                relationship_type_id=FORMER_TYPE,
+                relationship_type_name="is a former employee of",
+            )
+        ]
         assert result.as_of == AsOf(
             modified_timestamp="2023-01-01T00:00:00Z", modified_by="crm-admin"
         )
@@ -132,9 +137,9 @@ class TestGetPerson:
             PersonResolvedResponse,
         )
 
-        assert result.departed is True
-        assert len(result.departures) == 1
-        assert result.departures[0].organization_id == "o1"
+        assert len(result.employments) == 1
+        assert result.employments[0].status == "former"
+        assert result.employments[0].organization_id == "o1"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -264,7 +269,7 @@ class TestGetPerson:
         )
         assert person_get.call_count == 0
 
-    def test_docstring_instructs_model_to_relay_departed_flag(self) -> None:
+    def test_docstring_instructs_model_to_relay_employments(self) -> None:
         doc = get_person.__doc__ or ""
-        assert "departed" in doc
+        assert "employments" in doc
         assert "relay" in doc.lower()

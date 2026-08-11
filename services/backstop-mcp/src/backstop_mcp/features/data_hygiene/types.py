@@ -182,6 +182,7 @@ class EmploymentEdge:
     """
 
     person_id: str
+    person_type: str
     organization_id: str
     organization_type: str
     relationship_type_id: str | None
@@ -193,9 +194,21 @@ class EmploymentEdge:
 
 @dataclass(frozen=True)
 class EmploymentRecord:
-    """The resolved answer for one person/organization pair, after edges are reduced to one."""
+    """The resolved answer for one person/organization pair, after edges are reduced to one.
 
+    Always carries both sides of the pair. `status` is only `CURRENT` or `FORMER` — unknown
+    pairs are absent from the index entirely rather than stored as `IRRELEVANT`. `departure` is
+    set only when status is `FORMER`.
+    """
+
+    person_id: str
+    person_type: str
+    organization_id: str
+    organization_type: str
     status: EmploymentStatus
+    relationship_type_id: str | None
+    relationship_type_name: str | None
+    effective_date: date | None
     departure: DepartedEmployment | None
 
 

@@ -4,7 +4,7 @@ The scan and the type classification it rests on, pure and fully parameterised. 
 any of it directly — they go through `service.EmploymentIndexFactory`, which owns the employment
 vocabulary. List/org-contact tools should use that verdict to exclude departed people
 from "who do we contact at X" answers unless the user asked for historical contacts; a by-id
-person fetch returns the person with the flag set rather than hiding the record.
+person fetch returns the person with employment links rather than hiding the record.
 """
 
 from collections.abc import Sequence
@@ -13,6 +13,7 @@ from datetime import date
 from typing import TypeGuard
 
 from backstop_mcp.backstop_client import BackstopApiResource
+from backstop_mcp.features.data_hygiene.responses import EmploymentLinkResponse
 from backstop_mcp.features.data_hygiene.types import (
     ORG_SIDE_TYPES,
     PERSON_SIDE_TYPES,
@@ -41,6 +42,14 @@ class _Employer:
     organization_type: str
 
 
+@dataclass(frozen=True)
+class _Person:
+    """The person side of one person→org relationship, once it is known to have both."""
+
+    person_id: str
+    person_type: str
+
+
 class EmploymentIndex:
     """One winner per `(person_id, organization_id)` pair, folded out of `_employment_edges`.
 
@@ -67,25 +76,63 @@ class EmploymentIndex:
             key: _to_record(edge) for key, edge in winners.items()
         }
 
-    def status(self, *, person_id: str, organization_id: str) -> EmploymentStatus:
-        """The winning edge's status, or `IRRELEVANT` — "no employment evidence" — for an unknown
-        pair. Never a false `CURRENT`: a pair this index has never seen is not a live employee.
+    def get(self, *, person_id: str, organization_id: str) -> EmploymentRecord | None:
+        """The winning record for this pair, or `None` when the index has no employment evidence."""
+        return self._records.get((person_id, organization_id))
+
+    def status(self, *, person_id: str, organization_id: str) -> EmploymentStatus | None:
+        """The winning edge's status, or `None` — "no employment evidence" — for an unknown pair.
+
+        Never a false `CURRENT`: a pair this index has never seen is not a live employee.
         """
-        record = self._records.get((person_id, organization_id))
-        if record is None:
-            return EmploymentStatus.IRRELEVANT
-        return record.status
+        record = self.get(person_id=person_id, organization_id=organization_id)
+        return None if record is None else record.status
 
     def departure(self, *, person_id: str, organization_id: str) -> DepartedEmployment | None:
         """The winning edge's departure evidence, when the pair's resolved status is `FORMER`."""
-        record = self._records.get((person_id, organization_id))
+        record = self.get(person_id=person_id, organization_id=organization_id)
         if record is None or record.status is not EmploymentStatus.FORMER:
             return None
         return record.departure
 
+    def current(self) -> tuple[EmploymentRecord, ...]:
+        """Every resolved pair whose winning status is `CURRENT`."""
+        return self.pairs(status=EmploymentStatus.CURRENT)
+
+    def former(self) -> tuple[EmploymentRecord, ...]:
+        """Every resolved pair whose winning status is `FORMER`."""
+        return self.pairs(status=EmploymentStatus.FORMER)
+
     def pairs(self, *, status: EmploymentStatus) -> tuple[EmploymentRecord, ...]:
         """Every resolved pair whose winning status matches `status`, for list annotation."""
         return tuple(record for record in self._records.values() if record.status is status)
+
+    def links(self) -> list[EmploymentLinkResponse]:
+        """Current then former employment links — the shape tools should relay."""
+        return [_to_link(record) for record in (*self.current(), *self.former())]
+
+
+def _to_link(record: EmploymentRecord) -> EmploymentLinkResponse:
+    if record.status is EmploymentStatus.CURRENT:
+        status = "current"
+    elif record.status is EmploymentStatus.FORMER:
+        status = "former"
+    else:
+        raise AssertionError(
+            f"EmploymentIndex only stores CURRENT/FORMER winners, got {record.status!r}"
+        )
+    departure = record.departure
+    return EmploymentLinkResponse(
+        status=status,
+        person_id=record.person_id,
+        person_type=record.person_type,
+        organization_id=record.organization_id,
+        organization_type=record.organization_type,
+        signal=None if departure is None else departure.signal,
+        end_date=None if departure is None else departure.end_date,
+        relationship_type_id=record.relationship_type_id,
+        relationship_type_name=record.relationship_type_name,
+    )
 
 
 def _outranks(edge: EmploymentEdge, current: EmploymentEdge) -> bool:
@@ -106,7 +153,17 @@ def _rank(edge: EmploymentEdge) -> tuple[bool, date, bool]:
 
 
 def _to_record(edge: EmploymentEdge) -> EmploymentRecord:
-    return EmploymentRecord(status=edge.status, departure=edge.departure)
+    return EmploymentRecord(
+        person_id=edge.person_id,
+        person_type=edge.person_type,
+        organization_id=edge.organization_id,
+        organization_type=edge.organization_type,
+        status=edge.status,
+        relationship_type_id=edge.relationship_type_id,
+        relationship_type_name=edge.relationship_type_name,
+        effective_date=edge.effective_date,
+        departure=edge.departure,
+    )
 
 
 def classify_employment(
@@ -156,6 +213,19 @@ def _side_type(*, side: EntityRefAttributes) -> str | None:
     return normalize_entity_type(side.resource_type)
 
 
+def _sides(
+    *, attrs: EntityRelationshipAttributes
+) -> tuple[tuple[EntityRefAttributes, str | None], tuple[EntityRefAttributes, str | None]] | None:
+    sides = [
+        (side, _side_type(side=side))
+        for side in (attrs.source_entity, attrs.destination_entity)
+        if side is not None
+    ]
+    if len(sides) != 2:
+        return None
+    return (sides[0], sides[1])
+
+
 def _employer_side(*, attrs: EntityRelationshipAttributes) -> _Employer | None:
     """The organization a relationship could attribute employment to, when there is one.
 
@@ -164,17 +234,13 @@ def _employer_side(*, attrs: EntityRelationshipAttributes) -> _Employer | None:
     rather than keyed on a placeholder: every such side would share one bucket, so a live
     relationship to one unnamed company would clear a departure from a different one.
     """
-    sides = [
-        (side, _side_type(side=side))
-        for side in (attrs.source_entity, attrs.destination_entity)
-        if side is not None
-    ]
-    if len(sides) != 2:
+    sides = _sides(attrs=attrs)
+    if sides is None:
         return None
     (first, first_type), (second, second_type) = sides
-    if first_type in PERSON_SIDE_TYPES and _is_organization(second_type):
+    if _is_person(first_type) and _is_organization(second_type):
         organization, organization_type = second, second_type
-    elif second_type in PERSON_SIDE_TYPES and _is_organization(first_type):
+    elif _is_person(second_type) and _is_organization(first_type):
         organization, organization_type = first, first_type
     else:
         return None
@@ -182,6 +248,32 @@ def _employer_side(*, attrs: EntityRelationshipAttributes) -> _Employer | None:
     if organization.resource_id is None:
         return None
     return _Employer(organization_id=organization.resource_id, organization_type=organization_type)
+
+
+def _person_side(*, attrs: EntityRelationshipAttributes) -> _Person | None:
+    """The person side's id and type, whichever literal JSON key it landed on.
+
+    Mirrors `_employer_side`'s type-based matching. A person side with no `resourceId` is skipped
+    for the same reason an unidentified organization is: an id-less side would collide every such
+    relationship into one bucket.
+    """
+    sides = _sides(attrs=attrs)
+    if sides is None:
+        return None
+    (first, first_type), (second, second_type) = sides
+    if _is_person(first_type) and _is_organization(second_type):
+        person, person_type = first, first_type
+    elif _is_person(second_type) and _is_organization(first_type):
+        person, person_type = second, second_type
+    else:
+        return None
+    if person.resource_id is None:
+        return None
+    return _Person(person_id=person.resource_id, person_type=person_type)
+
+
+def _is_person(side_type: str | None) -> TypeGuard[str]:
+    return side_type in PERSON_SIDE_TYPES
 
 
 def _is_organization(side_type: str | None) -> TypeGuard[str]:
@@ -216,8 +308,8 @@ def _employment_edges(
         employer = _employer_side(attrs=attrs)
         if employer is None:
             continue
-        person_id = _person_id(attrs=attrs)
-        if person_id is None:
+        person = _person_side(attrs=attrs)
+        if person is None:
             continue
 
         type_name = type_names.get(type_id) if type_id is not None else None
@@ -258,7 +350,8 @@ def _employment_edges(
 
         edges.append(
             EmploymentEdge(
-                person_id=person_id,
+                person_id=person.person_id,
+                person_type=person.person_type,
                 organization_id=employer.organization_id,
                 organization_type=employer.organization_type,
                 relationship_type_id=type_id,
@@ -270,31 +363,6 @@ def _employment_edges(
         )
 
     return edges
-
-
-def _person_id(*, attrs: EntityRelationshipAttributes) -> str | None:
-    """The person side's id, whichever literal JSON key (`sourceEntity`/`destinationEntity`) it
-    landed on.
-
-    Mirrors `_employer_side`'s type-based matching. A person side with no `resourceId` is skipped
-    for the same reason an unidentified organization is: an id-less side would collide every such
-    relationship into one bucket.
-    """
-    sides = [
-        (side, _side_type(side=side))
-        for side in (attrs.source_entity, attrs.destination_entity)
-        if side is not None
-    ]
-    if len(sides) != 2:
-        return None
-    (first, first_type), (second, second_type) = sides
-    if first_type in PERSON_SIDE_TYPES and _is_organization(second_type):
-        person = first
-    elif second_type in PERSON_SIDE_TYPES and _is_organization(first_type):
-        person = second
-    else:
-        return None
-    return person.resource_id
 
 
 def build_employment_index(
