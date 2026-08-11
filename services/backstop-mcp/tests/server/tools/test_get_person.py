@@ -163,8 +163,20 @@ class TestGetPerson:
             query="Jane",
             scope="people",
             candidates=[
-                PartyCandidateResponse(key="p1", label="Jane A", id="p1", name="Jane A"),
-                PartyCandidateResponse(key="p2", label="Jane B", id="p2", name="Jane B"),
+                PartyCandidateResponse(
+                    key="p1",
+                    label="Jane A",
+                    id="p1",
+                    search_type="people",
+                    name="Jane A",
+                ),
+                PartyCandidateResponse(
+                    key="p2",
+                    label="Jane B",
+                    id="p2",
+                    search_type="people",
+                    name="Jane B",
+                ),
             ],
         )
         assert person_get.call_count == 0
