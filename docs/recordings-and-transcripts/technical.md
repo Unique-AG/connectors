@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2399993877 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Recordings & Transcripts - Technical Manual
-
 This page documents how meeting transcripts and recordings get from Microsoft Teams into the Unique knowledge base, and how the Recordings area reads them back out. For the server that performs the capture — its OAuth model, token handling, chat tools, and deployment — see the [Teams MCP - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802633247/Teams+MCP+-+Technical+Manual).
 
 ## Architecture
@@ -221,7 +219,7 @@ Because every read is a normal knowledge-base read, standard access control appl
 
 ## Subscription lifecycle
 
-A Microsoft Graph webhook subscription must be active for meetings to be captured automatically. The server manages the whole lifecycle and exposes it through the tools described in [Ingestion tools](#ingestion-tools).
+A Microsoft Graph webhook subscription must be active for meetings to be captured automatically. The server manages the whole lifecycle and exposes it through the tools described in [Ingestion tools](#Ingestion-tools).
 
 !!! note "Transcripts only"
     This subscription covers meeting transcript capture. Teams chat and channel messages are read live through Microsoft Graph and are never subscribed to or ingested. The `ingest_meeting` tool does not require a subscription — it pulls a single meeting's transcript on demand.
@@ -365,7 +363,7 @@ Check whether automatic capture is active, expiring soon, expired, or not config
 
 **Input parameters:** None
 
-**Returns:** `status` (`active` \| `expiring_soon` \| `expired` \| `not_configured`), a `message`, and `subscription` (`id`, `expiresAt`, `minutesUntilExpiration`, `createdAt`, `updatedAt` — or `null` when not configured). See [Status](#status) for the meaning of each value.
+**Returns:** `status` (`active` \| `expiring_soon` \| `expired` \| `not_configured`), a `message`, and `subscription` (`id`, `expiresAt`, `minutesUntilExpiration`, `createdAt`, `updatedAt` — or `null` when not configured). See [Status](#Status) for the meaning of each value.
 
 ### `start_kb_integration`
 
@@ -448,7 +446,7 @@ Capture requires four delegated scopes **in addition to** the chat and messaging
 | `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | **Yes** | Read transcript content |
 | `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | **Yes** | Read recording content |
 
-Grant admin consent for the two privileged scopes with the URL in [Grant admin consent](./operator.md#grant-admin-consent).
+Grant admin consent for the two privileged scopes with the URL in [Grant admin consent](./operator.md#Grant-admin-consent).
 
 ### Least-privilege justification
 

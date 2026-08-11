@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2065694735 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP — Operator Manual
-
 ## Overview
 
 The Outlook Semantic MCP Server exposes MCP tools that allow AI assistants to search and retrieve email content. In `microsoft_graph_and_unique_api` mode (the default), it also runs background pipelines that ingest emails from connected Microsoft 365 accounts into the Unique knowledge base via Microsoft Graph webhooks and RabbitMQ. In `microsoft_graph` mode, no ingestion runs — emails are queried live from Microsoft Graph.

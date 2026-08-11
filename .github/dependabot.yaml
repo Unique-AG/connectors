@@ -4,7 +4,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     cooldown:
-      default-days: 14
+      default-days: 3
     schedule:
       interval: monthly
     groups:
@@ -17,15 +17,30 @@ updates:
     directories:
       - services/**/*
     cooldown:
-      default-days: 14
+      default-days: 3
     schedule:
-      interval: monthly
+      interval: weekly
+      day: friday
+      time: "06:00"
+      timezone: Europe/Berlin
+    labels:
+      - dependencies
+      - dependabot-docker
+    groups:
+      service-base-images:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+    rebase-strategy: disabled
 
   - package-ecosystem: helm
     directories:
       - services/**/*
     cooldown:
-      default-days: 14
+      default-days: 3
     schedule:
       interval: monthly
 
@@ -33,6 +48,6 @@ updates:
     directories:
       - services/**/*
     cooldown:
-      default-days: 14
+      default-days: 3
     schedule:
       interval: weekly

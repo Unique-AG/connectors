@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2061238285 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Tools
-
 The Outlook Semantic MCP Server exposes tools whose availability depends on the deployment mode (`MCP_BACKEND`) and debug settings.
 
 !!! warning "Mode A (`microsoft_graph_and_unique_api`) only tools"

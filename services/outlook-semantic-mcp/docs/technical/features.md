@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2258862199 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP – Features
-
 This page describes user-facing features of the Outlook Semantic MCP Server: what is supported, what is not, and any setup required. For per-tool input/output reference, see [Tools](./tools.md). For environment variables and deployment configuration, see [Configuration](../operator/configuration.md).
 
 ### Deployment modes
@@ -28,7 +26,7 @@ Where a feature works the same in both modes, this page says so once. Where beha
 
 - `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs.
 - Folder filtering is supported via the `directories` field on each `msGraphKeywordSearchQueries` entry. Pass a well-known folder name (e.g. `Inbox`) or a folder ID from `list_mailboxes_and_directories`. This works for the user's own mailbox and for fully delegated mailboxes (Full Access).
-- Search is **not supported** for mailboxes where the user only has folder-level (partial) access — Microsoft Graph requires full mailbox access for `$search` queries. See [Known limitations](#known-limitations) below.
+- Search is **not supported** for mailboxes where the user only has folder-level (partial) access — Microsoft Graph requires full mailbox access for `$search` queries. See [Known limitations](#Known-Limitations) below.
 
 **What's not supported (both modes)**
 
@@ -88,7 +86,7 @@ Available in both modes. Behaviour is identical.
 
 **What's not supported**
 
-- Searching in mailboxes where the user only has folder-level (partial) access in Mode B — Microsoft Graph does not support `$search` against such mailboxes. See [Known limitations](#known-limitations) below.
+- Searching in mailboxes where the user only has folder-level (partial) access in Mode B — Microsoft Graph does not support `$search` against such mailboxes. See [Known limitations](#Known-Limitations) below.
 
 **See also:** [Tools — list_mailboxes_and_directories](./tools.md#list_mailboxes_and_directories)
 
@@ -104,9 +102,9 @@ Three delegation configurations are supported:
 
 1. **Exchange admin grants Full Access (Read & Manage)** — an Exchange administrator grants a user Full Access to another user's mailbox via the Exchange admin center or PowerShell. The delegate can search the owner's entire mailbox. Supported in **both Mode A and Mode B** — configure [`DELEGATED_ACCESS_SCAN=full_access_only`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) (or `granular_access`) to enable scanning.
 
-2. **User shares specific folders via Outlook desktop** — a user shares individual folders (e.g. Inbox, RFQ) with another user directly from Outlook desktop, without Exchange admin involvement. **Mode A only** — requires [`DELEGATED_ACCESS_SCAN=granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN). See [Setup — User shares specific folders](#2-user-shares-specific-folders-no-admin-needed) for the required root-mailbox visibility step.
+2. **User shares specific folders via Outlook desktop** — a user shares individual folders (e.g. Inbox, RFQ) with another user directly from Outlook desktop, without Exchange admin involvement. **Mode A only** — requires [`DELEGATED_ACCESS_SCAN=granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN). See [Setup — User shares specific folders](#2.-User-shares-specific-folders-(no-admin-needed)) for the required root-mailbox visibility step.
 
-3. **Shared inbox configured as a normal mailbox** — a Microsoft 365 shared mailbox configured with a sign-in-eligible password. Every user who needs access must have Full Access delegation granted, and someone must sign into the MCP using the shared-inbox account itself so its emails are ingested. See [Setup — Shared inbox as a normal inbox](#3-shared-inbox-configured-as-a-normal-inbox).
+3. **Shared inbox configured as a normal mailbox** — a Microsoft 365 shared mailbox configured with a sign-in-eligible password. Every user who needs access must have Full Access delegation granted, and someone must sign into the MCP using the shared-inbox account itself so its emails are ingested. See [Setup — Shared inbox as a normal inbox](#3.-Shared-inbox-configured-as-a-normal-inbox).
 
 ### What's not supported
 
@@ -179,7 +177,7 @@ Use this path when a user wants to share individual folders with a colleague wit
 Use this path to make a Microsoft 365 shared mailbox searchable through the MCP. This is the only way to ingest a shared inbox today.
 
 1. In the [Microsoft 365 admin center](https://admin.microsoft.com), open the shared mailbox and **enable sign-in** by assigning it a password (under **Active users → Licenses and apps**, unblock sign-in and set a password).
-2. Grant **Full Access** to every user who needs delegated search access, using Exchange admin center or PowerShell (see [Step 1 above](#1-exchange-admin-grants-full-access)).
+2. Grant **Full Access** to every user who needs delegated search access, using Exchange admin center or PowerShell (see [Step 1 above](#1.-Exchange-admin-grants-Full-Access)).
 3. Connect the MCP using the **shared-inbox account** itself (its email and the password set above) so its emails are ingested into the Unique knowledge base.
 
 Without an MCP login for the shared-inbox account, no ingestion occurs and no delegated relationships are recorded against it. Users who have Full Access granted will not see its emails until the shared-inbox account is connected.
@@ -197,7 +195,7 @@ For a detailed description of how delegated access works at runtime, see the exi
 | | Mode A (`microsoft_graph_and_unique_api`) | Mode B (`microsoft_graph`) |
 |---|---|---|
 | **Full Access delegation** | Supported — delegate searches owner's ingested emails | Supported — live keyword search against owner's mailbox |
-| **Folder-level delegation** | Supported ([`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported — search requires full mailbox access (see [Known limitations](#known-limitations)) |
+| **Folder-level delegation** | Supported ([`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported — search requires full mailbox access (see [Known limitations](#Known-Limitations)) |
 | **Folder filtering** | Supported in `granular_access` | Supported for own mailbox and full-access delegated mailboxes only |
 | **Ingestion** | Owner's inbox only — delegated mailboxes are not re-ingested | No ingestion |
 | **Revocation detection** | Background scan: discovery (every 12 h), verification (every 4 h) | Immediate (live Graph query) |
@@ -219,4 +217,4 @@ Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DE
 **Workaround options:**
 
 - **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
-- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Setup — Shared inbox configured as a normal inbox](#3-shared-inbox-configured-as-a-normal-inbox).
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Setup — Shared inbox configured as a normal inbox](#3.-Shared-inbox-configured-as-a-normal-inbox).

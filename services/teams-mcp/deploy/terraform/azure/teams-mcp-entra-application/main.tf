@@ -7,9 +7,15 @@ resource "azuread_service_principal" "msgraph" {
 
 locals {
   # Microsoft Graph delegated scopes required by Teams MCP.
-  # Based on CHAT_SCOPES / KB_SCOPES in services/teams-mcp/src/auth/microsoft.provider.ts
-  chat_graph_scopes = toset([
+  # Based on IDENTITY_SCOPES / MESSAGING_SCOPES / KB_SCOPES in
+  # services/teams-mcp/src/auth/microsoft.provider.ts.
+  # chat_integration and unique_integration are two independent capability axes.
+  # (The OIDC scopes openid/profile/email/offline_access are not Graph delegated
+  #  permission grants and are therefore not managed here.)
+  identity_graph_scopes = toset([
     "User.Read",
+  ])
+  messaging_graph_scopes = toset([
     "ChannelMessage.Send",
     "ChatMessage.Send",
     "Chat.ReadBasic",
@@ -24,7 +30,11 @@ locals {
     "OnlineMeetingRecording.Read.All",
     "OnlineMeetingTranscript.Read.All",
   ])
-  graph_scopes = var.unique_integration == "enabled" ? setunion(local.chat_graph_scopes, local.kb_graph_scopes) : local.chat_graph_scopes
+  graph_scopes = setunion(
+    local.identity_graph_scopes,
+    var.chat_integration == "enabled" ? local.messaging_graph_scopes : [],
+    var.unique_integration == "enabled" ? local.kb_graph_scopes : [],
+  )
 }
 
 resource "azuread_application" "teams_mcp" {

@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
+import { assertAtLeastOneCapabilityEnabled } from './capabilities';
 import { type AppConfig, appConfig } from './config';
 
 async function bootstrap() {
@@ -23,6 +24,9 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
   const config = app.get<AppConfig>(appConfig.KEY);
+
+  assertAtLeastOneCapabilityEnabled();
+
   await app.listen(config.port, () =>
     logger.log(
       `Teams MCP server successfully started and listening on http://localhost:${config.port}`,

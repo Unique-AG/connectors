@@ -5,7 +5,7 @@
 
 Everything starts when a user connects to the MCP server. This triggers OAuth authentication. Once tokens are stored, the chat and messaging tools are immediately available.
 
-Deployments with transcript capture enabled have an additional per-user step after this flow — creating the Microsoft Graph subscription. See [Recordings & Transcripts — Subscription lifecycle](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#subscription-lifecycle).
+Deployments with transcript capture enabled have an additional per-user step after this flow — creating the Microsoft Graph subscription. See [Recordings & Transcripts — Subscription lifecycle](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Subscription-lifecycle).
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -139,8 +139,8 @@ sequenceDiagram
 
 When `UNIQUE_INTEGRATION=enabled`, the server also runs a webhook-driven capture pipeline: a Microsoft Graph subscription per user, lifecycle-notification renewal, and asynchronous transcript and recording ingestion into the Unique knowledge base. Those sequence diagrams live with the feature they belong to:
 
-- [Ingestion pipeline](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline)
-- [Subscription lifecycle](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#subscription-lifecycle)
+- [Ingestion pipeline](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Ingestion-pipeline)
+- [Subscription lifecycle](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Subscription-lifecycle)
 
 ## Chat Flows
 

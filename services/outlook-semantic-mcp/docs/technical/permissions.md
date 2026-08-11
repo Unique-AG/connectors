@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2064252966 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Permissions
-
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 
 ## Permission Summary
@@ -16,7 +14,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
 | `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
 
-**No permission requires admin consent.** Users can connect their own accounts without IT intervention. Note that `Mail.ReadWrite.Shared` is always included in the OAuth consent screen, even when `DELEGATED_ACCESS_SCAN=disabled` — see the [least-privilege justification](#mail-readwrite-shared) for details.
+**No permission requires admin consent.** Users can connect their own accounts without IT intervention. Note that `Mail.ReadWrite.Shared` is always included in the OAuth consent screen, even when `DELEGATED_ACCESS_SCAN=disabled` — see the [least-privilege justification](#Mail.ReadWrite.Shared) for details.
 
 ## Understanding Consent Requirements
 

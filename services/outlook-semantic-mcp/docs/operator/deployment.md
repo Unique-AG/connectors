@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2064449566 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Deployment
-
 ## Deployment Modes
 
 **Choose your mode before following any other step in this guide** — prerequisites, configuration, and verification differ by mode. See [Configuration — Deployment Modes](./configuration.md#Deployment-Modes) for the full feature and configuration comparison.

@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2061664301 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Authentication
-
 How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
@@ -28,7 +26,7 @@ For full justifications, see [Microsoft Graph Permissions](../technical/permissi
 https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a
 ```
 
-The consent prompt lists the [Required Permissions](#required-permissions) above. None require admin consent — users can also approve permissions themselves on first connection. Granting admin consent up front is optional but skips the per-user consent prompt.
+The consent prompt lists the [Required Permissions](#Required-Permissions) above. None require admin consent — users can also approve permissions themselves on first connection. Granting admin consent up front is optional but skips the per-user consent prompt.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `ba326974-edcf-49ef-bf7a-74b3e0ea450a`.
 
@@ -79,7 +77,7 @@ module "outlook_semantic_mcp_app" {
    - **Redirect URI**: Web — `https://outlook.semantic.mcp.example.com/auth/callback`
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
-   - Add all permissions listed under [Required Permissions](#required-permissions)
+   - Add all permissions listed under [Required Permissions](#Required-Permissions)
 
 3. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration

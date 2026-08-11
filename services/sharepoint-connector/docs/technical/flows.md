@@ -363,7 +363,7 @@ Each item sent to the diff API contains:
 
 ### Ingestion error handling
 
-The connector **does not read Unique ingestion states**. Each sync cycle it only runs the download and ingest pipeline for keys returned in `newFiles` or `updatedFiles` from the [file diff](#file-diff-mechanism). If a key is in neither list, **no ingest attempt runs for that item in that cycle**; the rest of the site still syncs. Which keys appear in those lists is decided by the Unique platform (file diff, stored ingestion state, and timestamps). Successful and in-progress processing (for example `FINISHED`, `QUEUED`, `INGESTION_READING`) is opaque to the connector until the diff includes the key again.
+The connector **does not read Unique ingestion states**. Each sync cycle it only runs the download and ingest pipeline for keys returned in `newFiles` or `updatedFiles` from the [file diff](#File-Diff-Mechanism). If a key is in neither list, **no ingest attempt runs for that item in that cycle**; the rest of the site still syncs. Which keys appear in those lists is decided by the Unique platform (file diff, stored ingestion state, and timestamps). Successful and in-progress processing (for example `FINISHED`, `QUEUED`, `INGESTION_READING`) is opaque to the connector until the diff includes the key again.
 
 When Unique reports an item in one of the failure states below, the platform throttles re-ingestion so the key is re-offered at most every **24 hours**:
 

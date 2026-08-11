@@ -19,6 +19,8 @@
 
 **Optional: meeting transcript capture.** Deployments that set `UNIQUE_INTEGRATION=enabled` additionally capture meeting transcripts and recordings into the Unique knowledge base and register four more tools. That is a separate, opt-in capability — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts). Most deployments do not enable it.
 
+The chat tools can also be turned off independently: `CHAT_INTEGRATION=disabled` with `UNIQUE_INTEGRATION=enabled` produces an **ingestion-only** deployment (transcript capture, no chat tools, no messaging permissions). See [Configuration — Chat Integration](./operator/configuration.md#chat-integration).
+
 **See also:** [Technical Reference — Tools](./technical/tools.md)
 
 ## Authentication & Permissions
@@ -160,7 +162,7 @@ https://<your-domain>/auth/callback
 
 ### What happens if I change the webhook secret?
 
-**Answer:** Rotation is currently not possible, because every existing transcript subscription carries the old value. This only affects deployments with transcript capture enabled — see [Recordings & Transcripts — FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#what-happens-if-the-webhook-secret-changes).
+**Answer:** Rotation is currently not possible, because every existing transcript subscription carries the old value. This only affects deployments with transcript capture enabled — see [Recordings & Transcripts — FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#What-happens-if-the-webhook-secret-changes?).
 
 ## Architecture & Design
 
@@ -253,7 +255,7 @@ Hashing reduces attack surface (no decryption key needed for MCP tokens), while 
 
 ## Webhooks & Processing
 
-Webhooks are only used by meeting transcript capture. A chat-only deployment exposes no webhook endpoint and needs no RabbitMQ. For the queue, dead-letter handling, and processing pipeline, see [Recordings & Transcripts — Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline).
+Webhooks are only used by meeting transcript capture. A chat-only deployment exposes no webhook endpoint and needs no RabbitMQ. For the queue, dead-letter handling, and processing pipeline, see [Recordings & Transcripts — Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Ingestion-pipeline).
 
 ### How does webhook validation work?
 

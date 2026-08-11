@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2065072136 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Subscription Management
-
 A Microsoft Graph webhook subscription must be active for live catch-up to function. The server manages the full lifecycle — creation, renewal, expiry detection, and removal.
 
 ## Subscription Creation

@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2065399822 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Security
-
 This document describes the security architecture, cryptographic decisions, and threat model for the Outlook Semantic MCP Server.
 
 **Security at a Glance:**

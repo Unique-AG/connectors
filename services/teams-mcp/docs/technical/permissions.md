@@ -22,7 +22,30 @@ These are all the scopes a Teams MCP server requests. Only one of them, `Channel
 No calendar, meeting, transcript, or recording scope is requested. The server reads and sends chat and channel messages, and nothing else.
 
 !!! note "Deployments with transcript capture request more"
-    Setting `UNIQUE_INTEGRATION=enabled` adds four calendar and meeting scopes on top of this set, two of which need admin consent. They are documented with the feature that uses them — see [Recordings & Transcripts — Required Microsoft Graph permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#required-microsoft-graph-permissions).
+    Setting `UNIQUE_INTEGRATION=enabled` adds four calendar and meeting scopes on top of this set, two of which need admin consent. They are documented with the feature that uses them — see [Recordings & Transcripts — Required Microsoft Graph permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Required-Microsoft-Graph-permissions).
+
+## Deployment Modes and Scope Sets
+
+The requested scopes are composed from two **independent** capability toggles:
+
+- `CHAT_INTEGRATION` (default `enabled`) — the Teams chat/channel messaging tools.
+- `UNIQUE_INTEGRATION` (default `disabled`) — meeting transcript/recording capture into the Unique knowledge base.
+
+The scopes fall into three groups:
+
+- **Identity** (always requested, regardless of toggles): `openid`, `profile`, `email`, `offline_access`, `User.Read`.
+- **Messaging** (requested only when `CHAT_INTEGRATION=enabled`): `ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All`.
+- **Knowledge base** (requested only when `UNIQUE_INTEGRATION=enabled`): `Calendars.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`.
+
+| Mode | `UNIQUE_INTEGRATION` | `CHAT_INTEGRATION` | Scopes requested |
+|------|----------------------|--------------------|------------------|
+| Full | `enabled` | `enabled` | identity + messaging + knowledge base |
+| Chat-only | `disabled` | `enabled` (default) | identity + messaging |
+| Ingestion-only | `enabled` | `disabled` | identity + knowledge base (**no messaging scopes**) |
+| Both off | `disabled` | `disabled` | — (server fails fast at startup) |
+
+!!! note "Ingestion-only least-privilege scope set"
+    An ingestion-only deployment (`UNIQUE_INTEGRATION=enabled`, `CHAT_INTEGRATION=disabled`) requests **only** the identity scopes plus `Calendars.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All`, and `OnlineMeetingTranscript.Read.All`. It requests **none** of the messaging scopes, so the app cannot read or send any chat or channel message. This is the least-privilege app registration for transcript capture.
 
 ## Understanding Consent Requirements
 

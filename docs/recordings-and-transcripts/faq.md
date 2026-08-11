@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2535129116 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Recordings & Transcripts - FAQ
-
 Questions about capturing meeting transcripts and recordings into the Unique knowledge base, and about the Recordings area that presents them. For questions about the Teams MCP Server itself — OAuth, consent, tokens, chat and channel tools — see the [Teams MCP - FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1801846803/Teams+MCP+-+FAQ).
 
 ## Eligibility & Scope
@@ -42,7 +40,7 @@ This is **not** fixed by re-consent, reconnecting with a different app, or chang
    ```
 4. Wait a few minutes, then have the user call `start_kb_integration` again and confirm with `verify_kb_integration_status` → `active`
 
-**See also:** [Teams Graph transcript API access](./operator.md#teams-graph-transcript-api-access) · [Meeting transcript API access (Microsoft)](https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access)
+**See also:** [Teams Graph transcript API access](./operator.md#Teams-Graph-transcript-API-access) · [Meeting transcript API access (Microsoft)](https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access)
 
 ### Why do I need a Zitadel service account?
 
@@ -50,13 +48,13 @@ This is **not** fixed by re-consent, reconnecting with a different app, or chang
 
 Credentials are passed as the `x-company-id` and `x-user-id` headers on every API request. The account must hold both `chat.admin.all` and `chat.knowledge.read`.
 
-**See also:** [Zitadel service account](./operator.md#zitadel-service-account)
+**See also:** [Zitadel service account](./operator.md#Zitadel-service-account)
 
 ### Why do I need a dedicated root scope?
 
 **Answer:** Every meeting is ingested as a child scope beneath one root scope, which gives Teams content a single organisational entry point and one place to manage permissions and visibility. The Recordings area reads from exactly that scope. The root scope must be created manually and the service account must be granted `MANAGE`, `READ`, and `WRITE` on it before the server starts — otherwise the pod hard-fails at boot.
 
-**See also:** [Root scope](./operator.md#root-scope)
+**See also:** [Root scope](./operator.md#Root-scope)
 
 ### Why must the two scope IDs match?
 

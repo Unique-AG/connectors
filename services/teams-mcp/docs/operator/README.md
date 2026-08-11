@@ -90,4 +90,4 @@ Unique will provide you with the MCP server endpoint URL once the deployment is 
    - [ ] OAuth flow works end-to-end
    - [ ] Chat tools operational: connect as a test user and confirm `list_teams` returns the user's teams
 
-Deployments with transcript capture enabled have their own prerequisites and verification steps — see the [Recordings & Transcripts enablement checklist](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#enablement-checklist).
+Deployments with transcript capture enabled have their own prerequisites and verification steps — see the [Recordings & Transcripts enablement checklist](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#Enablement-checklist).

@@ -10,7 +10,7 @@ The Teams MCP Server is a NestJS-based microservice that gives Unique AI access 
 - Searches across chats and channels using the Microsoft Search API
 - Sends messages to chats and channels via synchronous MCP tools
 
-**Optional add-on:** with `UNIQUE_INTEGRATION=enabled` the server also runs a webhook-driven pipeline that captures meeting transcripts and recordings into the Unique knowledge base, adding a webhook controller, a RabbitMQ queue, a transcript processor, and a Unique API client. That architecture is documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#architecture); this page covers the always-present core.
+**Optional add-on:** with `UNIQUE_INTEGRATION=enabled` the server also runs a webhook-driven pipeline that captures meeting transcripts and recordings into the Unique knowledge base, adding a webhook controller, a RabbitMQ queue, a transcript processor, and a Unique API client. That architecture is documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Architecture); this page covers the always-present core.
 
 ## High-Level Architecture
 
@@ -90,7 +90,7 @@ flowchart TB
 | **Graph Client Factory** | Creates authenticated Microsoft Graph API clients |
 | **Chat Module** | Chat, channel, and search services plus the 8-tool MCP surface |
 
-The Transcript Module — webhook controller, subscription services, transcript processor, Unique API client, and the AMQP module they depend on — is registered only when transcript capture is enabled. See the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#architecture).
+The Transcript Module — webhook controller, subscription services, transcript processor, Unique API client, and the AMQP module they depend on — is registered only when transcript capture is enabled. See the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Architecture).
 
 ### Chat Module
 
@@ -212,7 +212,7 @@ erDiagram
 
 ### RabbitMQ
 
-Used **only** by transcript capture, to process webhook notifications asynchronously. A chat-only deployment does not need RabbitMQ at all. The rationale, exchanges, queues, and dead-letter behaviour are documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline).
+Used **only** by transcript capture, to process webhook notifications asynchronously. A chat-only deployment does not need RabbitMQ at all. The rationale, exchanges, queues, and dead-letter behaviour are documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Ingestion-pipeline).
 
 ## Authentication Architecture
 

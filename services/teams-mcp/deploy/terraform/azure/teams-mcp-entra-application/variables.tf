@@ -92,11 +92,13 @@ variable "service_principal_configuration" {
 
 variable "unique_integration" {
   description = <<-EOT
-    Whether the Teams MCP deployment enables Unique knowledge-base integration.
-    When "enabled" (default), Graph scopes include calendar/meeting/transcript/recording
+    Whether the Teams MCP deployment enables Unique knowledge-base (ingestion) integration.
+    When "enabled" (default), Graph scopes include the calendar/meeting/transcript/recording
     permissions needed for KB ingestion.
-    When "disabled" (chat-only), only identity + Teams chat/channel messaging scopes are
-    registered — matching UNIQUE_INTEGRATION=disabled on the MCP server.
+    When "disabled", the KB scopes are omitted — matching UNIQUE_INTEGRATION=disabled on the
+    MCP server.
+    This is one of two independent capability axes; see chat_integration for the other. Any
+    combination is valid except both disabled (which the MCP server rejects at startup).
   EOT
   type        = string
   default     = "enabled"
@@ -104,5 +106,24 @@ variable "unique_integration" {
   validation {
     condition     = contains(["enabled", "disabled"], var.unique_integration)
     error_message = "The unique_integration must be one of: 'enabled', or 'disabled'."
+  }
+}
+
+variable "chat_integration" {
+  description = <<-EOT
+    Whether the Teams MCP deployment enables the Teams chat/channel messaging capability.
+    When "enabled" (default), Graph scopes include the messaging permissions needed by the
+    chat tools — matching CHAT_INTEGRATION=enabled on the MCP server.
+    When "disabled", the messaging scopes are omitted (e.g. for an ingestion-only, least-
+    privilege app registration).
+    This is one of two independent capability axes; see unique_integration for the other.
+    Any combination is valid except both disabled (which the MCP server rejects at startup).
+  EOT
+  type        = string
+  default     = "enabled"
+
+  validation {
+    condition     = contains(["enabled", "disabled"], var.chat_integration)
+    error_message = "The chat_integration must be one of: 'enabled', or 'disabled'."
   }
 }

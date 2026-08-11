@@ -16,6 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
 import type {
   AppConfigNamespaced,
+  ChatConfigNamespaced,
   MicrosoftConfigNamespaced,
   UniqueConfigNamespaced,
 } from '~/config';
@@ -33,7 +34,10 @@ export class GraphClientFactory {
 
   public constructor(
     private readonly configService: ConfigService<
-      AppConfigNamespaced & MicrosoftConfigNamespaced & UniqueConfigNamespaced,
+      AppConfigNamespaced &
+        ChatConfigNamespaced &
+        MicrosoftConfigNamespaced &
+        UniqueConfigNamespaced,
       true
     >,
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
@@ -42,9 +46,10 @@ export class GraphClientFactory {
   ) {
     this.clientId = this.configService.get('microsoft.clientId', { infer: true });
     this.clientSecret = this.configService.get('microsoft.clientSecret', { infer: true }).value;
-    this.scopes = resolveMicrosoftScopes(
-      this.configService.get('unique.integration', { infer: true }),
-    );
+    this.scopes = resolveMicrosoftScopes({
+      chat: this.configService.get('chat.integration', { infer: true }),
+      ingestion: this.configService.get('unique.integration', { infer: true }),
+    });
   }
 
   public createClientForUser(userProfileId: string): Client {

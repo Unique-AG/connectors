@@ -38,7 +38,7 @@
   "engines": {
     "node": "24"
   },
-  "packageManager": "pnpm@10.28.1",
+  "packageManager": "pnpm@10.34.5",
   "pnpm": {
     "overrides": {
       "minimatch@<3.1.4": "3.1.5",

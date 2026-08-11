@@ -64,7 +64,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Channel.ReadBasic.All` | Delegated | No |
 | `ChannelMessage.Read.All` | Delegated | **Yes** |
 
-Nothing calendar-, meeting-, transcript-, or recording-related is requested, and `ChannelMessage.Read.All` is the sole permission needing admin consent. Transcript capture adds four further scopes, documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#required-microsoft-graph-permissions).
+Nothing calendar-, meeting-, transcript-, or recording-related is requested, and `ChannelMessage.Read.All` is the sole permission needing admin consent. Transcript capture adds four further scopes, documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Required-Microsoft-Graph-permissions).
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 
@@ -90,6 +90,8 @@ Chat and messaging tools target chats and channels by id: call a `list_*` tool t
 When `UNIQUE_INTEGRATION=enabled`, the server additionally captures meeting transcripts and recordings into the Unique knowledge base with participant-based access control, and registers four tools to manage that capture (`ingest_meeting`, `start_kb_integration`, `stop_kb_integration`, `verify_kb_integration_status`).
 
 This capability, its infrastructure requirements, its Microsoft Graph limitations, and the Recordings area in Unique that presents the captured meetings are documented in [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
+
+Transcript capture and the chat/messaging tools are independent: setting `CHAT_INTEGRATION=disabled` alongside `UNIQUE_INTEGRATION=enabled` gives an **ingestion-only** deployment that captures meetings but exposes no chat tools and requests no messaging permissions. See [Configuration — Chat Integration](./operator/configuration.md#chat-integration).
 
 ### Cross-Cutting Capabilities
 
@@ -145,7 +147,7 @@ flowchart TB
     Chat --> MSGraph
 ```
 
-Enabling transcript capture adds a webhook controller, a RabbitMQ queue, and a transcript processor to this picture — see the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#architecture).
+Enabling transcript capture adds a webhook controller, a RabbitMQ queue, and a transcript processor to this picture — see the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Architecture).
 
 See [Architecture Documentation](./technical/architecture.md#components) for detailed component diagrams.
 
@@ -241,7 +243,7 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 - **Token introspection**: Tokens validated locally with short TTLs for performance
 - **Multi-tenant in one session**: A user belonging to multiple Microsoft tenants must authenticate separately for each tenant; one OAuth session covers exactly one tenant
 
-Limitations that apply to transcript capture — forward-only capture, no delta sync, VTT only — are listed in [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts#limitations-and-constraints).
+Limitations that apply to transcript capture — forward-only capture, no delta sync, VTT only — are listed in [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts#Limitations-and-constraints).
 
 ### Single App Registration Architecture
 

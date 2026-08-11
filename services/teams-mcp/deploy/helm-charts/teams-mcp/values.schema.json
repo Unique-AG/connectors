@@ -2166,6 +2166,21 @@
             "clientId"
           ]
         },
+        "chat": {
+          "type": "object",
+          "description": "Teams chat integration configuration",
+          "properties": {
+            "integration": {
+              "type": "string",
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "default": "enabled",
+              "description": "Enable Teams chat/channel messaging tools (independent of unique.integration). When disabled, chat tools are not registered and messaging Graph scopes are not requested."
+            }
+          }
+        },
         "unique": {
           "type": "object",
           "description": "Unique API configuration",

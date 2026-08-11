@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2065629188 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Configuration
-
 ## Deployment Modes
 
 The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose your mode before configuring anything else** — it determines which infrastructure components you need and which configuration sections apply.

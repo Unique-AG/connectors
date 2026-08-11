@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2063335449 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Technical Reference
-
 ## Overview
 
 This section contains detailed technical documentation for developers and architects working with the Outlook Semantic MCP Server.

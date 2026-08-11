@@ -1,0 +1,214 @@
+# kb-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: kb-mcp
+fullnameOverride: kb-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json
+# (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  LOG_LEVEL: info
+  # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
+  UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
+
+# -- Non-secret, tenant-specific config; see values.schema.json for field
+# descriptions. Mapped to env vars by templates/_ext.tpl + _helpers.tpl.
+mcpConfig:
+  enabled: true
+  app:
+    publicBaseUrl: "" # e.g. https://kb-mcp.<tenant>.unique.app — must match routes.hostname
+    frontendBaseUrl: "" # optional, e.g. https://<tenant>.unique.app
+  zitadel:
+    baseUrl: "" # e.g. https://id.<tenant>.unique.app
+
+# -- Secrets. The Unique QA overlay uses extraEnvSecrets + external-secrets
+# instead; the envVars + secretKeyRef pattern below is a portable fallback
+# for third-party installs. ENCRYPTION_KEY protects OAuth proxy state in
+# Postgres — generate with:
+#   openssl rand -hex 32
+#
+# Example for loading secrets (uncomment and customize as needed):
+#   envVars:
+#     - name: UNIQUE_APP_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_KEY
+#     - name: UNIQUE_APP_ID
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_ID
+#     - name: UNIQUE_API_BASE_URL
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_API_BASE_URL
+#     - name: UNIQUE_APP_ENDPOINT
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_ENDPOINT
+#     - name: UNIQUE_APP_ENDPOINT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_ENDPOINT_SECRET
+#     - name: ZITADEL_CLIENT_ID
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-zitadel-secret
+#           key: ZITADEL_CLIENT_ID
+#     - name: ZITADEL_CLIENT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-zitadel-secret
+#           key: ZITADEL_CLIENT_SECRET
+#     - name: ENCRYPTION_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-oauth-storage-secret
+#           key: ENCRYPTION_KEY
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/kb-mcp
+  tag: 0.1.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 256Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# OAuth proxy storage. Required — Settings refuses to boot without a durable
+# DATABASE_URL (from this block) + ENCRYPTION_KEY (envVars above).
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # ── Use-case B — in-cluster PostgreSQL (CloudNativePG) ────────────────────
+    #
+    # host:
+    #   fromKubernetesService:
+    #     name: <release-name>-pg-cluster-rw
+    #     namespace: <namespace>
+    #     podPort: 5432
+    #     podSelectorLabels:
+    #       cnpg.io/cluster: <release-name>-pg-cluster
+    #
+    # url:
+    #   fromSecret:
+    #     name: <release-name>-pg-cluster-app
+    #     key: fqdn-uri
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: kb-mcp.<tenant>.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: false
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# postgresql.connection.url is opaque (real host is inside the secret), so
+# egress generation is soft-skipped for it — an overlay enabling this against
+# connection.url must also set postgresql.networkPolicyEgressManaged: true
+# and add its own Postgres egress rule under networkPolicy.egress[].
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false
+    # Zitadel OIDC + Unique API gateway — same idea as teams-mcp's microsoft block.
+    # Overlay hostnames (id.qa / gateway.qa) match *.unique.app.
+    egress:
+      unique:
+        toFQDNs:
+          - matchPattern: "*.unique.app"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+
+# Do NOT set UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID in production —
+# those are local unauthenticated-dev fallbacks only (identity comes from OIDC / _meta).
