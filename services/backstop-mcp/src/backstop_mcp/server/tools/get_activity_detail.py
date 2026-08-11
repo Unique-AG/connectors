@@ -3,9 +3,10 @@
 `activity_id` alone is a complete, self-sufficient handle — no party resolution needed. Fetches
 `entity-activity-details/{activity_id}` and, when `activity_id` looks like a meeting/call (the
 `meeting-or-calls_` prefix — the only shape that ever carries attendees on this instance),
-`/meeting-or-calls/{activity_id}/attendees` CONCURRENTLY via `asyncio.gather`, mirroring
-`get_activity_history`'s party+streams fan-out rather than gating the attendees fetch on the
-details response.
+`/meeting-or-calls/{resourceId}/attendees` CONCURRENTLY via `asyncio.gather`, mirroring
+`get_activity_history`'s stream fan-out rather than gating the attendees fetch on the details
+response. The attendees path uses the bare resource id (prefix stripped), not the polymorphic
+timeline id.
 
 Caveat: the wire field names this depends on for `entity-activity-details`'s meeting specifics
 and the attendees shape were not byte-verified against a live Backstop instance the way this
