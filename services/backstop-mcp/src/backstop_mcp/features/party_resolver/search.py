@@ -35,13 +35,35 @@ _EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
 }
 
 
+def normalized_email(value: str) -> str | None:
+    """Return pydantic's normalized address, or `None` when `value` is not an email.
+
+    Accepts display-name forms (`"Bob" <bob@example.com>`) and surrounding whitespace; the
+    returned string is what Backstop's exact `email` / `email2` / `email3` filters expect.
+    """
+    try:
+        _name, email = validate_email(value)
+    except PydanticCustomError:
+        return None
+    return email
+
+
+def normalized_email(value: str) -> str | None:
+    """Return pydantic's normalized address, or `None` when `value` is not an email.
+
+    Accepts display-name forms (`"Bob" <bob@example.com>`) and surrounding whitespace; the
+    returned string is what Backstop's exact `email` / `email2` / `email3` filters expect.
+    """
+    try:
+        _name, email = validate_email(value)
+    except PydanticCustomError:
+        return None
+    return email
+
+
 def looks_like_email(value: str) -> bool:
     """Return True when `value` is a valid email (pydantic / email-validator)."""
-    try:
-        validate_email(value)
-    except PydanticCustomError:
-        return False
-    return True
+    return normalized_email(value) is not None
 
 
 async def search_by_email(
@@ -55,6 +77,9 @@ async def search_by_email(
     Queries each field separately (never AND-ed) and dedupes hits by resource id. Backstop
     stores up to three addresses per person/employee, so checking only `email` would silently
     miss a match on `email2`/`email3`.
+
+    `email` should already be normalized (see `normalized_email`); this path filters with the
+    string as given.
 
     The fan-out is safe to gather: concurrency is gated per upstream request inside
     `BackstopClient`, not per client, so these queue against the per-user limit rather than
