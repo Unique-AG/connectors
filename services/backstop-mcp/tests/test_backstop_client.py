@@ -18,6 +18,7 @@ from backstop_mcp.backstop_client import (
     BackstopUnreachableError,
     BackstopUntrustedUrlError,
     PageResult,
+    SinglePage,
 )
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig

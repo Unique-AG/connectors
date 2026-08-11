@@ -35,7 +35,7 @@ from backstop_mcp.backstop_client.json_api import (
     follow_included,
     included_by_type,
 )
-from backstop_mcp.backstop_client.pagination import PageResult
+from backstop_mcp.backstop_client.pagination import PageResult, SinglePage
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
 __all__ = [
@@ -57,6 +57,7 @@ __all__ = [
     "CallerClientProvider",
     "PageResult",
     "RetrySettings",
+    "SinglePage",
     "follow_included",
     "included_by_type",
 ]
