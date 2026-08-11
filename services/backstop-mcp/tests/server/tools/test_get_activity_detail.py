@@ -229,3 +229,31 @@ class TestDefensiveParsing:
         # name resolves to None, since neither `name` nor `firstName`/`lastName` matched.
         assert len(result.attendees) == 1
         assert result.attendees[0].name is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_activity_id_path_segment_is_percent_encoded(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-ad-6", "org-frank")  # pyright: ignore[reportGeneralTypeIssues]
+
+        activity_id = "notes_1/../2"
+        details = respx.get(f"{BASE_URL}/entity-activity-details/notes_1%2F..%2F2").mock(
+            return_value=httpx.Response(
+                200,
+                json=_detail_document(activity_id, type="note", title="Safe"),
+            )
+        )
+        attendees = respx.get(url__regex=rf"{BASE_URL}/meeting-or-calls/.+/attendees").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = tool_model(
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            ActivityDetailResponse,
+        )
+
+        assert result.title == "Safe"
+        assert details.call_count == 1
+        assert attendees.call_count == 0
+        assert "/entity-activity-details/notes_1%2F..%2F2" in str(details.calls.last.request.url)
