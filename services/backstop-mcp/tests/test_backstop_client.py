@@ -617,6 +617,25 @@ class TestUntrustedNextLink:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_refuses_protocol_relative_link_to_another_host(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        """`//evil...` must not skip host pinning just because it lacks an http(s) scheme."""
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": [{"id": "1"}], "links": {"next": "//evil.example.com/records"}},
+            )
+        )
+
+        with pytest.raises(BackstopUntrustedUrlError) as exc_info:
+            await factory.for_credential(_credential()).paginate("/records", schema=_Record)
+
+        assert exc_info.value.url == "https://evil.example.com/records"
+        assert exc_info.value.expected_host == httpx.URL(_BASE_URL).netloc.decode("ascii")
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_refuses_same_host_scheme_downgrade(self, factory: BackstopClientFactory) -> None:
         """`links.next` must not flip https→http on the configured host either."""
         https_base = httpx.URL(_BASE_URL)

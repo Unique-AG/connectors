@@ -87,7 +87,13 @@ def resolve_request_url(base_url: str, path: str) -> str:
     scheme + host: an authenticated client following an arbitrary upstream-supplied origin
     (or a same-host scheme downgrade) would send `Authorization: Basic ...` wherever that
     origin points.
+
+    Protocol-relative URLs (`//evil.example/...`) are absolute network-path references — rewrite
+    them with the configured scheme so host/scheme pinning still runs.
     """
+    if path.startswith("//"):
+        path = f"{httpx.URL(base_url).scheme}:{path}"
+
     if not path.startswith(("http://", "https://")):
         return path if path.startswith("/") else f"/{path}"
 
