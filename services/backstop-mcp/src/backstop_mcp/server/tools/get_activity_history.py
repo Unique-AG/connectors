@@ -2,13 +2,12 @@
 
 On a `type="first"` request, resolves the party (`party_type` + `party_id`/`search`, exactly like
 `get_person`/`get_organization`), then fetches the party record and every requested stream's first
-page concurrently. On a `type="next"` request, the cursor already carries the full query state —
-no resolve, no `/quick-search` round trip — and only the streams the cursor says are still open
-get re-fetched.
+page. On a `type="next"` request, the cursor already carries the full query state — no resolve, no
+`/quick-search` round trip — and only the streams the cursor says are still open get re-fetched.
 
-The party fetch and every active stream fetch go through one `asyncio.gather` call so a partial
-upstream failure fails the whole tool call rather than silently dropping a stream (see the design
-doc's Error Handling section).
+The party record is fetched first (it also side-loads employments). Active stream fetches then go
+through one `asyncio.gather` call so a partial upstream failure fails the whole tool call rather
+than silently dropping a stream (see the design doc's Error Handling section).
 """
 
 import asyncio

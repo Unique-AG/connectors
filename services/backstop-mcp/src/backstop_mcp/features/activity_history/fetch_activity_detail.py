@@ -17,11 +17,13 @@ live verification:
 the design doc, so they carry no aliases.
 
 `activity_id` is the same prefixed id a timeline record already carries (e.g.
-`meeting-or-calls_76280387`) — Backstop's own convention elsewhere in this codebase is that a
-resource's `id` is what you interpolate directly into a follow-up detail-fetch path. Only a
-meeting/call ever carries attendees on this instance, and that shape is always labelled with the
-`meeting-or-calls_` prefix (confirmed, not a guess) — `is_meeting_or_call` lets a caller decide
-locally, from the id string alone, whether to fetch attendees at all.
+`meeting-or-calls_76280387`) — Backstop's polymorphic activities view uses that form. The typed
+`meeting-or-calls` collection (and its `/attendees` relationship) uses the bare
+`specificResource.resourceId` (e.g. `76280387`), so `fetch_attendees` strips the
+`meeting-or-calls_` prefix before interpolating the path. Only a meeting/call ever carries
+attendees on this instance, and that shape is always labelled with the `meeting-or-calls_`
+prefix (confirmed, not a guess) — `is_meeting_or_call` lets a caller decide locally, from the id
+string alone, whether to fetch attendees at all.
 """
 
 import logging
@@ -171,9 +173,13 @@ async def fetch_activity_detail(client: BackstopClient, *, activity_id: str) -> 
 
 async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[Attendee, ...]:
     """Fetch the trimmed attendee list for one meeting/call. Only call when `is_meeting_or_call`."""
-    logger.debug("activity_history.attendees.fetch", extra={"activity_id": activity_id})
+    resource_id = activity_id.removeprefix(_MEETING_OR_CALL_PREFIX)
+    logger.debug(
+        "activity_history.attendees.fetch",
+        extra={"activity_id": activity_id, "resource_id": resource_id},
+    )
     document = await client.get(
-        f"/meeting-or-calls/{activity_id}/attendees",
+        f"/meeting-or-calls/{resource_id}/attendees",
         params={"fields": _ATTENDEE_FIELDS},
         schema=_AttendeeDocument,
     )

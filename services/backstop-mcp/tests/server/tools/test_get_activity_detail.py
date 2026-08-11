@@ -37,8 +37,8 @@ def _details_route(activity_id: str) -> respx.Route:
     return respx.get(f"{BASE_URL}/entity-activity-details/{activity_id}")
 
 
-def _attendees_route(activity_id: str) -> respx.Route:
-    return respx.get(f"{BASE_URL}/meeting-or-calls/{activity_id}/attendees")
+def _attendees_route(resource_id: str) -> respx.Route:
+    return respx.get(f"{BASE_URL}/meeting-or-calls/{resource_id}/attendees")
 
 
 class TestMeetingOrCall:
@@ -63,7 +63,7 @@ class TestMeetingOrCall:
                 ),
             )
         )
-        _attendees_route(activity_id).mock(
+        _attendees_route("76280387").mock(
             return_value=httpx.Response(
                 200,
                 json=collection(
@@ -110,7 +110,7 @@ class TestMeetingOrCall:
         _details_route(activity_id).mock(
             return_value=httpx.Response(200, json=_detail_document(activity_id, description=html))
         )
-        _attendees_route(activity_id).mock(return_value=httpx.Response(200, json=collection()))
+        _attendees_route("99999").mock(return_value=httpx.Response(200, json=collection()))
 
         result = tool_model(
             await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
@@ -143,7 +143,7 @@ class TestNoteOrDocument:
                 ),
             )
         )
-        attendees = _attendees_route(activity_id).mock(
+        attendees = _attendees_route("555").mock(
             return_value=httpx.Response(200, json=collection())
         )
 
@@ -204,7 +204,7 @@ class TestDefensiveParsing:
                 ),
             )
         )
-        _attendees_route(activity_id).mock(
+        _attendees_route("777").mock(
             return_value=httpx.Response(
                 200,
                 json=collection(
