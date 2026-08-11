@@ -1,0 +1,192 @@
+# kb-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: kb-mcp
+fullnameOverride: kb-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json
+# (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  LOG_LEVEL: info
+  # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
+  UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
+
+# -- Environment variables from secrets / Argo overlays.
+# UNIQUE_MCP_* URLs are not secrets — set them in the overlay `env:` (examples below).
+# App/Zitadel credentials stay in envVars via secretKeyRef.
+#
+# ArgoCD overlay examples for UNIQUE_MCP_*:
+#   env:
+#     # Public URL of THIS MCP service (Gateway/Kong host clients hit).
+#     # Used for OAuth redirect base + FastMCP Host allowlist (allowed_hosts).
+#     # Must match the routes.hostname you enable in this overlay, e.g.:
+#     #   https://kb-mcp.<tenant>.unique.app
+#     UNIQUE_MCP_PUBLIC_BASE_URL: https://kb-mcp.<tenant>.unique.app
+#
+#     # Unique web app origin (the product UI), NOT this MCP.
+#     # Optional — only for knowledge-upload deep links in citations:
+#     # Leave unset to fall back to unique://content/{id} links.
+#     UNIQUE_MCP_FRONTEND_BASE_URL: https://<tenant>.unique.app
+#
+# Example for loading secrets (uncomment and customize as needed):
+#   envVars:
+#     - name: UNIQUE_APP_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_KEY
+#     - name: UNIQUE_APP_ID
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_ID
+#     - name: UNIQUE_API_BASE_URL
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_API_BASE_URL
+#     - name: UNIQUE_APP_ENDPOINT
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_ENDPOINT
+#     - name: UNIQUE_APP_ENDPOINT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-unique-secret
+#           key: UNIQUE_APP_ENDPOINT_SECRET
+#     - name: ZITADEL_BASE_URL
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-zitadel-secret
+#           key: ZITADEL_BASE_URL
+#     - name: ZITADEL_CLIENT_ID
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-zitadel-secret
+#           key: ZITADEL_CLIENT_ID
+#     - name: ZITADEL_CLIENT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-zitadel-secret
+#           key: ZITADEL_CLIENT_SECRET
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/kb-mcp
+  tag: 0.0.1 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 256Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: false
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: kb-mcp.<tenant>.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: false
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false
+
+# Required via envVars (secrets) for a working deploy:
+# - UNIQUE_APP_KEY / UNIQUE_APP_ID / UNIQUE_API_BASE_URL
+# - UNIQUE_APP_ENDPOINT / UNIQUE_APP_ENDPOINT_SECRET
+# - ZITADEL_BASE_URL / ZITADEL_CLIENT_ID / ZITADEL_CLIENT_SECRET
+# Required via overlay env: (plain URLs, see comments above envVars):
+# - UNIQUE_MCP_PUBLIC_BASE_URL = https://kb-mcp.<tenant>.unique.app
+# Optional via overlay env::
+# - UNIQUE_MCP_FRONTEND_BASE_URL = https://<tenant>.unique.app (citation deep links)
+# Do NOT set UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID in production —
+# those are local unauthenticated-dev fallbacks only (identity comes from OIDC / _meta).

@@ -26,6 +26,7 @@ CHART_DIRS=(
   "services/teams-mcp/deploy/helm-charts/teams-mcp"
   "services/outlook-semantic-mcp/deploy/helm-charts/outlook-semantic-mcp"
   "services/hello-mcp/deploy/helm-charts/hello-mcp"
+  "services/kb-mcp/deploy/helm-charts/kb-mcp"
 )
 
 had_drift=false
