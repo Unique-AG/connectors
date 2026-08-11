@@ -41,11 +41,11 @@ from backstop_mcp.dates import LenientDate
 __all__ = [
     "ActivityItem",
     "ActivityPage",
-    "ActivityStreamKind",
+    "ActivityType",
+    "BackstopActivityType",
     "EmailItem",
     "EmailPage",
     "Segment",
-    "StreamKind",
     "fetch_activity_page",
     "fetch_email_page",
 ]
@@ -54,15 +54,15 @@ __all__ = [
 # entirely). `activityType`'s valid values are `[notes, meetings, calls, documents]` — the plural
 # wire spellings live in `_ACTIVITY_TYPE_FILTER` below, keyed by the singular kind used everywhere
 # else in this codebase's vocabulary.
-ActivityStreamKind = Literal["meeting", "call", "note", "document"]
-StreamKind = ActivityStreamKind | Literal["email"]
+BackstopActivityType = Literal["meeting", "call", "note", "document"]
+ActivityType = BackstopActivityType | Literal["email"]
 
 # `{segment}` in `/{segment}/{id}/activities|emails` — organizations for an organization entity,
 # people for a person entity. Party resolution itself (mapping a resolved party to a segment) is a
 # later task; this layer just takes the segment it's told.
 Segment = Literal["organizations", "people"]
 
-_ACTIVITY_TYPE_FILTER: dict[ActivityStreamKind, str] = {
+_ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "meeting": "meetings",
     "call": "calls",
     "note": "notes",
@@ -167,7 +167,7 @@ class ActivityItem(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     id: str
-    stream: ActivityStreamKind
+    stream: BackstopActivityType
     title: str | None
     description: str | None
     effective_date: date | None
@@ -221,18 +221,6 @@ class EmailPage(BaseModel):
     end_of_stream: bool
 
 
-def _activity_from_resource(
-    resource: BackstopApiResource[_ActivityAttributes], *, stream: ActivityStreamKind
-) -> ActivityItem:
-    return ActivityItem.model_validate(
-        {**resource.attributes.model_dump(), "id": resource.id, "stream": stream}
-    )
-
-
-def _email_from_resource(resource: BackstopApiResource[_EmailAttributes]) -> EmailItem:
-    return EmailItem.model_validate({**resource.attributes.model_dump(), "id": resource.id})
-
-
 def _activity_date_filter_params(*, since: date | None, until: date | None) -> dict[str, object]:
     """`filter[effectiveDate][...]` per the two-bound rule.
 
@@ -281,7 +269,7 @@ async def fetch_activity_page(
     *,
     segment: Segment,
     entity_id: str,
-    stream: ActivityStreamKind,
+    stream: BackstopActivityType,
     limit: int,
     offset: int,
     since: date | None = None,
@@ -312,7 +300,12 @@ async def fetch_activity_page(
         offset=offset,
     )
     raw_count = len(page.items)
-    items = tuple(_activity_from_resource(resource, stream=stream) for resource in page.items)
+    items = tuple(
+        ActivityItem.model_validate(
+            {**resource.attributes.model_dump(), "id": resource.id, "stream": stream}
+        )
+        for resource in page.items
+    )
 
     if since is not None and until is not None:
         items, cutoff_hit = _truncate_since(items, since=since)
@@ -349,5 +342,8 @@ async def fetch_email_page(
         page_size=limit,
         offset=offset,
     )
-    items = tuple(_email_from_resource(resource) for resource in page.items)
+    items = tuple(
+        EmailItem.model_validate({**resource.attributes.model_dump(), "id": resource.id})
+        for resource in page.items
+    )
     return EmailPage(items=items, end_of_stream=len(page.items) < limit)
