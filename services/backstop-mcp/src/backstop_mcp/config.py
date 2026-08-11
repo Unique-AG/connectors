@@ -18,11 +18,6 @@ from sqlalchemy.engine.url import URL, make_url
 
 PKG_VERSION = pkg_version("backstop-mcp")
 
-# libpq sslmode values that require certificate verification.
-_SSLMODE_VERIFY = frozenset({"verify", "verify-ca", "verify-full"})
-# Encrypt the connection but do not verify the server certificate.
-_SSLMODE_ENCRYPT = frozenset({"require", "prefer"})
-
 _HTTP_URL = TypeAdapter(HttpUrl)
 
 
@@ -46,12 +41,13 @@ def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
     """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
     if sslmode in ("disable", "allow"):
         return None
-    if sslmode in _SSLMODE_ENCRYPT:
+    if sslmode in ("require", "prefer"):
+        # Encrypt the connection but do not verify the server certificate.
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
-    if sslmode in _SSLMODE_VERIFY:
+    if sslmode in ("verify", "verify-ca", "verify-full"):
         return ssl.create_default_context()
     raise ValueError(f"Unsupported sslmode={sslmode!r} in database URL")
 
@@ -176,7 +172,12 @@ class BackstopConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    """Where backstop-mcp stores its state."""
+    """Where backstop-mcp stores its state.
+
+    Provide either `url` / `DB_URL` (or Helm's `DATABASE_URL` alias) **or** the discrete
+    `host`/`name`/`user`/`password` fields. The discrete fields may be `None` when a URL is
+    set — `_resolve_connection_url` only requires them when building a DSN from parts.
+    """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
 

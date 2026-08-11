@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Runtime: no uv binary — only venv + system Python 3.12
 FROM python:3.12-slim-trixie@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de AS runtime
 WORKDIR /app
-RUN groupadd --system --gid 1001 app && useradd --system --uid 1001 --gid app app
+RUN groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/alembic.ini /app/alembic.ini
 COPY --from=builder --chown=app:app /app/src /app/src
