@@ -289,8 +289,20 @@ class TestFirstCallBySearch:
             query="Capstone",
             scope="organizations",
             candidates=[
-                PartyCandidateResponse(key="o1", label="Capstone A", id="o1", name="Capstone A"),
-                PartyCandidateResponse(key="o2", label="Capstone B", id="o2", name="Capstone B"),
+                PartyCandidateResponse(
+                    key="o1",
+                    label="Capstone A",
+                    id="o1",
+                    search_type="organizations",
+                    name="Capstone A",
+                ),
+                PartyCandidateResponse(
+                    key="o2",
+                    label="Capstone B",
+                    id="o2",
+                    search_type="organizations",
+                    name="Capstone B",
+                ),
             ],
         )
         assert org_get.call_count == 0
