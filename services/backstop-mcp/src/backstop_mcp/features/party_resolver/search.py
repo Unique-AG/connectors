@@ -48,19 +48,6 @@ def normalized_email(value: str) -> str | None:
     return email
 
 
-def normalized_email(value: str) -> str | None:
-    """Return pydantic's normalized address, or `None` when `value` is not an email.
-
-    Accepts display-name forms (`"Bob" <bob@example.com>`) and surrounding whitespace; the
-    returned string is what Backstop's exact `email` / `email2` / `email3` filters expect.
-    """
-    try:
-        _name, email = validate_email(value)
-    except PydanticCustomError:
-        return None
-    return email
-
-
 def looks_like_email(value: str) -> bool:
     """Return True when `value` is a valid email (pydantic / email-validator)."""
     return normalized_email(value) is not None
