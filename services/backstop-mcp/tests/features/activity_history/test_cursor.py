@@ -1,10 +1,10 @@
-"""`encode_cursor`/`decode_and_validate_cursor`, and the full merge+cursor paging round-trip.
+"""`encode_cursor`/`decode_cursor`, and the full merge+cursor paging round-trip.
 
 The round-trip test drives a synthetic multi-stream fixture (plain in-memory pages, no HTTP)
-through `fetch_offsets` + `merge_page` + `encode_cursor`/`decode_and_validate_cursor` to full
-exhaustion, across several `limit` values and deliberately uneven stream lengths (one empty from
-the start, one much longer than the rest) — the regression test for a dropped or duplicated
-record anywhere across a paging session.
+through `merge_page` + `encode_cursor`/`decode_cursor` to full exhaustion, across several
+`limit` values and deliberately uneven stream lengths (one empty from the start, one much longer
+than the rest) — the regression test for a dropped or duplicated record anywhere across a paging
+session. `consumed[s]` is used directly as each stream's next `page[offset]`.
 """
 
 import base64
@@ -17,21 +17,19 @@ import pytest
 
 from backstop_mcp.features.activity_history import (
     ActivityItem,
-    CursorConflict,
+    ActivityType,
     InvalidCursor,
     Segment,
-    StreamKind,
-    decode_and_validate_cursor,
+    decode_cursor,
     encode_cursor,
-    fetch_offsets,
     merge_page,
 )
-from backstop_mcp.features.activity_history.streams import ActivityStreamKind
+from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
 
 _ActivityPage = tuple[Sequence[ActivityItem], bool]
 
 
-def _activity(item_id: str, stream: ActivityStreamKind, effective_date: date) -> ActivityItem:
+def _activity(item_id: str, stream: BackstopActivityType, effective_date: date) -> ActivityItem:
     return ActivityItem(
         id=item_id,
         stream=stream,
@@ -50,7 +48,7 @@ def _fetch(items: Sequence[ActivityItem], *, limit: int, offset: int) -> _Activi
     return page, len(page) < limit
 
 
-def _fixture() -> dict[StreamKind, list[ActivityItem]]:
+def _fixture() -> dict[ActivityType, list[ActivityItem]]:
     """Deliberately uneven: `call` empty from the start, `note` much longer than the rest."""
     return {
         "meeting": [
@@ -71,37 +69,33 @@ class TestCursorRoundTrip:
         expected_ids = {item.id for items in fixture.values() for item in items}
 
         collected: list[str] = []
-        consumed: dict[StreamKind, int] = {}
+        consumed: dict[ActivityType, int] = {}
         cursor: str | None = None
         for _ in range(200):  # generous cap: a real bug here would otherwise hang the suite
             if cursor is None:
                 # First page: every stream is active, none exhausted yet.
                 active_streams = set(fixture.keys())
+                page_limit = limit
             else:
-                consumed = decode_and_validate_cursor(
-                    cursor,
-                    segment="organizations",
-                    entity_id="42",
-                    limit=limit,
-                    activity_types=None,
-                    since=None,
-                    until=None,
-                )
+                decoded = decode_cursor(cursor)
                 # Every still-active stream appears in `consumed` (even at 0) — an exhausted
                 # stream is the only thing omitted, so its keys are exactly the active set.
+                consumed = dict(decoded.consumed)
                 active_streams = set(consumed.keys())
+                page_limit = decoded.limit
 
-            offsets = fetch_offsets(active_streams, consumed, limit=limit)
-            pages: dict[StreamKind, _ActivityPage] = {
-                stream: _fetch(fixture[stream], limit=limit, offset=offsets[stream])
+            pages: dict[ActivityType, _ActivityPage] = {
+                stream: _fetch(
+                    fixture[stream], limit=page_limit, offset=consumed.get(stream, 0)
+                )
                 for stream in active_streams
             }
-            result = merge_page(pages, consumed, limit=limit)
+            result = merge_page(pages, consumed)
             collected.extend(record.item.id for record in result.records)
             cursor = encode_cursor(
                 segment="organizations",
                 entity_id="42",
-                limit=limit,
+                limit=page_limit,
                 activity_types=None,
                 since=None,
                 until=None,
@@ -131,7 +125,7 @@ class TestEncodeCursor:
             is None
         )
 
-    def test_is_reasonably_compact(self) -> None:
+    def test_round_trips_full_query_state(self) -> None:
         cursor = encode_cursor(
             segment="organizations",
             entity_id="123456",
@@ -142,26 +136,27 @@ class TestEncodeCursor:
             consumed={"meeting": 25, "call": 50, "note": 5},
         )
         assert cursor is not None
-        # Not a strict byte-count assertion — a sanity check that this stays "reasonably
-        # compact" for a named-JSON-object wire format (measured ~183 chars for this example;
-        # segment/stream names and field names are spelled out, unlike a positional-tuple
-        # encoding, so this is a looser bound than a code-based format would need). Tight enough
-        # to catch a regression to plain `json.dumps` (adds spaces after `:`/`,`, ~203 chars for
-        # this example) rather than `model_dump_json`'s compact separators.
-        assert len(cursor) < 195
+        decoded = decode_cursor(cursor)
+        assert decoded.segment == "organizations"
+        assert decoded.entity_id == "123456"
+        assert decoded.limit == 25
+        assert decoded.activity_types == ("call", "meeting")  # sorted unique
+        assert decoded.since == date(2026, 1, 1)
+        assert decoded.until == date(2026, 12, 31)
+        assert dict(decoded.consumed) == {"meeting": 25, "call": 50, "note": 5}
 
 
-class TestCursorAuthority:
+class TestDecodeCursor:
     def _cursor(
         self,
         *,
         segment: Segment = "organizations",
         entity_id: str = "42",
         limit: int = 10,
-        activity_types: Collection[ActivityStreamKind] | None = None,
+        activity_types: Collection[BackstopActivityType] | None = None,
         since: date | None = None,
         until: date | None = None,
-        consumed: Mapping[StreamKind, int] | None = None,
+        consumed: Mapping[ActivityType, int] | None = None,
     ) -> str:
         cursor = encode_cursor(
             segment=segment,
@@ -185,100 +180,24 @@ class TestCursorAuthority:
         raw = json.dumps(payload).encode()
         return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
-    def test_conflicting_entity_id_raises_cursor_conflict(self) -> None:
-        cursor = self._cursor(entity_id="42")
-        with pytest.raises(CursorConflict, match="entity_id"):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="99",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+    def test_empty_activity_types_normalizes_to_none(self) -> None:
+        cursor = self._cursor(activity_types=[])
+        decoded = decode_cursor(cursor)
+        assert decoded.activity_types is None
 
-    def test_conflicting_limit_raises_cursor_conflict(self) -> None:
-        cursor = self._cursor(limit=10)
-        with pytest.raises(CursorConflict, match="limit"):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=25,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
-
-    def test_conflicting_segment_raises_cursor_conflict(self) -> None:
-        cursor = self._cursor(segment="organizations")
-        with pytest.raises(CursorConflict, match="segment"):
-            decode_and_validate_cursor(
-                cursor,
-                segment="people",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
-
-    def test_digest_mismatch_raises_invalid_cursor_with_restart_instruction(self) -> None:
-        cursor = self._cursor(activity_types=["meeting"], since=date(2026, 1, 1))
-        with pytest.raises(InvalidCursor, match="restart from page one"):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=["meeting", "call"],  # differs from what the cursor was issued for
-                since=date(2026, 1, 1),
-                until=None,
-            )
-
-    def test_matching_plain_fields_and_digest_round_trip_consumed(self) -> None:
-        cursor = self._cursor(
-            activity_types=["meeting", "note"],
-            since=date(2026, 1, 1),
-            until=date(2026, 6, 1),
-            consumed={"meeting": 10, "note": 3},
-        )
-        consumed = decode_and_validate_cursor(
-            cursor,
-            segment="organizations",
-            entity_id="42",
-            limit=10,
-            activity_types=["note", "meeting"],  # order-independent
-            since=date(2026, 1, 1),
-            until=date(2026, 6, 1),
-        )
-        assert consumed == {"meeting": 10, "note": 3}
+    def test_activity_types_order_independent(self) -> None:
+        cursor = self._cursor(activity_types=["note", "meeting", "meeting"])
+        decoded = decode_cursor(cursor)
+        assert decoded.activity_types == ("meeting", "note")
 
     def test_corrupted_cursor_string_raises_invalid_cursor(self) -> None:
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                "not-a-valid-cursor-at-all-!!!",
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor("not-a-valid-cursor-at-all-!!!")
 
     def test_truncated_cursor_raises_invalid_cursor(self) -> None:
         cursor = self._cursor()
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor[: len(cursor) // 2],
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor[: len(cursor) // 2])
 
     def test_malformed_json_payload_raises_invalid_cursor(self) -> None:
         # JSON strings (including `entity_id`) are always valid Unicode text by construction, so
@@ -289,48 +208,24 @@ class TestCursorAuthority:
         raw = bytes([0xFF, 0xFE, 0x00, 0x01, 0x02, 0x03])
         cursor = base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor)
 
     def test_unrecognized_shape_raises_invalid_cursor(self) -> None:
-        # A well-formed JSON object that is missing every field `_DecodedCursor` requires —
+        # A well-formed JSON object that is missing every field `ActivityCursor` requires —
         # valid JSON, but pydantic's required-field validation rejects it on its own.
         raw = json.dumps({"unrelated": True}).encode()
         cursor = base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor)
 
     def test_missing_required_field_raises_invalid_cursor(self) -> None:
         # A well-formed JSON object with `consumed` dropped entirely — valid JSON, but
-        # `_DecodedCursor.consumed` is required, so pydantic rejects the omission on its own.
+        # `ActivityCursor.consumed` is required, so pydantic rejects the omission on its own.
         payload = self._decode_payload(self._cursor())
         del payload["consumed"]
         cursor = self._encode_payload(payload)
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor)
 
     def test_wrong_field_type_raises_invalid_cursor(self) -> None:
         # `limit` as a string instead of an int — pydantic's strict-enough int coercion rejects
@@ -339,51 +234,32 @@ class TestCursorAuthority:
         payload["limit"] = "not-a-number"
         cursor = self._encode_payload(payload)
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor)
 
     def test_unrecognized_segment_value_raises_invalid_cursor(self) -> None:
         # `segment` outside `Segment`'s `Literal["organizations", "people"]` membership —
-        # pydantic rejects this on its own, the same way an out-of-range segment code did
-        # before segment travelled on the wire as its own string.
+        # pydantic rejects this on its own.
         payload = self._decode_payload(self._cursor())
         payload["segment"] = "not_a_real_segment"
         cursor = self._encode_payload(payload)
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor)
 
     def test_unrecognized_stream_key_raises_invalid_cursor(self) -> None:
-        # A `consumed` key outside `StreamKind`'s five valid values — pydantic rejects this on
-        # its own, the same way an out-of-range stream code did before streams travelled on the
-        # wire as their own strings.
+        # A `consumed` key outside `ActivityType`'s five valid values — pydantic rejects this on
+        # its own.
         payload = self._decode_payload(self._cursor())
         payload["consumed"] = {"not_a_real_stream": 1}
         cursor = self._encode_payload(payload)
         with pytest.raises(InvalidCursor):
-            decode_and_validate_cursor(
-                cursor,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(cursor)
+
+    def test_unrecognized_activity_type_raises_invalid_cursor(self) -> None:
+        payload = self._decode_payload(self._cursor())
+        payload["activity_types"] = ["not_a_real_type"]
+        cursor = self._encode_payload(payload)
+        with pytest.raises(InvalidCursor):
+            decode_cursor(cursor)
 
     def test_unsupported_schema_version_raises_invalid_cursor(self) -> None:
         # Same shape as a valid cursor, but with the version field bumped past what's supported.
@@ -396,12 +272,4 @@ class TestCursorAuthority:
         payload["version"] = version + 1
         bumped = self._encode_payload(payload)
         with pytest.raises(InvalidCursor, match="unrecognized shape"):
-            decode_and_validate_cursor(
-                bumped,
-                segment="organizations",
-                entity_id="42",
-                limit=10,
-                activity_types=None,
-                since=None,
-                until=None,
-            )
+            decode_cursor(bumped)
