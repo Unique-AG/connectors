@@ -7,6 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import {
+  GRAPH_ACCESS_TO_TRANSCRIPTS_DISABLED,
+  GRAPH_TRANSCRIPT_ACCESS_DISABLED_MESSAGE,
+  isGraphAccessToTranscriptsDisabled,
+} from './graph-transcript-access';
 
 /**
  * MS Graph SDK bug: `.getStream()` error responses leave `GraphError.body` as
@@ -57,6 +62,11 @@ export class GraphErrorFilter implements ExceptionFilter {
 
     await hydrateStreamBody(exception);
 
+    const transcriptAccessDisabled = isGraphAccessToTranscriptsDisabled(exception);
+    const clientMessage = transcriptAccessDisabled
+      ? GRAPH_TRANSCRIPT_ACCESS_DISABLED_MESSAGE
+      : exception.message;
+
     const formattedCode = exception.code ? `[${exception.code ?? ''}] ` : ' ';
     this.logger.error(
       {
@@ -66,8 +76,9 @@ export class GraphErrorFilter implements ExceptionFilter {
         date: exception.date,
         body: exception.body,
         message: exception.message,
+        transcriptAccessDisabled,
       },
-      `${formattedCode}Microsoft Graph API: ${exception.message}`,
+      `${formattedCode}Microsoft Graph API: ${clientMessage}`,
     );
 
     // Pass through the Graph API status code so MCP clients can react appropriately —
@@ -78,8 +89,8 @@ export class GraphErrorFilter implements ExceptionFilter {
     const statusCode = isValidHttpStatus ? exception.statusCode : HttpStatus.INTERNAL_SERVER_ERROR;
     response.status(statusCode).json({
       error: 'Microsoft Graph API Error',
-      code: exception.code,
-      message: exception.message,
+      code: transcriptAccessDisabled ? GRAPH_ACCESS_TO_TRANSCRIPTS_DISABLED : exception.code,
+      message: clientMessage,
       requestId: exception.requestId,
       timestamp: exception.date?.toISOString(),
     });
