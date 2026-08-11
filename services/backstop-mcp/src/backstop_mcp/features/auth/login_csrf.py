@@ -70,9 +70,21 @@ def set_csrf_cookie(
     )
 
 
-def clear_csrf_cookie(response: Response, request_id: str, *, path: str) -> None:
-    """Drop the cookie once its pending authorization has been consumed."""
-    response.delete_cookie(csrf_cookie_name(request_id), path=path)
+def clear_csrf_cookie(
+    response: Response, request_id: str, *, path: str, secure: bool
+) -> None:
+    """Drop the cookie once its pending authorization has been consumed.
+
+    `secure` / `httponly` / `samesite` must match `set_csrf_cookie`: browsers treat a clear
+    with different flags as a different cookie and leave the original in place.
+    """
+    response.delete_cookie(
+        csrf_cookie_name(request_id),
+        path=path,
+        secure=secure,
+        httponly=True,
+        samesite="lax",
+    )
 
 
 def csrf_token_is_valid(request: Request, request_id: str, submitted: str) -> bool:

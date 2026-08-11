@@ -419,6 +419,11 @@ class TestLoginCsrf:
         assert csrf_cookie_name(request_id) in set_cookie
         # Starlette expresses deletion as an immediate expiry.
         assert "Max-Age=0" in set_cookie or "1970" in set_cookie
+        # Flags must match the set cookie or browsers leave the Secure original in place.
+        assert "Secure" in set_cookie
+        assert "HttpOnly" in set_cookie
+        assert "samesite=lax" in set_cookie.lower()
+        assert f"Path={provider.login_path}" in set_cookie
 
 
 class TestLoginThrottling:
