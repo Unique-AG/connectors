@@ -5,6 +5,7 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from backstop_mcp.config import (
+    ActivityHistoryConfig,
     AppConfig,
     AppEnv,
     AuthConfig,
@@ -153,6 +154,34 @@ class TestBackstopConfigDefaults:
         """A zero TTL would refetch the whole schema on every call."""
         with pytest.raises(ValueError, match="custom_field_schema_ttl_minutes"):
             BackstopConfig(custom_field_schema_ttl_minutes=0)
+
+
+class TestActivityHistoryConfig:
+    def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("ACTIVITY_HISTORY_PAGE_SIZE", raising=False)
+        monkeypatch.delenv("ACTIVITY_HISTORY_GIST_CHARS", raising=False)
+
+        config = ActivityHistoryConfig()
+
+        assert config.page_size == 10
+        assert config.gist_chars == 300
+
+    def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ACTIVITY_HISTORY_PAGE_SIZE", "25")
+        monkeypatch.setenv("ACTIVITY_HISTORY_GIST_CHARS", "500")
+
+        config = ActivityHistoryConfig()
+
+        assert config.page_size == 25
+        assert config.gist_chars == 500
+
+    def test_page_size_rejects_zero(self) -> None:
+        with pytest.raises(ValueError, match="page_size"):
+            ActivityHistoryConfig(page_size=0)
+
+    def test_gist_chars_rejects_zero(self) -> None:
+        with pytest.raises(ValueError, match="gist_chars"):
+            ActivityHistoryConfig(gist_chars=0)
 
 
 class TestAuthConfig:

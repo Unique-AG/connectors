@@ -1,11 +1,13 @@
-"""Tool-facing responses for provenance and departed-contact signals."""
+"""Tool-facing responses for provenance and employment links."""
 
 from datetime import date
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
+
+type EmploymentLinkStatus = Literal["current", "former"]
 
 
 class DepartedContactResponse(BaseModel):
@@ -23,6 +25,40 @@ class DepartedContactResponse(BaseModel):
     )
     organization_id: str
     organization_type: str
+    end_date: date | None = Field(
+        default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
+    )
+    relationship_type_id: str | None = None
+    relationship_type_name: str | None = None
+
+
+class EmploymentLinkResponse(BaseModel):
+    """One resolved person↔organization employment pair for tool payloads.
+
+    Always carries both sides. `status` is `current` or `former`; unknown pairs are omitted
+    entirely rather than listed. `signal` / `end_date` are set only when `status` is `former`.
+    Built via `EmploymentIndex.links()`.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    status: EmploymentLinkStatus = Field(
+        description=(
+            "Whether this pair is current employment or a departure. Only 'current' and "
+            "'former' appear here — pairs with no employment evidence are omitted."
+        )
+    )
+    person_id: str
+    person_type: str
+    organization_id: str
+    organization_type: str
+    signal: DepartureSignal | None = Field(
+        default=None,
+        description=(
+            "Departure evidence when status is 'former': 'former_relationship_type' or "
+            "'end_date_passed'. Absent for current employment."
+        ),
+    )
     end_date: date | None = Field(
         default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
     )

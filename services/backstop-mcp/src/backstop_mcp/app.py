@@ -19,6 +19,7 @@ from backstop_mcp.backstop_client import (
     RetrySettings,
 )
 from backstop_mcp.config import (
+    ActivityHistoryConfig,
     AppConfig,
     AuthConfig,
     BackstopConfig,
@@ -27,6 +28,7 @@ from backstop_mcp.config import (
     EncryptionConfig,
 )
 from backstop_mcp.db import create_engine, create_session_factory
+from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.auth import (
     BackstopAuthContext,
     BackstopOAuthProvider,
@@ -55,6 +57,7 @@ def create_app(
     database_config: DatabaseConfig | None = None,
     encryption_config: EncryptionConfig | None = None,
     auth_config: AuthConfig | None = None,
+    activity_history_config: ActivityHistoryConfig | None = None,
 ) -> Starlette:
     """The composition root.
 
@@ -62,14 +65,15 @@ def create_app(
     injected. Nothing downstream re-reads the environment, and no layer below this one sees a
     `config` type at all: each env-parsed shape is translated into the owning layer's own domain
     type here (`BackstopTransportSettings`, `RetrySettings`, `FieldOverride`,
-    `BackstopCredentialSecret`), so the tuning knobs a deployment sets are the ones every request
-    actually uses.
+    `BackstopCredentialSecret`, `ActivityHistorySettings`), so the tuning knobs a deployment
+    sets are the ones every request actually uses.
     """
     config = config or AppConfig()
     backstop_config = backstop_config or BackstopConfig()
     database_config = database_config or DatabaseConfig()
     encryption_config = encryption_config or EncryptionConfig()
     auth_config = auth_config or AuthConfig()
+    activity_history_config = activity_history_config or ActivityHistoryConfig()
 
     configure_logging(config)
     configure_metrics(config)
@@ -120,6 +124,10 @@ def create_app(
             backstop=backstop_clients,
             custom_fields=custom_fields_service,
             employment_index_factory=employment_index_factory,
+            activity_history=ActivityHistorySettings(
+                page_size=activity_history_config.page_size,
+                gist_max_chars=activity_history_config.gist_chars,
+            ),
         )
     )
 

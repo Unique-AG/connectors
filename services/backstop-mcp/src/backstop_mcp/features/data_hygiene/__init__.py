@@ -1,9 +1,10 @@
 """Read-response provenance and departed-contact detection.
 
 The public surface is deliberately small: `EmploymentIndexFactory.index` for the employment
-index (person or organization side-loads), `entity_relationships` to pull those includes, and
-`extract_as_of` for provenance. `employment.py` is the pure scan the factory composes —
-importable for tests, not part of what tools are handed.
+index (person or organization side-loads), `EmploymentIndex.links` for the tool-facing list,
+`entity_relationships` to pull those includes, and `extract_as_of` for provenance.
+`employment.py` is the pure scan the factory composes — importable for tests, not part of what
+tools are handed.
 """
 
 from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
@@ -11,6 +12,7 @@ from backstop_mcp.features.data_hygiene.entity_relationships import entity_relat
 from backstop_mcp.features.data_hygiene.provenance import extract_as_of
 from backstop_mcp.features.data_hygiene.responses import (
     DepartedContactResponse,
+    EmploymentLinkResponse,
     as_of_response,
     departed_response,
 )
@@ -37,6 +39,7 @@ __all__ = [
     "DepartureSignal",
     "EmploymentIndex",
     "EmploymentIndexFactory",
+    "EmploymentLinkResponse",
     "EmploymentRules",
     "EmploymentStatus",
     "EntityRelationshipInclude",

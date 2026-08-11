@@ -13,11 +13,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from backstop_mcp.features.activity_history.fetch_activities import (
-    ActivityType,
-    BackstopActivityType,
-    Segment,
-)
+from backstop_mcp.features.activity_history.fetch_activities import ActivityType, Segment
 
 __all__ = ["ActivityCursor", "InvalidCursor", "decode_cursor", "encode_cursor"]
 
@@ -37,15 +33,15 @@ class ActivityCursor(BaseModel):
     segment: Segment
     entity_id: str
     limit: int
-    activity_types: tuple[BackstopActivityType, ...] | None = None
+    activity_types: tuple[ActivityType, ...] | None = None
     since: date | None = None
     until: date | None = None
     consumed: Mapping[ActivityType, int]
 
 
 def _normalize_activity_types(
-    activity_types: Collection[BackstopActivityType] | None,
-) -> tuple[BackstopActivityType, ...] | None:
+    activity_types: Collection[ActivityType] | None,
+) -> tuple[ActivityType, ...] | None:
     if not activity_types:
         return None
     return tuple(sorted(set(activity_types)))
@@ -56,7 +52,7 @@ def encode_cursor(
     segment: Segment,
     entity_id: str,
     limit: int,
-    activity_types: Collection[BackstopActivityType] | None,
+    activity_types: Collection[ActivityType] | None,
     since: date | None,
     until: date | None,
     consumed: Mapping[ActivityType, int],

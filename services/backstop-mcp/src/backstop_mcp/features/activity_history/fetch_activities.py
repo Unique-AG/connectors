@@ -30,6 +30,7 @@ __all__ = [
     "EmailPage",
     "Segment",
     "fetch_activity_page",
+    "fetch_activities_page_by_type",
     "fetch_email_page",
 ]
 
@@ -110,7 +111,10 @@ _EmailResource = BackstopApiResource[_EmailAttributes]
 class ActivityItem(BaseModel):
     """One activity; `stream` is the requested type (not parsed from the wire)."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    # `populate_by_name` so `resource_type`/`resource_id` — populated from the wire via a
+    # nested `AliasPath` — can also be set by their own Python name in a plain keyword
+    # constructor call (tests, `.model_copy(update=...)`), not just through `model_validate`.
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, populate_by_name=True)
 
     id: str
     stream: BackstopActivityType
@@ -246,3 +250,37 @@ async def fetch_email_page(
         for resource in page.items
     )
     return EmailPage(items=items, end_of_stream=len(page.items) < limit)
+
+
+async def fetch_activities_page_by_type(
+    client: BackstopClient,
+    *,
+    activity_type: ActivityType,
+    segment: Segment,
+    entity_id: str,
+    limit: int,
+    offset: int,
+    since: date | None = None,
+    until: date | None = None,
+) -> ActivityPage | EmailPage:
+    """Dispatch to the activity or email single-page fetcher for `activity_type`."""
+    if activity_type == "email":
+        return await fetch_email_page(
+            client,
+            segment=segment,
+            entity_id=entity_id,
+            limit=limit,
+            offset=offset,
+            since=since,
+            until=until,
+        )
+    return await fetch_activity_page(
+        client,
+        segment=segment,
+        entity_id=entity_id,
+        stream=activity_type,
+        limit=limit,
+        offset=offset,
+        since=since,
+        until=until,
+    )

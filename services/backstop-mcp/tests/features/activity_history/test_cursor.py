@@ -153,7 +153,7 @@ class TestDecodeCursor:
         segment: Segment = "organizations",
         entity_id: str = "42",
         limit: int = 10,
-        activity_types: Collection[BackstopActivityType] | None = None,
+        activity_types: Collection[ActivityType] | None = None,
         since: date | None = None,
         until: date | None = None,
         consumed: Mapping[ActivityType, int] | None = None,
@@ -189,6 +189,14 @@ class TestDecodeCursor:
         cursor = self._cursor(activity_types=["note", "meeting", "meeting"])
         decoded = decode_cursor(cursor)
         assert decoded.activity_types == ("meeting", "note")
+
+    def test_activity_types_accepts_email(self) -> None:
+        # `email` lives on a separate endpoint from the four `/activities` types, but it's still
+        # a selectable value in `activity_types` — a caller can ask for email-only, or exclude it
+        # from an otherwise-default set.
+        cursor = self._cursor(activity_types=["email", "meeting"])
+        decoded = decode_cursor(cursor)
+        assert decoded.activity_types == ("email", "meeting")
 
     def test_corrupted_cursor_string_raises_invalid_cursor(self) -> None:
         with pytest.raises(InvalidCursor):
