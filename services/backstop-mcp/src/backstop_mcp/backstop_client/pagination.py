@@ -39,6 +39,42 @@ def _resource_identity(resource: dict[str, object]) -> tuple[str, str]:
 
 
 @dataclass
+class SinglePage(Generic[T]):
+    """One parsed JSON:API page — the primitive both `fetch_page` and `paginate_all` share.
+
+    `total_count` is `meta.totalResourceCount` verbatim — untrustworthy on any endpoint where a
+    date filter degrades it to a running count rather than a true total (see activity streams).
+    `next_path` is `links.next` verbatim; a caller doing explicit offset paging should ignore it
+    rather than follow it, since some endpoints drop the link under a date filter while
+    pagination still works via `page[offset]`.
+    """
+
+    items: list[T] = field(default_factory=list)
+    included: list[dict[str, object]] = field(default_factory=list)
+    total_count: int | None = None
+    next_path: str | None = None
+
+
+def parse_page(content: bytes, schema: type[T], *, path: str) -> SinglePage[T]:
+    """Parse one page's response body as `_Page[schema]` — the one parsing path.
+
+    Shared by `BackstopClient.fetch_page` (single explicit page) and `paginate_all` (the
+    `links.next` walk), so a malformed envelope or item fails the same way — a
+    `BackstopResponseSchemaError` — no matter which caller triggered it.
+    """
+    # Parameterized page model — `adapter_for` caches the compiled adapter process-wide under
+    # this GenericAlias key, so a 10k-record walk does not rebuild schemas per page/item.
+    page_schema = _Page[schema]
+    page = cast(_Page[T], deserialize(content, page_schema, path=path))
+    return SinglePage(
+        items=page.data,
+        included=page.included,
+        total_count=page.meta.total_resource_count if page.meta is not None else None,
+        next_path=page.links.next,
+    )
+
+
+@dataclass
 class PageResult(Generic[T]):
     """Accumulated result of walking a JSON:API `links.next` chain.
 
@@ -63,7 +99,7 @@ async def paginate_all(
     """Walk a JSON:API `links.next` chain, accumulating `data` from every page.
 
     `fetch_page` fetches a single page given a path/URL and query params (the caller supplies
-    auth, retries, and the shared client); this function parses each response as `_Page[schema]`
+    auth, retries, and the shared client); this function parses each response via `parse_page`
     (envelope + typed items in one pass) and follows `links.next`. Stops once accumulated items
     reach `max_records` (if given), setting `truncated=True` — the triggering page is kept in
     full rather than trimmed to the exact count, since callers can trim further themselves and
@@ -76,16 +112,13 @@ async def paginate_all(
     seen_included: set[tuple[str, str]] = set()
     path: str | None = first_path
     params = first_page_params
-    # Parameterized page model — `adapter_for` caches the compiled adapter process-wide under
-    # this GenericAlias key, so a 10k-record walk does not rebuild schemas per page/item.
-    page_schema = _Page[schema]
 
     while path is not None:
         response = await fetch_page(path, params)
         params = None
-        page = cast(_Page[T], deserialize(response.content, page_schema, path=path))
+        page = parse_page(response.content, schema, path=path)
 
-        result.items.extend(page.data)
+        result.items.extend(page.items)
         for resource in page.included:
             identity = _resource_identity(resource)
             if identity in seen_included:
@@ -93,13 +126,13 @@ async def paginate_all(
             seen_included.add(identity)
             result.included.append(resource)
 
-        if result.total_count is None and page.meta is not None:
-            result.total_count = page.meta.total_resource_count
+        if result.total_count is None and page.total_count is not None:
+            result.total_count = page.total_count
 
         if max_records is not None and len(result.items) >= max_records:
             result.truncated = True
             break
 
-        path = page.links.next
+        path = page.next_path
 
     return result
