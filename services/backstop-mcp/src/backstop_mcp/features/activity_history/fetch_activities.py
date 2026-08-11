@@ -175,7 +175,7 @@ def _email_date_filter_params(*, since: date | None, until: date | None) -> dict
 def _truncate_since(
     items: tuple[ActivityItem, ...], *, since: date
 ) -> tuple[tuple[ActivityItem, ...], bool]:
-    """Drop the first item older than `since` and everything after it (stream is `-effectiveDate`)."""
+    """Drop the first item older than `since` and everything after (stream is `-effectiveDate`)."""
     for index, item in enumerate(items):
         if item.effective_date is not None and item.effective_date < since:
             return items[:index], True
