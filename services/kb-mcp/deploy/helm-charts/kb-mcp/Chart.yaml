@@ -2,8 +2,8 @@ apiVersion: v2
 name: kb-mcp
 description: Knowledge Base Search MCP — Unique KB search via FastMCP + unique-mcp.
 type: application
-version: 0.0.1
-appVersion: 0.0.1
+version: 0.1.0
+appVersion: 0.1.0
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
