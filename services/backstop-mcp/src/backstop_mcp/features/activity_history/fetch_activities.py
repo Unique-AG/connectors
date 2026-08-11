@@ -16,6 +16,7 @@ Backstop quirks this layer absorbs:
 import logging
 from datetime import date, datetime
 from typing import ClassVar, Literal
+from urllib.parse import quote
 
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
@@ -235,7 +236,7 @@ async def fetch_activity_page(
         },
     )
     page = await client.fetch_page(
-        f"/{segment}/{entity_id}/activities",
+        f"/{segment}/{quote(entity_id, safe='')}/activities",
         schema=_ActivityResource,
         params={
             "fields": _ACTIVITY_FIELDS,
@@ -296,7 +297,7 @@ async def fetch_email_page(
         },
     )
     page = await client.fetch_page(
-        f"/{segment}/{entity_id}/emails",
+        f"/{segment}/{quote(entity_id, safe='')}/emails",
         schema=_EmailResource,
         params={
             "fields": _EMAIL_FIELDS,
