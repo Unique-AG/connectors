@@ -1,33 +1,16 @@
-"""Per-stream single-page fetch for the four activity types plus email.
+"""Per-stream single-page fetch for meetings/calls/notes/documents and email.
 
-This is only the per-stream single-page fetch primitive: given a stream kind, an entity, a
-`limit`/`offset`, and optional `since`/`until` bounds, fetch exactly one page and report typed
-items plus whether the stream is now exhausted. The k-way merge across streams, the response/wire
-models for a tool payload, and config-driven page sizing all live in later modules — see the
-package docstring.
+Given a stream, entity, `limit`/`offset`, and optional date bounds, fetch one page and report
+typed items plus whether the stream is exhausted.
 
-**Why per-type, not one `activityType` request covering all four**: the activities list cannot
-carry the meeting/call subtype back on the wire. Both meetings and calls surface as JSON:API
-resources whose own `id` looks like `meeting-or-calls_76280387` (Backstop's
-`{internal-type}_{numeric-id}` convention) and whose `specificResource.resourceType` is literally
-the string `"meeting-or-calls"` — there is no field that distinguishes a meeting from a call in
-the response. Requesting one `activityType` per stream is what lets each item be labelled
-`stream="meeting"` vs `stream="call"` at all: the label is carried through from what *we asked
-for*, not parsed back out of the response.
-
-**Why pagination never reads `links.next`/`total_count`**: a date filter on `/activities` (
-`filter[effectiveDate][ge|le]`) makes `links.next` disappear and degrades `totalResourceCount` to
-a running count. Driving every page via explicit `page[limit]`/`page[offset]` through
-`BackstopClient.fetch_page` sidesteps that regardless of whether a date filter is present, so
-`ActivityPage`/`EmailPage` don't even expose those fields — there's no way for a later layer to
-misuse them.
-
-**The two date dialects**: activities take `filter[effectiveDate][ge|le]`, but `ge`+`le` together
-silently return zero rows, so a both-bounds request sends `le` only and this layer truncates the
-`since` side client-side (see `_truncate_since`). Emails take `filter[startDate]`/
-`filter[endDate]`, which combine into a true range server-side, so no client-side truncation is
-needed there — and `filter[sentTimestamp][ge]` must never be sent, since Backstop silently ignores
-it (accepted, count unchanged, wrong answer, no error).
+Backstop quirks this layer absorbs:
+- Meetings and calls are indistinguishable on the wire (`meeting-or-calls`); request one
+  `activityType` at a time and label items from what we asked for.
+- Date filters on `/activities` break `links.next` / `totalResourceCount` — always page via
+  explicit `page[limit]`/`page[offset]`.
+- `filter[effectiveDate][ge]`+`[le]` together return zero rows; both-bounds sends `le` only and
+  truncates `since` client-side. Emails use `filter[startDate]`/`filter[endDate]` as a real range.
+- Never send `filter[sentTimestamp][ge]` — Backstop accepts it and silently ignores it.
 """
 
 from datetime import date, datetime
@@ -50,16 +33,8 @@ __all__ = [
     "fetch_email_page",
 ]
 
-# The four activity kinds this layer can request individually, plus email (a different endpoint
-# entirely). `activityType`'s valid values are `[notes, meetings, calls, documents]` — the plural
-# wire spellings live in `_ACTIVITY_TYPE_FILTER` below, keyed by the singular kind used everywhere
-# else in this codebase's vocabulary.
 BackstopActivityType = Literal["meeting", "call", "note", "document"]
 ActivityType = BackstopActivityType | Literal["email"]
-
-# `{segment}` in `/{segment}/{id}/activities|emails` — organizations for an organization entity,
-# people for a person entity. Party resolution itself (mapping a resolved party to a segment) is a
-# later task; this layer just takes the segment it's told.
 Segment = Literal["organizations", "people"]
 
 _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
@@ -68,22 +43,13 @@ _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "note": "notes",
     "document": "documents",
 }
-
-# Fixed field lists confirmed against the live instance — see module docstring. `description` is
-# fetched despite its size (18-58KB HTML) because a later layer computes a gist from it; this
-# layer carries it through raw.
 _ACTIVITY_FIELDS = (
     "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp"
 )
 _EMAIL_FIELDS = "subject,sentTimestamp,fromEmail,toEmails,ccEmails,hasAttachments,contentUrl"
 
-_ACTIVITY_SORT = "-effectiveDate"
-_EMAIL_SORT = "-sentTimestamp"
-
 
 class _SpecificResource(BaseModel):
-    """The `specificResource` attribute on an activity resource: `{resourceType, resourceId}`."""
-
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     resource_type: str | None = Field(
@@ -95,8 +61,6 @@ class _SpecificResource(BaseModel):
 
 
 class _ActivityAttributes(BaseModel):
-    """Wire shape of one `/activities` resource's `attributes`, restricted to `_ACTIVITY_FIELDS`."""
-
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     title: str | None = None
@@ -116,14 +80,6 @@ class _ActivityAttributes(BaseModel):
 
 
 class _EmailAttributes(BaseModel):
-    """Wire shape of one `/emails` resource's `attributes`, restricted to `_EMAIL_FIELDS`.
-
-    `sent_timestamp` is a real timestamp (not date-only); pydantic's built-in `datetime`
-    coercion already parses Backstop's `2026-06-25T00:00:00.000-0400` spelling (offset without a
-    colon), so no bespoke lenient-datetime parser is needed here the way `LenientDate` is for
-    `effectiveDate`.
-    """
-
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     subject: str | None = None
@@ -147,22 +103,12 @@ class _EmailAttributes(BaseModel):
     )
 
 
-# `fetch_page(schema=...)` wants the type of one element of the JSON:API `data` array — a whole
-# resource (id/type/attributes), not just the attributes model. See `BackstopApiResource` in
-# `backstop_client.json_api`.
 _ActivityResource = BackstopApiResource[_ActivityAttributes]
 _EmailResource = BackstopApiResource[_EmailAttributes]
 
 
 class ActivityItem(BaseModel):
-    """One parsed activity — meeting, call, note, or document, per `stream`.
-
-    `id` is Backstop's own resource id, prefixed for meetings/calls (`meeting-or-calls_...`) and
-    unprefixed-looking-but-still-wire-native for notes/documents. `stream` is never parsed from
-    the response — meetings and calls are indistinguishable on the wire (see module docstring) —
-    it is the stream kind the caller requested this item under. `description` is the raw HTML
-    body, untouched; gisting it is a later layer's job (`activity_history.gist`).
-    """
+    """One activity; `stream` is the requested type (not parsed from the wire)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -182,8 +128,6 @@ class ActivityItem(BaseModel):
 
 
 class EmailItem(BaseModel):
-    """One parsed email from `/{segment}/{id}/emails`."""
-
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     id: str
@@ -197,13 +141,6 @@ class EmailItem(BaseModel):
 
 
 class ActivityPage(BaseModel):
-    """One fetched page of one activity stream.
-
-    `end_of_stream` is true when Backstop's raw page came back shorter than the requested
-    `limit` (no more data), or — only in the both-bounds case — when the `since` cutoff was hit
-    within this page. Deliberately carries no `total_count`/`next_path`: see module docstring.
-    """
-
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     items: tuple[ActivityItem, ...]
@@ -211,10 +148,6 @@ class ActivityPage(BaseModel):
 
 
 class EmailPage(BaseModel):
-    """One fetched page of the email stream. See `ActivityPage` for the `end_of_stream` rule —
-    emails never need client-side since-truncation, so it is always the short-page check alone.
-    """
-
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     items: tuple[EmailItem, ...]
@@ -222,11 +155,7 @@ class EmailPage(BaseModel):
 
 
 def _activity_date_filter_params(*, since: date | None, until: date | None) -> dict[str, object]:
-    """`filter[effectiveDate][...]` per the two-bound rule.
-
-    `ge`+`le` together silently 0-row this endpoint, so a both-bounds request sends `le` only;
-    `_truncate_since` applies the `since` cutoff client-side against the fetched page instead.
-    """
+    # ge+le together silently 0-row; both-bounds sends le only (since truncated client-side).
     if until is not None:
         return {"filter[effectiveDate][le]": until.isoformat()}
     if since is not None:
@@ -235,11 +164,6 @@ def _activity_date_filter_params(*, since: date | None, until: date | None) -> d
 
 
 def _email_date_filter_params(*, since: date | None, until: date | None) -> dict[str, object]:
-    """`filter[startDate]`/`filter[endDate]` — true window bounds, sent independently.
-
-    Never send `filter[sentTimestamp]`: its `[ge]` operator is silently ignored by Backstop
-    (accepted, count unchanged, wrong answer, no error).
-    """
     params: dict[str, object] = {}
     if since is not None:
         params["filter[startDate]"] = since.isoformat()
@@ -251,13 +175,7 @@ def _email_date_filter_params(*, since: date | None, until: date | None) -> dict
 def _truncate_since(
     items: tuple[ActivityItem, ...], *, since: date
 ) -> tuple[tuple[ActivityItem, ...], bool]:
-    """Drop the first item older than `since` and everything after it; report whether that fired.
-
-    The stream is sorted `-effectiveDate` (descending), so once one fetched item's
-    `effective_date` is older than `since`, every later item on this page — and every later page
-    — is too. An item with no parseable `effective_date` can't be compared, so it's kept as-is and
-    scanning continues past it rather than being treated as the cutoff.
-    """
+    """Drop the first item older than `since` and everything after it (stream is `-effectiveDate`)."""
     for index, item in enumerate(items):
         if item.effective_date is not None and item.effective_date < since:
             return items[:index], True
@@ -275,27 +193,16 @@ async def fetch_activity_page(
     since: date | None = None,
     until: date | None = None,
 ) -> ActivityPage:
-    """Fetch exactly one page of one activity stream kind (meeting/call/note/document).
-
-    Requests a single `filter[activityType][eq]` value — never a comma-joined multi-value — so
-    every returned item can be labelled `stream=<stream>` without parsing anything back out of
-    the response (see module docstring). `limit`/`offset` go straight through to
-    `BackstopClient.fetch_page`; alignment (`offset` a multiple of `limit`) is the caller's
-    responsibility, not re-derived or validated here.
-
-    Activities are frequently future-dated (scheduled meetings) and are never filtered out for
-    that reason — "newest first" legitimately includes future items.
-    """
-    params: dict[str, object] = {
-        "fields": _ACTIVITY_FIELDS,
-        "sort": _ACTIVITY_SORT,
-        "filter[activityType][eq]": _ACTIVITY_TYPE_FILTER[stream],
-        **_activity_date_filter_params(since=since, until=until),
-    }
+    """Fetch one page of one activity type. Future-dated items are kept."""
     page = await client.fetch_page(
         f"/{segment}/{entity_id}/activities",
         schema=_ActivityResource,
-        params=params,
+        params={
+            "fields": _ACTIVITY_FIELDS,
+            "sort": "-effectiveDate",
+            "filter[activityType][eq]": _ACTIVITY_TYPE_FILTER[stream],
+            **_activity_date_filter_params(since=since, until=until),
+        },
         page_size=limit,
         offset=offset,
     )
@@ -306,7 +213,6 @@ async def fetch_activity_page(
         )
         for resource in page.items
     )
-
     if since is not None and until is not None:
         items, cutoff_hit = _truncate_since(items, since=since)
         return ActivityPage(items=items, end_of_stream=cutoff_hit or raw_count < limit)
@@ -323,22 +229,15 @@ async def fetch_email_page(
     since: date | None = None,
     until: date | None = None,
 ) -> EmailPage:
-    """Fetch exactly one page of the email stream.
-
-    `since`/`until` map to `filter[startDate]`/`filter[endDate]` independently — unlike
-    activities, both bounds combine into a true range server-side, so no client-side truncation
-    is needed. `limit`/`offset` go straight through to `BackstopClient.fetch_page`, same as
-    `fetch_activity_page`.
-    """
-    params: dict[str, object] = {
-        "fields": _EMAIL_FIELDS,
-        "sort": _EMAIL_SORT,
-        **_email_date_filter_params(since=since, until=until),
-    }
+    """Fetch one page of emails. `since`/`until` map to startDate/endDate independently."""
     page = await client.fetch_page(
         f"/{segment}/{entity_id}/emails",
         schema=_EmailResource,
-        params=params,
+        params={
+            "fields": _EMAIL_FIELDS,
+            "sort": "-sentTimestamp",
+            **_email_date_filter_params(since=since, until=until),
+        },
         page_size=limit,
         offset=offset,
     )
