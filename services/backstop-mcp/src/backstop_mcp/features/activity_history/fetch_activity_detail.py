@@ -29,6 +29,7 @@ string alone, whether to fetch attendees at all.
 import logging
 from datetime import datetime
 from typing import ClassVar
+from urllib.parse import quote
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -139,7 +140,7 @@ async def fetch_activity_detail(client: BackstopClient, *, activity_id: str) -> 
     """
     logger.debug("activity_history.detail.fetch", extra={"activity_id": activity_id})
     document = await client.get(
-        f"/entity-activity-details/{activity_id}",
+        f"/entity-activity-details/{quote(activity_id, safe='')}",
         schema=_ActivityDetailDocument,
     )
     attributes = document.data.attributes
@@ -179,7 +180,7 @@ async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[
         extra={"activity_id": activity_id, "resource_id": resource_id},
     )
     document = await client.get(
-        f"/meeting-or-calls/{resource_id}/attendees",
+        f"/meeting-or-calls/{quote(resource_id, safe='')}/attendees",
         params={"fields": _ATTENDEE_FIELDS},
         schema=_AttendeeDocument,
     )

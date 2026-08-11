@@ -406,6 +406,26 @@ class TestActivityParsing:
         assert not hasattr(page, "total_count")
         assert not hasattr(page, "next_path")
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_entity_id_path_segment_is_percent_encoded(self, client: BackstopClient) -> None:
+        """Slash-bearing entity ids must not reshape the authenticated CRM path."""
+        route = respx.get(f"{BASE_URL}/organizations/foo%2F..%2Fbar/activities").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await fetch_activity_page(
+            client,
+            segment="organizations",
+            entity_id="foo/../bar",
+            stream="meeting",
+            limit=5,
+            offset=0,
+        )
+
+        assert route.call_count == 1
+        assert "/organizations/foo%2F..%2Fbar/activities" in str(route.calls.last.request.url)
+
 
 def _email(id_: str, sent_timestamp: str) -> dict[str, object]:
     return resource(id_, "emails", subject=f"Subject {id_}", sentTimestamp=sent_timestamp)
