@@ -110,9 +110,7 @@ class TestEmailSearch:
         """Display-name forms must exact-filter on the bare address, not the raw string."""
         raw = '"Ada Lovelace" <ada@example.com>'
         normalized = "ada@example.com"
-        email1 = respx.get(
-            f"{BASE_URL}/people", params={"filter[email][eq]": normalized}
-        ).mock(
+        email1 = respx.get(f"{BASE_URL}/people", params={"filter[email][eq]": normalized}).mock(
             return_value=httpx.Response(
                 200,
                 json=collection(resource("p1", "people", name="Ada Lovelace")),
