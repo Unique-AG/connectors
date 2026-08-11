@@ -235,7 +235,7 @@ class TestDefensiveParsing:
     async def test_activity_id_path_segment_is_percent_encoded(
         self, connect_user: ConnectUser
     ) -> None:
-        await connect_user("user-ad-6", "org-frank")  # pyright: ignore[reportGeneralTypeIssues]
+        await connect_user("user-ad-6", "org-frank-ad")  # pyright: ignore[reportGeneralTypeIssues]
 
         activity_id = "notes_1/../2"
         details = respx.get(f"{BASE_URL}/entity-activity-details/notes_1%2F..%2F2").mock(
