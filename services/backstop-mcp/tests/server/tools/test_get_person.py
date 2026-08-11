@@ -147,7 +147,7 @@ class TestGetPerson:
         self, connect_user: ConnectUser
     ) -> None:
         """Name search uses shared PERSON_* types; a contact hit must GET /contacts/{id}."""
-        await connect_user("user-person-4", "person-erin")  # pyright: ignore[reportGeneralTypeIssues]
+        await connect_user("user-person-4", "person-erin-contact")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
