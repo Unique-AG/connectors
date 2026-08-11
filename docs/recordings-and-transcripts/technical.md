@@ -446,7 +446,7 @@ Capture requires four delegated scopes **in addition to** the chat and messaging
 | `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | **Yes** | Read transcript content |
 | `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | **Yes** | Read recording content |
 
-Grant admin consent for the two privileged scopes with the URL in [Grant admin consent](./operator.md#grant-admin-consent).
+Grant admin consent for the two privileged scopes with the URL in [Grant admin consent](./operator.md#Grant-admin-consent).
 
 ### Least-privilege justification
 
