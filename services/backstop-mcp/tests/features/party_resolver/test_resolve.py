@@ -18,6 +18,7 @@ from backstop_mcp.features.resolution import (
     BatchAmbiguous,
     BatchResolved,
     NotFound,
+    NotFoundResponse,
     Resolved,
 )
 from tests.features.party_resolver.helpers import (
@@ -290,6 +291,7 @@ class TestQuickSearch:
         assert isinstance(result, Ambiguous)
 
         response = unresolved_party_response(result)
+        assert not isinstance(response, NotFoundResponse)
         assert [c.id for c in response.candidates] == ["p1", "o2"]
         assert [c.search_type for c in response.candidates] == ["people", "organizations"]
 
