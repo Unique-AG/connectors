@@ -12,6 +12,7 @@ doc's Error Handling section).
 """
 
 import asyncio
+import logging
 from collections.abc import Coroutine
 from urllib.parse import quote
 
@@ -50,6 +51,8 @@ from backstop_mcp.server.tools.utils.get_activity_history_utils import (
     PartyAttributes,
     extract_fetch_activity_history_args,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityHistoryFirstPageInput",
@@ -102,6 +105,17 @@ async def get_activity_history(
     if isinstance(args, CallToolResult):
         return args
 
+    logger.info(
+        "activity_history.get.start",
+        extra={
+            "segment": args.segment,
+            "entity_id": args.entity_id,
+            "streams": list(args.active_activity_types),
+            "limit": args.limit,
+            "since": args.since.isoformat() if args.since is not None else None,
+            "until": args.until.isoformat() if args.until is not None else None,
+        },
+    )
     document = await client.get(
         f"/{args.segment}/{quote(args.entity_id, safe='')}",
         params={"include": EntityRelationshipInclude.for_employment()},
@@ -126,10 +140,7 @@ async def get_activity_history(
     )
 
     merged = merge_page(
-        {
-            activity_type: (page.items, page.end_of_stream)
-            for activity_type, page in pages.items()
-        },
+        {activity_type: (page.items, page.end_of_stream) for activity_type, page in pages.items()},
         args.consumed,
     )
     records = [
@@ -149,6 +160,17 @@ async def get_activity_history(
     attributes = document.data.attributes
     employments = get_employment_index_factory().index(**entity_relationships(document)).links()
 
+    logger.info(
+        "activity_history.get.completed",
+        extra={
+            "segment": args.segment,
+            "entity_id": args.entity_id,
+            "records": len(records),
+            "employments": len(employments),
+            "has_next_cursor": next_cursor_out is not None,
+            "open_streams": sorted(merged.consumed),
+        },
+    )
     return tool_result(
         ActivityHistoryResolvedResponse(
             resolved=party_response(
@@ -158,5 +180,6 @@ async def get_activity_history(
             next_cursor=next_cursor_out,
             as_of=as_of_response(extract_as_of(attributes)),
             employments=employments,
-        )
+        ),
+        exclude_none=True,
     )

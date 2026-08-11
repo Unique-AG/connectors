@@ -595,6 +595,138 @@ class TestPaginate:
         assert [item["id"] for item in result.included] == ["9", "10"]
 
 
+class TestFetchPage:
+    """`fetch_page` returns exactly one parsed page — no `links.next` walk."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_items_included_total_count_and_next_path(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [{"id": "1"}, {"id": "2"}],
+                    "included": [{"type": "lov-system-sets", "id": "9"}],
+                    "links": {"next": "/records?page[offset]=25"},
+                    "meta": {"totalResourceCount": 42},
+                },
+            )
+        )
+
+        result = await factory.for_credential(_credential()).fetch_page("/records", schema=_Record)
+
+        assert result == SinglePage(
+            items=[_Record(id="1"), _Record(id="2")],
+            included=[{"type": "lov-system-sets", "id": "9"}],
+            total_count=42,
+            next_path="/records?page[offset]=25",
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_defaults_page_size_and_zero_offset(self, factory: BackstopClientFactory) -> None:
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+
+        await factory.for_credential(_credential()).fetch_page("/records", schema=_Record)
+
+        params = route.calls.last.request.url.params
+        assert params["page[limit]"] == str(BackstopConfig().default_page_size)
+        assert params["page[offset]"] == "0"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_sends_caller_supplied_page_size_and_offset(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+
+        await factory.for_credential(_credential()).fetch_page(
+            "/records", schema=_Record, page_size=25, offset=50
+        )
+
+        params = route.calls.last.request.url.params
+        assert params["page[limit]"] == "25"
+        assert params["page[offset]"] == "50"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_report_paths_default_to_the_report_page_size(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        route = respx.get(f"{_BASE_URL}/reports").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+
+        await factory.for_credential(_credential()).fetch_page("/reports", schema=_Record)
+
+        assert route.calls.last.request.url.params["page[limit]"] == str(
+            BackstopConfig().report_page_size
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_page_size_and_offset_override_caller_supplied_params(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        """Unlike `.paginate()`, `fetch_page` always drives limit/offset from its own args —
+        there's no "first page vs later pages" split, so an explicit `page_size`/`offset`
+        always wins over whatever a caller passed in `params`.
+        """
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+
+        await factory.for_credential(_credential()).fetch_page(
+            "/records",
+            schema=_Record,
+            params={"page[limit]": 999, "page[offset]": 999},
+            page_size=10,
+            offset=20,
+        )
+
+        params = route.calls.last.request.url.params
+        assert params["page[limit]"] == "10"
+        assert params["page[offset]"] == "20"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_page_param_names_come_from_config(self) -> None:
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+        built = client_factory(page_limit_param="limit", page_offset_param="offset")
+        try:
+            await built.for_credential(_credential()).fetch_page(
+                "/records", schema=_Record, page_size=25, offset=50
+            )
+        finally:
+            await built.aclose()
+
+        params = route.calls.last.request.url.params
+        assert params["limit"] == "25"
+        assert params["offset"] == "50"
+        assert "page[limit]" not in params
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_malformed_item_raises_schema_error(self, factory: BackstopClientFactory) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": [{"not_id": "1"}], "links": {}})
+        )
+
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            await factory.for_credential(_credential()).fetch_page("/records", schema=_Record)
+
+        assert exc_info.value.path == "/records"
+        assert exc_info.value.schema_name == "_Page[_Record]"
+
+
 class TestUntrustedNextLink:
     @pytest.mark.asyncio
     @respx.mock

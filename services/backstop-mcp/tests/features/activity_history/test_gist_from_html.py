@@ -69,9 +69,7 @@ class TestTableConversion:
 
         gist = to_gist(html, max_chars=300)
 
-        assert gist.text == (
-            "| Firm | Status |\n| --- | --- |\n|  |  |\n| Real Corp | Active |"
-        )
+        assert gist.text == ("| Firm | Status |\n| --- | --- |\n|  |  |\n| Real Corp | Active |")
 
     def test_a_dash_placeholder_row_deeper_in_a_th_table_survives(self) -> None:
         # A row of `-` cells (an "N/A" placeholder) is shaped like a separator row, but only the
@@ -86,9 +84,7 @@ class TestTableConversion:
 
         gist = to_gist(html, max_chars=300)
 
-        assert gist.text == (
-            "| Firm | Status |\n| --- | --- |\n| - | - |\n| Real Corp | Active |"
-        )
+        assert gist.text == ("| Firm | Status |\n| --- | --- |\n| - | - |\n| Real Corp | Active |")
 
     def test_blank_spacer_and_dash_placeholder_rows_both_survive_together(self) -> None:
         # The exact reproduction from the bug report: both a genuine blank spacer row and a
@@ -105,11 +101,7 @@ class TestTableConversion:
         gist = to_gist(html, max_chars=300)
 
         assert gist.text == (
-            "| Firm | Status |\n"
-            "| --- | --- |\n"
-            "|  |  |\n"
-            "| - | - |\n"
-            "| Real Corp | Active |"
+            "| Firm | Status |\n| --- | --- |\n|  |  |\n| - | - |\n| Real Corp | Active |"
         )
 
     def test_two_consecutive_td_only_tables_each_get_their_own_header_stripped(self) -> None:

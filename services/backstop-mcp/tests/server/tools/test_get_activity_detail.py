@@ -108,9 +108,7 @@ class TestMeetingOrCall:
         long_paragraph = " ".join(f"word{i}" for i in range(5_000))
         html = f"<p>{long_paragraph}</p>"
         _details_route(activity_id).mock(
-            return_value=httpx.Response(
-                200, json=_detail_document(activity_id, description=html)
-            )
+            return_value=httpx.Response(200, json=_detail_document(activity_id, description=html))
         )
         _attendees_route(activity_id).mock(return_value=httpx.Response(200, json=collection()))
 

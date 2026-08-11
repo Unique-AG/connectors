@@ -203,9 +203,7 @@ class TestFirstCallByTrustedPartyId:
             id="o42", search_type="organizations", name="Capstone"
         )
         assert result.employments == []
-        assert result.as_of == AsOf(
-            modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"
-        )
+        assert result.as_of == AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops")
         assert documents.call_count == 0
         assert _record_keys(result.records) == [
             *[("email", f"e{i}") for i in range(10)],
@@ -254,7 +252,9 @@ class TestFirstCallBySearch:
 
         assert result.resolved.id == "o7"
         assert _record_keys(result.records) == [("meeting", "m1")]
-        assert result.records[0].title == "Item m1"
+        first = result.records[0]
+        assert isinstance(first, ActivityRecordResponse)
+        assert first.title == "Item m1"
         # Short page → stream exhausted → no next page.
         assert result.next_cursor is None
 
@@ -310,9 +310,7 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_never_elicit(), _first(party_type="person", search="Nope")
             ),
-            ActivityHistoryResolvedResponse
-            | PartyAmbiguousResponse
-            | NotFoundResponse,
+            ActivityHistoryResolvedResponse | PartyAmbiguousResponse | NotFoundResponse,
         )
 
         assert isinstance(result, NotFoundResponse)
@@ -404,9 +402,7 @@ class TestResumedCall:
         assert first.next_cursor is not None
 
         second = tool_model(
-            await get_activity_history(
-                ctx_never_elicit(), _next(next_cursor=first.next_cursor)
-            ),
+            await get_activity_history(ctx_never_elicit(), _next(next_cursor=first.next_cursor)),
             ActivityHistoryResolvedResponse,
         )
 
@@ -432,6 +428,16 @@ class TestRequestShape:
     def test_first_page_input_requires_party_type(self) -> None:
         with pytest.raises(ValidationError):
             ActivityHistoryFirstPageInput.model_validate({"type": "first", "party_id": "o42"})
+
+    def test_first_page_input_rejects_non_positive_limit(self) -> None:
+        with pytest.raises(ValidationError):
+            ActivityHistoryFirstPageInput.model_validate(
+                {"type": "first", "party_type": "organization", "party_id": "o42", "limit": 0}
+            )
+        with pytest.raises(ValidationError):
+            ActivityHistoryFirstPageInput.model_validate(
+                {"type": "first", "party_type": "organization", "party_id": "o42", "limit": -1}
+            )
 
     def test_next_page_input_requires_next_cursor(self) -> None:
         with pytest.raises(ValidationError):
@@ -469,9 +475,7 @@ class TestHygieneDecoration:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_organization_party_gets_employments(
-        self, connect_user: ConnectUser
-    ) -> None:
+    async def test_organization_party_gets_employments(self, connect_user: ConnectUser) -> None:
         await connect_user("user-ah-9", "org-jill")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
@@ -502,18 +506,14 @@ class TestHygieneDecoration:
 class TestPartialFailurePropagates:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_one_failing_stream_fails_the_whole_call(
-        self, connect_user: ConnectUser
-    ) -> None:
+    async def test_one_failing_stream_fails_the_whole_call(self, connect_user: ConnectUser) -> None:
         await connect_user("user-ah-10", "org-kelly")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o5").mock(
             return_value=httpx.Response(200, json=_org_document(org_id="o5"))
         )
         _activities_route("organizations", "o5", "meetings").mock(
-            return_value=httpx.Response(
-                500, json={"errors": [{"detail": "boom"}]}
-            )
+            return_value=httpx.Response(500, json={"errors": [{"detail": "boom"}]})
         )
         _activities_route("organizations", "o5", "notes").mock(
             return_value=httpx.Response(200, json=collection(_activity("n1", "2026-01-01")))
@@ -558,4 +558,6 @@ class TestDocumentInclusion:
         )
 
         assert _record_keys(result.records) == [("document", "d1")]
-        assert result.records[0].title == "Item d1"
+        first = result.records[0]
+        assert isinstance(first, ActivityRecordResponse)
+        assert first.title == "Item d1"

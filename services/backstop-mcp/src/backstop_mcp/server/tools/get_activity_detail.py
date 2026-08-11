@@ -18,6 +18,7 @@ bespoke not-found response, matching `get_person`/`get_activity_history`'s conve
 """
 
 import asyncio
+import logging
 from typing import Annotated
 
 from fastmcp import Context
@@ -35,6 +36,8 @@ from backstop_mcp.features.activity_history import (
 )
 from backstop_mcp.server.runtime import get_backstop_client
 from backstop_mcp.server.tools.results import tool_result
+
+logger = logging.getLogger(__name__)
 
 
 @tool(
@@ -70,13 +73,31 @@ async def get_activity_detail(
     client = await get_backstop_client()
     detail: ActivityDetail
     attendees: tuple[Attendee, ...]
-    if is_meeting_or_call(activity_id):
+    fetch_attendees_for = is_meeting_or_call(activity_id)
+    logger.info(
+        "activity_history.detail.get.start",
+        extra={"activity_id": activity_id, "fetch_attendees": fetch_attendees_for},
+    )
+    if fetch_attendees_for:
         detail, attendees = await asyncio.gather(
             fetch_activity_detail(client, activity_id=activity_id),
             fetch_attendees(client, activity_id=activity_id),
         )
     else:
+        logger.debug(
+            "activity_history.detail.get.skip_attendees",
+            extra={"activity_id": activity_id},
+        )
         detail = await fetch_activity_detail(client, activity_id=activity_id)
         attendees = ()
 
+    logger.info(
+        "activity_history.detail.get.completed",
+        extra={
+            "activity_id": activity_id,
+            "type": detail.type,
+            "attendees": len(attendees),
+            "has_body": detail.description is not None,
+        },
+    )
     return tool_result(to_activity_detail_response(detail, attendees), exclude_none=True)
