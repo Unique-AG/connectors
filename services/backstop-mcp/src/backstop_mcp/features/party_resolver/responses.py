@@ -25,9 +25,15 @@ from backstop_mcp.features.resolution import (
 
 
 class PartyCandidateResponse(CandidateResponse):
-    """One ambiguous party match, returned so the model can ask the user to pick one."""
+    """One ambiguous party match, returned so the model can ask the user to pick one.
+
+    `search_type` is the candidate's own collection (which may differ from the requested
+    scope when `enhance_search_types` returns a cross-type hit) — callers must echo it
+    verbatim with `id` when retrying as a trusted `party_id`.
+    """
 
     id: str
+    search_type: SearchType
     name: str | None = None
 
 
@@ -71,6 +77,7 @@ def party_candidate_response(candidate: PartyCandidate) -> PartyCandidateRespons
         key=candidate.key,
         label=candidate.label,
         id=party.id,
+        search_type=party.search_type,
         name=party.name,
     )
 
