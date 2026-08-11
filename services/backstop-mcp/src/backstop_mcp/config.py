@@ -304,6 +304,24 @@ class BackstopConfig(BaseSettings):
         return self
 
 
+class ActivityHistoryConfig(BaseSettings):
+    """Tuning knobs for the activity-history feature (meetings/calls/notes/documents + email).
+
+    `page_size` is a PER-STREAM page size: each active stream (up to five — four activity types
+    plus email) is fetched with this same `page[limit]`, and the merge step does not cap the
+    combined result. A page can therefore return up to `page_size * number of active streams`
+    records — a deliberate simplification (UN-23680) rather than a hard total-output cap.
+
+    `gist_chars` is the character budget `gist_from_html.to_gist` truncates each record's
+    body to.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ACTIVITY_HISTORY_")
+
+    page_size: int = Field(default=10, gt=0)
+    gist_chars: int = Field(default=300, gt=0)
+
+
 class DatabaseConfig(BaseSettings):
     """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials.
 

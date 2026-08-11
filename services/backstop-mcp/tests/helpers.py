@@ -16,6 +16,7 @@ from backstop_mcp.app import retry_settings, transport_settings
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.factory import BackstopClientFactory
 from backstop_mcp.config import BackstopConfig
+from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.auth.context import BackstopAuthContext
 from backstop_mcp.features.custom_fields import (
     CustomFieldsService,
@@ -71,11 +72,14 @@ def install_services(
     backstop: BackstopClientFactory,
     custom_fields: CustomFieldsService,
     employment_index_factory: EmploymentIndexFactory | None = None,
+    activity_history_settings: ActivityHistorySettings | None = None,
 ) -> Services:
     services = Services(
         backstop=backstop,
         custom_fields=custom_fields,
         employment_index_factory=employment_index_factory or build_employment_index_factory(),
+        activity_history=activity_history_settings
+        or ActivityHistorySettings(page_size=10, gist_max_chars=300),
     )
     configure_services(services)
     return services

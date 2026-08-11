@@ -9,6 +9,8 @@ from collections.abc import Awaitable, Callable
 
 from mcp.types import CallToolResult
 
+from backstop_mcp.server.tools.get_activity_detail import get_activity_detail
+from backstop_mcp.server.tools.get_activity_history import get_activity_history
 from backstop_mcp.server.tools.get_organization import get_organization
 from backstop_mcp.server.tools.get_person import get_person
 from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
@@ -21,4 +23,6 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_organization,
     get_person,
     list_custom_fields,
+    get_activity_history,
+    get_activity_detail,
 )

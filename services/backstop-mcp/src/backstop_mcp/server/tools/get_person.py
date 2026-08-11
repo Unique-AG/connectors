@@ -10,12 +10,10 @@ from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.custom_fields import glossary_meta
 from backstop_mcp.features.data_hygiene import (
     AsOf,
-    DepartedContactResponse,
-    EmploymentStatus,
+    EmploymentLinkResponse,
     EntityRelationshipInclude,
     ProvenanceFields,
     as_of_response,
-    departed_response,
     entity_relationships,
     extract_as_of,
 )
@@ -43,19 +41,17 @@ class PersonAttributes(ProvenanceFields):
 class PersonResolvedResponse(BaseModel):
     """`get_person` once the person was found and fetched.
 
-    Always returns the person when resolved. When employment has ended anywhere, `departed` is
-    true and `departures` carries one entry per organization the person has left, each already
-    identifying its own `organization_id` — relay every entry to the user and do not present the
-    person as a current contact at any of those organizations unless they asked for historical
-    contacts.
+    Always returns the person when resolved. `employments` lists every current and former
+    organization link the CRM records for this person — relay each entry, and do not present the
+    person as a current contact at any organization marked `status="former"` unless they asked
+    for historical contacts.
     """
 
     status: Literal["resolved"] = "resolved"
     person: PersonAttributes
     resolved: ResolvedPartyResponse
     as_of: AsOf | None = None
-    departed: bool = False
-    departures: list[DepartedContactResponse] = Field(default_factory=list)
+    employments: list[EmploymentLinkResponse] = Field(default_factory=list)
 
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -100,10 +96,9 @@ async def get_person(
     Exactly one of party_id or search must be provided.
 
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
-    trip). When the CRM links the person to an organization as a past employee, or an employment
-    endDate has passed, `departed` is true — always relay `departed` / `departures` to the
-    user; do not present a departed person as a current contact unless they explicitly asked for
-    historical contacts.
+    trip). `employments` lists every current and former organization link — always relay those
+    entries; do not present a person as a current contact at an organization whose link has
+    `status="former"` unless they explicitly asked for historical contacts.
 
     `as_of` is plain provenance (modifiedTimestamp / modifiedBy). Relay it; do not treat
     record age as a staleness verdict.
@@ -132,17 +127,7 @@ async def get_person(
         schema=BackstopApiResourceDocument[PersonAttributes],
     )
     attributes = document.data.attributes
-    index = get_employment_index_factory().index(
-        **entity_relationships(document),
-    )
-    departures: list[DepartedContactResponse] = []
-    for record in index.pairs(status=EmploymentStatus.FORMER):
-        assert record.departure is not None, (
-            "EmploymentIndex invariant: a FORMER record always carries departure evidence"
-        )
-        response = departed_response(record.departure)
-        assert response is not None
-        departures.append(response)
+    index = get_employment_index_factory().index(**entity_relationships(document))
 
     return tool_result(
         PersonResolvedResponse(
@@ -151,7 +136,6 @@ async def get_person(
                 party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
             ),
             as_of=as_of_response(extract_as_of(attributes)),
-            departed=bool(departures),
-            departures=departures,
+            employments=index.links(),
         )
     )

@@ -1,7 +1,7 @@
 """The tool-facing responses: every field of the internal signal has to survive the hop.
 
 A dropped field here is invisible to the feature tests — the scan would still be right and the
-user would still never hear about it — so each response is asserted whole.
+caller would still never hear about it — so each response is asserted whole.
 """
 
 from datetime import date
@@ -12,9 +12,12 @@ from backstop_mcp.features.data_hygiene import (
     DepartedContactResponse,
     DepartedEmployment,
     DepartureSignal,
+    EmploymentStatus,
     as_of_response,
     departed_response,
 )
+from backstop_mcp.features.data_hygiene.employment import EmploymentIndex
+from backstop_mcp.features.data_hygiene.types import EmploymentEdge
 
 
 class TestAsOf:
@@ -81,3 +84,101 @@ class TestDepartedResponse:
             "former_relationship_type",
             "end_date_passed",
         }
+
+
+class TestEmploymentIndexLinks:
+    def test_current_link_carries_both_sides_without_a_signal(self) -> None:
+        index = EmploymentIndex(
+            [
+                EmploymentEdge(
+                    person_id="p1",
+                    person_type="people",
+                    organization_id="o1",
+                    organization_type="organizations",
+                    relationship_type_id="456439",
+                    relationship_type_name="is employee of",
+                    status=EmploymentStatus.CURRENT,
+                    effective_date=date(2024, 1, 1),
+                    departure=None,
+                )
+            ]
+        )
+
+        assert index.links()[0].model_dump() == {
+            "status": "current",
+            "person_id": "p1",
+            "person_type": "people",
+            "organization_id": "o1",
+            "organization_type": "organizations",
+            "signal": None,
+            "end_date": None,
+            "relationship_type_id": "456439",
+            "relationship_type_name": "is employee of",
+        }
+
+    def test_former_link_carries_the_departure_signal(self) -> None:
+        index = EmploymentIndex(
+            [
+                EmploymentEdge(
+                    person_id="p1",
+                    person_type="people",
+                    organization_id="o1",
+                    organization_type="organizations",
+                    relationship_type_id="459795",
+                    relationship_type_name="is a former employee of",
+                    status=EmploymentStatus.FORMER,
+                    effective_date=date(2022, 12, 31),
+                    departure=DepartedEmployment(
+                        signal=DepartureSignal.END_DATE,
+                        organization_id="o1",
+                        organization_type="organizations",
+                        end_date=date(2022, 12, 31),
+                        relationship_type_id="459795",
+                        relationship_type_name="is a former employee of",
+                    ),
+                )
+            ]
+        )
+
+        link = index.links()[0]
+        assert link.status == "former"
+        assert link.signal is DepartureSignal.END_DATE
+        assert link.end_date == date(2022, 12, 31)
+
+    def test_links_lists_current_then_former(self) -> None:
+        index = EmploymentIndex(
+            [
+                EmploymentEdge(
+                    person_id="p1",
+                    person_type="people",
+                    organization_id="orgB",
+                    organization_type="organizations",
+                    relationship_type_id="456439",
+                    relationship_type_name="is employee of",
+                    status=EmploymentStatus.CURRENT,
+                    effective_date=date(2024, 1, 1),
+                    departure=None,
+                ),
+                EmploymentEdge(
+                    person_id="p1",
+                    person_type="people",
+                    organization_id="orgA",
+                    organization_type="organizations",
+                    relationship_type_id="459795",
+                    relationship_type_name="is a former employee of",
+                    status=EmploymentStatus.FORMER,
+                    effective_date=date(2020, 1, 1),
+                    departure=DepartedEmployment(
+                        signal=DepartureSignal.FORMER_TYPE,
+                        organization_id="orgA",
+                        organization_type="organizations",
+                        relationship_type_id="459795",
+                        relationship_type_name="is a former employee of",
+                    ),
+                ),
+            ]
+        )
+
+        links = index.links()
+        assert [link.status for link in links] == ["current", "former"]
+        assert [link.organization_id for link in links] == ["orgB", "orgA"]
