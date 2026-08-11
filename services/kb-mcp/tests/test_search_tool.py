@@ -1,5 +1,6 @@
 """Tests for the search tool — config schema, routing logic, and references."""
 
+import logging
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,7 +12,6 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchConfig,
 )
 
-from kb_mcp.config import SearchToolConfig
 from kb_mcp.references import (
     CITATION_RESULT_INSTRUCTION,
     REFERENCE_FORMAT_INFORMATION,
@@ -22,7 +22,7 @@ from kb_mcp.references import (
     reference_url,
     scope_id_from_folder_id_path,
 )
-from kb_mcp.tools.search import _TOOL_DESCRIPTION, search
+from kb_mcp.tools.search import SearchToolConfig, search
 
 
 def test_json_schema_has_service_config():
@@ -52,8 +52,10 @@ def test_default_config_round_trips():
 
 
 def test_tool_description_includes_citation_rules():
-    assert "Do NOT invent placeholders like [source1]" in _TOOL_DESCRIPTION
-    assert REFERENCE_FORMAT_INFORMATION in _TOOL_DESCRIPTION
+    description = search.__fastmcp__.description
+    assert description is not None
+    assert "Do NOT invent placeholders like [source1]" in description
+    assert REFERENCE_FORMAT_INFORMATION in description
 
 
 def _make_chunk(text: str, **kwargs) -> ContentChunk:
@@ -70,37 +72,42 @@ def _patch_post_processor(chunks: list):
     mock_pp = MagicMock()
     mock_pp.process = AsyncMock(return_value=chunks)
     return patch(
-        "kb_mcp.tools.search.InternalSearchPostProcessor.from_settings",
+        "kb_mcp.tools.search.tool.InternalSearchPostProcessor.from_settings",
         return_value=mock_pp,
     )
+
+
+def _make_identity(company_id: str = "company-1", user_id: str = "user-1"):
+    settings = MagicMock()
+    settings.authcontext.get_confidential_company_id.return_value = company_id
+    settings.authcontext.get_confidential_user_id.return_value = user_id
+    return settings
 
 
 def _patch_identity():
     """Per-request identity resolves in-body via unique_mcp; return a stub."""
     return patch(
-        "kb_mcp.tools.search.get_unique_settings_async",
-        new=AsyncMock(return_value=MagicMock()),
+        "kb_mcp.tools.search.tool.get_unique_settings_async",
+        new=AsyncMock(return_value=_make_identity()),
     )
 
 
-def _patch_frontend_settings(base_url: str | None = None):
+def _patch_kb_settings(base_url: str | None = None, lookup_concurrency: int = 8):
     mock_settings = MagicMock()
     mock_settings.frontend_base_url_str.return_value = base_url
-    return patch(
-        "kb_mcp.tools.search.KbMcpServerSettings",
-        return_value=mock_settings,
-    )
+    mock_settings.scope_lookup_concurrency = lookup_concurrency
+    return patch("kb_mcp.tools.search.tool.get_settings", return_value=mock_settings)
 
 
 def _patch_resolve_scope_ids(mapping: dict[str, str] | None = None):
     return patch(
-        "kb_mcp.tools.search.resolve_scope_ids",
+        "kb_mcp.tools.search.tool.resolve_scope_ids",
         new=AsyncMock(return_value=mapping or {}),
     )
 
 
 @pytest.mark.asyncio
-async def test_search_calls_kb_service():
+async def test_search_string_becomes_the_search_query():
     chunks = [_make_chunk("result A")]
     mock_service = MagicMock()
     mock_service.bind_settings.return_value = mock_service
@@ -109,12 +116,12 @@ async def test_search_calls_kb_service():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
-        ) as mock_from_config,
+        ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings(None),
+        _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
         result = await search(
@@ -122,12 +129,42 @@ async def test_search_calls_kb_service():
             config=SearchToolConfig(),
         )
 
-    mock_from_config.assert_called_once_with(SearchToolConfig().service_config)
-    mock_service.bind_settings.assert_called_once()
+    # The only way search_string reaches the retrieval backend, given the
+    # backend itself is mocked out here — this is the resulting query state,
+    # not an assertion on which collaborator got called.
     assert mock_service.state.search_queries == ["test query"]
     assert isinstance(result, CallToolResult)
     # result chunks + trailing citation instruction
     assert len(result.content) == 2
+
+
+@pytest.mark.asyncio
+async def test_logs_never_contain_raw_user_or_company_id(caplog):
+    """user_id/company_id are confidential; logs must carry a correlation
+    id derived from them, never the raw values."""
+    chunks = [_make_chunk("result A")]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = MagicMock()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        caplog.at_level(logging.INFO, logger="kb_mcp"),
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await search(search_string="test query", config=SearchToolConfig())
+
+    assert caplog.records, "expected at least one log record"
+    for record in caplog.records:
+        assert "user-1" not in record.getMessage()
+        assert "company-1" not in record.getMessage()
 
 
 @pytest.mark.asyncio
@@ -140,12 +177,12 @@ async def test_search_uses_defaults_when_no_config_provided():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings(None),
+        _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
         result = await search(
@@ -161,7 +198,7 @@ async def test_search_uses_defaults_when_no_config_provided():
 async def test_search_returns_error_result_on_service_failure():
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             side_effect=RuntimeError("KB unavailable"),
         ),
         _patch_identity(),
@@ -187,11 +224,11 @@ async def test_search_returns_error_result_on_post_processor_failure():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         patch(
-            "kb_mcp.tools.search.InternalSearchPostProcessor.from_settings",
+            "kb_mcp.tools.search.tool.InternalSearchPostProcessor.from_settings",
             return_value=mock_pp,
         ),
         _patch_identity(),
@@ -208,7 +245,7 @@ async def test_search_returns_error_result_on_post_processor_failure():
 @pytest.mark.asyncio
 async def test_search_returns_error_when_identity_unresolvable():
     with patch(
-        "kb_mcp.tools.search.get_unique_settings_async",
+        "kb_mcp.tools.search.tool.get_unique_settings_async",
         new=AsyncMock(side_effect=ValueError("Refusing to fall back to UNIQUE_AUTH_")),
     ):
         result = await search(
@@ -359,12 +396,12 @@ async def test_search_results_are_numbered_sequentially_and_include_citation_blo
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings(None),
+        _patch_kb_settings(None),
         _patch_resolve_scope_ids(),
     ):
         result = await search(
@@ -392,12 +429,12 @@ async def test_search_uses_frontend_deep_links_when_scopes_resolved():
 
     with (
         patch(
-            "kb_mcp.tools.search.KnowledgeBaseInternalSearchService.from_config",
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
             return_value=mock_service,
         ),
         _patch_post_processor(chunks),
         _patch_identity(),
-        _patch_frontend_settings("https://example.unique.app"),
+        _patch_kb_settings("https://example.unique.app"),
         _patch_resolve_scope_ids(
             {"cont_aaaaaaaaaaaaaaaaaaaaaaa1": "scope_uy3cznkuysy3gasrxx2m4ezb"}
         ),

@@ -16,22 +16,21 @@ env:
   # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
   UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
 
-# -- Environment variables from secrets / Argo overlays.
-# UNIQUE_MCP_* URLs are not secrets — set them in the overlay `env:` (examples below).
-# App/Zitadel credentials stay in envVars via secretKeyRef.
-#
-# ArgoCD overlay examples for UNIQUE_MCP_*:
-#   env:
-#     # Public URL of THIS MCP service (Gateway/Kong host clients hit).
-#     # Used for OAuth redirect base + FastMCP Host allowlist (allowed_hosts).
-#     # Must match the routes.hostname you enable in this overlay, e.g.:
-#     #   https://kb-mcp.<tenant>.unique.app
-#     UNIQUE_MCP_PUBLIC_BASE_URL: https://kb-mcp.<tenant>.unique.app
-#
-#     # Unique web app origin (the product UI), NOT this MCP.
-#     # Optional — only for knowledge-upload deep links in citations:
-#     # Leave unset to fall back to unique://content/{id} links.
-#     UNIQUE_MCP_FRONTEND_BASE_URL: https://<tenant>.unique.app
+# -- Non-secret, tenant-specific config; see values.schema.json for field
+# descriptions. Mapped to env vars by templates/_ext.tpl + _helpers.tpl.
+mcpConfig:
+  enabled: true
+  app:
+    publicBaseUrl: "" # e.g. https://kb-mcp.<tenant>.unique.app — must match routes.hostname
+    frontendBaseUrl: "" # optional, e.g. https://<tenant>.unique.app
+  zitadel:
+    baseUrl: "" # e.g. https://id.<tenant>.unique.app
+
+# -- Secrets. The Unique QA overlay uses extraEnvSecrets + external-secrets
+# instead; the envVars + secretKeyRef pattern below is a portable fallback
+# for third-party installs. ENCRYPTION_KEY protects OAuth proxy state in
+# Postgres — generate with:
+#   openssl rand -hex 32
 #
 # Example for loading secrets (uncomment and customize as needed):
 #   envVars:
@@ -60,11 +59,6 @@ env:
 #         secretKeyRef:
 #           name: kb-mcp-unique-secret
 #           key: UNIQUE_APP_ENDPOINT_SECRET
-#     - name: ZITADEL_BASE_URL
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-zitadel-secret
-#           key: ZITADEL_BASE_URL
 #     - name: ZITADEL_CLIENT_ID
 #       valueFrom:
 #         secretKeyRef:
@@ -75,6 +69,11 @@ env:
 #         secretKeyRef:
 #           name: kb-mcp-zitadel-secret
 #           key: ZITADEL_CLIENT_SECRET
+#     - name: ENCRYPTION_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-oauth-storage-secret
+#           key: ENCRYPTION_KEY
 envVars: []
 
 image:
@@ -130,8 +129,26 @@ volumeMounts:
   - name: tmp
     mountPath: /tmp
 
+# OAuth proxy storage. Required — Settings refuses to boot without a durable
+# DATABASE_URL (from this block) + ENCRYPTION_KEY (envVars above).
 postgresql:
-  enabled: false
+  enabled: true
+  connection:
+    sslMode: verify
+    # ── Use-case B — in-cluster PostgreSQL (CloudNativePG) ────────────────────
+    #
+    # host:
+    #   fromKubernetesService:
+    #     name: <release-name>-pg-cluster-rw
+    #     namespace: <namespace>
+    #     podPort: 5432
+    #     podSelectorLabels:
+    #       cnpg.io/cluster: <release-name>-pg-cluster
+    #
+    # url:
+    #   fromSecret:
+    #     name: <release-name>-pg-cluster-app
+    #     key: fqdn-uri
 
 rabbitmq:
   enabled: false
@@ -167,7 +184,10 @@ hooks:
     enabled: false
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
-# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+# postgresql.connection.url is opaque (real host is inside the secret), so
+# egress generation is soft-skipped for it — an overlay enabling this against
+# connection.url must also set postgresql.networkPolicyEgressManaged: true
+# and add its own Postgres egress rule under networkPolicy.egress[].
 networkPolicy:
   enabled: false
   flavor: cilium
@@ -179,14 +199,16 @@ networkPolicy:
       enabled: false
     ephemeralPorts:
       enabled: false
+    # Zitadel OIDC + Unique API gateway — same idea as teams-mcp's microsoft block.
+    # Overlay hostnames (id.qa / gateway.qa) match *.unique.app.
+    egress:
+      unique:
+        toFQDNs:
+          - matchPattern: "*.unique.app"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
 
-# Required via envVars (secrets) for a working deploy:
-# - UNIQUE_APP_KEY / UNIQUE_APP_ID / UNIQUE_API_BASE_URL
-# - UNIQUE_APP_ENDPOINT / UNIQUE_APP_ENDPOINT_SECRET
-# - ZITADEL_BASE_URL / ZITADEL_CLIENT_ID / ZITADEL_CLIENT_SECRET
-# Required via overlay env: (plain URLs, see comments above envVars):
-# - UNIQUE_MCP_PUBLIC_BASE_URL = https://kb-mcp.<tenant>.unique.app
-# Optional via overlay env::
-# - UNIQUE_MCP_FRONTEND_BASE_URL = https://<tenant>.unique.app (citation deep links)
 # Do NOT set UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID in production —
 # those are local unauthenticated-dev fallbacks only (identity comes from OIDC / _meta).

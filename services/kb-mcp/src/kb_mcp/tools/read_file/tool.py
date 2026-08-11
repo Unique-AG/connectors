@@ -13,7 +13,7 @@ import tiktoken
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import Field, RootModel, field_validator
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -30,17 +30,15 @@ from unique_toolkit.content.functions import (
 from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
+from kb_mcp.correlation import correlation_id
 from kb_mcp.references import file_reference_url, markdown_citation_link
-from kb_mcp.settings import KbMcpServerSettings
+from kb_mcp.settings import Settings, get_settings
+from kb_mcp.tools.read_file.config import ReadFileToolConfig
 
 _LOGGER = logging.getLogger(__name__)
 
 _TEXT_EXTENSIONS = {".txt", ".md", ".html", ".json", ".csv"}
 _CHUNKED_EXTENSIONS = {".pdf", ".docx"}
-
-
-class ReadFileToolConfig(BaseModel):
-    max_tokens_per_call: int = 8_000
 
 
 class SupportedFileExtension(RootModel[str]):
@@ -58,21 +56,6 @@ class SupportedFileExtension(RootModel[str]):
     def is_chunked(self) -> bool:
         return self.root in _CHUNKED_EXTENSIONS
 
-
-_TOOL_DESCRIPTION = (
-    "Read a specific knowledge-base file's text content. Requires "
-    "`content_id` (from a prior content_tree 'list'/'search' call). "
-    "For large files, pass `start_page`/`end_page` to read a portion — for "
-    "PDFs/DOCX these are real document pages; for plain-text formats "
-    "(.txt/.md/.html/.json/.csv) they're fixed-size virtual pages, same "
-    "semantics either way. If the file is too large and no range is given, "
-    "the call returns an informative error (with the file's total token/page "
-    "count) instead of silently truncating — use that to pick a range. Ranges "
-    "are also token-capped; if a range is too large, narrow it (a single-page "
-    "request always succeeds). Successful reads start with a markdown link "
-    "that opens the file in the Unique knowledge base — paste it as-is when "
-    "citing the file."
-)
 
 _META = merge_tool_meta(
     {
@@ -93,7 +76,9 @@ def _error(text: str) -> CallToolResult:
     return CallToolResult(isError=True, content=[TextContent(type="text", text=text)])
 
 
-def _with_reference_header(result: CallToolResult, content: Content) -> CallToolResult:
+def _with_reference_header(
+    result: CallToolResult, content: Content, settings: Settings
+) -> CallToolResult:
     """Prefix successful reads with a markdown link that opens the file."""
     if result.isError or not result.content:
         return result
@@ -103,11 +88,11 @@ def _with_reference_header(result: CallToolResult, content: Content) -> CallTool
     url = file_reference_url(
         content.id,
         metadata=content.metadata,
-        frontend_base_url=KbMcpServerSettings().frontend_base_url_str(),
+        frontend_base_url=settings.frontend_base_url_str(),
     )
     header = markdown_citation_link(content.title or content.key, url)
-    first.text = f"{header}\n\n{first.text}"
-    return result
+    prefixed = TextContent(type="text", text=f"{header}\n\n{first.text}")
+    return result.model_copy(update={"content": [prefixed, *result.content[1:]]})
 
 
 def _ok(text: str) -> CallToolResult:
@@ -234,7 +219,6 @@ def _virtual_page_token_bounds(
 
 @tool(
     name="read_file",
-    description=_TOOL_DESCRIPTION,
     meta=_META,
     annotations=ToolAnnotations(
         readOnlyHint=True,
@@ -263,12 +247,28 @@ async def read_file(
     ] = None,
     config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
 ) -> CallToolResult:
-    """Read one KB file by content_id; dispatch by extension."""
+    """Read a specific knowledge-base file's text content. Requires
+    `content_id` (from a prior content_tree 'list'/'search' call).
+    For large files, pass `start_page`/`end_page` to read a portion — for
+    PDFs/DOCX these are real document pages; for plain-text formats
+    (.txt/.md/.html/.json/.csv) they're fixed-size virtual pages, same
+    semantics either way. If the file is too large and no range is given,
+    the call returns an informative error (with the file's total token/page
+    count) instead of silently truncating — use that to pick a range. Ranges
+    are also token-capped; if a range is too large, narrow it (a single-page
+    request always succeeds). Successful reads start with a markdown link
+    that opens the file in the Unique knowledge base — paste it as-is when
+    citing the file.
+    """
+    kb_settings = get_settings()
+    cid: str | None = None
     try:
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
         company_id = settings.authcontext.get_confidential_company_id()
         user_id = settings.authcontext.get_confidential_user_id()
+        cid = correlation_id(user_id, company_id)
+        _LOGGER.info("read_file start correlation_id=%s content_id=%s", cid, content_id)
 
         contents = await search_contents_async(
             user_id=user_id,
@@ -277,6 +277,12 @@ async def read_file(
             where={"id": {"equals": content_id}},
         )
         if not contents:
+            _LOGGER.info(
+                "read_file complete correlation_id=%s content_id=%s is_error=True "
+                "reason=not_found",
+                cid,
+                content_id,
+            )
             return _error(f"no content found for content_id={content_id}")
         content = contents[0]
 
@@ -284,6 +290,12 @@ async def read_file(
             ext = SupportedFileExtension(Path(content.key).suffix)
         except ValueError:
             suffix = Path(content.key).suffix
+            _LOGGER.info(
+                "read_file complete correlation_id=%s content_id=%s is_error=True "
+                "reason=unsupported_extension",
+                cid,
+                content_id,
+            )
             return _error(f"unsupported file type for read_file: {suffix}")
 
         if ext.is_chunked:
@@ -302,9 +314,21 @@ async def read_file(
             result = _render_text(
                 full_text, start_page, end_page, config.max_tokens_per_call
             )
-        return _with_reference_header(result, content)
+        result = _with_reference_header(result, content, kb_settings)
+        _LOGGER.info(
+            "read_file complete correlation_id=%s content_id=%s is_error=%s",
+            cid,
+            content_id,
+            result.isError,
+        )
+        return result
     except Exception as exc:
-        _LOGGER.exception("read_file error")
+        _LOGGER.exception(
+            "read_file error correlation_id=%s content_id=%s error_type=%s",
+            cid,
+            content_id,
+            type(exc).__name__,
+        )
         return CallToolResult(
             isError=True, content=[TextContent(type="text", text=str(exc))]
         )

@@ -1,1 +1,8 @@
-{}
+mcpConfig:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+rabbitmq:
+  enabled: false

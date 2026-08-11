@@ -29,21 +29,17 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchService,
 )
 
-from kb_mcp.config import SearchToolConfig
+from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
     REFERENCE_FORMAT_INFORMATION,
     chunk_to_text_content,
     citation_instruction_content,
 )
-from kb_mcp.scope_resolver import resolve_scope_ids
-from kb_mcp.settings import KbMcpServerSettings
+from kb_mcp.settings import get_settings
+from kb_mcp.tools.search.config import SearchToolConfig
+from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)
-
-_TOOL_DESCRIPTION = (
-    "Search the knowledge base for the given query and return relevant chunks. "
-    + REFERENCE_FORMAT_INFORMATION
-)
 
 _META = merge_tool_meta(
     {
@@ -63,7 +59,12 @@ _META = merge_tool_meta(
 
 @tool(
     name="search",
-    description=_TOOL_DESCRIPTION,
+    # Not the docstring: this reuses REFERENCE_FORMAT_INFORMATION (also in
+    # _META below), and a literal docstring can't reference a module constant.
+    description=(
+        "Search the knowledge base for the given query and return relevant "
+        "chunks. " + REFERENCE_FORMAT_INFORMATION
+    ),
     meta=_META,
     annotations=ToolAnnotations(
         readOnlyHint=True,
@@ -80,10 +81,18 @@ async def search(
     config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
 ) -> CallToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
+    kb_settings = get_settings()
+    cid: str | None = None
 
     try:
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
+        cid = correlation_id(
+            settings.authcontext.get_confidential_user_id(),
+            settings.authcontext.get_confidential_company_id(),
+        )
+        _LOGGER.info("search start correlation_id=%s", cid)
+
         service = KnowledgeBaseInternalSearchService.from_config(
             config.service_config
         ).bind_settings(settings)
@@ -96,16 +105,22 @@ async def search(
         )
         chunks = await post_processor.process(result)
     except Exception as exc:
-        _LOGGER.exception("search error")
+        _LOGGER.exception(
+            "search error correlation_id=%s error_type=%s", cid, type(exc).__name__
+        )
         return CallToolResult(
             isError=True, content=[TextContent(type="text", text=str(exc))]
         )
 
-    frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
+    frontend_base_url = kb_settings.frontend_base_url_str()
     scope_by_content_id: dict[str, str] = {}
     if frontend_base_url and chunks:
         try:
-            scope_by_content_id = await resolve_scope_ids(chunks, settings)
+            scope_by_content_id = await resolve_scope_ids(
+                chunks,
+                settings,
+                lookup_concurrency=kb_settings.scope_lookup_concurrency,
+            )
         except Exception:
             _LOGGER.exception("scope resolution failed; falling back to unique:// URLs")
 
@@ -121,4 +136,5 @@ async def search(
     if content:
         content.append(citation_instruction_content())
 
+    _LOGGER.info("search complete correlation_id=%s result_count=%d", cid, len(chunks))
     return CallToolResult(content=cast(list[ContentBlock], content))

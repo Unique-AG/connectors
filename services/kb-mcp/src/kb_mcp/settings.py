@@ -1,12 +1,37 @@
-"""kb_mcp-specific server settings (extends unique_mcp ServerSettings)."""
+"""All configuration for kb-mcp.
 
-from pydantic import Field, HttpUrl
-from unique_mcp.settings import ServerSettings
+If it reads the environment, it is declared in this file. No exceptions.
+"""
+
+from functools import lru_cache
+from pathlib import Path
+
+from fastmcp.server.server import Transport
+from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from unique_mcp.util.find_env_file import find_env_file
+
+# main.py also loads this into the process env for libraries that bypass Settings.
+ENV_FILE: Path | None = find_env_file(filenames=["kb_mcp.env", ".env"], required=False)
 
 
-class KbMcpServerSettings(ServerSettings):
-    """ServerSettings plus optional frontend origin for knowledge-upload deep links."""
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        # Env vars win over the file, unlike load_dotenv(override=True).
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
+        frozen=True,
+        extra="ignore",
+    )
 
+    # ── Server ──
+    public_base_url: HttpUrl | None = Field(
+        default=None, validation_alias="UNIQUE_MCP_PUBLIC_BASE_URL"
+    )
+    local_base_url: HttpUrl = Field(
+        default=HttpUrl("http://localhost:8003"),
+        validation_alias="UNIQUE_MCP_LOCAL_BASE_URL",
+    )
     frontend_base_url: HttpUrl | None = Field(
         default=None,
         description=(
@@ -14,9 +39,94 @@ class KbMcpServerSettings(ServerSettings):
             "deep links, e.g. https://<tenant>.unique.app. When unset, "
             "references fall back to unique://content/{id}."
         ),
+        validation_alias="UNIQUE_MCP_FRONTEND_BASE_URL",
     )
+
+    # ── Zitadel ──
+    zitadel_base_url: str
+    zitadel_client_id: str
+    zitadel_client_secret: SecretStr
+
+    # ── OAuth storage (see auth/storage.py) ──
+    database_url: PostgresDsn | None = Field(default=None)
+    # Raw hex (openssl rand -hex 32) — auth/storage.py derives the Fernet
+    # key kb-mcp actually needs from these bytes.
+    encryption_key: SecretStr | None = Field(default=None, min_length=64, max_length=64)
+    allow_ephemeral_oauth_storage: bool = Field(
+        default=False,
+        description=("DEV ONLY. Per-pod storage that loses all sessions on restart."),
+    )
+
+    # ── Content-tree cache ──
+    content_tree_cache_ttl_seconds: int = Field(
+        default=1800, validation_alias="KB_SEARCH_CONTENT_TREE_CACHE_TTL_SECONDS"
+    )
+    content_tree_cache_max_entries: int = Field(
+        default=128, validation_alias="KB_SEARCH_CONTENT_TREE_CACHE_MAX_ENTRIES"
+    )
+
+    # ── Search scope lookups ──
+    scope_lookup_concurrency: int = Field(default=8, ge=1)
+
+    @property
+    def base_url(self) -> HttpUrl:
+        return self.public_base_url or self.local_base_url
+
+    @property
+    def transport_scheme(self) -> Transport:
+        url = self.base_url
+        match url.scheme:
+            case "http":
+                return "http"
+            case "https":
+                return "http"
+            case "sse":
+                return "sse"
+            case "streamable-http":
+                return "streamable-http"
+            case _:
+                raise ValueError(f"Invalid scheme: {url.scheme}")
 
     def frontend_base_url_str(self) -> str | None:
         if self.frontend_base_url is None:
             return None
         return str(self.frontend_base_url).rstrip("/")
+
+    @model_validator(mode="after")
+    def _storage_must_be_durable(self) -> "Settings":
+        durable = bool(self.database_url and self.encryption_key)
+        half = bool(self.database_url) ^ bool(self.encryption_key)
+        if half:
+            raise ValueError(
+                "OAuth storage is half-configured: set BOTH DATABASE_URL and "
+                "ENCRYPTION_KEY, or neither (with "
+                "ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev)."
+            )
+        if durable and self.allow_ephemeral_oauth_storage:
+            # Otherwise build_storage() would ignore Postgres and write to /tmp.
+            raise ValueError(
+                "Refuse ALLOW_EPHEMERAL_OAUTH_STORAGE when DATABASE_URL and "
+                "ENCRYPTION_KEY are set — pick durable or ephemeral, not both."
+            )
+        if durable:
+            assert self.encryption_key is not None
+            try:
+                bytes.fromhex(self.encryption_key.get_secret_value())
+            except ValueError as exc:
+                raise ValueError(
+                    "ENCRYPTION_KEY is the right length but not valid hex. "
+                    "Generate one with: openssl rand -hex 32"
+                ) from exc
+            return self
+        if self.allow_ephemeral_oauth_storage:
+            return self
+        raise ValueError(
+            "OAuth storage is not durable: set DATABASE_URL + ENCRYPTION_KEY, "
+            "or set ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev. "
+            "Ephemeral storage logs out every user on pod restart."
+        )
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()  # pyright: ignore[reportCallIssue]

@@ -13,12 +13,25 @@ from kb_mcp.references import scope_id_from_chunk, scope_id_from_metadata
 
 _LOGGER = logging.getLogger(__name__)
 
-_LOOKUP_CONCURRENCY = 8
+# Process-wide, not per call: a fresh semaphore per resolve_scope_ids() call
+# would let concurrent search calls each get their own lookup_concurrency
+# budget instead of sharing one (github.com/Unique-AG/connectors/pull/719
+# review comment on scope_resolver.py#L48).
+_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_semaphore(limit: int) -> asyncio.Semaphore:
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(limit)
+    return _semaphore
 
 
 async def resolve_scope_ids(
     chunks: list[ContentChunk],
     settings: UniqueSettings,
+    *,
+    lookup_concurrency: int,
 ) -> dict[str, str]:
     """Map content id → leaf scope id for the given search chunks.
 
@@ -45,7 +58,7 @@ async def resolve_scope_ids(
 
     user_id = settings.authcontext.get_confidential_user_id()
     company_id = settings.authcontext.get_confidential_company_id()
-    semaphore = asyncio.Semaphore(_LOOKUP_CONCURRENCY)
+    semaphore = _get_semaphore(lookup_concurrency)
 
     async def _lookup(content_id: str) -> tuple[str, str | None]:
         async with semaphore:
