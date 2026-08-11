@@ -104,6 +104,45 @@ class TestEmailSearch:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_display_name_email_filters_on_normalized_address(
+        self, client: BackstopClient
+    ) -> None:
+        """Display-name forms must exact-filter on the bare address, not the raw string."""
+        raw = '"Ada Lovelace" <ada@example.com>'
+        normalized = "ada@example.com"
+        email1 = respx.get(
+            f"{BASE_URL}/people", params={"filter[email][eq]": normalized}
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p1", "people", name="Ada Lovelace")),
+            )
+        )
+        respx.get(f"{BASE_URL}/people", params={"filter[email2][eq]": normalized}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/people", params={"filter[email3][eq]": normalized}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        # A raw-string filter must never be issued — that would miss Backstop's stored address.
+        raw_filter = respx.get(f"{BASE_URL}/people", params={"filter[email][eq]": raw}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="people",
+            search=raw,
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "p1"
+        assert email1.call_count == 1
+        assert raw_filter.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_email_search_for_organizations_uses_only_email_filter(
         self, client: BackstopClient
     ) -> None:

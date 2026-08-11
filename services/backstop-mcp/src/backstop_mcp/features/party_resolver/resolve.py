@@ -6,7 +6,7 @@ from fastmcp import Context
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.party_resolver.search import (
     fetch_party_name,
-    looks_like_email,
+    normalized_email,
     quick_search,
     search_by_email,
 )
@@ -46,8 +46,9 @@ async def _resolve_one(
         )
 
     assert item.search is not None
-    if looks_like_email(item.search):
-        candidates = await search_by_email(client, search_type=search_type, email=item.search)
+    email = normalized_email(item.search)
+    if email is not None:
+        candidates = await search_by_email(client, search_type=search_type, email=email)
     else:
         candidates = await quick_search(
             client,
