@@ -123,7 +123,9 @@ async def get_person(
         return tool_result(unresolved_party_response(result))
 
     party = result.value
-    path = f"/people/{quote(party.id, safe='')}"
+    # Quick-search for people uses the shared PERSON_* types, so a hit may be a
+    # contact/employee; follow `party.search_type` instead of hard-coding `/people`.
+    path = f"/{party.search_type}/{quote(party.id, safe='')}"
     document = await client.get(
         path,
         params={"include": EntityRelationshipInclude.for_employment()},

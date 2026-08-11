@@ -138,6 +138,49 @@ class TestGetPerson:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_fetches_resolved_collection_when_hit_is_not_people(
+        self, connect_user: ConnectUser
+    ) -> None:
+        """Name search uses shared PERSON_* types; a contact hit must GET /contacts/{id}."""
+        await connect_user("user-person-4", "person-erin")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("c9", "contacts", name="Jane Contact")),
+            )
+        )
+        contact_get = respx.get(f"{BASE_URL}/contacts/c9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "contacts",
+                        "id": "c9",
+                        "attributes": {"name": "Jane Contact"},
+                        "relationships": {"entityRelationships": {"data": []}},
+                    },
+                    "included": [],
+                },
+            )
+        )
+        people_get = respx.get(url__regex=rf"{BASE_URL}/people/\w+").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = tool_model(
+            await get_person(ctx_never_elicit(), search="Jane Contact"),
+            PersonResolvedResponse,
+        )
+
+        assert result.resolved == ResolvedPartyResponse(
+            id="c9", search_type="contacts", name="Jane Contact"
+        )
+        assert contact_get.call_count == 1
+        assert people_get.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_ambiguous_search_skips_person_get(self, connect_user: ConnectUser) -> None:
         await connect_user("user-person-2", "person-carol")  # pyright: ignore[reportGeneralTypeIssues]
 
