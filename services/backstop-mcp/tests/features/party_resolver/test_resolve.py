@@ -11,6 +11,7 @@ from backstop_mcp.features.party_resolver import (
     resolve_parties,
     resolve_party,
     unresolved_parties_response,
+    unresolved_party_response,
 )
 from backstop_mcp.features.resolution import (
     Ambiguous,
@@ -225,6 +226,35 @@ class TestQuickSearch:
         assert result.value.id == "p1"
         assert result.value.search_type == "people"
         assert result.value.name == "Jane Doe"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ambiguous_enhanced_candidates_expose_resource_search_type(
+        self, client: BackstopClient
+    ) -> None:
+        """Cross-type ambiguous hits must carry each candidate's own search_type."""
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("p1", "people", name="Jane A"),
+                    resource("o2", "organizations", name="Jane Holdings"),
+                ),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Jane",
+            quick_search_options=QuickSearchOptions(enhance_search_types=True),
+        )
+        assert isinstance(result, Ambiguous)
+
+        response = unresolved_party_response(result)
+        assert [c.id for c in response.candidates] == ["p1", "o2"]
+        assert [c.search_type for c in response.candidates] == ["people", "organizations"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -477,6 +507,10 @@ class TestBatchResolve:
         assert response.unresolved[0].query == "Nope"
         assert response.unresolved[0].candidates == []
         assert [c.id for c in response.unresolved[1].candidates] == ["o2", "o3"]
+        assert [c.search_type for c in response.unresolved[1].candidates] == [
+            "organizations",
+            "organizations",
+        ]
         assert response.unresolved[1].scope == "organizations"
         assert response.resolved == []
 
