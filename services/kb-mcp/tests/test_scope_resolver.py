@@ -11,6 +11,14 @@ from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 pytestmark = pytest.mark.ai
 
 
+@pytest.fixture(autouse=True)
+def _reset_semaphore(monkeypatch):
+    # _get_semaphore() sizes the module-level semaphore on first use per
+    # process; different tests use different lookup_concurrency values, so
+    # each test needs its own fresh singleton.
+    monkeypatch.setattr("kb_mcp.tools.search.scope_resolver._semaphore", None)
+
+
 def _metadata(folder_id_path: str) -> ContentMetadata:
     return ContentMetadata(key="k", mimeType="text/plain", folderIdPath=folder_id_path)
 
@@ -30,6 +38,24 @@ def _make_settings(company_id: str = "company-1", user_id: str = "user-1"):
     settings.authcontext.get_confidential_company_id.return_value = company_id
     settings.authcontext.get_confidential_user_id.return_value = user_id
     return settings
+
+
+class _ConcurrencyTracker:
+    """Records the peak number of simultaneously in-flight fake lookups."""
+
+    def __init__(self) -> None:
+        self.in_flight = 0
+        self.max_in_flight = 0
+        self._lock = asyncio.Lock()
+
+    async def search(self, *, where, **_kwargs):
+        async with self._lock:
+            self.in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        await asyncio.sleep(0.01)
+        async with self._lock:
+            self.in_flight -= 1
+        return []
 
 
 @pytest.mark.asyncio
@@ -128,28 +154,43 @@ async def test_all_lookups_failing_returns_empty_without_raising():
 
 
 @pytest.mark.asyncio
-async def test_concurrent_lookups_never_exceed_lookup_concurrency():
+async def test_concurrent_lookups_within_one_call_never_exceed_lookup_concurrency():
     chunks = [_chunk(f"c{i}") for i in range(10)]
-    in_flight = 0
-    max_in_flight = 0
-    lock = asyncio.Lock()
-
-    async def tracked_search(*, where, **_kwargs):
-        nonlocal in_flight, max_in_flight
-        async with lock:
-            in_flight += 1
-            max_in_flight = max(max_in_flight, in_flight)
-        await asyncio.sleep(0.01)
-        async with lock:
-            in_flight -= 1
-        return []
+    tracker = _ConcurrencyTracker()
 
     with patch(
         "kb_mcp.tools.search.scope_resolver.search_contents_async",
-        new=AsyncMock(side_effect=tracked_search),
+        new=AsyncMock(side_effect=tracker.search),
     ):
         await resolve_scope_ids(chunks, _make_settings(), lookup_concurrency=3)
 
     # == not <=: 10 lookups against a limit of 3 must saturate the semaphore,
     # so a regression that serialized them would still satisfy <=.
-    assert max_in_flight == 3
+    assert tracker.max_in_flight == 3
+
+
+@pytest.mark.asyncio
+async def test_concurrent_calls_share_one_process_wide_budget():
+    """Two concurrent search calls must share lookup_concurrency, not get
+    lookup_concurrency each (github.com/Unique-AG/connectors/pull/719 review
+    comment on scope_resolver.py#L48)."""
+    tracker = _ConcurrencyTracker()
+
+    with patch(
+        "kb_mcp.tools.search.scope_resolver.search_contents_async",
+        new=AsyncMock(side_effect=tracker.search),
+    ):
+        await asyncio.gather(
+            resolve_scope_ids(
+                [_chunk(f"a{i}") for i in range(5)],
+                _make_settings(user_id="user-1"),
+                lookup_concurrency=3,
+            ),
+            resolve_scope_ids(
+                [_chunk(f"b{i}") for i in range(5)],
+                _make_settings(user_id="user-2"),
+                lookup_concurrency=3,
+            ),
+        )
+
+    assert tracker.max_in_flight == 3
