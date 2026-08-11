@@ -51,9 +51,7 @@ def _fetch(items: Sequence[ActivityItem], *, limit: int, offset: int) -> _Activi
 def _fixture() -> dict[ActivityType, list[ActivityItem]]:
     """Deliberately uneven: `call` empty from the start, `note` much longer than the rest."""
     return {
-        "meeting": [
-            _activity(f"meeting-{i}", "meeting", date(2026, 1, 30 - i)) for i in range(5)
-        ],
+        "meeting": [_activity(f"meeting-{i}", "meeting", date(2026, 1, 30 - i)) for i in range(5)],
         "call": [],
         "note": [_activity(f"note-{i}", "note", date(2026, 2, 28 - i)) for i in range(23)],
         "document": [
@@ -85,9 +83,7 @@ class TestCursorRoundTrip:
                 page_limit = decoded.limit
 
             pages: dict[ActivityType, _ActivityPage] = {
-                stream: _fetch(
-                    fixture[stream], limit=page_limit, offset=consumed.get(stream, 0)
-                )
+                stream: _fetch(fixture[stream], limit=page_limit, offset=consumed.get(stream, 0))
                 for stream in active_streams
             }
             result = merge_page(pages, consumed)

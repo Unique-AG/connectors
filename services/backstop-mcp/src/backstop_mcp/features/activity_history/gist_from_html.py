@@ -6,10 +6,13 @@ table, so the gist answers "who" far better than "what was discussed" — nothin
 summarize. See `to_gist` for the library choice this rests on.
 """
 
+import logging
 import re
 from dataclasses import dataclass
 
 from markdownify import markdownify
+
+logger = logging.getLogger(__name__)
 
 # Matches a Markdown pipe-table separator cell: `---`, `:---`, `---:`, or `:---:`.
 _SEPARATOR_CELL_RE = re.compile(r"^:?-+:?$")
@@ -47,6 +50,10 @@ def to_gist(html: str, *, max_chars: int) -> Gist:
     if full_length <= max_chars:
         return Gist(text=squeezed, truncated=False, full_length=full_length)
     truncated_text = _truncate_at_word_boundary(squeezed, max_chars)
+    logger.debug(
+        "activity_history.gist.truncated",
+        extra={"full_length": full_length, "max_chars": max_chars, "kept": len(truncated_text)},
+    )
     return Gist(text=truncated_text, truncated=True, full_length=full_length)
 
 

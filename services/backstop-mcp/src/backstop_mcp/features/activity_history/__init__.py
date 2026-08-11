@@ -53,8 +53,8 @@ from backstop_mcp.features.activity_history.fetch_activities import (
     EmailItem,
     EmailPage,
     Segment,
-    fetch_activity_page,
     fetch_activities_page_by_type,
+    fetch_activity_page,
     fetch_email_page,
 )
 from backstop_mcp.features.activity_history.fetch_activity_detail import (

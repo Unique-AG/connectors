@@ -419,9 +419,7 @@ class TestEmailRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(
-            client, segment="organizations", entity_id="42", limit=10, offset=0
-        )
+        await fetch_email_page(client, segment="organizations", entity_id="42", limit=10, offset=0)
 
         params = route.calls.last.request.url.params
         assert params["fields"] == (
@@ -534,9 +532,7 @@ class TestEmailDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(
-            client, segment="organizations", entity_id="42", limit=10, offset=0
-        )
+        await fetch_email_page(client, segment="organizations", entity_id="42", limit=10, offset=0)
 
         params = route.calls.last.request.url.params
         assert "filter[startDate]" not in params

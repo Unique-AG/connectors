@@ -6,6 +6,7 @@ every fetched page fully, sorts by `(occurred_at desc, stream asc, id desc)`, an
 updated `consumed` map — short pages are dropped from it.
 """
 
+import logging
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, time
 from typing import ClassVar
@@ -17,6 +18,8 @@ from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityType,
     EmailItem,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["ActivityWithType", "UnifiedActivities", "merge_page"]
 
@@ -47,9 +50,17 @@ def _occurred_at(item: ActivityItem | EmailItem) -> datetime:
     if isinstance(item, EmailItem):
         sent = item.sent_timestamp
         if sent is None:
+            logger.debug(
+                "activity_history.merge.null_occurred_at",
+                extra={"activity_id": item.id, "stream": "email"},
+            )
             return _OLDEST
         return sent.astimezone(UTC) if sent.tzinfo is not None else sent.replace(tzinfo=UTC)
     if item.effective_date is None:
+        logger.debug(
+            "activity_history.merge.null_occurred_at",
+            extra={"activity_id": item.id, "stream": item.stream},
+        )
         return _OLDEST
     return datetime.combine(item.effective_date, time.min, tzinfo=UTC)
 
@@ -68,9 +79,24 @@ def merge_page(
         )
         if not end_of_stream:
             new_consumed[stream] = consumed.get(stream, 0) + len(items)
+        else:
+            logger.debug(
+                "activity_history.merge.stream_exhausted",
+                extra={"stream": stream, "page_count": len(items)},
+            )
 
     # Stable multi-pass for (occurred_at desc, stream asc, id desc).
     records.sort(key=lambda r: r.item.id, reverse=True)
     records.sort(key=lambda r: r.stream)
     records.sort(key=lambda r: r.occurred_at, reverse=True)
+    logger.info(
+        "activity_history.merge.completed",
+        extra={
+            "records": len(records),
+            "open_streams": sorted(new_consumed),
+            "exhausted_streams": sorted(
+                stream for stream, (_, end_of_stream) in pages.items() if end_of_stream
+            ),
+        },
+    )
     return UnifiedActivities(records=tuple(records), consumed=new_consumed)
