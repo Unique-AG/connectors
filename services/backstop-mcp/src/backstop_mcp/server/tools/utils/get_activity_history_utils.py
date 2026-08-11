@@ -1,5 +1,6 @@
 """Request shapes and first/next → fetch-input helpers for `get_activity_history`."""
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
@@ -25,6 +26,8 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import Resolved
 from backstop_mcp.server.runtime import get_activity_history_settings
 from backstop_mcp.server.tools.results import tool_error, tool_result
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_ACTIVITY_TYPES: tuple[ActivityType, ...] = ("meeting", "call", "note", "email")
 
@@ -88,6 +91,7 @@ class ActivityHistoryFirstPageInput(BaseModel):
     limit: Annotated[
         int | None,
         Field(
+            gt=0,
             description=(
                 "Page size per stream (not a total cap — a response can carry up to `limit` "
                 "records per active stream). Defaults to this server's configured page size."
@@ -172,9 +176,13 @@ async def extract_fetch_activity_history_args(
             try:
                 decoded = decode_cursor(next_cursor)
             except InvalidCursor as exc:
+                logger.warning(
+                    "activity_history.args.invalid_cursor",
+                    extra={"error": str(exc)},
+                )
                 return tool_error(str(exc))
             activity_types = decoded.activity_types or _DEFAULT_ACTIVITY_TYPES
-            return FetchArgs(
+            args = FetchArgs(
                 segment=decoded.segment,
                 entity_id=decoded.entity_id,
                 party=ResolvedParty(id=decoded.entity_id, search_type=decoded.segment, name=None),
@@ -185,6 +193,18 @@ async def extract_fetch_activity_history_args(
                 consumed=decoded.consumed,
                 active_activity_types=tuple(decoded.consumed.keys()),
             )
+            logger.info(
+                "activity_history.args.next",
+                extra={
+                    "segment": args.segment,
+                    "entity_id": args.entity_id,
+                    "active_streams": list(args.active_activity_types),
+                    "limit": args.limit,
+                    "since": args.since.isoformat() if args.since is not None else None,
+                    "until": args.until.isoformat() if args.until is not None else None,
+                },
+            )
+            return args
         case ActivityHistoryFirstPageInput(
             party_type=party_type,
             party_id=party_id,
@@ -202,10 +222,19 @@ async def extract_fetch_activity_history_args(
                 search=search,
             )
             if not isinstance(result, Resolved):
+                logger.info(
+                    "activity_history.args.unresolved",
+                    extra={
+                        "party_type": party_type,
+                        "has_party_id": party_id is not None,
+                        "has_search": search is not None,
+                        "status": result.status,
+                    },
+                )
                 return tool_result(unresolved_party_response(result))
             party = result.value
             effective_types = effective_activity_types(activity_types)
-            return FetchArgs(
+            args = FetchArgs(
                 segment=segment_for(party_type),
                 entity_id=party.id,
                 party=party,
@@ -216,3 +245,15 @@ async def extract_fetch_activity_history_args(
                 consumed={},
                 active_activity_types=effective_types,
             )
+            logger.info(
+                "activity_history.args.first",
+                extra={
+                    "segment": args.segment,
+                    "entity_id": args.entity_id,
+                    "activity_types": list(args.activity_types),
+                    "limit": args.limit,
+                    "since": args.since.isoformat() if args.since is not None else None,
+                    "until": args.until.isoformat() if args.until is not None else None,
+                },
+            )
+            return args

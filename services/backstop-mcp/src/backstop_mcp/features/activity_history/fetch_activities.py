@@ -13,6 +13,7 @@ Backstop quirks this layer absorbs:
 - Never send `filter[sentTimestamp][ge]` — Backstop accepts it and silently ignores it.
 """
 
+import logging
 from datetime import date, datetime
 from typing import ClassVar, Literal
 
@@ -20,6 +21,8 @@ from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.dates import LenientDate
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityItem",
@@ -179,9 +182,30 @@ def _email_date_filter_params(*, since: date | None, until: date | None) -> dict
 def _truncate_since(
     items: tuple[ActivityItem, ...], *, since: date
 ) -> tuple[tuple[ActivityItem, ...], bool]:
-    """Drop the first item older than `since` and everything after (stream is `-effectiveDate`)."""
+    """Drop the first item older than `since` and everything after (stream is `-effectiveDate`).
+
+    Items with a missing `effective_date` never trip the cutoff — left intentional until we
+    confirm null-date ordering against the live Backstop API.
+    """
     for index, item in enumerate(items):
-        if item.effective_date is not None and item.effective_date < since:
+        if item.effective_date is None:
+            logger.debug(
+                "activity_history.since_truncate.null_date",
+                extra={"activity_id": item.id, "stream": item.stream, "since": since.isoformat()},
+            )
+            continue
+        if item.effective_date < since:
+            logger.info(
+                "activity_history.since_truncate.cutoff",
+                extra={
+                    "activity_id": item.id,
+                    "stream": item.stream,
+                    "effective_date": item.effective_date.isoformat(),
+                    "since": since.isoformat(),
+                    "kept": index,
+                    "dropped": len(items) - index,
+                },
+            )
             return items[:index], True
     return items, False
 
@@ -198,6 +222,18 @@ async def fetch_activity_page(
     until: date | None = None,
 ) -> ActivityPage:
     """Fetch one page of one activity type. Future-dated items are kept."""
+    logger.debug(
+        "activity_history.activity_page.fetch",
+        extra={
+            "segment": segment,
+            "entity_id": entity_id,
+            "stream": stream,
+            "limit": limit,
+            "offset": offset,
+            "since": since.isoformat() if since is not None else None,
+            "until": until.isoformat() if until is not None else None,
+        },
+    )
     page = await client.fetch_page(
         f"/{segment}/{entity_id}/activities",
         schema=_ActivityResource,
@@ -219,8 +255,22 @@ async def fetch_activity_page(
     )
     if since is not None and until is not None:
         items, cutoff_hit = _truncate_since(items, since=since)
-        return ActivityPage(items=items, end_of_stream=cutoff_hit or raw_count < limit)
-    return ActivityPage(items=items, end_of_stream=raw_count < limit)
+        end_of_stream = cutoff_hit or raw_count < limit
+    else:
+        end_of_stream = raw_count < limit
+    logger.info(
+        "activity_history.activity_page.fetched",
+        extra={
+            "segment": segment,
+            "entity_id": entity_id,
+            "stream": stream,
+            "raw_count": raw_count,
+            "kept": len(items),
+            "end_of_stream": end_of_stream,
+            "offset": offset,
+        },
+    )
+    return ActivityPage(items=items, end_of_stream=end_of_stream)
 
 
 async def fetch_email_page(
@@ -234,6 +284,17 @@ async def fetch_email_page(
     until: date | None = None,
 ) -> EmailPage:
     """Fetch one page of emails. `since`/`until` map to startDate/endDate independently."""
+    logger.debug(
+        "activity_history.email_page.fetch",
+        extra={
+            "segment": segment,
+            "entity_id": entity_id,
+            "limit": limit,
+            "offset": offset,
+            "since": since.isoformat() if since is not None else None,
+            "until": until.isoformat() if until is not None else None,
+        },
+    )
     page = await client.fetch_page(
         f"/{segment}/{entity_id}/emails",
         schema=_EmailResource,
@@ -249,7 +310,18 @@ async def fetch_email_page(
         EmailItem.model_validate({**resource.attributes.model_dump(), "id": resource.id})
         for resource in page.items
     )
-    return EmailPage(items=items, end_of_stream=len(page.items) < limit)
+    end_of_stream = len(page.items) < limit
+    logger.info(
+        "activity_history.email_page.fetched",
+        extra={
+            "segment": segment,
+            "entity_id": entity_id,
+            "count": len(items),
+            "end_of_stream": end_of_stream,
+            "offset": offset,
+        },
+    )
+    return EmailPage(items=items, end_of_stream=end_of_stream)
 
 
 async def fetch_activities_page_by_type(

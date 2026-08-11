@@ -44,7 +44,9 @@ class ActivityDetailResponse(BaseModel):
     document, never special-cased by `type` here (see `fetch_activity_detail.py`).
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True, extra="ignore")
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        frozen=True, from_attributes=True, extra="ignore"
+    )
 
     activity_id: str
     type: str | None = None

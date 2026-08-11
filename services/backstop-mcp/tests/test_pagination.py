@@ -34,6 +34,43 @@ async def _fetch_page(path: str, params: dict[str, object] | None) -> httpx.Resp
         return await client.get(path, params=params)  # pyright: ignore[reportArgumentType]
 
 
+class TestParsePage:
+    """`parse_page` is the primitive both `fetch_page` and `paginate_all` share."""
+
+    def test_parses_items_included_total_count_and_next_path(self) -> None:
+        content = _page(
+            [{"id": "1"}, {"id": "2"}],
+            next_path="/records?page[offset]=25",
+            total_count=42,
+        )
+        content["included"] = [{"type": "lov-system-sets", "id": "9"}]
+
+        result = parse_page(httpx.Response(200, json=content).content, _Record, path="/records")
+
+        assert result == SinglePage(
+            items=[_Record(id="1"), _Record(id="2")],
+            included=[{"type": "lov-system-sets", "id": "9"}],
+            total_count=42,
+            next_path="/records?page[offset]=25",
+        )
+
+    def test_defaults_when_no_meta_or_next_link(self) -> None:
+        result = parse_page(
+            httpx.Response(200, json=_page([{"id": "1"}])).content, _Record, path="/records"
+        )
+
+        assert result == SinglePage(items=[_Record(id="1")], total_count=None, next_path=None)
+
+    def test_malformed_item_raises_backstop_response_schema_error(self) -> None:
+        content = _page([{"not_id": "1"}])
+
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            parse_page(httpx.Response(200, json=content).content, _Record, path="/records")
+
+        assert exc_info.value.path == "/records"
+        assert exc_info.value.schema_name == "_Page[_Record]"
+
+
 class TestPaginateAll:
     @pytest.mark.asyncio
     @respx.mock

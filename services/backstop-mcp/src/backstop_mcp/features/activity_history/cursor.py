@@ -7,6 +7,7 @@ secret. Corrupt or unrecognized payloads raise `InvalidCursor`.
 
 import base64
 import binascii
+import logging
 from collections.abc import Collection, Mapping
 from datetime import date
 from typing import ClassVar, Literal
@@ -14,6 +15,8 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from backstop_mcp.features.activity_history.fetch_activities import ActivityType, Segment
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["ActivityCursor", "InvalidCursor", "decode_cursor", "encode_cursor"]
 
@@ -59,6 +62,10 @@ def encode_cursor(
 ) -> str | None:
     """Encode the next-page cursor, or `None` when every stream is exhausted."""
     if not consumed:
+        logger.debug(
+            "activity_history.cursor.encode_exhausted",
+            extra={"segment": segment, "entity_id": entity_id},
+        )
         return None
 
     for stream, count in consumed.items():
@@ -73,7 +80,19 @@ def encode_cursor(
         until=until,
         consumed=consumed,
     )
-    return base64.urlsafe_b64encode(payload.model_dump_json().encode()).rstrip(b"=").decode("ascii")
+    encoded = (
+        base64.urlsafe_b64encode(payload.model_dump_json().encode()).rstrip(b"=").decode("ascii")
+    )
+    logger.debug(
+        "activity_history.cursor.encoded",
+        extra={
+            "segment": segment,
+            "entity_id": entity_id,
+            "open_streams": sorted(consumed),
+            "limit": limit,
+        },
+    )
+    return encoded
 
 
 def decode_cursor(cursor: str) -> ActivityCursor:
@@ -82,9 +101,28 @@ def decode_cursor(cursor: str) -> ActivityCursor:
         padded = cursor + "=" * (-len(cursor) % 4)
         raw = base64.urlsafe_b64decode(padded)
     except (binascii.Error, ValueError) as exc:
+        logger.warning(
+            "activity_history.cursor.invalid",
+            extra={"reason": "base64", "error": str(exc)},
+        )
         raise InvalidCursor(f"Cursor is not valid base64; {_RESTART}.") from exc
 
     try:
-        return ActivityCursor.model_validate_json(raw)
+        decoded = ActivityCursor.model_validate_json(raw)
     except ValidationError as exc:
+        logger.warning(
+            "activity_history.cursor.invalid",
+            extra={"reason": "shape", "error": str(exc)},
+        )
         raise InvalidCursor(f"Cursor has an unrecognized shape; {_RESTART}.") from exc
+
+    logger.debug(
+        "activity_history.cursor.decoded",
+        extra={
+            "segment": decoded.segment,
+            "entity_id": decoded.entity_id,
+            "open_streams": sorted(decoded.consumed),
+            "limit": decoded.limit,
+        },
+    )
+    return decoded

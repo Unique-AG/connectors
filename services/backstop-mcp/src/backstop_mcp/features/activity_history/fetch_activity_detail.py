@@ -24,6 +24,7 @@ meeting/call ever carries attendees on this instance, and that shape is always l
 locally, from the id string alone, whether to fetch attendees at all.
 """
 
+import logging
 from datetime import datetime
 from typing import ClassVar
 
@@ -34,6 +35,8 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityDetail",
@@ -132,12 +135,13 @@ async def fetch_activity_detail(client: BackstopClient, *, activity_id: str) -> 
     names risks Backstop dropping an attribute that's actually spelled differently — fetching
     the whole record and letting `AliasChoices` sort out the spelling is the safer default.
     """
+    logger.debug("activity_history.detail.fetch", extra={"activity_id": activity_id})
     document = await client.get(
         f"/entity-activity-details/{activity_id}",
         schema=_ActivityDetailDocument,
     )
     attributes = document.data.attributes
-    return ActivityDetail(
+    detail = ActivityDetail(
         id=document.data.id,
         type=attributes.type,
         title=attributes.title,
@@ -147,13 +151,43 @@ async def fetch_activity_detail(client: BackstopClient, *, activity_id: str) -> 
         location=attributes.location,
         time_zone=attributes.time_zone,
     )
+    if is_meeting_or_call(activity_id) and all(
+        value is None for value in (detail.start, detail.stop, detail.location, detail.time_zone)
+    ):
+        logger.debug(
+            "activity_history.detail.meeting_fields_empty",
+            extra={"activity_id": activity_id, "type": detail.type},
+        )
+    logger.info(
+        "activity_history.detail.fetched",
+        extra={
+            "activity_id": activity_id,
+            "type": detail.type,
+            "has_description": detail.description is not None,
+        },
+    )
+    return detail
 
 
 async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[Attendee, ...]:
     """Fetch the trimmed attendee list for one meeting/call. Only call when `is_meeting_or_call`."""
+    logger.debug("activity_history.attendees.fetch", extra={"activity_id": activity_id})
     document = await client.get(
         f"/meeting-or-calls/{activity_id}/attendees",
         params={"fields": _ATTENDEE_FIELDS},
         schema=_AttendeeDocument,
     )
-    return tuple(Attendee(name=resource.attributes.display_name()) for resource in document.data)
+    attendees = tuple(
+        Attendee(name=resource.attributes.display_name()) for resource in document.data
+    )
+    nameless = sum(1 for attendee in attendees if not attendee.name)
+    if nameless:
+        logger.debug(
+            "activity_history.attendees.nameless",
+            extra={"activity_id": activity_id, "nameless": nameless, "total": len(attendees)},
+        )
+    logger.info(
+        "activity_history.attendees.fetched",
+        extra={"activity_id": activity_id, "count": len(attendees)},
+    )
+    return attendees

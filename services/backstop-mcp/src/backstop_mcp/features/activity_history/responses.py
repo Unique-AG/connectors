@@ -16,6 +16,7 @@ Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurr
 `to_timeline_record`.
 """
 
+import logging
 from datetime import date, datetime
 from typing import Annotated, ClassVar, Literal
 
@@ -31,6 +32,8 @@ from backstop_mcp.features.activity_history.merge import ActivityWithType
 from backstop_mcp.features.data_hygiene import AsOf, EmploymentLinkResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, ResolvedPartyResponse
 from backstop_mcp.features.resolution import NotFoundResponse
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityHistoryResolvedResponse",
@@ -90,6 +93,10 @@ def _cap_recipients(emails: tuple[str, ...]) -> tuple[tuple[str, ...], int | Non
     """First three addresses, plus a count populated only when something was dropped."""
     if len(emails) <= _MAX_RECIPIENTS:
         return emails, None
+    logger.debug(
+        "activity_history.recipients.capped",
+        extra={"total": len(emails), "kept": _MAX_RECIPIENTS},
+    )
     return emails[:_MAX_RECIPIENTS], len(emails)
 
 
