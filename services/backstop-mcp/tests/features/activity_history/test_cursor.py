@@ -241,13 +241,28 @@ class TestDecodeCursor:
             decode_cursor(cursor)
 
     def test_unrecognized_segment_value_raises_invalid_cursor(self) -> None:
-        # `segment` outside `Segment`'s `Literal["organizations", "people"]` membership —
-        # pydantic rejects this on its own.
+        # `segment` outside `Segment` / `SearchType` membership — pydantic rejects this on its
+        # own.
         payload = self._decode_payload(self._cursor())
         payload["segment"] = "not_a_real_segment"
         cursor = self._encode_payload(payload)
         with pytest.raises(InvalidCursor):
             decode_cursor(cursor)
+
+    def test_contact_and_employee_segments_round_trip(self) -> None:
+        for segment in ("contacts", "employees"):
+            cursor = encode_cursor(
+                segment=cast(Segment, segment),
+                entity_id="c9",
+                limit=10,
+                activity_types=("meeting",),
+                since=None,
+                until=None,
+                consumed={"meeting": 0},
+            )
+            assert cursor is not None
+            decoded = decode_cursor(cursor)
+            assert decoded.segment == segment
 
     def test_unrecognized_stream_key_raises_invalid_cursor(self) -> None:
         # A `consumed` key outside `ActivityType`'s five valid values — pydantic rejects this on

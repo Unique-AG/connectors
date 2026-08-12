@@ -329,6 +329,61 @@ class TestFirstCallBySearch:
         assert result.query == "Nope"
         assert result.scope == "people"
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetches_resolved_collection_when_person_hit_is_a_contact(
+        self, connect_user: ConnectUser
+    ) -> None:
+        """Person quick-search can return contacts; timeline paths must follow search_type."""
+        await connect_user("user-ah-contact", "person-contact-hit")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("c9", "contacts", name="Jane Contact")),
+            )
+        )
+        contact_get = respx.get(f"{BASE_URL}/contacts/c9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "contacts",
+                        "id": "c9",
+                        "attributes": {"name": "Jane Contact"},
+                        "relationships": {"entityRelationships": {"data": []}},
+                    },
+                    "included": [],
+                },
+            )
+        )
+        people_get = respx.get(url__regex=rf"{BASE_URL}/people/\w+").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        _activities_route("contacts", "c9", "meetings").mock(
+            return_value=httpx.Response(200, json=collection(_activity("m1", "2026-01-05")))
+        )
+        for activity_type in ("calls", "notes"):
+            _activities_route("contacts", "c9", activity_type).mock(
+                return_value=httpx.Response(200, json=collection())
+            )
+        _emails_route("contacts", "c9").mock(return_value=httpx.Response(200, json=collection()))
+
+        result = tool_model(
+            await get_activity_history(
+                ctx_never_elicit(),
+                _first(party_type="person", search="Jane Contact", activity_types=["meeting"]),
+            ),
+            ActivityHistoryResolvedResponse,
+        )
+
+        assert result.resolved == ResolvedPartyResponse(
+            id="c9", search_type="contacts", name="Jane Contact"
+        )
+        assert contact_get.call_count == 1
+        assert people_get.call_count == 0
+        assert _record_keys(result.records) == [("meeting", "m1")]
+
 
 class TestResumedCall:
     @pytest.mark.asyncio

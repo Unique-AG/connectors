@@ -22,6 +22,7 @@ from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.features.entity_types import SearchType
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,8 @@ __all__ = [
 
 BackstopActivityType = Literal["meeting", "call", "note", "document"]
 ActivityType = BackstopActivityType | Literal["email"]
-Segment = Literal["organizations", "people"]
+# Same vocabulary as party resolve: person-scoped quick-search can return contacts/employees.
+Segment = SearchType
 
 _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "meeting": "meetings",
