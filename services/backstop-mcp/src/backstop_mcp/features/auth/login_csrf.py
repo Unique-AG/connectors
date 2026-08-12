@@ -70,9 +70,7 @@ def set_csrf_cookie(
     )
 
 
-def clear_csrf_cookie(
-    response: Response, request_id: str, *, path: str, secure: bool
-) -> None:
+def clear_csrf_cookie(response: Response, request_id: str, *, path: str, secure: bool) -> None:
     """Drop the cookie once its pending authorization has been consumed.
 
     `secure` / `httponly` / `samesite` must match `set_csrf_cookie`: browsers treat a clear
