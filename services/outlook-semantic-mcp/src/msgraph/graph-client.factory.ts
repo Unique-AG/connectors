@@ -13,6 +13,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ProxyService } from '@unique-ag/proxy';
 import { and, desc, eq, ilike, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
@@ -37,6 +38,7 @@ export class GraphClientFactory {
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: AesGcmEncryptionService,
     private readonly metricService: MetricService,
+    private readonly proxyService: ProxyService,
   ) {
     this.clientId = this.configService.get('microsoft.clientId', {
       infer: true,
@@ -126,6 +128,13 @@ export class GraphClientFactory {
       debugLogging: this.configService.get('app.isDebuggingOn', {
         infer: true,
       }),
+      // Node's fetch (undici) accepts `dispatcher` at runtime and the SDK forwards
+      // fetchOptions into that call, but FetchOptions is typed as RequestInit +
+      // legacy node-fetch fields and omits `dispatcher` — cast until the SDK types catch up.
+      // See https://github.com/microsoftgraph/msgraph-sdk-javascript/issues/1646
+      fetchOptions: {
+        dispatcher: this.proxyService.getDispatcher({ mode: 'always' }),
+      } as ClientOptions['fetchOptions'],
     };
 
     return Client.initWithMiddleware(clientOptions);
