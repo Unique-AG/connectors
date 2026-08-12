@@ -6,6 +6,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { type Dispatcher, fetch } from 'undici';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import { userProfiles } from '../db/schema';
 
@@ -17,6 +18,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
+  private readonly dispatcher: Dispatcher;
 
   public constructor(
     {
@@ -33,9 +35,11 @@ export class TokenProvider implements AuthenticationProvider {
     {
       drizzle,
       encryptionService,
+      dispatcher,
     }: {
       drizzle: DrizzleDatabase;
       encryptionService: AesGcmEncryptionService;
+      dispatcher: Dispatcher;
     },
   ) {
     this.userProfileId = userProfileId;
@@ -44,6 +48,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.scopes = scopes;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
+    this.dispatcher = dispatcher;
   }
 
   public async getAccessToken(
@@ -87,6 +92,7 @@ export class TokenProvider implements AuthenticationProvider {
           client_secret: this.clientSecret,
           scope: this.scopes.join(' '),
         }),
+        dispatcher: this.dispatcher,
       });
 
       if (!response.ok) {

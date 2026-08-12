@@ -75,6 +75,7 @@ export class GraphClientFactory {
   }
 
   public createClientForUser(userProfileId: string): Client {
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
     const tokenProvider = new TokenProvider(
       {
         userProfileId,
@@ -85,6 +86,7 @@ export class GraphClientFactory {
       {
         drizzle: this.drizzle,
         encryptionService: this.encryptionService,
+        dispatcher,
       },
     );
 
@@ -133,7 +135,7 @@ export class GraphClientFactory {
       // legacy node-fetch fields and omits `dispatcher` — cast until the SDK types catch up.
       // See https://github.com/microsoftgraph/msgraph-sdk-javascript/issues/1646
       fetchOptions: {
-        dispatcher: this.proxyService.getDispatcher({ mode: 'always' }),
+        dispatcher,
       } as ClientOptions['fetchOptions'],
     };
 

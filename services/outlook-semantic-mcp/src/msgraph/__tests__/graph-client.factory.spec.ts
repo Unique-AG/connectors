@@ -17,6 +17,12 @@ vi.mock('@microsoft/microsoft-graph-client', async (importOriginal) => {
   };
 });
 
+vi.mock('../token.provider', () => ({
+  TokenProvider: vi.fn().mockImplementation(() => ({})),
+}));
+
+import { TokenProvider } from '../token.provider';
+
 describe('GraphClientFactory', () => {
   const mockConfigService = {
     get: vi.fn((key: string) => {
@@ -59,6 +65,22 @@ describe('GraphClientFactory', () => {
       expect.objectContaining({
         fetchOptions: { dispatcher: mockDispatcher },
         debugLogging: false,
+      }),
+    );
+  });
+
+  it('passes proxy dispatcher to TokenProvider in always mode', () => {
+    factory.createClientForUser('user-profile-123');
+
+    expect(mockGetDispatcher).toHaveBeenCalledWith({ mode: 'always' });
+    expect(TokenProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userProfileId: 'user-profile-123',
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+      }),
+      expect.objectContaining({
+        dispatcher: mockDispatcher,
       }),
     );
   });
