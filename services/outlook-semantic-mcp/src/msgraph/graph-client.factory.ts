@@ -1,4 +1,5 @@
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
+import { ProxyService } from '@unique-ag/proxy';
 import {
   AuthenticationHandler,
   Client,
@@ -13,7 +14,6 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ProxyService } from '@unique-ag/proxy';
 import { and, desc, eq, ilike, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';

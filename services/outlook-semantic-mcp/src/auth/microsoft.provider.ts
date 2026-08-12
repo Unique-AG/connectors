@@ -15,13 +15,13 @@ export const SCOPES = [
   'People.Read', // (delegated):
 ];
 
-type OAuth2WithSetAgent = {
+interface OAuth2WithSetAgent {
   setAgent: (agent: http.Agent) => void;
-};
+}
 
 export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderConfig {
   class MicrosoftStrategyWithProxy extends MicrosoftStrategy {
-    constructor(...args: ConstructorParameters<typeof MicrosoftStrategy>) {
+    public constructor(...args: ConstructorParameters<typeof MicrosoftStrategy>) {
       super(...args);
       if (agent) {
         // _oauth2 is assigned in passport-oauth2 constructor; setAgent covers token + profile

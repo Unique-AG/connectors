@@ -26,9 +26,15 @@ import { TokenProvider } from '../token.provider';
 describe('GraphClientFactory', () => {
   const mockConfigService = {
     get: vi.fn((key: string) => {
-      if (key === 'microsoft.clientId') return 'test-client-id';
-      if (key === 'microsoft.clientSecret') return { value: 'test-client-secret' };
-      if (key === 'app.isDebuggingOn') return false;
+      if (key === 'microsoft.clientId') {
+        return 'test-client-id';
+      }
+      if (key === 'microsoft.clientSecret') {
+        return { value: 'test-client-secret' };
+      }
+      if (key === 'app.isDebuggingOn') {
+        return false;
+      }
       return undefined;
     }),
   };

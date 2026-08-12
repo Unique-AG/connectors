@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import type { ConfigService } from '@nestjs/config';
 import { Redacted } from '@unique-ag/utils';
+import type { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyConfigNamespaced } from '../proxy.config';
 import type { ProxyModuleOptions } from '../proxy.module-definition';

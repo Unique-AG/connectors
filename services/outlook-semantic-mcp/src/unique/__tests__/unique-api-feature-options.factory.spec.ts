@@ -51,10 +51,7 @@ describe('uniqueApiFeatureOptionsFactory', () => {
   });
 
   it('composes retry and redirect onto a for-external-only dispatcher', () => {
-    const result = uniqueApiFeatureOptionsFactory(
-      configService as never,
-      proxyService as never,
-    );
+    const result = uniqueApiFeatureOptionsFactory(configService as never, proxyService as never);
 
     expect(proxyService.getDispatcher).toHaveBeenCalledWith({ mode: 'for-external-only' });
     expect(interceptors.retry).toHaveBeenCalled();

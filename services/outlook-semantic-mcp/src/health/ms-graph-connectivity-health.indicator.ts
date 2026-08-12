@@ -1,7 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { ProxyService } from '@unique-ag/proxy';
 import { extractErrorCode, type PingResult } from '@unique-ag/unique-api';
+import { Inject, Injectable } from '@nestjs/common';
+import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { Dispatcher, fetch as undiciFetch } from 'undici';
 import { IngestionConfig, ingestionConfig } from '~/config';
 

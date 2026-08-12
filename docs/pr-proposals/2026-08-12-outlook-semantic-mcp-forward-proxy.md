@@ -6,11 +6,11 @@ UN-23554
 
 ## Title
 
-`feat(outlook-semantic-mcp,proxy,ci,deps): add forward proxy support`
+`feat(outlook-semantic-mcp,proxy,ci,main,deps): add forward proxy support`
 
 Scopes verified against `.gitcommitizen`: `packages/proxy/**` → new `proxy` scope (added by this PR),
 `services/outlook-semantic-mcp/**` → `outlook-semantic-mcp`, `.gitcommitizen` → `ci`,
-`pnpm-lock.yaml` → `deps`.
+`docs/plans/**` + `docs/pr-proposals/**` → `main`, `pnpm-lock.yaml` → `deps`.
 
 ## Description
 

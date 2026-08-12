@@ -7,8 +7,8 @@ const { setAgentMock } = vi.hoisted(() => ({
 
 vi.mock('passport-microsoft', () => {
   class MockMicrosoft {
-    _oauth2 = { setAgent: setAgentMock };
-    constructor() {}
+    public _oauth2 = { setAgent: setAgentMock };
+    public constructor() {}
   }
   return { Strategy: MockMicrosoft };
 });

@@ -1,6 +1,6 @@
+import { ProxyService } from '@unique-ag/proxy';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
-import { ProxyService } from '@unique-ag/proxy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionConfig, ingestionConfig } from '~/config';
 import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
