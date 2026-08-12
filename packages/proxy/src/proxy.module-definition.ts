@@ -6,6 +6,7 @@ export interface ProxyModuleOptions {
 
 export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN: PROXY_MODULE_OPTIONS_TOKEN } =
   new ConfigurableModuleBuilder<ProxyModuleOptions>()
+    .setClassMethodName('forRoot')
     .setExtras({ isGlobal: true }, (definition, extras) => ({
       ...definition,
       global: extras.isGlobal,

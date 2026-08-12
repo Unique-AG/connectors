@@ -3,6 +3,7 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
+import { ProxyModule, proxyConfig } from '@unique-ag/proxy';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
@@ -32,6 +33,7 @@ import {
   encryptionConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
 import { delegatedAccessConfig } from './config/delegated-access.config';
@@ -59,7 +61,14 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         uniqueConfig,
         delegatedAccessConfig,
         ingestionConfig,
+        proxyConfig,
       ],
+    }),
+    ProxyModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<UniqueConfigNamespaced, true>) => ({
+        isExternal: config.get('unique', { infer: true }).serviceAuthMode === 'external',
+      }),
     }),
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
