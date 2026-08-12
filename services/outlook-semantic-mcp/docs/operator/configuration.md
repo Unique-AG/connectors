@@ -45,6 +45,7 @@ These must be provided via Kubernetes secrets:
 | `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key | Both modes |
 | `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key | Both modes |
 | `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth only |
+| `PROXY_PASSWORD` | String | Proxy password | `username_password` proxy auth only |
 
 **Connection string formats:**
 
@@ -93,6 +94,82 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
 | `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
+
+### Proxy Configuration
+
+The server supports HTTP/HTTPS forward proxies for environments where outbound internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
+
+| Mode                | Description                          |
+|---------------------|--------------------------------------|
+| `none`              | Proxy disabled (default)             |
+| `no_auth`           | Proxy enabled without authentication |
+| `username_password` | Basic authentication proxy           |
+| `ssl_tls`           | TLS client certificate proxy         |
+
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
+
+| Variable                   | Description                                                      |
+|----------------------------|------------------------------------------------------------------|
+| `PROXY_HOST`               | Proxy server hostname                                            |
+| `PROXY_PORT`               | Proxy server port                                                |
+| `PROXY_PROTOCOL`           | `http` or `https`                                                |
+| `PROXY_SSL_CA_BUNDLE_PATH` | (Optional) Path to CA bundle for verifying proxy TLS certificate |
+| `PROXY_HEADERS`            | (Optional) JSON string of custom headers for CONNECT request     |
+
+**`username_password` mode** adds:
+
+| Variable         | Description                         |
+|------------------|-------------------------------------|
+| `PROXY_USERNAME` | Proxy username                      |
+| `PROXY_PASSWORD` | Proxy password (loaded from secret) |
+
+**`ssl_tls` mode** adds:
+
+| Variable              | Description                    |
+|-----------------------|--------------------------------|
+| `PROXY_SSL_CERT_PATH` | Path to TLS client certificate |
+| `PROXY_SSL_KEY_PATH`  | Path to TLS client key         |
+
+For `ssl_tls` mode, certificates must be mounted into the pod and the path env vars must point at those files. The chart does not mount proxy certs automatically. Example (Secret-backed volume):
+
+```yaml
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 20Gi
+  - name: proxy-certs
+    secret:
+      secretName: outlook-semantic-mcp-proxy-certs
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+  - name: proxy-certs
+    mountPath: /app/proxy-certs
+    readOnly: true
+
+proxyConfig:
+  enabled: true
+  authMode: ssl_tls
+  host: proxy.example.com
+  port: 8443
+  protocol: https
+  sslCertPath: /app/proxy-certs/client.crt
+  sslKeyPath: /app/proxy-certs/client.key
+  # Optional when the proxy uses a private/self-signed CA:
+  # sslCaBundlePath: /app/proxy-certs/ca.crt
+```
+
+The service reads these files at startup; missing or unreadable paths prevent the pod from starting.
+
+#### Traffic Routing
+
+When the proxy is enabled, traffic is routed as follows:
+
+| Target | Routing |
+|--------|---------|
+| Microsoft Graph, `login.microsoftonline.com`, Graph upload sessions, and passport Microsoft login | Always through the proxy |
+| Unique API and blob-ingestion upload | Through the proxy only when `UNIQUE_SERVICE_AUTH_MODE` is `external`. Bypassed in `cluster_local` mode |
+| Unique content download (cluster-local attachment stream) | Never proxied |
 
 ### Authentication Token Configuration
 
