@@ -100,12 +100,14 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
-        async with cleanup_lifespan(session_factory, auth_config):
-            try:
+        # Stop the auth sweep before disposing the engine — otherwise
+        # `cleanup_lifespan`'s cancel/await runs after the pool is already closed.
+        try:
+            async with cleanup_lifespan(session_factory, auth_config):
                 yield
-            finally:
-                await reset_services()
-                await engine.dispose()
+        finally:
+            await reset_services()
+            await engine.dispose()
 
     mcp = FastMCP(
         "Backstop MCP",
