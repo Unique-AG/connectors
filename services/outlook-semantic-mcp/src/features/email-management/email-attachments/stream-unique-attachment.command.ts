@@ -1,7 +1,9 @@
+import { ProxyService } from '@unique-ag/proxy';
 import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Dispatcher, fetch } from 'undici';
 import { UniqueConfigNamespaced } from '~/config';
 import {
   AttachmentUploadResult,
@@ -14,7 +16,10 @@ import {
 export class StreamUniqueAttachmentCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly configService: ConfigService<UniqueConfigNamespaced, true>) {}
+  public constructor(
+    private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
+    private readonly proxyService: ProxyService,
+  ) {}
 
   public async run({
     client,
@@ -65,6 +70,9 @@ export class StreamUniqueAttachmentCommand {
       contentUrl.searchParams.set('chatId', chatId);
     }
 
+    // Mode `never`: this path is unconditionally in-cluster (hard-gated on
+    // serviceAuthMode === 'cluster_local' above).
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'never' });
     const response = await fetch(contentUrl, {
       headers: {
         // We impersonate the unique user because the mcp user might not have access to the content
@@ -76,6 +84,7 @@ export class StreamUniqueAttachmentCommand {
         // file.
         'x-user-roles': 'chat.chat.basic',
       },
+      dispatcher,
     });
 
     if (!response.ok) {
@@ -151,7 +160,10 @@ export class StreamUniqueAttachmentCommand {
     userProfileId,
     mailbox,
   }: {
-    reader: ReadableStreamDefaultReader<Uint8Array<ArrayBufferLike>>;
+    reader: {
+      read(): Promise<{ done: boolean; value?: Uint8Array }>;
+      cancel(reason?: unknown): Promise<void>;
+    };
     client: Client;
     draftId: string;
     fileName: Smeared;
@@ -177,6 +189,8 @@ export class StreamUniqueAttachmentCommand {
       }),
     );
 
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
+
     while (true) {
       const { done, value } = await reader.read();
 
@@ -188,7 +202,7 @@ export class StreamUniqueAttachmentCommand {
         const chunk = pending.subarray(0, UPLOAD_CHUNK_SIZE);
         pending = pending.subarray(UPLOAD_CHUNK_SIZE);
         const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
-        await this.uploadChunk(uploadUrl, chunk, offset, end, totalSize);
+        await this.uploadChunk(uploadUrl, chunk, offset, end, totalSize, dispatcher);
         chunkIndex++;
 
         if (chunkIndex % 20 === 0) {
@@ -209,7 +223,7 @@ export class StreamUniqueAttachmentCommand {
       if (done) {
         if (pending.length > 0) {
           const end = offset + pending.length;
-          await this.uploadChunk(uploadUrl, pending, offset, end, totalSize);
+          await this.uploadChunk(uploadUrl, pending, offset, end, totalSize, dispatcher);
           offset += pending.length;
           chunkIndex++;
         }
@@ -234,6 +248,7 @@ export class StreamUniqueAttachmentCommand {
     offset: number,
     end: number,
     totalSize: number,
+    dispatcher: Dispatcher,
   ): Promise<void> {
     const response = await fetch(uploadUrl, {
       method: 'PUT',
@@ -243,7 +258,8 @@ export class StreamUniqueAttachmentCommand {
         // The content type on each chunk is octet-stream not the actual mime type of the file.
         'Content-Type': 'application/octet-stream',
       },
-      body: chunk as BodyInit,
+      body: chunk,
+      dispatcher,
     });
     // 308 (Resume Incomplete) is the expected response for intermediate chunks;
     // only the final chunk returns 200/201.

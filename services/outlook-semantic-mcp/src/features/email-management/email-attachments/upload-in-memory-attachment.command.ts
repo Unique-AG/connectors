@@ -1,11 +1,15 @@
+import { ProxyService } from '@unique-ag/proxy';
 import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
+import { fetch } from 'undici';
 import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {
   private readonly logger = new Logger(this.constructor.name);
+
+  public constructor(private readonly proxyService: ProxyService) {}
 
   public async run({
     client,
@@ -68,6 +72,7 @@ export class UploadInMemoryAttachmentCommand {
 
     let offset = 0;
     let chunkIndex = 0;
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
     while (offset < totalSize) {
       const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
       const chunk = data.subarray(offset, end);
@@ -79,7 +84,8 @@ export class UploadInMemoryAttachmentCommand {
           // The content type on each chunk is octet-stream not the actual mime type of the file.
           'Content-Type': 'application/octet-stream',
         },
-        body: chunk as BodyInit,
+        body: chunk,
+        dispatcher,
       });
       // 308 (Resume Incomplete) is the expected response for intermediate chunks;
       // only the final chunk returns 200/201.
