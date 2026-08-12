@@ -289,6 +289,49 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  packages/proxy:
+    dependencies:
+      '@proventuslabs/nestjs-zod':
+        specifier: 2.0.0
+        version: 2.0.0(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.3(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
+      '@unique-ag/utils':
+        specifier: workspace:*
+        version: link:../utils
+      https-proxy-agent:
+        specifier: 7.0.6
+        version: 7.0.6
+      remeda:
+        specifier: 2.32.0
+        version: 2.32.0
+      undici:
+        specifier: 7.28.0
+        version: 7.28.0
+    devDependencies:
+      '@nestjs/common':
+        specifier: 11.1.18
+        version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/config':
+        specifier: 4.0.3
+        version: 4.0.3(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@swc/core':
+        specifier: 1.13.5
+        version: 1.13.5
+      '@types/node':
+        specifier: 22.16.5
+        version: 22.16.5
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      unplugin-swc:
+        specifier: 1.5.7
+        version: 1.5.7(@swc/core@1.13.5)(rollup@4.60.1)
+      vitest:
+        specifier: 3.2.6
+        version: 3.2.6(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
+      zod:
+        specifier: 4.1.5
+        version: 4.1.5
+
   packages/unique-api:
     dependencies:
       '@proventuslabs/nestjs-zod':
@@ -491,7 +534,7 @@ importers:
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: 11.0.10
-        version: 11.0.10(typescript@5.9.2)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
       '@nestjs/testing':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
@@ -670,7 +713,7 @@ importers:
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: 11.0.10
-        version: 11.0.10(typescript@5.9.2)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
       '@nestjs/testing':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
@@ -887,10 +930,10 @@ importers:
         version: 2.43.1
       '@nestjs/cli':
         specifier: 11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.12)
       '@nestjs/schematics':
         specifier: 11.0.10
-        version: 11.0.10(typescript@5.9.2)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
       '@nestjs/testing':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
@@ -1062,7 +1105,7 @@ importers:
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: 11.0.10
-        version: 11.0.10(typescript@5.9.2)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
       '@nestjs/testing':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
@@ -1252,10 +1295,10 @@ importers:
         version: 2.43.1
       '@nestjs/cli':
         specifier: 11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.12)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: 11.0.10
-        version: 11.0.10(typescript@5.9.2)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
       '@nestjs/testing':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
@@ -1403,7 +1446,7 @@ importers:
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: 11.0.10
-        version: 11.0.10(typescript@5.9.2)
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
       '@nestjs/testing':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
@@ -1588,24 +1631,28 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@biomejs/cli-linux-arm64@2.3.11':
     resolution: {integrity: sha512-l4xkGa9E7Uc0/05qU2lMYfN1H+fzzkHgaJoy98wO+b/7Gl78srbCRRgwYSW+BTLixTBrM6Ede5NSBwt7rd/i6g==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@biomejs/cli-linux-x64-musl@2.3.11':
     resolution: {integrity: sha512-vU7a8wLs5C9yJ4CB8a44r12aXYb8yYgBn+WeyzbMjaCMklzCv1oXr8x+VEyWodgJt9bDmhiaW/I0RHbn7rsNmw==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@biomejs/cli-linux-x64@2.3.11':
     resolution: {integrity: sha512-/1s9V/H3cSe0r0Mv/Z8JryF5x9ywRxywomqZVLHAoa/uN0eY7F8gEngWKNS5vbbN/BsfpCG5yeBT5ENh50Frxg==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@biomejs/cli-win32-arm64@2.3.11':
     resolution: {integrity: sha512-PZQ6ElCOnkYapSsysiTy0+fYX+agXPlWugh6+eQ6uPKI3vKAqNp6TnMhoM3oY2NltSB89hz59o8xIfOdyhi9Iw==}
@@ -2376,42 +2423,49 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@napi-rs/nice-linux-arm64-musl@1.0.4':
     resolution: {integrity: sha512-4b1KYG+sriufhFrpUS9uNOEYYJqSfcbnwGx6uGX7JjrH8tELG90cOpCawz5THNIwlS3DhLgnCOcn0+4p6z26QA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@napi-rs/nice-linux-ppc64-gnu@1.0.4':
     resolution: {integrity: sha512-iaf3vMRgr23oe1PUaKpxaH3DS0IMN0+N9iEiWVwYPm/U15vZFYdqVegGfN2PzrZLUl5lc8ZxbmEKDfuqslhAMA==}
     engines: {node: '>= 10'}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@napi-rs/nice-linux-riscv64-gnu@1.0.4':
     resolution: {integrity: sha512-UXoREY6Yw6rHrGuTwQgBxpfjK34t6mTjibE9/cXbefL9AuUCJ9gEgwNKZiONuR5QGswChqo9cnthjdKkYyAdDg==}
     engines: {node: '>= 10'}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@napi-rs/nice-linux-s390x-gnu@1.0.4':
     resolution: {integrity: sha512-eFbgYCRPmsqbYPAlLYU5hYTNbogmIDUvknilehHsFhCH1+0/kN87lP+XaLT0Yeq4V/rpwChSd9vlz4muzFArtw==}
     engines: {node: '>= 10'}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@napi-rs/nice-linux-x64-gnu@1.0.4':
     resolution: {integrity: sha512-4T3E6uTCwWT6IPnwuPcWVz3oHxvEp/qbrCxZhsgzwTUBEwu78EGNXGdHfKJQt3soth89MLqZJw+Zzvnhrsg1mQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@napi-rs/nice-linux-x64-musl@1.0.4':
     resolution: {integrity: sha512-NtbBkAeyBPLvCBkWtwkKXkNSn677eaT0cX3tygq+2qVv71TmHgX4gkX6o9BXjlPzdgPGwrUudavCYPT9tzkEqQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@napi-rs/nice-win32-arm64-msvc@1.0.4':
     resolution: {integrity: sha512-vubOe3i+YtSJGEk/++73y+TIxbuVHi+W8ZzrRm2eETCjCRwNlgbfToQZ85dSA+4iBB/NJRGNp+O4hfdbbttZWA==}
@@ -3282,66 +3336,79 @@ packages:
     resolution: {integrity: sha512-L+34Qqil+v5uC0zEubW7uByo78WOCIrBvci69E7sFASRl0X7b/MB6Cqd1lky/CtcSVTydWa2WZwFuWexjS5o6g==}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm-musleabihf@4.60.1':
     resolution: {integrity: sha512-n83O8rt4v34hgFzlkb1ycniJh7IR5RCIqt6mz1VRJD6pmhRi0CXdmfnLu9dIUS6buzh60IvACM842Ffb3xd6Gg==}
     cpu: [arm]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-arm64-gnu@4.60.1':
     resolution: {integrity: sha512-Nql7sTeAzhTAja3QXeAI48+/+GjBJ+QmAH13snn0AJSNL50JsDqotyudHyMbO2RbJkskbMbFJfIJKWA6R1LCJQ==}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm64-musl@4.60.1':
     resolution: {integrity: sha512-+pUymDhd0ys9GcKZPPWlFiZ67sTWV5UU6zOJat02M1+PiuSGDziyRuI/pPue3hoUwm2uGfxdL+trT6Z9rxnlMA==}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-loong64-gnu@4.60.1':
     resolution: {integrity: sha512-VSvgvQeIcsEvY4bKDHEDWcpW4Yw7BtlKG1GUT4FzBUlEKQK0rWHYBqQt6Fm2taXS+1bXvJT6kICu5ZwqKCnvlQ==}
     cpu: [loong64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-loong64-musl@4.60.1':
     resolution: {integrity: sha512-4LqhUomJqwe641gsPp6xLfhqWMbQV04KtPp7/dIp0nzPxAkNY1AbwL5W0MQpcalLYk07vaW9Kp1PBhdpZYYcEw==}
     cpu: [loong64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-ppc64-gnu@4.60.1':
     resolution: {integrity: sha512-tLQQ9aPvkBxOc/EUT6j3pyeMD6Hb8QF2BTBnCQWP/uu1lhc9AIrIjKnLYMEroIz/JvtGYgI9dF3AxHZNaEH0rw==}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-ppc64-musl@4.60.1':
     resolution: {integrity: sha512-RMxFhJwc9fSXP6PqmAz4cbv3kAyvD1etJFjTx4ONqFP9DkTkXsAMU4v3Vyc5BgzC+anz7nS/9tp4obsKfqkDHg==}
     cpu: [ppc64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-riscv64-gnu@4.60.1':
     resolution: {integrity: sha512-QKgFl+Yc1eEk6MmOBfRHYF6lTxiiiV3/z/BRrbSiW2I7AFTXoBFvdMEyglohPj//2mZS4hDOqeB0H1ACh3sBbg==}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-riscv64-musl@4.60.1':
     resolution: {integrity: sha512-RAjXjP/8c6ZtzatZcA1RaQr6O1TRhzC+adn8YZDnChliZHviqIjmvFwHcxi4JKPSDAt6Uhf/7vqcBzQJy0PDJg==}
     cpu: [riscv64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-s390x-gnu@4.60.1':
     resolution: {integrity: sha512-wcuocpaOlaL1COBYiA89O6yfjlp3RwKDeTIA0hM7OpmhR1Bjo9j31G1uQVpDlTvwxGn2nQs65fBFL5UFd76FcQ==}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-gnu@4.60.1':
     resolution: {integrity: sha512-77PpsFQUCOiZR9+LQEFg9GClyfkNXj1MP6wRnzYs0EeWbPcHs02AXu4xuUbM1zhwn3wqaizle3AEYg5aeoohhg==}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-musl@4.60.1':
     resolution: {integrity: sha512-5cIATbk5vynAjqqmyBjlciMJl1+R/CwX9oLk/EyiFXDWd95KpHdrOJT//rnUl4cUcskrd0jCCw3wpZnhIHdD9w==}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-openbsd-x64@4.60.1':
     resolution: {integrity: sha512-cl0w09WsCi17mcmWqqglez9Gk8isgeWvoUZ3WiJFYSR3zjBQc2J5/ihSjpl+VLjPqjQ/1hJRcqBfLjssREQILw==}
@@ -3457,24 +3524,28 @@ packages:
     engines: {node: '>=10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@swc/core-linux-arm64-musl@1.13.5':
     resolution: {integrity: sha512-9+ZxFN5GJag4CnYnq6apKTnnezpfJhCumyz0504/JbHLo+Ue+ZtJnf3RhyA9W9TINtLE0bC4hKpWi8ZKoETyOQ==}
     engines: {node: '>=10'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@swc/core-linux-x64-gnu@1.13.5':
     resolution: {integrity: sha512-WD530qvHrki8Ywt/PloKUjaRKgstQqNGvmZl54g06kA+hqtSE2FTG9gngXr3UJxYu/cNAjJYiBifm7+w4nbHbA==}
     engines: {node: '>=10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@swc/core-linux-x64-musl@1.13.5':
     resolution: {integrity: sha512-Luj8y4OFYx4DHNQTWjdIuKTq2f5k6uSXICqx+FSabnXptaOBAbJHNbHT/06JZh6NRUouaf0mYXN0mcsqvkhd7Q==}
     engines: {node: '>=10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@swc/core-win32-arm64-msvc@1.13.5':
     resolution: {integrity: sha512-cZ6UpumhF9SDJvv4DA2fo9WIzlNFuKSkZpZmPG1c+4PFSEMy5DFOjBSllCvnqihCabzXzpn6ykCwBmHpy31vQw==}
@@ -7391,6 +7462,17 @@ snapshots:
       '@nestjs/core': 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       cron: 4.3.5
 
+  '@nestjs/schematics@11.0.10(chokidar@4.0.3)(typescript@5.9.2)':
+    dependencies:
+      '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
+      '@angular-devkit/schematics': 19.2.23(chokidar@4.0.3)
+      comment-json: 4.6.2
+      jsonc-parser: 3.3.1
+      pluralize: 8.0.0
+      typescript: 5.9.2
+    transitivePeerDependencies:
+      - chokidar
+
   '@nestjs/schematics@11.0.10(chokidar@4.0.3)(typescript@5.9.3)':
     dependencies:
       '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
@@ -7399,17 +7481,6 @@ snapshots:
       jsonc-parser: 3.3.1
       pluralize: 8.0.0
       typescript: 5.9.3
-    transitivePeerDependencies:
-      - chokidar
-
-  '@nestjs/schematics@11.0.10(typescript@5.9.2)':
-    dependencies:
-      '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
-      '@angular-devkit/schematics': 19.2.23(chokidar@4.0.3)
-      comment-json: 4.6.2
-      jsonc-parser: 3.3.1
-      pluralize: 8.0.0
-      typescript: 5.9.2
     transitivePeerDependencies:
       - chokidar
 
@@ -8771,6 +8842,14 @@ snapshots:
       '@vitest/utils': 3.2.6
       chai: 5.3.3
       tinyrainbow: 2.0.0
+
+  '@vitest/mocker@3.2.6(vite@7.3.2(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))':
+    dependencies:
+      '@vitest/spy': 3.2.6
+      estree-walker: 3.0.3
+      magic-string: 0.30.17
+    optionalDependencies:
+      vite: 7.3.2(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
 
   '@vitest/mocker@3.2.6(vite@7.3.2(@types/node@24.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))':
     dependencies:
@@ -11592,7 +11671,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.6
-      '@vitest/mocker': 3.2.6(vite@7.3.2(@types/node@24.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
+      '@vitest/mocker': 3.2.6(vite@7.3.2(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
       '@vitest/pretty-format': 3.2.6
       '@vitest/runner': 3.2.6
       '@vitest/snapshot': 3.2.6
