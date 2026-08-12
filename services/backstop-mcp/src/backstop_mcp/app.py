@@ -133,19 +133,21 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
-        async with (
-            warmup_lifespan(
-                custom_fields_service,
-                backstop_clients,
-                _service_account_credential(backstop_config),
-            ),
-            cleanup_lifespan(session_factory, auth_config),
-        ):
-            try:
+        # Stop background tasks (auth sweep, warmup) before disposing the engine — otherwise
+        # `cleanup_lifespan`'s cancel/await runs after the pool is already closed.
+        try:
+            async with (
+                warmup_lifespan(
+                    custom_fields_service,
+                    backstop_clients,
+                    _service_account_credential(backstop_config),
+                ),
+                cleanup_lifespan(session_factory, auth_config),
+            ):
                 yield
-            finally:
-                await reset_services()
-                await engine.dispose()
+        finally:
+            await reset_services()
+            await engine.dispose()
 
     mcp = FastMCP(
         "Backstop MCP",
