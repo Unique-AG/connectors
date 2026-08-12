@@ -396,9 +396,7 @@ class BackstopOAuthProvider(OAuthProvider):
         redirect_url = construct_redirect_uri(pending.redirect_uri, code=code, state=pending.state)
         response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)
         # The pending authorization is gone, so its CSRF cookie has nothing left to protect.
-        clear_csrf_cookie(
-            response, request_id, path=self.login_path, secure=self._secure_cookies
-        )
+        clear_csrf_cookie(response, request_id, path=self.login_path, secure=self._secure_cookies)
         return response
 
     async def _load_pending(self, request_id: str) -> PendingAuthorization | None:
