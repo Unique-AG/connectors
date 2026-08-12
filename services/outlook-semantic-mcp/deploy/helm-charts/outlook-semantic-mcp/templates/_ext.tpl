@@ -7,6 +7,9 @@
 {{- include "chart.config.microsoft" . }}
 {{- include "chart.config.unique" . }}
 {{- end }}
+{{- if .Values.proxyConfig.enabled }}
+{{- include "chart.config.proxy" . }}
+{{- end }}
 {{- end -}}
 
 {{- define "base.hookJob.container.app.env.ext" -}}
@@ -17,5 +20,8 @@
 {{- include "chart.config.auth" . }}
 {{- include "chart.config.microsoft" . }}
 {{- include "chart.config.unique" . }}
+{{- end }}
+{{- if .Values.proxyConfig.enabled }}
+{{- include "chart.config.proxy" . }}
 {{- end }}
 {{- end -}}

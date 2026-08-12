@@ -38,6 +38,12 @@ env:
 #         secretKeyRef:
 #           name: outlook-semantic-mcp-zitadel-secret
 #           key: UNIQUE_ZITADEL_CLIENT_SECRET
+#     # For proxy basic auth password (required when proxyConfig.authMode is 'username_password')
+#     - name: PROXY_PASSWORD
+#       valueFrom:
+#         secretKeyRef:
+#           name: outlook-semantic-mcp-secret
+#           key: PROXY_PASSWORD
 envVars: []
 
 image:
@@ -434,6 +440,35 @@ mcpConfig:
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
   # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
+
+# -- HTTP proxy configuration for external API calls
+# Required for environments where internet access is only available through a proxy.
+# When enabled, PROXY_* env vars are rendered into the deployment and hook job via templates/_ext.tpl.
+proxyConfig:
+  enabled: true
+  # -- Proxy authentication mode
+  # none: proxy disabled
+  # no_auth: proxy enabled, no authentication
+  # username_password: username/password authentication
+  # ssl_tls: TLS client certificate authentication
+  authMode: none
+  # -- Proxy server hostname (required for no_auth/username_password/ssl_tls modes)
+  # host: proxy.example.com
+  # -- Proxy server port (required for no_auth/username_password/ssl_tls modes)
+  # port: 8080
+  # -- Proxy protocol: http or https (required for no_auth/username_password/ssl_tls modes)
+  # protocol: http
+  # -- Basic auth username (required for username_password mode)
+  # username: proxy-user
+  # password is loaded from a secret, see envVars example for PROXY_PASSWORD
+  # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
+  # sslCertPath: /app/proxy-certs/client.crt
+  # -- Path to SSL/TLS client key (required for ssl_tls mode)
+  # sslKeyPath: /app/proxy-certs/client.key
+  # -- Path to CA bundle for verifying proxy server certificate (optional)
+  # sslCaBundlePath: /app/proxy-certs/ca.crt
+  # -- Optional JSON string of headers for CONNECT request
+  # headers: '{"X-Proxy-Header":"value"}'
 
 # ── NetworkPolicy ─────────────────────────────────────────────────────────────
 networkPolicy:
