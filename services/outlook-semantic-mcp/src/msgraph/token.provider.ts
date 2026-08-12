@@ -7,8 +7,14 @@ import {
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { type Dispatcher, fetch } from 'undici';
+import { z } from 'zod';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import { userProfiles } from '../db/schema';
+
+const TokenRefreshResponseSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
+});
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -108,7 +114,7 @@ export class TokenProvider implements AuthenticationProvider {
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
-      const tokenData = await response.json();
+      const tokenData = TokenRefreshResponseSchema.parse(await response.json());
 
       const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
       // Keep old refresh token if new one not provided
