@@ -25,9 +25,10 @@ Scopes verified against `.gitcommitizen`: `packages/proxy/**` → new `proxy` sc
 - Compose `interceptors.retry()` and `interceptors.redirect()` back onto the dispatcher passed to
   `UniqueApiModule`. `unique-api` only applies them when no dispatcher is supplied, so passing one
   would otherwise have silently dropped both — including when no proxy is configured.
-- Add the Helm `proxyConfig` block, ConfigMap template and chart tests, plus `.env.example` and
-  operator documentation, matching the SharePoint connector's env var names and semantics.
+- Add the Helm `proxyConfig` block, inject `PROXY_*` via `_config-proxy.tpl` / `_ext.tpl`, and chart
+  tests, plus `.env.example` and operator documentation, matching the SharePoint connector's env var
+  names and semantics.
 - Delete the unused `HttpClientModule`, which composed retry/redirect on a non-proxied agent and
   would have become a silent proxy bypass.
-- `sharepoint-connector` and `confluence-connector` are untouched; migrating them onto the new
-  package is a tracked follow-up.
+- `sharepoint-connector` and `confluence-connector` are untouched; migrating them onto
+  `@unique-ag/proxy` is tracked in [UN-24194](https://unique-ch.atlassian.net/browse/UN-24194).
