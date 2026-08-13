@@ -121,6 +121,15 @@ def main_module() -> Iterator[_MainModule]:
     """
     environment_before = os.environ.copy()
     try:
+        # Importing the module runs `AppConfig()` and `create_app()` — which builds a
+        # `DatabaseConfig()` too — so the import needs a complete environment or it raises.
+        # Set one here rather than relying on the developer's local `.env`: CI has no `.env`,
+        # and `load_dotenv()` doesn't override variables that are already set, so these win in
+        # both places. Postgres is never reached — `create_engine` is lazy and the app's
+        # lifespan doesn't run in these tests — so an unroutable URL is enough.
+        os.environ["PUBLIC_BASE_URL"] = "https://office-mcp.example"
+        os.environ["DB_URL"] = "postgresql://user:pass@127.0.0.1:1/nope"
+
         # Imported through `importlib`, then widened via `object` before being narrowed: the
         # `import` statement form infers a literal `Module("office_mcp.main")` type that
         # `reportInvalidCast` refuses to convert to `_MainModule` at all — even through
