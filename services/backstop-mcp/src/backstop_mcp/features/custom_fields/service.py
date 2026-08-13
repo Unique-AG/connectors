@@ -11,7 +11,6 @@ from backstop_mcp.db import read_session, transaction
 from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
-from backstop_mcp.features.custom_fields.glossary import format_glossary
 from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
 from backstop_mcp.features.custom_fields.overrides import (
     FieldOverride,
@@ -42,8 +41,7 @@ class CustomFieldsService:
     Definitions only ever come from a real Backstop fetch, persisted as a snapshot keyed by
     `(base_url, subject)` so one caller's refresh cannot populate another's catalog.
     `overrides` are a display overlay reapplied on every load — never a source of fields on
-    their own, so until a fetch succeeds this service serves nothing and the glossary stays
-    absent.
+    their own, so until a fetch succeeds this service serves nothing.
 
     Name → definition resolution (including elicitation) lives in `resolve.py`, mirroring
     `party_resolver.resolve`. Constructed by `create_app()` and reached via
@@ -118,12 +116,6 @@ class CustomFieldsService:
             return {}
         entry = self._by_subject.get(resolved)
         return entry.index if entry is not None else {}
-
-    def glossary_for(self, entity_type: str, *, subject: str | None = None) -> str:
-        entity = normalize_entity_type(entity_type)
-        if entity is None:
-            return ""
-        return format_glossary(self.definitions_for(entity, subject=subject), entity_type=entity)
 
     def definitions_for(
         self, entity_type: str, *, subject: str | None = None

@@ -10,7 +10,6 @@ Nothing here imports `config` either: the tuning knobs arrive as the frozen type
 
 from backstop_mcp.backstop_client.client import (
     BackstopClient,
-    CallerClientProvider,
 )
 from backstop_mcp.backstop_client.credential import (
     BackstopCredentialSecret,
@@ -54,7 +53,6 @@ __all__ = [
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
-    "CallerClientProvider",
     "PageResult",
     "RetrySettings",
     "SinglePage",

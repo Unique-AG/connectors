@@ -233,7 +233,7 @@ class TestRoutes:
 
         checks = _checks(body)
         assert checks["database"] is True
-        # No service account and no snapshot row, so the glossary legitimately hasn't loaded —
+        # No service account and no snapshot row, so the custom-field schema hasn't loaded —
         # and that must not gate readiness.
         assert checks["custom_field_schema"] is False
 

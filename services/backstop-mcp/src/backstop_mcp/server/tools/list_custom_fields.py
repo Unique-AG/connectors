@@ -53,9 +53,9 @@ async def list_custom_fields(
 ) -> CallToolResult:
     """List custom-field definitions for one Backstop entity type.
 
-    Use when a tool glossary is missing, truncated, or you need the full catalog (ids, types,
-    aliases, allowed values) for organizations, people, contacts, employees, opportunities, or
-    accounts. Pass refresh=true to re-fetch definitions from Backstop into the cache.
+    Use when you need the custom-field catalog (ids, types, aliases, allowed values) for
+    organizations, people, contacts, employees, opportunities, or accounts. Pass refresh=true
+    to re-fetch definitions from Backstop into the cache.
     """
     client = await get_backstop_client()
     service = get_custom_fields_service()

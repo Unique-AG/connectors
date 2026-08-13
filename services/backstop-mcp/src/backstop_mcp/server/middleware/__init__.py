@@ -1,3 +1,7 @@
-from backstop_mcp.server.middleware.custom_field_glossary import CustomFieldGlossaryMiddleware
+"""FastMCP middleware for this server.
 
-__all__ = ["CustomFieldGlossaryMiddleware"]
+Empty after glossary prefetch was dropped; kept as a public-surface package so a later
+middleware has a home that `create_app` can import without reaching past `__init__`.
+"""
+
+__all__: list[str] = []
