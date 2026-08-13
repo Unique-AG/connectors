@@ -7,6 +7,7 @@ from office_mcp.config import (
     AppConfig,
     AppEnv,
     DatabaseConfig,
+    LogLevel,
     normalize_asyncpg_url,
 )
 
@@ -14,6 +15,14 @@ from office_mcp.config import (
 class TestNormalizeAsyncpgUrl:
     def test_adds_asyncpg_driver_prefix(self) -> None:
         url, connect_args = normalize_asyncpg_url("postgresql://user:pass@db:5432/office")
+
+        assert url == "postgresql+asyncpg://user:pass@db:5432/office"
+        assert connect_args == {}
+
+    def test_normalizes_the_postgres_short_form_scheme(self) -> None:
+        """`postgres://` is the libpq short form; pydantic's `PostgresDsn` accepts it verbatim
+        without rewriting it, so it must be normalized here alongside `postgresql://`."""
+        url, connect_args = normalize_asyncpg_url("postgres://user:pass@db:5432/office")
 
         assert url == "postgresql+asyncpg://user:pass@db:5432/office"
         assert connect_args == {}
@@ -50,6 +59,16 @@ class TestNormalizeAsyncpgUrl:
         assert isinstance(ssl_ctx, ssl.SSLContext)
         assert ssl_ctx.verify_mode == ssl.CERT_NONE
 
+    def test_strips_sslmode_prefer_and_uses_asyncpgs_own_fallback_string(self) -> None:
+        """asyncpg treats an `SSLContext` as mandatory TLS, but libpq `sslmode=prefer` means
+        "try TLS, fall back to plaintext" — asyncpg's `ssl="prefer"` string matches that."""
+        url, connect_args = normalize_asyncpg_url(
+            "postgresql://user:pass@db:5432/office?sslmode=prefer"
+        )
+
+        assert url == "postgresql+asyncpg://user:pass@db:5432/office"
+        assert connect_args == {"ssl": "prefer"}
+
     def test_strips_channel_binding(self) -> None:
         url, connect_args = normalize_asyncpg_url(
             "postgresql://user:pass@db:5432/office?sslmode=disable&channel_binding=require"
@@ -79,6 +98,7 @@ class TestPublicBaseUrl:
             "http://[::1]:9544",
             # A bind address, not somewhere a client can reach this service.
             "http://0.0.0.0:9544",
+            "http://[::]:9544",
         ],
     )
     def test_production_rejects_a_url_no_client_can_reach(self, url: str) -> None:
@@ -124,6 +144,23 @@ class TestPublicBaseUrl:
             AppConfig()
 
 
+class TestCaseInsensitiveEnumFields:
+    """Pydantic's `StrEnum` coercion is case-sensitive, but the canonical spellings
+    (`LOG_LEVEL=INFO`, `APP_ENV=Production`) are what operators reach for."""
+
+    def test_log_level_accepts_the_canonical_uppercase_spelling(self) -> None:
+        config = AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, "log_level": "INFO"})
+
+        assert config.log_level == LogLevel.INFO
+
+    def test_app_env_accepts_mixed_case(self) -> None:
+        config = AppConfig.model_validate(
+            {"app_env": "Production", "public_base_url": "https://office-mcp.example"}
+        )
+
+        assert config.app_env == AppEnv.PRODUCTION
+
+
 class TestDatabaseConfigSsl:
     def test_rewrites_helm_database_url_with_sslmode(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(
@@ -138,7 +175,8 @@ class TestDatabaseConfigSsl:
         assert isinstance(config.connect_args.get("ssl"), ssl.SSLContext)
 
     def test_builds_url_from_discrete_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("DATABASE_URL", raising=False)
+        # DATABASE_URL no longer needs to be cleared here: supplying any discrete field makes
+        # `accept_database_url` skip the env fallback entirely, regardless of what's ambient.
         monkeypatch.delenv("DB_URL", raising=False)
 
         config = DatabaseConfig(
@@ -150,6 +188,25 @@ class TestDatabaseConfigSsl:
         )
 
         assert config.connection_url == "postgresql+asyncpg://user:p%40ss@db:5432/office"
+
+    def test_explicit_discrete_fields_beat_a_set_database_url(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A DATABASE_URL left over in the ambient environment must not silently override
+        explicit constructor arguments — the composition-root contract is that nothing
+        downstream re-reads the environment."""
+        monkeypatch.delenv("DB_URL", raising=False)
+        monkeypatch.setenv("DATABASE_URL", "postgresql://envuser:envpass@envhost:5432/envdb")
+
+        config = DatabaseConfig(
+            host="explicit",
+            port=5432,
+            name="office",
+            user="user",
+            password="p@ss",
+        )
+
+        assert config.connection_url == "postgresql+asyncpg://user:p%40ss@explicit:5432/office"
 
     def test_missing_parts_list_all_absent_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("DATABASE_URL", raising=False)
