@@ -12,9 +12,11 @@ message handles are minted, `channels` takes both the message shape and the "did
 this" test from `message_read`, so that a message means the same thing whichever tool produced it,
 and `chats` takes the meeting handle from `transcripts`, which owns that family for the same reason
 — a chat is where a meeting's join URL comes from, and one grammar with two spellers is two
-grammars. `recordings` borrows the most: the handle, the join-URL resolve, the occurrence window
-and the "is an empty answer settled" inference all come from `transcripts`, because both artifacts
-are asked for by the same handle over the same window. What it does not borrow is why the two are
+grammars. `recordings` borrows the most: the handle, the join-URL resolve, the occurrence window,
+the newest-first walk over a meeting's artifacts and the "is an empty answer settled" inference all
+come from `transcripts`, because both artifacts are asked for by the same handle over the same
+window — and a promise about order or about absence that the two made separately is a promise they
+would keep differently. What it does not borrow is why the two are
 separate tools rather than one — Microsoft gates transcripts behind a tenant switch that is off by
 default and gates recordings behind nothing of the kind, so a single tool would answer nothing
 about a reachable recording in the commonest tenant. `recordings` argues that where the decision

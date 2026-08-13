@@ -48,11 +48,33 @@ def _resolved(graph: respx.MockRouter, **meeting: object) -> respx.Route:
     )
 
 
-def _listed(graph: respx.MockRouter, *payloads: object, next_link: bool = False) -> respx.Route:
-    body: dict[str, object] = {"value": list(payloads)}
-    if next_link:
-        body["@odata.nextLink"] = f"{GRAPH_V1}{_RECORDINGS}?$skiptoken=synthetic"
-    return graph.get(_RECORDINGS).mock(return_value=httpx.Response(200, json=body))
+def _listed(graph: respx.MockRouter, *payloads: object) -> respx.Route:
+    return graph.get(_RECORDINGS).mock(
+        return_value=httpx.Response(200, json={"value": list(payloads)})
+    )
+
+
+def _pages(
+    graph: respx.MockRouter, first: list[dict[str, object]], second: list[dict[str, object]]
+) -> respx.Route:
+    """Graph's own paging: a first page carrying `@odata.nextLink`, then the rest.
+
+    Two real pages rather than one page that links to itself, because the walk now follows the
+    cursor to the end of the collection (bounded by `MAX_ARTIFACT_SCAN`) rather than stopping as
+    soon as it has `limit` items — which is the whole of what makes "newest first" true.
+    """
+    return graph.get(_RECORDINGS).mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                json={
+                    "value": first,
+                    "@odata.nextLink": f"{GRAPH_V1}{_RECORDINGS}?$skiptoken=synthetic",
+                },
+            ),
+            httpx.Response(200, json={"value": second}),
+        ]
+    )
 
 
 def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
@@ -415,19 +437,91 @@ class TestScopingToOneOccurrence:
     async def test_a_full_window_with_more_behind_it_says_so(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        """More recordings in the window than `limit` holds: the newest of them come back, and
+        `truncated` says the rest are older ones rather than a next page to fetch."""
         _resolved(graph)
-        _listed(
+        _pages(
             graph,
-            recording_payload(recording_id="one"),
-            recording_payload(recording_id="two"),
-            next_link=True,
+            [recording_payload(recording_id="week-1", created_at="2026-02-03T14:00:00Z")],
+            [recording_payload(recording_id="week-2", created_at="2026-02-10T14:00:00Z")],
         )
         _me(graph)
 
-        found = await _listing(client, limit=2)
+        found = await _listing(client, limit=1)
 
         assert found.truncated is True
         assert found.status == "available"
+        assert [item.recording_id for item in found.recordings] == ["week-2"]
+
+    async def test_the_newest_are_returned_and_not_the_first_graph_answered_with(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The recordings lister inherited this from the transcript one and is fixed with it: the
+        collection is ordered before `limit` cuts it, so "the recording of the latest occurrence"
+        is what a small `limit` answers with. Cutting first would have answered `oldest` here.
+        """
+        _resolved(graph, meeting_type="recurring")
+        _listed(
+            graph,
+            recording_payload(recording_id="oldest", created_at="2026-02-03T14:00:00Z"),
+            recording_payload(recording_id="middle", created_at="2026-02-10T14:00:00Z"),
+            recording_payload(recording_id="newest", created_at="2026-02-17T14:00:00Z"),
+        )
+        _me(graph)
+
+        found = await _listing(client, limit=1)
+
+        assert [item.recording_id for item in found.recordings] == ["newest"]
+        assert found.truncated is True
+
+    async def test_the_newest_is_found_even_when_it_is_on_a_later_page(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _resolved(graph, meeting_type="recurring")
+        _pages(
+            graph,
+            [recording_payload(recording_id="oldest", created_at="2026-02-03T14:00:00Z")],
+            [recording_payload(recording_id="newest", created_at="2026-02-17T14:00:00Z")],
+        )
+        _me(graph)
+
+        found = await _listing(client, limit=1)
+
+        assert [item.recording_id for item in found.recordings] == ["newest"]
+
+    async def test_a_scan_that_stopped_short_asserts_no_absence(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The self-contradicting answer, in the lister that shares the code it came from:
+        `not_recorded` ("retrying will not help") could be reported alongside `truncated: true`
+        ("there is more"). A collection that was not read to the end settles nothing, so the answer
+        is `scan_incomplete` and no absence is claimed.
+        """
+        ended = datetime.now(UTC) - timedelta(days=30)
+        _resolved(graph, meeting_type="recurring", end=ended.isoformat())
+        _listed(
+            graph,
+            *(
+                recording_payload(
+                    recording_id=f"occurrence-{index}", created_at="2026-02-03T14:00:00Z"
+                )
+                for index in range(transcripts.MAX_ARTIFACT_SCAN + 50)
+            ),
+        )
+        _me(graph)
+
+        found = await _listing(
+            client,
+            started_after=datetime(2026, 3, 1, tzinfo=UTC),
+            started_before=datetime(2026, 3, 2, tzinfo=UTC),
+        )
+
+        assert found.recordings == []
+        assert found.truncated is True
+        assert found.status == "scan_incomplete"
+        assert found.status not in ("not_recorded", "not_ready"), (
+            "a window whose collection was not read to the end settles nothing either way"
+        )
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
         self, client: GraphServiceClient

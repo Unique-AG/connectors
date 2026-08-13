@@ -9,11 +9,29 @@ replayed verbatim, never decomposed (https://learn.microsoft.com/en-us/graph/pag
   can otherwise walk a long way for nothing, so a cap has to bound what was *looked at* and not
   only what was kept. What it does not bound is requests: a page Graph chooses to answer short
   leaves the cap unspent and the walk goes on, so this is a cap on work rather than a request
-  budget. Where the budget is the point — a channel's messages, at 1 request per second per app
-  per tenant for a given channel (https://learn.microsoft.com/en-us/graph/throttling-limits) —
-  the feature reading them makes one request and does not page at all.
+  budget.
 * saying so. A truncated answer that looks complete is the failure mode, because the caller
   above is a language model that will summarise 20 of 4000 messages as "the discussion".
+
+Three ways of bounding a read live in this connector, and they are three because the collections
+are. This is the one place they are set out together:
+
+1. **Walk, bounded by items kept.** The inventories — `/me/chats`, `/me/joinedTeams`,
+   `/teams/{id}/channels` — are unfiltered, so `limit` items kept *is* the work done and
+   `MAX_SCANNED_ITEMS` never binds. Nothing filters them after the fact, so nothing more is needed.
+2. **Walk, bounded by items scanned, at a tighter cap.** A meeting's transcripts and its
+   recordings are filtered here (an occurrence window) *and* sorted here (newest first), so the
+   walk cannot stop at `limit` — it has to see the collection before it can say which of it is
+   newest. `max_scanned` is what bounds that, and the meeting listers pass their own
+   (`features/transcripts.MAX_ARTIFACT_SCAN`) rather than this module's default, because a
+   per-meeting collection is a small thing to walk 1000 items of.
+3. **Do not walk at all.** Where the request budget is the point — a channel's messages, at 1
+   request per second per app per tenant for a given channel
+   (https://learn.microsoft.com/en-us/graph/throttling-limits) — the feature reading them makes
+   one request, uses `$top` as the window, and never comes here.
+
+So the item budget and the request budget are not two competing strategies: a cap on items is what
+bounds a walk, and where a walk is what the throttle cannot afford, there is no walk.
 
 Search paging is deliberately not here. `POST /search/query` takes `from`/`size` offsets instead
 of an opaque cursor, so a stateless MCP tool resumes a search by re-issuing it with a larger
@@ -48,7 +66,8 @@ class GraphCollection[T](Protocol):
 
 # How many items may be looked at to satisfy one request, however few of them are kept. A
 # safety valve on request count, not a tuning knob: a caller that needs more than this from a
-# filtered collection is asking the wrong endpoint (use search).
+# filtered collection is asking the wrong endpoint (use search). A caller with a smaller
+# collection and a tighter budget passes its own `max_scanned` — see shape 2 above.
 MAX_SCANNED_ITEMS = 1000
 
 

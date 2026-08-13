@@ -16,6 +16,7 @@ from office_mcp.graph_client.errors import (
 from office_mcp.graph_client.pagination import (
     MAX_SCANNED_ITEMS,
     CollectedItems,
+    GraphCollection,
     collect_pages,
 )
 from office_mcp.graph_client.settings import GraphSettings
@@ -23,6 +24,7 @@ from office_mcp.graph_client.settings import GraphSettings
 __all__ = [
     "MAX_SCANNED_ITEMS",
     "CollectedItems",
+    "GraphCollection",
     "GraphFailure",
     "GraphForbidden",
     "GraphNotFound",

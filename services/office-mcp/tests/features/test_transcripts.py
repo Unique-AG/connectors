@@ -67,6 +67,29 @@ def _resolved(graph: respx.MockRouter, **meeting: object) -> respx.Route:
     )
 
 
+def _pages(
+    graph: respx.MockRouter, first: list[dict[str, object]], second: list[dict[str, object]]
+) -> respx.Route:
+    """Graph's own paging: a first page carrying `@odata.nextLink`, then the rest.
+
+    Two real pages rather than one page that links to itself, because the walk now follows the
+    cursor to the end of the collection (bounded by `MAX_ARTIFACT_SCAN`) rather than stopping as
+    soon as it has `limit` items — which is the whole of what makes "newest first" true.
+    """
+    return graph.get(_TRANSCRIPTS).mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                json={
+                    "value": first,
+                    "@odata.nextLink": f"{GRAPH_V1}{_TRANSCRIPTS}?$skiptoken=synthetic",
+                },
+            ),
+            httpx.Response(200, json={"value": second}),
+        ]
+    )
+
+
 def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
     """A recurring series as Graph holds it: one meeting, one transcript collection, three weeks.
 
@@ -453,25 +476,115 @@ class TestScopingToOneOccurrence:
     async def test_a_full_window_with_more_behind_it_says_so(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        """More transcripts in the window than `limit` holds: the newest of them come back, and
+        `truncated` says the rest are older ones rather than a next page to fetch."""
         _resolved(graph)
+        _pages(
+            graph,
+            [transcript_payload(transcript_id="week-1", created_at="2026-02-03T14:00:00Z")],
+            [transcript_payload(transcript_id="week-2", created_at="2026-02-10T14:00:00Z")],
+        )
+
+        found = await transcripts.list_meeting_transcripts(
+            client, handle=_handle(), started_after=None, started_before=None, limit=1
+        )
+
+        assert found.truncated is True
+        assert found.status == "available"
+        assert [t.transcript_id for t in found.transcripts] == ["week-2"]
+
+    async def test_the_newest_are_returned_and_not_the_first_graph_answered_with(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """ "The latest transcript of this series" is the question this tool exists for, and Graph
+        answers this collection in an order of its own — it documents no `$orderby` at all. So the
+        window is filled from the whole collection and sorted before `limit` cuts it. Cutting first
+        and sorting the remainder returns an arbitrary handful sorted among themselves, which reads
+        exactly like the right answer: here it would have answered `oldest`.
+        """
+        _resolved(graph, meeting_type="recurring")
         graph.get(_TRANSCRIPTS).mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "value": [
-                        transcript_payload(transcript_id=f"week-{index}") for index in range(2)
-                    ],
-                    "@odata.nextLink": f"{GRAPH_V1}{_TRANSCRIPTS}?$skiptoken=synthetic",
+                        transcript_payload(
+                            transcript_id="oldest", created_at="2026-02-03T14:00:00Z"
+                        ),
+                        transcript_payload(
+                            transcript_id="middle", created_at="2026-02-10T14:00:00Z"
+                        ),
+                        transcript_payload(
+                            transcript_id="newest", created_at="2026-02-17T14:00:00Z"
+                        ),
+                    ]
                 },
             )
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=2
+            client, handle=_handle(), started_after=None, started_before=None, limit=1
         )
 
+        assert [t.transcript_id for t in found.transcripts] == ["newest"]
         assert found.truncated is True
-        assert found.status == "available"
+
+    async def test_the_newest_is_found_even_when_it_is_on_a_later_page(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The same promise across Graph's own paging: a walk that stopped as soon as it had
+        `limit` items would never have seen the newest one."""
+        _resolved(graph, meeting_type="recurring")
+        _pages(
+            graph,
+            [transcript_payload(transcript_id="oldest", created_at="2026-02-03T14:00:00Z")],
+            [transcript_payload(transcript_id="newest", created_at="2026-02-17T14:00:00Z")],
+        )
+
+        found = await transcripts.list_meeting_transcripts(
+            client, handle=_handle(), started_after=None, started_before=None, limit=1
+        )
+
+        assert [t.transcript_id for t in found.transcripts] == ["newest"]
+
+    async def test_a_scan_that_stopped_short_asserts_no_absence(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The answer that used to contradict itself: `not_transcribed` ("retrying will not help")
+        alongside `truncated: true` ("there is more"). Both cannot be true, and a caller cannot see
+        which one is wrong. A meeting with more transcripts than one call looks through, none of
+        them in the window, is now `scan_incomplete` — which claims nothing about absence.
+        """
+        ended = datetime.now(UTC) - timedelta(days=30)
+        _resolved(graph, meeting_type="recurring", end=ended.isoformat())
+        graph.get(_TRANSCRIPTS).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        transcript_payload(
+                            transcript_id=f"occurrence-{index}", created_at="2026-02-03T14:00:00Z"
+                        )
+                        for index in range(transcripts.MAX_ARTIFACT_SCAN + 50)
+                    ]
+                },
+            )
+        )
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=datetime(2026, 3, 1, tzinfo=UTC),
+            started_before=datetime(2026, 3, 2, tzinfo=UTC),
+            limit=20,
+        )
+
+        assert found.transcripts == []
+        assert found.truncated is True
+        assert found.status == "scan_incomplete"
+        assert found.status not in ("not_transcribed", "not_ready"), (
+            "a window whose collection was not read to the end settles nothing either way"
+        )
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
         self, client: GraphServiceClient

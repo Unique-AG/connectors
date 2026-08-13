@@ -74,9 +74,19 @@ midnight-to-midnight would be an empty window reported as an answer. The assumpt
 each parameter's own description, where a model reads it: `09:00` is a different instant in Zurich,
 and a window quietly built in the wrong zone is worse than one that was refused.
 
-## Three failures a caller must act on differently
+## Newest first, and what it costs
 
-`GET …/transcripts` returning nothing is not one answer but two, and the tenant switch is a third:
+"The latest transcript of this series" is the question this tool exists for, so the order has to be
+a property of the *collection* and not of the page Graph happened to answer with — Graph documents
+no `$orderby` here, and a walk that stopped at `limit` before sorting would return an arbitrary
+`limit` transcripts sorted among themselves and call them the newest. That is a wrong answer with
+the shape of a right one. `newest_in_window` is where the sort and the cut happen in that order, for
+both artifacts, bounded by `MAX_ARTIFACT_SCAN` artifacts looked at per call.
+
+## Four failures a caller must act on differently
+
+`GET …/transcripts` returning nothing is not one answer but three, and the tenant switch is a
+fourth:
 
 * **`GraphAccessToTranscriptsDisabled`** — a `403` whose remedy names a Teams administrator, not a
   Graph permission. Microsoft Graph access to transcripts is off by default and "no app can access
@@ -90,8 +100,13 @@ and a window quietly built in the wrong zone is worse than one that was refused.
   model is sent back to poll for an occurrence that ended last month. Graph publishes no status for
   availability and no latency SLA, so both halves are an inference over one generous allowance;
   `OccurrenceWindow.settled` is the whole of it and `MeetingTranscripts.status` admits it as one.
+* **Not known** — the walk hit `MAX_ARTIFACT_SCAN` before the collection ended, so the transcripts
+  it did not reach might hold the one asked for. Neither absence verdict above is available here:
+  both assert something about a collection that was not read to the end, and the caller cannot tell
+  from the outside. `scan_incomplete` is that answer, and it is exactly the case where `truncated`
+  is true — an answer saying both "there is more" and "there is none" is one no caller can act on.
 
-`SpeakerAttributionNotAllowed` is a fourth Graph answer and the one this module handles rather than
+`SpeakerAttributionNotAllowed` is a fifth Graph answer and the one this module handles rather than
 reports: a tenant may permit transcripts and forbid speaker names, and the documented response is
 to ask again for the unattributed format. That degrades the answer instead of losing it, and
 `Transcript.speaker_attribution` says which one came back.
@@ -99,12 +114,12 @@ to ask again for the unattributed format. That degrades the answer instead of lo
 ## What `recordings` borrows from here, and why it is a separate module
 
 A meeting's recordings are answered by `features/recordings.py`, which takes `MeetingHandle`,
-`resolve_meeting`, `OccurrenceWindow` and the two helpers below from here: this module owns the
-meeting handle family (layering rule 9), so the join URL, the escaping and the window have exactly
-one home whichever artifact is being asked about. What it does not share is the outcome word — "was
-not transcribed" and "was not recorded" are different facts — or the refusal above, which Microsoft
-scopes to transcripts alone. That asymmetry is why the two artifacts are two tools;
-`features/recordings.py` argues it where the decision was made.
+`resolve_meeting`, `OccurrenceWindow`, `newest_in_window` and `as_utc` from here: this module owns
+the meeting handle family (layering rule 9), so the join URL, the escaping, the window and the order
+the artifacts come back in have exactly one home whichever artifact is being asked about. What it
+does not share is the outcome word — "was not transcribed" and "was not recorded" are different
+facts — or the refusal above, which Microsoft scopes to transcripts alone. That asymmetry is why the
+two artifacts are two tools; `features/recordings.py` argues it where the decision was made.
 """
 
 import html
@@ -124,7 +139,13 @@ from msgraph.generated.users.item.online_meetings.online_meetings_request_builde
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import GraphForbidden, collect_pages, graph_errors
+from office_mcp.graph_client import (
+    CollectedItems,
+    GraphCollection,
+    GraphForbidden,
+    collect_pages,
+    graph_errors,
+)
 
 # Resolving a join URL to a meeting is `OnlineMeetings.Read`, the least privilege Graph documents
 # for the filter, and needs no admin consent. Reading a transcript is a different, admin-consented
@@ -141,6 +162,20 @@ LISTING_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSIO
 # accumulates one per occurrence in the same collection, which is what makes a window necessary at
 # all. Graph documents `$top` here but publishes no ceiling, so this is ours.
 MAX_TRANSCRIPTS = 50
+
+# How many of a meeting's artifacts one listing may look at, whichever artifact it is. This is what
+# "newest first" costs: Graph documents no `$orderby` on either collection, so the newest can only
+# be known by looking at the collection, and a walk that stopped at `limit` would be sorting an
+# arbitrary handful of it (see `newest_in_window`). The bound is on artifacts rather than on
+# requests because that is what `collect_pages` can bound — Graph chooses the page size here and
+# publishes none — so the honest statement of the cost is "at most this many artifacts are looked
+# at, in however many pages Graph answers them in".
+#
+# 200 is four times the largest `limit` either lister offers and far past any real meeting: a
+# meeting accumulates one artifact per occurrence, so reaching this takes a series that has run
+# daily for the better part of a year *and* been recorded every time. A meeting that does exceed it
+# is not answered with a guess — the scan is reported as incomplete and no absence is asserted.
+MAX_ARTIFACT_SCAN = 200
 
 # How many turns one read returns, and the default window. A turn is one WebVTT cue — a sentence or
 # two — so an hour of meeting is some hundreds of them and a 30-hour one (Teams' own limit) is tens
@@ -417,6 +452,11 @@ class MeetingTranscripts(BaseModel):
             + "other cause looks identical and cannot be distinguished: Microsoft's "
             + "meeting-artifact APIs stop serving a meeting once it expires (about 60 days after a "
             + "one-off), so a transcript that once existed can read as never having existed.\n"
+            + "- `scan_incomplete` — this meeting has more transcripts than one call looks through "
+            + f"({MAX_ARTIFACT_SCAN}) and none of the ones looked at fall in your window, so "
+            + "whether one exists there is NOT known and is not being claimed either way. Narrow "
+            + "`started_after`/`started_before` to the occurrence you mean and ask again. Never "
+            + "report this as 'there is no transcript'. `truncated` is true for the same reason.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Not an error and not proof the meeting is gone; a meeting created outside a "
             + "calendar, or one this user was never invited to, answers the same way. Do not retry "
@@ -455,14 +495,21 @@ class MeetingTranscripts(BaseModel):
     transcripts: list[TranscriptSummary] = Field(
         description=(
             "The transcripts of this meeting that fall inside the requested window, newest first. "
-            + "Empty for every status other than `available`."
+            + "The order is over the whole collection rather than over one page of it, so the "
+            + "first entry is the latest transcript of the window — which for a recurring series "
+            + "is how to reach the most recent occurrence. Empty for every status other than "
+            + "`available`."
         )
     )
     truncated: bool = Field(
         description=(
-            "True when the meeting has more transcripts than this `limit` holds — the same 'there "
-            + "is more' flag every list-shaped tool here reports. Raise `limit` (up to "
-            + f"{MAX_TRANSCRIPTS}) or narrow `started_after`/`started_before`; there is no cursor."
+            "True when there is more — the same 'there is more' flag every list-shaped tool here "
+            + "reports. Two things set it, and both mean the same thing for what you may conclude: "
+            + "the window holds more transcripts than this `limit` (the ones here are still the "
+            + f"newest of them; raise `limit`, up to {MAX_TRANSCRIPTS}), or the meeting has more "
+            + f"transcripts in total than one call looks through ({MAX_ARTIFACT_SCAN}), in which "
+            + "case narrow `started_after`/`started_before`. There is no cursor. When this is true "
+            + "and nothing came back, `status` is `scan_incomplete` and no absence is claimed."
         )
     )
 
@@ -565,11 +612,13 @@ async def list_meeting_transcripts(
             meeting.id
         ).transcripts.get()
         assert first_page is not None, "Graph answered a transcript listing with no collection"
-        collected = await collect_pages(first_page, client, limit=limit, matches=window.holds)
+        collected = await newest_in_window(first_page, client, window=window, limit=limit)
 
-    found = sorted(collected.items, key=began_at, reverse=True)
+    found = collected.items
     return MeetingTranscripts(
-        status="available" if found else _absence(window.settled(meeting)),
+        status="available"
+        if found
+        else _absence(scan_stopped_short=collected.truncated, settled=window.settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
         # `OnlineMeetingBase.meetingType` is a generated enum subclassing `str`, so the member is
@@ -582,13 +631,22 @@ async def list_meeting_transcripts(
     )
 
 
-def _absence(settled: bool) -> str:
-    """Which of the two empty answers to give: the one that means stop, or the one that means wait.
+def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
+    """Which empty answer to give: the one that means stop, the one that means wait, or neither.
 
-    The evidence is `OccurrenceWindow.settled` and the word is this module's, because a meeting that
-    was recorded but not transcribed is answered `not_transcribed` here and `available` by the
-    recordings lister — the same evidence about two different artifacts.
+    A scan that stopped short is checked first, and it is the whole of the second fix here: the
+    walk having been cut means the artifacts it did not reach might hold the one asked for, so
+    nothing about absence is known — and "not transcribed / retrying will not help" is exactly the
+    assertion that must not be made. Reported instead as `scan_incomplete`, alongside the
+    `truncated: true` that comes from the same value, so that "there is more" and "there is none"
+    can never both be said of one answer.
+
+    Otherwise the evidence is `OccurrenceWindow.settled` and the word is this module's, because a
+    meeting that was recorded but not transcribed is answered `not_transcribed` here and
+    `available` by the recordings lister — the same evidence about two different artifacts.
     """
+    if scan_stopped_short:
+        return "scan_incomplete"
     return "not_transcribed" if settled else "not_ready"
 
 
@@ -621,16 +679,57 @@ async def resolve_meeting(
     return meetings[0] if meetings else None
 
 
-def began_at(artifact: MeetingArtifact) -> datetime:
+def _began_at(artifact: MeetingArtifact) -> datetime:
     """The sort key: when the artifact began, or the beginning of time where Graph did not say.
 
     Aware for the same reason `OccurrenceWindow.holds` is — one naive value among aware ones makes
     the sort itself raise, which is a crash in the middle of an answer that was already complete.
-    Shared with the recordings lister so that both artifacts come back newest first by the same
-    rule: Graph documents no `$orderby` on either collection, so the order is ours either way.
     """
     began = artifact.created_date_time
     return as_utc(began) if began is not None else datetime.min.replace(tzinfo=UTC)
+
+
+async def newest_in_window[T: MeetingArtifact](
+    first_page: GraphCollection[T],
+    client: GraphServiceClient,
+    *,
+    window: OccurrenceWindow,
+    limit: int,
+) -> CollectedItems[T]:
+    """The `limit` newest artifacts of a meeting that fall inside `window`, newest first.
+
+    Shared by both meeting listers, and the reason it is one function rather than four lines
+    written twice: the order, the bound and the meaning of `truncated` are the same promise about
+    two artifacts, and the two got it wrong the same way.
+
+    **Newest first is a property of the collection, not of the page Graph chose to answer with.**
+    Graph documents no `$orderby` on either collection, so it answers in an order of its own; a
+    walk that stopped at `limit` and sorted afterwards would return an arbitrary `limit` artifacts
+    sorted among themselves, which is the opposite of what "the latest transcript of this series"
+    asks for and is undetectable — the answer looks exactly like the right one. So the walk keeps
+    everything the window holds, sorts, and only then cuts to `limit`.
+
+    **What that costs, and the bound on it.** Up to `MAX_ARTIFACT_SCAN` artifacts are looked at,
+    however many pages Graph answers them in, rather than up to `limit`. For any real meeting that
+    is the same single page it always was — a meeting has one artifact per occurrence — and the cap
+    is what stops a pathological collection turning one tool call into an unbounded walk.
+
+    **`truncated` means "there is more", and both ways of there being more set it**: matching
+    artifacts older than the ones returned, and a collection larger than the scan cap. The second
+    is also the case in which an empty answer proves nothing, which is why the flag and the verdict
+    are read from the same value — see `_absence` in each lister.
+    """
+    collected = await collect_pages(
+        first_page,
+        client,
+        limit=MAX_ARTIFACT_SCAN,
+        matches=window.holds,
+        max_scanned=MAX_ARTIFACT_SCAN,
+    )
+    newest = sorted(collected.items, key=_began_at, reverse=True)
+    return CollectedItems(
+        items=newest[:limit], truncated=collected.truncated or len(newest) > limit
+    )
 
 
 def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:

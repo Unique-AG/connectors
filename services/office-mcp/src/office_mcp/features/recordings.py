@@ -32,9 +32,11 @@ transcript answer actionable replaced by something a model has to unpick. It wou
 one thing a 403 here is good for: every tool in this connector names only the permissions its own
 request was made under, so an administrator is sent after the permission that was actually missing.
 
-What is shared is shared for real rather than copied: the meeting handle, the join-URL resolve and
-the occurrence window all live in `transcripts`, which owns that handle family (layering rule 9),
-and this module imports them. The bridge between the two answers is `content_correlation_id`,
+What is shared is shared for real rather than copied: the meeting handle, the join-URL resolve, the
+occurrence window and the windowed newest-first walk (`newest_in_window`, which is also where both
+listers' `truncated` and their "the scan stopped short, so nothing about absence is known" verdict
+come from) all live in `transcripts`, which owns that handle family (layering rule 9), and this
+module imports them. The bridge between the two answers is `content_correlation_id`,
 Microsoft's own "unique identifier that links the transcript with its corresponding recording" —
 present on both artifacts, so a model holding one list can pair it with the other.
 
@@ -88,14 +90,15 @@ from pydantic import BaseModel, Field
 
 from office_mcp.features import identity
 from office_mcp.features.transcripts import (
+    MAX_ARTIFACT_SCAN,
     MEETING_PERMISSION,
     MeetingHandle,
     OccurrenceWindow,
     as_utc,
-    began_at,
+    newest_in_window,
     resolve_meeting,
 )
-from office_mcp.graph_client import collect_pages, graph_errors
+from office_mcp.graph_client import graph_errors
 
 # The delegated permission this module's own request needs. Admin-consented, like transcript
 # access and separately from it — a tenant may grant either without the other, which is why the
@@ -199,6 +202,12 @@ class MeetingRecordings(BaseModel):
             + "identical and cannot be distinguished: Microsoft's meeting-artifact APIs stop "
             + "serving a meeting once it expires (about 60 days after a one-off), so a recording "
             + "that once existed can read as never having existed.\n"
+            + "- `scan_incomplete` — this meeting has more recordings than one call looks through "
+            + f"({MAX_ARTIFACT_SCAN}) and none of the ones looked at fall in your window, so "
+            + "whether one exists there is NOT known and is not being claimed either way. Narrow "
+            + "`started_after`/`started_before` to the occurrence you mean and ask again. Never "
+            + "report this as 'the call was not recorded'. `truncated` is true for the same "
+            + "reason.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Not an error and not proof the meeting is gone; a meeting created outside a "
             + "calendar, or one this user was never invited to, answers the same way. Do not retry "
@@ -237,14 +246,22 @@ class MeetingRecordings(BaseModel):
     recordings: list[RecordingSummary] = Field(
         description=(
             "The recordings of this meeting that fall inside the requested window, newest first. "
-            + "Empty for every status other than `available`."
+            + "The order is over the whole collection rather than over one page of it, so the "
+            + "first entry is the latest recording of the window — which for a recurring series "
+            + "is how to reach the most recent occurrence. Empty for every status other than "
+            + "`available`."
         )
     )
     truncated: bool = Field(
         description=(
-            "True when the meeting has more recordings than this `limit` holds — the same 'there "
-            + "is more' flag every list-shaped tool here reports. Raise `limit` (up to "
-            + f"{MAX_RECORDINGS}) or narrow `started_after`/`started_before`; there is no cursor."
+            "True when there is more — the same 'there is more' flag every list-shaped tool here "
+            + "reports. Two things set it, and both mean the same thing for what you may conclude: "
+            + "the window holds more recordings than this `limit` (the ones here are still the "
+            + f"newest of them; raise `limit`, up to {MAX_RECORDINGS}), or the meeting has more "
+            + f"recordings in total than one call looks through ({MAX_ARTIFACT_SCAN}), "
+            + "in which case narrow `started_after`/`started_before`. There is no cursor. When "
+            + "this is true and nothing came back, `status` is `scan_incomplete` and no absence is "
+            + "claimed."
         )
     )
 
@@ -290,14 +307,16 @@ async def list_meeting_recordings(
             meeting.id
         ).recordings.get()
         assert first_page is not None, "Graph answered a recording listing with no collection"
-        collected = await collect_pages(first_page, client, limit=limit, matches=window.holds)
-        found = sorted(collected.items, key=began_at, reverse=True)
+        collected = await newest_in_window(first_page, client, window=window, limit=limit)
+        found = collected.items
         # Asked for last and only when it changes an answer: with nothing to report there is no
         # organiser to compare anybody with, and the request would be spent on every empty listing.
         caller = (await identity.get_signed_in_user(client)).user_id if found else None
 
     return MeetingRecordings(
-        status="available" if found else _absence(window.settled(meeting)),
+        status="available"
+        if found
+        else _absence(scan_stopped_short=collected.truncated, settled=window.settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
         meeting_type=meeting.meeting_type,
@@ -308,14 +327,19 @@ async def list_meeting_recordings(
     )
 
 
-def _absence(settled: bool) -> str:
-    """Which of the two empty answers to give: the one that means stop, or the one that means wait.
+def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
+    """Which empty answer to give: the one that means stop, the one that means wait, or neither.
 
-    The evidence is `OccurrenceWindow.settled`, shared with the transcript listing because the
-    inference is the same one — Microsoft publishes neither a processing status nor a latency SLA
-    for either artifact — and only the word for it differs, because "was not transcribed" and "was
-    not recorded" are different facts about a meeting.
+    The same three-way decision the transcript lister makes, in the same order and for the same
+    reasons: a walk cut short by the scan cap knows nothing about absence and says so
+    (`scan_incomplete`, which is shared vocabulary because the situation is not about recordings),
+    and otherwise the evidence is `OccurrenceWindow.settled` — shared with the transcript listing
+    because the inference is the same one, Microsoft publishing neither a processing status nor a
+    latency SLA for either artifact. Only the settled word differs, because "was not transcribed"
+    and "was not recorded" are different facts about a meeting.
     """
+    if scan_stopped_short:
+        return "scan_incomplete"
     return "not_recorded" if settled else "not_ready"
 
 

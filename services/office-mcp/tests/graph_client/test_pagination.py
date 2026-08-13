@@ -85,7 +85,13 @@ class TestTheCaps:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The teams-mcp lesson: a filtered collection can page a long way for nothing, so the
-        cap has to bound what was *looked at*, not what was kept."""
+        cap has to bound what was *looked at*, not what was kept.
+
+        Both of these parameters are used in production, which is why they are here: `matches` by
+        each meeting lister (an occurrence window), and `max_scanned` by the walk underneath them
+        (`features/transcripts.newest_in_window`), which passes a tighter cap than this module's
+        default because a per-meeting collection is a small thing to walk 1000 items of.
+        """
         mock_two_pages(graph)
         first = await client.me.chats.get()
         assert first is not None

@@ -353,6 +353,44 @@ _RECORDINGS = {
     ]
 }
 
+# A recurring series as Microsoft holds it: one meeting, one collection, three occurrences — and
+# answered oldest-first, which is an order of Microsoft's own (it documents no `$orderby` on either
+# collection). Written out in that order on purpose: it is what makes "the newest of a series"
+# something a lister has to work for rather than something it gets by accident.
+_SERIES_TRANSCRIPTS: dict[str, object] = {
+    "value": [
+        {
+            "id": f"week-{week}",
+            "meetingId": _MEETING_ID,
+            "createdDateTime": f"2026-02-0{2 + week}T14:00:00Z",
+            "endDateTime": f"2026-02-0{2 + week}T14:50:00Z",
+            "contentCorrelationId": f"bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e{week}",
+        }
+        for week in (1, 2, 3)
+    ]
+}
+
+_SERIES_RECORDINGS: dict[str, object] = {
+    "value": [
+        {
+            "id": f"week-{week}",
+            "meetingId": _MEETING_ID,
+            "createdDateTime": f"2026-02-0{2 + week}T14:00:00Z",
+            "endDateTime": f"2026-02-0{2 + week}T14:50:00Z",
+            "contentCorrelationId": f"bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e{week}",
+            "meetingOrganizer": {
+                "user": {"id": "00000000-0000-4000-8000-000000000002", "displayName": None}
+            },
+        }
+        for week in (1, 2, 3)
+    ]
+}
+
+# The meeting handle `list_chats` mints for the chat above, written out rather than derived: that
+# the handle a model copies from one tool is the argument another takes is the contract between
+# them, and deriving it here would assert only that the test agrees with itself.
+_MEETING_URI = "teams:///meetings/" + quote(_JOIN_WEB_URL, safe="")
+
 _TRANSCRIPT_VTT = """WEBVTT
 
 00:00:16.246 --> 00:00:19.900
@@ -772,25 +810,34 @@ class TestTheToolsThisServerAdvertises:
         for name in ("from_seconds", "to_seconds", "speaker"):
             assert _object(properties[name]).get("description"), f"{name} is undescribed"
 
-    async def test_list_meeting_transcripts_names_the_four_answers_and_their_remedies(
+    async def test_list_meeting_transcripts_names_its_five_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The three absences that must stay distinct, plus "no such meeting". A model can only act
+        """The four absences that must stay distinct, plus "no such meeting". A model can only act
         differently on them if the tool says what each one means, so the words are asserted: the
-        one that means wait must say wait, and must say it is not the one that means stop."""
+        one that means wait must say wait and must say it is not the one that means stop, and the
+        one that means "this was not knowable" must not be reportable as either."""
         tools = _named(await mcp_client.list_tools())
         description = tools["list_meeting_transcripts"].description
         status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
         assert description is not None
         rendered = description + str(status.get("description"))
 
-        for value in ("available", "not_ready", "not_transcribed", "meeting_not_found"):
+        for value in (
+            "available",
+            "not_ready",
+            "not_transcribed",
+            "scan_incomplete",
+            "meeting_not_found",
+        ):
             assert value in description, value
         assert "Wait and call again later" in description
         assert 'NOT "there is no transcript"' in description
         assert "Retrying will not help" in description
         assert "no availability SLA" in rendered, "the inference has to be admitted as one"
         assert "recurring" in description and "started_after" in description
+        assert 'Never report it as "there is no transcript"' in description
+        assert "not known" in description, "the fifth answer claims nothing, and has to say so"
 
     async def test_list_meeting_transcripts_takes_a_meeting_handle_and_an_occurrence_window(
         self, mcp_client: Client[FastMCPTransport]
@@ -926,10 +973,10 @@ class TestTheToolsThisServerAdvertises:
             tools["list_meeting_recordings"].outputSchema
         ), "the constraint belongs where the result is read, not only in the tool's prose"
 
-    async def test_list_meeting_recordings_names_its_four_answers_and_their_remedies(
+    async def test_list_meeting_recordings_names_its_five_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The same four-outcome vocabulary the transcript lister established, adapted by one word:
+        """The same five-outcome vocabulary the transcript lister establishes, adapted by one word:
         `not_recorded` instead of `not_transcribed`. A model that learned when to wait and when to
         stop for one artifact must not have to learn it again for the other."""
         tools = _named(await mcp_client.list_tools())
@@ -938,7 +985,13 @@ class TestTheToolsThisServerAdvertises:
         assert description is not None
         rendered = description + str(status.get("description"))
 
-        for value in ("available", "not_ready", "not_recorded", "meeting_not_found"):
+        for value in (
+            "available",
+            "not_ready",
+            "not_recorded",
+            "scan_incomplete",
+            "meeting_not_found",
+        ):
             assert value in description, value
         assert "Wait and call again later" in description
         assert 'NOT "the call was not recorded"' in description
@@ -946,6 +999,30 @@ class TestTheToolsThisServerAdvertises:
         assert "no availability SLA" in rendered, "the inference has to be admitted as one"
         assert "recurring" in description and "started_after" in description
         assert "no duration property" in description, "the duration is derived, and says so"
+        assert 'Never report it as "the call was not recorded"' in description
+        assert "not known" in description, "the fifth answer claims nothing, and has to say so"
+
+    async def test_both_meeting_listers_teach_the_same_status_vocabulary(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """Two artifacts, one vocabulary: the three words that are about neither artifact in
+        particular have to be the same words, or a model that learned one tool guesses at the
+        other. Only the settled absence differs, which is the fact that actually differs.
+        """
+        tools = _named(await mcp_client.list_tools())
+        shared = {"available", "not_ready", "scan_incomplete", "meeting_not_found"}
+        statuses = {
+            name: str(_object(_properties(tools[name].outputSchema)["status"]).get("description"))
+            for name in ("list_meeting_transcripts", "list_meeting_recordings")
+        }
+
+        for name, rendered in statuses.items():
+            for value in shared:
+                assert f"`{value}`" in rendered, f"{name} does not name {value}"
+        assert "`not_transcribed`" in statuses["list_meeting_transcripts"]
+        assert "`not_recorded`" in statuses["list_meeting_recordings"]
+        assert "`not_recorded`" not in statuses["list_meeting_transcripts"]
+        assert "`not_transcribed`" not in statuses["list_meeting_recordings"]
 
     async def test_list_meeting_recordings_says_it_is_not_behind_the_transcript_switch(
         self, mcp_client: Client[FastMCPTransport]
@@ -1320,6 +1397,57 @@ class TestCallingThem:
             ),
             ("https://graph.microsoft.com/OnlineMeetingTranscript.Read.All",),
         ], "the reader needs only transcript access; resolving a join URL is the lister's job"
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        ("tool", "path", "collection", "items", "identifier"),
+        [
+            (
+                "list_meeting_transcripts",
+                _TRANSCRIPTS_PATH,
+                "transcripts",
+                _SERIES_TRANSCRIPTS,
+                "transcript_id",
+            ),
+            (
+                "list_meeting_recordings",
+                _RECORDINGS_PATH,
+                "recordings",
+                _SERIES_RECORDINGS,
+                "recording_id",
+            ),
+        ],
+        ids=["transcripts", "recordings"],
+    )
+    async def test_asking_for_the_latest_of_a_series_answers_with_the_latest(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        tool: str,
+        path: str,
+        collection: str,
+        items: dict[str, object],
+        identifier: str,
+    ) -> None:
+        """ "The latest transcript of this series", over the real protocol — the question both
+        listers exist for, and the one they used to get wrong in the same way. Microsoft answers
+        this collection in an order of its own, so a `limit` applied before ordering returns an
+        arbitrary handful sorted among themselves; a model asking for the newest one gets whichever
+        occurrence Microsoft happened to put first, with nothing in the answer to say so.
+        Microsoft's order here puts the oldest first, which is what the old shape would return.
+        """
+        _ = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        _ = graph.get(path).mock(return_value=httpx.Response(200, json=items))
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+
+        answer = _structured(
+            await mcp_client.call_tool(tool, {"meeting_uri": _MEETING_URI, "limit": 1})
+        )
+
+        listed = cast("Sequence[Mapping[str, object]]", answer[collection])
+        assert [item[identifier] for item in listed] == ["week-3"], "the newest, not the first"
+        assert answer["status"] == "available"
+        assert answer["truncated"] is True, "the two older occurrences are the 'more' there is"
 
     async def test_a_model_walks_from_a_meeting_chat_to_whether_the_call_was_recorded(
         self,

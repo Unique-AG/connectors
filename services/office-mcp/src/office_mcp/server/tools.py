@@ -172,7 +172,10 @@ Return the signed-in Microsoft 365 user's own profile: `user_id`, `display_name`
 
 Call this before anything that turns on who "I", "me" or "my" is: filtering a message search to \
 the signed-in user, deciding which participant of a chat is them, or addressing them by name. It \
-is one cheap request and its answer is stable for the session.
+is one cheap request and its answer is stable for the session. Its `user_id` is the value \
+search_messages matches `mentions` on — a name will not work there — and the one to compare a \
+recording's `organizer_user_id` against; `email` is what a chat member from list_chats is matched \
+by, because that list carries no ids at all.
 
 `email` is the canonical primary SMTP address (Microsoft's `mail`) and the right value to match a \
 sender or recipient against — but it is null for guest and unlicensed accounts, and \
@@ -452,8 +455,8 @@ neither. Both bounds take a date (`2026-08-11`, meaning that whole UTC day) or a
 or without a timezone offset — one without is read as UTC, so pass the offset when you are working \
 from a local time.
 
-**Read `status` before anything else. It has four values and they mean four different actions:**
-- `available` — transcripts are listed; read one with read_transcript.
+**Read `status` before anything else. It has five values and they mean five different actions:**
+- `available` — transcripts are listed, newest first; read one with read_transcript.
 - `not_ready` — nothing has landed for the window you asked about and something still might: that \
 window has only just closed, or you asked for no window and the meeting has not ended or ended \
 recently. Wait and call again later. This is NOT "there is no transcript", and reporting it as one \
@@ -465,6 +468,11 @@ last-month occurrence "still processing".
 or not transcribed. Retrying will not help. Say the meeting has no transcript rather than that the \
 meeting did not happen. (One other cause is indistinguishable: Microsoft stops serving a meeting's \
 transcripts once the meeting expires, roughly 60 days after a one-off.)
+- `scan_incomplete` — this meeting has more transcripts than one call looks through \
+({transcripts.MAX_ARTIFACT_SCAN}) and none of the ones looked at are in your window, so whether \
+one exists there is not known. This is the one answer that claims nothing: narrow \
+`started_after`/`started_before` to the occurrence you mean and ask again. Never report it as \
+"there is no transcript".
 - `meeting_not_found` — Microsoft matched the join URL in the handle to no meeting this user can \
 see. Not an error, and not proof the meeting is gone. Do not retry and do not rebuild the handle.
 
@@ -554,8 +562,8 @@ identifier for "these two are the same call". Reach for this tool when the quest
 recording itself — was there one, how long, who has it — or when list_meeting_transcripts has \
 already said `not_transcribed` and the remaining question is whether anything was captured at all.
 
-**Read `status` before anything else. It has four values and they mean four different actions:**
-- `available` — recordings are listed, with durations and access.
+**Read `status` before anything else. It has five values and they mean five different actions:**
+- `available` — recordings are listed, newest first, with durations and access.
 - `not_ready` — nothing has landed for the window you asked about and something still might: that \
 window has only just closed, or you asked for no window and the meeting has not ended or ended \
 recently. Wait and call again later. This is NOT "the call was not recorded", and reporting it as \
@@ -565,6 +573,11 @@ window that is already well past never answers this.
 - `not_recorded` — the window you asked about is over and nothing is there: nobody recorded it. \
 Retrying will not help. (One other cause is indistinguishable: Microsoft stops serving a meeting's \
 artifacts once the meeting expires, roughly 60 days after a one-off.)
+- `scan_incomplete` — this meeting has more recordings than one call looks through \
+({transcripts.MAX_ARTIFACT_SCAN}) and none of the ones looked at are in your window, so whether \
+one exists there is not known. This is the one answer that claims nothing: narrow \
+`started_after`/`started_before` to the occurrence you mean and ask again. Never report it as "the \
+call was not recorded".
 - `meeting_not_found` — Microsoft matched the join URL in the handle to no meeting this user can \
 see. Not an error, and not proof the meeting is gone. Do not retry and do not rebuild the handle.
 
@@ -1052,10 +1065,14 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=transcripts.MAX_TRANSCRIPTS,
                 description=(
-                    "How many transcripts to return, newest first. Default 20, maximum "
-                    + f"{transcripts.MAX_TRANSCRIPTS}. One meeting has one transcript per "
+                    "How many transcripts to return. Default 20, maximum "
+                    + f"{transcripts.MAX_TRANSCRIPTS}. They are the NEWEST that many of the "
+                    + "window, not the first that many Microsoft happens to answer with: the "
+                    + f"meeting's transcripts are read (up to {transcripts.MAX_ARTIFACT_SCAN} of "
+                    + "them, which is this call's whole cost) and ordered before this cuts them, "
+                    + "so asking for 3 gives the 3 latest. One meeting has one transcript per "
                     + "occurrence that was transcribed, so only a long-running recurring series "
-                    + "reaches this; `truncated` says when the window was too small."
+                    + "reaches either bound; `truncated` says when one was reached."
                 ),
             ),
         ] = 20,
@@ -1238,11 +1255,15 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=recordings.MAX_RECORDINGS,
                 description=(
-                    "How many recordings to return, newest first. Default 20, maximum "
-                    + f"{recordings.MAX_RECORDINGS}. A meeting has one recording per occurrence "
-                    + "that was recorded — two if somebody stopped and restarted — so only a "
-                    + "long-running recurring series reaches this; `truncated` says when the "
-                    + "window was too small."
+                    "How many recordings to return. Default 20, maximum "
+                    + f"{recordings.MAX_RECORDINGS}. They are the NEWEST that many of the window, "
+                    + "not the first that many Microsoft happens to answer with: the meeting's "
+                    + f"recordings are read (up to {transcripts.MAX_ARTIFACT_SCAN} of them, which "
+                    + "is this call's whole cost) and ordered before this cuts them, so asking for "
+                    + "3 gives the 3 latest. A meeting has one recording per occurrence that was "
+                    + "recorded — two if somebody stopped and restarted — so only a long-running "
+                    + "recurring series reaches either bound; `truncated` says when one was "
+                    + "reached."
                 ),
             ),
         ] = 20,

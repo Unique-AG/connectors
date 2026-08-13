@@ -19,6 +19,17 @@ env:
   # ENTRA_TENANT_ID and ENTRA_CLIENT_ID identify the app registration users sign in through;
   # both are required and set in the overlay (not secrets). ENTRA_TENANT_ID must be a single
   # tenant's ID — a multi-tenant authority is rejected at startup.
+  #
+  # These four plus the two secrets below are the whole of this service's configuration: the ten
+  # MCP tools add no environment variables of their own. What they do add is tenant-side
+  # onboarding, which no value here can carry (see README, "Auth"):
+  #   - eight delegated Graph permissions on that app registration, two of which
+  #     (OnlineMeetingTranscript.Read.All, OnlineMeetingRecording.Read.All) need admin consent
+  #     and are granted independently of each other;
+  #   - Graph access to Teams meeting transcripts, a tenant-wide Teams setting that is OFF by
+  #     default and that only a Teams administrator can turn on. Until they do,
+  #     list_meeting_transcripts answers 403 with that remedy and every other tool — recordings
+  #     included — is unaffected.
 
 envVars: []
 # Required secrets (provide via envVars in overlay):

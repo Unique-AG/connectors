@@ -16,7 +16,8 @@ src/office_mcp/
   auth.py                Entra auth: which app registration, and where its state lives
   logging.py metrics.py  cross-cutting, used by both sides below
   graph_client/          the Microsoft Graph transport — the official SDK, one caller's token
-  features/              what the connector does — one module per slice (identity, chats, channels, messages)
+  features/              what the connector does — one module per slice (identity, chats, channels,
+                         message search/read, meeting transcripts, meeting recordings)
   server/                how it's exposed over MCP — the tools, the errors they report, /ready
 ```
 
@@ -171,9 +172,14 @@ gets that string onto the wire.
   Wrap Graph work in `with graph_errors():`. Anything else stays the base `GraphFailure`.
 - **Paging follows `@odata.nextLink`** via `collect_pages`, replaying the URL verbatim, with both an
   item cap and a *scan* cap — the teams-mcp lesson that a filtered collection can walk a long way
-  for very few kept items — and a `truncated` flag so a partial answer never looks complete. Search
-  is not paged this way: `POST /search/query` takes stateless `from`/`size` offsets, so a search
-  tool resumes by re-issuing rather than by carrying a cursor.
+  for very few kept items — and a `truncated` flag so a partial answer never looks complete. There
+  are three ways a read is bounded here and `graph_client/pagination.py` sets all three out
+  together: an inventory walks until it has `limit` items, a meeting's artifacts are walked to a
+  tighter *scan* cap (they are filtered and ordered here, so the walk cannot stop at `limit`), and
+  a channel's messages are not walked at all — Graph allows about one request a second on a given
+  channel for the whole app, so `browse_channel` makes exactly one and `$top` is its window. Search
+  is not paged this way either: `POST /search/query` takes stateless `from`/`size` offsets, so a
+  search tool resumes by re-issuing rather than by carrying a cursor.
 - **The caller's token goes to `graph.microsoft.com` and nowhere else.** The SDK's bearer provider
   does not check its own allowed-hosts validator, so a redirect or an off-Graph `nextLink` would
   otherwise be handed a user's delegated credential.
@@ -330,13 +336,28 @@ Decisions worth knowing:
   over the protocol.
 - **`200 OK` with an empty `value` is an answer, not an error.** The `JoinWebUrl` filter never 404s,
   so "no match" is `status: meeting_not_found` — reported as not proof the meeting is gone.
-- **Four statuses, because there are four different things to do.** `available`, `not_ready`,
-  `not_transcribed`, `meeting_not_found`. `not_ready` and `not_transcribed` are the *same* empty
-  collection from Graph and the opposite advice — wait, or stop — and Graph publishes no
-  "processing" status and no availability SLA, so the split is inferred from the meeting's end time
-  with a deliberately generous allowance and the field says so. A meeting Graph gave no end time for
-  counts as `not_ready`: one wasted call is cheaper than telling a caller a transcript will never
-  exist ten minutes before it arrives.
+- **Five statuses, because there are five different things to do.** `available`, `not_ready`,
+  `not_transcribed` (`not_recorded` for the other artifact), `scan_incomplete`,
+  `meeting_not_found`. `not_ready` and the settled absence are the *same* empty collection from
+  Graph and the opposite advice — wait, or stop — and Graph publishes no "processing" status and no
+  availability SLA, so the split is inferred from the end of the *window that was asked about*,
+  falling back to the meeting's own end time where no window was, with a deliberately generous
+  allowance; the field says so. A meeting Graph gave no end time for counts as `not_ready`: one
+  wasted call is cheaper than telling a caller a transcript will never exist ten minutes before it
+  arrives. `scan_incomplete` is the fifth because an absence is only knowable from a collection
+  that was read to the end: a meeting with more artifacts than one call looks through, none of them
+  in the window, used to answer "there is none" *and* `truncated: true` in the same breath, which
+  cannot both be true and which a caller cannot see through. Now the scan that stopped short is the
+  answer, and it claims nothing.
+- **"Newest first" is a promise about the collection, not about a page of it.** Both meeting
+  listers take the whole window (up to a 200-artifact scan cap, which is this call's whole cost),
+  order it, and only then cut it to `limit` — because Graph documents no `$orderby` on either
+  collection, so a `limit` applied to the order Graph chose returns an arbitrary handful sorted
+  among themselves and calls them the latest. "The latest transcript of this series" is the
+  question the tools exist for, and that shape answered it wrongly with the shape of a right
+  answer. The order, the cut, the scan cap and the `truncated` flag are one function
+  (`features/transcripts.newest_in_window`) shared by both, which is why the recordings lister
+  inherited the bug and why both were fixed at once.
 - **The tenant switch gets its own remedy, keyed on the inner error code.** `403` +
   `GraphAccessToTranscriptsDisabled` is not a permission problem and not a consent problem, so the
   message names a Teams administrator and the cmdlet, and explicitly rules out re-consent and
@@ -380,9 +401,10 @@ Decisions worth knowing:
   fails the whole call or carries a verdict per artifact instead of the single `status` that makes
   either answer actionable. It would also blunt a 403, which is only useful here because each tool
   names the permissions its own request was made under. So the artifacts are siblings that share
-  everything shareable — the handle, the window, the resolve, the four-outcome vocabulary — and
-  differ in one word of it: `not_transcribed` against `not_recorded`. `tests/test_mcp_tools.py`
-  asserts the two answers stay the same shape, and that the tenant switch stops at transcripts.
+  everything shareable — the handle, the window, the resolve, the newest-first walk and the
+  five-outcome vocabulary — and differ in one word of it: `not_transcribed` against `not_recorded`.
+  `tests/test_mcp_tools.py` asserts the two answers stay the same shape, that they teach the same
+  status words, and that the tenant switch stops at transcripts.
 - **A search query is never logged. Neither is a transcript.** Not in a message, not as a structured
   field, not as a span attribute — what someone searched their own messages for names people and
   deals, and a transcript is a verbatim record of a room. `teams-mcp` had to remove query terms from
