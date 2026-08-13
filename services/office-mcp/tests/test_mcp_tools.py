@@ -38,6 +38,7 @@ from starlette.applications import Starlette
 
 from office_mcp.app import create_app
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig
+from office_mcp.features import channels
 from office_mcp.graph_client import GraphSettings, create_graph_transport
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -587,6 +588,28 @@ class TestTheToolsThisServerAdvertises:
         assert "reply chain" in description
         assert "created_at" in description, "the field that does tell the truth about age"
         assert "search_messages" in description, "where a date-bounded question goes instead"
+
+    async def test_browse_channel_says_what_one_call_costs_and_where_it_stops(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The budget is only a bound if the caller can see it. Microsoft allows this whole
+        connector about one request a second on a given channel across the tenant, so the tool
+        makes exactly one — which means `limit` is the entire window, and a model that expects
+        paging to reach further has to be told it does not, in the description and in the schema
+        rather than only in the code.
+        """
+        tools = _named(await mcp_client.list_tools())
+        description = tools["browse_channel"].description
+        limit = _object(_properties(tools["browse_channel"].inputSchema)["limit"])
+        assert description is not None
+
+        assert "exactly one request" in description
+        assert "never pages deeper" in description
+        assert "one request against the channel" in str(limit["description"])
+        assert "browsing again returns the same newest replies" in description, (
+            "the reply window is a dead end, not a first page"
+        )
+        assert "do not browse again for it" in description
 
     async def test_search_messages_makes_its_criteria_optional_but_not_all_of_them(
         self, mcp_client: Client[FastMCPTransport]
@@ -1244,6 +1267,39 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "not evidence that the message does not exist" in message
         assert "synthetic-request-id" in message, "the id Microsoft support asks for first"
         assert "verbatim" not in message, "the handle did come from a tool response"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_advice_for_an_unreadable_reply_terminates_instead_of_looping(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The one 404 this connector predicts, and the advice that must not be circular. A search
+        hit on a channel reply carries the root-post shape, because Microsoft's index does not say
+        which post the reply hangs under — so it 404s. browse_channel is the only tool that mints a
+        reply's own handle, but it returns the newest replies of each post on a channel's first page
+        and follows neither of Microsoft's cursors past them, since a given channel allows this
+        whole connector about one request a second across the tenant. "Browse the channel instead"
+        is therefore a route for a recent reply and a loop for an older one, so this text has to
+        name the window, say there is no route beyond it, and tell the model what to answer with.
+        """
+        _ = graph.get(_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                404,
+                headers={"request-id": "synthetic-request-id"},
+                json={"error": {"code": "NotFound", "message": "Not Found"}},
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+        )
+
+        message = _error_text(result)
+        assert f"newest {channels.MAX_REPLIES_PER_POST} replies" in message, message
+        assert "no route to its full text" in message
+        assert "a second browse returns the same window" in message
+        assert "stop looking" in message
 
     @pytest.mark.usefixtures("obo")
     async def test_a_refused_read_names_only_the_permission_that_surface_needs(

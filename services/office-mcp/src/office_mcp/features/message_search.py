@@ -242,9 +242,12 @@ class MessageHit(BaseModel):
             + "identity, which cannot be addressed. One handle here can fail to read: Microsoft "
             + "addresses a reply in a channel thread under its parent post and its search index "
             + "does not say which post that is, so a hit that is a reply gets the root-post form "
-            + "above and read_message may answer that it could not be read. Reach that reply by "
-            + "browsing its channel with browse_channel, which knows each reply's parent and "
-            + "emits the reply's own handle."
+            + "above and read_message may answer that it could not be read. browse_channel is the "
+            + "only tool that emits a reply's own handle, and it reaches only the newest replies "
+            + "of each post on the channel's first page, following no cursor further back. If "
+            + "the reply is not in that window there is no route to its full text and browsing "
+            + "again returns the same window: report this `summary` with the sender and date "
+            + "here, say the full text could not be retrieved, and stop looking."
         )
     )
     message_id: str = Field(

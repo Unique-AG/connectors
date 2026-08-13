@@ -5,10 +5,13 @@ replayed verbatim, never decomposed (https://learn.microsoft.com/en-us/graph/pag
 `PageIterator` does that walk, so this module is only the two lessons teams-mcp paid for in
 `src/msgraph/graph-pagination.ts`:
 
-* a scan cap as well as an item cap. Where a collection is filtered after the fact — channel
-  messages are mostly system messages about members joining — "give me 20" can otherwise walk
-  the entire history of a busy channel one page at a time, at 1 request per second per chat per
-  tenant for the whole app (https://learn.microsoft.com/en-us/graph/throttling-limits).
+* a scan cap as well as an item cap. Where a collection is filtered after the fact, "give me 20"
+  can otherwise walk a long way for nothing, so a cap has to bound what was *looked at* and not
+  only what was kept. What it does not bound is requests: a page Graph chooses to answer short
+  leaves the cap unspent and the walk goes on, so this is a cap on work rather than a request
+  budget. Where the budget is the point — a channel's messages, at 1 request per second per app
+  per tenant for a given channel (https://learn.microsoft.com/en-us/graph/throttling-limits) —
+  the feature reading them makes one request and does not page at all.
 * saying so. A truncated answer that looks complete is the failure mode, because the caller
   above is a language model that will summarise 20 of 4000 messages as "the discussion".
 

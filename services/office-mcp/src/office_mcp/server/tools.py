@@ -253,7 +253,9 @@ Reach for this when the question is "what is going on in this channel" rather th
 mentioned". Do not call it for channel after channel: Microsoft rate-limits reads of a given \
 channel to about one request a second for this whole connector across the tenant, so a sweep is \
 slow for you and harmful to everyone else on it — search_messages covers every channel in one \
-request.
+request. This call spends exactly one request of that budget: it reads the single page Microsoft \
+answers with and never pages deeper, so `limit` is the whole window and widening `limit` — not \
+calling again — is how to see more.
 
 **The order is not what it looks like.** Microsoft sorts this collection by the last modified time \
 of the entire reply chain, so a two-year-old post returns to the front the moment somebody replies \
@@ -269,11 +271,16 @@ answered by a wider `limit` (up to {channels.MAX_POSTS}, Microsoft's own maximum
 
 Replies come with their posts: up to {channels.MAX_REPLIES_PER_POST} of the newest per post, \
 oldest first, each carrying the post it answers in `reply_to_id`. `truncated` is also set when a \
-thread had more replies than that. Every message is complete — the same fields, and the same plain \
-text normalised out of Teams' HTML, that read_message returns — so a message here needs no second \
-call to read it. Its `uri` is a handle for quoting or re-reading it, and for a reply it is the \
-only handle that exists: Microsoft addresses a reply under its parent post, which a search result \
-cannot express.
+thread had more replies than that, and those older replies are out of reach rather than one call \
+away — Microsoft's cursor into a thread is a request per post against the same one-a-second \
+budget, so it is not followed and browsing again returns the same newest replies. Every message is \
+complete — the same fields, and the same plain text normalised out of Teams' HTML, that \
+read_message returns — so a message here needs no second call to read it. Its `uri` is a handle \
+for quoting or re-reading it, and for a reply it is the only handle that exists: Microsoft \
+addresses a reply under its parent post, which a search result cannot express. That is also the \
+limit of what this tool can rescue: when a search hit is a reply older than the window above, \
+there is no route to its full text anywhere in this connector — report the search snippet, say so, \
+and do not browse again for it.
 
 System messages are dropped — somebody joining, a call ending, a channel being renamed — because \
 Microsoft gives them no author and no text. That is why a page can hold fewer posts than `limit`, \
@@ -394,8 +401,15 @@ _UNREADABLE = (
     + "written. Retrying will not help and this connector has no other route to the text. One "
     + "well-formed handle always fails this way: a reply in a channel thread is addressed under "
     + "the post it answers, and a search result does not identify that post — so a search hit that "
-    + "is a reply cannot be read from its own handle. Browse that channel with browse_channel, "
-    + "which emits the reply's own handle and returns its text outright."
+    + "is a reply cannot be read from its own handle. browse_channel is the only tool that emits a "
+    + "reply's own handle, and it reaches the newest "
+    + f"{channels.MAX_REPLIES_PER_POST} replies of each post on the channel's first page and no "
+    + "further: it follows neither Microsoft's cursor into an older part of a thread nor the one "
+    + "into older posts, because a given channel allows this whole connector about one request a "
+    + "second across the tenant. So browse that channel once; if the reply is not in what comes "
+    + "back there is no route to its full text, and a second browse returns the same window. "
+    + "Report the search snippet with its sender and date, say the full text could not be "
+    + "retrieved, and stop looking."
 )
 
 _READ_ONLY = {"readOnlyHint": True, "openWorldHint": True}
@@ -547,8 +561,9 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "How many posts to return, each with its replies. Default 20 and maximum "
                     + f"{channels.MAX_POSTS} — both Microsoft Graph's own, for this collection. "
-                    + "System messages are dropped after Graph counts them, so a page can hold "
-                    + "fewer posts than this."
+                    + "One call is one request against the channel and this is the whole of its "
+                    + "window: widen it to see more rather than calling again. System messages are "
+                    + "dropped after Graph counts them, so a page can hold fewer posts than this."
                 ),
             ),
         ] = 20,

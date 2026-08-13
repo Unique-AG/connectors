@@ -357,6 +357,23 @@ class TestTheHandleItMints:
         assert reply == _REPLY_HANDLE
         assert reply is not None and reply.uri == _REPLY_URI
 
+    def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
+        """A hit that is really a channel reply carries the root-post shape, which Graph answers 404
+        to — and the advice for that has to end somewhere. `channels.browse_channel` mints a reply's
+        own handle but reaches only the newest replies of each post on a channel's first page and
+        follows no cursor past them, so "browse the channel instead" is a route for a recent reply
+        and a loop for an older one: browse, not find it, read the same advice, browse again. So the
+        window is named and the terminus is stated here, where the handle that can fail is minted.
+        """
+        described = message_search.MessageHit.model_fields["uri"].description
+        assert described is not None
+
+        assert "browse_channel" in described, "the one tool that can, when the reply is recent"
+        assert "only the newest replies" in described, "and where it stops"
+        assert "no route to its full text" in described
+        assert "browsing again returns the same window" in described
+        assert "stop looking" in described
+
     def test_a_handle_survives_the_round_trip_it_came_from(self) -> None:
         chat = message_search.message_handle(_CHAT_URI)
         channel = message_search.message_handle(_CHANNEL_URI)

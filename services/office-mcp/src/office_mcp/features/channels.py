@@ -27,13 +27,18 @@ The last of those also has the ordering nobody expects. Graph sorts it "by the l
 of the entire reply chain, including both the root channel message and its replies", so a two-year-
 old post returns to the first page the moment somebody replies to it. That is thread activity, not
 post recency: it makes "the newest posts" the wrong reading of a page, and it makes "stop paging
-once a page is older than X" an unsound stop condition, which is why paging here is bounded by a
-count and never by a date.
+once a page is older than X" an unsound stop condition — a walk down this collection could not know
+when it had gone back far enough, which is one of the two reasons there is no walk (the other is
+below).
 
-Neither is there a sweep. Graph caps reads at "one request per second per app per tenant … on a
-given channel" (https://learn.microsoft.com/en-us/graph/throttling-limits) and that budget is per
-*app*, so walking every channel of a team degrades every other user in the tenant. One call reads
-one channel; searching across channels is `message_search`'s job.
+Neither is there a sweep — of channels, or of a channel's own pages. Graph caps reads at "one
+request per second per app per tenant … on a given channel"
+(https://learn.microsoft.com/en-us/graph/throttling-limits) and that budget is per *app*, so
+walking every channel of a team degrades every other user in the tenant, and following
+`@odata.nextLink` down one channel spends the tenant's whole budget for that channel on one
+caller. `browse_channel` therefore issues exactly one request: `$top` is the window, the single
+page Graph answers with is the answer, and `truncated` says when there was more. A caller who
+needs a wider window raises `limit`; searching across channels is `message_search`'s job.
 """
 
 from datetime import UTC, datetime
@@ -68,13 +73,22 @@ POSTS_PERMISSION = CHANNEL_PERMISSION
 # would refuse a larger one.
 MAX_LISTED = 200
 
-# Graph's documented ceiling on `$top` for a channel's messages.
+# Graph's documented ceiling on `$top` for a channel's messages, and so the widest window one
+# `browse_channel` call can answer with: the call is one request and `$top` is the whole of it.
 MAX_POSTS = 50
 
 # How many of a post's replies are returned. `$expand=replies` brings back up to 200 replies per
 # post, and 50 posts of 200 replies is a response no caller has a budget for — so the newest of
-# each thread are kept and `truncated` says when a thread had more. There is no "rest of this
-# thread" tool: a reply further back is reachable through `message_search`.
+# each thread are kept and `truncated` says when a thread had more.
+#
+# This window is the end of the line rather than a first page. Graph puts its own cursor on a post
+# whose expanded replies were themselves paged, and following it is a request per post against a
+# channel that allows the whole app one a second — the same reason the channel's own pages are not
+# walked. So a reply older than this window has no route to its full text here: `message_search`
+# can find it and report Microsoft's snippet, but Graph addresses a reply under the post it answers
+# and the search index does not name that post, so such a hit cannot be read. Browsing again
+# returns the same newest replies, which is why every surface that mentions this says so rather
+# than sending a caller back round.
 MAX_REPLIES_PER_POST = 10
 
 # What a channel listing asks for, which is everything Graph populates that identifies a channel.
@@ -190,7 +204,10 @@ class ChannelPosts(BaseModel):
             + f"more than {MAX_REPLIES_PER_POST} replies and only its newest are here. There is no "
             + "cursor, and paging deeper is not a way to reach older posts: Microsoft orders this "
             + "collection by reply-chain activity rather than by date, so use search_messages with "
-            + "`sent_before` to reach back in time."
+            + "`sent_before` to reach back in time. The older replies of a thread are a dead end "
+            + "rather than a next page — browsing again returns the same newest ones, and a search "
+            + "can find such a reply but cannot read its text — so report what is here and say the "
+            + "rest of the thread could not be retrieved."
         )
     )
 
@@ -260,15 +277,19 @@ def _channel(channel: Channel) -> ChannelSummary:
 async def browse_channel(
     client: GraphServiceClient, *, team_id: str, channel_id: str, limit: int
 ) -> ChannelPosts:
-    """Up to `limit` posts of one channel, each with the newest of its replies.
+    """Up to `limit` posts from one channel's first page, each with the newest of its replies.
 
-    `$expand=replies` is one request for a thread rather than one per post, which matters more here
-    than anywhere else in this connector: Graph's per-channel budget is a single request a second
-    for the whole app in the tenant, so a per-post round trip would spend a minute on a page.
+    One Graph request against the channel, always. Graph's per-channel budget is a single request a
+    second for the whole app in the tenant, so neither cursor Graph offers here is followed: not the
+    collection's `@odata.nextLink` and not a post's own `replies@odata.nextLink`. `$top` is the
+    window and `$expand=replies` makes a thread part of that one request rather than a round trip
+    per post; a caller who needs more raises `limit` (up to `MAX_POSTS`, Graph's own ceiling)
+    instead of the tool spending the tenant's budget on their behalf.
 
     The system messages — somebody joining, a call ending, a channel being renamed — are dropped,
-    and Graph offers no `$filter` to drop them at the source, so they are filtered here and they
-    spend the walk's scan budget. That is what `collect_pages` bounds.
+    and Graph offers no `$filter` to drop them at the source, so they are filtered out of the page
+    Graph counted them into: a page can hold fewer posts than `limit`, and `truncated` reports that
+    alongside a page Graph itself said was not the last.
     """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
@@ -278,17 +299,22 @@ async def browse_channel(
         )
     )
     with graph_errors():
-        first_page = await (
+        page = await (
             client.teams.by_team_id(team_id)
             .channels.by_channel_id(channel_id)
             .messages.get(request_configuration=configuration)
         )
-        assert first_page is not None, "Graph answered a channel message listing with no collection"
-        collected = await collect_pages(first_page, client, limit=limit, matches=_is_a_post)
+        assert page is not None, "Graph answered a channel message listing with no collection"
+
+    # `$top` is `limit`, so Graph returning more posts than were asked for should not happen — but
+    # the window is this tool's promise rather than Graph's, so it is applied rather than trusted.
+    posts = [message for message in (page.value or []) if _is_a_post(message)]
+    kept = posts[:limit]
+    more_posts = len(kept) < len(posts) or bool(page.odata_next_link)
 
     messages: list[TeamsMessage] = []
     threads_cut = False
-    for post in collected.items:
+    for post in kept:
         assert post.id is not None, "Graph returned a channel message with no id"
         messages.append(
             message_of(post, handle=MessageHandle(post.id, team_id=team_id, channel_id=channel_id))
@@ -305,7 +331,7 @@ async def browse_channel(
             for reply in replies
         )
 
-    return ChannelPosts(messages=messages, truncated=collected.truncated or threads_cut)
+    return ChannelPosts(messages=messages, truncated=more_posts or threads_cut)
 
 
 def _is_a_post(message: ChatMessage) -> bool:
