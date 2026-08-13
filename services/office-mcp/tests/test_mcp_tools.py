@@ -466,10 +466,15 @@ def _object(value: object) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
-def _optional_type(schema: object) -> dict[str, object]:
-    """The non-null branch of an optional parameter's schema, which is where its type lives."""
+def _optional_types(schema: object) -> list[dict[str, object]]:
+    """Every non-null branch of an optional parameter's schema, in the order it declares them."""
     branches = cast("Sequence[object]", _object(schema)["anyOf"])
-    typed = [_object(branch) for branch in branches if _object(branch).get("type") != "null"]
+    return [_object(branch) for branch in branches if _object(branch).get("type") != "null"]
+
+
+def _optional_type(schema: object) -> dict[str, object]:
+    """The one non-null branch of an optional parameter's schema, where it has exactly one."""
+    typed = _optional_types(schema)
     assert len(typed) == 1, f"expected one non-null branch, got {typed!r}"
     return typed[0]
 
@@ -711,16 +716,61 @@ class TestTheToolsThisServerAdvertises:
 
         assert set(properties) == {"meeting_uri", "started_after", "started_before", "limit"}
         assert schema.get("required") == ["meeting_uri"]
-        assert _optional_type(properties["started_after"]) == {
-            "type": "string",
-            "format": "date-time",
-        }
         assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
             "integer",
             1,
             50,
             20,
         )
+
+    @pytest.mark.parametrize("bound", ["started_after", "started_before"], ids=["after", "before"])
+    async def test_each_occurrence_bound_admits_a_bare_date_in_its_own_schema(
+        self, mcp_client: Client[FastMCPTransport], bound: str
+    ) -> None:
+        """A bare `2026-08-11` is what a model writes when scoping a series to one occurrence — the
+        only reason these parameters exist — so the schema has to say a date is legal. A schema
+        offering only `date-time` while the code accepted a date anyway is the disagreement the
+        crash came from: the model was never told which shape was meant."""
+        tools = _named(await mcp_client.list_tools())
+        properties = _properties(tools["list_meeting_transcripts"].inputSchema)
+
+        assert _optional_types(properties[bound]) == [
+            {"type": "string", "format": "date"},
+            {"type": "string", "format": "date-time"},
+        ]
+
+    async def test_the_occurrence_window_states_the_zone_it_resolves_against(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """`09:00` is a different instant in every zone, so a tool that silently picks one has to
+        say which — in the parameter's own description, which is the only place a model reads before
+        writing the value. Both halves are asserted: what an offset-less timestamp means, and what a
+        bare date means at each end of the window."""
+        tools = _named(await mcp_client.list_tools())
+        properties = _properties(tools["list_meeting_transcripts"].inputSchema)
+        after = str(_object(properties["started_after"])["description"])
+        before = str(_object(properties["started_before"])["description"])
+
+        assert "READ AS UTC" in after, "the assumption a naive timestamp is resolved against"
+        assert "whole UTC day" in after and "first instant" in after
+        assert "END of that UTC day" in before, "the same date in both bounds must be that one day"
+        assert "07:00Z" in after, "a worked example beats the word 'timezone'"
+
+    async def test_list_meeting_transcripts_says_the_verdict_is_about_the_window(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The promise the `not_ready` inference has to keep. A recurring series' `endDateTime` can
+        be in the future for years, and a caller told to wait for a transcript of an occurrence that
+        ended last month polls forever — so both the tool and the field say the verdict follows the
+        window that was asked for, not the meeting."""
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_transcripts"].description
+        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        assert description is not None
+
+        assert "window you asked about" in description
+        assert "already well past never answers this" in description
+        assert "demonstrably passed is never reported this way" in str(status["description"])
 
     async def test_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
         self, mcp_client: Client[FastMCPTransport]
@@ -1166,6 +1216,71 @@ class TestCallingThem:
         assert body["status"] == "meeting_not_found"
         assert body["transcripts"] == []
         assert not listing.called
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        ("started_after", "started_before"),
+        [
+            ("2026-02-10", "2026-02-10"),
+            ("2026-02-10T14:00:00", "2026-02-10T14:30:00"),
+            ("2026-02-10T15:00:00+01:00", "2026-02-10T15:30:00+01:00"),
+            ("2026-02-10T14:00:00Z", None),
+        ],
+        ids=["bare-dates", "no-offset", "offset", "one-sided"],
+    )
+    async def test_the_window_shapes_a_model_writes_are_answered_and_never_raised(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        started_after: str,
+        started_before: str | None,
+    ) -> None:
+        """Over the real protocol, in the shapes a model sends: scoping a recurring series to one
+        occurrence is the only reason these parameters exist, and a model writes `2026-02-10` or
+        `2026-02-10T14:00:00` as readily as an offset-bearing timestamp. Every one of them used to
+        reach a naive-versus-aware comparison and come back as a raw `TypeError` — a failure naming
+        no remedy, for a value the tool's own schema had accepted.
+        """
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        graph.get(_TRANSCRIPTS_PATH).mock(return_value=httpx.Response(200, json=_TRANSCRIPTS))
+
+        result = await mcp_client.call_tool(
+            "list_meeting_transcripts",
+            {
+                "meeting_uri": f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}",
+                "started_after": started_after,
+                "started_before": started_before,
+            },
+        )
+
+        assert not result.is_error, "a window a model plausibly writes must not fail the call"
+        body = _structured(result)
+        assert body["status"] == "available"
+        assert len(cast("Sequence[object]", body["transcripts"])) == 1
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_window_a_model_could_not_have_meant_is_refused_before_any_graph_request(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The other half of "never crash": what is not a date at all is rejected by the schema, so
+        the failure names the parameter and the shape rather than surfacing an exception from inside
+        a comparison — and it costs no Graph request."""
+        meetings = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+
+        result = await mcp_client.call_tool(
+            "list_meeting_transcripts",
+            {
+                "meeting_uri": f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}",
+                "started_after": "last Tuesday",
+            },
+            raise_on_error=False,
+        )
+
+        assert result.is_error
+        assert "started_after" in _error_text(result)
+        assert not meetings.called
 
     @pytest.mark.usefixtures("obo")
     async def test_a_channel_post_reaches_the_caller_and_no_log_or_span(

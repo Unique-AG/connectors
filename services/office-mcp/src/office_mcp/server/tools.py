@@ -443,16 +443,22 @@ what was said. Two calls rather than one because a transcript is large and becau
 meeting is a single meeting to Microsoft — every occurrence's transcript lands in the same \
 collection, distinguished only by when transcription started — so which one to read is a decision, \
 not a default. Scope to one occurrence with `started_after`/`started_before` when \
-`meeting_type` comes back `recurring`; a one-off meeting has a single transcript and needs neither.
+`meeting_type` comes back `recurring`; a one-off meeting has a single transcript and needs \
+neither. Both bounds take a date (`2026-08-11`, meaning that whole UTC day) or a timestamp, with \
+or without a timezone offset — one without is read as UTC, so pass the offset when you are working \
+from a local time.
 
 **Read `status` before anything else. It has four values and they mean four different actions:**
 - `available` — transcripts are listed; read one with read_transcript.
-- `not_ready` — the meeting has not ended, or ended recently enough that Microsoft may still be \
-processing the transcript. Wait and call again later. This is NOT "there is no transcript", and \
-reporting it as one is wrong: Microsoft publishes no availability SLA, so this tool infers it from \
-the meeting's end time and errs towards telling you to wait.
-- `not_transcribed` — the meeting is over and nothing is there: it was not recorded or not \
-transcribed. Retrying will not help. Say the meeting has no transcript rather than that the \
+- `not_ready` — nothing has landed for the window you asked about and something still might: that \
+window has only just closed, or you asked for no window and the meeting has not ended or ended \
+recently. Wait and call again later. This is NOT "there is no transcript", and reporting it as one \
+is wrong: Microsoft publishes no availability SLA, so this tool infers it from how recently the \
+window (or the meeting) ended and errs towards telling you to wait. An occurrence window that is \
+already well past never answers this — a series whose end date is in the future does not make a \
+last-month occurrence "still processing".
+- `not_transcribed` — the window you asked about is over and nothing is there: it was not recorded \
+or not transcribed. Retrying will not help. Say the meeting has no transcript rather than that the \
 meeting did not happen. (One other cause is indistinguishable: Microsoft stops serving a meeting's \
 transcripts once the meeting expires, roughly 60 days after a one-off.)
 - `meeting_not_found` — Microsoft matched the join URL in the handle to no meeting this user can \
@@ -902,23 +908,34 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         started_after: Annotated[
-            datetime | None,
+            date | datetime | None,
             Field(
                 description=(
                     "Only transcripts whose transcription began at or after this moment. This is "
                     + "how to reach one occurrence of a recurring meeting, whose occurrences all "
-                    + "share a single meeting and therefore a single transcript collection. Pass a "
-                    + "timestamp with a timezone offset; a bound with no transcript inside it "
-                    + "answers `not_transcribed` for that window rather than an error."
+                    + "share a single meeting and therefore a single transcript collection. Three "
+                    + "shapes are accepted and none of them fails: `2026-08-11T09:00:00+02:00` (or "
+                    + "`...Z`) means the instant it names; `2026-08-11T09:00:00`, which names no "
+                    + "offset, IS READ AS UTC; and a bare `2026-08-11` means that whole UTC day, "
+                    + "starting at its first instant here. Pass the offset whenever what you know "
+                    + "is a local time — 09:00 in Zurich is 07:00Z, and a window built in the "
+                    + "wrong zone answers about the wrong hours without saying so. A window with "
+                    + "no transcript inside it is an answer and not an error: `not_transcribed` "
+                    + "once the window is past, `not_ready` while it is recent."
                 )
             ),
         ] = None,
         started_before: Annotated[
-            datetime | None,
+            date | datetime | None,
             Field(
                 description=(
                     "Only transcripts whose transcription began at or before this moment. Pair it "
-                    + "with `started_after` to bracket one occurrence."
+                    + "with `started_after` to bracket one occurrence; the same three shapes are "
+                    + "accepted on the same UTC assumption, except that a bare `2026-08-11` here "
+                    + "means the END of that UTC day — so the same date in both bounds is that one "
+                    + "whole day. This bound is also what decides an empty answer: a window whose "
+                    + "end is already well past reports `not_transcribed` rather than sending you "
+                    + "back to wait, even for a recurring series with occurrences still to come."
                 )
             ),
         ] = None,

@@ -5,7 +5,7 @@ nothing here came from a meeting: the speakers are historical figures, the words
 the ids are obviously fake.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -50,6 +50,11 @@ _ATTRIBUTION_OFF = {
 }
 
 
+# Central European Time, which February is in: the offset a European caller's "15:00" carries, and
+# one hour away from the UTC the same string is read as when it carries no offset at all.
+_CET = timezone(timedelta(hours=1))
+
+
 def _handle() -> transcripts.MeetingHandle:
     handle = transcripts.meeting_handle(transcripts.meeting_uri_for(JOIN_WEB_URL) or "")
     assert handle is not None
@@ -59,6 +64,28 @@ def _handle() -> transcripts.MeetingHandle:
 def _resolved(graph: respx.MockRouter, **meeting: object) -> respx.Route:
     return graph.get(_MEETINGS).mock(
         return_value=httpx.Response(200, json={"value": [meeting_payload(**meeting)]})  # pyright: ignore[reportArgumentType]
+    )
+
+
+def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
+    """A recurring series as Graph holds it: one meeting, one transcript collection, three weeks.
+
+    Three occurrences in one collection is the whole reason a window exists — Graph publishes no
+    occurrence id and no per-occurrence addressing — and `end` is the series-wide `endDateTime`,
+    which is the value the verdict must NOT be read off when a window was asked for.
+    """
+    _resolved(graph, meeting_type="recurring", end=end)
+    _ = graph.get(_TRANSCRIPTS).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "value": [
+                    transcript_payload(transcript_id="week-1", created_at="2026-02-03T14:02:00Z"),
+                    transcript_payload(transcript_id="week-2", created_at="2026-02-10T14:01:00Z"),
+                    transcript_payload(transcript_id="week-3", created_at="2026-02-17T14:04:00Z"),
+                ]
+            },
+        )
     )
 
 
@@ -443,6 +470,224 @@ class TestScopingToOneOccurrence:
         )
         assert summary.content_correlation_id == "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3"
         assert summary.started_at is not None and summary.ended_at is not None
+
+
+class TestTheWindowShapesAModelActuallySends:
+    """A window is the only reason `started_after`/`started_before` exist, and a model writes a date
+    the way people write dates. `2026-02-10` and `2026-02-10T14:00:00` both used to reach a
+    comparison between a naive datetime and Graph's aware one and raise `TypeError` at the caller —
+    a crash naming no remedy, for a value the schema had accepted.
+    """
+
+    def test_a_bound_that_named_no_zone_is_resolved_against_utc_and_not_the_host(self) -> None:
+        """Asserted on the resolved instant rather than through a filter, because a machine whose
+        local zone happens to be UTC cannot tell the two readings apart — and the assumption is what
+        the parameter descriptions promise, so it is what has to be pinned."""
+        window = transcripts.OccurrenceWindow.of(
+            datetime(2026, 2, 10, 9, 0), datetime(2026, 2, 10, 17, 0)
+        )
+
+        assert window.started_after == datetime(2026, 2, 10, 9, 0, tzinfo=UTC)
+        assert window.started_before == datetime(2026, 2, 10, 17, 0, tzinfo=UTC)
+
+    def test_a_bare_date_is_a_whole_utc_day_and_not_an_empty_span(self) -> None:
+        """The same date in both bounds is how one occurrence gets bracketed. Resolving both to
+        midnight would make that the empty span between one instant and itself — a window matching
+        nothing, reported as an answer about the day."""
+        window = transcripts.OccurrenceWindow.of(date(2026, 2, 10), date(2026, 2, 10))
+
+        assert window.started_after == datetime(2026, 2, 10, tzinfo=UTC)
+        assert window.started_before is not None
+        assert datetime(2026, 2, 10, 23, 59, 59, tzinfo=UTC) < window.started_before
+        assert window.started_before < datetime(2026, 2, 11, tzinfo=UTC)
+
+    @pytest.mark.parametrize(
+        ("started_after", "started_before", "expected"),
+        [
+            (date(2026, 2, 10), date(2026, 2, 10), ["week-2"]),
+            (datetime(2026, 2, 10, 14, 0), datetime(2026, 2, 10, 14, 2), ["week-2"]),
+            (datetime(2026, 2, 10), datetime(2026, 2, 11), ["week-2"]),
+            (
+                datetime(2026, 2, 10, 15, 0, tzinfo=_CET),
+                datetime(2026, 2, 10, 16, 0, tzinfo=_CET),
+                ["week-2"],
+            ),
+            (datetime(2026, 2, 10, 14, 0, tzinfo=UTC), None, ["week-3", "week-2"]),
+            (None, date(2026, 2, 10), ["week-2", "week-1"]),
+        ],
+        ids=[
+            "bare-dates",
+            "naive-datetimes",
+            "naive-midnights",
+            "offset-aware",
+            "open-at-the-top",
+            "open-at-the-bottom",
+        ],
+    )
+    async def test_every_shape_bounds_the_series_and_none_of_them_raises(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        started_after: date | datetime | None,
+        started_before: date | datetime | None,
+        expected: list[str],
+    ) -> None:
+        """The `_CET` case is the one that has to differ from the naive one: `15:00+01:00` is
+        `14:00Z`, so an offset is honoured rather than dropped, and a bound that carries none is not
+        silently given the host's."""
+        _weekly_series(graph)
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=started_after,
+            started_before=started_before,
+            limit=20,
+        )
+
+        assert found.status == "available"
+        assert [summary.transcript_id for summary in found.transcripts] == expected
+
+    async def test_a_bare_date_keeps_the_last_minute_of_its_day_and_not_the_next_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """What "the whole day" has to mean at the edges, where an off-by-one is invisible: a turn
+        transcribed at 23:59 belongs to the day asked for and one at 00:00 does not."""
+        _resolved(graph, meeting_type="recurring")
+        graph.get(_TRANSCRIPTS).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        transcript_payload(transcript_id="dawn", created_at="2026-02-10T00:00:01Z"),
+                        transcript_payload(transcript_id="dusk", created_at="2026-02-10T23:59:30Z"),
+                        transcript_payload(
+                            transcript_id="after", created_at="2026-02-11T00:00:30Z"
+                        ),
+                    ]
+                },
+            )
+        )
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=date(2026, 2, 10),
+            started_before=date(2026, 2, 10),
+            limit=20,
+        )
+
+        assert [summary.transcript_id for summary in found.transcripts] == ["dusk", "dawn"]
+
+    async def test_a_graph_timestamp_carrying_no_offset_is_still_comparable(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The other side of the same crash. Graph timestamps in UTC and says so with a `Z`, but a
+        window is worth nothing if one payload without one takes the whole call down — so the
+        transcript's own timestamp is resolved on the same assumption as the bounds."""
+        _resolved(graph, meeting_type="recurring")
+        graph.get(_TRANSCRIPTS).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        transcript_payload(transcript_id="naive", created_at="2026-02-10T14:01:00")
+                    ]
+                },
+            )
+        )
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=date(2026, 2, 10),
+            started_before=date(2026, 2, 10),
+            limit=20,
+        )
+
+        assert [summary.transcript_id for summary in found.transcripts] == ["naive"]
+
+
+class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
+    """`not_ready` and `not_transcribed` are the same empty collection and opposite advice, so which
+    one is given has to follow the window the caller asked about. Reading it off the *meeting* was
+    wrong in exactly the case the window exists for: a series is one meeting, its `endDateTime` is
+    one value for the whole series, and a caller told to wait for an occurrence that ended last
+    month waits forever.
+    """
+
+    @pytest.mark.parametrize(
+        "end",
+        [None, (datetime.now(UTC) + timedelta(days=180)).isoformat()],
+        ids=["no-end-time", "series-runs-for-months"],
+    )
+    async def test_a_long_past_occurrence_of_a_running_series_was_never_transcribed(
+        self, client: GraphServiceClient, graph: respx.MockRouter, end: str | None
+    ) -> None:
+        past = (datetime.now(UTC) - timedelta(days=30)).date()
+        _weekly_series(graph, end=end)
+
+        found = await transcripts.list_meeting_transcripts(
+            client, handle=_handle(), started_after=past, started_before=past, limit=20
+        )
+
+        assert found.transcripts == []
+        assert found.status == "not_transcribed", (
+            "the occurrence is a month gone; the series' own end time says nothing about it"
+        )
+
+    async def test_a_window_that_has_only_just_closed_is_still_not_ready(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The allowance has to keep applying to the window itself, or the fix for one wrong answer
+        becomes the other one: a transcript minutes away would be reported as never coming."""
+        _weekly_series(graph, end=None)
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=datetime.now(UTC) - timedelta(hours=1),
+            started_before=datetime.now(UTC) - timedelta(minutes=5),
+            limit=20,
+        )
+
+        assert found.status == "not_ready"
+
+    async def test_a_window_still_open_at_its_far_end_admits_the_answer_is_not_known(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Where it genuinely cannot be told, it still says wait. `started_after` alone leaves the
+        window running up to now, and a series with no end time offers no second piece of evidence —
+        Graph publishes neither a processing status nor an SLA, so the cheap wrong answer wins."""
+        _weekly_series(graph, end=None)
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=datetime.now(UTC) - timedelta(days=30),
+            started_before=None,
+            limit=20,
+        )
+
+        assert found.status == "not_ready"
+
+    async def test_a_meeting_long_over_settles_even_a_window_set_in_the_future(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Either side may settle it. A window a caller put in next week is not an instruction to
+        wait for a meeting that ended nine days ago — nothing more is coming from it."""
+        _resolved(graph, end=(datetime.now(UTC) - timedelta(days=9)).isoformat())
+        graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=(datetime.now(UTC) + timedelta(days=7)).date(),
+            started_before=None,
+            limit=20,
+        )
+
+        assert found.status == "not_transcribed"
 
 
 class TestReadingTheWords:

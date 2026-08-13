@@ -57,6 +57,23 @@ Here the two transforms are separated, and only the first is ours:
 `200 OK` with `value: []` is Graph's documented "no match" for this filter — it never 404s — so it
 is reported as its own outcome and not as an error.
 
+## The occurrence window, and the shapes a model actually sends
+
+`started_after`/`started_before` exist for one reason: a recurring series is a single meeting to
+Graph, so its occurrences share one transcript collection and the only thing telling them apart is
+when transcription began. That makes the window the thing a model reaches for most, and it arrives
+in whatever shape the model wrote — `2026-08-11T09:00:00+02:00`, but just as often
+`2026-08-11T09:00:00` or `2026-08-11`, because that is how a date gets written when nobody is
+watching. All three are accepted and resolved against UTC, in `OccurrenceWindow` and nowhere else:
+Graph timestamps every transcript in UTC, so UTC is the assumption that needs no second piece of
+information, and resolving once at the edge of the module is what stops anything downstream
+comparing a naive datetime with an aware one — which is a `TypeError` raised at a caller who did
+nothing wrong, not a wrong answer it could notice. A bare date is a whole UTC day rather than its
+first instant, because writing the same date in both bounds is how one occurrence gets bracketed and
+midnight-to-midnight would be an empty window reported as an answer. The assumption is stated in
+each parameter's own description, where a model reads it: `09:00` is a different instant in Zurich,
+and a window quietly built in the wrong zone is worse than one that was refused.
+
 ## Three failures a caller must act on differently
 
 `GET …/transcripts` returning nothing is not one answer but two, and the tenant switch is a third:
@@ -66,10 +83,13 @@ is reported as its own outcome and not as an error.
   meeting transcripts, regardless of app-level permissions"; there is "no request-side workaround".
   It is recognised by inner code in `server/errors.py`, where every other refusal is worded.
 * **No transcript** — the meeting was never recorded or never transcribed. Retrying is pointless.
-* **Not ready yet** — the meeting has just ended and the transcript has not landed. Retrying is the
-  *only* thing that helps, which is why this must never be reported as the case above. Graph
-  publishes no status for it and no latency SLA, so it is derived from the meeting's end time and a
-  deliberately generous allowance; `MeetingTranscripts.status` says exactly what that means.
+* **Not ready yet** — nothing has landed for the window asked about and something still might.
+  Retrying is the *only* thing that helps, which is why this must never be reported as the case
+  above — and, just as importantly, why the case above must not be reported as this one: a window
+  that has demonstrably passed is answered `not_transcribed` even for a series still running, or a
+  model is sent back to poll for an occurrence that ended last month. Graph publishes no status for
+  availability and no latency SLA, so both halves are an inference over one generous allowance;
+  `OccurrenceWindow.absence` is the whole of it and `MeetingTranscripts.status` admits it as one.
 
 `SpeakerAttributionNotAllowed` is a fourth Graph answer and the one this module handles rather than
 reports: a tenant may permit transcripts and forbid speaker names, and the documented response is
@@ -80,7 +100,8 @@ to ask again for the unattributed format. That degrades the answer instead of lo
 import html
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Self
 from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -117,12 +138,13 @@ MAX_TRANSCRIPTS = 50
 # context per call.
 MAX_TURNS = 500
 
-# How long after a meeting ends a missing transcript is still called "not ready" rather than "never
-# transcribed". Microsoft publishes no SLA and no "processing" status for transcript availability,
-# so this is not a promise about Graph — it is which of two opposite pieces of advice to give when
-# the evidence is the same empty collection. Generous on purpose: telling a caller to wait once
-# when nothing will ever arrive costs one call, while telling it a transcript does not exist when it
-# is ten minutes away is a wrong answer it cannot detect.
+# How long after a window closes — or after a meeting ends, where no window was asked for — a
+# missing transcript is still called "not ready" rather than "never transcribed". Microsoft
+# publishes no SLA and no "processing" status for transcript availability, so this is not a promise
+# about Graph — it is which of two opposite pieces of advice to give when the evidence is the same
+# empty collection. Generous on purpose: telling a caller to wait once when nothing will ever
+# arrive costs one call, while telling it a transcript does not exist when it is ten minutes away
+# is a wrong answer it cannot detect.
 TRANSCRIPT_DELAY_ALLOWANCE = timedelta(hours=4)
 
 # The inner code Graph sends when a tenant permits transcripts but forbids speaker names. Branched
@@ -223,6 +245,100 @@ def _segment(value: str) -> str:
     return quote(value, safe="")
 
 
+@dataclass(frozen=True, slots=True)
+class OccurrenceWindow:
+    """Which occurrence was asked about, as two instants that are always timezone-aware.
+
+    A type rather than two arguments threaded through, because the window decides two things that
+    have to agree: which transcripts are kept, and — when none are — whether an empty answer means
+    "wait" or "there is none". Reading the second off the *meeting* instead was a wrong answer no
+    caller could detect: a recurring series whose `endDateTime` is in the future (or absent) made
+    every empty window "still processing", including one bracketing an occurrence that ended weeks
+    ago and was never transcribed, which is an instruction to poll forever.
+
+    `of` is the only constructor a caller should use: it takes the shapes a model actually sends and
+    resolves them, so that no comparison downstream can meet a naive datetime.
+    """
+
+    started_after: datetime | None
+    started_before: datetime | None
+
+    @classmethod
+    def of(
+        cls, started_after: date | datetime | None, started_before: date | datetime | None
+    ) -> Self:
+        """A window from bounds as given, resolving anything that named no timezone against UTC.
+
+        A bare date names a whole UTC day: `started_after` takes its first instant and
+        `started_before` its last, so the same date in both is that one day rather than the empty
+        span between one midnight and itself.
+        """
+        return cls(_first_instant(started_after), _last_instant(started_before))
+
+    def holds(self, transcript: CallTranscript) -> bool:
+        """Whether this transcript began inside the window.
+
+        A transcript Graph gave no `createdDateTime` for is kept when no window was asked for and
+        dropped when one was: it cannot be shown to be the occurrence the caller meant.
+        """
+        if self.started_after is None and self.started_before is None:
+            return True
+        began = transcript.created_date_time
+        if began is None:
+            return False
+        # Aware even though Graph's own timestamps carry `Z`: this comparison is the one that used
+        # to raise, and it must not depend on a payload's punctuation to stay safe.
+        began = _utc(began)
+        if self.started_after is not None and began < self.started_after:
+            return False
+        return not (self.started_before is not None and began > self.started_before)
+
+    def absence(self, meeting: OnlineMeeting) -> str:
+        """Which of the two empty answers this is, for the window that was actually asked about.
+
+        Two independent pieces of evidence, either of which settles it: the window's own end is far
+        enough past that anything falling inside it would have landed, or the *meeting* is — the
+        second being what answers a caller who asked for no window at all, and what stops a window
+        mistakenly set in the future promising a transcript for a meeting that is long over.
+
+        Absent evidence never settles anything: no `started_before` and no `endDateTime` both mean
+        nothing says transcription has finished, and of the two wrong answers the one that costs a
+        caller a second call is the cheaper one.
+        """
+        now = datetime.now(UTC)
+        settled = _settled_by(self.started_before, now) or _settled_by(meeting.end_date_time, now)
+        return "not_transcribed" if settled else "not_ready"
+
+
+def _first_instant(bound: date | datetime | None) -> datetime | None:
+    """The earliest instant `bound` includes, or None where there is no bound."""
+    if bound is None:
+        return None
+    # `datetime` subclasses `date`, so this order is the whole of the distinction.
+    if isinstance(bound, datetime):
+        return _utc(bound)
+    return datetime.combine(bound, time.min, tzinfo=UTC)
+
+
+def _last_instant(bound: date | datetime | None) -> datetime | None:
+    """The latest instant `bound` includes, or None where there is no bound."""
+    if bound is None:
+        return None
+    if isinstance(bound, datetime):
+        return _utc(bound)
+    return datetime.combine(bound, time.max, tzinfo=UTC)
+
+
+def _utc(moment: datetime) -> datetime:
+    """`moment` as an aware datetime, reading one that named no timezone as already being UTC."""
+    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
+
+
+def _settled_by(moment: datetime | None, now: datetime) -> bool:
+    """Whether `moment` is far enough past that a transcript belonging to it would have arrived."""
+    return moment is not None and _utc(moment) + TRANSCRIPT_DELAY_ALLOWANCE < now
+
+
 class TranscriptSummary(BaseModel):
     uri: str = Field(
         description=(
@@ -257,11 +373,14 @@ class MeetingTranscripts(BaseModel):
         description=(
             "What was found, and therefore what to do next. Exactly one of:\n"
             + "- `available` — `transcripts` lists them; read one.\n"
-            + "- `not_ready` — the meeting has not ended, or ended recently enough that a "
-            + "transcript may still be processing. Microsoft publishes no availability SLA and no "
-            + "'processing' status, so this is inferred from the meeting's end time: it means wait "
-            + "and ask again later, and it is NOT evidence that no transcript will ever exist.\n"
-            + "- `not_transcribed` — the meeting is over, nothing is there, and nothing is "
+            + "- `not_ready` — nothing is there for the window you asked about and something may "
+            + "still arrive: that window has only just closed, or you asked for no window and the "
+            + "meeting itself has not ended or ended recently. Microsoft publishes no availability "
+            + "SLA and no 'processing' status, so this is inferred: it means wait and ask again "
+            + "later, and it is NOT evidence that no transcript will ever exist. A window that has "
+            + "demonstrably passed is never reported this way, however far in the future a "
+            + "recurring series runs.\n"
+            + "- `not_transcribed` — the window is over, nothing is there, and nothing is "
             + "expected: it was not recorded or transcribed. Retrying will not change this. One "
             + "other cause looks identical and cannot be distinguished: Microsoft's "
             + "meeting-artifact APIs stop serving a meeting once it expires (about 60 days after a "
@@ -367,8 +486,8 @@ async def list_meeting_transcripts(
     client: GraphServiceClient,
     *,
     handle: MeetingHandle,
-    started_after: datetime | None,
-    started_before: datetime | None,
+    started_after: date | datetime | None,
+    started_before: date | datetime | None,
     limit: int,
 ) -> MeetingTranscripts:
     """The transcripts of the meeting `handle` addresses, and what a caller should do about them.
@@ -377,8 +496,12 @@ async def list_meeting_transcripts(
     the listing rather than as a `$filter` — Graph advertises `$filter` on this collection without
     documenting a single filterable property, so a server-side date bound is unverifiable and a
     wrong one would silently return nothing.
+
+    The bounds are whatever the caller passed — `OccurrenceWindow.of` is what makes them instants —
+    and the same window then decides both which transcripts are kept and what an empty answer means.
     """
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
+    window = OccurrenceWindow.of(started_after, started_before)
 
     with graph_errors():
         meeting = await _resolve_meeting(client, handle)
@@ -397,16 +520,11 @@ async def list_meeting_transcripts(
             meeting.id
         ).transcripts.get()
         assert first_page is not None, "Graph answered a transcript listing with no collection"
-        collected = await collect_pages(
-            first_page,
-            client,
-            limit=limit,
-            matches=lambda transcript: _within(transcript, started_after, started_before),
-        )
+        collected = await collect_pages(first_page, client, limit=limit, matches=window.holds)
 
     found = sorted(collected.items, key=_started_at, reverse=True)
     return MeetingTranscripts(
-        status="available" if found else _absence(meeting),
+        status="available" if found else window.absence(meeting),
         meeting_id=meeting.id,
         subject=meeting.subject,
         # `OnlineMeetingBase.meetingType` is a generated enum subclassing `str`, so the member is
@@ -444,39 +562,14 @@ async def _resolve_meeting(
     return meetings[0] if meetings else None
 
 
-def _within(
-    transcript: CallTranscript, started_after: datetime | None, started_before: datetime | None
-) -> bool:
-    """Whether this transcript began inside the requested window.
-
-    A transcript Graph gave no `createdDateTime` for is kept when no window was asked for and
-    dropped when one was: it cannot be shown to be the occurrence the caller meant.
-    """
-    if started_after is None and started_before is None:
-        return True
-    began = transcript.created_date_time
-    if began is None:
-        return False
-    if started_after is not None and began < started_after:
-        return False
-    return not (started_before is not None and began > started_before)
-
-
-def _absence(meeting: OnlineMeeting) -> str:
-    """Which of the two empty answers this is: worth waiting for, or not.
-
-    An end time Graph did not send counts as "not ready" rather than "never transcribed", because
-    without it there is no evidence transcription has finished — and of the two wrong answers, the
-    one that costs a caller a second call is the cheaper one.
-    """
-    ended = meeting.end_date_time
-    if ended is None or datetime.now(UTC) < ended + TRANSCRIPT_DELAY_ALLOWANCE:
-        return "not_ready"
-    return "not_transcribed"
-
-
 def _started_at(transcript: CallTranscript) -> datetime:
-    return transcript.created_date_time or datetime.min.replace(tzinfo=UTC)
+    """The sort key: when transcription began, or the beginning of time where Graph did not say.
+
+    Aware for the same reason `OccurrenceWindow.holds` is — one naive value among aware ones makes
+    the sort itself raise, which is a crash in the middle of an answer that was already complete.
+    """
+    began = transcript.created_date_time
+    return _utc(began) if began is not None else datetime.min.replace(tzinfo=UTC)
 
 
 def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
