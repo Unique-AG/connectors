@@ -6,8 +6,10 @@ from pydantic import ValidationError
 from backstop_mcp.config import (
     AppConfig,
     AppEnv,
+    AuthConfig,
     BackstopConfig,
     DatabaseConfig,
+    EncryptionConfig,
     normalize_asyncpg_url,
 )
 
@@ -72,6 +74,15 @@ class TestBackstopConfigDefaults:
         config = BackstopConfig()
 
         assert config.base_url == "https://api.backstopsolutions.com"
+        assert config.default_timeout_seconds == 30.0
+        assert config.reports_timeout_seconds == 120.0
+        assert config.max_concurrent_requests_per_user == 5
+        assert config.max_retry_attempts == 5
+        assert config.max_retry_wait_ms == 30_000
+        assert config.default_page_size == 100
+        assert config.report_page_size == 500
+        assert config.page_limit_param == "page[limit]"
+        assert config.page_offset_param == "page[offset]"
 
     def test_env_var_overrides_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_BASE_URL", "https://tenant.backstopsolutions.com")
@@ -92,6 +103,31 @@ class TestBackstopConfigDefaults:
 
         with pytest.raises(ValidationError):
             BackstopConfig()
+
+    def test_client_tuning_knobs_are_overridable_via_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("BACKSTOP_DEFAULT_TIMEOUT_SECONDS", "11")
+        monkeypatch.setenv("BACKSTOP_REPORTS_TIMEOUT_SECONDS", "222")
+        monkeypatch.setenv("BACKSTOP_MAX_CONCURRENT_REQUESTS_PER_USER", "3")
+        monkeypatch.setenv("BACKSTOP_MAX_RETRY_ATTEMPTS", "2")
+        monkeypatch.setenv("BACKSTOP_MAX_RETRY_WAIT_MS", "5000")
+        monkeypatch.setenv("BACKSTOP_DEFAULT_PAGE_SIZE", "33")
+        monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "444")
+        monkeypatch.setenv("BACKSTOP_PAGE_LIMIT_PARAM", "limit")
+        monkeypatch.setenv("BACKSTOP_PAGE_OFFSET_PARAM", "offset")
+
+        config = BackstopConfig()
+
+        assert config.default_timeout_seconds == 11.0
+        assert config.reports_timeout_seconds == 222.0
+        assert config.max_concurrent_requests_per_user == 3
+        assert config.max_retry_attempts == 2
+        assert config.max_retry_wait_ms == 5_000
+        assert config.default_page_size == 33
+        assert config.report_page_size == 444
+        assert config.page_limit_param == "limit"
+        assert config.page_offset_param == "offset"
 
 
 class TestPublicBaseUrl:
@@ -188,3 +224,41 @@ class TestDatabaseConfigSsl:
 
         with pytest.raises(ValidationError, match="DB_HOST"):
             DatabaseConfig()
+
+
+class TestAuthConfigDefaults:
+    def test_defaults(self) -> None:
+        config = AuthConfig()
+
+        assert config.token_retention_days == 30
+        assert config.unused_client_retention_hours == 24.0
+        assert config.cleanup_interval_hours == 6.0
+        assert config.login_max_attempts == 10
+        assert config.login_attempt_window_minutes == 15
+
+    def test_derived_timedeltas(self) -> None:
+        config = AuthConfig(
+            token_retention_days=1,
+            unused_client_retention_hours=2.0,
+            cleanup_interval_hours=3.0,
+            login_attempt_window_minutes=4,
+        )
+
+        assert config.token_retention.days == 1
+        assert config.unused_client_retention.total_seconds() == 2.0 * 3600
+        assert config.cleanup_interval.total_seconds() == 3.0 * 3600
+        assert config.login_attempt_window.total_seconds() == 4 * 60
+
+
+class TestEncryptionConfig:
+    def test_requires_an_encryption_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("BACKSTOP_MCP_ENCRYPTION_KEY", raising=False)
+
+        with pytest.raises(ValueError, match="BACKSTOP_MCP_ENCRYPTION_KEY"):
+            EncryptionConfig()
+
+    def test_accepts_a_configured_key(self) -> None:
+        config = EncryptionConfig(encryption_key="a-key")  # pyright: ignore[reportArgumentType]
+
+        assert config.encryption_key is not None
+        assert config.encryption_key.get_secret_value() == "a-key"

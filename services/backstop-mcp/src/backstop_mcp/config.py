@@ -1,5 +1,6 @@
 import os
 import ssl
+from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, TypedDict, cast
@@ -10,6 +11,7 @@ from pydantic import (
     HttpUrl,
     PostgresDsn,
     PrivateAttr,
+    SecretStr,
     TypeAdapter,
     model_validator,
 )
@@ -163,21 +165,50 @@ class AppConfig(BaseSettings):
 
 
 class BackstopConfig(BaseSettings):
-    """Where to reach the Backstop REST API.
+    """Where to reach the Backstop REST API, and how the shared HTTP client is tuned.
 
-    Credentials are NOT configured here: each connecting MCP client will eventually complete a
-    hosted login form, verified against Backstop and stored encrypted in Postgres. That bridge —
-    and the tuning knobs for the shared HTTP client — land in a later PR; for now this only
-    carries the base URL tools will eventually talk to.
+    Credentials are NOT configured here: each connecting MCP client completes the hosted
+    login form (username + personal API token), which is verified against Backstop and then
+    stored encrypted in Postgres. Tool calls load that per-user credential and send
+    `Authorization: Basic ...` + `token: true` to Backstop. See `features/auth/provider.py`,
+    `backstop_client/`, and https://backstopsolutions.elevio.help/en/articles/1018 /
+    .../236.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_")
 
     base_url: HttpUrlStr = "https://api.backstopsolutions.com"
 
+    # httpx's undocumented default is ~5s; ordinary CRUD calls get a saner explicit timeout.
+    default_timeout_seconds: float = Field(default=30.0, gt=0)
+    # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records.
+    reports_timeout_seconds: float = Field(default=120.0, gt=0)
+
+    # Backstop hard-limits each user token to 5 concurrent connections.
+    max_concurrent_requests_per_user: int = Field(default=5, ge=1)
+
+    # Retry tuning for 429 (rate-limit) responses.
+    max_retry_attempts: int = Field(default=5, ge=1)
+    max_retry_wait_ms: int = Field(default=30_000, ge=0)
+
+    # Default page size for `.paginate()` on ordinary CRUD collections.
+    default_page_size: int = Field(default=100, ge=1)
+    # Default page size for /reports and /analytics pagination; Backstop recommends not
+    # exceeding 500 records per report page.
+    report_page_size: int = Field(default=500, ge=1, le=500)
+
+    # JSON:API pagination parameter names. Defaults come from the Backstop swagger, which
+    # spells the only paginated example as
+    # `/quick-search/?...&page[offset]={value4}&page[limit]={value5}`
+    # (.docs-local/backstop/backstop-api-swagger.json). Overridable because getting these
+    # wrong is silent: Backstop ignores an unknown query param, so `report_page_size` would
+    # stop bounding report pages without any error to notice.
+    page_limit_param: str = Field(default="page[limit]", min_length=1)
+    page_offset_param: str = Field(default="page[offset]", min_length=1)
+
 
 class DatabaseConfig(BaseSettings):
-    """Where backstop-mcp stores its state.
+    """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials.
 
     Provide either `url` / `DB_URL` (or Helm's `DATABASE_URL` alias) **or** the discrete
     `host`/`name`/`user`/`password` fields. The discrete fields may be `None` when a URL is
@@ -247,3 +278,66 @@ class DatabaseConfig(BaseSettings):
     def connect_args(self) -> AsyncpgConnectArgs:
         """asyncpg connect args derived from libpq query params (e.g. sslmode)."""
         return self._connect_args
+
+
+class AuthConfig(BaseSettings):
+    """Retention and sweep cadence for the OAuth rows this service issues.
+
+    See `features/auth/cleanup.py`: without a periodic sweep, `pending_authorizations`,
+    `authorization_codes` and — chiefly — `oauth_tokens` grow without bound.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")
+
+    # How long a fully-expired token family is kept. `rotated_from` makes those rows an audit
+    # trail of one grant's rotations, so they outlive their usefulness as credentials.
+    token_retention_days: int = Field(default=30, ge=1)
+
+    # How long a registered OAuth client with nothing left referencing it is kept. Dynamic client
+    # registration is open (RFC 7591), so every client that ever connected — and anyone who
+    # merely called /register — leaves an `oauth_clients` row behind. A client in use always has a
+    # live token family and so is never reachable by the sweep; this bounds registration spam and
+    # clients that registered but never finished a login. Comfortably longer than
+    # `BackstopOAuthProvider.PENDING_AUTHORIZATION_TTL`, so a client waiting on its user to fill
+    # in the login form can't be swept mid-handshake.
+    unused_client_retention_hours: float = Field(default=24.0, gt=0)
+
+    # How often the sweep runs. Rows are unusable the moment they expire, so this bounds only
+    # how long dead rows linger — never whether an expired token is accepted.
+    cleanup_interval_hours: float = Field(default=6.0, gt=0)
+
+    # Failed-login throttling for the hosted Backstop login form (see `features/auth/throttle.py`).
+    # Without it, `POST /backstop/login` forwards any username/token pair to Backstop, which
+    # makes it a credential-testing oracle for anyone who can start an OAuth flow.
+    login_max_attempts: int = Field(default=10, ge=1)
+    login_attempt_window_minutes: int = Field(default=15, ge=1)
+
+    @property
+    def token_retention(self) -> timedelta:
+        return timedelta(days=self.token_retention_days)
+
+    @property
+    def unused_client_retention(self) -> timedelta:
+        return timedelta(hours=self.unused_client_retention_hours)
+
+    @property
+    def cleanup_interval(self) -> timedelta:
+        return timedelta(hours=self.cleanup_interval_hours)
+
+    @property
+    def login_attempt_window(self) -> timedelta:
+        return timedelta(minutes=self.login_attempt_window_minutes)
+
+
+class EncryptionConfig(BaseSettings):
+    """Key used to encrypt Backstop credentials (username + personal API token) at rest."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_MCP_")
+
+    encryption_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_encryption_key(self) -> Self:
+        if self.encryption_key is None:
+            raise ValueError("BACKSTOP_MCP_ENCRYPTION_KEY not set")
+        return self

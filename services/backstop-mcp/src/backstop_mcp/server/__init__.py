@@ -2,8 +2,8 @@
 
 Tool declarations (`tools`), FastMCP/ASGI middleware (`middleware`), and the process-wide
 service holder (`runtime`) that exists only because FastMCP calls tool functions with a plain
-signature and so denies them constructor injection. None of those exist yet — this package is
-scaffolding until the first feature lands.
+signature and so denies them constructor injection. `tools` and `middleware` are still empty in
+this PR — they fill in once `features/custom_fields` and `features/party_resolver` land.
 
 This side may import freely from `features/`. The reverse is a layering violation — see
 `features/__init__.py`.
