@@ -8,6 +8,10 @@ dependencies = [
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
     # the postgresql extra and because auth.py imports it directly (OAuth state store).
     "py-key-value-aio[postgresql]==0.4.5",
+    # The official Microsoft Graph SDK. `msgraph-core` (the request-adapter/telemetry layer),
+    # `microsoft-kiota-*` (the HTTP middleware pipeline) and `azure-core` (the credential
+    # protocol the SDK authenticates with) all arrive transitively and are pinned in uv.lock.
+    "msgraph-sdk==1.61.0",
     "uvicorn[standard]==0.52.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
@@ -15,7 +19,10 @@ dependencies = [
     "pydantic==2.13.4",
     "pydantic-settings==2.14.2",
     "python-dotenv==1.2.2",
-    "httpx==0.28.1",
+    # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
+    # SDK's own default client; the SDK pulls the same extra, but we ask for it directly because
+    # we are the ones passing `http2=True`.
+    "httpx[http2]==0.28.1",
     "opentelemetry-api==1.44.0",
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-prometheus==0.65b0",
