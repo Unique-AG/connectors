@@ -2,9 +2,8 @@
 
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes no MCP
-tools yet: the feature packages and the tools that use the Graph client land in later PRs, stacked
-on top of this one.
+Users sign in with their own Microsoft account and the server acts as them. It exposes two tools so
+far — `whoami` and `list_chats` — and more land in later PRs, stacked on top of this one.
 
 ## Layout
 
@@ -15,19 +14,24 @@ src/office_mcp/
   auth.py                Entra auth: which app registration, and where its state lives
   logging.py metrics.py  cross-cutting, used by both sides below
   graph_client/          the Microsoft Graph transport — the official SDK, one caller's token
-  features/              what the connector does — empty until the first feature lands
-  server/                how it's exposed over MCP — the /ready probe today, tools when they land
+  features/              what the connector does — one module per slice (identity, chats)
+  server/                how it's exposed over MCP — the tools, the errors they report, /ready
 ```
 
 This service owns no database schema and has no ORM, no engine and no migrations. Its only table
 (`oauth_kv`) belongs to the OAuth state store, which creates it itself — see **State** below.
 
+A feature module owns three things that belong together: the Graph request it makes, the shape it
+answers with, and the delegated Graph permission that request needs. `server/tools.py` declares the
+MCP tools over them and is the only place that knows about MCP.
+
 The layering rules are that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse — that **`graph_client/` imports neither `features/`
-nor `config`**, taking its own frozen `GraphSettings` instead, and that **only `create_app`
-constructs a config**, so nothing downstream can quietly re-read the environment and disagree with
-the app it runs in. `tests/test_layering.py` enforces all of them, and grows as each package
-arrives.
+nor `config`**, taking its own frozen `GraphSettings` instead, that **`server/` does not import the
+Graph SDK**, since a tool declares and exposes while the request belongs to a feature, and that
+**only `create_app` constructs a config**, so nothing downstream can quietly re-read the
+environment and disagree with the app it runs in. `tests/test_layering.py` enforces all of them,
+and grows as each package arrives.
 
 ## Auth
 
@@ -59,7 +63,19 @@ all of these hold:
   the provider validates every token against one issuer derived from that value, so a
   multi-tenant authority would reject all of them rather than accept all tenants.
 
-Graph permissions are deliberately not requested yet — they belong to the tools that need them.
+**Graph permissions** belong to the tools that need them, and `create_app` passes their union to
+the provider as `additional_authorize_scopes`. They ride the authorize request only — Entra issues
+one token per resource, so the code exchange asks for this API's own scope and each tool redeems a
+Graph one per call via On-Behalf-Of. That redemption can only succeed for a permission already
+consented to, which is why sign-in has to ask for it:
+
+| Permission | Type | Admin consent | Used by |
+| --- | --- | --- | --- |
+| `User.Read` | Delegated | No | `whoami` |
+| `Chat.Read` | Delegated | No | `list_chats` |
+
+`Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
+`$expand=lastMessagePreview`, and a message preview is a message.
 
 **State.** Every token the server issues is a reference token re-validated on each request, so
 where that state lives decides whether the deployment survives a restart or a second replica.
@@ -97,6 +113,32 @@ gets that string onto the wire.
 - **The caller's token goes to `graph.microsoft.com` and nowhere else.** The SDK's bearer provider
   does not check its own allowed-hosts validator, so a redirect or an off-Graph `nextLink` would
   otherwise be handed a user's delegated credential.
+
+## Tools
+
+| Tool | What it answers | Graph |
+| --- | --- | --- |
+| `whoami` | Who the signed-in user is: `id`, `display_name`, `mail`, `user_principal_name`, `job_title` | `GET /me` |
+| `list_chats` | The user's Teams chats, most recently active first | `GET /me/chats` |
+
+Both are read-only, both take their caller's identity from the token rather than from a parameter,
+and both are described to the model in prose that names the traps rather than only the fields —
+`mail` is null for guests (use `user_principal_name`, which may be on a different domain), and a
+chat's recency is its last message, not the `lastUpdatedDateTime` that Graph moves on a rename.
+
+Three decisions worth knowing:
+
+- **Every result has a declared output schema.** So `truncated` and `members_truncated` are typed
+  fields rather than prose or, worse, an extra object appended to the results array that a model can
+  mistake for a result.
+- **`list_chats` does not paginate.** `limit` (max 50, which is Graph's own `$top` ceiling on that
+  collection) is a window on the most recent chats, and `truncated` says when there are more. A
+  cursor over a collection that reorders itself on every message returns duplicates and gaps, and
+  the window is what "recent chats" means; `services/teams-mcp` ships the same shape.
+- **A refusal names its remedy.** `server/errors.py` maps each Graph failure onto the one thing a
+  model can do about it: 401 → ask the user to sign in again, 403 → ask an administrator for *this
+  named permission*, 429 → wait Graph's own `Retry-After`, 5xx → retry once. The Graph request id
+  rides along, because that is what Microsoft support asks for.
 
 ## Run locally
 

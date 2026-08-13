@@ -13,8 +13,8 @@
    configured — a transport is only allowed to be told.
 
 4. **A package is entered through its `__init__`, never through its modules.** Applies to the
-   packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` is not among them: it is a
-   grouping whose `__init__` is documentation.
+   packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` is not among them: it is a grouping
+   whose `__init__` is documentation, and whose modules are the units features are composed from.
 
 5. **A config class is only instantiated at the composition root.** `create_app` builds each one
    exactly once and injects it; anything downstream constructing its own re-reads the
@@ -23,10 +23,14 @@
    is unrestricted; only *calling* them is the violation. `main.py` is exempt as a process
    entrypoint: it is the root of its own program and hands `create_app` the config it built.
 
-Rules 2 and 3 apply to `graph_client/`, which lands with the Graph transport — both classes run
-against it from that PR on. Rule 1's "the tree actually has feature packages" guard still skips
-until the first feature package exists; the import-direction check itself runs against whatever
-*is* under `features/` (currently just `__init__.py`, which trivially passes).
+6. **`server/` must not import the Microsoft Graph SDK.** The mirror of rules 2 and 3, from the
+   other side: `msgraph` belongs to `graph_client/` (the transport) and `features/` (the requests).
+   A tool that reaches for the SDK itself is how Graph knowledge — which endpoint, which `$expand`,
+   which permission — ends up spread across the layer whose job is only to expose it, and the
+   tool's request then escapes every test that covers the feature.
+
+Rule 1's "the tree actually has feature packages" guard still skips until a feature grows into a
+subpackage; the import-direction check itself runs against every module under `features/`.
 
 All rules are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
@@ -42,9 +46,11 @@ _SRC = pathlib.Path(__file__).parent.parent / "src" / "office_mcp"
 
 _FEATURES = _SRC / "features"
 _GRAPH_CLIENT = _SRC / "graph_client"
+_SERVER = _SRC / "server"
 _SERVER_PREFIX = "office_mcp.server"
 _FEATURES_PREFIX = "office_mcp.features"
 _CONFIG_MODULE = "office_mcp.config"
+_GRAPH_SDK = "msgraph"
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
@@ -52,7 +58,10 @@ _CONFIG_MODULE = "office_mcp.config"
 # door. A new package belongs here as soon as its `__init__` exports anything: `server/` earned
 # its place by exporting `ready_response`, `graph_client/` by exporting its transport, and the
 # feature packages join as they land.
-_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.server", "office_mcp.graph_client")
+_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
+    "office_mcp.graph_client",
+    "office_mcp.server",
+)
 
 # The `BaseSettings` classes in config.py, which read the environment when constructed.
 _CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig"})
@@ -273,16 +282,28 @@ class TestTheDetectionItself:
             _SERVER_PREFIX,
         )
 
+    def test_catches_the_violation_the_graph_sdk_rule_exists_for(self) -> None:
+        assert _imports_under(
+            "from msgraph.generated.models.chat import Chat\nimport msgraph\n", _GRAPH_SDK
+        ) == ["msgraph.generated.models.chat", "msgraph"]
+
+    def test_the_graph_sdk_rule_leaves_this_services_own_client_alone(self) -> None:
+        """`graph_client` is how `server/` is *supposed* to reach Graph, and `msgraph_core` is a
+        different distribution — neither may be mistaken for the SDK itself."""
+        assert not _imports_under(
+            "from office_mcp.graph_client import graph_client_for\nimport msgraph_core\n",
+            _GRAPH_SDK,
+        )
+
     def test_catches_the_violation_the_config_rule_exists_for(self) -> None:
         assert _imports_under("from office_mcp.config import AppConfig", _CONFIG_MODULE) == [
             "office_mcp.config"
         ]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
-        # `_PUBLIC_SURFACE_PACKAGES` only lists `server` for now, so that's the package under
-        # test here; once the first feature package lands and joins the list, its own modules
-        # serve this same role. The importing directory is `_SRC` — i.e. `app.py`, the
-        # composition root, which is the likeliest place to reach past a front door.
+        # `server` stands in for any listed package here; the rule is about the front door, not
+        # about which package happens to be behind it. The importing directory is `_SRC` — i.e.
+        # `app.py`, the composition root, which is the likeliest place to reach past one.
         assert _internal_imports(
             "from office_mcp.server.readiness import ready_response",
             _SRC,
@@ -388,6 +409,23 @@ class TestGraphClientDoesNotImportConfig:
             "graph_client/ must not import config — it takes its own frozen settings types "
             + "from graph_client/settings.py, which create_app translates the app config into. "
             + "Add the field to those settings and map it in create_app instead:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestTheServerLayerDoesNotSpeakGraph:
+    def test_the_tool_module_is_actually_there(self) -> None:
+        """Guards the guard: with no tools, nothing in `server/` would be tempted to call Graph
+        and the rule below would pass vacuously."""
+        assert (_SERVER / "tools.py").is_file()
+
+    @pytest.mark.parametrize("source", sorted(_SERVER.rglob("*.py")), ids=_source_id)
+    def test_no_server_module_imports_the_graph_sdk(self, source: pathlib.Path) -> None:
+        violations = _violations(source, _GRAPH_SDK)
+        assert not violations, (
+            "server/ must not import the Microsoft Graph SDK — a tool declares and exposes; the "
+            + "request belongs in a feature module and the transport in graph_client/. Move the "
+            + "Graph call into features/ and have the tool call that:\n  "
             + "\n  ".join(violations)
         )
 

@@ -1,7 +1,8 @@
 """The composition root, exercised as a real ASGI app.
 
 Checks that the app starts, its lifespan runs, the process-health routes behave, and that Entra
-auth is actually mounted and enforced. No Microsoft Graph client and no tools yet.
+auth is actually mounted and enforced. The tools it exposes are exercised over the MCP protocol in
+`test_mcp_tools.py`.
 
 Nothing here reaches Entra: constructing the provider performs no I/O, and the assertions below
 only touch metadata this service serves itself plus one unauthenticated request that is rejected
@@ -10,7 +11,7 @@ before any upstream call would happen.
 
 import importlib
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from types import ModuleType
 from typing import Protocol, cast, final, override
 from unittest.mock import MagicMock
@@ -179,10 +180,18 @@ class TestReadyProbesTheConnectionSignInDependsOn:
             return storage
 
         def _auth(
-            entra: EntraConfig, base_url: str, client_storage: AsyncKeyValue
+            entra: EntraConfig,
+            base_url: str,
+            client_storage: AsyncKeyValue,
+            graph_scopes: Sequence[str],
         ) -> AzureProvider:
             provider_was_given.append(client_storage)
-            return build_auth(entra, base_url=base_url, client_storage=client_storage)
+            return build_auth(
+                entra,
+                base_url=base_url,
+                client_storage=client_storage,
+                graph_scopes=graph_scopes,
+            )
 
         monkeypatch.setattr(app_module, "build_oauth_storage", _storage)
         monkeypatch.setattr(app_module, "build_auth", _auth)

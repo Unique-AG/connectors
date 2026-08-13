@@ -1,0 +1,117 @@
+"""What a model is told when Graph says no.
+
+These assertions are about *advice*, not wording: each one pins the fact that distinguishes one
+remedy from another, because getting those wrong is what makes a model retry a call that can never
+succeed, or give up on one that would have worked a second later.
+"""
+
+import pytest
+from fastmcp.exceptions import ToolError
+
+from office_mcp.graph_client import (
+    GraphFailure,
+    GraphForbidden,
+    GraphNotFound,
+    GraphThrottled,
+    GraphUnavailable,
+)
+from office_mcp.server.errors import graph_tool_errors
+
+_PERMISSION = "Chat.Read"
+
+
+def _message(failure: GraphFailure) -> str:
+    with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION):
+        raise failure
+    return str(raised.value)
+
+
+class TestTheTwoRemediesGraphCannotTellApart:
+    """401 and 403 are both `GraphForbidden`. One is fixed by the user, the other by an admin."""
+
+    def test_a_rejected_token_asks_the_user_to_sign_in_again(self) -> None:
+        message = _message(
+            GraphForbidden("nope", status=401, code="InvalidAuthenticationToken", request_id=None)
+        )
+
+        assert "sign in" in message
+        assert _PERMISSION not in message, "a 401 is not a missing-permission problem"
+
+    def test_a_missing_permission_names_the_permission_and_who_must_grant_it(self) -> None:
+        """The failure Graph is least helpful about: it never says which permission was missing,
+        so the tool has to. Without the name, the remedy is not actionable."""
+        message = _message(
+            GraphForbidden("nope", status=403, code="Authorization_RequestDenied", request_id=None)
+        )
+
+        assert message.count(_PERMISSION) >= 1
+        assert "administrator" in message
+        assert "Retrying will not help" in message
+
+
+class TestRetryAdvice:
+    def test_throttling_passes_graphs_own_delay_through(self) -> None:
+        """Graph's `Retry-After` is the documented fastest way out of throttling; an eager retry
+        makes it last longer, so the number has to survive into the message."""
+        message = _message(
+            GraphThrottled(
+                "slow down",
+                status=429,
+                code="activityLimitReached",
+                request_id=None,
+                retry_after_seconds=42.0,
+            )
+        )
+
+        assert "42 seconds" in message
+
+    def test_throttling_without_a_delay_still_says_not_to_spin(self) -> None:
+        message = _message(
+            GraphThrottled(
+                "slow down", status=429, code=None, request_id=None, retry_after_seconds=None
+            )
+        )
+
+        assert "loop" in message
+        assert "seconds" not in message, "no invented number when Graph gave no advice"
+
+    def test_an_outage_is_worth_exactly_one_retry(self) -> None:
+        message = _message(GraphUnavailable("boom", status=503, code=None, request_id=None))
+
+        assert "Retry once" in message
+
+    def test_a_bad_request_is_not_worth_retrying(self) -> None:
+        message = _message(GraphFailure("bad filter", status=400, code=None, request_id=None))
+
+        assert "retrying it unchanged will fail identically" in message
+
+    def test_a_missing_item_does_not_claim_the_item_does_not_exist(self) -> None:
+        """Graph returns 404 both for "no such thing" and for "none of your business", so a
+        message that asserts absence teaches the model something false."""
+        message = _message(GraphNotFound("gone", status=404, code=None, request_id=None))
+
+        assert "not allowed to know it exists" in message
+
+
+class TestDiagnostics:
+    def test_the_graph_request_id_survives(self) -> None:
+        """It exists only in that one response, and it is the first thing Microsoft support asks
+        for — losing it makes a production failure untraceable afterwards."""
+        message = _message(
+            GraphUnavailable("boom", status=500, code="internalError", request_id="req-42")
+        )
+
+        assert "HTTP 500" in message
+        assert "Graph error code internalError" in message
+        assert "Graph request id req-42" in message
+
+    def test_nothing_is_invented_when_graph_sent_no_evidence(self) -> None:
+        message = _message(GraphUnavailable("unreachable", status=None, code=None, request_id=None))
+
+        assert "None" not in message
+
+    def test_a_success_passes_through_untouched(self) -> None:
+        with graph_tool_errors(_PERMISSION):
+            outcome = "fine"
+
+        assert outcome == "fine"
