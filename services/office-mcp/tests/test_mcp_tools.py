@@ -17,6 +17,7 @@ import json
 import logging
 import re
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import cast
 from urllib.parse import quote
 
@@ -39,7 +40,7 @@ from starlette.applications import Starlette
 
 from office_mcp.app import create_app
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig
-from office_mcp.features import channels
+from office_mcp.features import channels, transcripts
 from office_mcp.graph_client import GraphSettings, create_graph_transport
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -385,6 +386,37 @@ _SERIES_RECORDINGS: dict[str, object] = {
         for week in (1, 2, 3)
     ]
 }
+
+# The one meeting shape that outgrows what a single call reads: a daily series, transcribed and
+# recorded every time, for the better part of a year. Oldest-first for the same reason the weekly
+# series above is — Microsoft's order is its own — which puts the genuinely newest occurrence past
+# `MAX_ARTIFACT_SCAN`, where neither lister can see it and neither lister may claim it has.
+_PAST_THE_CAP = transcripts.MAX_ARTIFACT_SCAN + 60
+_DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
+
+
+def _day(index: int) -> datetime:
+    """When occurrence `index` of the daily series ran."""
+    return _DAILY_SERIES_START + timedelta(days=index)
+
+
+def _daily_series() -> dict[str, object]:
+    """`_PAST_THE_CAP` artifacts in one page, in the shape both collections share."""
+    return {
+        "value": [
+            {
+                "id": f"day-{index}",
+                "meetingId": _MEETING_ID,
+                "createdDateTime": _day(index).isoformat().replace("+00:00", "Z"),
+                "endDateTime": (_day(index) + timedelta(minutes=50))
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "contentCorrelationId": f"bc842d7a-2f6e-4b18-a1c7-73ef91d5c8{index:03d}",
+            }
+            for index in range(_PAST_THE_CAP)
+        ]
+    }
+
 
 # The meeting handle `list_chats` mints for the chat above, written out rather than derived: that
 # the handle a model copies from one tool is the argument another takes is the contract between
@@ -1024,6 +1056,64 @@ class TestTheToolsThisServerAdvertises:
         assert "`not_recorded`" not in statuses["list_meeting_transcripts"]
         assert "`not_transcribed`" not in statuses["list_meeting_recordings"]
 
+    @pytest.mark.parametrize(
+        "tool",
+        ["list_meeting_transcripts", "list_meeting_recordings"],
+        ids=["transcripts", "recordings"],
+    )
+    async def test_neither_lister_offers_a_remedy_its_mechanism_cannot_keep(
+        self, mcp_client: Client[FastMCPTransport], tool: str
+    ) -> None:
+        """`scan_incomplete` used to end "narrow the window and ask again", which is advice a model
+        can follow forever without progress: the window is applied to the artifacts after Microsoft
+        has answered — Microsoft documents no filterable date on either collection — so a narrower
+        window is the same request over the same artifacts and answers the same way. A dead end
+        stated plainly is a better answer than an actionable-sounding loop, so the remedy is now to
+        stop and report the uncertainty, and the old sentence must not come back.
+        """
+        tools = _named(await mcp_client.list_tools())
+        description = tools[tool].description
+        status = _object(_properties(tools[tool].outputSchema)["status"])
+        assert description is not None
+        rendered = description + str(status.get("description"))
+
+        assert "Stop here." in description, "the answer with nothing to try has to say stop"
+        assert "could not be determined" in description, "the uncertainty IS the answer to report"
+        assert "There is nothing to try" in rendered
+        assert (
+            "narrow `started_after`/`started_before` to the occurrence you mean and ask again"
+            not in rendered.lower()
+        ), "this is the remedy that cannot work, in either place a model reads it"
+
+    @pytest.mark.parametrize(
+        ("tool", "collection"),
+        [
+            ("list_meeting_transcripts", "transcripts"),
+            ("list_meeting_recordings", "recordings"),
+        ],
+        ids=["transcripts", "recordings"],
+    )
+    async def test_neither_lister_promises_the_newest_past_its_scan_cap(
+        self, mcp_client: Client[FastMCPTransport], tool: str, collection: str
+    ) -> None:
+        """ "Newest first" is a property of the artifacts one call READ, not of the meeting: the
+        read stops at `MAX_ARTIFACT_SCAN` and Microsoft publishes no `$orderby` to ask the newest
+        for, so a meeting past that cap can hold a newer artifact than any that came back. Both
+        places a model learns the ordering from — the `limit` it chooses with and the list it reads
+        — have to say so, and "asking for 3 gives the 3 latest" is the sentence that did not.
+        """
+        tools = _named(await mcp_client.list_tools())
+        limit = _object(_properties(tools[tool].inputSchema)["limit"])
+        listed = _object(_properties(tools[tool].outputSchema)[collection])
+        rendered = str(limit.get("description")) + str(listed.get("description"))
+
+        assert str(transcripts.MAX_ARTIFACT_SCAN) in rendered, "the cap is named where it binds"
+        assert "the 3 newest OF THE ONES READ" in str(limit.get("description"))
+        assert "the latest of what was READ" in str(listed.get("description"))
+        assert "so asking for 3 gives the 3 latest" not in rendered, (
+            "the overstatement: past the cap those 3 are the newest of what was read"
+        )
+
     async def test_list_meeting_recordings_says_it_is_not_behind_the_transcript_switch(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
@@ -1448,6 +1538,73 @@ class TestCallingThem:
         assert [item[identifier] for item in listed] == ["week-3"], "the newest, not the first"
         assert answer["status"] == "available"
         assert answer["truncated"] is True, "the two older occurrences are the 'more' there is"
+
+    @pytest.mark.parametrize(
+        ("tool", "path", "collection", "identifier"),
+        [
+            ("list_meeting_transcripts", _TRANSCRIPTS_PATH, "transcripts", "transcript_id"),
+            ("list_meeting_recordings", _RECORDINGS_PATH, "recordings", "recording_id"),
+        ],
+        ids=["transcripts", "recordings"],
+    )
+    async def test_a_meeting_larger_than_one_call_reads_answers_within_what_it_read(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+        tool: str,
+        path: str,
+        collection: str,
+        identifier: str,
+    ) -> None:
+        """The rare meeting both promises have to be exact about, over the real protocol: a series
+        that ran daily for most of a year, so its collection is longer than one call reads.
+
+        Two things are asserted, and they are the two defects this shape found. Asking for the
+        newest returns the newest of the artifacts READ — `day-199` — and never the meeting's
+        actual newest, which sits past the cap where nothing here can see it; `truncated` is the
+        answer's own admission of that. And a window over the part that was not read answers
+        `scan_incomplete` whether it is wide or narrow, because the window is applied to what came
+        back: narrowing it is not a remedy, which is why the tool no longer offers it as one.
+        """
+        _ = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        _ = graph.get(path).mock(return_value=httpx.Response(200, json=_daily_series()))
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+
+        newest = _structured(
+            await mcp_client.call_tool(tool, {"meeting_uri": _MEETING_URI, "limit": 1})
+        )
+        wide = _structured(
+            await mcp_client.call_tool(
+                tool,
+                {
+                    "meeting_uri": _MEETING_URI,
+                    "started_after": _day(transcripts.MAX_ARTIFACT_SCAN).date().isoformat(),
+                    "started_before": _day(_PAST_THE_CAP - 1).date().isoformat(),
+                },
+            )
+        )
+        narrow = _structured(
+            await mcp_client.call_tool(
+                tool,
+                {
+                    "meeting_uri": _MEETING_URI,
+                    "started_after": _day(250).date().isoformat(),
+                    "started_before": _day(250).date().isoformat(),
+                },
+            )
+        )
+
+        listed = cast("Sequence[Mapping[str, object]]", newest[collection])
+        assert len(obo.requested_scopes) == 3, "one delegated exchange per call, all three made"
+        assert [item[identifier] for item in listed] == ["day-199"], "the newest of what was read"
+        assert newest["truncated"] is True, "the read stopped at the cap, and the answer says so"
+        assert wide["status"] == "scan_incomplete"
+        assert (narrow["status"], narrow["truncated"], narrow[collection]) == (
+            wide["status"],
+            wide["truncated"],
+            wide[collection],
+        ), "a narrower window is the same call over the same artifacts, so it is not a remedy"
 
     async def test_a_model_walks_from_a_meeting_chat_to_whether_the_call_was_recorded(
         self,

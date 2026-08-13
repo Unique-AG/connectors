@@ -202,12 +202,15 @@ class MeetingRecordings(BaseModel):
             + "identical and cannot be distinguished: Microsoft's meeting-artifact APIs stop "
             + "serving a meeting once it expires (about 60 days after a one-off), so a recording "
             + "that once existed can read as never having existed.\n"
-            + "- `scan_incomplete` — this meeting has more recordings than one call looks through "
-            + f"({MAX_ARTIFACT_SCAN}) and none of the ones looked at fall in your window, so "
-            + "whether one exists there is NOT known and is not being claimed either way. Narrow "
-            + "`started_after`/`started_before` to the occurrence you mean and ask again. Never "
-            + "report this as 'the call was not recorded'. `truncated` is true for the same "
-            + "reason.\n"
+            + "- `scan_incomplete` — this meeting has more recordings than one call reads "
+            + f"({MAX_ARTIFACT_SCAN}) and none of the ones read fall in your window, so whether "
+            + "one exists there is NOT known and is not being claimed either way. There is nothing "
+            + "to try: the window is applied to the recordings after Microsoft has answered, not "
+            + "by Microsoft while answering, so changing `started_after`/`started_before` — "
+            + "narrower, wider, anything — reads the same recordings and returns this same status. "
+            + "Stop, and report that whether that occurrence was recorded could not be determined. "
+            + "Never report this as 'the call was not recorded', and do not ask again. `truncated` "
+            + "is true for the same reason.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Not an error and not proof the meeting is gone; a meeting created outside a "
             + "calendar, or one this user was never invited to, answers the same way. Do not retry "
@@ -246,22 +249,34 @@ class MeetingRecordings(BaseModel):
     recordings: list[RecordingSummary] = Field(
         description=(
             "The recordings of this meeting that fall inside the requested window, newest first. "
-            + "The order is over the whole collection rather than over one page of it, so the "
-            + "first entry is the latest recording of the window — which for a recurring series "
-            + "is how to reach the most recent occurrence. Empty for every status other than "
+            + "The order is over every recording this call read rather than over one page of "
+            + f"Microsoft's answer, and one call reads up to {MAX_ARTIFACT_SCAN} of them. For a "
+            + "meeting with no more recordings than that — every meeting bar a series recorded "
+            + "daily for most of a year — those are all of them, so the first entry is the latest "
+            + "recording of the window outright, which for a recurring series is how to reach the "
+            + "most recent occurrence. Past that cap the first entry is the latest of what was "
+            + "READ: Microsoft returns this collection in an order of its own and offers no way to "
+            + "ask for the newest, so a newer recording can sit among the ones never read. "
+            + "`truncated` is true whenever that happened. Empty for every status other than "
             + "`available`."
         )
     )
     truncated: bool = Field(
         description=(
             "True when there is more — the same 'there is more' flag every list-shaped tool here "
-            + "reports. Two things set it, and both mean the same thing for what you may conclude: "
-            + "the window holds more recordings than this `limit` (the ones here are still the "
-            + f"newest of them; raise `limit`, up to {MAX_RECORDINGS}), or the meeting has more "
-            + f"recordings in total than one call looks through ({MAX_ARTIFACT_SCAN}), "
-            + "in which case narrow `started_after`/`started_before`. There is no cursor. When "
-            + "this is true and nothing came back, `status` is `scan_incomplete` and no absence is "
-            + "claimed."
+            + "reports. Two things set it, and they differ in what you may conclude:\n"
+            + "- The window holds more recordings than this `limit`. The ones here are still the "
+            + f"newest of the window; raise `limit`, up to {MAX_RECORDINGS}.\n"
+            + "- The meeting has more recordings in total than one call reads "
+            + f"({MAX_ARTIFACT_SCAN}). Then `recordings` is ordered over the ones read and not "
+            + "over the meeting, so the first entry may not be the meeting's latest, and no "
+            + "argument to this tool reads further — the window is applied after the read, so "
+            + "narrowing it changes nothing.\n"
+            + "Which of the two happened is not always visible, so do not call the first entry the "
+            + "meeting's most recent recording while this is true unless you say it is the most "
+            + "recent of what was read. Fewer entries than you asked for with this true is always "
+            + "the second case. There is no cursor. When this is true and nothing came back, "
+            + "`status` is `scan_incomplete` and no absence is claimed."
         )
     )
 
@@ -280,12 +295,14 @@ async def list_meeting_recordings(
     collection, and — only then — ask who the caller is, which is what turns Microsoft's
     organiser-only rule from a sentence into an answer about this user.
 
-    The window is applied while paging rather than as a `$filter`. Graph documents `$filter` on
-    this collection and documents exactly one filterable property by example, `contentCorrelationId`
+    The listing goes out bare and the window is applied while paging rather than as a `$filter`.
+    Graph documents `$select`, `$filter` and `$top` on this collection and no `$orderby`, and it
+    documents exactly one filterable property by example, `contentCorrelationId`
     (https://learn.microsoft.com/en-us/graph/api/callrecording-get, Example 5) — never a date — so
     a server-side date bound would be unverified, and a wrong one returns nothing rather than
     failing. The same window then decides both which recordings are kept and what an empty answer
-    means, exactly as it does for transcripts.
+    means, exactly as it does for transcripts — and, exactly as there, it is no route further into
+    a collection the scan cap cut short, because it is applied to what came back.
     """
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -332,7 +349,9 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
 
     The same three-way decision the transcript lister makes, in the same order and for the same
     reasons: a walk cut short by the scan cap knows nothing about absence and says so
-    (`scan_incomplete`, which is shared vocabulary because the situation is not about recordings),
+    (`scan_incomplete`, which is shared vocabulary because the situation is not about recordings,
+    down to its having no remedy — the window cannot send the next call further into the
+    collection, so what the caller is told is to stop rather than to narrow and retry),
     and otherwise the evidence is `OccurrenceWindow.settled` — shared with the transcript listing
     because the inference is the same one, Microsoft publishing neither a processing status nor a
     latency SLA for either artifact. Only the settled word differs, because "was not transcribed"

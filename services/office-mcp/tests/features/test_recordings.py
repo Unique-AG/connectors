@@ -77,6 +77,33 @@ def _pages(
     )
 
 
+# The only meeting shape that outgrows `MAX_ARTIFACT_SCAN`: one occurrence a day, recorded every
+# time, for the better part of a year. Oldest-first, which is an order of Graph's own — it documents
+# no `$orderby` on this collection either — and the one that puts the genuinely newest occurrence
+# past the cap.
+_DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
+_PAST_THE_CAP = transcripts.MAX_ARTIFACT_SCAN + 60
+
+
+def _day(index: int) -> datetime:
+    """When occurrence `index` of the daily series was recorded."""
+    return _DAILY_SERIES_START + timedelta(days=index)
+
+
+def _daily_series(graph: respx.MockRouter, *, total: int = _PAST_THE_CAP) -> respx.Route:
+    """A meeting with more recordings than one call reads, in one page Graph answers with."""
+    return _listed(
+        graph,
+        *(
+            recording_payload(
+                recording_id=f"day-{index}",
+                created_at=_day(index).isoformat().replace("+00:00", "Z"),
+            )
+            for index in range(total)
+        ),
+    )
+
+
 def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
     """A recurring series as Graph holds it: one meeting, one recording collection, three weeks.
 
@@ -522,6 +549,77 @@ class TestScopingToOneOccurrence:
         assert found.status not in ("not_recorded", "not_ready"), (
             "a window whose collection was not read to the end settles nothing either way"
         )
+
+    async def test_narrowing_the_window_cannot_reach_past_the_scan_cap(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The remedy `scan_incomplete` used to give, in the lister that shares the code it came
+        from. The window is applied to the recordings after Graph has answered — Graph documents
+        `contentCorrelationId` as this collection's one filterable property and never a date — so
+        the request goes out bare and a narrower window reads the same recordings. Two windows,
+        one of them bracketing a recording that really exists (`day-250`): the same answer both
+        times, which is why the advice is now to stop rather than to ask again.
+        """
+        _resolved(graph, meeting_type="recurring")
+        listing = _daily_series(graph)
+        _me(graph)
+
+        wide = await _listing(
+            client,
+            started_after=_day(transcripts.MAX_ARTIFACT_SCAN).date(),
+            started_before=_day(_PAST_THE_CAP - 1).date(),
+        )
+        wide_request = listing.calls.last.request.url
+        narrow = await _listing(
+            client, started_after=_day(250).date(), started_before=_day(250).date()
+        )
+        narrow_request = listing.calls.last.request.url
+
+        assert (wide.status, wide.truncated, wide.recordings) == ("scan_incomplete", True, [])
+        assert (narrow.status, narrow.truncated, narrow.recordings) == (wide.status, True, [])
+        assert str(wide_request) == str(narrow_request), "two windows, one request"
+        for asked in (wide_request, narrow_request):
+            assert not {"$filter", "$orderby", "$top"} & set(asked.params), (
+                f"the window is applied here, not by Graph: {asked}"
+            )
+
+    async def test_the_unreadable_answer_tells_a_caller_to_stop_rather_than_to_retry(self) -> None:
+        """The same advice as the transcript lister gives, because it is the same dead end: there
+        is no argument that sends the next call further into the collection."""
+        described = str(recordings.MeetingRecordings.model_fields["status"].description)
+
+        assert "There is nothing to try" in described
+        assert "Stop, and report" in described
+        assert "do not ask again" in described
+        assert "Narrow `started_after`/`started_before` to the occurrence you mean" not in described
+
+    async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """ "Newest first" is exact over the recordings read, and the read stops at the cap: a
+        daily series recorded for most of a year has its newest occurrence past
+        `MAX_ARTIFACT_SCAN`, and no `$orderby` exists to ask Graph for it."""
+        _resolved(graph, meeting_type="recurring")
+        _daily_series(graph)
+        _me(graph)
+
+        found = await _listing(client, limit=3)
+
+        assert found.status == "available"
+        assert found.truncated is True, "the cap was reached, and the answer has to say so"
+        returned = [item.recording_id for item in found.recordings]
+        assert returned == ["day-199", "day-198", "day-197"], "the newest of the ones read"
+        assert f"day-{_PAST_THE_CAP - 1}" not in returned, (
+            "the meeting's genuinely newest recording was never read, which is the whole point"
+        )
+
+    async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
+        """The sentence the case above makes false if it drifts back."""
+        described = str(recordings.MeetingRecordings.model_fields["recordings"].description)
+
+        assert str(transcripts.MAX_ARTIFACT_SCAN) in described
+        assert "the latest of what was READ" in described
+        assert "The order is over the whole collection" not in described
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
         self, client: GraphServiceClient

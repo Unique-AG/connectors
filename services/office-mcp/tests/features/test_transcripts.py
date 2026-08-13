@@ -90,6 +90,37 @@ def _pages(
     )
 
 
+# The only meeting shape that outgrows `MAX_ARTIFACT_SCAN`: one occurrence a day, transcribed every
+# time, for the better part of a year. Written oldest-first because Graph documents no `$orderby`
+# here and answers in an order of its own — this is the order that puts the genuinely newest
+# occurrence past the cap, which is the case both promises below have to be exact about.
+_DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
+_PAST_THE_CAP = transcripts.MAX_ARTIFACT_SCAN + 60
+
+
+def _day(index: int) -> datetime:
+    """When occurrence `index` of the daily series was transcribed."""
+    return _DAILY_SERIES_START + timedelta(days=index)
+
+
+def _daily_series(graph: respx.MockRouter, *, total: int = _PAST_THE_CAP) -> respx.Route:
+    """A meeting with more transcripts than one call reads, in one page Graph answers with."""
+    return graph.get(_TRANSCRIPTS).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "value": [
+                    transcript_payload(
+                        transcript_id=f"day-{index}",
+                        created_at=_day(index).isoformat().replace("+00:00", "Z"),
+                    )
+                    for index in range(total)
+                ]
+            },
+        )
+    )
+
+
 def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
     """A recurring series as Graph holds it: one meeting, one transcript collection, three weeks.
 
@@ -585,6 +616,93 @@ class TestScopingToOneOccurrence:
         assert found.status not in ("not_transcribed", "not_ready"), (
             "a window whose collection was not read to the end settles nothing either way"
         )
+
+    async def test_narrowing_the_window_cannot_reach_past_the_scan_cap(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The remedy `scan_incomplete` used to give, and why it could not work.
+
+        The window is ours: it is applied to the transcripts *after* Graph has answered, because
+        Graph documents no filterable date on this collection. So the request goes out bare and the
+        same first `MAX_ARTIFACT_SCAN` transcripts are read whatever window was asked for — a wide
+        window and a narrow one over the same collection are the same call with the same answer,
+        and "narrow it and ask again" was a loop a model could run forever. Here the narrow window
+        even brackets a transcript that genuinely exists (`day-250`), and it is still never seen.
+        """
+        _resolved(graph, meeting_type="recurring")
+        listing = _daily_series(graph)
+
+        wide = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=_day(transcripts.MAX_ARTIFACT_SCAN).date(),
+            started_before=_day(_PAST_THE_CAP - 1).date(),
+            limit=20,
+        )
+        wide_request = listing.calls.last.request.url
+        narrow = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=_day(250).date(),
+            started_before=_day(250).date(),
+            limit=20,
+        )
+        narrow_request = listing.calls.last.request.url
+
+        assert (wide.status, wide.truncated, wide.transcripts) == ("scan_incomplete", True, [])
+        assert (narrow.status, narrow.truncated, narrow.transcripts) == (wide.status, True, [])
+        assert str(wide_request) == str(narrow_request), "two windows, one request"
+        for asked in (wide_request, narrow_request):
+            assert not {"$filter", "$orderby", "$top"} & set(asked.params), (
+                f"the window is applied here, not by Graph: {asked}"
+            )
+
+    async def test_the_unreadable_answer_tells_a_caller_to_stop_rather_than_to_retry(self) -> None:
+        """The advice a model reads, pinned against the loop it used to be. `scan_incomplete` is
+        the one verdict with no caller action behind it, so what it must say is that there is
+        nothing to try — not an argument to change, which is advice that never terminates."""
+        described = str(transcripts.MeetingTranscripts.model_fields["status"].description)
+
+        assert "There is nothing to try" in described
+        assert "Stop, and report" in described
+        assert "do not ask again" in described
+        assert "Narrow `started_after`/`started_before` to the occurrence you mean" not in described
+
+    async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """ "Newest first" is exact over the transcripts read, and the read stops at the cap.
+
+        A daily series recorded for most of a year has its genuinely newest occurrence past
+        `MAX_ARTIFACT_SCAN`, and Graph offers no `$orderby` to ask for it — so asking for 3 gives
+        the 3 newest of the 200 that were read, not the 3 newest of the meeting. That is the honest
+        answer; the dishonest part was ever calling them "the 3 latest", so the flag that says the
+        read stopped short is asserted here alongside it.
+        """
+        _resolved(graph, meeting_type="recurring")
+        _daily_series(graph)
+
+        found = await transcripts.list_meeting_transcripts(
+            client, handle=_handle(), started_after=None, started_before=None, limit=3
+        )
+
+        assert found.status == "available"
+        assert found.truncated is True, "the cap was reached, and the answer has to say so"
+        returned = [item.transcript_id for item in found.transcripts]
+        assert returned == ["day-199", "day-198", "day-197"], "the newest of the ones read"
+        assert f"day-{_PAST_THE_CAP - 1}" not in returned, (
+            "the meeting's genuinely newest transcript was never read, which is the whole point"
+        )
+
+    async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
+        """The sentence the case above makes false if it drifts back. A model reads this field's
+        description to decide whether the first entry is "the latest transcript of the series", so
+        it has to name the cap and say what the order is over past it."""
+        described = str(transcripts.MeetingTranscripts.model_fields["transcripts"].description)
+
+        assert str(transcripts.MAX_ARTIFACT_SCAN) in described
+        assert "the latest of what was READ" in described
+        assert "The order is over the whole collection" not in described
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
         self, client: GraphServiceClient

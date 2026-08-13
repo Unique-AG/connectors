@@ -24,7 +24,10 @@ are. This is the one place they are set out together:
    walk cannot stop at `limit` — it has to see the collection before it can say which of it is
    newest. `max_scanned` is what bounds that, and the meeting listers pass their own
    (`features/transcripts.MAX_ARTIFACT_SCAN`) rather than this module's default, because a
-   per-meeting collection is a small thing to walk 1000 items of.
+   per-meeting collection is a small thing to walk 1000 items of. The cap is also the limit of
+   what "newest" can mean: a walk stopped by it saw a prefix of the collection in Graph's own
+   order, `truncated` says so, and the listers' own prose is worded to that prefix rather than
+   promising the newest of a collection nobody read to the end.
 3. **Do not walk at all.** Where the request budget is the point — a channel's messages, at 1
    request per second per app per tenant for a given channel
    (https://learn.microsoft.com/en-us/graph/throttling-limits) — the feature reading them makes

@@ -74,14 +74,25 @@ midnight-to-midnight would be an empty window reported as an answer. The assumpt
 each parameter's own description, where a model reads it: `09:00` is a different instant in Zurich,
 and a window quietly built in the wrong zone is worse than one that was refused.
 
-## Newest first, and what it costs
+## Newest first, exactly as far as it is true
 
 "The latest transcript of this series" is the question this tool exists for, so the order has to be
-a property of the *collection* and not of the page Graph happened to answer with — Graph documents
-no `$orderby` here, and a walk that stopped at `limit` before sorting would return an arbitrary
-`limit` transcripts sorted among themselves and call them the newest. That is a wrong answer with
-the shape of a right one. `newest_in_window` is where the sort and the cut happen in that order, for
-both artifacts, bounded by `MAX_ARTIFACT_SCAN` artifacts looked at per call.
+a property of what was *read* and not of the page Graph happened to answer with — Graph documents
+`$select`, `$filter` and `$top` on this collection and no `$orderby` at all
+(https://learn.microsoft.com/en-us/graph/api/onlinemeeting-list-transcripts), and a walk that
+stopped at `limit` before sorting would return an arbitrary `limit` transcripts sorted among
+themselves and call them the newest. That is a wrong answer with the shape of a right one.
+`newest_in_window` is where the sort and the cut happen in that order, for both artifacts.
+
+What the promise is worth is bounded by `MAX_ARTIFACT_SCAN`, and every sentence a model reads is
+worded to that bound rather than to "the newest of this meeting". Up to that many artifacts are
+read, in whatever order Graph chose; for a meeting with no more than that they are the whole
+collection and the first entry is the latest outright, which covers every meeting but a series
+recorded daily for the better part of a year. Past it the first entry is the newest of the
+artifacts that were *read*, a newer one can sit in the part that was not, and `truncated` is true.
+Raising the cap would move that boundary rather than remove it: with no `$orderby` to ask the
+newest for, nothing short of reading the whole collection makes the word exact, and Graph publishes
+no ceiling on how large that collection can be.
 
 ## Four failures a caller must act on differently
 
@@ -105,6 +116,16 @@ fourth:
   both assert something about a collection that was not read to the end, and the caller cannot tell
   from the outside. `scan_incomplete` is that answer, and it is exactly the case where `truncated`
   is true — an answer saying both "there is more" and "there is none" is one no caller can act on.
+  It is also the one answer here with **no remedy**, and every place it is described says so. The
+  window is applied to the artifacts *after* they are read: Graph documents no filterable date on
+  either collection — the one filterable property either reference shows by example is
+  `contentCorrelationId` (https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example
+  11) — so the request is bare and the same `MAX_ARTIFACT_SCAN` artifacts are read whatever window
+  is asked for. "Narrow `started_after`/`started_before` and ask again" was therefore advice a model
+  could follow forever without progress: the next call reads the same artifacts and answers the same
+  way. That is the defect class the channel browser already paid for with its circular reply advice,
+  and the fix is the same one — a dead end stated plainly beats an actionable-sounding loop, so what
+  a caller is told is to stop and report that it is not known.
 
 `SpeakerAttributionNotAllowed` is a fifth Graph answer and the one this module handles rather than
 reports: a tenant may permit transcripts and forbid speaker names, and the documented response is
@@ -174,7 +195,12 @@ MAX_TRANSCRIPTS = 50
 # 200 is four times the largest `limit` either lister offers and far past any real meeting: a
 # meeting accumulates one artifact per occurrence, so reaching this takes a series that has run
 # daily for the better part of a year *and* been recorded every time. A meeting that does exceed it
-# is not answered with a guess — the scan is reported as incomplete and no absence is asserted.
+# is not answered with a guess — the scan is reported as incomplete, no absence is asserted, and
+# "newest first" is stated as what it then is, an order over the artifacts that were read.
+#
+# Raising it is not the fix for either of those, which is why the number is boring: a bigger cap
+# moves the boundary and leaves both statements needing the same qualification, because Graph
+# offers no `$orderby` to ask the newest for and no date `$filter` to make the window the server's.
 MAX_ARTIFACT_SCAN = 200
 
 # How many turns one read returns, and the default window. A turn is one WebVTT cue — a sentence or
@@ -452,11 +478,15 @@ class MeetingTranscripts(BaseModel):
             + "other cause looks identical and cannot be distinguished: Microsoft's "
             + "meeting-artifact APIs stop serving a meeting once it expires (about 60 days after a "
             + "one-off), so a transcript that once existed can read as never having existed.\n"
-            + "- `scan_incomplete` — this meeting has more transcripts than one call looks through "
-            + f"({MAX_ARTIFACT_SCAN}) and none of the ones looked at fall in your window, so "
-            + "whether one exists there is NOT known and is not being claimed either way. Narrow "
-            + "`started_after`/`started_before` to the occurrence you mean and ask again. Never "
-            + "report this as 'there is no transcript'. `truncated` is true for the same reason.\n"
+            + "- `scan_incomplete` — this meeting has more transcripts than one call reads "
+            + f"({MAX_ARTIFACT_SCAN}) and none of the ones read fall in your window, so whether "
+            + "one exists there is NOT known and is not being claimed either way. There is nothing "
+            + "to try: the window is applied to the transcripts after Microsoft has answered, not "
+            + "by Microsoft while answering, so changing `started_after`/`started_before` — "
+            + "narrower, wider, anything — reads the same transcripts and returns this same "
+            + "status. Stop, and report that whether a transcript exists for that occurrence could "
+            + "not be determined. Never report this as 'there is no transcript', and do not ask "
+            + "again. `truncated` is true for the same reason.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Not an error and not proof the meeting is gone; a meeting created outside a "
             + "calendar, or one this user was never invited to, answers the same way. Do not retry "
@@ -495,21 +525,34 @@ class MeetingTranscripts(BaseModel):
     transcripts: list[TranscriptSummary] = Field(
         description=(
             "The transcripts of this meeting that fall inside the requested window, newest first. "
-            + "The order is over the whole collection rather than over one page of it, so the "
-            + "first entry is the latest transcript of the window — which for a recurring series "
-            + "is how to reach the most recent occurrence. Empty for every status other than "
+            + "The order is over every transcript this call read rather than over one page of "
+            + f"Microsoft's answer, and one call reads up to {MAX_ARTIFACT_SCAN} of them. For a "
+            + "meeting with no more transcripts than that — every meeting bar a series recorded "
+            + "daily for most of a year — those are all of them, so the first entry is the latest "
+            + "transcript of the window outright, which for a recurring series is how to reach the "
+            + "most recent occurrence. Past that cap the first entry is the latest of what was "
+            + "READ: Microsoft returns this collection in an order of its own and offers no way to "
+            + "ask for the newest, so a newer transcript can sit among the ones never read. "
+            + "`truncated` is true whenever that happened. Empty for every status other than "
             + "`available`."
         )
     )
     truncated: bool = Field(
         description=(
             "True when there is more — the same 'there is more' flag every list-shaped tool here "
-            + "reports. Two things set it, and both mean the same thing for what you may conclude: "
-            + "the window holds more transcripts than this `limit` (the ones here are still the "
-            + f"newest of them; raise `limit`, up to {MAX_TRANSCRIPTS}), or the meeting has more "
-            + f"transcripts in total than one call looks through ({MAX_ARTIFACT_SCAN}), in which "
-            + "case narrow `started_after`/`started_before`. There is no cursor. When this is true "
-            + "and nothing came back, `status` is `scan_incomplete` and no absence is claimed."
+            + "reports. Two things set it, and they differ in what you may conclude:\n"
+            + "- The window holds more transcripts than this `limit`. The ones here are still the "
+            + f"newest of the window; raise `limit`, up to {MAX_TRANSCRIPTS}.\n"
+            + "- The meeting has more transcripts in total than one call reads "
+            + f"({MAX_ARTIFACT_SCAN}). Then `transcripts` is ordered over the ones read and not "
+            + "over the meeting, so the first entry may not be the meeting's latest, and no "
+            + "argument to this tool reads further — the window is applied after the read, so "
+            + "narrowing it changes nothing.\n"
+            + "Which of the two happened is not always visible, so do not call the first entry the "
+            + "meeting's most recent transcript while this is true unless you say it is the most "
+            + "recent of what was read. Fewer entries than you asked for with this true is always "
+            + "the second case. There is no cursor. When this is true and nothing came back, "
+            + "`status` is `scan_incomplete` and no absence is claimed."
         )
     )
 
@@ -584,10 +627,14 @@ async def list_meeting_transcripts(
 ) -> MeetingTranscripts:
     """The transcripts of the meeting `handle` addresses, and what a caller should do about them.
 
-    Two Graph requests at most: resolve the join URL, then list. The window is applied while paging
-    the listing rather than as a `$filter` — Graph advertises `$filter` on this collection without
-    documenting a single filterable property, so a server-side date bound is unverifiable and a
-    wrong one would silently return nothing.
+    Two Graph requests at most: resolve the join URL, then list. The listing goes out bare, and the
+    window is applied while paging it rather than as a `$filter`: Graph advertises `$select`,
+    `$filter` and `$top` here and no `$orderby`, and the only filterable property either artifact's
+    reference shows is `contentCorrelationId`
+    (https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example 11) — never a date. So
+    a server-side date bound is unverified, and a wrong one returns `200 OK` with nothing rather
+    than failing. That is also why the window is no help to a caller whose scan stopped short: it
+    is ours, applied to what came back, so it cannot make Graph send different artifacts.
 
     The bounds are whatever the caller passed — `OccurrenceWindow.of` is what makes them instants —
     and the same window then decides both which transcripts are kept and what an empty answer means.
@@ -640,6 +687,11 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
     assertion that must not be made. Reported instead as `scan_incomplete`, alongside the
     `truncated: true` that comes from the same value, so that "there is more" and "there is none"
     can never both be said of one answer.
+
+    It is also the one verdict here that offers a caller nothing to do, and its description says so
+    in as many words: the window is applied after the artifacts are read, so no window sends the
+    next call further into the collection. The advice is to stop and report the uncertainty, which
+    is the only advice that is true — see the module docstring's fourth failure.
 
     Otherwise the evidence is `OccurrenceWindow.settled` and the word is this module's, because a
     meeting that was recorded but not transcribed is answered `not_transcribed` here and
@@ -702,22 +754,29 @@ async def newest_in_window[T: MeetingArtifact](
     written twice: the order, the bound and the meaning of `truncated` are the same promise about
     two artifacts, and the two got it wrong the same way.
 
-    **Newest first is a property of the collection, not of the page Graph chose to answer with.**
+    **Newest first is a property of what was read, not of the page Graph chose to answer with.**
     Graph documents no `$orderby` on either collection, so it answers in an order of its own; a
     walk that stopped at `limit` and sorted afterwards would return an arbitrary `limit` artifacts
     sorted among themselves, which is the opposite of what "the latest transcript of this series"
     asks for and is undetectable — the answer looks exactly like the right one. So the walk keeps
     everything the window holds, sorts, and only then cuts to `limit`.
 
-    **What that costs, and the bound on it.** Up to `MAX_ARTIFACT_SCAN` artifacts are looked at,
-    however many pages Graph answers them in, rather than up to `limit`. For any real meeting that
-    is the same single page it always was — a meeting has one artifact per occurrence — and the cap
-    is what stops a pathological collection turning one tool call into an unbounded walk.
+    **What was read is the collection up to `MAX_ARTIFACT_SCAN` artifacts, and no further.** That
+    bound is where the promise stops being "the newest of this meeting" and starts being "the
+    newest of the artifacts read": for a collection no larger than the cap the two coincide, which
+    is every meeting bar a daily series recorded for most of a year, and past it the artifacts
+    never read are in Graph's arbitrary order and can hold a newer one. Nothing in this function
+    can close that gap — with no `$orderby`, the only way to know the newest is to read everything,
+    and the cap exists because a collection with no documented ceiling must not turn one tool call
+    into an unbounded walk. So the gap is not hidden: it is what the second `truncated` cause
+    below means, and every description over these two listers is worded to the prefix rather than
+    to the collection.
 
     **`truncated` means "there is more", and both ways of there being more set it**: matching
     artifacts older than the ones returned, and a collection larger than the scan cap. The second
-    is also the case in which an empty answer proves nothing, which is why the flag and the verdict
-    are read from the same value — see `_absence` in each lister.
+    is the case in which the order is only over the prefix, and the same case in which an empty
+    answer proves nothing — which is why the flag and the verdict are read from the same value; see
+    `_absence` in each lister.
     """
     collected = await collect_pages(
         first_page,
