@@ -94,9 +94,11 @@ TOOL_DESCRIPTION_CITATION_GUIDANCE = (
 # (unique_internal_search.prompts.DEFAULT_TOOL_FORMAT_INFORMATION_FOR_SYSTEM_PROMPT),
 # which has no competing citation text elsewhere. kb-mcp's description still
 # carries TOOL_DESCRIPTION_CITATION_GUIDANCE, so this has to be at least as
-# forceful to win out for Unique AI.
+# forceful to win out for Unique AI. Wording is deliberately verbatim-close
+# to Internal Search's own — proven reliable there; keep it that way rather
+# than tuning it further (see UN-24212 history for what didn't work).
 UNIQUE_AI_TOOL_FORMAT_INFORMATION = (
-    "Whenever you use information retrieved with this tool, you must "
+    "Whenever you use information retrieved with this search tool, you must "
     "adhere to strict reference guidelines. You must strictly reference each "
     "fact used with the `source_number` of the corresponding passage, in the "
     "following format: '[source<source_number>]'.\n\n"
@@ -105,13 +107,6 @@ UNIQUE_AI_TOOL_FORMAT_INFORMATION = (
     "- The policy requires dual approval [source2][source3].\n\n"
     "A fact is preferably referenced by ONLY ONE source, e.g [sourceX], which "
     "should be the most relevant source for the fact.\n"
-    "This applies even when the tool call response contains only a single "
-    "source_number — cite it too; a single source is not a reason to skip "
-    "citation.\n"
-    "This also applies when you summarize an entire document rather than "
-    "listing individual facts: still include that source_number at least "
-    "once, e.g. in your first sentence — a summary is not a reason to skip "
-    "citation either.\n"
     "Follow these guidelines closely and be sure to use the proper "
     "`source_number` when referencing facts.\n"
     "Make sure that your reference follows the format [sourceX] and that the "
