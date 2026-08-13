@@ -39,6 +39,7 @@ from backstop_mcp.features.custom_fields import (
     create_custom_fields_service,
     warmup_lifespan,
 )
+from backstop_mcp.features.data_hygiene import create_employment_index_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.middleware import CustomFieldGlossaryMiddleware
@@ -63,9 +64,6 @@ def create_app(
     type here (`BackstopTransportSettings`, `RetrySettings`, `FieldOverride`,
     `BackstopCredentialSecret`), so the tuning knobs a deployment sets are the ones every request
     actually uses.
-
-    Still no tools registered — `list_custom_fields`, `get_organization`, `get_person` and
-    `get_system_info` land in a later PR, wired in here the same way.
     """
     config = config or AppConfig()
     backstop_config = backstop_config or BackstopConfig()
@@ -111,7 +109,19 @@ def create_app(
         overrides=_field_overrides(backstop_config.custom_field_overrides),
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
-    configure_services(Services(backstop=backstop_clients, custom_fields=custom_fields_service))
+    employment_index_factory = create_employment_index_factory(
+        employment_type_ids=backstop_config.employment_relationship_type_ids,
+        employment_type_markers=backstop_config.employment_relationship_type_markers,
+        former_type_ids=backstop_config.former_employment_relationship_type_ids,
+        former_type_markers=backstop_config.former_employment_relationship_type_markers,
+    )
+    configure_services(
+        Services(
+            backstop=backstop_clients,
+            custom_fields=custom_fields_service,
+            employment_index_factory=employment_index_factory,
+        )
+    )
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:

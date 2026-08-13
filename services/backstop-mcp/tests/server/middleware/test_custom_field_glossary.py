@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import cast
 
 import httpx
 import pytest
@@ -21,6 +22,7 @@ from backstop_mcp.features.custom_fields import (
     FieldOverride,
     create_custom_fields_service,
     glossary_meta,
+    parse_glossary_entities,
 )
 from backstop_mcp.features.custom_fields.store import save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
@@ -329,3 +331,37 @@ class TestGlossaryMiddleware:
         org_tool = next(t for t in tools if t.name == "get_organization")
         assert org_tool.description is not None
         assert "is1" in org_tool.description
+
+
+class TestGlossaryScopesComeFromToolMeta:
+    def test_registered_tools_declare_scopes_on_meta(self) -> None:
+        from fastmcp.tools.function_tool import ToolMeta
+
+        from backstop_mcp.server.tools.get_organization import get_organization
+        from backstop_mcp.server.tools.get_person import get_person
+        from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
+        from backstop_mcp.server.tools.registry import TOOLS
+        from backstop_mcp.server.tools.system_info import get_system_info
+
+        assert (get_system_info, get_organization, get_person, list_custom_fields) == TOOLS
+
+        org_meta = getattr(get_organization, "__fastmcp__", None)
+        assert isinstance(org_meta, ToolMeta)
+        assert parse_glossary_entities(_as_object_dict(org_meta.meta)) == (
+            EntityType.ORGANIZATIONS,
+        )
+
+        person_meta = getattr(get_person, "__fastmcp__", None)
+        assert isinstance(person_meta, ToolMeta)
+        assert parse_glossary_entities(_as_object_dict(person_meta.meta)) == (EntityType.PEOPLE,)
+
+        list_meta = getattr(list_custom_fields, "__fastmcp__", None)
+        assert isinstance(list_meta, ToolMeta)
+        assert parse_glossary_entities(_as_object_dict(list_meta.meta)) == ()
+
+
+def _as_object_dict(meta: object) -> dict[str, object] | None:
+    if meta is None:
+        return None
+    assert isinstance(meta, dict)
+    return cast(dict[str, object], meta)

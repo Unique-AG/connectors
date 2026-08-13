@@ -1,9 +1,9 @@
 """Feature implementations: what this connector actually does.
 
-So far: Backstop credential bridging (`auth`), CRM custom-field schema discovery
-(`custom_fields`), name-to-record lookup (`party_resolver`), the shared entity-type vocabulary
+Everything here is domain logic — Backstop credential bridging (`auth`), CRM custom-field
+schema discovery (`custom_fields`), name-to-record lookup (`party_resolver`), read-response
+provenance and departed-contact detection (`data_hygiene`), the shared entity-type vocabulary
 (`entity_types`), and the resolution algebra party/custom-field resolution share (`resolution`).
-Read-response provenance and departed-contact detection (`data_hygiene`) land in a later PR.
 
 Layering rules, both enforced by `tests/test_layering.py`:
 

@@ -15,9 +15,10 @@ from pydantic import (
     PrivateAttr,
     SecretStr,
     TypeAdapter,
+    field_validator,
     model_validator,
 )
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
 
 
@@ -245,6 +246,53 @@ class BackstopConfig(BaseSettings):
     # custom-field metadata, so treat it like any other shared secret.
     service_username: str | None = None
     service_api_token: SecretStr | None = None
+
+    # Which entity-relationship types mean employment, and which of those mean it has ended,
+    # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
+    # exactly; markers match case-insensitively as substrings of the type's name.
+    #
+    # The FORMER half is what actually detects a departure. A tenant models one as a separate
+    # relationship type rather than as a date: the instance this was built against carries both
+    # `is employee of` and `is a former employee of`, and fills in `endDate` on well under one
+    # percent of records. Which is also why the two marker lists must not overlap — matching
+    # "employee" cannot tell those two type names apart, so the departure word is the marker.
+    #
+    # Ids are exact but per-instance (an admin's numeric ids mean nothing on another deployment)
+    # and so have no default; `GET /entity-relationship-types` lists the ones a deployment can
+    # set, with `entityRestrictions` showing which link people to organizations. Setting a
+    # markers env var *replaces* its defaults; setting it empty leaves ids as that bucket's only
+    # signal. They live here rather than inside the feature so that every knob a deployment can
+    # turn is visible in one place — the detector itself has no built-in vocabulary.
+    #
+    # `NoDecode` keeps pydantic-settings from JSON-decoding the CSV before our validator runs.
+    employment_relationship_type_ids: Annotated[tuple[str, ...], NoDecode] = Field(default=())
+    employment_relationship_type_markers: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=("employ",)
+    )
+    former_employment_relationship_type_ids: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=()
+    )
+    former_employment_relationship_type_markers: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=("former", "previous", "ex-", "no longer")
+    )
+
+    @field_validator(
+        "employment_relationship_type_ids",
+        "employment_relationship_type_markers",
+        "former_employment_relationship_type_ids",
+        "former_employment_relationship_type_markers",
+        mode="before",
+    )
+    @classmethod
+    def _split_csv_tuple(cls, value: object) -> object:
+        if value is None or value == "":
+            return ()
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        if isinstance(value, list):
+            items = cast(list[object], value)
+            return tuple(str(item).strip() for item in items if str(item).strip())
+        return value
 
     @model_validator(mode="after")
     def _require_complete_service_account(self) -> "BackstopConfig":
