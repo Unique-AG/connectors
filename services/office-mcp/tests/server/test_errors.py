@@ -15,13 +15,27 @@ from office_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
-from office_mcp.server.errors import graph_tool_errors
+from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
 _PERMISSION = "Chat.Read"
+
+# What azure-identity's `OnBehalfOfCredential.get_token` reports when the delegated permission was
+# never consented to, trimmed of its trace ids.
+_UNCONSENTED = (
+    "AADSTS65001: The user or administrator has not consented to use the application with ID "
+    + "'1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061'. Send an interactive authorization request for "
+    + "this user and resource."
+)
 
 
 def _message(failure: GraphFailure) -> str:
     with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION):
+        raise failure
+    return str(raised.value)
+
+
+def _token_message(failure: Exception) -> str:
+    with pytest.raises(ToolError) as raised, entra_token_errors(_PERMISSION):
         raise failure
     return str(raised.value)
 
@@ -115,3 +129,52 @@ class TestDiagnostics:
             outcome = "fine"
 
         assert outcome == "fine"
+
+
+class TestTheRefusalThatHappensBeforeGraph:
+    """A permission nobody consented to fails in the On-Behalf-Of exchange, not in Graph.
+
+    Same remedy as the 403 above, reached a step earlier — and the step matters, because this one
+    happens while FastMCP is resolving the tool's token dependency, where the default report is
+    "Failed to resolve dependency 'graph_token'".
+    """
+
+    def test_an_unconsented_permission_names_the_permission_and_the_remedy(self) -> None:
+        message = _token_message(RuntimeError(_UNCONSENTED))
+
+        assert message.count(_PERMISSION) >= 1
+        assert "administrator" in message
+        assert "grant the delegated permission" in message
+        assert "sign in" in message, "consent granted after sign-in needs a new token"
+        assert "retrying will not help" in message.lower()
+
+    def test_it_says_the_call_never_happened(self) -> None:
+        """Unlike every Graph failure above, nothing was asked of Microsoft 365 here — a model
+        that believes otherwise reports the read as attempted-and-refused."""
+        message = _token_message(RuntimeError(_UNCONSENTED))
+
+        assert "never reached Microsoft Graph" in message
+
+    def test_entras_own_code_survives_for_whoever_has_to_diagnose_it(self) -> None:
+        message = _token_message(RuntimeError(_UNCONSENTED))
+
+        assert "AADSTS65001" in message
+        assert "Send an interactive authorization request" not in message, (
+            "the model cannot act on Entra's prose, and it is not addressed to this connector"
+        )
+
+    def test_a_failure_entra_never_answered_is_still_actionable(self) -> None:
+        """No AADSTS code means the exchange never got as far as Entra — a broken connector, not
+        a refused user. The permission is still named, because it is still what was being asked
+        for, and the exception type is the only evidence there is."""
+        message = _token_message(ValueError("no access token available"))
+
+        assert _PERMISSION in message
+        assert "AADSTS" not in message, "no code was invented"
+        assert "ValueError" in message
+
+    def test_a_token_that_arrives_passes_through_untouched(self) -> None:
+        with entra_token_errors(_PERMISSION):
+            token = "synthetic-obo-graph-token"
+
+        assert token == "synthetic-obo-graph-token"

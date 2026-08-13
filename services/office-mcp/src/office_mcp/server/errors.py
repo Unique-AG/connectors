@@ -11,8 +11,14 @@ rejected (sign in again), 403 means the token was fine and the permission is mis
 administrator) — opposite remedies behind one exception class. And a 403 is only actionable if
 the message says *which* permission, which Graph never does; the tool does, so every mapping
 here is scoped to the permission the failing call was made with.
+
+The same missing permission also has an earlier, uglier shape: if it was never consented to,
+Entra refuses the On-Behalf-Of exchange (AADSTS65001) and Graph is never reached at all. That
+failure is `entra_token_errors`, and it says the same thing as the 403 above — because from the
+caller's side it *is* the same thing, and the remedy is identical.
 """
 
+import re
 from collections.abc import Generator
 from contextlib import contextmanager
 
@@ -38,6 +44,52 @@ def graph_tool_errors(permission: str) -> Generator[None]:
         yield
     except GraphFailure as failure:
         raise ToolError(_advice(failure, permission)) from failure
+
+
+# Entra puts a machine-readable code in every token-endpoint failure (`AADSTS65001` is "the user
+# or administrator has not consented"). It is the one part of a multi-line azure-identity error
+# worth repeating to the caller, and what an operator searches for.
+_ENTRA_CODE = re.compile(r"AADSTS\d+")
+
+
+@contextmanager
+def entra_token_errors(permission: str) -> Generator[None]:
+    """Map a failed On-Behalf-Of exchange in this block onto an actionable MCP tool error.
+
+    Wrap the *acquisition* of a Graph token, not the Graph call: this is the failure that happens
+    before any request is made, and the one FastMCP would otherwise report as "Failed to resolve
+    dependency 'graph_token'" — a message that names neither the missing permission nor the
+    remedy, because FastMCP's dependency resolver knows neither. It re-raises `ToolError`
+    untouched (`fastmcp.server.dependencies` lets `FastMCPError` subclasses out of dependency
+    resolution unwrapped, which is what makes this interception point work at all).
+    """
+    try:
+        yield
+    except Exception as failure:
+        raise ToolError(_token_advice(failure, permission)) from failure
+
+
+def _token_advice(failure: BaseException, permission: str) -> str:
+    """What to do about an On-Behalf-Of exchange that did not produce a token.
+
+    One message for every cause, because the two the exchange can actually fail for share the
+    first remedy: the permission was never consented to (AADSTS65001, overwhelmingly the common
+    one), or this connector's own Entra credentials are wrong. Splitting them would mean
+    classifying Entra error codes this connector has never observed, and the cost of guessing
+    wrong is advice that sends the caller after the wrong fix.
+    """
+    code = _ENTRA_CODE.search(str(failure))
+    diagnostics = code.group() if code is not None else type(failure).__name__
+    return (
+        "Microsoft 365 would not issue this connector a token to act for the signed-in user with "
+        + f"the delegated permission {permission}, so this call never reached Microsoft Graph. "
+        + f"Usually that means {permission} was never consented to: ask a Microsoft 365 "
+        + f"administrator to grant the delegated permission {permission} to this connector's app "
+        + "registration (and consent to it for the organisation), then have the user sign in to "
+        + "this connector again. If it is already granted, this connector's Entra configuration "
+        + "is broken and only an operator can fix it. Either way, retrying will not help and no "
+        + f"other arguments will succeed either. (Entra {diagnostics})"
+    )
 
 
 def _advice(failure: GraphFailure, permission: str) -> str:

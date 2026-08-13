@@ -9,19 +9,23 @@ otherwise need a process-wide service holder for.
 The token comes from `EntraOBOToken`, FastMCP's own On-Behalf-Of dependency: it takes the Entra
 token the caller presented (audience `api://{client_id}`, useless against Graph) and exchanges it
 for a Graph one in the scopes named here. It is a dependency default, so it never appears in the
-tool's input schema — the model cannot see it and cannot supply it.
+tool's input schema — the model cannot see it and cannot supply it. `_GraphToken` wraps it for
+one reason: a dependency is resolved *outside* the tool body, so an exchange Entra refuses cannot
+be explained by anything the body does.
 """
 
-from typing import Annotated
+from types import TracebackType
+from typing import Annotated, cast, override
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.dependencies import Dependency
 from fastmcp.server.auth.providers.azure import EntraOBOToken
 from pydantic import Field
 
 from office_mcp.features import chats, identity
 from office_mcp.graph_client import graph_client_for
-from office_mcp.server.errors import graph_tool_errors
+from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
 # A Graph delegated permission, as a scope the On-Behalf-Of exchange can ask for. Graph accepts a
 # bare permission name at the authorize endpoint too, but only because it is the default resource;
@@ -43,14 +47,63 @@ GRAPH_SCOPES: tuple[str, ...] = (
     _scope(chats.GRAPH_PERMISSION),
 )
 
-# The On-Behalf-Of dependency each tool declares as its token parameter's default, one per Graph
-# permission. Built here rather than inline because a call inside a parameter default rebuilds the
-# descriptor on every registration and is a lint error in both of this repo's checkers. Sharing one
-# instance is safe: FastMCP enters it per call and it holds nothing but its scopes. The declared
-# type is `str` because a token is what FastMCP injects in its place — the tool body never sees
-# this object.
-_IDENTITY_TOKEN: str = EntraOBOToken([_scope(identity.GRAPH_PERMISSION)])
-_CHATS_TOKEN: str = EntraOBOToken([_scope(chats.GRAPH_PERMISSION)])
+
+class _GraphToken(Dependency[str]):
+    """`EntraOBOToken` for one permission, with the refusal explained in terms of it.
+
+    The wrapping exists because of *where* the exchange happens. FastMCP resolves a dependency
+    before it calls the tool, so a failure there never enters the tool body and never reaches the
+    `graph_tool_errors` block inside it; FastMCP reports it as "Failed to resolve dependency
+    'graph_token' for list_chats", which tells a model nothing it can act on. The one thing it
+    does pass through untouched is a `FastMCPError` — so raising `ToolError` here, from the
+    permission this instance was built for, is what makes an unconsented permission as fixable
+    before the Graph call as a 403 is after it.
+
+    The exchange itself is untouched: `__aenter__` delegates to FastMCP's dependency, which owns
+    the credential cache, and `__aexit__` delegates so any cleanup it grows is not dropped.
+    """
+
+    def __init__(self, permission: str) -> None:
+        self._permission: str = permission
+        # `EntraOBOToken` is annotated `-> str` (a lie for the type checker's benefit, so a tool
+        # can annotate the token as the string it receives); the value is the dependency object.
+        # Casting back to what it is has to go through `object` — the two types do not overlap.
+        self._exchange: Dependency[str] = cast(
+            "Dependency[str]", cast("object", EntraOBOToken([_scope(permission)]))
+        )
+
+    @override
+    async def __aenter__(self) -> str:
+        with entra_token_errors(self._permission):
+            return await self._exchange.__aenter__()
+
+    @override
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        await self._exchange.__aexit__(exc_type, exc_value, traceback)
+
+
+def _graph_token(permission: str) -> str:
+    """A `_GraphToken` typed as the token FastMCP will inject in its place.
+
+    The same annotation `EntraOBOToken` uses, for the same reason: the tool body is handed a
+    string and should say so, and the dependency object it never sees would otherwise have to be
+    cast at every declaration site. The cast goes through `object` for the same reason it does
+    above — a dependency is not a string, which is precisely why FastMCP replaces it with one.
+    """
+    return cast("str", cast("object", _GraphToken(permission)))
+
+
+# The dependency each tool declares as its token parameter's default, one per Graph permission.
+# Built here rather than inline because a call inside a parameter default rebuilds the descriptor
+# on every registration and is a lint error in both of this repo's checkers. Sharing one instance
+# is safe: FastMCP enters it per call and it holds nothing but its permission.
+_IDENTITY_TOKEN: str = _graph_token(identity.GRAPH_PERMISSION)
+_CHATS_TOKEN: str = _graph_token(chats.GRAPH_PERMISSION)
 
 _WHOAMI = """\
 Return the signed-in Microsoft 365 user's own profile: `id`, `display_name`, `mail`, \
@@ -84,8 +137,10 @@ defines it as when the chat was renamed or its membership changed, so a chat nob
 for a year can carry yesterday's timestamp. `last_message_at` is null for a chat with no messages.
 
 `members` is returned only for chats whose `topic` is null, because those chats have no other \
-name; Graph caps that list at {chats.MEMBERS_PER_CHAT} members per chat and `members_truncated` \
-says when the cap was hit. Set `include_member_emails` when two members share a display name.
+name; Graph caps that list at {chats.MEMBERS_PER_CHAT} members per chat and sends no member \
+total, so `members_may_be_incomplete` says when a list came back full to that cap — people may \
+be missing from it, and Graph will not say whether they are. Set `include_member_emails` when \
+two members share a display name.
 
 There is no pagination. `limit` is a window on the most recent chats and `truncated` says whether \
 the user has more than fit in it — widen `limit` (up to {chats.MAX_CHATS}, Graph's own maximum \

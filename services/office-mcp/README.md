@@ -128,9 +128,9 @@ chat's recency is its last message, not the `lastUpdatedDateTime` that Graph mov
 
 Three decisions worth knowing:
 
-- **Every result has a declared output schema.** So `truncated` and `members_truncated` are typed
-  fields rather than prose or, worse, an extra object appended to the results array that a model can
-  mistake for a result.
+- **Every result has a declared output schema.** So `truncated` and `members_may_be_incomplete` are
+  typed fields rather than prose or, worse, an extra object appended to the results array that a
+  model can mistake for a result.
 - **`list_chats` does not paginate.** `limit` (max 50, which is Graph's own `$top` ceiling on that
   collection) is a window on the most recent chats, and `truncated` says when there are more. A
   cursor over a collection that reorders itself on every message returns duplicates and gaps, and
@@ -138,7 +138,10 @@ Three decisions worth knowing:
 - **A refusal names its remedy.** `server/errors.py` maps each Graph failure onto the one thing a
   model can do about it: 401 → ask the user to sign in again, 403 → ask an administrator for *this
   named permission*, 429 → wait Graph's own `Retry-After`, 5xx → retry once. The Graph request id
-  rides along, because that is what Microsoft support asks for.
+  rides along, because that is what Microsoft support asks for. A permission that was never
+  consented to fails earlier still — Entra refuses the On-Behalf-Of exchange (AADSTS65001) while
+  FastMCP is resolving the tool's token, before the tool body runs — so `server/tools.py` wraps that
+  exchange to give it the same named-permission remedy instead of "Failed to resolve dependency".
 
 ## Run locally
 

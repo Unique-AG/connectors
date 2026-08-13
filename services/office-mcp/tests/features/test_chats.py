@@ -137,11 +137,17 @@ class TestWhatTheCallerIsTold:
             ("Room 3", None),
         ]
 
-    async def test_graphs_silent_member_cap_is_reported(
+    async def test_a_member_list_full_to_graphs_cap_is_flagged_as_possibly_incomplete(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph returns at most 25 members per chat on this endpoint and says nothing about it,
-        so a model summarising "who is in this chat" from the list is wrong without a flag."""
+        so a model summarising "who is in this chat" from the list is wrong without a flag.
+
+        The chat below has *exactly* the cap's worth of members, which is the case the flag may
+        not overclaim on: nothing was dropped from it, and Graph's response is byte-for-byte what
+        a 200-person chat's would be. So the flag is raised — 25-of-25 and 25-of-200 have to be
+        treated alike — and says only that members may be missing.
+        """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 200,
@@ -165,22 +171,37 @@ class TestWhatTheCallerIsTold:
 
         listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
 
-        assert listed.chats[0].members_truncated is True
-        assert listed.chats[1].members_truncated is False
+        crowded = listed.chats[0].members
+        assert crowded is not None and len(crowded) == chats.MEMBERS_PER_CHAT
+        assert listed.chats[0].members_may_be_incomplete is True
+        assert listed.chats[1].members_may_be_incomplete is False
+
+    def test_the_cap_flag_claims_only_what_graph_actually_reveals(self) -> None:
+        """The flag's description is read by the model, so it is part of the contract: a list at
+        the cap may be short of members, and Graph gives nothing that would prove it is."""
+        description = chats.ChatSummary.model_fields["members_may_be_incomplete"].description
+
+        assert description is not None
+        assert "may" in description
+        assert "not proof" in description
 
     async def test_an_unknown_chat_type_does_not_fail_the_listing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        """A `chatType` the SDK's generated enum has no member for deserializes to `None` rather
+        than raising, so the chat arrives typeless and the listing must still name it something.
+        Passing a *valid* type here would exercise nothing.
+        """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 200,
-                json={"value": [chat_payload("19:future@thread.v2", chat_type="meeting")]},
+                json={"value": [chat_payload("19:future@thread.v2", chat_type="sharedChannel")]},
             )
         )
 
         listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
 
-        assert listed.chats[0].chat_type == "meeting"
+        assert listed.chats[0].chat_type == "unknown"
 
 
 class TestTheWindowAndItsHonesty:

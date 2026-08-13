@@ -20,6 +20,7 @@ import httpx
 import pytest
 import respx
 from azure.core.credentials import AccessToken as GraphAccessToken
+from azure.core.exceptions import ClientAuthenticationError
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
@@ -78,14 +79,18 @@ class _StubOboCredential:
     """Stands in for `azure.identity.aio.OnBehalfOfCredential`, which would call Entra.
 
     Records the scopes it was asked for: those are what the tool declared it needs, and getting
-    them wrong is invisible until a real tenant refuses the exchange.
+    them wrong is invisible until a real tenant refuses the exchange. Set `refusal` to be that
+    tenant — an exchange Entra declines is the failure that happens before Graph.
     """
 
     def __init__(self) -> None:
         self.requested_scopes: list[tuple[str, ...]] = []
+        self.refusal: Exception | None = None
 
     async def get_token(self, *scopes: str) -> GraphAccessToken:
         self.requested_scopes.append(scopes)
+        if self.refusal is not None:
+            raise self.refusal
         return GraphAccessToken(token=OBO_TOKEN, expires_on=0)
 
 
@@ -345,3 +350,38 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "administrator" in message
         assert "synthetic-request-id" in message
         assert obo.requested_scopes, "the failure came from Graph, not from the token exchange"
+
+    async def test_a_permission_nobody_consented_to_names_it_too(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The same missing permission, one step earlier: Entra refuses the On-Behalf-Of exchange
+        (AADSTS65001) and Graph is never called.
+
+        This runs inside FastMCP's dependency resolution rather than inside the tool body, so it
+        bypasses the tool's own error handling entirely — the report a model gets by default is
+        "Failed to resolve dependency 'graph_token' for list_chats", which names neither the
+        permission nor anyone who could grant it. Whatever else changes, this end of the wire has
+        to stay as actionable as the 403 above.
+        """
+        route = graph.get("/me/chats").mock(return_value=httpx.Response(200, json=_CHATS))
+        obo.refusal = ClientAuthenticationError(
+            message=(
+                "AADSTS65001: The user or administrator has not consented to use the application "
+                + "with ID '1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061'."
+            )
+        )
+
+        result = await mcp_client.call_tool("list_chats", {}, raise_on_error=False)
+
+        assert result.is_error
+        message = "\n".join(
+            block.text for block in result.content if isinstance(block, TextContent)
+        )
+        assert "Chat.Read" in message, message
+        assert "administrator" in message
+        assert "AADSTS65001" in message
+        assert "resolve dependency" not in message
+        assert not route.called, "no token means no Graph request was ever made"

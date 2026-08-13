@@ -12,8 +12,10 @@ Three Graph facts shape everything here, all from the list-chats reference
   `@odata.nextLink` still set — so filling a window needs the page walk `collect_pages` does, and
   a short first page is not evidence that there are no more chats.
 * `$expand=members` returns at most 25 members per chat "even if a larger `$top` value is
-  specified". That truncation is silent, which is exactly how a model comes to summarise a
-  200-person chat from 25 names, so it is reported as a field.
+  specified". The cap is silent and Graph sends no member total on this collection, which is
+  exactly how a model comes to summarise a 200-person chat from 25 names. So a list that arrives
+  full to the cap is reported as *possibly* incomplete — which is the whole of what is known: a
+  chat with exactly 25 members and one with 200 come back identical.
 """
 
 from datetime import datetime
@@ -95,11 +97,14 @@ class ChatSummary(BaseModel):
             + "has no members."
         )
     )
-    members_truncated: bool = Field(
+    members_may_be_incomplete: bool = Field(
         description=(
-            f"True when `members` hit Microsoft Graph's cap of {MEMBERS_PER_CHAT} members per "
-            + "chat on this endpoint, so people are missing from the list. Always false when "
-            + "`members` is null."
+            f"True when `members` came back full to Microsoft Graph's cap of {MEMBERS_PER_CHAT} "
+            + "members per chat on this endpoint, so the chat may have members that were not "
+            + "returned. It is not proof that any were: Graph sends no member total here, so a "
+            + f"chat with exactly {MEMBERS_PER_CHAT} members is indistinguishable from one with "
+            + 'hundreds. Either way, do not answer "who is in this chat" from a list this is '
+            + "set on. Always false when `members` is null."
         )
     )
 
@@ -158,7 +163,7 @@ def _summarise(chat: Chat, include_member_emails: bool) -> ChatSummary:
         last_message_at=preview.created_date_time if preview is not None else None,
         created_at=chat.created_date_time,
         members=members,
-        members_truncated=members is not None and len(members) >= MEMBERS_PER_CHAT,
+        members_may_be_incomplete=members is not None and len(members) >= MEMBERS_PER_CHAT,
     )
 
 
