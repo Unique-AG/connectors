@@ -100,7 +100,7 @@ class AppConfig(BaseSettings):
 
     app_env: AppEnv = AppEnv.PRODUCTION
     version: str = PKG_VERSION
-    port: int = Field(default=9010, ge=0, le=65535)
+    port: int = Field(default=9544, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
 
     # The externally-reachable URL of this service — used as the OAuth issuer/base URL
@@ -110,7 +110,7 @@ class AppConfig(BaseSettings):
     # Kept as the validated `HttpUrl` rather than a string: `host` and `scheme` are both read
     # downstream (here, and by the auth layer once it lands), and one parse serving all of them
     # is why none of those places re-parse it.
-    public_base_url: HttpUrl = HttpUrl("http://localhost:9010")
+    public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
