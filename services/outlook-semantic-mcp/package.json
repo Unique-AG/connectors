@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "nest build",
-    "dev": "NODE_EXTRA_CA_CERTS=/Users/nicolaebacila/.mitmproxy/mitmproxy-ca-cert.pem nest start",
+    "dev": "nest start --watch",
     "mac:kill-dangling": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && ps | grep \"[c]onnectors\" | awk '{print $1}' | xargs -r kill -9",
     "debug": "nest start --debug",
     "codegen": "echo \"No codegen for this server\"",
