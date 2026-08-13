@@ -23,11 +23,10 @@
    is unrestricted; only *calling* them is the violation. `main.py` is exempt as a process
    entrypoint: it is the root of its own program and hands `create_app` the config it built.
 
-Rules 2 and 3 only apply to `graph_client/`, which doesn't exist yet in this PR — those test
-classes no-op (skip) until it lands. Rule 1's "the tree actually has feature packages" guard
-similarly skips until the first feature package exists; the import-direction check itself still
-runs against whatever *is* under `features/` (currently just `__init__.py`, which trivially
-passes).
+Rules 2 and 3 apply to `graph_client/`, which lands with the Graph transport — both classes run
+against it from that PR on. Rule 1's "the tree actually has feature packages" guard still skips
+until the first feature package exists; the import-direction check itself runs against whatever
+*is* under `features/` (currently just `__init__.py`, which trivially passes).
 
 All rules are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
@@ -51,8 +50,9 @@ _CONFIG_MODULE = "office_mcp.config"
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
 # directly testable without being callable from production code that should go through the front
 # door. A new package belongs here as soon as its `__init__` exports anything: `server/` earned
-# its place by exporting `ready_response`, and the feature packages join as they land.
-_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.server",)
+# its place by exporting `ready_response`, `graph_client/` by exporting its transport, and the
+# feature packages join as they land.
+_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.server", "office_mcp.graph_client")
 
 # The `BaseSettings` classes in config.py, which read the environment when constructed.
 _CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig"})
