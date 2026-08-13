@@ -25,7 +25,7 @@ const patAuth = z.object({
 
 const basicAuth = z.object({
   mode: z.literal(AuthMode.Basic).describe('HTTP Basic username/password (Data Center only)'),
-  username: requiredStringSchema,
+  username: envRequiredSecretSchema,
   password: envRequiredSecretSchema,
 });
 

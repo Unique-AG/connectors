@@ -138,5 +138,26 @@ describe('ConfluenceConfigSchema', () => {
 
       delete process.env.TEST_CONFLUENCE_SECRET;
     });
+
+    it('resolves os.environ/ prefix for the basic auth username', () => {
+      process.env.TEST_CONFLUENCE_USERNAME = 'resolved-user';
+
+      const result = ConfluenceConfigSchema.parse({
+        ...baseDataCenterInput,
+        auth: {
+          mode: 'basic',
+          username: 'os.environ/TEST_CONFLUENCE_USERNAME',
+          password: 'my-password',
+        },
+      });
+
+      if (result.auth.mode === 'basic') {
+        expect(result.auth.username.value).toBe('resolved-user');
+        expect(String(result.auth.username)).toBe('[Redacted]');
+        expect(result.auth.password.value).toBe('my-password');
+      }
+
+      delete process.env.TEST_CONFLUENCE_USERNAME;
+    });
   });
 });
