@@ -239,8 +239,10 @@ mail, a calendar event, a file, a SharePoint page or a meeting transcript, and n
 person's name or a chat topic into one — pass the `uri` from a search result verbatim.
 
 `text` is plain text, normalised from Teams' own HTML: a mention reads as `@Name`, a list item as \
-`- `, an attachment as `[attachment: name]`, an inline image as `[image]` and an adaptive card as \
-`[card]`. `mentions` and `attachments` say who and what those refer to.
+`- `, an attachment as `[attachment: name]`, an inline image as `[image]` and a card as `[card]`. \
+`mentions` and `attachments` say who and what those refer to. Nothing else is summarised or \
+abridged — a message that happens to contain JSON, a config fragment or code is somebody's own \
+words and comes back verbatim, and `[card]` appears only where `attachments` names a card.
 
 Two messages have no text and must not be reported as empty ones. A deleted message returns \
 `deleted_at` and no text: say it was deleted. A system event message — somebody joining, a call \

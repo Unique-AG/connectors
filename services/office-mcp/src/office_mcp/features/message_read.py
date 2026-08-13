@@ -21,7 +21,10 @@ What a read has to survive, all of it documented and none of it optional:
 * **The body is Teams HTML.** `itemBody.contentType` is `html` or `text`, and the HTML is wrapper
   divs, `<at>` mention tags, `<emoji alt="👀">`, hostedContents `<img>` and `<attachment>`
   placeholders. Handing that to a model is a quality bug, so it is normalised to text here — the
-  same normalisation `services/teams-mcp` ships merged, ported rather than reinvented.
+  same normalisation `services/teams-mcp` ships merged, ported rather than reinvented, with one
+  deliberate divergence: that port decides a message is an adaptive card when its *text* starts
+  with `{` and contains `"type"`, which discards any message somebody pasted JSON into. The card
+  signal here is attachment metadata instead, per `_is_card` below.
 * **The sender is a different shape from search's.** A read gives `teamworkUserIdentity`
   (https://learn.microsoft.com/en-us/graph/api/resources/teamworkuseridentity): an id, an
   *optional* display name, and **no email property at all**. Search gives a mailbox-shaped
@@ -35,13 +38,17 @@ What a read has to survive, all of it documented and none of it optional:
   properties of `chatMessage`; a tombstone must not be presented as live content.
 * **`mentions[]` and `attachments[]` are the key to the body.** The body carries `<at id="0">` and
   `<attachment id="…">` placeholders whose meaning is in those collections, so both are returned
-  resolved.
+  resolved. A *card* is one of those attachments and nothing else: Graph marks it by the
+  attachment's `contentType`, so that — never the shape of the body text — is what says a message
+  is a card here.
 """
 
 import html
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -120,9 +127,11 @@ class MessageAttachment(BaseModel):
     content_type: str | None = Field(
         description=(
             "Microsoft's `contentType`: `reference` for a link to a file, "
-            + "`forwardedMessageReference` for a forwarded message, "
-            + "`application/vnd.microsoft.card.codesnippet` for a code snippet, or a Bot Framework "
-            + "card type. It says what the attachment is, not what format the file is in."
+            + "`forwardedMessageReference` for a forwarded message, or a card type such as "
+            + "`application/vnd.microsoft.card.adaptive` for an adaptive card and "
+            + "`application/vnd.microsoft.card.codesnippet` for a code snippet. It says what the "
+            + "attachment is, not what format the file is in — and it is the only thing that says "
+            + "a message carries a card, which is why `[card]` in `text` comes from here."
         )
     )
     url: str | None = Field(
@@ -169,10 +178,12 @@ class TeamsMessage(BaseModel):
         description=(
             "The message, as plain text. Teams HTML is normalised: mentions read as `@Name`, list "
             + "items as `- `, emoji as themselves, an inline image as `[image]`, an attachment as "
-            + "`[attachment: name]` and an adaptive card as `[card]`, with every remaining tag "
-            + "removed and every HTML entity decoded. Null when the message has no text of its "
-            + "own — a system event, a deleted message, or a post that was only an image or a "
-            + "card. This is the full body, not search's `summary` snippet."
+            + "`[attachment: name]` and a card as `[card]`, with every remaining tag removed and "
+            + "every HTML entity decoded. Null when the message has no text of its own — a system "
+            + "event, a deleted message, or a post that was only an image or a card. This is the "
+            + "whole message, never abridged: text that happens to look like JSON or code is a "
+            + "person's own words and is reported verbatim, and `[card]` appears only where "
+            + "`attachments` names a card. This is the full body, not search's `summary` snippet."
         )
     )
     event: str | None = Field(
@@ -440,9 +451,30 @@ _IMAGE = re.compile(r"<img[^>]*>", re.IGNORECASE)
 _ANY_TAG = re.compile(r"<[^>]*>")
 _BLANK_LINES = re.compile(r"\n{3,}")
 
-# An adaptive card whose JSON Teams put in the body rather than in `attachments`. Dumping it would
-# spend a model's context on layout; `services/teams-mcp` found this the hard way.
+_ATTACHMENT = "[attachment]"
 _CARD = "[card]"
+
+# A card is *attachment metadata*, not something to sniff out of body text. Graph names it in
+# `attachments[].contentType` — "If the attachment is a rich card, set the property to the rich card
+# object" of `content` — and the documented value for an adaptive card is
+# `application/vnd.microsoft.card.adaptive`, one of two card namespaces Teams publishes
+# (https://learn.microsoft.com/en-us/graph/api/resources/chatmessageattachment,
+# https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/cards-reference):
+#
+#     application/vnd.microsoft.card.adaptive              an adaptive card
+#     application/vnd.microsoft.card.hero                  a hero card
+#     application/vnd.microsoft.card.thumbnail             a thumbnail card
+#     application/vnd.microsoft.card.receipt               a receipt card
+#     application/vnd.microsoft.card.signin                a sign-in card
+#     application/vnd.microsoft.card.codesnippet           a code snippet
+#     application/vnd.microsoft.card.announcement          an announcement header
+#     application/vnd.microsoft.teams.card.list            a list card
+#     application/vnd.microsoft.teams.card.o365connector   a connector card for Microsoft 365 Groups
+#
+# The two prefixes are matched rather than those nine values enumerated, for the same reason
+# `_EVENT_TYPE` reads an event's name instead of tabulating the 31 subtypes that exist today: the
+# namespace is the documented shape, and Teams keeps adding card types to it.
+_CARD_CONTENT_TYPES = ("application/vnd.microsoft.card.", "application/vnd.microsoft.teams.card.")
 
 
 def _text(
@@ -475,8 +507,10 @@ def _from_html(
     mention_texts = {
         mention.id: mention.mention_text for mention in mentions if mention.id is not None
     }
-    names = {
-        attachment.id: attachment.name for attachment in attachments if attachment.id is not None
+    markers = {
+        attachment.id: _attachment_marker(attachment)
+        for attachment in attachments
+        if attachment.id is not None
     }
 
     text = _PARAGRAPH_END.sub("\n", content)
@@ -485,16 +519,14 @@ def _from_html(
     text = _LIST_ITEM.sub("- ", text)
     text = _MENTION_TAG.sub(lambda tag: _mention_text(tag, mention_texts), text)
     text = _EMOJI.sub(lambda tag: tag.group(1), text)
-    text = _ATTACHMENT_TAG.sub(lambda tag: _attachment_text(tag, names), text)
+    text = _ATTACHMENT_TAG.sub(lambda tag: markers.get(tag.group(1), _ATTACHMENT), text)
     text = _IMAGE.sub("[image]", text)
     text = _ANY_TAG.sub("", text)
     # A non-breaking space is what Teams puts between pasted words; a model reads it as a word
     # joiner rather than as the space it is meant to be.
     text = html.unescape(text).replace("\xa0", " ")
     text = _BLANK_LINES.sub("\n\n", text).strip()
-    if text.startswith("{") and '"type"' in text:
-        return _CARD
-    return text
+    return _CARD if _is_card_payload(text, attachments) else text
 
 
 def _mention_text(tag: re.Match[str], mention_texts: dict[int, str | None]) -> str:
@@ -511,6 +543,46 @@ def _mention_text(tag: re.Match[str], mention_texts: dict[int, str | None]) -> s
     return f"@{name}" if name else "[mention]"
 
 
-def _attachment_text(tag: re.Match[str], names: dict[str, str | None]) -> str:
-    name = names.get(tag.group(1))
-    return f"[attachment: {name}]" if name else "[attachment]"
+def _attachment_marker(attachment: ChatMessageAttachment) -> str:
+    """How one attachment reads where the body's `<attachment id="…">` placeholder sat.
+
+    Teams gives a card no `name`, so a card would otherwise read as an anonymous `[attachment]`.
+    Its `contentType` is what says it is a card, and that is where `[card]` comes from.
+    """
+    if attachment.name:
+        return f"[attachment: {attachment.name}]"
+    return _CARD if _is_card(attachment) else _ATTACHMENT
+
+
+def _is_card(attachment: ChatMessageAttachment) -> bool:
+    """Whether Graph marked this attachment as a card, by the only property that says so."""
+    return (attachment.content_type or "").lower().startswith(_CARD_CONTENT_TYPES)
+
+
+def _is_card_payload(text: str, attachments: list[ChatMessageAttachment]) -> bool:
+    """Whether `text` is nothing but the payload of a card this message already carries.
+
+    Teams sometimes leaves a card's own JSON in `body.content` instead of the
+    `<attachment id="…">` placeholder, and handing a model a screenful of layout JSON spends its
+    context on nothing. But *looking* like JSON is not evidence of a card — a developer pasting a
+    config fragment or an API response into Teams writes a brace-and-`"type"` object too, and a
+    guard that went by the shape of the text silently threw those messages away, in the one tool
+    that is the only route to a message's text. So a body is only dropped when the message carries
+    a card attachment whose `content` *is* that payload, compared parsed so that indentation and
+    escaping do not decide it. Everything else is what somebody wrote, and is returned in full.
+    """
+    payload = _json(text)
+    if payload is None:
+        return False
+    cards = (attachment for attachment in attachments if _is_card(attachment))
+    return any(_json(card.content) == payload for card in cards)
+
+
+def _json(value: str | None) -> object | None:
+    """`value` parsed, or None when it is not a JSON object or array to begin with."""
+    if value is None or not value.lstrip().startswith(("{", "[")):
+        return None
+    try:
+        return cast("object", json.loads(value))
+    except ValueError:
+        return None
