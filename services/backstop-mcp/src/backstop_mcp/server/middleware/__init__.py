@@ -1,6 +1,3 @@
-"""FastMCP and ASGI middleware.
+from backstop_mcp.server.middleware.custom_field_glossary import CustomFieldGlossaryMiddleware
 
-Empty for now — the custom-field glossary middleware lands once `features.custom_fields` does.
-"""
-
-__all__: list[str] = []
+__all__ = ["CustomFieldGlossaryMiddleware"]

@@ -1,16 +1,15 @@
 """Feature implementations: what this connector actually does.
 
-So far: Backstop credential bridging (`auth`), name-to-record lookup (`party_resolver`), the
-shared entity-type vocabulary (`entity_types`), and the resolution algebra party/custom-field
-resolution share (`resolution`). CRM custom-field schema discovery (`custom_fields`) and
-read-response provenance / departed-contact detection (`data_hygiene`) land in later PRs, stacked
-on top of this.
+So far: Backstop credential bridging (`auth`), CRM custom-field schema discovery
+(`custom_fields`), name-to-record lookup (`party_resolver`), the shared entity-type vocabulary
+(`entity_types`), and the resolution algebra party/custom-field resolution share (`resolution`).
+Read-response provenance and departed-contact detection (`data_hygiene`) land in a later PR.
 
 Layering rules, both enforced by `tests/test_layering.py`:
 
 * **Nothing under `features/` may import from `server/`.** The server wires features together,
   never the reverse. That rule is what keeps a presentation concern from drifting back into a
-  feature package.
+  feature package, which is how `custom_fields` came to import `server.tools` before.
 * **Nothing under `backstop_client/` may import from here.** Features may use the shared
   infrastructure (`backstop_client`, `db`, `config`, `logging`, `metrics`, `coerce`) freely, but
   that traffic is one-way: a type both sides need belongs in the infrastructure module, with
