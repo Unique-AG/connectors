@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 vi.mock('undici', () => ({
   Agent: class MockAgent {
-    public compose() {
-      return {};
+    public compose(composed: string[]) {
+      return { composed };
     }
   },
-  interceptors: { redirect: () => ({}), retry: () => ({}) },
+  interceptors: { redirect: () => 'redirect', retry: () => 'retry' },
   request: vi.fn(),
 }));
 
@@ -39,6 +39,7 @@ function mockUndiciResponse(
     body: {
       json: vi.fn().mockResolvedValue(body),
       text: vi.fn().mockResolvedValue(JSON.stringify(body)),
+      dump: vi.fn().mockResolvedValue(undefined),
     },
   } as unknown as Dispatcher.ResponseData;
 }
@@ -88,6 +89,48 @@ describe('RateLimitedHttpClient', () => {
 
       await expect(client.rateLimitedRequest('https://example.com', {})).rejects.toThrow(/500/);
     });
+
+    it('follows same-origin redirects with the credentials intact', async () => {
+      mockedRequest
+        .mockResolvedValueOnce(
+          mockUndiciResponse(302, '', { location: '/confluence/rest/api/content' }),
+        )
+        .mockResolvedValueOnce(mockUndiciResponse(200, { data: 'value' }));
+
+      const result = await client.rateLimitedRequest('https://example.com/rest/api/content', {
+        Authorization: 'Basic dXNlcjpwYXNz',
+      });
+
+      expect(result).toEqual({ data: 'value' });
+      expect(mockedRequest).toHaveBeenLastCalledWith(
+        'https://example.com/confluence/rest/api/content',
+        expect.objectContaining({ headers: { Authorization: 'Basic dXNlcjpwYXNz' } }),
+      );
+    });
+
+    it('rejects a cross-origin redirect instead of continuing unauthenticated', async () => {
+      mockedRequest.mockResolvedValueOnce(
+        mockUndiciResponse(302, '', { location: 'https://other.example.com/rest/api/content' }),
+      );
+
+      await expect(
+        client.rateLimitedRequest('https://example.com/rest/api/content', {
+          Authorization: 'Basic dXNlcjpwYXNz',
+        }),
+      ).rejects.toThrow(/redirected to a different origin \(https:\/\/other\.example\.com\)/);
+
+      expect(mockedRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a scheme-only redirect because it also drops credentials', async () => {
+      mockedRequest.mockResolvedValueOnce(
+        mockUndiciResponse(301, '', { location: 'https://example.com/rest/api/content' }),
+      );
+
+      await expect(
+        client.rateLimitedRequest('http://example.com/rest/api/content', {}),
+      ).rejects.toThrow(/redirected to a different origin/);
+    });
   });
 
   describe('rateLimitedStreamRequest', () => {
@@ -133,6 +176,19 @@ describe('RateLimitedHttpClient', () => {
       await expect(
         client.rateLimitedStreamRequest('https://example.com/download', {}),
       ).rejects.toThrow(/Error response from/);
+    });
+
+    // Cloud attachment downloads redirect to a presigned media URL on another origin, which only
+    // works when undici follows the redirect and drops the Authorization header.
+    it('uses the redirect-following dispatcher', async () => {
+      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, new Readable({ read() {} })));
+
+      await client.rateLimitedStreamRequest('https://example.com/download', {});
+
+      expect(mockedRequest).toHaveBeenCalledWith(
+        'https://example.com/download',
+        expect.objectContaining({ dispatcher: { composed: ['redirect', 'retry'] } }),
+      );
     });
   });
 

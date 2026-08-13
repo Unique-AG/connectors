@@ -7,6 +7,8 @@ import type { Metrics } from '../metrics';
 import { handleErrorStatus } from './http-util';
 
 const API_PATH_START = /\/(rest\/api|api\/v2)\//;
+const MAX_REDIRECTS = 10;
+const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Extracts a short, normalized endpoint from a full Confluence URL.
@@ -38,14 +40,17 @@ export class RateLimitedHttpClient {
   private readonly logger = new Logger(RateLimitedHttpClient.name);
   private readonly limiter: Bottleneck;
   private readonly dispatcher: Dispatcher;
+  private readonly redirectDispatcher: Dispatcher;
 
   public constructor(
     ratePerMinute: number,
     private readonly metrics: Metrics,
     dispatcher?: Dispatcher,
   ) {
-    this.dispatcher = (dispatcher ?? new Agent()).compose([
-      interceptors.redirect({ maxRedirections: 10 }),
+    const baseDispatcher = dispatcher ?? new Agent();
+    this.dispatcher = baseDispatcher.compose([interceptors.retry()]);
+    this.redirectDispatcher = baseDispatcher.compose([
+      interceptors.redirect({ maxRedirections: MAX_REDIRECTS }),
       interceptors.retry(),
     ]);
 
@@ -59,7 +64,9 @@ export class RateLimitedHttpClient {
   }
 
   public async rateLimitedRequest(url: string, headers: Record<string, string>): Promise<unknown> {
-    const body = await this.executeRequest(url, headers);
+    const body = await this.executeRequest(url, (target) =>
+      this.sendFollowingSameOriginRedirects(target, headers),
+    );
     return body.json();
   }
 
@@ -67,12 +74,51 @@ export class RateLimitedHttpClient {
     url: string,
     headers: Record<string, string>,
   ): Promise<Readable> {
-    return this.executeRequest(url, headers);
+    return this.executeRequest(url, (target) =>
+      request(target, { method: 'GET', headers, dispatcher: this.redirectDispatcher }),
+    );
+  }
+
+  // Undici's redirect interceptor drops the Authorization header whenever a redirect changes origin,
+  // which silently downgrades an authenticated API call to an anonymous one instead of failing.
+  // Same-origin redirects keep the header and are common on context-path deployments, so we follow
+  // those ourselves and surface a cross-origin one as a configuration error.
+  private async sendFollowingSameOriginRedirects(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<Dispatcher.ResponseData> {
+    let currentUrl = url;
+
+    for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+      const response = await request(currentUrl, {
+        method: 'GET',
+        headers,
+        dispatcher: this.dispatcher,
+      });
+
+      const { location } = response.headers;
+      if (!REDIRECT_STATUS_CODES.has(response.statusCode) || typeof location !== 'string') {
+        return response;
+      }
+
+      const target = new URL(location, currentUrl);
+      if (target.origin !== new URL(currentUrl).origin) {
+        await response.body.dump();
+        throw new Error(
+          `${currentUrl} redirected to a different origin (${target.origin}). Credentials cannot be forwarded across origins, so the request would run unauthenticated. Point the configured baseUrl at ${target.origin} instead.`,
+        );
+      }
+
+      await response.body.dump();
+      currentUrl = target.toString();
+    }
+
+    throw new Error(`${url} exceeded ${MAX_REDIRECTS} redirects`);
   }
 
   private async executeRequest(
     url: string,
-    headers: Record<string, string>,
+    send: (url: string) => Promise<Dispatcher.ResponseData>,
   ): Promise<Dispatcher.ResponseData['body']> {
     return this.limiter.schedule(async () => {
       const startTime = Date.now();
@@ -80,11 +126,7 @@ export class RateLimitedHttpClient {
       let statusCode: number | undefined;
 
       try {
-        const response = await request(url, {
-          method: 'GET',
-          headers,
-          dispatcher: this.dispatcher,
-        });
+        const response = await send(url);
 
         statusCode = response.statusCode;
         await handleErrorStatus(response.statusCode, response.body, url);
