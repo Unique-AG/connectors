@@ -64,9 +64,13 @@ def test_tool_description_includes_citation_rules():
 
 def test_tool_meta_uses_unique_ai_format_and_slim_system_prompt():
     meta = search.__fastmcp__.meta or {}
-    assert meta["unique.app/tool-format-information"] == UNIQUE_AI_TOOL_FORMAT_INFORMATION
+    assert (
+        meta["unique.app/tool-format-information"] == UNIQUE_AI_TOOL_FORMAT_INFORMATION
+    )
     assert "[source" in meta["unique.app/tool-format-information"]
-    assert "Do NOT invent placeholders" not in meta["unique.app/tool-format-information"]
+    assert (
+        "Do NOT invent placeholders" not in meta["unique.app/tool-format-information"]
+    )
     assert meta["unique.app/system-prompt"] == SEARCH_SYSTEM_PROMPT
     assert TOOL_DESCRIPTION_CITATION_GUIDANCE not in meta["unique.app/system-prompt"]
 

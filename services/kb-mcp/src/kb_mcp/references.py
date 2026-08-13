@@ -89,14 +89,12 @@ TOOL_DESCRIPTION_CITATION_GUIDANCE = (
     "Never alter unique:// or https:// URLs from the result headers."
 )
 
-# Unique-host only (`unique.app/tool-format-information`). Mirrors the
-# emphatic tone of Internal Search's own format info
-# (unique_internal_search.prompts.DEFAULT_TOOL_FORMAT_INFORMATION_FOR_SYSTEM_PROMPT),
-# which has no competing citation text elsewhere. kb-mcp's description still
-# carries TOOL_DESCRIPTION_CITATION_GUIDANCE, so this has to be at least as
-# forceful to win out for Unique AI. Wording is deliberately verbatim-close
-# to Internal Search's own — proven reliable there; keep it that way rather
-# than tuning it further (see UN-24212 history for what didn't work).
+# Unique-host only (`unique.app/tool-format-information`). Kept verbatim-close
+# to Internal Search's own format info
+# (unique_internal_search.prompts.DEFAULT_TOOL_FORMAT_INFORMATION_FOR_SYSTEM_PROMPT)
+# — that wording is proven reliable there, and edits here (e.g. loosening it
+# for other tools) have measurably regressed search's own citation rate, so
+# don't tune this without re-testing search specifically.
 UNIQUE_AI_TOOL_FORMAT_INFORMATION = (
     "Whenever you use information retrieved with this search tool, you must "
     "adhere to strict reference guidelines. You must strictly reference each "
@@ -146,13 +144,11 @@ UNIQUE_AI_RESULT_CITATION_INSTRUCTION = (
     "markers as clickable references automatically."
 )
 
-# Server-wide `instructions` field — static, sent to every client regardless
-# of who's calling, so (like TOOL_DESCRIPTION_CITATION_GUIDANCE) it must defer
-# to a stronger, client-specific instruction when one exists. Also the only
-# citation guidance content_tree and read_file get (their own descriptions
-# just have a casual one-liner) — search additionally reinforces this
-# per-call via citation_instruction_content, so keep this tool-neutral
-# rather than search-flavored.
+# Server-wide `instructions` field — static, sent to every client, so (like
+# TOOL_DESCRIPTION_CITATION_GUIDANCE) it must defer to a stronger,
+# client-specific instruction when one exists. It's also the only citation
+# guidance content_tree/read_file get (their descriptions just have a casual
+# one-liner), so keep this tool-neutral rather than search-flavored.
 SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "If your system prompt or a tool result instructs you to cite with "
     "'[source<number>]' markers instead, follow that guidance — it takes "

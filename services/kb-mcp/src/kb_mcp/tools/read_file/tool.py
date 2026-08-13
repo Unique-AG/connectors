@@ -261,7 +261,8 @@ async def read_file(
             return ToolResult(
                 content=[
                     TextContent(
-                        type="text", text=f"no content found for content_id={content_id}"
+                        type="text",
+                        text=f"no content found for content_id={content_id}",
                     )
                 ],
                 is_error=True,
