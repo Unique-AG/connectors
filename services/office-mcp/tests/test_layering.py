@@ -35,6 +35,12 @@
    job. Without this, "reject a search with no criteria" would sit in the feature as a `ToolError`,
    and the layer that owns the boundary would no longer own its refusals.
 
+8. **`server/` must not import the Graph SDK's request layer either.** Rule 6 one level down.
+   `msgraph` is the generated client, but a Graph request is *configured* through `kiota_*` — a
+   `RequestConfiguration`, its query parameters, its headers, its middleware options — and all of
+   those are reachable without ever spelling `msgraph`. A tool that builds one has put the shape of
+   a Graph call in the layer whose only job is to expose it, and rule 6 alone would not notice.
+
 Rule 1's "the tree actually has feature packages" guard still skips until a feature grows into a
 subpackage; the import-direction check itself runs against every module under `features/`.
 
@@ -57,6 +63,11 @@ _SERVER_PREFIX = "office_mcp.server"
 _FEATURES_PREFIX = "office_mcp.features"
 _CONFIG_MODULE = "office_mcp.config"
 _GRAPH_SDK = "msgraph"
+# The distributions underneath the generated SDK: `kiota_abstractions` is where a
+# `RequestConfiguration`, its headers and its request options live, `kiota_http` is the middleware
+# pipeline and `msgraph_core` is the request adapter. All three are ways to shape a Graph call
+# without importing `msgraph`, which is why rule 8 names them separately from rule 6.
+_GRAPH_REQUEST_LAYER: tuple[str, ...] = ("kiota_abstractions", "kiota_http", "msgraph_core")
 _MCP_FRAMEWORK = "fastmcp"
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
@@ -302,6 +313,37 @@ class TestTheDetectionItself:
             _GRAPH_SDK,
         )
 
+    def test_catches_configuring_a_graph_request_without_naming_the_sdk(self) -> None:
+        """The escape hatch rule 6 leaves open: this is a Graph request being shaped, and the word
+        `msgraph` appears nowhere in it."""
+        found = [
+            module
+            for prefix in _GRAPH_REQUEST_LAYER
+            for module in _imports_under(
+                "from kiota_abstractions.base_request_configuration import RequestConfiguration\n"
+                + "from kiota_abstractions.headers_collection import HeadersCollection\n"
+                + "import msgraph_core\n",
+                prefix,
+            )
+        ]
+
+        assert found == [
+            "kiota_abstractions.base_request_configuration",
+            "kiota_abstractions.headers_collection",
+            "msgraph_core",
+        ]
+
+    def test_the_request_layer_rule_leaves_unrelated_names_alone(self) -> None:
+        assert not [
+            module
+            for prefix in _GRAPH_REQUEST_LAYER
+            for module in _imports_under(
+                "from office_mcp.graph_client import graph_client_for\n"
+                + "from kiotalike.thing import Thing\n",
+                prefix,
+            )
+        ]
+
     def test_catches_the_violation_the_mcp_framework_rule_exists_for(self) -> None:
         assert _imports_under(
             "from fastmcp.exceptions import ToolError\nimport fastmcp\n", _MCP_FRAMEWORK
@@ -464,6 +506,33 @@ class TestTheServerLayerDoesNotSpeakGraph:
             "server/ must not import the Microsoft Graph SDK — a tool declares and exposes; the "
             + "request belongs in a feature module and the transport in graph_client/. Move the "
             + "Graph call into features/ and have the tool call that:\n  "
+            + "\n  ".join(violations)
+        )
+
+    def test_the_layer_that_may_configure_a_request_actually_does(self) -> None:
+        """Guards the guard for the rule below: the request layer is used, in `features/`, which is
+        where it belongs — so forbidding it in `server/` is a boundary rather than a dead letter."""
+        used = [
+            module
+            for source in sorted(_FEATURES.rglob("*.py"))
+            for prefix in _GRAPH_REQUEST_LAYER
+            for module in _imports_under(source.read_text(), prefix, _package_of(source))
+        ]
+
+        assert used, f"nothing under {_FEATURES} configures a Graph request"
+
+    @pytest.mark.parametrize("source", sorted(_SERVER.rglob("*.py")), ids=_source_id)
+    def test_no_server_module_imports_the_graph_request_layer(self, source: pathlib.Path) -> None:
+        violations = [
+            violation
+            for prefix in _GRAPH_REQUEST_LAYER
+            for violation in _violations(source, prefix)
+        ]
+        assert not violations, (
+            "server/ must not import the Graph SDK's request layer — a RequestConfiguration, a "
+            + "header or a request option is part of a Graph call, and a Graph call belongs in "
+            + "features/ however it is spelled. Move it there and have the tool call the "
+            + "feature:\n  "
             + "\n  ".join(violations)
         )
 

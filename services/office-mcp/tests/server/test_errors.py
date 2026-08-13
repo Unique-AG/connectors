@@ -107,6 +107,25 @@ class TestRetryAdvice:
 
         assert "not allowed to know it exists" in message
 
+    def test_a_tool_whose_id_came_from_another_tool_can_say_so_instead(self) -> None:
+        """The default advice — check the id came from a tool response verbatim — is the right
+        first guess when a caller supplied an id, and wrong for a handle another tool just
+        produced: it sends the model to re-check the one thing that cannot be the cause. Only the
+        404 advice is replaceable, because it is the only one whose remedy depends on where the
+        argument came from.
+        """
+        with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION, not_found="Gone."):
+            raise GraphNotFound("gone", status=404, code=None, request_id="req-7")
+
+        assert str(raised.value) == "Gone. (HTTP 404, Graph request id req-7)"
+
+    def test_it_does_not_replace_the_advice_for_any_other_failure(self) -> None:
+        with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION, not_found="Gone."):
+            raise GraphForbidden("nope", status=403, code=None, request_id=None)
+
+        assert "Gone." not in str(raised.value)
+        assert _PERMISSION in str(raised.value)
+
 
 class TestDiagnostics:
     def test_the_graph_request_id_survives(self) -> None:

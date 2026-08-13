@@ -92,6 +92,68 @@ _SEARCH = {
     ]
 }
 
+# The handle the search hit above carries, which is what read_message has to resolve. Written out
+# rather than derived: that a search result's `uri` and a read's argument are the same string is the
+# contract between the two tools, and deriving it here would assert only that the test agrees with
+# itself.
+_MESSAGE_URI = "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
+_MESSAGE_PATH = "/chats/19%3Arelease%40thread.v2/messages/1770000000000"
+
+# The same message as `GET /chats/{id}/messages/{id}` returns it: with a body, and with the
+# Teams-shaped sender that carries no email at all.
+_MESSAGE = {
+    "@odata.type": "#microsoft.graph.chatMessage",
+    "id": "1770000000000",
+    "etag": "1770000000000",
+    "messageType": "message",
+    "createdDateTime": "2026-02-11T09:15:22.31Z",
+    "lastModifiedDateTime": "2026-02-11T09:15:22.31Z",
+    "importance": "normal",
+    "from": {
+        "user": {
+            "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+            "id": "00000000-0000-4000-8000-000000000001",
+            "displayName": "Ada Lovelace",
+            "userIdentityType": "aadUser",
+        }
+    },
+    "body": {
+        "contentType": "html",
+        "content": "<div><p>Let's cut the <strong>release</strong> on Friday&nbsp;&amp; tell "
+        + '<at id="0">Grace Hopper</at>.</p></div>',
+    },
+    "mentions": [
+        {
+            "id": 0,
+            "mentionText": "Grace Hopper",
+            "mentioned": {
+                "user": {
+                    "id": "00000000-0000-4000-8000-000000000002",
+                    "displayName": "Grace Hopper",
+                    "userIdentityType": "aadUser",
+                }
+            },
+        }
+    ],
+    "attachments": [],
+}
+
+# A system event message, which Graph sends with no author and no text: the body is the literal
+# `<systemEventMessage/>` and the sentence Teams displays is written by the Teams client.
+_SYSTEM_MESSAGE = {
+    "@odata.type": "#microsoft.graph.chatMessage",
+    "id": "1770000000000",
+    "messageType": "systemEventMessage",
+    "createdDateTime": "2026-02-11T09:15:22.31Z",
+    "from": None,
+    "body": {"contentType": "html", "content": "<systemEventMessage/>"},
+    "eventDetail": {
+        "@odata.type": "#microsoft.graph.membersJoinedEventMessageDetail",
+        "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z",
+        "members": [{"id": "00000000-0000-4000-8000-000000000002"}],
+    },
+}
+
 _CHATS = {
     "value": [
         {
@@ -265,7 +327,7 @@ class TestTheToolsThisServerAdvertises:
         schema, a model would try to invent one."""
         tools = _named(await mcp_client.list_tools())
 
-        assert set(tools) == {"whoami", "list_chats", "search_messages"}
+        assert set(tools) == {"whoami", "list_chats", "search_messages", "read_message"}
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
 
@@ -306,6 +368,50 @@ class TestTheToolsThisServerAdvertises:
             "more_results_available",
             "next_offset",
         }
+        assert set(_properties(tools["read_message"].outputSchema)) == {
+            "uri",
+            "message_id",
+            "chat_id",
+            "team_id",
+            "channel_id",
+            "sender",
+            "text",
+            "event",
+            "created_at",
+            "last_edited_at",
+            "deleted_at",
+            "reply_to_id",
+            "subject",
+            "importance",
+            "web_url",
+            "mentions",
+            "attachments",
+        }
+
+    async def test_read_message_takes_exactly_one_required_handle(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """A reader with optional parameters would invite a model to try reading "the last message
+        in this chat", which no handle expresses and this connector cannot serve."""
+        tools = _named(await mcp_client.list_tools())
+        schema = tools["read_message"].inputSchema
+
+        assert set(_properties(schema)) == {"uri"}
+        assert schema.get("required") == ["uri"]
+
+    async def test_read_message_names_both_handle_shapes_and_no_others(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The description is where a model learns what it may pass. Naming the two shapes is what
+        stops it inventing `mail:///` — and the oracle connector's one polymorphic `read_resource`
+        is exactly the promise this connector does not make."""
+        tools = _named(await mcp_client.list_tools())
+        description = tools["read_message"].description
+        assert description is not None
+
+        assert "teams:///chats/{chat_id}/messages/{message_id}" in description
+        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in description
+        assert "search_messages" in description, "a handle has exactly one source"
 
     async def test_search_messages_makes_its_criteria_optional_but_not_all_of_them(
         self, mcp_client: Client[FastMCPTransport]
@@ -455,6 +561,89 @@ class TestCallingThem:
                 "https://graph.microsoft.com/ChannelMessage.Read.All",
             )
         ]
+
+    async def test_a_handle_from_a_search_result_reads_the_message_behind_it(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The whole point of the pair, over the real protocol: search returns a handle and no body,
+        and the handle — passed back verbatim, exactly as a model would — resolves into the text.
+        """
+        search = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
+        read = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_MESSAGE))
+
+        found = _structured(await mcp_client.call_tool("search_messages", {"query": "release"}))
+        hits = cast("Sequence[Mapping[str, object]]", found["messages"])
+        uri = hits[0]["uri"]
+        result = await mcp_client.call_tool("read_message", {"uri": uri})
+
+        assert search.called
+        body = _structured(result)
+        assert body["uri"] == _MESSAGE_URI == uri
+        assert body["text"] == "Let's cut the release on Friday & tell @Grace Hopper."
+        assert body["event"] is None
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        assert [mention["user_id"] for mention in mentions] == [
+            "00000000-0000-4000-8000-000000000002"
+        ]
+        sender = cast("Mapping[str, object]", body["sender"])
+        assert sender["display_name"] == "Ada Lovelace"
+        assert read.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert obo.requested_scopes[-1] == (
+            "https://graph.microsoft.com/Chat.Read",
+            "https://graph.microsoft.com/ChannelMessage.Read.All",
+        ), "the exchange happens before the handle is parsed, so it asks for both surfaces"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_reading_a_system_event_says_what_happened_rather_than_nothing(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """A handle can resolve to a message Graph gives no author and no text for. Answering with
+        an empty message would read as "they said nothing"; the event is what actually happened."""
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_SYSTEM_MESSAGE))
+
+        result = await mcp_client.call_tool("read_message", {"uri": _MESSAGE_URI})
+
+        body = _structured(result)
+        assert body["event"] == "members joined"
+        assert body["text"] is None
+        assert body["sender"] is None
+        assert "systemEventMessage" not in json.dumps(body), (
+            "the literal tag Graph puts in the body is not an answer"
+        )
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_message_text_reaches_the_caller_and_no_log_or_span(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A message body is as sensitive as the query that found it, and this tool is the one that
+        actually returns message content — so the same rule search is held to holds here, over the
+        whole call and both destinations."""
+        exporter = InMemorySpanExporter()
+        provider = trace.get_tracer_provider()
+        if not isinstance(provider, TracerProvider):
+            provider = TracerProvider()
+            trace.set_tracer_provider(provider)
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        secret = "acquisition-of-northwind-traders"
+        payload = {**_MESSAGE, "body": {"contentType": "text", "content": secret}}
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=payload))
+        caplog.set_level(logging.DEBUG)
+
+        result = await mcp_client.call_tool("read_message", {"uri": _MESSAGE_URI})
+
+        assert _structured(result)["text"] == secret, "the text has to have been returned"
+        for record in caplog.records:
+            assert secret not in _record_text(record), f"logged by {record.name}"
+        for span in exporter.get_finished_spans():
+            assert secret not in str(span.attributes)
 
     @pytest.mark.usefixtures("obo")
     async def test_a_multi_word_query_reaches_graph_as_words_over_the_real_protocol(
@@ -639,6 +828,127 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "AADSTS65001" in message
         assert "resolve dependency" not in message
         assert not route.called, "no token means no Graph request was ever made"
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "mail:///messages/AAMkAGI2",
+            "teams:///chats/19%3Arelease%40thread.v2",
+            "https://teams.microsoft.com/l/message/19%3Ageneral/1770000000000",
+        ],
+    )
+    async def test_a_handle_this_connector_cannot_read_shows_the_shapes_it_can(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        uri: str,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The first of three failures a reader has to keep apart, and the only one that is this
+        connector's own fault to explain: the argument is not a handle. Graph is never called, and
+        the remedy is the shape — not "try again"."""
+        route = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_MESSAGE))
+
+        result = await mcp_client.call_tool("read_message", {"uri": uri}, raise_on_error=False)
+
+        assert result.is_error
+        assert not route.called
+        message = _error_text(result)
+        assert "teams:///chats/{chat_id}/messages/{message_id}" in message
+        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in message
+        assert "search_messages" in message
+        assert obo.requested_scopes, "the handle is parsed inside the tool, after the exchange"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_message_graph_will_not_return_is_not_reported_as_never_existing(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The second failure: a well-formed handle Graph answers 404 to. It means deleted, or
+        invisible to this user, or gone — Graph does not say which, so neither may the tool. The
+        default advice for a missing item ("check the id came from a tool response verbatim") is
+        wrong here, because it did.
+        """
+        _ = graph.get(_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                404,
+                headers={"request-id": "synthetic-request-id"},
+                json={"error": {"code": "NotFound", "message": "Not Found"}},
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+        )
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "could not be read" in message
+        assert "not evidence that the message does not exist" in message
+        assert "synthetic-request-id" in message, "the id Microsoft support asks for first"
+        assert "verbatim" not in message, "the handle did come from a tool response"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_refused_read_names_only_the_permission_that_surface_needs(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The third failure, and the one an administrator acts on. Graph's permissions for a
+        message read are per surface, so a 403 reading a chat can only be about `Chat.Read` —
+        naming the channel permission too would send them after one that was never missing, which
+        is the same defect as naming none.
+        """
+        _ = graph.get(_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+        )
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "Chat.Read" in message
+        assert "administrator" in message
+        assert "ChannelMessage.Read.All" not in message, "this read was in a chat"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_refused_channel_read_names_the_channel_permission_instead(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The other half of the same rule: the tenant that grants `Chat.Read` and withholds the
+        broad channel permission is the common case, and this is the message that gets fixed."""
+        team = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+        _ = graph.get(
+            f"/teams/{team}/channels/19%3Ageneral%40thread.tacv2/messages/1770000000000"
+        ).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "read_message",
+            {
+                "uri": (
+                    f"teams:///teams/{team}/channels/19%3Ageneral%40thread.tacv2"
+                    + "/messages/1770000000000"
+                )
+            },
+            raise_on_error=False,
+        )
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "ChannelMessage.Read.All" in message
+        assert "Chat.Read" not in message, "this read was in a channel"
 
     async def test_an_unconsented_search_names_both_permissions_it_asked_for(
         self,

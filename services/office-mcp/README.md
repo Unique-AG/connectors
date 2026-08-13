@@ -2,9 +2,9 @@
 
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes three tools
-so far — `whoami`, `list_chats` and `search_messages` — and more land in later PRs, stacked on top
-of this one.
+Users sign in with their own Microsoft account and the server acts as them. It exposes four tools
+so far — `whoami`, `list_chats`, `search_messages` and `read_message` — and more land in later PRs,
+stacked on top of this one.
 
 ## Layout
 
@@ -15,7 +15,7 @@ src/office_mcp/
   auth.py                Entra auth: which app registration, and where its state lives
   logging.py metrics.py  cross-cutting, used by both sides below
   graph_client/          the Microsoft Graph transport — the official SDK, one caller's token
-  features/              what the connector does — one module per slice (identity, chats, search)
+  features/              what the connector does — one module per slice (identity, chats, messages)
   server/                how it's exposed over MCP — the tools, the errors they report, /ready
 ```
 
@@ -30,8 +30,9 @@ The layering rules are that **nothing under `features/` may import from `server/
 wires features together, never the reverse — nor **from FastMCP**, since deciding what an MCP client
 is told (a `ToolError`, a schema, an annotation) is the tool layer's job; that **`graph_client/`
 imports neither `features/` nor `config`**, taking its own frozen `GraphSettings` instead, that
-**`server/` does not import the Graph SDK**, since a tool declares and exposes while the request
-belongs to a feature, and that
+**`server/` does not import the Graph SDK** — nor the `kiota_*`/`msgraph_core` request layer
+underneath it, which is how a Graph call gets shaped without ever spelling `msgraph` — since a tool
+declares and exposes while the request belongs to a feature, and that
 **only `create_app` constructs a config**, so nothing downstream can quietly re-read the
 environment and disagree with the app it runs in. `tests/test_layering.py` enforces all of them,
 and grows as each package arrives.
@@ -75,8 +76,8 @@ consented to, which is why sign-in has to ask for it:
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `whoami` |
-| `Chat.Read` | Delegated | No | `list_chats`, `search_messages` |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages` |
+| `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
 
 `Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
 `$expand=lastMessagePreview`, and a message preview is a message.
@@ -86,7 +87,9 @@ enough for Graph to *accept* a `chatMessage` search, but Microsoft documents tha
 returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
 `ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
 missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
-than serve half an answer per query. It is also what the message reader in the next PR needs.
+than serve half an answer per query. It is also what `read_message` needs for a channel message —
+Graph's permissions for a message read are per surface, so that tool's own 403 names whichever one
+the handle it was given required.
 
 **State.** Every token the server issues is a reference token re-validated on each request, so
 where that state lives decides whether the deployment survives a restart or a second replica.
@@ -132,6 +135,7 @@ gets that string onto the wire.
 | `whoami` | Who the signed-in user is: `id`, `display_name`, `mail`, `user_principal_name`, `job_title` | `GET /me` |
 | `list_chats` | The user's Teams chats, most recently active first | `GET /me/chats` |
 | `search_messages` | Teams messages matching keywords, a sender, mentions, a date range, attachment or read state | `POST /search/query` |
+| `read_message` | One Teams message in full — text, sender, mentions, attachments, edits, deletion | `GET /chats/{id}/messages/{id}`, `GET /teams/{id}/channels/{id}/messages/{id}` |
 
 All are read-only, all take their caller's identity from the token rather than from a parameter, and
 all are described to the model in prose that names the traps rather than only the fields — `mail` is
@@ -174,6 +178,34 @@ Decisions worth knowing:
   than the advertised schema. It is the only constraint of that kind here: nothing else about
   Microsoft's KQL scope terms makes two of these parameters genuinely incompatible, so nothing else
   is invented.
+- **The reader is `read_message`, not a polymorphic `read_resource`.** It takes a URI handle, which
+  pairs with a search that returns one, but its name says only what it reads. Two reasons, and the
+  second is the load-bearing one. A tool called `read_resource` that serves Teams messages alone
+  invites `mail:///`, `site:///` and `drive:///` — the connector we compared against exposes exactly
+  that one polymorphic reader over every M365 entity — and every one of those is a failure a model
+  could not have predicted from the name. More importantly, a message read's permission is per
+  surface (`Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel) and a token is exchanged
+  per tool, so one reader over every entity type would have to redeem the union of every read
+  permission on every call: a tenant unwilling to grant meeting-transcript access would break
+  reading a chat message. Transcripts (which Microsoft addresses by a join-URL-derived handle) and
+  recordings therefore arrive as their own handle-taking readers rather than as new schemes here.
+- **A message body is normalised, never passed through as Teams HTML.** Wrapper divs, `<at>`
+  mentions, `<emoji alt="👀">`, hostedContents `<img>`, `<attachment>` placeholders and adaptive-card
+  JSON all become readable text (`@Name`, the emoji itself, `[image]`, `[attachment: name]`,
+  `[card]`), and `mentions` / `attachments` come back resolved so the placeholders have a key. This
+  is `services/teams-mcp`'s normaliser ported, not a second attempt at it.
+- **A message with no text says why.** Microsoft Graph has no rendered text for a system event
+  message — `from` is null and the body is the literal `<systemEventMessage/>`, because Teams writes
+  "Ada joined the chat" in the client — so a read that lands on one reports the event named from
+  `eventDetail` (`members joined`, `chat renamed`) and a null `text`. A deleted message reports
+  `deleted_at` and a null `text` rather than a tombstone's leftovers. Both are the difference
+  between "no content" and "they said nothing".
+- **`read_message` keeps three failures distinct.** A malformed handle is ours to explain, so its
+  error shows both readable shapes and says where a handle comes from; Graph's 404 on a well-formed
+  handle says the message could not be read and explicitly *not* that it never existed (Graph
+  answers deleted, invisible and absent identically); a 403 names the one permission that surface
+  needs. The generic "check the id came from a tool response verbatim" advice is suppressed for the
+  404 here, because the handle did come from one — that is `graph_tool_errors(..., not_found=...)`.
 - **A search query is never logged.** Not in a message, not as a structured field, not as a span
   attribute — what someone searched their own messages for names people and deals. `teams-mcp` had
   to remove query terms from its spans and logs after the fact; a test here asserts they never

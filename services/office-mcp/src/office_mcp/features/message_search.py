@@ -405,7 +405,7 @@ def _message(hit: SearchHit) -> MessageHit | None:
     resource = hit.resource
     if not isinstance(resource, ChatMessage) or resource.id is None:
         return None
-    sender = _sender(resource.from_)
+    sender = sender_of(resource.from_)
     if sender is None:
         # A system event message — "Ada joined the chat", a call ending, a channel being renamed.
         # Graph sends `from: null` and a body of the literal `<systemEventMessage/>` for these,
@@ -461,8 +461,17 @@ def _segment(value: str) -> str:
     return quote(value, safe="")
 
 
-def _sender(identity: ChatMessageFromIdentitySet | None) -> MessageSender | None:
-    """The sender, or None when the identity set names nobody at all."""
+def sender_of(identity: ChatMessageFromIdentitySet | None) -> MessageSender | None:
+    """The sender, or None when the identity set names nobody at all.
+
+    Public because a search hit and a read of the same message must report the same sender, and the
+    two arrive in different shapes: search's mailbox `emailAddress` and the Teams
+    `teamworkUserIdentity` every read API answers with. One function over both shapes is what makes
+    that consistency a property of the code rather than of two implementations agreeing.
+
+    A null `from` — and an identity set that named nobody — is how Graph sends a system event
+    message, so None is also the signal `message_search` filters those hits out by.
+    """
     if identity is None:
         return None
     mailbox_name, mailbox_address = _mailbox_identity(identity)
@@ -472,8 +481,11 @@ def _sender(identity: ChatMessageFromIdentitySet | None) -> MessageSender | None
     if display_name is None and application is not None:
         display_name = application.display_name
     sender = MessageSender(
-        display_name=display_name or mailbox_name,
-        email=mailbox_address,
+        # Empty strings are collapsed to null: `displayName` is documented Optional and Graph does
+        # send it blank, and a name that is present-but-empty reads as an unnamed sender rather
+        # than as the "Graph did not say" that `user_id` is there to work around.
+        display_name=_present(display_name) or _present(mailbox_name),
+        email=_present(mailbox_address),
         user_id=user.id if user is not None else None,
     )
     if (sender.display_name, sender.email, sender.user_id) == (None, None, None):
@@ -499,3 +511,8 @@ def _mailbox_identity(identity: ChatMessageFromIdentitySet) -> tuple[str | None,
 
 def _string(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _present(value: str | None) -> str | None:
+    """`value` if it says anything, else None."""
+    return value if value is not None and value.strip() else None

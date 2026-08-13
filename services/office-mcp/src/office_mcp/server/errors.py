@@ -36,19 +36,25 @@ from office_mcp.graph_client import (
 
 
 @contextmanager
-def graph_tool_errors(*permissions: str) -> Generator[None]:
+def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
     """Map any Graph failure raised in this block onto an actionable MCP tool error.
 
     `permissions` are the delegated Graph permissions the enclosed calls were made with, e.g.
     `Chat.Read` — they are what make a 403 fixable rather than merely reported. Where a call needs
     more than one, name them all: Graph never says which of them it refused, so an administrator
     given only one name may grant the wrong permission and see the same failure.
+
+    `not_found` replaces the advice for a 404. The default tells the caller to check that the id it
+    sent came from a tool response verbatim, which is the likeliest cause when a tool takes an id —
+    and is misleading advice for one that takes a handle another tool just produced, where the
+    remaining causes are deletion and lost access. Pass the sentence that is true of this call; the
+    diagnostics Graph sent are appended either way.
     """
     assert permissions, "a Graph call is made under at least one permission"
     try:
         yield
     except GraphFailure as failure:
-        raise ToolError(_advice(failure, permissions)) from failure
+        raise ToolError(_advice(failure, permissions, not_found)) from failure
 
 
 # Entra puts a machine-readable code in every token-endpoint failure (`AADSTS65001` is "the user
@@ -109,11 +115,11 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
     )
 
 
-def _advice(failure: GraphFailure, permissions: tuple[str, ...]) -> str:
-    return _remedy(failure, permissions) + _diagnostics(failure)
+def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
+    return _remedy(failure, permissions, not_found) + _diagnostics(failure)
 
 
-def _remedy(failure: GraphFailure, permissions: tuple[str, ...]) -> str:
+def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
     if isinstance(failure, GraphThrottled):
         if failure.retry_after_seconds is None:
             return (
@@ -141,6 +147,8 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...]) -> str:
             + "organisation. Retrying will not help, and no other arguments will succeed either."
         )
     if isinstance(failure, GraphNotFound):
+        if not_found is not None:
+            return not_found
         return (
             "Microsoft 365 has no such item — or the signed-in user is not allowed to know it "
             + "exists, which Graph reports identically. Check the id came from a tool response "

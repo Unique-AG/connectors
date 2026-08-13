@@ -28,7 +28,7 @@ from fastmcp.tools import Tool
 from fastmcp.tools import tool as tool_metadata
 from pydantic import Field
 
-from office_mcp.features import chats, identity, message_search
+from office_mcp.features import chats, identity, message_read, message_search
 from office_mcp.graph_client import graph_client_for
 from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
@@ -58,6 +58,7 @@ GRAPH_SCOPES: tuple[str, ...] = tuple(
             identity.GRAPH_PERMISSION,
             chats.GRAPH_PERMISSION,
             *message_search.GRAPH_PERMISSIONS,
+            *message_read.GRAPH_PERMISSIONS,
         )
     )
 )
@@ -128,6 +129,7 @@ def _graph_token(*permissions: str) -> str:
 _IDENTITY_TOKEN: str = _graph_token(identity.GRAPH_PERMISSION)
 _CHATS_TOKEN: str = _graph_token(chats.GRAPH_PERMISSION)
 _SEARCH_TOKEN: str = _graph_token(*message_search.GRAPH_PERMISSIONS)
+_READ_TOKEN: str = _graph_token(*message_read.GRAPH_PERMISSIONS)
 
 _WHOAMI = """\
 Return the signed-in Microsoft 365 user's own profile: `id`, `display_name`, `mail`, \
@@ -181,7 +183,7 @@ need to know who the user is.
 A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
 view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
 truncated with `...` where it was cut — is the only text here. Every hit carries a `uri` handle \
-identifying that exact message; read that resource for the real text, the attachments and the \
+identifying that exact message; pass it to read_message for the real text, the attachments and the \
 mentions. Never present `summary` as the whole message, and never conclude from it that the \
 message does not say more.
 
@@ -216,6 +218,61 @@ _NO_CRITERIA = (
     + ", ".join(message_search.CRITERIA)
     + ". Searching with none of them would return an arbitrary sample of every message the user "
     + "can see, not an answer. Add the keywords, person or date range the question is about."
+)
+
+_READ_MESSAGE = """\
+Read one Microsoft Teams message in full, from the `uri` handle a search_messages result carries: \
+the whole message text, who sent it, who was @-mentioned, what was attached, and whether it has \
+been edited or deleted.
+
+This is the other half of search_messages, and the only route to a message's text. Microsoft's \
+search index answers with a reduced view of a message that contains no body at all, so a search \
+result carries only Microsoft's `summary` snippet. Read the message here whenever the answer \
+depends on what somebody actually said rather than on the fact that a matching message exists — \
+and never present a snippet as the message.
+
+`uri` takes a handle this connector produced, in one of exactly two shapes:
+  teams:///chats/{chat_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
+Nothing else is readable. This connector serves Microsoft Teams messages, so no handle here names \
+mail, a calendar event, a file, a SharePoint page or a meeting transcript, and nothing turns a \
+person's name or a chat topic into one — pass the `uri` from a search result verbatim.
+
+`text` is plain text, normalised from Teams' own HTML: a mention reads as `@Name`, a list item as \
+`- `, an attachment as `[attachment: name]`, an inline image as `[image]` and an adaptive card as \
+`[card]`. `mentions` and `attachments` say who and what those refer to.
+
+Two messages have no text and must not be reported as empty ones. A deleted message returns \
+`deleted_at` and no text: say it was deleted. A system event message — somebody joining, a call \
+ending, a chat being renamed — has no author and no text anywhere in Microsoft Graph, because the \
+sentence Teams displays is written by the Teams client and never sent. For those, `event` names \
+what happened, and inventing the wording of one is a fabrication.\
+"""
+
+# What the tool says when `uri` is not a handle at all. This is the failure that is *our* fault to
+# explain — the two below are Microsoft's answers — so it is the one that shows the shapes.
+_BAD_HANDLE = (
+    "read_message takes a `uri` handle that search_messages produced, and this is not one. A "
+    + "readable handle has one of exactly two shapes:\n"
+    + "  teams:///chats/{chat_id}/messages/{message_id}\n"
+    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
+    + "with the ids percent-encoded, e.g. "
+    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a search "
+    + "result rather than assembling one, and note that this connector reads Teams messages only — "
+    + "no mail, files, sites or meetings are addressable here. Retrying this value will fail "
+    + "identically."
+)
+
+# Graph's 404 on a well-formed handle, which is a different failure from a malformed one and must
+# not be reported as the message never having existed.
+_UNREADABLE = (
+    "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
+    + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
+    + "'never existed' and 'the signed-in user may not see it' with the same 404, and does not say "
+    + "which of them it meant. Report that the message could not be read, never that it was never "
+    + "written. Retrying will not help and this connector has no other route to the text. (A reply "
+    + "inside a channel thread is also addressed under its parent post, which this handle shape "
+    + "cannot express.)"
 )
 
 _READ_ONLY = {"readOnlyHint": True, "openWorldHint": True}
@@ -411,6 +468,40 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             )
 
     _require_a_criterion(mcp.add_tool(search_messages))
+
+    @mcp.tool(
+        name="read_message",
+        title="Read a Teams Message",
+        description=_READ_MESSAGE,
+        annotations=_READ_ONLY,
+    )
+    async def read_message(
+        uri: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The handle of the message to read, exactly as a search_messages result gave "
+                    + "it: `teams:///chats/{chat_id}/messages/{message_id}` or "
+                    + "`teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}`. No "
+                    + "other scheme or shape is readable, and nothing else identifies a Teams "
+                    + "message — a chat topic, a person's name or a Teams web link cannot be "
+                    + "turned into one."
+                ),
+            ),
+        ],
+        graph_token: str = _READ_TOKEN,
+    ) -> message_read.TeamsMessage:
+        handle = message_read.message_handle(uri)
+        if handle is None:
+            raise ToolError(_BAD_HANDLE)
+        # One permission, not both: the handle says which surface is being read, and Graph's 403
+        # there can only be about that one. The token was exchanged for both because a dependency
+        # is resolved before the tool sees its argument.
+        with graph_tool_errors(handle.permission, not_found=_UNREADABLE):
+            return await message_read.read_message(
+                graph_client_for(transport, graph_token), handle=handle
+            )
 
 
 def _require_a_criterion(tool: Tool) -> None:

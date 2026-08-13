@@ -125,6 +125,62 @@ def _chat_message(*, message_id: str, sender: Mapping[str, object] | None) -> di
     }
 
 
+# The sender shape every Teams *read* API answers with: a `teamworkUserIdentity`, which has an id,
+# an optional display name and no email property at all.
+TEAMS_SENDER: dict[str, object] = {
+    "user": {
+        "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "displayName": "Ada Lovelace",
+        "userIdentityType": "aadUser",
+    }
+}
+
+
+def message_payload(
+    *,
+    message_id: str = "1770000000000",
+    content: str = "<div><p>cut the release on Friday</p></div>",
+    content_type: str = "html",
+    sender: Mapping[str, object] | None = TEAMS_SENDER,
+    message_type: str = "message",
+    last_modified_at: str = "2026-02-11T09:15:22.31Z",
+    last_edited_at: str | None = None,
+    deleted_at: str | None = None,
+    reply_to_id: str | None = None,
+    web_url: str | None = None,
+    mentions: Sequence[Mapping[str, object]] = (),
+    attachments: Sequence[Mapping[str, object]] = (),
+    event_detail: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """One full `chatMessage`, as `GET /chats/{id}/messages/{id}` returns it.
+
+    Unlike a search hit this carries a `body` — which is the whole reason a reader exists — and the
+    Teams-shaped sender rather than the mailbox-shaped one.
+    """
+    return {
+        "@odata.type": "#microsoft.graph.chatMessage",
+        "id": message_id,
+        "etag": message_id,
+        "messageType": message_type,
+        "createdDateTime": "2026-02-11T09:15:22.31Z",
+        "lastModifiedDateTime": last_modified_at,
+        "lastEditedDateTime": last_edited_at,
+        "deletedDateTime": deleted_at,
+        "subject": None,
+        "importance": "normal",
+        "locale": "en-us",
+        "webUrl": web_url,
+        "replyToId": reply_to_id,
+        "from": dict(sender) if sender is not None else None,
+        "body": {"contentType": content_type, "content": content},
+        "mentions": [dict(mention) for mention in mentions],
+        "attachments": [dict(attachment) for attachment in attachments],
+        "reactions": [],
+        "eventDetail": dict(event_detail) if event_detail is not None else None,
+    }
+
+
 def search_response(
     hits: Sequence[Mapping[str, object]] | None,
     *,
