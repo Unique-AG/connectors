@@ -3,7 +3,8 @@
 An MCP server for Microsoft 365 via the Microsoft Graph API.
 
 Users sign in with their own Microsoft account. The server acts as them. No MCP tools are exposed
-yet. The Microsoft Graph client and feature packages land in later PRs on top of this one.
+yet. The feature packages and the tools that use the Graph client land in later PRs on top of this
+one.
 
 ## Layout
 
@@ -13,6 +14,7 @@ src/office_mcp/
   config.py              one BaseSettings class per concern
   auth.py                Entra auth: app registration and state location
   logging.py metrics.py  cross-cutting utilities
+  graph_client/          the Microsoft Graph transport — the official SDK, one caller's token
   features/              connector features — populated in later PRs
   server/                MCP surface — /ready probe today, tools in later PRs
 ```
@@ -21,8 +23,9 @@ This service owns no database schema, ORM, engine, or migrations. Its only table
 belongs to the OAuth state store, which creates it itself (see **State** below).
 
 Layering rules: **features/ must not import server/** (the server wires features, not the
-reverse), and **only create_app constructs a config** (so nothing can quietly re-read the
-environment). `tests/test_layering.py` enforces both.
+reverse), **graph_client/ must import neither features/ nor config** (it takes its own frozen
+`GraphSettings`), and **only create_app constructs a config** (so nothing can quietly re-read the
+environment). `tests/test_layering.py` enforces all three.
 
 ## Auth
 
@@ -60,6 +63,33 @@ exists because the columns are the store library's to define and keep in sync �
 duplicating them would be ours to keep in sync, which breaks when the library changes its schema.
 Rows are encrypted with a key derived from the client secret. Rotating the secret costs each
 signed-in user one re-login (decryption failure is treated as a cache miss, not an error).
+
+## Microsoft Graph
+
+`graph_client/` is the official `msgraph-sdk`, and nothing else. It acquires no tokens: FastMCP's
+On-Behalf-Of exchange hands a tool the caller's Graph access token as a string, and this package
+gets that string onto the wire.
+
+- **One transport, many callers.** `create_graph_transport(settings)` builds the `httpx.AsyncClient`
+  — connection pool plus the SDK's middleware pipeline — once, and `graph_client_for(transport,
+  token)` wraps it per call. The token is the only thing that varies; a client per call would mean
+  a TLS handshake per call and a leaked pool.
+- **Throttling is the SDK's, deliberately.** Its retry middleware already waits out `Retry-After`
+  on 429/503/504 (on `asyncio.sleep`, not a blocking one) three times, which is exactly Graph's
+  documented contract. Nothing here re-implements it and there is no rate limiter. What is added is
+  the *typed* outcome: when the retries are outlasted, callers get `GraphThrottled` carrying
+  `retry_after_seconds`, not a status code to re-interpret.
+- **Errors are four categories**, because those are the four remedies: `GraphThrottled` (429),
+  `GraphForbidden` (401/403), `GraphNotFound` (404) and `GraphUnavailable` (5xx, or never reached).
+  Wrap Graph work in `with graph_errors():`. Anything else stays the base `GraphFailure`.
+- **Paging follows `@odata.nextLink`** via `collect_pages`, replaying the URL verbatim, with both an
+  item cap and a *scan* cap — the teams-mcp lesson that a filtered collection can walk a long way
+  for very few kept items — and a `truncated` flag so a partial answer never looks complete. Search
+  is not paged this way: `POST /search/query` takes stateless `from`/`size` offsets, so a search
+  tool resumes by re-issuing rather than by carrying a cursor.
+- **The caller's token goes to `graph.microsoft.com` and nowhere else.** The SDK's bearer provider
+  does not check its own allowed-hosts validator, so a redirect or an off-Graph `nextLink` would
+  otherwise be handed a user's delegated credential.
 
 ## Run locally
 
