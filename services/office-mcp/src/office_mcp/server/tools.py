@@ -9,8 +9,9 @@ otherwise need a process-wide service holder for.
 Three conventions hold across every tool here, and a new one is expected to keep them, because a
 model reads this surface as one thing:
 
-* **A name is `verb_noun`** — `get_me`, `list_chats`, `search_messages`, `read_message` — naming
-  what the tool does and what it does it to. `whoami` was the one exception and is now `get_me`:
+* **A name is `verb_noun`** — `get_me`, `list_chats`, `list_teams`, `list_channels`,
+  `browse_channel`, `search_messages`, `read_message` — naming what the tool does and what it does
+  it to. `whoami` was the one exception and is now `get_me`:
   the shell idiom made the odd tool out of the very tool a model calls first, and renaming a tool
   is a breaking change best spent before there are more of them. (Microsoft's own M365 connector
   arrived at `get_me` independently, which is one less name for a model to have to learn twice.)
@@ -42,7 +43,7 @@ from fastmcp.tools import Tool
 from fastmcp.tools import tool as tool_metadata
 from pydantic import Field
 
-from office_mcp.features import chats, identity, message_read, message_search
+from office_mcp.features import channels, chats, identity, message_read, message_search
 from office_mcp.graph_client import graph_client_for
 from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
@@ -71,6 +72,9 @@ GRAPH_SCOPES: tuple[str, ...] = tuple(
         for permission in (
             identity.GRAPH_PERMISSION,
             chats.GRAPH_PERMISSION,
+            channels.TEAMS_PERMISSION,
+            channels.CHANNELS_PERMISSION,
+            channels.POSTS_PERMISSION,
             *message_search.GRAPH_PERMISSIONS,
             *message_read.GRAPH_PERMISSIONS,
         )
@@ -142,6 +146,9 @@ def _graph_token(*permissions: str) -> str:
 # nothing but its permissions.
 _IDENTITY_TOKEN: str = _graph_token(identity.GRAPH_PERMISSION)
 _CHATS_TOKEN: str = _graph_token(chats.GRAPH_PERMISSION)
+_TEAMS_TOKEN: str = _graph_token(channels.TEAMS_PERMISSION)
+_CHANNELS_TOKEN: str = _graph_token(channels.CHANNELS_PERMISSION)
+_POSTS_TOKEN: str = _graph_token(channels.POSTS_PERMISSION)
 _SEARCH_TOKEN: str = _graph_token(*message_search.GRAPH_PERMISSIONS)
 _READ_TOKEN: str = _graph_token(*message_read.GRAPH_PERMISSIONS)
 
@@ -170,11 +177,11 @@ unnamed chats) its members.
 
 Reach for this to see which conversations are live, who is in them, and when each was last posted \
 in — never for what was said in them: no message text is returned here, and search_messages is the \
-only route to any. The other use is naming: a `chat_id` here is the same id search_messages puts \
+route to any. The other use is naming: a `chat_id` here is the same id search_messages puts \
 on every chat message it finds, so this list is how a found message gets a topic and a set of \
 participants. It is not an argument to anything — no tool here takes a chat id, and a search \
-cannot be narrowed to one chat. This returns chats only: Teams channels live inside teams and are \
-not part of this list.
+cannot be narrowed to one chat. This returns chats only: Teams channels live inside teams, are \
+listed by list_teams and list_channels, and are read by browse_channel.
 
 Ordering and `last_message_at` both come from the last message actually sent in the chat, which is \
 the only notion of recency Microsoft Graph will sort this collection by. The chat property that \
@@ -196,12 +203,90 @@ member is matched by display name or, with `include_member_emails`, by email —
 no user ids).\
 """
 
+_LIST_TEAMS = f"""\
+List the Microsoft Teams teams the signed-in user is a member of, with each team's id, name, \
+description and archived flag.
+
+This is the first step into the channel side of Teams, which list_chats does not cover at all: a \
+`team_id` here is what list_channels takes, and browsing what was posted in a channel starts from \
+that. It answers "which teams am I in" and nothing more — no channels, no members, no messages, \
+and no activity date, because Microsoft Graph populates none of those on this collection whether \
+or not they are asked for.
+
+`is_archived` marks a team that is read-only in Teams, which usually means finished; together with \
+`description` it is what tells apart two teams sharing a display name. Teams that merely host a \
+shared channel the user belongs to are not listed — Microsoft returns only teams the user is a \
+member of.
+
+There is no pagination and no ordering: Microsoft Graph accepts no page size on this collection, \
+and applies no order to it, so `limit` is a window over whatever order it answered in and \
+`truncated` says the user is in more teams than fit. Widen `limit` (up to {channels.MAX_LISTED}) \
+rather than looking for a cursor.\
+"""
+
+_LIST_CHANNELS = f"""\
+List the channels of one Microsoft Teams team, identified by the `team_id` list_teams returned: \
+each channel's id, name, description, membership type and creation date.
+
+Call this to find the channel to browse, then pass `team_id` and `channel_id` together to \
+browse_channel — a channel id alone addresses nothing. Channel names are unique only inside their \
+own team (every team has a `General`), which is why the pair is always needed. No message content \
+is returned here.
+
+The list is already trimmed to what the signed-in user may see: Microsoft omits private and shared \
+channels they are not a member of, so an absent channel is not evidence that the team has no such \
+channel. `membership_type` says which kind each one is — `standard`, `private` or `shared`.
+
+There is no pagination and no ordering, for the same reason as list_teams: Microsoft accepts no \
+page size on this collection either. `truncated` says the team has more channels than this `limit` \
+holds; widen it (up to {channels.MAX_LISTED}).\
+"""
+
+_BROWSE_CHANNEL = f"""\
+Read what was posted in one Microsoft Teams channel: its posts with their full text, each followed \
+by the replies to it. Takes the `team_id` and `channel_id` list_teams and list_channels returned.
+
+This is the one thing the other message tools cannot do — walk a single channel in order. \
+search_messages finds messages by keyword across every chat and channel at once but cannot be \
+scoped to one channel, and read_message reads a single message you already have a handle for. \
+Reach for this when the question is "what is going on in this channel" rather than "where was this \
+mentioned". Do not call it for channel after channel: Microsoft rate-limits reads of a given \
+channel to about one request a second for this whole connector across the tenant, so a sweep is \
+slow for you and harmful to everyone else on it — search_messages covers every channel in one \
+request.
+
+**The order is not what it looks like.** Microsoft sorts this collection by the last modified time \
+of the entire reply chain, so a two-year-old post returns to the front the moment somebody replies \
+to it. The first message here is the most recently *active* thread, not the most recent post. Read \
+`created_at` before saying when anything was written, never the position in this list, and do not \
+report the top of the list as "the latest news in the channel".
+
+It cannot be date-filtered, and this is Microsoft's limit rather than a missing parameter: this \
+collection accepts no filter and no sort at all. To bound by date use search_messages with \
+`sent_after`/`sent_before`, which the search index applies and which covers channels. For the same \
+reason, paging deeper is not a way to reach older posts — there is no cursor, and `truncated` is \
+answered by a wider `limit` (up to {channels.MAX_POSTS}, Microsoft's own maximum) or by searching.
+
+Replies come with their posts: up to {channels.MAX_REPLIES_PER_POST} of the newest per post, \
+oldest first, each carrying the post it answers in `reply_to_id`. `truncated` is also set when a \
+thread had more replies than that. Every message is complete — the same fields, and the same plain \
+text normalised out of Teams' HTML, that read_message returns — so a message here needs no second \
+call to read it. Its `uri` is a handle for quoting or re-reading it, and for a reply it is the \
+only handle that exists: Microsoft addresses a reply under its parent post, which a search result \
+cannot express.
+
+System messages are dropped — somebody joining, a call ending, a channel being renamed — because \
+Microsoft gives them no author and no text. That is why a page can hold fewer posts than `limit`, \
+and it is not evidence that the channel is quiet.\
+"""
+
 _SEARCH_MESSAGES = f"""\
 Search the Microsoft Teams messages the signed-in user can see — every one-to-one chat, group \
 chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
 and read state. Messages from ANY participant match, not only the user's own; call get_me if you \
-need to know who the user is. This is the only tool here that returns messages at all, and the \
-only way to reach a message's text: it finds them, read_message reads one.
+need to know who the user is. It is the only tool here that searches: it finds messages anywhere, \
+read_message reads one of them in full, and browse_channel is what walks a single channel when the \
+question is about that channel rather than about a keyword.
 
 A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
 view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
@@ -254,18 +339,22 @@ Read one Microsoft Teams message in full, from the `uri` handle a search_message
 the whole message text, who sent it, who was @-mentioned, what was attached, and whether it has \
 been edited or deleted.
 
-This is the other half of search_messages, and the only route to a message's text. Microsoft's \
-search index answers with a reduced view of a message that contains no body at all, so a search \
-result carries only Microsoft's `summary` snippet. Read the message here whenever the answer \
-depends on what somebody actually said rather than on the fact that a matching message exists — \
-and never present a snippet as the message.
+This is the other half of search_messages, and the only route to the text of a message a search \
+found. Microsoft's search index answers with a reduced view of a message that contains no body at \
+all, so a search result carries only Microsoft's `summary` snippet. Read the message here whenever \
+the answer depends on what somebody actually said rather than on the fact that a matching message \
+exists — and never present a snippet as the message. A message browse_channel returned needs no \
+read: that tool answers with the whole message already.
 
-`uri` takes a handle this connector produced, in one of exactly two shapes:
+`uri` takes a handle this connector produced, in one of exactly three shapes:
   teams:///chats/{chat_id}/messages/{message_id}
   teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
 Nothing else is readable. This connector serves Microsoft Teams messages, so no handle here names \
 mail, a calendar event, a file, a SharePoint page or a meeting transcript, and nothing turns a \
-person's name or a chat topic into one — pass the `uri` from a search result verbatim.
+person's name or a chat topic into one — pass the `uri` from a tool result verbatim. The third \
+shape is the one only browse_channel emits: Microsoft addresses a reply in a channel thread under \
+the post it answers, and a search result does not say which post that is.
 
 `text` is plain text, normalised from Teams' own HTML: a mention reads as `@Name`, a list item as \
 `- `, an attachment as `[attachment: name]`, an inline image as `[image]` and a card as `[card]`. \
@@ -283,12 +372,13 @@ what happened, and inventing the wording of one is a fabrication.\
 # What the tool says when `uri` is not a handle at all. This is the failure that is *our* fault to
 # explain — the two below are Microsoft's answers — so it is the one that shows the shapes.
 _BAD_HANDLE = (
-    "read_message takes a `uri` handle that search_messages produced, and this is not one. A "
-    + "readable handle has one of exactly two shapes:\n"
+    "read_message takes a `uri` handle that search_messages or browse_channel produced, and this "
+    + "is not one. A readable handle has one of exactly three shapes:\n"
     + "  teams:///chats/{chat_id}/messages/{message_id}\n"
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
+    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}\n"
     + "with the ids percent-encoded, e.g. "
-    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a search "
+    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool "
     + "result rather than assembling one, and note that this connector reads Teams messages only — "
     + "no mail, files, sites or meetings are addressable here. Retrying this value will fail "
     + "identically."
@@ -301,9 +391,11 @@ _UNREADABLE = (
     + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
     + "'never existed' and 'the signed-in user may not see it' with the same 404, and does not say "
     + "which of them it meant. Report that the message could not be read, never that it was never "
-    + "written. Retrying will not help and this connector has no other route to the text. (A reply "
-    + "inside a channel thread is also addressed under its parent post, which this handle shape "
-    + "cannot express.)"
+    + "written. Retrying will not help and this connector has no other route to the text. One "
+    + "well-formed handle always fails this way: a reply in a channel thread is addressed under "
+    + "the post it answers, and a search result does not identify that post — so a search hit that "
+    + "is a reply cannot be read from its own handle. Browse that channel with browse_channel, "
+    + "which emits the reply's own handle and returns its text outright."
 )
 
 _READ_ONLY = {"readOnlyHint": True, "openWorldHint": True}
@@ -356,6 +448,118 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 graph_client_for(transport, graph_token),
                 limit=limit,
                 include_member_emails=include_member_emails,
+            )
+
+    @mcp.tool(
+        name="list_teams",
+        title="List My Teams",
+        description=_LIST_TEAMS,
+        annotations=_READ_ONLY,
+    )
+    async def list_teams(
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=channels.MAX_LISTED,
+                description=(
+                    "How many teams to return. Default 50, maximum "
+                    + f"{channels.MAX_LISTED} — Microsoft Graph applies no page size to this "
+                    + "collection, so this is a window this connector applies while paging it."
+                ),
+            ),
+        ] = 50,
+        graph_token: str = _TEAMS_TOKEN,
+    ) -> channels.TeamList:
+        with graph_tool_errors(channels.TEAMS_PERMISSION):
+            return await channels.list_teams(graph_client_for(transport, graph_token), limit=limit)
+
+    @mcp.tool(
+        name="list_channels",
+        title="List a Team's Channels",
+        description=_LIST_CHANNELS,
+        annotations=_READ_ONLY,
+    )
+    async def list_channels(
+        team_id: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The team whose channels to list, exactly as list_teams reported its "
+                    + "`team_id`. Opaque — a team's name is not one, and one cannot be "
+                    + "constructed."
+                ),
+            ),
+        ],
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=channels.MAX_LISTED,
+                description=(
+                    "How many channels to return. Default 50, maximum "
+                    + f"{channels.MAX_LISTED} — as with list_teams, Microsoft Graph applies no "
+                    + "page size here and this is the window applied while paging."
+                ),
+            ),
+        ] = 50,
+        graph_token: str = _CHANNELS_TOKEN,
+    ) -> channels.ChannelList:
+        with graph_tool_errors(channels.CHANNELS_PERMISSION):
+            return await channels.list_channels(
+                graph_client_for(transport, graph_token), team_id=team_id, limit=limit
+            )
+
+    @mcp.tool(
+        name="browse_channel",
+        title="Browse a Teams Channel",
+        description=_BROWSE_CHANNEL,
+        annotations=_READ_ONLY,
+    )
+    async def browse_channel(
+        team_id: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The team the channel belongs to, exactly as list_teams reported its "
+                    + "`team_id`. A channel id alone does not address a channel."
+                ),
+            ),
+        ],
+        channel_id: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The channel to read, exactly as list_channels reported its `channel_id` (or "
+                    + "as search_messages reported `channel_id` on a channel message). Opaque — a "
+                    + "channel's name is not one."
+                ),
+            ),
+        ],
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=channels.MAX_POSTS,
+                description=(
+                    "How many posts to return, each with its replies. Default 20 and maximum "
+                    + f"{channels.MAX_POSTS} — both Microsoft Graph's own, for this collection. "
+                    + "System messages are dropped after Graph counts them, so a page can hold "
+                    + "fewer posts than this."
+                ),
+            ),
+        ] = 20,
+        graph_token: str = _POSTS_TOKEN,
+    ) -> channels.ChannelPosts:
+        with graph_tool_errors(channels.POSTS_PERMISSION):
+            return await channels.browse_channel(
+                graph_client_for(transport, graph_token),
+                team_id=team_id,
+                channel_id=channel_id,
+                limit=limit,
             )
 
     # Declared and registered in two steps rather than with `@mcp.tool`, which does both and hands

@@ -31,8 +31,17 @@ _CHANNEL_URI = (
     f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
 )
 
+_ROOT_ID = "1760000000000"
+_REPLY_URI = (
+    f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2"
+    + f"/messages/{_ROOT_ID}/replies/{_MESSAGE_ID}"
+)
+
 _CHAT_HANDLE = MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID)
 _CHANNEL_HANDLE = MessageHandle(message_id=_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID)
+_REPLY_HANDLE = MessageHandle(
+    message_id=_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, reply_to_id=_ROOT_ID
+)
 
 _MENTIONED = UUID("497b7a2a-9e1a-48d7-80e8-2965d2fc3a81")
 
@@ -336,6 +345,18 @@ class TestTheHandleItMints:
         assert chat == _CHAT_HANDLE
         assert channel == _CHANNEL_HANDLE
 
+    def test_it_reads_the_reply_shape_that_only_browsing_a_channel_can_mint(self) -> None:
+        """The third shape. Graph addresses a reply in a channel thread under the post it answers,
+        and the search projection carries no `replyToId` — so a search hit on a reply becomes the
+        root-post shape and cannot be read, while `channels.browse_channel` walks a channel post by
+        post and knows each reply's parent. The grammar still lives here, with the other two: two
+        modules that each knew how to write a handle would be free to disagree.
+        """
+        reply = message_search.message_handle(_REPLY_URI)
+
+        assert reply == _REPLY_HANDLE
+        assert reply is not None and reply.uri == _REPLY_URI
+
     def test_a_handle_survives_the_round_trip_it_came_from(self) -> None:
         chat = message_search.message_handle(_CHAT_URI)
         channel = message_search.message_handle(_CHANNEL_URI)
@@ -357,6 +378,7 @@ class TestTheHandleItMints:
         never missing."""
         assert _CHAT_HANDLE.permission == "Chat.Read"
         assert _CHANNEL_HANDLE.permission == "ChannelMessage.Read.All"
+        assert _REPLY_HANDLE.permission == "ChannelMessage.Read.All"
 
     @pytest.mark.parametrize(
         "uri",
@@ -371,7 +393,10 @@ class TestTheHandleItMints:
             "teams:///messages/1770000000000",
             "teams:///chats//messages/1770000000000",
             "teams:///chats/19%3Arelease%40thread.v2/messages/",
+            # A chat has no replies in Graph's addressing — only a channel thread does.
             "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000/replies/1770000000001",
+            "teams:///teams/8a9c3c47/channels/19%3Ageneral/messages/1770000000000/replies/",
+            "teams:///teams/8a9c3c47/channels/19%3Ageneral/messages//replies/1770000000001",
             "teams:///teams/8a9c3c47/messages/1770000000000",
             "teams:///chats/19%3Arelease%40thread.v2/messages/%20",
             # A Teams web link, which is what a model reaches for when it has no handle.

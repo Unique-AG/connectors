@@ -77,21 +77,31 @@ class MessageHandle:
     second time. Two modules that each knew how to write `teams:///chats/…` would be free to
     disagree, and the disagreement would look like a message that cannot be read.
 
-    Exactly two shapes exist, because Graph addresses a Teams message exactly two ways
+    Three shapes exist, because Graph addresses a Teams message exactly three ways
     (https://learn.microsoft.com/en-us/graph/api/chatmessage-get):
 
         teams:///chats/{chatId}/messages/{messageId}
         teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}
+        teams:///teams/{teamId}/channels/{channelId}/messages/{rootId}/replies/{replyId}
+
+    The third is the one a search cannot mint. Graph addresses a reply in a channel thread *under*
+    its parent post, and the search projection carries no `replyToId` — so a channel hit that is
+    really a reply becomes the second shape, which Graph answers 404 to. `browse_channel` walks a
+    channel post by post and therefore knows each reply's parent, which is why it is what mints
+    this shape and why the shape lives here rather than there: a handle means the same thing
+    whichever tool produced it only while there is one definition of it.
 
     Nothing else is a handle. `mail:///`, `site:///` and friends are not "not yet implemented" —
     this connector is scoped to Teams, and advertising a scheme it cannot serve teaches a model to
-    ask for things that will always fail.
+    ask for things that will always fail. A chat has no replies in Graph's addressing, so a
+    `teams:///chats/…/replies/…` is not a handle either.
     """
 
     message_id: str
     chat_id: str | None = None
     team_id: str | None = None
     channel_id: str | None = None
+    reply_to_id: str | None = None
 
     @property
     def permission(self) -> str:
@@ -117,18 +127,24 @@ class MessageHandle:
         assert self.team_id is not None and self.channel_id is not None, (
             "a handle addresses either a chat or a team channel"
         )
-        return (
-            f"teams:///teams/{_segment(self.team_id)}/channels/{_segment(self.channel_id)}"
-            + f"/messages/{_segment(self.message_id)}"
-        )
+        channel = f"teams:///teams/{_segment(self.team_id)}/channels/{_segment(self.channel_id)}"
+        if self.reply_to_id is not None:
+            return (
+                f"{channel}/messages/{_segment(self.reply_to_id)}"
+                + f"/replies/{_segment(self.message_id)}"
+            )
+        return f"{channel}/messages/{_segment(self.message_id)}"
 
 
-# The two handle shapes, and only those. Ids are matched as "anything but a separator" because
+# The three handle shapes, and only those. Ids are matched as "anything but a separator" because
 # `MessageHandle.uri` percent-encodes each one — a Teams id is full of `:` and `@` and would
 # otherwise be ambiguous — but the encoding is not *required* here: `unquote` leaves an id that was
 # already readable exactly as it is, so a handle a caller copied out of a log still resolves.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
+_REPLY_HANDLE = re.compile(
+    r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)/replies/([^/]+)\Z"
+)
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -141,6 +157,17 @@ def message_handle(uri: str) -> MessageHandle | None:
     if chat is not None:
         chat_id, message_id = (unquote(part) for part in chat.groups())
         return _handle(MessageHandle(message_id=message_id, chat_id=chat_id))
+    reply = _REPLY_HANDLE.match(uri)
+    if reply is not None:
+        team_id, channel_id, root_id, message_id = (unquote(part) for part in reply.groups())
+        return _handle(
+            MessageHandle(
+                message_id=message_id,
+                team_id=team_id,
+                channel_id=channel_id,
+                reply_to_id=root_id,
+            )
+        )
     channel = _CHANNEL_HANDLE.match(uri)
     if channel is not None:
         team_id, channel_id, message_id = (unquote(part) for part in channel.groups())
@@ -150,7 +177,13 @@ def message_handle(uri: str) -> MessageHandle | None:
 
 def _handle(handle: MessageHandle) -> MessageHandle | None:
     """The handle, unless a segment decoded to nothing — `%20` is not an id."""
-    ids = (handle.message_id, handle.chat_id, handle.team_id, handle.channel_id)
+    ids = (
+        handle.message_id,
+        handle.chat_id,
+        handle.team_id,
+        handle.channel_id,
+        handle.reply_to_id,
+    )
     if any(value is not None and not value.strip() for value in ids):
         return None
     return handle
@@ -206,7 +239,12 @@ class MessageHit(BaseModel):
             + "percent-encoded. Pass it verbatim to read_message; this search returns no message "
             + "body, so it is the only route to the full text, the attachments and the mentions. "
             + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
-            + "identity, which cannot be addressed."
+            + "identity, which cannot be addressed. One handle here can fail to read: Microsoft "
+            + "addresses a reply in a channel thread under its parent post and its search index "
+            + "does not say which post that is, so a hit that is a reply gets the root-post form "
+            + "above and read_message may answer that it could not be read. Reach that reply by "
+            + "browsing its channel with browse_channel, which knows each reply's parent and "
+            + "emits the reply's own handle."
         )
     )
     message_id: str = Field(

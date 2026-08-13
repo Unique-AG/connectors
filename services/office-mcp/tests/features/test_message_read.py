@@ -5,8 +5,8 @@ authorless `<systemEventMessage/>`, the `<at>`/`<emoji>`/`<attachment>` decorati
 carries. Nothing here came from a tenant.
 
 Which strings are handles at all is `message_search`'s question, since search is what mints them:
-`TestTheHandleItMints` in `test_message_search.py` covers the two shapes and everything that is not
-one of them. What is covered here is what a read does with a handle it was given.
+`TestTheHandleItMints` in `test_message_search.py` covers the three shapes and everything that is
+not one of them. What is covered here is what a read does with a handle it was given.
 """
 
 import httpx
@@ -32,8 +32,16 @@ _CHAT_URI = f"teams:///chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
 _CHAT_PATH = f"/chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
 _CHANNEL_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
 
+_REPLY_ID = "1770000000002"
+_REPLY_PATH = f"{_CHANNEL_PATH}/replies/{_REPLY_ID}"
+
 _CHAT_HANDLE = MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID)
 _CHANNEL_HANDLE = MessageHandle(message_id=_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID)
+# A reply is addressed under the post it answers: the parent's id is `reply_to_id`, and the reply's
+# own id is the message this handle names.
+_REPLY_HANDLE = MessageHandle(
+    message_id=_REPLY_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, reply_to_id=_MESSAGE_ID
+)
 
 
 def _reads(graph: respx.MockRouter, payload: dict[str, object], path: str = _CHAT_PATH) -> None:
@@ -60,6 +68,39 @@ class TestTheRequestItMakes:
         _ = await message_read.read_message(client, handle=_CHANNEL_HANDLE)
 
         assert route.called
+
+    async def test_a_reply_handle_reads_it_under_the_post_it_answers(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The only way Graph addresses a channel reply. The reply's own id beside its siblings is
+        a 404, which is the failure a search hit on a reply produces — so the handle names both ids
+        and the request nests them.
+        """
+        route = graph.get(_REPLY_PATH).mock(
+            return_value=httpx.Response(
+                200, json=message_payload(message_id=_REPLY_ID, reply_to_id=_MESSAGE_ID)
+            )
+        )
+
+        message = await message_read.read_message(client, handle=_REPLY_HANDLE)
+
+        assert route.called
+        assert message.message_id == _REPLY_ID
+        assert message.reply_to_id == _MESSAGE_ID
+        assert message.uri == _REPLY_HANDLE.uri, "the handle is echoed as it was given"
+
+    async def test_a_reply_graph_named_no_parent_for_is_still_placed_in_its_thread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`replyToId` is the message's own property and the handle is only the fallback — but the
+        fallback matters: a reply reported without a parent would read as a root post."""
+        _ = graph.get(_REPLY_PATH).mock(
+            return_value=httpx.Response(200, json=message_payload(message_id=_REPLY_ID))
+        )
+
+        message = await message_read.read_message(client, handle=_REPLY_HANDLE)
+
+        assert message.reply_to_id == _MESSAGE_ID
 
     async def test_it_asks_for_the_message_type_graph_hides_by_default(
         self, client: GraphServiceClient, graph: respx.MockRouter

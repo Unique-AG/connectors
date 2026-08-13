@@ -7,8 +7,10 @@ single message" (https://learn.microsoft.com/en-us/graph/search-concept-chat-mes
 is metadata plus a handle, and this is the module that turns the handle back into a message.
 
 The handle is `message_search`'s contract, so `MessageHandle` and its parser live there, with the
-search that mints them, and this module takes them from there rather than spelling the two shapes a
-second time. `MessageSender` and `sender_of` arrive the same way and for the same reason: a message
+search that mints them, and this module takes them from there rather than spelling the three shapes
+a second time — including the reply shape, which `channels.browse_channel` mints and which is read
+here under its parent post, the only way Graph addresses a reply at all.
+`MessageSender` and `sender_of` arrive the same way and for the same reason: a message
 means the same thing whichever of the two tools produced it, and that is a property of there being
 one definition rather than of two agreeing.
 
@@ -58,6 +60,9 @@ from msgraph.generated.models.chat_message_type import ChatMessageType
 from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_request_builder import (  # noqa: E501
     ChatMessageItemRequestBuilder as ChannelMessageRequestBuilder,
 )
+from msgraph.generated.teams.item.channels.item.messages.item.replies.item.chat_message_item_request_builder import (  # noqa: E501
+    ChatMessageItemRequestBuilder as ChannelReplyRequestBuilder,
+)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -88,6 +93,7 @@ type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilder
 type _ChannelMessageQuery = (
     ChannelMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 )
+type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 
 
 class MessageMention(BaseModel):
@@ -249,7 +255,7 @@ async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> 
         message = await _get(client, handle)
 
     assert message is not None, "Graph answered a message read with no message"
-    return _message(message, handle)
+    return message_of(message, handle=handle)
 
 
 async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:
@@ -262,11 +268,20 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
     assert handle.team_id is not None and handle.channel_id is not None, (
         "a handle addresses either a chat or a team channel"
     )
-    return await (
-        client.teams.by_team_id(handle.team_id)
-        .channels.by_channel_id(handle.channel_id)
-        .messages.by_chat_message_id(handle.message_id)
-        .get(request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers()))
+    messages = (
+        client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
+    )
+    if handle.reply_to_id is not None:
+        # A reply is addressed under the post it replies to, never beside it — the reply id alone
+        # is a 404. `by_chat_message_id1` is the generated name for the second message id in that
+        # path, the first being the parent post's.
+        return await (
+            messages.by_chat_message_id(handle.reply_to_id)
+            .replies.by_chat_message_id1(handle.message_id)
+            .get(request_configuration=RequestConfiguration[_ChannelReplyQuery](headers=_headers()))
+        )
+    return await messages.by_chat_message_id(handle.message_id).get(
+        request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers())
     )
 
 
@@ -282,7 +297,14 @@ def _headers() -> HeadersCollection:
     return headers
 
 
-def _message(message: ChatMessage, handle: MessageHandle) -> TeamsMessage:
+def message_of(message: ChatMessage, *, handle: MessageHandle) -> TeamsMessage:
+    """`message` as this connector reports a Teams message, addressed by `handle`.
+
+    Public because `channels.browse_channel` gets whole messages back from Graph rather than a
+    projection — a channel message list carries every field a single read does — so browsing a
+    channel and reading one message answer with the same shape, normalised the same way, because
+    they are the same function rather than two that agree.
+    """
     mentions = message.mentions or []
     attachments = message.attachments or []
     return TeamsMessage(
@@ -293,11 +315,13 @@ def _message(message: ChatMessage, handle: MessageHandle) -> TeamsMessage:
         channel_id=handle.channel_id,
         sender=sender_of(message.from_),
         text=_text(message, mentions=mentions, attachments=attachments),
-        event=_event(message),
+        event=event_of(message),
         created_at=message.created_date_time,
         last_edited_at=message.last_edited_date_time,
         deleted_at=message.deleted_date_time,
-        reply_to_id=message.reply_to_id,
+        # The handle is the fallback rather than the source: it names a parent only for a reply,
+        # while Graph sets `replyToId` on every message in a channel thread.
+        reply_to_id=message.reply_to_id or handle.reply_to_id,
         subject=message.subject,
         # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
         importance=message.importance,
@@ -336,12 +360,17 @@ _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _UNDESCRIBED_EVENT = "a system event Microsoft Graph sent no detail for"
 
 
-def _event(message: ChatMessage) -> str | None:
+def event_of(message: ChatMessage) -> str | None:
     """What this message is an event *of*, or None if a person wrote it.
 
     Three independent signals, because no one of them is reliable alone: `eventDetail` is only
     populated for `systemEventMessage`, `messageType` needs the `Prefer` header above to be legible
     at all, and a null `from` is what Graph actually sends for every one of them.
+
+    Public because it is also the test for "is this a message somebody wrote", which is what
+    `channels.browse_channel` filters a channel listing by: Graph offers no server-side
+    `messageType` filter on that collection, so the filtering is client-side there, and it has to
+    ask the same question this does or the two tools disagree about what a message is.
     """
     detail = message.event_detail
     if detail is not None:

@@ -41,6 +41,14 @@
    those are reachable without ever spelling `msgraph`. A tool that builds one has put the shape of
    a Graph call in the layer whose only job is to expose it, and rule 6 alone would not notice.
 
+9. **Only `features/message_search.py` may spell a `teams:///` handle.** A handle is minted by the
+   search that produces it and parsed by the one grammar that lives with it, which is why
+   `message_read` and `channels` take `MessageHandle` from there rather than assembling a URI of
+   their own. Two modules that each knew how to write one would be free to disagree, and the
+   disagreement would look like a message that cannot be read — which is exactly the failure the
+   third (reply) shape exists to fix. `server/` is not subject to this: a tool description names the
+   shapes so a model knows what it may pass, and that is prose rather than a second implementation.
+
 Every rule is paired with a guard that fails if the rule has become vacuous — an empty tree to walk,
 a missing file to forbid reaching for, a framework nothing imports any more. None of them is
 conditional: every package these rules are about now exists, so a rule that stops running is a
@@ -71,6 +79,13 @@ _GRAPH_SDK = "msgraph"
 # without importing `msgraph`, which is why rule 8 names them separately from rule 6.
 _GRAPH_REQUEST_LAYER: tuple[str, ...] = ("kiota_abstractions", "kiota_http", "msgraph_core")
 _MCP_FRAMEWORK = "fastmcp"
+
+# The scheme every message handle this connector mints is written in, and the one feature module
+# allowed to write it. Matched as text rather than through the AST because what rule 9 forbids is a
+# handle being *spelled* anywhere else — as an f-string, a format template or a concatenation, each
+# of which is a different AST and the same duplication.
+_HANDLE_SCHEME = "teams:///"
+_HANDLE_GRAMMAR = _FEATURES / "message_search.py"
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
@@ -531,6 +546,28 @@ class TestTheServerLayerDoesNotSpeakGraph:
             + "features/ however it is spelled. Move it there and have the tool call the "
             + "feature:\n  "
             + "\n  ".join(violations)
+        )
+
+
+class TestTheHandleGrammarHasOneHome:
+    def test_the_module_that_owns_it_actually_writes_one(self) -> None:
+        """Guards the guard: if handles stopped being minted there, the rule below would forbid
+        something nothing does and the grammar would have quietly moved."""
+        assert _HANDLE_SCHEME in _HANDLE_GRAMMAR.read_text(), (
+            f"{_HANDLE_GRAMMAR.name} no longer mints a handle; rule 9 names the wrong module"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        sorted(path for path in _FEATURES.rglob("*.py") if path != _HANDLE_GRAMMAR),
+        ids=_source_id,
+    )
+    def test_no_other_feature_module_writes_a_handle(self, source: pathlib.Path) -> None:
+        assert _HANDLE_SCHEME not in source.read_text(), (
+            f"only {_HANDLE_GRAMMAR.name} may spell a {_HANDLE_SCHEME} handle — it is minted and "
+            + "parsed there, and a second speller is free to disagree with it. Build a "
+            + "`MessageHandle` and read its `uri` instead:\n  "
+            + str(source.relative_to(_SRC))
         )
 
 

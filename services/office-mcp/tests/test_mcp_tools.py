@@ -155,6 +155,103 @@ _SYSTEM_MESSAGE = {
     },
 }
 
+_TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CHANNEL_ID = "19:general@thread.tacv2"
+_CHANNELS_PATH = f"/teams/{_TEAM_ID}/channels"
+_CHANNEL_MESSAGES_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages"
+
+# Only the five properties `GET /me/joinedTeams` populates; every other property of a team comes
+# back null on that endpoint, asked for or not.
+_TEAMS = {
+    "value": [
+        {
+            "id": _TEAM_ID,
+            "displayName": "Engineering",
+            "description": "Ships the product",
+            "isArchived": False,
+            "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+        }
+    ]
+}
+
+_CHANNELS = {
+    "value": [
+        {
+            "id": _CHANNEL_ID,
+            "displayName": "General",
+            "description": "Everything and nothing",
+            "createdDateTime": "2026-01-04T12:00:00Z",
+            "membershipType": "standard",
+        }
+    ]
+}
+
+_ROOT_POST_ID = "1770000000000"
+_REPLY_ID = "1770000000002"
+
+# One channel post with one reply, as `?$top=…&$expand=replies` returns it.
+_CHANNEL_POSTS = {
+    "value": [
+        {
+            "@odata.type": "#microsoft.graph.chatMessage",
+            "id": _ROOT_POST_ID,
+            "messageType": "message",
+            "createdDateTime": "2026-02-11T09:15:22.31Z",
+            "from": {
+                "user": {
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "displayName": "Ada Lovelace",
+                    "userIdentityType": "aadUser",
+                }
+            },
+            "body": {"contentType": "html", "content": "<div><p>Release plan for Friday</p></div>"},
+            "replies": [
+                {
+                    "@odata.type": "#microsoft.graph.chatMessage",
+                    "id": _REPLY_ID,
+                    "messageType": "message",
+                    "createdDateTime": "2026-02-11T10:02:00Z",
+                    "replyToId": _ROOT_POST_ID,
+                    "from": {
+                        "user": {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "displayName": "Grace Hopper",
+                            "userIdentityType": "aadUser",
+                        }
+                    },
+                    "body": {"contentType": "text", "content": "agreed, Friday works"},
+                }
+            ],
+        }
+    ]
+}
+
+# The handle the reply above carries, and the path Graph serves it from. A reply is addressed under
+# the post it answers — no other shape reaches it — which is the whole point of the third shape.
+_REPLY_URI = (
+    f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2"
+    + f"/messages/{_ROOT_POST_ID}/replies/{_REPLY_ID}"
+)
+_REPLY_PATH = f"{_CHANNEL_MESSAGES_PATH}/{_ROOT_POST_ID}/replies/{_REPLY_ID}"
+
+_REPLY: dict[str, object] = {
+    "@odata.type": "#microsoft.graph.chatMessage",
+    "id": _REPLY_ID,
+    "messageType": "message",
+    "createdDateTime": "2026-02-11T10:02:00Z",
+    "replyToId": _ROOT_POST_ID,
+    "from": {
+        "user": {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "displayName": "Grace Hopper",
+            "userIdentityType": "aadUser",
+        }
+    },
+    "body": {"contentType": "text", "content": "agreed, Friday works"},
+    "attachments": [],
+    "mentions": [],
+}
+
 _CHATS = {
     "value": [
         {
@@ -328,7 +425,15 @@ class TestTheToolsThisServerAdvertises:
         schema, a model would try to invent one."""
         tools = _named(await mcp_client.list_tools())
 
-        assert set(tools) == {"get_me", "list_chats", "search_messages", "read_message"}
+        assert set(tools) == {
+            "get_me",
+            "list_chats",
+            "list_teams",
+            "list_channels",
+            "browse_channel",
+            "search_messages",
+            "read_message",
+        }
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
 
@@ -364,6 +469,9 @@ class TestTheToolsThisServerAdvertises:
             "job_title",
         }
         assert set(_properties(tools["list_chats"].outputSchema)) == {"chats", "truncated"}
+        assert set(_properties(tools["list_teams"].outputSchema)) == {"teams", "truncated"}
+        assert set(_properties(tools["list_channels"].outputSchema)) == {"channels", "truncated"}
+        assert set(_properties(tools["browse_channel"].outputSchema)) == {"messages", "truncated"}
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
             "truncated",
@@ -405,7 +513,13 @@ class TestTheToolsThisServerAdvertises:
         for tool in tools.values():
             for field in _properties(tool.outputSchema):
                 assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
-        for name in ("list_chats", "search_messages"):
+        for name in (
+            "list_chats",
+            "list_teams",
+            "list_channels",
+            "browse_channel",
+            "search_messages",
+        ):
             assert "truncated" in _properties(tools[name].outputSchema), name
 
     async def test_read_message_takes_exactly_one_required_handle(
@@ -419,19 +533,60 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(schema)) == {"uri"}
         assert schema.get("required") == ["uri"]
 
-    async def test_read_message_names_both_handle_shapes_and_no_others(
+    async def test_read_message_names_every_handle_shape_and_no_others(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The description is where a model learns what it may pass. Naming the two shapes is what
+        """The description is where a model learns what it may pass. Naming the shapes is what
         stops it inventing `mail:///` — and the oracle connector's one polymorphic `read_resource`
-        is exactly the promise this connector does not make."""
+        is exactly the promise this connector does not make. The reply shape is named with the tool
+        that mints it, because it is the one no search result carries.
+        """
         tools = _named(await mcp_client.list_tools())
         description = tools["read_message"].description
         assert description is not None
 
         assert "teams:///chats/{chat_id}/messages/{message_id}" in description
         assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in description
-        assert "search_messages" in description, "a handle has exactly one source"
+        assert (
+            "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}"
+            in description
+        )
+        assert "search_messages" in description
+        assert "browse_channel" in description, "the reply shape has exactly one source"
+
+    async def test_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """A channel id alone addresses nothing — Graph's only path to a channel's messages goes
+        through its team — and 20/50 are Graph's own default and maximum for the collection."""
+        tools = _named(await mcp_client.list_tools())
+        schema = tools["browse_channel"].inputSchema
+        limit = _object(_properties(schema)["limit"])
+
+        assert set(_properties(schema)) == {"team_id", "channel_id", "limit"}
+        assert schema.get("required") == ["team_id", "channel_id"]
+        assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
+            "integer",
+            1,
+            50,
+            20,
+        )
+
+    async def test_browse_channel_says_what_the_order_actually_is(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The one thing a model cannot find out for itself. Graph orders this collection by the
+        last modified date of the whole reply chain, so the first post is the most recently *active*
+        thread and may be years old — a tool that let "newest first" be assumed would have the
+        model reporting an old post as today's news.
+        """
+        tools = _named(await mcp_client.list_tools())
+        description = tools["browse_channel"].description
+        assert description is not None
+
+        assert "reply chain" in description
+        assert "created_at" in description, "the field that does tell the truth about age"
+        assert "search_messages" in description, "where a date-bounded question goes instead"
 
     async def test_search_messages_makes_its_criteria_optional_but_not_all_of_them(
         self, mcp_client: Client[FastMCPTransport]
@@ -615,6 +770,100 @@ class TestCallingThem:
             "https://graph.microsoft.com/Chat.Read",
             "https://graph.microsoft.com/ChannelMessage.Read.All",
         ), "the exchange happens before the handle is parsed, so it asks for both surfaces"
+
+    async def test_a_model_walks_from_its_teams_to_a_reply_it_can_read(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The channel side end to end, over the real protocol, with every id taken from the
+        previous answer exactly as a model would take it: which teams am I in, what channels are in
+        this team, what was posted in this channel — and then the reply's own handle, resolved.
+
+        That last step is the gap this piece closes. Graph addresses a reply under the post it
+        answers, so before browsing existed no tool could produce a handle for one: a search hit on
+        a reply carries the root-post shape and Graph answers it 404. Here the browse mints the
+        reply's handle and read_message resolves it, which is the whole contract between the two.
+        """
+        teams = graph.get("/me/joinedTeams").mock(return_value=httpx.Response(200, json=_TEAMS))
+        listing = graph.get(_CHANNELS_PATH).mock(return_value=httpx.Response(200, json=_CHANNELS))
+        posts = graph.get(_CHANNEL_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json=_CHANNEL_POSTS)
+        )
+        read = graph.get(_REPLY_PATH).mock(return_value=httpx.Response(200, json=_REPLY))
+
+        listed = _structured(await mcp_client.call_tool("list_teams", {}))
+        found = cast("Sequence[Mapping[str, object]]", listed["teams"])
+        team_id = found[0]["team_id"]
+        channels = _structured(await mcp_client.call_tool("list_channels", {"team_id": team_id}))
+        in_team = cast("Sequence[Mapping[str, object]]", channels["channels"])
+        channel_id = in_team[0]["channel_id"]
+        browsed = _structured(
+            await mcp_client.call_tool(
+                "browse_channel", {"team_id": team_id, "channel_id": channel_id}
+            )
+        )
+        messages = cast("Sequence[Mapping[str, object]]", browsed["messages"])
+        result = _structured(
+            await mcp_client.call_tool("read_message", {"uri": messages[1]["uri"]})
+        )
+
+        assert (team_id, channel_id) == (_TEAM_ID, _CHANNEL_ID)
+        assert all(route.called for route in (teams, listing, posts, read))
+        assert [message["message_id"] for message in messages] == [_ROOT_POST_ID, _REPLY_ID]
+        assert messages[0]["text"] == "Release plan for Friday", "browsing returns the whole post"
+        assert messages[1]["reply_to_id"] == _ROOT_POST_ID
+        assert messages[1]["uri"] == _REPLY_URI
+        assert result["text"] == "agreed, Friday works"
+        assert result["uri"] == _REPLY_URI
+        assert read.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert obo.requested_scopes == [
+            ("https://graph.microsoft.com/Team.ReadBasic.All",),
+            ("https://graph.microsoft.com/Channel.ReadBasic.All",),
+            ("https://graph.microsoft.com/ChannelMessage.Read.All",),
+            (
+                "https://graph.microsoft.com/Chat.Read",
+                "https://graph.microsoft.com/ChannelMessage.Read.All",
+            ),
+        ], "each tool exchanges a token for the permissions its own request needs"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_channel_post_reaches_the_caller_and_no_log_or_span(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A channel post is message content like any other, and this tool returns a page of it at
+        once — so the rule search and read are held to holds here too, over the whole call."""
+        exporter = InMemorySpanExporter()
+        provider = trace.get_tracer_provider()
+        if not isinstance(provider, TracerProvider):
+            provider = TracerProvider()
+            trace.set_tracer_provider(provider)
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        secret = "acquisition-of-northwind-traders"
+        post = {
+            **_CHANNEL_POSTS["value"][0],
+            "body": {"contentType": "text", "content": secret},
+            "replies": [],
+        }
+        _ = graph.get(_CHANNEL_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json={"value": [post]})
+        )
+        caplog.set_level(logging.DEBUG)
+
+        result = await mcp_client.call_tool(
+            "browse_channel", {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}
+        )
+
+        messages = cast("Sequence[Mapping[str, object]]", _structured(result)["messages"])
+        assert messages[0]["text"] == secret, "the post has to have been returned"
+        for record in caplog.records:
+            assert secret not in _record_text(record), f"logged by {record.name}"
+        for span in exporter.get_finished_spans():
+            assert secret not in str(span.attributes)
 
     @pytest.mark.usefixtures("obo")
     async def test_reading_a_system_event_says_what_happened_rather_than_nothing(
@@ -813,6 +1062,92 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "administrator" in message
         assert "synthetic-request-id" in message
         assert obo.requested_scopes, "the failure came from Graph, not from the token exchange"
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "path", "permission", "not_named"),
+        [
+            ("list_teams", {}, "/me/joinedTeams", "Team.ReadBasic.All", "Channel.ReadBasic.All"),
+            (
+                "list_channels",
+                {"team_id": _TEAM_ID},
+                _CHANNELS_PATH,
+                "Channel.ReadBasic.All",
+                "Team.ReadBasic.All",
+            ),
+            (
+                "browse_channel",
+                {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID},
+                _CHANNEL_MESSAGES_PATH,
+                "ChannelMessage.Read.All",
+                "Channel.ReadBasic.All",
+            ),
+        ],
+    )
+    @pytest.mark.usefixtures("obo")
+    async def test_each_channel_tool_names_only_the_permission_its_own_request_needs(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        tool: str,
+        arguments: dict[str, str],
+        path: str,
+        permission: str,
+        not_named: str,
+    ) -> None:
+        """Three requests, three delegated permissions, and a tenant that grants the two basic ones
+        while withholding the broad message permission is the common case — so naming the wrong one
+        sends an administrator after a permission that was never missing, which is as useless as
+        naming none. Graph's 403 says only that something was forbidden.
+        """
+        _ = graph.get(path).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "synthetic-request-id"},
+                json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}},
+            )
+        )
+
+        result = await mcp_client.call_tool(tool, arguments, raise_on_error=False)
+
+        assert result.is_error
+        message = _error_text(result)
+        assert permission in message
+        assert not_named not in message
+        assert "administrator" in message
+        assert "synthetic-request-id" in message
+
+    async def test_an_unconsented_channel_browse_names_the_message_permission(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The same missing permission one step earlier, on the tool most likely to hit it:
+        `ChannelMessage.Read.All` is the broad scope an administrator has to consent to, and Entra
+        refuses the exchange before Graph is reached at all."""
+        route = graph.get(_CHANNEL_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json=_CHANNEL_POSTS)
+        )
+        obo.refusal = ClientAuthenticationError(
+            message=(
+                "AADSTS65001: The user or administrator has not consented to use the application "
+                + "with ID '1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061'."
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "browse_channel",
+            {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID},
+            raise_on_error=False,
+        )
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "ChannelMessage.Read.All" in message, message
+        assert "administrator" in message
+        assert "AADSTS65001" in message
+        assert "resolve dependency" not in message
+        assert not route.called, "no token means no Graph request was ever made"
 
     async def test_a_permission_nobody_consented_to_names_it_too(
         self,

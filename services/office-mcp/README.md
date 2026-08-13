@@ -2,9 +2,9 @@
 
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes four tools
-so far — `get_me`, `list_chats`, `search_messages` and `read_message` — and more land in later PRs,
-stacked on top of this one.
+Users sign in with their own Microsoft account and the server acts as them. It exposes seven tools
+so far — `get_me`, `list_chats`, `list_teams`, `list_channels`, `browse_channel`, `search_messages`
+and `read_message` — and more land in later PRs, stacked on top of this one.
 
 ## Layout
 
@@ -15,7 +15,7 @@ src/office_mcp/
   auth.py                Entra auth: which app registration, and where its state lives
   logging.py metrics.py  cross-cutting, used by both sides below
   graph_client/          the Microsoft Graph transport — the official SDK, one caller's token
-  features/              what the connector does — one module per slice (identity, chats, messages)
+  features/              what the connector does — one module per slice (identity, chats, channels, messages)
   server/                how it's exposed over MCP — the tools, the errors they report, /ready
 ```
 
@@ -27,11 +27,14 @@ answers with, and the delegated Graph permissions that request needs. `server/to
 MCP tools over them and is the only place that knows about MCP.
 
 Where two features answer about the same thing, the shared vocabulary lives in one of them rather
-than in both: `message_search` owns the `teams:///` message handle — its two shapes, its parser and
+than in both: `message_search` owns the `teams:///` message handle — its three shapes, its parser and
 which permission each surface is read under — and the sender shape, and `message_read` imports both.
 Search is where a handle and a search-shaped sender are minted, and two modules that each knew how
 to spell a handle would be free to disagree; the disagreement would surface as a search result that
-cannot be read.
+cannot be read. The same rule runs one step further out: `channels` takes the message shape and the
+"did a person write this" test from `message_read`, so a post browsed in a channel and a message read
+by handle are the same type, normalised by the same function. A layering rule enforces the first
+half — only `message_search` may spell a handle.
 
 The layering rules are that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse — nor **from FastMCP**, since deciding what an MCP client
@@ -86,7 +89,9 @@ consented to, which is why sign-in has to ask for it:
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me` |
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
+| `Team.ReadBasic.All` | Delegated | No | `list_teams` |
+| `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
 
 `Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
 `$expand=lastMessagePreview`, and a message preview is a message.
@@ -96,9 +101,15 @@ enough for Graph to *accept* a `chatMessage` search, but Microsoft documents tha
 returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
 `ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
 missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
-than serve half an answer per query. It is also what `read_message` needs for a channel message —
-Graph's permissions for a message read are per surface, so that tool's own 403 names whichever one
-the handle it was given required.
+than serve half an answer per query. It is also what `browse_channel` and `read_message` need for a
+channel message — Graph's permissions for a message read are per surface, so the reader's own 403
+names whichever one the handle it was given required.
+
+The two channel-inventory permissions are the least-privileged ones Microsoft documents for their
+collections, and they are separate scopes on purpose: a tenant that refuses
+`ChannelMessage.Read.All` can still list its teams and channels, and each tool's 403 names only the
+permission its own request needed rather than sending an administrator after one that was never
+missing.
 
 **State.** Every token the server issues is a reference token re-validated on each request, so
 where that state lives decides whether the deployment survives a restart or a second replica.
@@ -143,8 +154,11 @@ gets that string onto the wire.
 | --- | --- | --- |
 | `get_me` | Who the signed-in user is: `user_id`, `display_name`, `email`, `user_principal_name`, `job_title` | `GET /me` |
 | `list_chats` | The user's Teams chats, most recently active first | `GET /me/chats` |
+| `list_teams` | The teams the user is a member of | `GET /me/joinedTeams` |
+| `list_channels` | The channels of one team the user can see | `GET /teams/{id}/channels` |
+| `browse_channel` | One channel's posts, each with its newest replies, in Graph's reply-chain order | `GET /teams/{id}/channels/{id}/messages?$expand=replies` |
 | `search_messages` | Teams messages matching keywords, a sender, mentions, a date range, attachment or read state | `POST /search/query` |
-| `read_message` | One Teams message in full — text, sender, mentions, attachments, edits, deletion | `GET /chats/{id}/messages/{id}`, `GET /teams/{id}/channels/{id}/messages/{id}` |
+| `read_message` | One Teams message in full — text, sender, mentions, attachments, edits, deletion | `GET /chats/{id}/messages/{id}`, `GET /teams/{id}/channels/{id}/messages/{id}[/replies/{id}]` |
 
 All are read-only, all take their caller's identity from the token rather than from a parameter, and
 all are described to the model in prose that names the traps rather than only the fields — `email` is
@@ -154,7 +168,7 @@ hit's `summary` is a snippet rather than the message.
 
 Decisions worth knowing:
 
-- **The four tools are one surface, and the conventions are asserted, not just intended.** A name is
+- **The tools are one surface, and the conventions are asserted, not just intended.** A name is
   `verb_noun` — which is why the identity tool is `get_me` and not `whoami`, the shell idiom having
   made the odd one out of the tool a model calls first (Microsoft's own M365 connector landed on
   `get_me` too). A result field is snake_case, and one thing has one name across every tool: a
@@ -162,7 +176,7 @@ Decisions worth knowing:
   tool whose answer is a list says "there is more" with the same word, `truncated`, and says in its
   own description how to get the rest — a wider `limit` where there is no cursor, `next_offset` where
   there is. `tests/test_mcp_tools.py` checks all of that against the live schemas, because a
-  convention nothing enforces is how the fifth tool comes out different from the first four.
+  convention nothing enforces is how a new tool comes out different from the ones before it.
 - **Every result has a declared output schema.** So `truncated` and `members_may_be_incomplete` are
   typed fields rather than prose or, worse, an extra object appended to the results array that a
   model can mistake for a result.
@@ -175,6 +189,31 @@ Decisions worth knowing:
   tool here takes a chat id as an argument, a search cannot be narrowed to one chat, and a handle
   cannot be assembled out of one — so the description says all three rather than promising a
   chat-scoped tool that does not exist.
+- **`browse_channel` is the only channel-message tool, because browsing is the only thing missing.**
+  `search_messages` already searches channel content and cannot be scoped to one channel; a
+  `get_channel_messages` beside it would have been a second way to ask a question one of them already
+  answers. What neither could do is walk a single channel in order, so that is the tool: one channel
+  per call, `$expand=replies` so a thread is one request rather than one per post, and no sweep —
+  Graph allows this whole connector about one request a second on a given channel *per tenant*, so a
+  loop over a team's channels would degrade every other user of the app registration.
+- **`browse_channel` says what Graph's order actually is.** Microsoft sorts a channel's messages by
+  the last modified date of the *entire reply chain*, so a two-year-old post returns to the front the
+  moment somebody replies to it. The list is therefore not reordered here (that would invent an order
+  Graph never gave) and the description tells the model to read `created_at` rather than the position
+  — a tool that let "newest first" be assumed would have it reporting an old post as today's news.
+  The same fact is why paging is bounded by a count and never by a date: "stop when a page is older
+  than X" is unsound on this collection, and Graph accepts no `$filter` or `$orderby` here at all, so
+  a date-bounded question goes to `search_messages` instead. Neither `$top` on `/me/joinedTeams` nor
+  on `/teams/{id}/channels` is sent, either: both are documented as unsupported and `teams-mcp` had
+  to remove them.
+- **A channel reply got the handle grammar's third shape.** Graph addresses a reply *under* the post
+  it answers (`…/messages/{root}/replies/{reply}`), which the two shapes minted by search could not
+  express — and since the search projection carries no `replyToId`, a hit on a reply produced a
+  root-post handle that Graph answers 404 to. `browse_channel` walks a channel post by post and so
+  knows each reply's parent, which makes it the one tool that can mint the shape; the grammar itself
+  stayed in `message_search` where the other two live, and `read_message` grew one request branch.
+  The 404 advice now names this as the one well-formed handle that always fails, and says to browse
+  the channel instead.
 - **`search_messages` is one Graph request, always.** No fan-out, and specifically no per-chat scan
   when a date filter is set or a permission is missing — which is what the connector this replaces
   falls back to, up to 50 chats × 50 messages. Graph's read budget is "one request per second per
