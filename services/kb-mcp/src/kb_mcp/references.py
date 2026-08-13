@@ -58,8 +58,6 @@ def is_unique_ai_client() -> bool:
         ctx = get_context()
     except (RuntimeError, LookupError):
         return False
-    if ctx is None:
-        return False
     client_params = ctx.session.client_params
     if client_params is None:
         return False
