@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.0...confluence-connector@3.0.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **confluence-connector,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** allow azurerm v4 or v5 (&gt;= 4, &lt; 6) in remaining modules ([#768](https://github.com/Unique-AG/connectors/issues/768)) ([dcdd34f](https://github.com/Unique-AG/connectors/commit/dcdd34f521aac36ffa7d388c0478b7e4e8237368))
+* **confluence-connector:** resolve basic auth username from env references ([#774](https://github.com/Unique-AG/connectors/issues/774)) ([061a714](https://github.com/Unique-AG/connectors/commit/061a71427fa3a167ee4766b7282cce9fc490802d))
+
 ## [3.0.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.2.0...confluence-connector@3.0.0) (2026-07-07)
 
 
