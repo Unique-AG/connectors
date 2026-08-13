@@ -69,16 +69,16 @@ class TestPublicBaseUrl:
     def test_the_local_default_is_allowed_outside_production(self) -> None:
         config = AppConfig(app_env=AppEnv.DEVELOPMENT)
 
-        assert config.issuer == "http://localhost:9010"
+        assert config.issuer == "http://localhost:9544"
 
     @pytest.mark.parametrize(
         "url",
         [
-            "http://localhost:9010",
-            "http://127.0.0.1:9010",
-            "http://[::1]:9010",
+            "http://localhost:9544",
+            "http://127.0.0.1:9544",
+            "http://[::1]:9544",
             # A bind address, not somewhere a client can reach this service.
-            "http://0.0.0.0:9010",
+            "http://0.0.0.0:9544",
         ],
     )
     def test_production_rejects_a_url_no_client_can_reach(self, url: str) -> None:
