@@ -1,24 +1,9 @@
-import { Redacted } from '@unique-ag/utils';
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
-import { json } from '@unique-ag/utils/zod';
+import { envRequiredSecretSchema, json } from '@unique-ag/utils/zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
 
 const requiredStringSchema = z.string().trim().nonempty();
-
-const ENV_REF_PREFIX = 'os.environ/';
-
-const envResolvableStringSchema = z.string().transform((val) => {
-  if (!val.startsWith(ENV_REF_PREFIX)) {
-    return val;
-  }
-  const varName = val.slice(ENV_REF_PREFIX.length);
-  return process.env[varName] ?? '';
-});
-
-const envRequiredSecretSchema = envResolvableStringSchema
-  .pipe(z.string().trim().nonempty())
-  .transform((val) => new Redacted(val));
 
 const portSchema = z.coerce.number().int().positive().max(65535);
 

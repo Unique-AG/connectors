@@ -1,8 +1,16 @@
 import { typeid as libtypeid, TypeID } from 'typeid-js';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import z from 'zod/v4';
 import { Redacted } from '../redacted';
-import { isoDatetimeToDate, json, redacted, stringToURL, typeid } from '../zod';
+import {
+  envRequiredSecretSchema,
+  envResolvableStringSchema,
+  isoDatetimeToDate,
+  json,
+  redacted,
+  stringToURL,
+  typeid,
+} from '../zod';
 
 describe('json', () => {
   const schema = json(z.object({ name: z.string(), age: z.number() }));
@@ -214,5 +222,70 @@ describe('redacted', () => {
 
       expect(encoded).toEqual({ key: 'value' });
     });
+  });
+});
+
+describe('envResolvableStringSchema', () => {
+  const ENV_VAR = 'ZOD_SPEC_ENV_RESOLVABLE';
+
+  afterEach(() => {
+    delete process.env[ENV_VAR];
+  });
+
+  it('returns an inline value unchanged', () => {
+    expect(z.parse(envResolvableStringSchema, 'plain-value')).toBe('plain-value');
+  });
+
+  it('resolves an os.environ/ prefix to the env var value', () => {
+    process.env[ENV_VAR] = 'from-env';
+
+    expect(z.parse(envResolvableStringSchema, `os.environ/${ENV_VAR}`)).toBe('from-env');
+  });
+
+  it('resolves a missing os.environ/ target to an empty string', () => {
+    expect(z.parse(envResolvableStringSchema, 'os.environ/ZOD_SPEC_ENV_MISSING')).toBe('');
+  });
+});
+
+describe('envRequiredSecretSchema', () => {
+  const ENV_VAR = 'ZOD_SPEC_ENV_SECRET';
+
+  afterEach(() => {
+    delete process.env[ENV_VAR];
+  });
+
+  it('wraps an inline value in Redacted', () => {
+    const result = z.parse(envRequiredSecretSchema, 's3cr3t');
+
+    expect(result).toBeInstanceOf(Redacted);
+    expect(result.value).toBe('s3cr3t');
+    expect(String(result)).toBe('[Redacted]');
+  });
+
+  it('resolves os.environ/ and redacts the looked-up value', () => {
+    process.env[ENV_VAR] = 'from-env';
+
+    const result = z.parse(envRequiredSecretSchema, `os.environ/${ENV_VAR}`);
+
+    expect(result.value).toBe('from-env');
+    expect(String(result)).toBe('[Redacted]');
+  });
+
+  it('strips the trailing newline a Kubernetes secret adds', () => {
+    process.env[ENV_VAR] = 'sup3r-s3cret\n';
+
+    expect(z.parse(envRequiredSecretSchema, `os.environ/${ENV_VAR}`).value).toBe('sup3r-s3cret');
+  });
+
+  it('strips surrounding whitespace from an inline secret', () => {
+    expect(z.parse(envRequiredSecretSchema, '  s3cr3t  ').value).toBe('s3cr3t');
+  });
+
+  it('rejects a missing os.environ/ target', () => {
+    expect(() => z.parse(envRequiredSecretSchema, 'os.environ/ZOD_SPEC_ENV_MISSING')).toThrow();
+  });
+
+  it('rejects a whitespace-only secret', () => {
+    expect(() => z.parse(envRequiredSecretSchema, '   ')).toThrow();
   });
 });
