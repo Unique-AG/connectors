@@ -4,10 +4,15 @@ Scaffolding only: no auth, no Microsoft Graph client, no tools yet — this just
 starts, its lifespan runs, and the process-health routes behave.
 """
 
-from collections.abc import Iterator
+import importlib
+import os
+from collections.abc import Callable, Iterator
+from types import ModuleType
 from typing import Protocol, cast
+from unittest.mock import MagicMock
 
 import pytest
+from starlette.applications import Starlette
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
@@ -92,3 +97,74 @@ class TestReadyReportsDatabaseUnreachable:
         body = response.json()
         assert body["status"] == "unhealthy"
         assert _checks(body)["database"] is False
+
+
+# `office_mcp.main` is a module, not a class, so pyright sees every attribute access on it as
+# `Any` unless narrowed. This describes just the surface `TestMainEntrypoint` touches.
+class _MainModule(Protocol):
+    app: Starlette
+    uvicorn: ModuleType
+    main: Callable[[], None]
+    _config: AppConfig
+
+
+@pytest.fixture
+def main_module() -> Iterator[_MainModule]:
+    """Import `office_mcp.main`, containing its `load_dotenv()` module-level side effect.
+
+    `office_mcp.main` calls `load_dotenv()` at import time — right for an operator launching the
+    process, but it would otherwise push this service's local `.env` into `os.environ` for the
+    rest of the test session the first time anything imports this module (the same hazard the
+    `postgres_container` fixture in conftest.py works around for `env.py`'s `load_dotenv()`).
+    The module is only ever exec'd once per process, so the whole environment — not just the
+    handful of vars `.env` sets — is snapshotted and restored around that one import.
+    """
+    environment_before = os.environ.copy()
+    try:
+        # Imported through `importlib`, then widened via `object` before being narrowed: the
+        # `import` statement form infers a literal `Module("office_mcp.main")` type that
+        # `reportInvalidCast` refuses to convert to `_MainModule` at all — even through
+        # `object` — whereas the plain `ModuleType` `import_module` returns widens cleanly.
+        yield cast("_MainModule", cast("object", importlib.import_module("office_mcp.main")))
+    finally:
+        os.environ.clear()
+        os.environ.update(environment_before)
+
+
+class TestMainEntrypoint:
+    """`office_mcp.main.main()`, exercised without ever letting uvicorn actually serve.
+
+    A string target (`"office_mcp.main:app"`) makes uvicorn re-import this module under its own
+    name when run as a script rather than through the `office-mcp` console script — re-running
+    `create_app()` a second time, with a second engine the first one's lifespan never disposes.
+    Passing the already-built `app` object avoids the re-import entirely.
+    """
+
+    def test_uvicorn_is_given_the_app_object_not_a_string_target(
+        self, main_module: _MainModule, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run = MagicMock()
+        monkeypatch.setattr(main_module.uvicorn, "run", run)
+
+        main_module.main()
+
+        run.assert_called_once()
+        target = cast("Starlette", run.call_args.args[0])
+        assert target is main_module.app
+
+    def test_main_reuses_the_module_level_config_instead_of_rebuilding_it(
+        self, main_module: _MainModule, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run = MagicMock()
+        monkeypatch.setattr(main_module.uvicorn, "run", run)
+        app_config = MagicMock(
+            side_effect=AssertionError("AppConfig() must not be re-instantiated in main()")
+        )
+        monkeypatch.setattr(main_module, "AppConfig", app_config)
+
+        main_module.main()
+
+        app_config.assert_not_called()
+        # Reaching into the module's private `_config` is the point of this white-box test: it
+        # proves `main()` served the *same* config object `app` was already built from.
+        assert run.call_args.kwargs["port"] == main_module._config.port  # pyright: ignore[reportPrivateUsage]

@@ -28,6 +28,7 @@ reported as a failing test with a file and line instead of an ImportError at col
 
 import ast
 import pathlib
+import sys
 
 import pytest
 
@@ -51,16 +52,75 @@ def _feature_packages() -> set[str]:
     return {p.name for p in _FEATURES.iterdir() if p.is_dir() and p.name != "__pycache__"}
 
 
-def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
-    """Every module name this file imports, with the line it's imported on."""
+def _imported_modules(tree: ast.AST, package: str | None = None) -> list[tuple[str, int]]:
+    """Every module name this file imports, with the line it's imported on.
+
+    A relative import (`level > 0`) is resolved to an absolute dotted name against `package` —
+    the importing file's own `__package__` — before it's reported. Without that resolution,
+    `from ...server.tools import TOOLS` inside `features/calendar/service.py` would never
+    spell `server` at `level == 0` and would be invisible to every rule below. Without a
+    `package` (the ad-hoc source snippets in `TestTheDetectionItself` below, which name no real
+    file), relative imports are skipped: there is nothing to resolve them against.
+    """
     found: list[tuple[str, int]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             found.extend((alias.name, node.lineno) for alias in node.names)
-        # `level > 0` is a relative import, which can't escape `features/` by name anyway.
-        elif isinstance(node, ast.ImportFrom) and node.module is not None and node.level == 0:
-            found.append((node.module, node.lineno))
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                if node.module is not None:
+                    found.append((node.module, node.lineno))
+            elif package is not None:
+                resolved = _resolved_import_target(package, node.level, node.module)
+                if resolved is not None:
+                    found.append((resolved, node.lineno))
     return found
+
+
+def _resolved_import_target(package: str, level: int, module: str | None) -> str | None:
+    """The absolute dotted module a relative import's `level`/`module` resolve to.
+
+    Mirrors Python's own relative-import resolution: `level` dots walk up from `package` (the
+    importing file's `__package__`) by `level - 1` components, and `module` — if the import
+    names one (`from . import x` doesn't) — is appended beneath that. Returns `None` if the
+    import walks above the top of the tree, which `ast` parses fine but Python raises
+    `ImportError` for at runtime.
+    """
+    parts = package.split(".")
+    remaining = len(parts) - (level - 1)
+    if remaining < 0:
+        return None
+    base = parts[:remaining]
+    if module:
+        base = base + module.split(".")
+    return ".".join(base) if base else None
+
+
+def _dotted_module(source: pathlib.Path) -> str:
+    """The dotted module name `source` would import as, e.g. `office_mcp.features.calendar.service`.
+
+    Found by anchoring on the `office_mcp` directory in `source`'s own path, rather than by
+    relativizing against the module-level `_SRC` constant — so a temporary copy of the tree
+    (as `TestTheDetectionItself` below uses to prove the escape is caught) resolves the same
+    way the real `src/office_mcp` does.
+    """
+    parts = source.with_suffix("").parts
+    module_parts = parts[parts.index("office_mcp") :]
+    if module_parts[-1] == "__init__":
+        module_parts = module_parts[:-1]
+    return ".".join(module_parts)
+
+
+def _package_of(source: pathlib.Path) -> str:
+    """The value `__package__` has inside `source`, i.e. what its relative imports resolve against.
+
+    For a plain module `foo/bar/baz.py` that's `foo.bar` — the package containing it. For
+    `foo/bar/__init__.py` it's `foo.bar` itself, since the module IS the package there.
+    """
+    module = _dotted_module(source)
+    if source.name == "__init__.py":
+        return module
+    return module.rsplit(".", 1)[0]
 
 
 def _source_id(source: pathlib.Path) -> str:
@@ -68,11 +128,11 @@ def _source_id(source: pathlib.Path) -> str:
     return str(source.relative_to(_SRC))
 
 
-def _imports_under(source: str, prefix: str) -> list[str]:
+def _imports_under(source: str, prefix: str, package: str | None = None) -> list[str]:
     """The `prefix`-rooted modules `source` imports. Both rules below are this, over real files."""
     return [
         module
-        for module, _line in _imported_modules(ast.parse(source))
+        for module, _line in _imported_modules(ast.parse(source), package)
         if module == prefix or module.startswith(f"{prefix}.")
     ]
 
@@ -81,7 +141,7 @@ def _violations(source: pathlib.Path, prefix: str) -> list[str]:
     tree = ast.parse(source.read_text(), filename=str(source))
     return [
         f"{source.relative_to(_SRC)}:{line} imports {module}"
-        for module, line in _imported_modules(tree)
+        for module, line in _imported_modules(tree, _package_of(source))
         if module == prefix or module.startswith(f"{prefix}.")
     ]
 
@@ -138,6 +198,25 @@ class TestTheDetectionItself:
     def test_catches_a_plain_import_too(self) -> None:
         assert _imports_under("import office_mcp.server.runtime", _SERVER_PREFIX) == [
             "office_mcp.server.runtime"
+        ]
+
+    def test_catches_a_relative_import_that_escapes_the_layer(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`from ...server.tools import TOOLS` inside `features/calendar/service.py` never
+        spells `server` at `level == 0`, so a level-blind check is silently invisible to exactly
+        the violation Rule 1 exists to catch. Proves the fix against the real checker
+        (`_violations`, what `test_no_feature_module_imports_from_server` runs) over an actual
+        file on disk, not just the resolution helper in isolation.
+        """
+        src = tmp_path / "office_mcp"
+        service = src / "features" / "calendar" / "service.py"
+        service.parent.mkdir(parents=True)
+        service.write_text("from ...server.tools import TOOLS\n")
+        monkeypatch.setattr(sys.modules[__name__], "_SRC", src)
+
+        assert _violations(service, _SERVER_PREFIX) == [
+            "features/calendar/service.py:1 imports office_mcp.server.tools"
         ]
 
     def test_does_not_fire_on_permitted_imports(self) -> None:
