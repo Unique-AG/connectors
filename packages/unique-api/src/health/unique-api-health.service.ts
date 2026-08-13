@@ -1,5 +1,5 @@
 import type { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { fetch as undiciFetch } from 'undici';
+import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuthFacade } from '../auth/unique-auth.facade';
 import { extractErrorCode, type PingResult } from './ping-result';
 
@@ -12,6 +12,7 @@ export class UniqueApiHealth {
     ingestionBaseUrl: string,
     scopeManagementBaseUrl: string,
     private readonly timeoutMs: number,
+    private readonly dispatcher: Dispatcher,
   ) {
     this.ingestionUrl = `${ingestionBaseUrl}/graphql`;
     this.scopeManagementUrl = `${scopeManagementBaseUrl}/graphql`;
@@ -58,6 +59,7 @@ export class UniqueApiHealth {
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ query: '{ __typename }' }),
         signal: AbortSignal.timeout(this.timeoutMs),
+        dispatcher: this.dispatcher,
       });
       await response.body?.cancel();
       if (response.ok) {

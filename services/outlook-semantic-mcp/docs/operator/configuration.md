@@ -45,7 +45,7 @@ These must be provided via Kubernetes secrets:
 | `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key | Both modes |
 | `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key | Both modes |
 | `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth only |
-| `PROXY_PASSWORD` | String | Proxy password | `username_password` proxy auth only |
+| `PROXY_PASSWORD` | String | Proxy password. Inline value or `os.environ/ENV_VAR_NAME`. | `username_password` proxy auth only |
 
 **Connection string formats:**
 
@@ -118,10 +118,10 @@ The server supports HTTP/HTTPS forward proxies for environments where outbound i
 
 **`username_password` mode** adds:
 
-| Variable         | Description                         |
-|------------------|-------------------------------------|
-| `PROXY_USERNAME` | Proxy username                      |
-| `PROXY_PASSWORD` | Proxy password (loaded from secret) |
+| Variable         | Description                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------------|
+| `PROXY_USERNAME` | Proxy username. Inline value or `os.environ/ENV_VAR_NAME` so the username is not stored in Helm values. |
+| `PROXY_PASSWORD` | Proxy password. Inline value or `os.environ/ENV_VAR_NAME` (typically loaded from a secret).          |
 
 **`ssl_tls` mode** adds:
 

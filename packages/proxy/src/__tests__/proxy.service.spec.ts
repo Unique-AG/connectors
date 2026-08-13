@@ -143,7 +143,7 @@ describe('ProxyService', () => {
         host: 'proxy.example.com',
         port: 3128,
         protocol: 'http',
-        username: 'alice',
+        username: new Redacted('alice'),
         password: new Redacted('s3cr3t'),
       });
 
@@ -185,6 +185,37 @@ describe('ProxyService', () => {
       expect(vi.mocked(ProxyAgent)).toHaveBeenCalledWith(
         expect.objectContaining({ headers: { 'X-Proxy-Token': 'abc123' } }),
       );
+    });
+
+    it('clones PROXY_HEADERS so ProxyAgent and HttpsProxyAgent do not share the same object', () => {
+      const headers = { 'X-Proxy-Token': 'abc123' };
+      createService({
+        authMode: 'username_password',
+        host: 'proxy.example.com',
+        port: 3128,
+        protocol: 'http',
+        username: new Redacted('alice'),
+        password: new Redacted('s3cr3t'),
+        headers,
+      });
+
+      const proxyAgentArg = vi.mocked(ProxyAgent).mock.calls[0]?.[0];
+      expect(proxyAgentArg).toEqual(expect.objectContaining({ headers }));
+      const proxyAgentHeaders = (proxyAgentArg as { headers: Record<string, string> }).headers;
+      const httpsAgentHeaders = vi.mocked(HttpsProxyAgent).mock.calls[0]?.[1]?.headers as Record<
+        string,
+        string
+      >;
+
+      expect(proxyAgentHeaders).toEqual(headers);
+      expect(httpsAgentHeaders).toEqual(headers);
+      expect(proxyAgentHeaders).not.toBe(headers);
+      expect(httpsAgentHeaders).not.toBe(headers);
+      expect(proxyAgentHeaders).not.toBe(httpsAgentHeaders);
+
+      proxyAgentHeaders['proxy-authorization'] = 'Basic from-undici';
+      expect(httpsAgentHeaders).toEqual(headers);
+      expect(headers).toEqual({ 'X-Proxy-Token': 'abc123' });
     });
 
     it('populates proxyTls with cert and key for ssl_tls auth', () => {
@@ -306,7 +337,7 @@ describe('ProxyService', () => {
         host: 'proxy.example.com',
         port: 3128,
         protocol: 'http',
-        username: 'alice',
+        username: new Redacted('alice'),
         password: new Redacted('s3cr3t'),
       });
 
@@ -351,7 +382,7 @@ describe('ProxyService', () => {
         host: 'proxy.example.com',
         port: 3128,
         protocol: 'http',
-        username: 'alice@corp',
+        username: new Redacted('alice@corp'),
         password: new Redacted('p@ss:word'),
       });
 

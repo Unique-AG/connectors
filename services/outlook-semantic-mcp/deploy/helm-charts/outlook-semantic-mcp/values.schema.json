@@ -2388,7 +2388,7 @@
         },
         "username": {
           "type": "string",
-          "description": "Basic auth username (required for username_password mode)"
+          "description": "Basic auth username (required for username_password mode). Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
         },
         "sslCertPath": {
           "type": "string",

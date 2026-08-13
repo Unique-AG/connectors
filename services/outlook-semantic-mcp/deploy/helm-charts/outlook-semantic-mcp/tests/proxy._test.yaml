@@ -117,6 +117,27 @@ tests:
           content:
             name: PROXY_PASSWORD
 
+  - it: passes os.environ username through to PROXY_USERNAME
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: username_password
+        host: proxy.example.com
+        port: 8080
+        protocol: http
+        username: os.environ/PROXY_USERNAME_SECRET
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_USERNAME
+            value: "os.environ/PROXY_USERNAME_SECRET"
+
   - it: sets SSL cert and key paths for ssl_tls
     values:
       - ../ci-values.yaml

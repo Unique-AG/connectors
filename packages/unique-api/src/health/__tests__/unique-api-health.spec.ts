@@ -6,7 +6,13 @@ vi.mock('undici', () => ({
   fetch: vi.fn(),
 }));
 
-import { fetch as undiciFetch } from 'undici';
+import { type Dispatcher, fetch as undiciFetch } from 'undici';
+
+const mockDispatcher = { kind: 'dispatcher' } as unknown as Dispatcher;
+
+function createHealth(auth = createAuth()) {
+  return new UniqueApiHealth(auth, 'http://ingestion', 'http://scope-mgmt', 3000, mockDispatcher);
+}
 
 function createHealthIndicatorService() {
   return {
@@ -51,7 +57,7 @@ describe('UniqueApiHealth', () => {
   let health: UniqueApiHealth;
 
   beforeEach(() => {
-    health = new UniqueApiHealth(createAuth(), 'http://ingestion', 'http://scope-mgmt', 3000);
+    health = createHealth();
   });
 
   afterEach(() => {
@@ -66,6 +72,13 @@ describe('UniqueApiHealth', () => {
       const result = await health.checkIngestion('ingestion', his as any);
 
       expect(result).toEqual({ ingestion: { status: 'up', ingestion: 'reachable' } });
+      expect(undiciFetch).toHaveBeenCalledWith(
+        'http://ingestion/graphql',
+        expect.objectContaining({
+          method: 'POST',
+          dispatcher: mockDispatcher,
+        }),
+      );
     });
 
     it('returns status down with ingestionError HTTP_503 on non-2xx response', async () => {
@@ -91,12 +104,7 @@ describe('UniqueApiHealth', () => {
     });
 
     it('returns status down with ingestionError AUTH_FAILURE on auth error', async () => {
-      health = new UniqueApiHealth(
-        createFailingAuth() as any,
-        'http://ingestion',
-        'http://scope-mgmt',
-        3000,
-      );
+      health = createHealth(createFailingAuth() as any);
       const his = createHealthIndicatorService();
 
       const result = await health.checkIngestion('ingestion', his as any);
@@ -117,6 +125,13 @@ describe('UniqueApiHealth', () => {
       expect(result).toEqual({
         scopeManagement: { status: 'up', scopeManagement: 'reachable' },
       });
+      expect(undiciFetch).toHaveBeenCalledWith(
+        'http://scope-mgmt/graphql',
+        expect.objectContaining({
+          method: 'POST',
+          dispatcher: mockDispatcher,
+        }),
+      );
     });
 
     it('returns status down with scopeManagementError HTTP_503 on non-2xx response', async () => {
@@ -150,12 +165,7 @@ describe('UniqueApiHealth', () => {
     });
 
     it('returns status down with scopeManagementError AUTH_FAILURE on auth error', async () => {
-      health = new UniqueApiHealth(
-        createFailingAuth() as any,
-        'http://ingestion',
-        'http://scope-mgmt',
-        3000,
-      );
+      health = createHealth(createFailingAuth() as any);
       const his = createHealthIndicatorService();
 
       const result = await health.checkScopeManagement('scopeManagement', his as any);

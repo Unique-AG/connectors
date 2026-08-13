@@ -99,7 +99,7 @@ export class ProxyService implements OnModuleDestroy {
 
     if (proxyConfig.authMode === 'username_password') {
       const credentials = Buffer.from(
-        `${proxyConfig.username}:${proxyConfig.password.value}`,
+        `${proxyConfig.username.value}:${proxyConfig.password.value}`,
       ).toString('base64');
       proxyOptions.token = `Basic ${credentials}`;
     }
@@ -117,7 +117,7 @@ export class ProxyService implements OnModuleDestroy {
     }
 
     if (proxyConfig.headers) {
-      proxyOptions.headers = proxyConfig.headers;
+      proxyOptions.headers = { ...proxyConfig.headers };
     }
 
     this.logger.log({
@@ -156,7 +156,7 @@ export class ProxyService implements OnModuleDestroy {
     }
 
     if (proxyConfig.headers) {
-      agentOptions.headers = proxyConfig.headers;
+      agentOptions.headers = { ...proxyConfig.headers };
     }
 
     this.logger.log({
@@ -175,7 +175,7 @@ export class ProxyService implements OnModuleDestroy {
   }
 
   private buildAuthenticatedProxyUrl(proxyConfig: BasicProxyConfig): string {
-    const username = encodeURIComponent(proxyConfig.username);
+    const username = encodeURIComponent(proxyConfig.username.value);
     const password = encodeURIComponent(proxyConfig.password.value);
     return `${proxyConfig.protocol}://${username}:${password}@${proxyConfig.host}:${proxyConfig.port}`;
   }

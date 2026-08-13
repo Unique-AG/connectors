@@ -1,9 +1,24 @@
+import { Redacted } from '@unique-ag/utils';
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
-import { json, redacted } from '@unique-ag/utils/zod';
+import { json } from '@unique-ag/utils/zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
 
 const requiredStringSchema = z.string().trim().nonempty();
+
+const ENV_REF_PREFIX = 'os.environ/';
+
+const envResolvableStringSchema = z.string().transform((val) => {
+  if (!val.startsWith(ENV_REF_PREFIX)) {
+    return val;
+  }
+  const varName = val.slice(ENV_REF_PREFIX.length);
+  return process.env[varName] ?? '';
+});
+
+const envRequiredSecretSchema = envResolvableStringSchema
+  .pipe(z.string().trim().nonempty())
+  .transform((val) => new Redacted(val));
 
 const portSchema = z.coerce.number().int().positive().max(65535);
 
@@ -37,8 +52,12 @@ const noAuthProxyConfigSchema = z.object({
 const basicProxyConfigSchema = z.object({
   authMode: z.literal('username_password').describe('Basic authentication'),
   ...baseProxyFields,
-  username: requiredStringSchema.describe('Proxy username'),
-  password: redacted(z.string().nonempty()).describe('Proxy password'),
+  username: envRequiredSecretSchema.describe(
+    'Proxy username. Use "os.environ/ENV_VAR_NAME" to read from an environment variable at runtime.',
+  ),
+  password: envRequiredSecretSchema.describe(
+    'Proxy password. Use "os.environ/ENV_VAR_NAME" to read from an environment variable at runtime.',
+  ),
 });
 
 const tlsProxyConfigSchema = z.object({

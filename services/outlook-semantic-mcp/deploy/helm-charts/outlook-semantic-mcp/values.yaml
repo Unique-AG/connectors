@@ -38,7 +38,14 @@ env:
 #         secretKeyRef:
 #           name: outlook-semantic-mcp-zitadel-secret
 #           key: UNIQUE_ZITADEL_CLIENT_SECRET
-#     # For proxy basic auth password (required when proxyConfig.authMode is 'username_password')
+#     # For proxy basic auth (required when proxyConfig.authMode is 'username_password').
+#     # Keep credentials out of Helm values with os.environ/ references:
+#     #   proxyConfig.username: os.environ/PROXY_USERNAME_SECRET
+#     - name: PROXY_USERNAME_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: outlook-semantic-mcp-secret
+#           key: PROXY_USERNAME
 #     - name: PROXY_PASSWORD
 #       valueFrom:
 #         secretKeyRef:
@@ -458,8 +465,8 @@ proxyConfig:
   # port: 8080
   # -- Proxy protocol: http or https (required for no_auth/username_password/ssl_tls modes)
   # protocol: http
-  # -- Basic auth username (required for username_password mode)
-  # username: proxy-user
+  # -- Basic auth username (required for username_password mode). Use "os.environ/ENV_VAR_NAME" to read from an environment variable at runtime.
+  # username: os.environ/PROXY_USERNAME_SECRET
   # password is loaded from a secret, see envVars example for PROXY_PASSWORD
   # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
   # sslCertPath: /app/proxy-certs/client.crt
