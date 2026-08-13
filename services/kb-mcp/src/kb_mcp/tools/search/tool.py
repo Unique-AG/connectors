@@ -10,11 +10,11 @@ Separation of concerns:
 """
 
 import logging
-from typing import Annotated, cast
+from typing import Annotated
 
 from fastmcp.dependencies import Depends
-from fastmcp.tools import tool
-from mcp.types import CallToolResult, ContentBlock, TextContent, ToolAnnotations
+from fastmcp.tools import ToolResult, tool
+from mcp.types import TextContent, ToolAnnotations
 from pydantic import Field
 from unique_mcp import (
     ConfigSchemaMeta,
@@ -31,9 +31,12 @@ from unique_toolkit.experimental.components.internal_search import (
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
-    REFERENCE_FORMAT_INFORMATION,
+    SEARCH_SYSTEM_PROMPT,
+    TOOL_DESCRIPTION_CITATION_GUIDANCE,
+    UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     chunk_to_text_content,
     citation_instruction_content,
+    is_unique_ai_client,
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.search.config import SearchToolConfig
@@ -44,11 +47,8 @@ _LOGGER = logging.getLogger(__name__)
 _META = merge_tool_meta(
     {
         "unique.app/icon": "search",
-        "unique.app/system-prompt": (
-            "Choose this tool if you need to search in the knowledge base. "
-            + REFERENCE_FORMAT_INFORMATION
-        ),
-        "unique.app/tool-format-information": REFERENCE_FORMAT_INFORMATION,
+        "unique.app/system-prompt": SEARCH_SYSTEM_PROMPT,
+        "unique.app/tool-format-information": UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     },
     ContextRequirements(
         required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID],
@@ -59,11 +59,11 @@ _META = merge_tool_meta(
 
 @tool(
     name="search",
-    # Not the docstring: this reuses REFERENCE_FORMAT_INFORMATION (also in
-    # _META below), and a literal docstring can't reference a module constant.
+    # Not the docstring: this reuses TOOL_DESCRIPTION_CITATION_GUIDANCE, and a
+    # literal docstring can't reference a module constant.
     description=(
         "Search the knowledge base for the given query and return relevant "
-        "chunks. " + REFERENCE_FORMAT_INFORMATION
+        "chunks. " + TOOL_DESCRIPTION_CITATION_GUIDANCE
     ),
     meta=_META,
     annotations=ToolAnnotations(
@@ -79,7 +79,7 @@ async def search(
         Field(description="The query to search for in the knowledge base."),
     ],
     config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
-) -> CallToolResult:
+) -> ToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
     kb_settings = get_settings()
     cid: str | None = None
@@ -108,8 +108,8 @@ async def search(
         _LOGGER.exception(
             "search error correlation_id=%s error_type=%s", cid, type(exc).__name__
         )
-        return CallToolResult(
-            isError=True, content=[TextContent(type="text", text=str(exc))]
+        return ToolResult(
+            content=[TextContent(type="text", text=str(exc))], is_error=True
         )
 
     frontend_base_url = kb_settings.frontend_base_url_str()
@@ -134,7 +134,9 @@ async def search(
         for i, chunk in enumerate(chunks, start=1)
     ]
     if content:
-        content.append(citation_instruction_content())
+        content.append(
+            citation_instruction_content(is_unique_ai_chat=is_unique_ai_client())
+        )
 
     _LOGGER.info("search complete correlation_id=%s result_count=%d", cid, len(chunks))
-    return CallToolResult(content=cast(list[ContentBlock], content))
+    return ToolResult(content=content)

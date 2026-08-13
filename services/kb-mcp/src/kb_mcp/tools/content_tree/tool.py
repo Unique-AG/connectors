@@ -9,8 +9,8 @@ import logging
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
-from fastmcp.tools import tool
-from mcp.types import CallToolResult, TextContent, ToolAnnotations
+from fastmcp.tools import ToolResult, tool
+from mcp.types import TextContent, ToolAnnotations
 from pydantic import Field
 from unique_mcp import (
     ConfigSchemaMeta,
@@ -162,7 +162,7 @@ async def content_tree(
         ),
     ] = False,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
-) -> CallToolResult:
+) -> ToolResult:
     """Browse the knowledge base's visible file/folder structure. Pick a
     `mode`; only that mode's args below apply, rest ignored. '*' = required.
     - mode='tree': max_depth — first orientation view of folders/files.
@@ -182,8 +182,8 @@ async def content_tree(
     cid: str | None = None
     try:
         if mode == "search" and not query:
-            return CallToolResult(
-                isError=True,
+            return ToolResult(
+                is_error=True,
                 content=[
                     TextContent(
                         type="text",
@@ -224,7 +224,7 @@ async def content_tree(
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
-            return CallToolResult(content=[TextContent(type="text", text=text)])
+            return ToolResult(content=[TextContent(type="text", text=text)])
 
         if mode == "list":
             rows = await tree_svc.resolve_visible_file_paths_async(
@@ -257,7 +257,7 @@ async def content_tree(
                 mode,
                 len(rows),
             )
-            return CallToolResult(content=[TextContent(type="text", text=text)])
+            return ToolResult(content=[TextContent(type="text", text=text)])
 
         assert query is not None and mode == "search"
         matches = await tree_svc.search_visible_files_fuzzy_async(
@@ -286,7 +286,7 @@ async def content_tree(
             mode,
             len(matches),
         )
-        return CallToolResult(content=[TextContent(type="text", text=text)])
+        return ToolResult(content=[TextContent(type="text", text=text)])
     except Exception as exc:
         _LOGGER.exception(
             "content_tree error correlation_id=%s mode=%s error_type=%s",
@@ -294,6 +294,6 @@ async def content_tree(
             mode,
             type(exc).__name__,
         )
-        return CallToolResult(
-            isError=True, content=[TextContent(type="text", text=str(exc))]
+        return ToolResult(
+            is_error=True, content=[TextContent(type="text", text=str(exc))]
         )

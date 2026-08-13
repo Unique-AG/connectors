@@ -4,7 +4,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from mcp.types import CallToolResult
+from fastmcp.tools import ToolResult
 from pydantic import SecretStr
 from unique_toolkit.experimental.components.content_tree.schemas import (
     MatchTarget as ServiceMatchTarget,
@@ -100,7 +100,7 @@ async def test_mode_tree_returns_tree_view_only():
             config=ContentTreeToolConfig(),
         )
 
-    assert isinstance(result, CallToolResult)
+    assert isinstance(result, ToolResult)
     text = result.content[0].text  # type: ignore[union-attr]
     assert text == "TREE VIEW"
     assert "list-result" not in text
@@ -133,7 +133,7 @@ async def test_mode_list_returns_list_view_only():
             config=ContentTreeToolConfig(),
         )
 
-    assert isinstance(result, CallToolResult)
+    assert isinstance(result, ToolResult)
     text = result.content[0].text  # type: ignore[union-attr]
     assert "[LIST/VIEW](unique://content/list-result) (content_id=list-result)" in text
     assert "TREE VIEW" not in text
@@ -150,7 +150,7 @@ async def test_mode_search_returns_search_view_only():
             config=ContentTreeToolConfig(),
         )
 
-    assert isinstance(result, CallToolResult)
+    assert isinstance(result, ToolResult)
     text = result.content[0].text  # type: ignore[union-attr]
     assert (
         "[SEARCH/VIEW](unique://content/search-result) "
@@ -169,8 +169,8 @@ async def test_mode_search_without_query_returns_error_without_calling_service()
             config=ContentTreeToolConfig(),
         )
 
-    assert isinstance(result, CallToolResult)
-    assert result.isError is True
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
     assert result.content[0].text == "query is required when mode='search'"  # type: ignore[union-attr]
     mock_cls.assert_not_called()
 
@@ -286,7 +286,7 @@ async def test_refresh_true_invalidates_caller_cache_only():
 
     mock_tree.invalidate_cache.assert_called_once_with()
     mock_tree.render_visible_tree_async.assert_called_once()
-    assert isinstance(result, CallToolResult)
+    assert isinstance(result, ToolResult)
     assert result.content[0].text == "tree output"  # type: ignore[union-attr]
 
 
@@ -388,7 +388,7 @@ async def test_identity_refusal_surfaces_as_tool_error(identity):
     identity.side_effect = ValueError("Refusing UNIQUE_AUTH_* env fallback")
     result = await content_tree(mode="tree", config=ContentTreeToolConfig())
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
 
 
