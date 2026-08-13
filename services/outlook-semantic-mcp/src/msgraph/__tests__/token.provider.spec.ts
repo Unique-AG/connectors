@@ -1,11 +1,17 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import type { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../../__mocks__';
+
+vi.mock('undici', () => ({
+  fetch: vi.fn(),
+}));
+
+import { fetch } from 'undici';
 import { TokenProvider } from '../token.provider';
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+const mockFetch = vi.mocked(fetch);
+const mockDispatcher = { kind: 'proxy-dispatcher' } as unknown as Dispatcher;
 
 describe('TokenProvider', () => {
   const mockConfig = {
@@ -18,6 +24,7 @@ describe('TokenProvider', () => {
   const mockDependencies = {
     drizzle: new MockDrizzleDatabase(),
     encryptionService: new MockEncryptionService(),
+    dispatcher: mockDispatcher,
   };
 
   beforeEach(() => {
@@ -85,7 +92,7 @@ describe('TokenProvider', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue(mockTokenResponse),
-      });
+      } as never);
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -106,6 +113,7 @@ describe('TokenProvider', () => {
             client_secret: 'test-client-secret',
             scope: 'https://graph.microsoft.com/.default',
           }),
+          dispatcher: mockDispatcher,
         },
       );
 
@@ -128,7 +136,7 @@ describe('TokenProvider', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue(mockTokenResponse),
-      });
+      } as never);
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -175,7 +183,7 @@ describe('TokenProvider', () => {
         status: 400,
         statusText: 'Bad Request',
         text: vi.fn().mockResolvedValue('Invalid refresh token'),
-      });
+      } as never);
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 

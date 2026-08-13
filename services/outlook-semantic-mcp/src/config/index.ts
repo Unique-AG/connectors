@@ -1,3 +1,4 @@
+import type { ProxyConfigNamespaced } from '@unique-ag/proxy';
 import type { AMQPConfigNamespaced } from './amqp.config';
 import type { AppConfigNamespaced } from './app.config';
 import type { AuthConfigNamespaced } from './auth.config';
@@ -27,4 +28,5 @@ export type ConfigNamespaced = AMQPConfigNamespaced &
   MicrosoftConfigNamespaced &
   UniqueConfigNamespaced &
   DelegatedAccessConfigNamespaced &
-  IngestionConfigNamespaced;
+  IngestionConfigNamespaced &
+  ProxyConfigNamespaced;

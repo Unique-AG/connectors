@@ -3,6 +3,7 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
+import { ProxyModule, ProxyService, proxyConfig } from '@unique-ag/proxy';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
@@ -19,7 +20,7 @@ import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
-import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
+import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import {
   type AppConfig,
   type AppConfigNamespaced,
@@ -32,6 +33,7 @@ import {
   encryptionConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
 import { delegatedAccessConfig } from './config/delegated-access.config';
@@ -59,7 +61,14 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         uniqueConfig,
         delegatedAccessConfig,
         ingestionConfig,
+        proxyConfig,
       ],
+    }),
+    ProxyModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<UniqueConfigNamespaced, true>) => ({
+        isExternal: config.get('unique', { infer: true }).serviceAuthMode === 'external',
+      }),
     }),
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
@@ -119,6 +128,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         CACHE_MANAGER,
         MetricService,
         AmqpConnection,
+        ProxyService,
       ],
       useFactory: async (
         configService: ConfigService<
@@ -130,8 +140,9 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         cacheManager: Cache,
         metricService: MetricService,
         amqpConnection: AmqpConnection,
+        proxyService: ProxyService,
       ) => ({
-        provider: MicrosoftOAuthProvider,
+        provider: createMicrosoftOAuthProvider(proxyService.getHttpAgent({ mode: 'always' })),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
         clientSecret: configService.get('microsoft.clientSecret', {

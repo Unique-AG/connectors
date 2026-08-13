@@ -49,6 +49,7 @@
     "@unique-ag/mcp-oauth": "workspace:*",
     "@unique-ag/mcp-server-module": "workspace:*",
     "@unique-ag/probe": "workspace:*",
+    "@unique-ag/proxy": "workspace:*",
     "@unique-ag/unique-api": "workspace:*",
     "@unique-ag/utils": "workspace:*",
     "amqplib": "0.10.9",

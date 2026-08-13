@@ -41,6 +41,7 @@ logger = packages/logger/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
+proxy = packages/proxy/**
 utils = packages/utils/**
 unique-api = packages/unique-api/**
 

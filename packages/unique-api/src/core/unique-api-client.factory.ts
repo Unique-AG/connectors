@@ -41,6 +41,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       config.ingestion.baseUrl,
       config.scopeManagement.baseUrl,
       config.healthCheckTimeoutMs ?? DEFAULT_HEALTH_CHECK_TIMEOUT_MS,
+      dispatcher,
     );
 
     const scopeManagementGraphQlClient = new UniqueGraphqlClient(
