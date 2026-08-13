@@ -7,14 +7,12 @@ from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
-from backstop_mcp.features.custom_fields import glossary_meta
 from backstop_mcp.features.data_hygiene import (
     AsOf,
     ProvenanceFields,
     as_of_response,
     extract_as_of,
 )
-from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
@@ -66,7 +64,6 @@ type GetOrganizationResponse = (
         idempotentHint=True,
         openWorldHint=False,
     ),
-    meta=glossary_meta(EntityType.ORGANIZATIONS),
 )
 async def get_organization(
     ctx: Context,
@@ -100,8 +97,8 @@ async def get_organization(
     Responses include `as_of` provenance when Backstop provides modifiedTimestamp/modifiedBy.
     Relay that provenance to the user; do not treat record age as a staleness verdict.
 
-    When the custom-field glossary on this tool is truncated or missing, call
-    `list_custom_fields` with entity_type=organizations.
+    When you need custom field names for this organization, call `list_custom_fields` with
+    entity_type=organizations.
     """
     client = await get_backstop_client()
     result = await resolve_party(

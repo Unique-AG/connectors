@@ -44,7 +44,6 @@ from backstop_mcp.features.custom_fields import (
 from backstop_mcp.features.data_hygiene import create_employment_index_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
-from backstop_mcp.server.middleware import CustomFieldGlossaryMiddleware
 from backstop_mcp.server.runtime import Services, configure_services, reset_services
 from backstop_mcp.server.tools import TOOLS
 
@@ -153,14 +152,6 @@ def create_app(
         "Backstop MCP",
         version=config.version,
         auth=auth_provider,
-        middleware=[
-            CustomFieldGlossaryMiddleware(
-                custom_fields_service,
-                # A bound method, safe to capture: it reads the factory's auth context at call
-                # time, and `attach_auth` above has already run.
-                client_for_caller=backstop_clients.for_current_caller,
-            )
-        ],
         lifespan=lifespan,
     )
     for fn in TOOLS:

@@ -18,8 +18,7 @@ async def warm_custom_field_schema(
 
     Schema snapshots are keyed by MCP OAuth `subject`, so a service-account fill cannot seed
     end-user catalogs without breaking caller isolation. This warmup only verifies the account
-    can reach Backstop; each caller's first authenticated `tools/list` or `list_custom_fields`
-    fills their own cache via `ensure_fresh`.
+    can reach Backstop; callers fill their own cache via `list_custom_fields` / `ensure_fresh`.
 
     `credential` is assembled by `create_app` (see `_service_account_credential`) rather than
     read back off the client factory. `None` is the normal case, not a failure. Errors are
