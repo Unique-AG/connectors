@@ -5,10 +5,16 @@ import pytest
 import respx
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_mcp.features import chats
+from office_mcp.features import chats, transcripts
 from office_mcp.graph_client import GraphThrottled
 
-from .conftest import GRAPH_V1, aad_member, chat_payload
+from .conftest import (
+    GRAPH_V1,
+    JOIN_WEB_URL,
+    aad_member,
+    chat_payload,
+    online_meeting_info,
+)
 
 _GUEST_MEMBER = "#microsoft.graph.anonymousGuestConversationMember"
 
@@ -184,6 +190,74 @@ class TestWhatTheCallerIsTold:
         assert description is not None
         assert "may" in description
         assert "not proof" in description
+
+    async def test_a_meeting_chat_carries_the_route_to_its_transcripts(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The whole of meeting discovery, and the reason there is no second tool for it: a meeting
+        chat is already listed here with its subject and its recency, and `onlineMeetingInfo` is
+        in this collection's default projection — so the handle that reaches the meeting behind it
+        costs no extra request and no extra permission."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload(
+                            "19:meeting_TjAwMDA@thread.v2",
+                            chat_type="meeting",
+                            topic="Pricing review",
+                            online_meeting_info=online_meeting_info(),
+                        ),
+                        chat_payload("19:release@thread.v2", chat_type="group"),
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
+
+        meeting_uri = listed.chats[0].meeting_uri
+        assert meeting_uri is not None
+        assert transcripts.meeting_handle(meeting_uri) == transcripts.MeetingHandle(JOIN_WEB_URL)
+        assert listed.chats[1].meeting_uri is None, "a group chat has no meeting behind it"
+
+    async def test_a_meeting_chat_with_no_join_url_offers_no_route_rather_than_a_broken_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The unverified half of the discovery path. `joinWebUrl` is documented on the chat
+        resource and modelled by the SDK, but no live call has proved it is always populated — and
+        it is the only documented route from a chat to its meeting. So a null is reported as a null:
+        no handle, and nothing invented from the chat id to stand in for one."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload(
+                            "19:meeting_TjAwMDA@thread.v2",
+                            chat_type="meeting",
+                            topic="Pricing review",
+                            online_meeting_info=online_meeting_info(join_web_url=None),
+                        )
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
+
+        assert listed.chats[0].chat_type == "meeting"
+        assert listed.chats[0].meeting_uri is None
+
+    def test_the_handle_field_says_a_null_is_a_dead_end(self) -> None:
+        """A model reads this description, and the honest reading of a null is "there is no route",
+        not "try something else" — there is nothing else to try."""
+        description = chats.ChatSummary.model_fields["meeting_uri"].description
+
+        assert description is not None
+        assert "no other route" in description
+        assert "list_meeting_transcripts" in description
 
     async def test_an_unknown_chat_type_does_not_fail_the_listing(
         self, client: GraphServiceClient, graph: respx.MockRouter

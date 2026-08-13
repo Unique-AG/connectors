@@ -16,6 +16,15 @@ Three Graph facts shape everything here, all from the list-chats reference
   exactly how a model comes to summarise a 200-person chat from 25 names. So a list that arrives
   full to the cap is reported as *possibly* incomplete — which is the whole of what is known: a
   chat with exactly 25 members and one with 200 come back identical.
+
+A meeting chat carries one thing more, and it is why there is no separate meeting-discovery tool:
+`chat.onlineMeetingInfo.joinWebUrl` is the only value a delegated caller is given that addresses the
+`onlineMeeting` behind the chat, and a join URL is how Graph's transcript chain starts. It is a
+property of this collection's default projection rather than something asked for — the endpoint
+supports `$expand`, `$top`, `$filter` and `$orderby` and nothing else, so it could not be
+`$select`ed even if it were absent. Turning it into a handle is `transcripts`' job, which is where
+the meeting handle grammar lives; this module only asks for it, and reports its absence as an
+absence.
 """
 
 from datetime import datetime
@@ -27,6 +36,7 @@ from msgraph.generated.users.item.chats.chats_request_builder import ChatsReques
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
+from office_mcp.features.transcripts import meeting_uri_for
 from office_mcp.graph_client import collect_pages, graph_errors
 
 # Reading a chat's `lastMessagePreview` is reading a message, which `Chat.ReadBasic` — "read the
@@ -78,6 +88,19 @@ class ChatSummary(BaseModel):
         description=(
             "The chat's name. Null for every oneOnOne chat and for group chats nobody named — "
             + "those are identified by `members` instead."
+        )
+    )
+    meeting_uri: str | None = Field(
+        description=(
+            "For a meeting chat, a handle for the Teams meeting behind it — pass it verbatim to "
+            + "list_meeting_transcripts to find out whether the meeting was transcribed and "
+            + "to read what was said in it. This is the only route from a conversation to a "
+            + "transcript: Microsoft addresses a meeting by the join URL this handle carries, and "
+            + "nothing turns a chat id, a topic or a date into one.\n"
+            + "Null for every chat whose `chat_type` is not `meeting`, and also null for a meeting "
+            + "chat Microsoft returned no join URL for — in which case that meeting's transcripts "
+            + "are unreachable from this connector, there is no other route to try, and the honest "
+            + "answer is to say so rather than to search for one."
         )
     )
     last_message_at: datetime | None = Field(
@@ -160,10 +183,12 @@ def _summarise(chat: Chat, include_member_emails: bool) -> ChatSummary:
     # narrows it to a plain `str` on the way in. Its `.value` would be the obvious thing to reach
     # for and is typed as a one-tuple, because the generated members carry trailing commas
     # (`OneOnOne = "oneOnOne",`).
+    meeting = chat.online_meeting_info
     return ChatSummary(
         chat_id=chat.id,
         chat_type=chat.chat_type if chat.chat_type is not None else "unknown",
         topic=chat.topic,
+        meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
         last_message_at=preview.created_date_time if preview is not None else None,
         created_at=chat.created_date_time,
         members=members,

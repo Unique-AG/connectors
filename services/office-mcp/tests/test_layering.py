@@ -41,14 +41,21 @@
    those are reachable without ever spelling `msgraph`. A tool that builds one has put the shape of
    a Graph call in the layer whose only job is to expose it, and rule 6 alone would not notice.
 
-9. **Only `features/message_search.py` may spell a `teams:///` handle.** A handle is minted by the
-   search that produces it and parsed by the one grammar that lives with it, which is why
-   `message_read` and `channels` take `MessageHandle` from there rather than assembling a URI of
-   their own. Two modules that each knew how to write one would be free to disagree, and the
-   disagreement would look like a message that cannot be read — which is exactly the failure the
-   third (reply) shape exists to fix. `server/` is not subject to this: a tool description names the
-   shapes so a model knows what it may pass, and that is prose rather than a second implementation.
-
+9. **A `teams:///` handle family has exactly one speller.** `features/message_search.py` owns
+   `teams:///chats/…` and `teams:///teams/…`; `features/transcripts.py` owns `teams:///meetings/…`
+   and `teams:///transcripts/…`. Nothing else in `features/` may spell the scheme at all. A
+   handle is minted by the tool that can produce it and parsed by the one grammar that lives with
+   it, which is why `message_read` and `channels` take `MessageHandle` from `message_search` and why
+   `chats` asks `transcripts` for a meeting handle rather than assembling a URI of its own. Two
+   modules that each knew how to write one would be free to disagree, and the disagreement would
+   look like a handle that cannot be read — which is exactly the failure the reply shape exists to
+   fix. The rule was originally "only `message_search`", and it is a *family* rule rather than a
+   module rule because the second family has a different owner for a reason: a meeting is addressed
+   by a join URL that only a chat can supply, and the permission a transcript is read under is
+   nothing to do with the one a message is read under. Widening it to "any feature may write a
+   handle" is what it must never become. `server/` is not subject to this: a tool description names
+   the shapes so a model knows what it may pass, and that is prose rather than a second
+implementation.
 Every rule is paired with a guard that fails if the rule has become vacuous — an empty tree to walk,
 a missing file to forbid reaching for, a framework nothing imports any more. None of them is
 conditional: every package these rules are about now exists, so a rule that stops running is a
@@ -60,6 +67,7 @@ reported as a failing test with a file and line instead of an ImportError at col
 
 import ast
 import pathlib
+import re
 import sys
 
 import pytest
@@ -80,12 +88,17 @@ _GRAPH_SDK = "msgraph"
 _GRAPH_REQUEST_LAYER: tuple[str, ...] = ("kiota_abstractions", "kiota_http", "msgraph_core")
 _MCP_FRAMEWORK = "fastmcp"
 
-# The scheme every message handle this connector mints is written in, and the one feature module
-# allowed to write it. Matched as text rather than through the AST because what rule 9 forbids is a
+# The scheme every handle this connector mints is written in, and which feature module owns which
+# family of them. Matched as text rather than through the AST because what rule 9 forbids is a
 # handle being *spelled* anywhere else — as an f-string, a format template or a concatenation, each
-# of which is a different AST and the same duplication.
+# of which is a different AST and the same duplication. The family is the first path segment after
+# the scheme, which is why the grammars keep their segments distinct.
 _HANDLE_SCHEME = "teams:///"
-_HANDLE_GRAMMAR = _FEATURES / "message_search.py"
+_HANDLE_OWNERS: dict[str, frozenset[str]] = {
+    "message_search.py": frozenset({"chats", "teams"}),
+    "transcripts.py": frozenset({"meetings", "transcripts"}),
+}
+_HANDLE_FAMILY = re.compile(re.escape(_HANDLE_SCHEME) + r"([A-Za-z_]*)")
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
@@ -549,25 +562,28 @@ class TestTheServerLayerDoesNotSpeakGraph:
         )
 
 
-class TestTheHandleGrammarHasOneHome:
-    def test_the_module_that_owns_it_actually_writes_one(self) -> None:
-        """Guards the guard: if handles stopped being minted there, the rule below would forbid
-        something nothing does and the grammar would have quietly moved."""
-        assert _HANDLE_SCHEME in _HANDLE_GRAMMAR.read_text(), (
-            f"{_HANDLE_GRAMMAR.name} no longer mints a handle; rule 9 names the wrong module"
+class TestEachHandleFamilyHasOneHome:
+    @pytest.mark.parametrize("owner", sorted(_HANDLE_OWNERS))
+    def test_the_module_that_owns_a_family_actually_writes_it(self, owner: str) -> None:
+        """Guards the guard: if a family stopped being minted where the rule says it is, the rule
+        would forbid something nothing does and the grammar would have quietly moved."""
+        written = set(_HANDLE_FAMILY.findall((_FEATURES / owner).read_text()))
+
+        assert written == _HANDLE_OWNERS[owner], (
+            f"{owner} spells the handle families {sorted(written)}, and rule 9 gives it "
+            + f"{sorted(_HANDLE_OWNERS[owner])}"
         )
 
-    @pytest.mark.parametrize(
-        "source",
-        sorted(path for path in _FEATURES.rglob("*.py") if path != _HANDLE_GRAMMAR),
-        ids=_source_id,
-    )
-    def test_no_other_feature_module_writes_a_handle(self, source: pathlib.Path) -> None:
-        assert _HANDLE_SCHEME not in source.read_text(), (
-            f"only {_HANDLE_GRAMMAR.name} may spell a {_HANDLE_SCHEME} handle — it is minted and "
-            + "parsed there, and a second speller is free to disagree with it. Build a "
-            + "`MessageHandle` and read its `uri` instead:\n  "
-            + str(source.relative_to(_SRC))
+    @pytest.mark.parametrize("source", sorted(_FEATURES.rglob("*.py")), ids=_source_id)
+    def test_no_feature_module_writes_another_families_handle(self, source: pathlib.Path) -> None:
+        owned = _HANDLE_OWNERS.get(source.name, frozenset())
+        trespasses = sorted(set(_HANDLE_FAMILY.findall(source.read_text())) - owned)
+
+        assert not trespasses, (
+            f"{source.relative_to(_SRC)} spells the handle families {trespasses}, which it does "
+            + f"not own — each family is minted and parsed in one module ({_HANDLE_OWNERS}), and a "
+            + "second speller is free to disagree with it. Build that module's handle type and "
+            + "read its `uri` instead."
         )
 
 

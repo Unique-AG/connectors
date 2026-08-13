@@ -121,6 +121,47 @@ async def test_a_throttle_without_a_retry_after_says_so_rather_than_guessing(
     assert retry_sleeps.delays, "the SDK still backs off, it just picks the delay itself"
 
 
+async def test_the_inner_code_is_carried_because_it_is_the_only_thing_that_differs(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    """Two Teams transcript refusals share a status and an outer code and have opposite remedies —
+    one is a tenant switch only a Teams administrator can flip, the other is a format to ask for
+    again — so `innerError.code` is the whole of the difference. It is not one of the SDK's typed
+    inner-error fields, so it arrives in `additional_data` and would be dropped without this.
+    """
+    graph.get("/me").mock(
+        return_value=httpx.Response(
+            403,
+            json={
+                "error": {
+                    "code": "Forbidden",
+                    "message": "Graph API access to transcripts is disabled for this tenant.",
+                    "innerError": {"code": "GraphAccessToTranscriptsDisabled"},
+                }
+            },
+        )
+    )
+
+    with pytest.raises(GraphForbidden) as raised, graph_errors():
+        _ = await client.me.get()
+
+    assert raised.value.code == "Forbidden", "the outer code says nothing actionable"
+    assert raised.value.inner_code == "GraphAccessToTranscriptsDisabled"
+
+
+async def test_an_error_without_an_inner_code_reports_none_rather_than_the_outer_one(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    graph.get("/me").mock(
+        return_value=httpx.Response(403, json={"error": {"code": "accessDenied", "message": "no"}})
+    )
+
+    with pytest.raises(GraphForbidden) as raised, graph_errors():
+        _ = await client.me.get()
+
+    assert raised.value.inner_code is None
+
+
 async def test_never_reaching_graph_is_reported_as_upstream_not_as_a_bad_request(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:

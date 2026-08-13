@@ -44,14 +44,20 @@ def chat_payload(
     topic: str | None = "Release planning",
     last_message_at: str | None = "2026-02-11T09:15:22.31Z",
     members: Sequence[Mapping[str, object]] | None = None,
+    online_meeting_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """One `chat` as `GET /me/chats?$expand=members,lastMessagePreview` returns it."""
+    """One `chat` as `GET /me/chats?$expand=members,lastMessagePreview` returns it.
+
+    `onlineMeetingInfo` is in the default projection of this collection — Graph sends it as null for
+    every chat that is not a meeting's — so it is always present here and only sometimes populated.
+    """
     payload: dict[str, object] = {
         "id": chat_id,
         "chatType": chat_type,
         "topic": topic,
         "createdDateTime": "2026-01-04T12:00:00Z",
         "lastUpdatedDateTime": "2026-02-11T09:15:22.31Z",
+        "onlineMeetingInfo": dict(online_meeting_info) if online_meeting_info is not None else None,
         "members": list(members) if members is not None else [aad_member("Ada Lovelace")],
     }
     if last_message_at is not None:
@@ -61,6 +67,115 @@ def chat_payload(
             "body": {"contentType": "text", "content": "synthetic preview"},
         }
     return payload
+
+
+# A join URL shaped like the ones Graph actually stores, and the reason the escaping is a bug class:
+# it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b`/`%22`
+# in its value, and an `&` parameter after it. Every one of those breaks a `$filter` that is encoded
+# too little, too much, or not at all — and breaks it into `200 OK` with an empty result.
+JOIN_WEB_URL = (
+    "https://teams.microsoft.invalid/l/meetup-join/"
+    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
+    + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
+)
+
+MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+
+
+def online_meeting_info(join_web_url: str | None = JOIN_WEB_URL) -> dict[str, object]:
+    """A meeting chat's `onlineMeetingInfo`, with or without the one field that matters.
+
+    A null `joinWebUrl` is the case the whole design has to survive: it is the only documented route
+    from a chat to its meeting, and no live call has proved it is always populated.
+    """
+    return {
+        "calendarEventId": "AAMkAGSYNTHETIC",
+        "joinWebUrl": join_web_url,
+        "organizer": {
+            "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "id": "00000000-0000-4000-8000-000000000002",
+                "displayName": "Grace Hopper",
+            }
+        },
+    }
+
+
+def meeting_payload(
+    *,
+    meeting_id: str = MEETING_ID,
+    subject: str | None = "Pricing review",
+    meeting_type: str | None = "scheduled",
+    start: str | None = "2026-02-10T14:00:00Z",
+    end: str | None = "2026-02-10T15:00:00Z",
+) -> dict[str, object]:
+    """One `onlineMeeting`, as the `JoinWebUrl` filter returns it: inside a one-element list."""
+    return {
+        "id": meeting_id,
+        "subject": subject,
+        "meetingType": meeting_type,
+        "joinWebUrl": JOIN_WEB_URL,
+        "startDateTime": start,
+        "endDateTime": end,
+    }
+
+
+def transcript_payload(
+    *,
+    transcript_id: str = "MSMjMCMjSYNTHETIC0001",
+    meeting_id: str = MEETING_ID,
+    created_at: str | None = "2026-02-10T14:03:11.204Z",
+    ended_at: str | None = "2026-02-10T14:58:02.117Z",
+    content_correlation_id: str | None = "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+) -> dict[str, object]:
+    """One `callTranscript`, which is metadata only — the words come from `/content`."""
+    return {
+        "id": transcript_id,
+        "meetingId": meeting_id,
+        "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+        "createdDateTime": created_at,
+        "endDateTime": ended_at,
+        "contentCorrelationId": content_correlation_id,
+    }
+
+
+# A synthetic WebVTT transcript in the shape Graph's `/content` returns, exercising everything the
+# parser has to survive: the header, a NOTE block, cue identifier lines, a voice tag with a class,
+# a cue wrapped over two lines, escaped entities, inline markup, a cue nobody was attributed for,
+# and the negative offset Microsoft documents for transcription that started mid-conversation.
+# Nothing anybody said: the speakers are long dead and the words are invented.
+TRANSCRIPT_VTT = """WEBVTT
+
+NOTE this transcript is synthetic
+
+-00:00:02.500 --> 00:00:01.250
+<v Ada Lovelace>Sorry, joining late &amp; muted.</v>
+
+f1f0c0de-0001
+00:00:16.246 --> 00:00:19.900
+<v.loud Grace Hopper>We should <i>raise</i> the floor price
+by three per cent.</v>
+
+f1f0c0de-0002
+00:01:02.000 --> 00:01:04.500
+<v Ada Lovelace>Agreed &lt;that&gt; works.</v>
+
+f1f0c0de-0003
+01:00:00.000 --> 01:00:02.000
+Nobody was attributed for this one.
+
+f1f0c0de-0004
+01:00:03.000 --> 01:00:04.000
+<v Ada Lovelace></v>
+"""
+
+# The same transcript as the unattributed format returns it: cue timings, no voice tags at all.
+TRANSCRIPT_UNATTRIBUTED = """00:00:16.246 --> 00:00:19.900
+We should raise the floor price by three per cent.
+
+00:01:02.000 --> 00:01:04.500
+Agreed that works.
+"""
 
 
 def aad_member(display_name: str, *, email: str | None = None) -> dict[str, object]:

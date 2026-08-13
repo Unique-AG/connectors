@@ -18,6 +18,7 @@ import logging
 import re
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from typing import cast
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -253,6 +254,90 @@ _REPLY: dict[str, object] = {
     "mentions": [],
 }
 
+# The meeting side, end to end. The join URL is shaped like the ones Graph stores — already-escaped
+# `%3a`/`%40`, a `?context=` query, an `&` parameter — because that shape is what the `$filter` has
+# to survive. Nothing here is a real meeting: the words are invented and the speakers are long dead.
+_JOIN_WEB_URL = (
+    "https://teams.microsoft.invalid/l/meetup-join/"
+    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
+    + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
+)
+_MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+_TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0001"
+_MEETINGS_PATH = "/me/onlineMeetings"
+_TRANSCRIPTS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/transcripts"
+_CONTENT_PATH = f"{_TRANSCRIPTS_PATH}/{_TRANSCRIPT_ID}/content"
+
+_MEETING_CHATS = {
+    "value": [
+        {
+            "id": "19:meeting_TjAwMDAwMDAwMDAwMA@thread.v2",
+            "chatType": "meeting",
+            "topic": "Pricing review",
+            "createdDateTime": "2026-02-10T13:55:00Z",
+            "lastUpdatedDateTime": "2026-02-10T15:01:00Z",
+            "onlineMeetingInfo": {
+                "calendarEventId": "AAMkAGSYNTHETIC",
+                "joinWebUrl": _JOIN_WEB_URL,
+                "organizer": {
+                    "user": {
+                        "id": "00000000-0000-4000-8000-000000000002",
+                        "displayName": "Grace Hopper",
+                    }
+                },
+            },
+            "lastMessagePreview": {
+                "id": "1770000000001",
+                "createdDateTime": "2026-02-10T15:01:00Z",
+                "body": {"contentType": "text", "content": "synthetic preview"},
+            },
+        }
+    ]
+}
+
+_MEETING = {
+    "value": [
+        {
+            "id": _MEETING_ID,
+            "subject": "Pricing review",
+            "meetingType": "scheduled",
+            "joinWebUrl": _JOIN_WEB_URL,
+            "startDateTime": "2026-02-10T14:00:00Z",
+            "endDateTime": "2026-02-10T15:00:00Z",
+        }
+    ]
+}
+
+_TRANSCRIPTS = {
+    "value": [
+        {
+            "id": _TRANSCRIPT_ID,
+            "meetingId": _MEETING_ID,
+            "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+            "createdDateTime": "2026-02-10T14:03:11.204Z",
+            "endDateTime": "2026-02-10T14:58:02.117Z",
+            "contentCorrelationId": "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+        }
+    ]
+}
+
+_TRANSCRIPT_VTT = """WEBVTT
+
+00:00:16.246 --> 00:00:19.900
+<v Grace Hopper>We should raise the floor price by three per cent.</v>
+
+00:01:02.000 --> 00:01:04.500
+<v Ada Lovelace>Agreed, that works.</v>
+"""
+
+_TENANT_SWITCH_OFF = {
+    "error": {
+        "code": "Forbidden",
+        "message": "Graph API access to transcripts is disabled for this tenant.",
+        "innerError": {"code": "GraphAccessToTranscriptsDisabled"},
+    }
+}
+
 _CHATS = {
     "value": [
         {
@@ -434,6 +519,8 @@ class TestTheToolsThisServerAdvertises:
             "browse_channel",
             "search_messages",
             "read_message",
+            "list_meeting_transcripts",
+            "read_transcript",
         }
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
@@ -475,6 +562,25 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(tools["browse_channel"].outputSchema)) == {"messages", "truncated"}
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
+            "truncated",
+            "next_offset",
+        }
+        assert set(_properties(tools["list_meeting_transcripts"].outputSchema)) == {
+            "status",
+            "meeting_id",
+            "subject",
+            "meeting_type",
+            "started_at",
+            "ended_at",
+            "transcripts",
+            "truncated",
+        }
+        assert set(_properties(tools["read_transcript"].outputSchema)) == {
+            "uri",
+            "meeting_id",
+            "transcript_id",
+            "speaker_attribution",
+            "turns",
             "truncated",
             "next_offset",
         }
@@ -520,6 +626,8 @@ class TestTheToolsThisServerAdvertises:
             "list_channels",
             "browse_channel",
             "search_messages",
+            "list_meeting_transcripts",
+            "read_transcript",
         ):
             assert "truncated" in _properties(tools[name].outputSchema), name
 
@@ -554,6 +662,65 @@ class TestTheToolsThisServerAdvertises:
         )
         assert "search_messages" in description
         assert "browse_channel" in description, "the reply shape has exactly one source"
+
+    async def test_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """A second reader, deliberately: a transcript is read under a different permission from a
+        message, and a token is exchanged per tool — so one polymorphic reader would have to redeem
+        transcript access to read a chat message. Its handle shape is therefore its own, and the
+        description has to name it and say which tool mints it."""
+        tools = _named(await mcp_client.list_tools())
+        schema = tools["read_transcript"].inputSchema
+        description = tools["read_transcript"].description
+        assert description is not None
+
+        assert set(_properties(schema)) == {"uri", "offset", "limit"}
+        assert schema.get("required") == ["uri"]
+        assert "teams:///transcripts/{meeting_id}/{transcript_id}" in description
+        assert "list_meeting_transcripts" in description
+        assert "read_message" in description, "the two readers must not be confusable"
+
+    async def test_list_meeting_transcripts_names_the_four_answers_and_their_remedies(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The three absences that must stay distinct, plus "no such meeting". A model can only act
+        differently on them if the tool says what each one means, so the words are asserted: the
+        one that means wait must say wait, and must say it is not the one that means stop."""
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_transcripts"].description
+        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        assert description is not None
+        rendered = description + str(status.get("description"))
+
+        for value in ("available", "not_ready", "not_transcribed", "meeting_not_found"):
+            assert value in description, value
+        assert "Wait and call again later" in description
+        assert 'NOT "there is no transcript"' in description
+        assert "Retrying will not help" in description
+        assert "no availability SLA" in rendered, "the inference has to be admitted as one"
+        assert "recurring" in description and "started_after" in description
+
+    async def test_list_meeting_transcripts_takes_a_meeting_handle_and_an_occurrence_window(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await mcp_client.list_tools())
+        schema = tools["list_meeting_transcripts"].inputSchema
+        properties = _properties(schema)
+        limit = _object(properties["limit"])
+
+        assert set(properties) == {"meeting_uri", "started_after", "started_before", "limit"}
+        assert schema.get("required") == ["meeting_uri"]
+        assert _optional_type(properties["started_after"]) == {
+            "type": "string",
+            "format": "date-time",
+        }
+        assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
+            "integer",
+            1,
+            50,
+            20,
+        )
 
     async def test_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
         self, mcp_client: Client[FastMCPTransport]
@@ -850,6 +1017,155 @@ class TestCallingThem:
                 "https://graph.microsoft.com/ChannelMessage.Read.All",
             ),
         ], "each tool exchanges a token for the permissions its own request needs"
+
+    async def test_a_model_walks_from_a_meeting_chat_to_what_was_said_in_the_meeting(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The flagship path of this piece, over the real protocol, with every value taken from the
+        previous answer exactly as a model would take it: which meetings are there (list_chats,
+        because a meeting chat *is* the index), what transcripts does this one have, and then the
+        words — speaker-attributed and timestamped, not a link to a file.
+
+        The oracle connector reaches a transcript only through an opaque URI it got from a calendar
+        read; this walk needs no calendar permission at all, and it ends in text.
+        """
+        chats_route = graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json=_MEETING_CHATS)
+        )
+        meeting = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        listing = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(200, json=_TRANSCRIPTS)
+        )
+        content = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                200, content=_TRANSCRIPT_VTT.encode(), headers={"content-type": "text/vtt"}
+            )
+        )
+
+        listed = _structured(await mcp_client.call_tool("list_chats", {"limit": 5}))
+        found = cast("Sequence[Mapping[str, object]]", listed["chats"])
+        meeting_uri = found[0]["meeting_uri"]
+        available = _structured(
+            await mcp_client.call_tool("list_meeting_transcripts", {"meeting_uri": meeting_uri})
+        )
+        listed_transcripts = cast("Sequence[Mapping[str, object]]", available["transcripts"])
+        read = _structured(
+            await mcp_client.call_tool("read_transcript", {"uri": listed_transcripts[0]["uri"]})
+        )
+
+        assert all(route.called for route in (chats_route, meeting, listing, content))
+        assert found[0]["chat_type"] == "meeting"
+        assert available["status"] == "available"
+        assert available["subject"] == "Pricing review"
+        assert available["meeting_id"] == _MEETING_ID
+        assert read["speaker_attribution"] is True
+        turns = cast("Sequence[Mapping[str, object]]", read["turns"])
+        assert [(turn["speaker"], turn["start_seconds"]) for turn in turns] == [
+            ("Grace Hopper", 16.246),
+            ("Ada Lovelace", 62.0),
+        ]
+        assert turns[0]["text"] == "We should raise the floor price by three per cent."
+        assert read["truncated"] is False
+        assert content.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert content.calls.last.request.headers["accept"] == "text/vtt"
+        assert obo.requested_scopes == [
+            ("https://graph.microsoft.com/Chat.Read",),
+            (
+                "https://graph.microsoft.com/OnlineMeetings.Read",
+                "https://graph.microsoft.com/OnlineMeetingTranscript.Read.All",
+            ),
+            ("https://graph.microsoft.com/OnlineMeetingTranscript.Read.All",),
+        ], "the reader needs only transcript access; resolving a join URL is the lister's job"
+
+    async def test_the_join_url_reaches_graph_encoded_exactly_once_over_the_real_protocol(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """End to end, the bug class: `services/teams-mcp` sends a raw join URL and Microsoft
+        answers `200 OK` with an empty result — a silent "meeting not found" — for any URL carrying
+        `&` or `#`. The handle carries the URL through the protocol unchanged, and the `$filter`
+        Graph receives has to decode back to exactly what Microsoft stored."""
+        graph.get("/me/chats").mock(return_value=httpx.Response(200, json=_MEETING_CHATS))
+        route = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        graph.get(_TRANSCRIPTS_PATH).mock(return_value=httpx.Response(200, json=_TRANSCRIPTS))
+
+        listed = _structured(await mcp_client.call_tool("list_chats", {}))
+        found = cast("Sequence[Mapping[str, object]]", listed["chats"])
+        _ = await mcp_client.call_tool(
+            "list_meeting_transcripts", {"meeting_uri": found[0]["meeting_uri"]}
+        )
+
+        url = route.calls.last.request.url
+        assert url.params["$filter"] == f"JoinWebUrl eq '{_JOIN_WEB_URL}'"
+        raw = url.query.decode()
+        assert "%253ameeting" in raw and "%2540thread" in raw and "%26anon%3Dtrue" in raw
+        assert "%2525" not in raw
+        assert obo.requested_scopes
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_transcript_text_reaches_the_caller_and_no_log_or_span(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A transcript is the most sensitive content this connector touches — a verbatim record of
+        what people said in a room — so the rule search and read are held to is tightest here: the
+        words reach the caller and no log line and no span attribute anywhere in the process."""
+        exporter = InMemorySpanExporter()
+        provider = trace.get_tracer_provider()
+        if not isinstance(provider, TracerProvider):
+            provider = TracerProvider()
+            trace.set_tracer_provider(provider)
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        secret = "acquisition-of-northwind-traders"
+        vtt = f"WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n<v Ada Lovelace>{secret}</v>\n"
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        graph.get(_TRANSCRIPTS_PATH).mock(return_value=httpx.Response(200, json=_TRANSCRIPTS))
+        _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=vtt.encode()))
+        caplog.set_level(logging.DEBUG)
+
+        result = await mcp_client.call_tool(
+            "read_transcript",
+            {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"},
+        )
+
+        turns = cast("Sequence[Mapping[str, object]]", _structured(result)["turns"])
+        assert turns[0]["text"] == secret, "the transcript has to have been returned"
+        for record in caplog.records:
+            assert secret not in _record_text(record), f"logged by {record.name}"
+        for span in exporter.get_finished_spans():
+            assert secret not in str(span.attributes)
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_meeting_no_join_url_matches_is_a_status_and_not_an_error(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """Microsoft answers this filter with `200 OK` and an empty `value` rather than a 404, so
+        "no match" must not arrive as a failure — and must not be reported as the meeting having
+        been deleted either."""
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json={"value": []}))
+        listing = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(200, json=_TRANSCRIPTS)
+        )
+
+        result = await mcp_client.call_tool(
+            "list_meeting_transcripts",
+            {"meeting_uri": f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"},
+        )
+
+        assert not result.is_error
+        body = _structured(result)
+        assert body["status"] == "meeting_not_found"
+        assert body["transcripts"] == []
+        assert not listing.called
 
     @pytest.mark.usefixtures("obo")
     async def test_a_channel_post_reaches_the_caller_and_no_log_or_span(
@@ -1360,6 +1676,126 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         message = _error_text(result)
         assert "ChannelMessage.Read.All" in message
         assert "Chat.Read" not in message, "this read was in a channel"
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "tool", ["list_meeting_transcripts", "read_transcript"], ids=["listing", "reading"]
+    )
+    async def test_the_tenant_transcript_switch_sends_the_caller_to_a_teams_administrator(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        tool: str,
+    ) -> None:
+        """The failure this connector has already paid for once, in `teams-mcp`. Microsoft Graph
+        access to transcripts is a tenant switch that is off by default, and while it is off every
+        transcript call returns 403 with no request-side workaround. Read as an ordinary 403 it
+        would send an administrator to grant a permission that was never missing, and read as a
+        consent problem it would send the user round the sign-in loop — so the remedy has to name
+        the Teams admin centre, name the cmdlet, and rule both of those out.
+        """
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(
+                403, headers={"request-id": "synthetic-request-id"}, json=_TENANT_SWITCH_OFF
+            )
+        )
+        graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                403, headers={"request-id": "synthetic-request-id"}, json=_TENANT_SWITCH_OFF
+            )
+        )
+        arguments = {
+            "list_meeting_transcripts": {
+                "meeting_uri": f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"
+            },
+            "read_transcript": {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"},
+        }[tool]
+
+        result = await mcp_client.call_tool(tool, arguments, raise_on_error=False)
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "Teams administrator" in message
+        assert "EnableGraphTranscriptAccess" in message
+        assert "not a consent problem" in message.replace("NOT a consent", "not a consent")
+        assert "sign in again will not change it" in message
+        assert "OnlineMeetingTranscript.Read.All" not in message, (
+            "naming the permission sends an administrator after one that was never missing"
+        )
+        assert "synthetic-request-id" in message
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        ("tool", "argument", "uri"),
+        [
+            ("list_meeting_transcripts", "meeting_uri", "teams:///transcripts/a/b"),
+            ("list_meeting_transcripts", "meeting_uri", "19:meeting_x@thread.v2"),
+            ("read_transcript", "uri", "teams:///meetings/https%3A%2F%2Fx.invalid%2Fa"),
+            ("read_transcript", "uri", "teams:///chats/19%3Ax%40thread.v2/messages/1"),
+        ],
+    )
+    async def test_each_meeting_tool_refuses_the_other_ones_handle_and_says_where_to_get_its_own(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        tool: str,
+        argument: str,
+        uri: str,
+    ) -> None:
+        """Four handle families now exist and a model will mix them up. Each refusal has to name the
+        one shape this tool reads and the one tool that mints it — "invalid handle" would leave a
+        model guessing, and guessing between families is exactly what produces a loop."""
+        meetings = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        content = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_TRANSCRIPT_VTT.encode())
+        )
+
+        result = await mcp_client.call_tool(tool, {argument: uri}, raise_on_error=False)
+
+        assert result.is_error
+        assert not meetings.called and not content.called, "a bad handle costs no Graph request"
+        message = _error_text(result)
+        expected = {
+            "list_meeting_transcripts": ("teams:///meetings/{join_web_url}", "list_chats"),
+            "read_transcript": (
+                "teams:///transcripts/{meeting_id}/{transcript_id}",
+                "list_meeting_transcripts",
+            ),
+        }[tool]
+        for fragment in expected:
+            assert fragment in message, message
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_transcript_graph_will_not_return_blames_the_meeting_window_not_the_handle(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """A 404 on a well-formed transcript handle is almost always age: Microsoft stops serving a
+        meeting's artifacts once the meeting expires. The message-reader's advice would be wrong
+        here in both directions — a transcript is not deleted by a user, and browsing a channel is
+        not a route to one."""
+        graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                404,
+                headers={"request-id": "synthetic-request-id"},
+                json={"error": {"code": "NotFound", "message": "Not Found"}},
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "read_transcript",
+            {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"},
+            raise_on_error=False,
+        )
+
+        assert result.is_error
+        message = _error_text(result)
+        assert "expires" in message
+        assert "list_meeting_transcripts" in message
+        assert "browse_channel" not in message
+        assert "synthetic-request-id" in message
 
     async def test_an_unconsented_search_names_both_permissions_it_asked_for(
         self,

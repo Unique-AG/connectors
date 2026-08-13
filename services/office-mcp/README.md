@@ -2,9 +2,10 @@
 
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes seven tools
-so far — `get_me`, `list_chats`, `list_teams`, `list_channels`, `browse_channel`, `search_messages`
-and `read_message` — and more land in later PRs, stacked on top of this one.
+Users sign in with their own Microsoft account and the server acts as them. It exposes nine tools
+so far — `get_me`, `list_chats`, `list_teams`, `list_channels`, `browse_channel`, `search_messages`,
+`read_message`, `list_meeting_transcripts` and `read_transcript` — and more land in later PRs,
+stacked on top of this one.
 
 ## Layout
 
@@ -33,8 +34,10 @@ Search is where a handle and a search-shaped sender are minted, and two modules 
 to spell a handle would be free to disagree; the disagreement would surface as a search result that
 cannot be read. The same rule runs one step further out: `channels` takes the message shape and the
 "did a person write this" test from `message_read`, so a post browsed in a channel and a message read
-by handle are the same type, normalised by the same function. A layering rule enforces the first
-half — only `message_search` may spell a handle.
+by handle are the same type, normalised by the same function. The meeting-side handles
+(`teams:///meetings/…`, `teams:///transcripts/…`) belong to `transcripts` for the same reason and by
+the same rule, and `chats` asks it for one rather than assembling a URI: a layering rule says each
+handle *family* has exactly one speller, and names which module owns which.
 
 The layering rules are that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse — nor **from FastMCP**, since deciding what an MCP client
@@ -92,6 +95,20 @@ consented to, which is why sign-in has to ask for it:
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
+| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts` (resolving a join URL to a meeting) |
+| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts`, `read_transcript` |
+
+**Transcripts need a tenant setting as well as a permission, and this is the one that surprises
+people.** Microsoft Graph access to Teams meeting transcripts is off by default and *"agents and apps
+can't access meeting transcripts, regardless of app-level permissions"* until a Teams administrator
+turns it on — Teams admin centre → Meetings → Meeting settings → Transcript API access, or
+`Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`. There is no
+Graph API to set it and no request-side workaround, so it is an onboarding step next to admin
+consent rather than something this connector can fix; `services/teams-mcp` learned this in PR #762
+and `docs/recordings-and-transcripts/operator.md` documents it. The neighbouring
+`-EnableAttributedTranscripts` setting is *not* a prerequisite: when it is off, `read_transcript`
+degrades to Microsoft's unattributed format and reports `speaker_attribution: false` rather than
+failing.
 
 `Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
 `$expand=lastMessagePreview`, and a message preview is a message.
@@ -159,6 +176,8 @@ gets that string onto the wire.
 | `browse_channel` | One channel's posts, each with its newest replies, in Graph's reply-chain order | `GET /teams/{id}/channels/{id}/messages?$expand=replies` |
 | `search_messages` | Teams messages matching keywords, a sender, mentions, a date range, attachment or read state | `POST /search/query` |
 | `read_message` | One Teams message in full — text, sender, mentions, attachments, edits, deletion | `GET /chats/{id}/messages/{id}`, `GET /teams/{id}/channels/{id}/messages/{id}[/replies/{id}]` |
+| `list_meeting_transcripts` | Whether a meeting was transcribed, and a handle per transcript | `GET /me/onlineMeetings?$filter=JoinWebUrl eq '…'`, `GET /me/onlineMeetings/{id}/transcripts` |
+| `read_transcript` | What was said in a meeting: speaker-attributed, timestamped turns | `GET /me/onlineMeetings/{id}/transcripts/{id}/content` |
 
 All are read-only, all take their caller's identity from the token rather than from a parameter, and
 all are described to the model in prose that names the traps rather than only the fields — `email` is
@@ -249,8 +268,9 @@ Decisions worth knowing:
   surface (`Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel) and a token is exchanged
   per tool, so one reader over every entity type would have to redeem the union of every read
   permission on every call: a tenant unwilling to grant meeting-transcript access would break
-  reading a chat message. Transcripts (which Microsoft addresses by a join-URL-derived handle) and
-  recordings therefore arrive as their own handle-taking readers rather than as new schemes here.
+  reading a chat message. That is no longer hypothetical — `read_transcript` is the second reader,
+  it takes its own handle shape, and it redeems `OnlineMeetingTranscript.Read.All` and nothing else,
+  so a tenant that withholds transcript access still reads messages.
 - **A message body is normalised, never passed through as Teams HTML.** Wrapper divs, `<at>`
   mentions, `<emoji alt="👀">`, hostedContents `<img>`, `<attachment>` placeholders and adaptive-card
   JSON all become readable text (`@Name`, the emoji itself, `[image]`, `[attachment: name]`,
@@ -268,10 +288,66 @@ Decisions worth knowing:
   answers deleted, invisible and absent identically); a 403 names the one permission that surface
   needs. The generic "check the id came from a tool response verbatim" advice is suppressed for the
   404 here, because the handle did come from one — that is `graph_tool_errors(..., not_found=...)`.
-- **A search query is never logged.** Not in a message, not as a structured field, not as a span
-  attribute — what someone searched their own messages for names people and deals. `teams-mcp` had
-  to remove query terms from its spans and logs after the fact; a test here asserts they never
-  arrive.
+- **Meeting discovery is `list_chats`, not a tool of its own.** A meeting chat is already listed
+  there, with the meeting's subject as its `topic` and its recency to order by, and Graph puts
+  `onlineMeetingInfo` in that collection's default projection — so the chat carries `meeting_uri`,
+  the handle `list_meeting_transcripts` takes, for no extra request and no extra permission. A
+  `find_meetings` beside `list_chats` would have been a second way to ask which meeting. It also
+  means no `Calendars.Read`: the connector stays Teams-only, where the M365 connector we compared
+  against reaches a transcript only through a URI it got from a calendar read.
+- **The join URL is the only route from a chat to a meeting, and it is not guaranteed.** Graph
+  documents exactly three delegated ways to reach an `onlineMeeting` — its id, its `joinWebUrl`, its
+  `joinMeetingId` — and a chat id is none of them. `chat.onlineMeetingInfo.joinWebUrl` is the one
+  value a delegated caller is handed. That the property is *populated*, and populated for meetings
+  the user did not organise, is **not verified against a live tenant**: it is documented on the
+  resource and modelled by the SDK, nothing says it is organiser-only, and no call has been made
+  that asked for it. So a null is a first-class outcome — `meeting_uri` is null, the description says
+  that meeting's transcripts are unreachable here, and nothing is invented from the chat id to stand
+  in. (`onlineMeeting` carries a `chatInfo.threadId`; filtering on it is undocumented and is not
+  shipped.)
+- **The `$filter` escaping is one line of doc and a live bug class.** *"joinWebUrl must be URL
+  encoded"*, and Microsoft's own example shows how far that goes: a `%3a` already in the stored URL
+  goes on the wire as `%253a`. `services/teams-mcp` doubles the OData quote and then hands the raw
+  URL to a JavaScript SDK that concatenates query parameters without encoding, so a join URL with an
+  `&` or a `#` — real ones have both — silently resolves to "meeting not found". Here the two
+  transforms are separate: the quote doubling is ours, the percent-encoding is the Python SDK's
+  (form-style URI-template expansion escapes `%`, `&`, `#`, `?` and `=`), and doing it twice would be
+  as wrong as not at all. Tests pin the bytes that reach the wire, at the feature level and again
+  over the protocol.
+- **`200 OK` with an empty `value` is an answer, not an error.** The `JoinWebUrl` filter never 404s,
+  so "no match" is `status: meeting_not_found` — reported as not proof the meeting is gone.
+- **Four statuses, because there are four different things to do.** `available`, `not_ready`,
+  `not_transcribed`, `meeting_not_found`. `not_ready` and `not_transcribed` are the *same* empty
+  collection from Graph and the opposite advice — wait, or stop — and Graph publishes no
+  "processing" status and no availability SLA, so the split is inferred from the meeting's end time
+  with a deliberately generous allowance and the field says so. A meeting Graph gave no end time for
+  counts as `not_ready`: one wasted call is cheaper than telling a caller a transcript will never
+  exist ten minutes before it arrives.
+- **The tenant switch gets its own remedy, keyed on the inner error code.** `403` +
+  `GraphAccessToTranscriptsDisabled` is not a permission problem and not a consent problem, so the
+  message names a Teams administrator and the cmdlet, and explicitly rules out re-consent and
+  signing in again. Microsoft says to branch on `innerError.code` and never on the message text, so
+  `GraphFailure` now carries `inner_code` — the SDK has no typed field for it, and it arrives in the
+  model's `additional_data`.
+- **Speaker attribution degrades instead of failing.** A tenant can permit transcripts and forbid
+  speaker names; Graph's documented remedy is to ask again for
+  `application/vnd.microsoft.graph.transcript+text`, which `read_transcript` does exactly once and
+  only for that inner code — the tenant switch answers with the same status and has no workaround.
+  `speaker_attribution: false` then says the words and the timings are all there and the names are
+  not. That is the gap `teams-mcp` still has (it hardcodes `Accept: text/vtt`).
+- **A recurring series is one meeting.** One join URL, one meeting id, one transcript collection, and
+  no occurrence addressing anywhere in Graph — so `started_after`/`started_before` scope to an
+  occurrence by when transcription began, filtered while paging rather than as a `$filter` (the
+  collection advertises `$filter` without documenting a single filterable property).
+- **`read_transcript` returns text, and only transcripts.** Recordings are deliberately absent:
+  Graph streams an MP4 inline with no ranged contract, an hour of 1080p is hundreds of megabytes, a
+  model cannot watch video, and delegated recording *content* is organiser-only by default. The
+  transcript is the artifact worth having anyway.
+- **A search query is never logged. Neither is a transcript.** Not in a message, not as a structured
+  field, not as a span attribute — what someone searched their own messages for names people and
+  deals, and a transcript is a verbatim record of a room. `teams-mcp` had to remove query terms from
+  its spans and logs after the fact; tests here assert both never arrive, and every transcript
+  fixture in the suite is synthetic.
 - **A refusal names its remedy, in one voice.** `server/errors.py` maps each Graph failure onto the
   one thing a model can do about it: 401 → ask the user to sign in again, 403 → ask an administrator
   for *this named permission*, 429 → wait Graph's own `Retry-After`, 5xx → retry once. Every one of

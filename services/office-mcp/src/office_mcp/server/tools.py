@@ -10,7 +10,8 @@ Three conventions hold across every tool here, and a new one is expected to keep
 model reads this surface as one thing:
 
 * **A name is `verb_noun`** — `get_me`, `list_chats`, `list_teams`, `list_channels`,
-  `browse_channel`, `search_messages`, `read_message` — naming what the tool does and what it does
+  `browse_channel`, `search_messages`, `read_message`, `list_meeting_transcripts`,
+  `read_transcript` — naming what the tool does and what it does
   it to. `whoami` was the one exception and is now `get_me`:
   the shell idiom made the odd tool out of the very tool a model calls first, and renaming a tool
   is a breaking change best spent before there are more of them. (Microsoft's own M365 connector
@@ -29,7 +30,7 @@ one reason: a dependency is resolved *outside* the tool body, so an exchange Ent
 be explained by anything the body does.
 """
 
-from datetime import date
+from datetime import date, datetime
 from types import TracebackType
 from typing import Annotated, cast, override
 from uuid import UUID
@@ -43,7 +44,14 @@ from fastmcp.tools import Tool
 from fastmcp.tools import tool as tool_metadata
 from pydantic import Field
 
-from office_mcp.features import channels, chats, identity, message_read, message_search
+from office_mcp.features import (
+    channels,
+    chats,
+    identity,
+    message_read,
+    message_search,
+    transcripts,
+)
 from office_mcp.graph_client import graph_client_for
 from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
@@ -77,6 +85,7 @@ GRAPH_SCOPES: tuple[str, ...] = tuple(
             channels.POSTS_PERMISSION,
             *message_search.GRAPH_PERMISSIONS,
             *message_read.GRAPH_PERMISSIONS,
+            *transcripts.LISTING_PERMISSIONS,
         )
     )
 )
@@ -151,6 +160,8 @@ _CHANNELS_TOKEN: str = _graph_token(channels.CHANNELS_PERMISSION)
 _POSTS_TOKEN: str = _graph_token(channels.POSTS_PERMISSION)
 _SEARCH_TOKEN: str = _graph_token(*message_search.GRAPH_PERMISSIONS)
 _READ_TOKEN: str = _graph_token(*message_read.GRAPH_PERMISSIONS)
+_TRANSCRIPT_LIST_TOKEN: str = _graph_token(*transcripts.LISTING_PERMISSIONS)
+_TRANSCRIPT_TOKEN: str = _graph_token(transcripts.TRANSCRIPT_PERMISSION)
 
 _GET_ME = """\
 Return the signed-in Microsoft 365 user's own profile: `user_id`, `display_name`, `email`, \
@@ -182,6 +193,15 @@ on every chat message it finds, so this list is how a found message gets a topic
 participants. It is not an argument to anything — no tool here takes a chat id, and a search \
 cannot be narrowed to one chat. This returns chats only: Teams channels live inside teams, are \
 listed by list_teams and list_channels, and are read by browse_channel.
+
+**This is also how a meeting is found.** A `meeting` chat is the conversation attached to a Teams \
+meeting, its `topic` is the meeting's subject, and it carries `meeting_uri` — the handle \
+list_meeting_transcripts takes. So "what was decided in the pricing call last Tuesday" starts \
+here: find the meeting chat by topic and recency, then follow its `meeting_uri`. There is no \
+separate meeting-search tool because this list already answers which meeting, and no Microsoft \
+calendar permission is involved. `meeting_uri` is null on every non-meeting chat, and null on a \
+meeting chat Microsoft returned no join URL for — that meeting's transcript is then unreachable \
+here, and no other tool or argument will reach it.
 
 Ordering and `last_message_at` both come from the last message actually sent in the chat, which is \
 the only notion of recency Microsoft Graph will sort this collection by. The chat property that \
@@ -357,11 +377,12 @@ read: that tool answers with the whole message already.
   teams:///chats/{chat_id}/messages/{message_id}
   teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
   teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
-Nothing else is readable. This connector serves Microsoft Teams messages, so no handle here names \
-mail, a calendar event, a file, a SharePoint page or a meeting transcript, and nothing turns a \
-person's name or a chat topic into one — pass the `uri` from a tool result verbatim. The third \
-shape is the one only browse_channel emits: Microsoft addresses a reply in a channel thread under \
-the post it answers, and a search result does not say which post that is.
+Nothing else is readable here. No handle of this connector's names mail, a calendar event, a file \
+or a SharePoint page, and nothing turns a person's name or a chat topic into one — pass the `uri` \
+from a tool result verbatim. A meeting transcript is the one other thing this connector reads and \
+it has its own reader: a `teams:///transcripts/...` handle goes to read_transcript, not here. The \
+third shape above is the one only browse_channel emits: Microsoft addresses a reply in a channel \
+thread under the post it answers, and a search result does not say which post that is.
 
 `text` is plain text, normalised from Teams' own HTML: a mention reads as `@Name`, a list item as \
 `- `, an attachment as `[attachment: name]`, an inline image as `[image]` and a card as `[card]`. \
@@ -386,8 +407,9 @@ _BAD_HANDLE = (
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}\n"
     + "with the ids percent-encoded, e.g. "
     + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool "
-    + "result rather than assembling one, and note that this connector reads Teams messages only — "
-    + "no mail, files, sites or meetings are addressable here. Retrying this value will fail "
+    + "result rather than assembling one. This reader serves Teams messages only: no mail, files "
+    + "or sites are addressable in this connector at all, and a meeting transcript handle "
+    + "(teams:///transcripts/...) belongs to read_transcript. Retrying this value will fail "
     + "identically."
 )
 
@@ -410,6 +432,107 @@ _UNREADABLE = (
     + "back there is no route to its full text, and a second browse returns the same window. "
     + "Report the search snippet with its sender and date, say the full text could not be "
     + "retrieved, and stop looking."
+)
+
+_LIST_MEETING_TRANSCRIPTS = f"""\
+Find out whether a Teams meeting was transcribed, and get a handle for each transcript. Takes the \
+`meeting_uri` that list_chats reports on a meeting chat.
+
+This is the first half of reading a meeting: this tool says what exists, read_transcript returns \
+what was said. Two calls rather than one because a transcript is large and because a recurring \
+meeting is a single meeting to Microsoft — every occurrence's transcript lands in the same \
+collection, distinguished only by when transcription started — so which one to read is a decision, \
+not a default. Scope to one occurrence with `started_after`/`started_before` when \
+`meeting_type` comes back `recurring`; a one-off meeting has a single transcript and needs neither.
+
+**Read `status` before anything else. It has four values and they mean four different actions:**
+- `available` — transcripts are listed; read one with read_transcript.
+- `not_ready` — the meeting has not ended, or ended recently enough that Microsoft may still be \
+processing the transcript. Wait and call again later. This is NOT "there is no transcript", and \
+reporting it as one is wrong: Microsoft publishes no availability SLA, so this tool infers it from \
+the meeting's end time and errs towards telling you to wait.
+- `not_transcribed` — the meeting is over and nothing is there: it was not recorded or not \
+transcribed. Retrying will not help. Say the meeting has no transcript rather than that the \
+meeting did not happen. (One other cause is indistinguishable: Microsoft stops serving a meeting's \
+transcripts once the meeting expires, roughly 60 days after a one-off.)
+- `meeting_not_found` — Microsoft matched the join URL in the handle to no meeting this user can \
+see. Not an error, and not proof the meeting is gone. Do not retry and do not rebuild the handle.
+
+This connector reads transcripts, not recordings: no video is returned or reachable here, and a \
+transcript is the better artifact for answering a question about a meeting anyway — it is text, \
+with who said what and when.
+
+Two things can refuse this call outright, and both are somebody's decision rather than a bug. \
+Reading transcripts over Microsoft Graph is an organisation-wide Teams setting that is OFF by \
+default and that no application can switch on; when it is off, the error says so and names the \
+administrator who can change it. Separately, Microsoft documents transcript access under \
+{transcripts.TRANSCRIPT_PERMISSION} without stating that meeting participants get it, so a \
+participant may be refused where the meeting's organiser would succeed.\
+"""
+
+_READ_TRANSCRIPT = f"""\
+Read what was said in a Teams meeting: the transcript as speaker-attributed, timestamped turns. \
+Takes the `uri` of a transcript that list_meeting_transcripts returned.
+
+This is the payoff of the whole meeting path, and it returns the words themselves rather than a \
+link to them — who spoke, in order, with the offset into the meeting at which they spoke. Quote it \
+as you would quote a message: it is what people actually said, verbatim, and Microsoft's \
+speech-to-text is not perfect, so an odd word is likelier a mis-transcription than a real one.
+
+`uri` takes a handle this connector produced, in exactly one shape:
+  teams:///transcripts/{{meeting_id}}/{{transcript_id}}
+Nothing else is readable here, and nothing turns a meeting's name, its date, its chat or its \
+`meeting_uri` into one — call list_meeting_transcripts and pass its `uri` verbatim. read_message \
+is the reader for a Teams message and takes a different handle; neither tool accepts the other's.
+
+`start_seconds` and `end_seconds` are offsets in seconds from the moment transcription began, not \
+wall-clock times and not offsets from the start of the meeting; add them to the transcript's \
+`started_at` from list_meeting_transcripts if an absolute time is needed. They can be negative, \
+which Microsoft defines as transcription having started after the conversation did.
+
+`speaker_attribution` is false when the organisation has turned speaker names off. The words and \
+timings still come back and every `speaker` is null: do not infer who spoke from the content, and \
+say the transcript is unattributed if the answer turns on who said something.
+
+A long meeting is more turns than fit in one answer. `truncated` says there are more and \
+`next_offset` is where to continue — the same convention every list-shaped tool here uses. Each \
+call re-fetches the whole transcript from Microsoft, so a wider `limit` (up to \
+{transcripts.MAX_TURNS}) costs less than paging through it, and a truncated page must never be \
+summarised as the whole meeting.\
+"""
+
+# What each reader says when its `uri` is not one of its own handles. Separate texts because the two
+# handle families are separate: pointing a caller at the wrong tool is the failure these prevent.
+_NOT_A_MEETING_HANDLE = (
+    "list_meeting_transcripts takes the `meeting_uri` that list_chats reports on a meeting chat, "
+    + "and this is not one. A meeting handle has exactly one shape:\n"
+    + "  teams:///meetings/{join_web_url}\n"
+    + "with the join URL percent-encoded. It cannot be assembled — Microsoft addresses a meeting "
+    + "by the join URL of the Teams meeting itself, which only Microsoft can supply — so call "
+    + "list_chats, find the `meeting` chat for the meeting in question, and pass its `meeting_uri` "
+    + "verbatim. A chat id, a chat topic, a Teams web link and a `teams:///transcripts/...` handle "
+    + "are none of them a meeting handle. Retrying this value will fail identically."
+)
+
+_NOT_A_TRANSCRIPT_HANDLE = (
+    "read_transcript takes the `uri` of a transcript that list_meeting_transcripts returned, and "
+    + "this is not one. A transcript handle has exactly one shape:\n"
+    + "  teams:///transcripts/{meeting_id}/{transcript_id}\n"
+    + "with both ids percent-encoded. Call list_meeting_transcripts with a meeting chat's "
+    + "`meeting_uri` and pass the `uri` of the transcript you want, verbatim. A `meeting_uri` is "
+    + "not a transcript handle — one meeting can have many transcripts — and neither is a Teams "
+    + "message handle. Retrying this value will fail identically."
+)
+
+# Graph's 404 on a well-formed transcript handle. Distinct advice from the message reader's, because
+# the causes are different: a transcript is not deleted by a user, it ages out with its meeting.
+_TRANSCRIPT_UNREADABLE = (
+    "Microsoft 365 would not return this transcript. The handle is well formed, so this is not a "
+    + "bad argument. The likeliest cause is age: Microsoft stops serving a meeting's transcripts "
+    + "once the meeting expires, about 60 days after a one-off meeting, and it answers that "
+    + "identically to a transcript that was removed or that this user may not see. Call "
+    + "list_meeting_transcripts for the meeting again to see what it still has; if the transcript "
+    + "is no longer listed there, it is out of reach and retrying will not bring it back."
 )
 
 _READ_ONLY = {"readOnlyHint": True, "openWorldHint": True}
@@ -756,6 +879,124 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         with graph_tool_errors(handle.permission, not_found=_UNREADABLE):
             return await message_read.read_message(
                 graph_client_for(transport, graph_token), handle=handle
+            )
+
+    @mcp.tool(
+        name="list_meeting_transcripts",
+        title="List a Meeting's Transcripts",
+        description=_LIST_MEETING_TRANSCRIPTS,
+        annotations=_READ_ONLY,
+    )
+    async def list_meeting_transcripts(
+        meeting_uri: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The meeting whose transcripts to list, exactly as list_chats reported "
+                    + "`meeting_uri` on a meeting chat: "
+                    + "`teams:///meetings/{join_web_url}`. Copy it verbatim — it carries the "
+                    + "meeting's join URL, which Microsoft matches character for character, and "
+                    + "nothing else identifies a meeting to this connector."
+                ),
+            ),
+        ],
+        started_after: Annotated[
+            datetime | None,
+            Field(
+                description=(
+                    "Only transcripts whose transcription began at or after this moment. This is "
+                    + "how to reach one occurrence of a recurring meeting, whose occurrences all "
+                    + "share a single meeting and therefore a single transcript collection. Pass a "
+                    + "timestamp with a timezone offset; a bound with no transcript inside it "
+                    + "answers `not_transcribed` for that window rather than an error."
+                )
+            ),
+        ] = None,
+        started_before: Annotated[
+            datetime | None,
+            Field(
+                description=(
+                    "Only transcripts whose transcription began at or before this moment. Pair it "
+                    + "with `started_after` to bracket one occurrence."
+                )
+            ),
+        ] = None,
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=transcripts.MAX_TRANSCRIPTS,
+                description=(
+                    "How many transcripts to return, newest first. Default 20, maximum "
+                    + f"{transcripts.MAX_TRANSCRIPTS}. One meeting has one transcript per "
+                    + "occurrence that was transcribed, so only a long-running recurring series "
+                    + "reaches this; `truncated` says when the window was too small."
+                ),
+            ),
+        ] = 20,
+        graph_token: str = _TRANSCRIPT_LIST_TOKEN,
+    ) -> transcripts.MeetingTranscripts:
+        handle = transcripts.meeting_handle(meeting_uri)
+        if handle is None:
+            raise ToolError(_NOT_A_MEETING_HANDLE)
+        with graph_tool_errors(*transcripts.LISTING_PERMISSIONS):
+            return await transcripts.list_meeting_transcripts(
+                graph_client_for(transport, graph_token),
+                handle=handle,
+                started_after=started_after,
+                started_before=started_before,
+                limit=limit,
+            )
+
+    @mcp.tool(
+        name="read_transcript",
+        title="Read a Meeting Transcript",
+        description=_READ_TRANSCRIPT,
+        annotations=_READ_ONLY,
+    )
+    async def read_transcript(
+        uri: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The transcript to read, exactly as list_meeting_transcripts reported its "
+                    + "`uri`: `teams:///transcripts/{meeting_id}/{transcript_id}`. A meeting's "
+                    + "`meeting_uri` is not one of these, and no other shape is readable here."
+                ),
+            ),
+        ],
+        offset: Annotated[
+            int,
+            Field(
+                ge=0,
+                description=(
+                    "How many turns to skip. Start at 0 and pass the previous response's "
+                    + "`next_offset` to continue through a long meeting."
+                ),
+            ),
+        ] = 0,
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=transcripts.MAX_TURNS,
+                description=(
+                    "How many turns to return. Default 200, maximum "
+                    + f"{transcripts.MAX_TURNS}. Every call fetches the whole transcript from "
+                    + "Microsoft, so widening this is cheaper than paging."
+                ),
+            ),
+        ] = 200,
+        graph_token: str = _TRANSCRIPT_TOKEN,
+    ) -> transcripts.Transcript:
+        handle = transcripts.transcript_handle(uri)
+        if handle is None:
+            raise ToolError(_NOT_A_TRANSCRIPT_HANDLE)
+        with graph_tool_errors(transcripts.TRANSCRIPT_PERMISSION, not_found=_TRANSCRIPT_UNREADABLE):
+            return await transcripts.read_transcript(
+                graph_client_for(transport, graph_token), handle=handle, offset=offset, limit=limit
             )
 
 
