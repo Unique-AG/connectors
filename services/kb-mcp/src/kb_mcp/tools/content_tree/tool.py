@@ -77,8 +77,12 @@ _META = merge_tool_meta(
     {
         "unique.app/icon": "folder-tree",
         "unique.app/system-prompt": (
-            "Choose this tool to browse or locate files/folders in the "
-            "knowledge base before reading one with the read_file tool."
+            "Choose this tool to browse the knowledge base's folder "
+            "structure, list files, or find a file by its name/path before "
+            "reading it with read_file. Its own mode='search' only "
+            "fuzzy-matches file names/paths — for questions about what a "
+            "document says (a topic, a fact, 'search about X'), use the "
+            "search tool instead, not this one."
         ),
     },
     ContextRequirements(
