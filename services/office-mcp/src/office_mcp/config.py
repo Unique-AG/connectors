@@ -18,14 +18,19 @@ PKG_VERSION = pkg_version("office-mcp")
 
 
 class AsyncpgConnectArgs(TypedDict, total=False):
-    ssl: ssl.SSLContext
+    ssl: ssl.SSLContext | str
 
 
-def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
+def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | str | None:
     """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
     if sslmode in ("disable", "allow"):
         return None
-    if sslmode in ("require", "prefer"):
+    if sslmode == "prefer":
+        # Libpq `prefer` means "try TLS, fall back to plaintext". An SSLContext would make
+        # asyncpg treat the connection as mandatory TLS, so pass its own `"prefer"` string
+        # through instead to keep the fallback-to-plaintext behavior.
+        return "prefer"
+    if sslmode == "require":
         # Encrypt the connection but do not verify the server certificate.
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -57,7 +62,10 @@ def normalize_asyncpg_url(url: str) -> tuple[str, AsyncpgConnectArgs]:
     those params, so strip them and return equivalent `connect_args` instead.
     """
     parsed = make_url(url)
-    if parsed.drivername == "postgresql":
+    if parsed.drivername in ("postgresql", "postgres"):
+        # `postgres://` is the libpq short form (Heroku/Azure and many operator-generated
+        # secrets emit it); pydantic's `PostgresDsn` accepts it verbatim without rewriting it,
+        # so it's normalized here alongside the long form.
         parsed = parsed.set(drivername="postgresql+asyncpg")
     elif not parsed.drivername.startswith("postgresql"):
         raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
@@ -79,10 +87,10 @@ class AppEnv(StrEnum):
     TEST = "test"
 
 
-# Hosts that can't be what an external MCP client reaches this service on. `0.0.0.0`/`::` are a
+# Hosts that can't be what an external MCP client reaches this service on. `0.0.0.0`/`[::]` are a
 # bind address rather than a destination, so they're just as wrong as loopback here.
-# `[::1]` is included because pydantic's `HttpUrl.host` keeps IPv6 brackets.
-_NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "::"})
+# The IPv6 entries are bracketed because pydantic's `HttpUrl.host` keeps IPv6 brackets.
+_NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "[::]"})
 
 
 class LogLevel(StrEnum):
@@ -111,6 +119,24 @@ class AppConfig(BaseSettings):
     # downstream (here, and by the auth layer once it lands), and one parse serving all of them
     # is why none of those places re-parse it.
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lowercase_log_level_and_app_env(cls, data: object) -> object:
+        """Lowercase `log_level`/`app_env` before enum coercion.
+
+        Pydantic's `StrEnum` coercion is case-sensitive, but `LOG_LEVEL=INFO` — the canonical
+        spelling, and what `unique_mcp.logging.configure_logging` itself normalises — is a
+        reasonable thing for an operator to set. Without this, it aborts startup instead.
+        """
+        if not isinstance(data, dict):
+            return data
+        values = cast(dict[str, object], data)
+        for field in ("log_level", "app_env"):
+            value = values.get(field)
+            if isinstance(value, str):
+                values = {**values, field: value.lower()}
+        return values
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
@@ -168,14 +194,24 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def accept_database_url(cls, data: object) -> object:
-        """Accept DATABASE_URL (injected by the base Helm chart) as an alias for DB_URL."""
+        """Accept DATABASE_URL (injected by the base Helm chart) as an alias for DB_URL.
+
+        Only falls back to the ambient DATABASE_URL when neither `url` nor any discrete field
+        was supplied. Without that guard, this read applied on every construction path — not
+        just env-sourced ones — so an explicit `DatabaseConfig(host=..., name=..., ...)` call
+        would have its arguments silently discarded in favor of whatever happened to be in the
+        environment. Explicit arguments must win over the environment.
+        """
         if not isinstance(data, dict):
             return data
         values = cast(dict[str, object], data)
-        if values.get("url") is None:
-            database_url = os.environ.get("DATABASE_URL")
-            if database_url:
-                return {**values, "url": database_url}
+        if values.get("url") is not None:
+            return values
+        if any(values.get(field) is not None for field in ("host", "name", "user", "password")):
+            return values
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url:
+            return {**values, "url": database_url}
         return values
 
     @model_validator(mode="after")
