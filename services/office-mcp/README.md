@@ -2,10 +2,10 @@
 
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes nine tools
+Users sign in with their own Microsoft account and the server acts as them. It exposes ten tools
 so far — `get_me`, `list_chats`, `list_teams`, `list_channels`, `browse_channel`, `search_messages`,
-`read_message`, `list_meeting_transcripts` and `read_transcript` — and more land in later PRs,
-stacked on top of this one.
+`read_message`, `list_meeting_transcripts`, `read_transcript` and `list_meeting_recordings` — and
+more land in later PRs, stacked on top of this one.
 
 ## Layout
 
@@ -37,7 +37,10 @@ cannot be read. The same rule runs one step further out: `channels` takes the me
 by handle are the same type, normalised by the same function. The meeting-side handles
 (`teams:///meetings/…`, `teams:///transcripts/…`) belong to `transcripts` for the same reason and by
 the same rule, and `chats` asks it for one rather than assembling a URI: a layering rule says each
-handle *family* has exactly one speller, and names which module owns which.
+handle *family* has exactly one speller, and names which module owns which. `recordings` borrows the
+most of any module — the meeting handle, the join-URL resolve, the occurrence window and the "is an
+empty answer settled" inference — and mints no handle of its own, because there is nothing to read:
+a recording is answered as metadata, never as video.
 
 The layering rules are that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse — nor **from FastMCP**, since deciding what an MCP client
@@ -95,8 +98,9 @@ consented to, which is why sign-in has to ask for it:
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
-| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts` (resolving a join URL to a meeting) |
+| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts`, `list_meeting_recordings` (resolving a join URL to a meeting) |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts`, `read_transcript` |
+| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `list_meeting_recordings` |
 
 **Transcripts need a tenant setting as well as a permission, and this is the one that surprises
 people.** Microsoft Graph access to Teams meeting transcripts is off by default and *"agents and apps
@@ -109,6 +113,15 @@ and `docs/recordings-and-transcripts/operator.md` documents it. The neighbouring
 `-EnableAttributedTranscripts` setting is *not* a prerequisite: when it is off, `read_transcript`
 degrades to Microsoft's unattributed format and reports `speaker_attribution: false` rather than
 failing.
+
+**That setting does not cover recordings, and the asymmetry is why they are a separate tool.**
+Microsoft scopes it to transcript resources only — the change-notification reference says so in as
+many words — and neither recordings reference page publishes a tenant control or an inner error code
+of its own. So in a default tenant (the switch off, admin consent granted) `list_meeting_transcripts`
+answers `403` while `list_meeting_recordings` answers normally, which one combined artifact tool
+could not do without either failing the whole call or growing a status per artifact.
+`OnlineMeetingRecording.Read.All` does need admin consent in its own right, separately from the
+transcript permission, so a tenant can grant either without the other.
 
 `Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
 `$expand=lastMessagePreview`, and a message preview is a message.
@@ -178,6 +191,7 @@ gets that string onto the wire.
 | `read_message` | One Teams message in full — text, sender, mentions, attachments, edits, deletion | `GET /chats/{id}/messages/{id}`, `GET /teams/{id}/channels/{id}/messages/{id}[/replies/{id}]` |
 | `list_meeting_transcripts` | Whether a meeting was transcribed, and a handle per transcript | `GET /me/onlineMeetings?$filter=JoinWebUrl eq '…'`, `GET /me/onlineMeetings/{id}/transcripts` |
 | `read_transcript` | What was said in a meeting: speaker-attributed, timestamped turns | `GET /me/onlineMeetings/{id}/transcripts/{id}/content` |
+| `list_meeting_recordings` | Whether a meeting was recorded, how long each recording runs, and whether this user may download it | `GET /me/onlineMeetings?$filter=JoinWebUrl eq '…'`, `GET /me/onlineMeetings/{id}/recordings`, `GET /me` |
 
 All are read-only, all take their caller's identity from the token rather than from a parameter, and
 all are described to the model in prose that names the traps rather than only the fields — `email` is
@@ -339,10 +353,36 @@ Decisions worth knowing:
   no occurrence addressing anywhere in Graph — so `started_after`/`started_before` scope to an
   occurrence by when transcription began, filtered while paging rather than as a `$filter` (the
   collection advertises `$filter` without documenting a single filterable property).
-- **`read_transcript` returns text, and only transcripts.** Recordings are deliberately absent:
-  Graph streams an MP4 inline with no ranged contract, an hour of 1080p is hundreds of megabytes, a
-  model cannot watch video, and delegated recording *content* is organiser-only by default. The
-  transcript is the artifact worth having anyway.
+- **A recording is answered as metadata and availability. The bytes are never returned, by anything
+  here.** Graph streams an MP4 inline with no ranged contract on that path, a Teams meeting can run
+  thirty hours, and a model cannot watch video — so a tool that returned one would be a defect
+  wearing a feature's clothes. `recordingContentUrl` is no better: it opens only with this
+  connector's own bearer token, so passing it on is either useless or a token leak. What
+  `list_meeting_recordings` answers is "there is a 47-minute recording from Tuesday, only the
+  organiser can download it, and here is the transcript instead" — existence, start and end,
+  a derived `duration_seconds` (Microsoft publishes no duration property at all), and
+  `content_correlation_id`, which is Microsoft's own link to the transcript of the same call.
+  Layering rule 10 forbids any module from addressing a single recording, because that is the only
+  door to its bytes and the change that opens it looks like a convenience.
+- **The organiser-only rule is a reported state, not a footnote.** Microsoft: *"In delegated
+  permission scenarios, getting callRecording content is supported only for the meeting organizer.
+  Meeting participants don't have permission to download meeting recordings"* — unless an
+  administrator unblocked participants. The *metadata* is not so restricted, so for most meetings a
+  participant asks about the recording is visible and its video is out of reach, and answering "there
+  is no recording" would be a wrong answer nobody could detect. `content_access` says which side of
+  the rule the signed-in user is on (`you_are_the_organizer` / `organizer_only` / `unknown`), which
+  is why the listing spends one `GET /me`: Graph returns the organiser's `displayName` as null in
+  every documented sample, so the comparison has to be made here rather than handed to the model as
+  a bare object id.
+- **Two artifacts, two tools — argued rather than assumed.** One tool listing a meeting's
+  transcripts *and* its recordings is the tidier surface and it loses answers: Microsoft gates the
+  two independently, the transcript gate is off by default, and a combined tool in that tenant either
+  fails the whole call or carries a verdict per artifact instead of the single `status` that makes
+  either answer actionable. It would also blunt a 403, which is only useful here because each tool
+  names the permissions its own request was made under. So the artifacts are siblings that share
+  everything shareable — the handle, the window, the resolve, the four-outcome vocabulary — and
+  differ in one word of it: `not_transcribed` against `not_recorded`. `tests/test_mcp_tools.py`
+  asserts the two answers stay the same shape, and that the tenant switch stops at transcripts.
 - **A search query is never logged. Neither is a transcript.** Not in a message, not as a structured
   field, not as a span attribute — what someone searched their own messages for names people and
   deals, and a transcript is a verbatim record of a room. `teams-mcp` had to remove query terms from

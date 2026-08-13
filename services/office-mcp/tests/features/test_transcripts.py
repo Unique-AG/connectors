@@ -353,8 +353,13 @@ class TestTheThreeAbsences:
     def test_the_allowance_is_generous_enough_to_be_the_safe_side(self) -> None:
         """Microsoft publishes no availability SLA, so the only defensible bias is towards telling
         a caller to wait. A tight window would report a still-processing transcript as one that
-        will never exist, which is the one wrong answer a caller cannot detect."""
-        assert timedelta(hours=1) <= transcripts.TRANSCRIPT_DELAY_ALLOWANCE
+        will never exist, which is the one wrong answer a caller cannot detect.
+
+        The allowance is named for artifacts rather than for transcripts because the recordings
+        lister answers its own absence with the same inference (`OccurrenceWindow.settled`) — the
+        assertion is unchanged.
+        """
+        assert timedelta(hours=1) <= transcripts.ARTIFACT_DELAY_ALLOWANCE
 
 
 class TestScopingToOneOccurrence:

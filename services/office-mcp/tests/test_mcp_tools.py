@@ -264,9 +264,12 @@ _JOIN_WEB_URL = (
 )
 _MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
 _TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0001"
+_RECORDING_ID = "7e31db25-bc6e-4fd8-96c7-e01264e9b6fc"
 _MEETINGS_PATH = "/me/onlineMeetings"
 _TRANSCRIPTS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/transcripts"
+_RECORDINGS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/recordings"
 _CONTENT_PATH = f"{_TRANSCRIPTS_PATH}/{_TRANSCRIPT_ID}/content"
+_RECORDING_CONTENT_PATH = f"{_RECORDINGS_PATH}/{_RECORDING_ID}/content"
 
 _MEETING_CHATS = {
     "value": [
@@ -317,6 +320,35 @@ _TRANSCRIPTS = {
             "createdDateTime": "2026-02-10T14:03:11.204Z",
             "endDateTime": "2026-02-10T14:58:02.117Z",
             "contentCorrelationId": "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+        }
+    ]
+}
+
+# One recording of the same meeting, organised by somebody other than the signed-in user — which is
+# the common case and the one the organiser-only rule bites on. It shares its `contentCorrelationId`
+# with the transcript above, because Microsoft's own link between the two artifacts is that value.
+_RECORDINGS = {
+    "value": [
+        {
+            "id": _RECORDING_ID,
+            "meetingId": _MEETING_ID,
+            "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+            "createdDateTime": "2026-02-10T14:02:41.204Z",
+            "endDateTime": "2026-02-10T14:49:53.117Z",
+            "contentCorrelationId": "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+            "recordingContentUrl": f"{GRAPH_V1}{_RECORDING_CONTENT_PATH}",
+            "meetingOrganizer": {
+                "application": None,
+                "device": None,
+                "user": {
+                    # The type Microsoft's own list-recordings sample sends, which the SDK does not
+                    # know: it has to fall back to the base identity rather than take the call down.
+                    "@odata.type": "#Microsoft.Teams.GraphSvc.teamworkUserIdentity",
+                    "id": "00000000-0000-4000-8000-000000000002",
+                    "displayName": None,
+                    "userIdentityType": "aadUser",
+                },
+            },
         }
     ]
 }
@@ -526,6 +558,7 @@ class TestTheToolsThisServerAdvertises:
             "read_message",
             "list_meeting_transcripts",
             "read_transcript",
+            "list_meeting_recordings",
         }
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
@@ -589,6 +622,16 @@ class TestTheToolsThisServerAdvertises:
             "truncated",
             "next_offset",
         }
+        assert set(_properties(tools["list_meeting_recordings"].outputSchema)) == {
+            "status",
+            "meeting_id",
+            "subject",
+            "meeting_type",
+            "started_at",
+            "ended_at",
+            "recordings",
+            "truncated",
+        }
         assert set(_properties(tools["read_message"].outputSchema)) == {
             "uri",
             "message_id",
@@ -633,8 +676,28 @@ class TestTheToolsThisServerAdvertises:
             "search_messages",
             "list_meeting_transcripts",
             "read_transcript",
+            "list_meeting_recordings",
         ):
             assert "truncated" in _properties(tools[name].outputSchema), name
+
+    async def test_the_two_meeting_listers_answer_in_the_same_shape(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """Two artifacts of one meeting, asked for by the same handle over the same window, so the
+        answers differ in exactly one field: which artifact is listed. That symmetry is what lets a
+        model that learned one tool use the other without reading it twice — and it is asserted
+        because the alternative (`status` here, `state` there; `subject` here, `topic` there) is
+        what two tools written a week apart drift into.
+        """
+        tools = _named(await mcp_client.list_tools())
+        transcripts_schema = set(_properties(tools["list_meeting_transcripts"].outputSchema))
+        recordings_schema = set(_properties(tools["list_meeting_recordings"].outputSchema))
+
+        assert transcripts_schema - recordings_schema == {"transcripts"}
+        assert recordings_schema - transcripts_schema == {"recordings"}
+        assert set(_properties(tools["list_meeting_transcripts"].inputSchema)) == set(
+            _properties(tools["list_meeting_recordings"].inputSchema)
+        )
 
     async def test_read_message_takes_exactly_one_required_handle(
         self, mcp_client: Client[FastMCPTransport]
@@ -794,6 +857,111 @@ class TestTheToolsThisServerAdvertises:
         assert "window you asked about" in description
         assert "already well past never answers this" in description
         assert "demonstrably passed is never reported this way" in str(status["description"])
+
+    async def test_list_meeting_recordings_takes_the_same_handle_and_window(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await mcp_client.list_tools())
+        schema = tools["list_meeting_recordings"].inputSchema
+        properties = _properties(schema)
+        limit = _object(properties["limit"])
+
+        assert set(properties) == {"meeting_uri", "started_after", "started_before", "limit"}
+        assert schema.get("required") == ["meeting_uri"]
+        assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
+            "integer",
+            1,
+            50,
+            20,
+        )
+        for bound in ("started_after", "started_before"):
+            assert _optional_types(properties[bound]) == [
+                {"type": "string", "format": "date"},
+                {"type": "string", "format": "date-time"},
+            ]
+
+    async def test_list_meeting_recordings_promises_no_video_and_says_why(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The one thing a model must not hope for. A recording is an MP4 of a meeting that can run
+        30 hours and a model cannot watch video, so no tool here returns or fetches one — and a
+        description that merely omitted to say so would have a model asking for the file, or
+        reporting that it could not get it as if that were a failure.
+        """
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_recordings"].description
+        assert description is not None
+
+        assert "No video is returned or reachable anywhere in this connector" in description
+        assert "30 hours" in description
+        assert "cannot watch video" in description
+        assert "list_meeting_transcripts" in description, "where a question about content goes"
+        assert "content_correlation_id" in description, "and how to get to the right transcript"
+
+    async def test_list_meeting_recordings_relays_the_organiser_only_rule(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """Microsoft's hard constraint, in the words a model has to be able to pass on: delegated
+        download is the organiser's alone unless an administrator unblocked participants. The
+        wording that matters most is the negative one — an unreachable recording is not a missing
+        recording, and reporting it as one is a wrong answer nobody can detect.
+        """
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_recordings"].description
+        assert description is not None
+        # The whole output schema, `$defs` included: a recording's own fields are described there
+        # rather than inline, and `content_access` has to carry its three meanings where a model
+        # reads the result — not only in the tool's prose.
+        rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
+
+        assert "ORGANISER-ONLY" in description
+        assert "Meeting participants don't have permission to download meeting recordings" in (
+            description
+        )
+        assert "unblocked participants" in description
+        assert "Never report an `organizer_only` recording as a missing one" in description
+        assert "organizer_user_id" in description, "who to ask for it"
+        assert "you_are_the_organizer" in rendered and "organizer_only" in rendered
+        assert "Meeting participants don't have permission" in json.dumps(
+            tools["list_meeting_recordings"].outputSchema
+        ), "the constraint belongs where the result is read, not only in the tool's prose"
+
+    async def test_list_meeting_recordings_names_its_four_answers_and_their_remedies(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The same four-outcome vocabulary the transcript lister established, adapted by one word:
+        `not_recorded` instead of `not_transcribed`. A model that learned when to wait and when to
+        stop for one artifact must not have to learn it again for the other."""
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_recordings"].description
+        status = _object(_properties(tools["list_meeting_recordings"].outputSchema)["status"])
+        assert description is not None
+        rendered = description + str(status.get("description"))
+
+        for value in ("available", "not_ready", "not_recorded", "meeting_not_found"):
+            assert value in description, value
+        assert "Wait and call again later" in description
+        assert 'NOT "the call was not recorded"' in description
+        assert "Retrying will not help" in description
+        assert "no availability SLA" in rendered, "the inference has to be admitted as one"
+        assert "recurring" in description and "started_after" in description
+        assert "no duration property" in description, "the duration is derived, and says so"
+
+    async def test_list_meeting_recordings_says_it_is_not_behind_the_transcript_switch(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The reason the two artifacts are two tools, said where it changes what a model does: the
+        tenant switch that blocks transcripts — off by default — leaves recordings alone, so a model
+        refused a transcript should still ask whether the meeting was recorded."""
+        tools = _named(await mcp_client.list_tools())
+        recordings_description = tools["list_meeting_recordings"].description
+        transcripts_description = tools["list_meeting_transcripts"].description
+        assert recordings_description is not None and transcripts_description is not None
+
+        assert "NOT behind the tenant-wide Teams switch" in recordings_description
+        assert "OnlineMeetingRecording.Read.All" in recordings_description
+        assert "list_meeting_recordings" in transcripts_description
+        assert "leaves recordings alone" in transcripts_description
 
     async def test_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
         self, mcp_client: Client[FastMCPTransport]
@@ -1152,6 +1320,133 @@ class TestCallingThem:
             ),
             ("https://graph.microsoft.com/OnlineMeetingTranscript.Read.All",),
         ], "the reader needs only transcript access; resolving a join URL is the lister's job"
+
+    async def test_a_model_walks_from_a_meeting_chat_to_whether_the_call_was_recorded(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The question this piece exists to answer, over the real protocol and end to end: was
+        Tuesday's call recorded, how long is it, and can I get at it. Every value is taken from the
+        previous answer exactly as a model would take it — the meeting chat's `meeting_uri` is the
+        same handle the transcript lister takes.
+
+        The recording here is somebody else's, which is the common case: Microsoft permits only the
+        organiser to download a recording, so the answer has to be "there is a 47-minute recording,
+        the organiser has it, and here is the transcript instead" — never "there is no recording".
+        No byte of video is fetched, and the mocked content route proves it.
+        """
+        chats_route = graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json=_MEETING_CHATS)
+        )
+        meeting = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        listing = graph.get(_RECORDINGS_PATH).mock(
+            return_value=httpx.Response(200, json=_RECORDINGS)
+        )
+        me = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        video = graph.get(_RECORDING_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=b"synthetic mp4 bytes")
+        )
+
+        listed = _structured(await mcp_client.call_tool("list_chats", {"limit": 5}))
+        found = cast("Sequence[Mapping[str, object]]", listed["chats"])
+        meeting_uri = found[0]["meeting_uri"]
+        available = _structured(
+            await mcp_client.call_tool("list_meeting_recordings", {"meeting_uri": meeting_uri})
+        )
+
+        assert all(route.called for route in (chats_route, meeting, listing, me))
+        assert not video.called, "listing a recording must never fetch it"
+        assert available["status"] == "available"
+        assert available["subject"] == "Pricing review"
+        assert available["truncated"] is False
+        recorded = cast("Sequence[Mapping[str, object]]", available["recordings"])
+        assert len(recorded) == 1
+        assert recorded[0]["duration_seconds"] == pytest.approx(2831.913)
+        assert recorded[0]["content_access"] == "organizer_only"
+        assert recorded[0]["organizer_user_id"] == "00000000-0000-4000-8000-000000000002"
+        assert (
+            recorded[0]["content_correlation_id"]
+            == _TRANSCRIPTS["value"][0]["contentCorrelationId"]
+        ), "the bridge to the readable artifact is Microsoft's own, and both tools report it"
+        assert listing.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert obo.requested_scopes == [
+            ("https://graph.microsoft.com/Chat.Read",),
+            (
+                "https://graph.microsoft.com/OnlineMeetings.Read",
+                "https://graph.microsoft.com/OnlineMeetingRecording.Read.All",
+                "https://graph.microsoft.com/User.Read",
+            ),
+        ], "resolving the meeting, listing recordings, and finding out who is asking"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_tenant_transcript_switch_does_not_take_the_recording_answer_with_it(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The reason these are two tools rather than one, proved rather than argued. Microsoft's
+        Graph access to transcripts is a tenant switch that is OFF BY DEFAULT and it applies to
+        transcript resources only — so in the commonest tenant the transcript listing 403s while the
+        recording listing answers perfectly well. One tool listing both artifacts would have to fail
+        the whole call here, and a model would be told nothing about a recording that is right
+        there.
+        """
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        graph.get(_TRANSCRIPTS_PATH).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
+        graph.get(_RECORDINGS_PATH).mock(return_value=httpx.Response(200, json=_RECORDINGS))
+        graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        meeting_uri = f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"
+
+        refused = await mcp_client.call_tool(
+            "list_meeting_transcripts", {"meeting_uri": meeting_uri}, raise_on_error=False
+        )
+        answered = await mcp_client.call_tool(
+            "list_meeting_recordings", {"meeting_uri": meeting_uri}, raise_on_error=False
+        )
+
+        assert refused.is_error
+        assert "EnableGraphTranscriptAccess" in _error_text(refused)
+        assert not answered.is_error, "the switch Microsoft scopes to transcripts must stop there"
+        body = _structured(answered)
+        assert body["status"] == "available"
+        assert len(cast("Sequence[object]", body["recordings"])) == 1
+
+    @pytest.mark.usefixtures("obo")
+    async def test_nothing_about_a_recording_reaches_a_log_or_a_span(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A meeting's subject is content — "Northwind acquisition: final terms" says most of what
+        the meeting was about — and this tool returns one for a meeting nobody may even download. So
+        the rule the rest of the surface is held to holds here too, over the whole call: it reaches
+        the caller and no log line and no span attribute anywhere in the process."""
+        exporter = InMemorySpanExporter()
+        provider = trace.get_tracer_provider()
+        if not isinstance(provider, TracerProvider):
+            provider = TracerProvider()
+            trace.set_tracer_provider(provider)
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        secret = "acquisition-of-northwind-traders"
+        meeting = {"value": [{**_MEETING["value"][0], "subject": secret}]}
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=meeting))
+        graph.get(_RECORDINGS_PATH).mock(return_value=httpx.Response(200, json=_RECORDINGS))
+        graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        caplog.set_level(logging.DEBUG)
+
+        result = await mcp_client.call_tool(
+            "list_meeting_recordings",
+            {"meeting_uri": f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"},
+        )
+
+        assert _structured(result)["subject"] == secret, "the subject has to have been returned"
+        for record in caplog.records:
+            assert secret not in _record_text(record), f"logged by {record.name}"
+        for span in exporter.get_finished_spans():
+            assert secret not in str(span.attributes)
 
     async def test_the_join_url_reaches_graph_encoded_exactly_once_over_the_real_protocol(
         self,
@@ -1937,6 +2232,8 @@ class TestWhatAModelIsToldWhenGraphRefuses:
             ("list_meeting_transcripts", "meeting_uri", "19:meeting_x@thread.v2"),
             ("read_transcript", "uri", "teams:///meetings/https%3A%2F%2Fx.invalid%2Fa"),
             ("read_transcript", "uri", "teams:///chats/19%3Ax%40thread.v2/messages/1"),
+            ("list_meeting_recordings", "meeting_uri", "teams:///transcripts/a/b"),
+            ("list_meeting_recordings", "meeting_uri", "19:meeting_x@thread.v2"),
         ],
     )
     async def test_each_meeting_tool_refuses_the_other_ones_handle_and_says_where_to_get_its_own(
@@ -1966,6 +2263,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
                 "teams:///transcripts/{meeting_id}/{transcript_id}",
                 "list_meeting_transcripts",
             ),
+            "list_meeting_recordings": ("teams:///meetings/{join_web_url}", "list_chats"),
         }[tool]
         for fragment in expected:
             assert fragment in message, message

@@ -11,7 +11,7 @@ model reads this surface as one thing:
 
 * **A name is `verb_noun`** — `get_me`, `list_chats`, `list_teams`, `list_channels`,
   `browse_channel`, `search_messages`, `read_message`, `list_meeting_transcripts`,
-  `read_transcript` — naming what the tool does and what it does
+  `read_transcript`, `list_meeting_recordings` — naming what the tool does and what it does
   it to. `whoami` was the one exception and is now `get_me`:
   the shell idiom made the odd tool out of the very tool a model calls first, and renaming a tool
   is a breaking change best spent before there are more of them. (Microsoft's own M365 connector
@@ -50,6 +50,7 @@ from office_mcp.features import (
     identity,
     message_read,
     message_search,
+    recordings,
     transcripts,
 )
 from office_mcp.graph_client import graph_client_for
@@ -86,6 +87,7 @@ GRAPH_SCOPES: tuple[str, ...] = tuple(
             *message_search.GRAPH_PERMISSIONS,
             *message_read.GRAPH_PERMISSIONS,
             *transcripts.LISTING_PERMISSIONS,
+            *recordings.LISTING_PERMISSIONS,
         )
     )
 )
@@ -162,6 +164,7 @@ _SEARCH_TOKEN: str = _graph_token(*message_search.GRAPH_PERMISSIONS)
 _READ_TOKEN: str = _graph_token(*message_read.GRAPH_PERMISSIONS)
 _TRANSCRIPT_LIST_TOKEN: str = _graph_token(*transcripts.LISTING_PERMISSIONS)
 _TRANSCRIPT_TOKEN: str = _graph_token(transcripts.TRANSCRIPT_PERMISSION)
+_RECORDING_LIST_TOKEN: str = _graph_token(*recordings.LISTING_PERMISSIONS)
 
 _GET_ME = """\
 Return the signed-in Microsoft 365 user's own profile: `user_id`, `display_name`, `email`, \
@@ -196,8 +199,9 @@ listed by list_teams and list_channels, and are read by browse_channel.
 
 **This is also how a meeting is found.** A `meeting` chat is the conversation attached to a Teams \
 meeting, its `topic` is the meeting's subject, and it carries `meeting_uri` — the handle \
-list_meeting_transcripts takes. So "what was decided in the pricing call last Tuesday" starts \
-here: find the meeting chat by topic and recency, then follow its `meeting_uri`. There is no \
+list_meeting_transcripts and list_meeting_recordings both take. So "what was decided in the \
+pricing call last Tuesday" and "was that call recorded" both start here: find the meeting chat by \
+topic and recency, then follow its `meeting_uri`. There is no \
 separate meeting-search tool because this list already answers which meeting, and no Microsoft \
 calendar permission is involved. `meeting_uri` is null on every non-meeting chat, and null on a \
 meeting chat Microsoft returned no join URL for — that meeting's transcript is then unreachable \
@@ -464,9 +468,12 @@ transcripts once the meeting expires, roughly 60 days after a one-off.)
 - `meeting_not_found` — Microsoft matched the join URL in the handle to no meeting this user can \
 see. Not an error, and not proof the meeting is gone. Do not retry and do not rebuild the handle.
 
-This connector reads transcripts, not recordings: no video is returned or reachable here, and a \
-transcript is the better artifact for answering a question about a meeting anyway — it is text, \
-with who said what and when.
+This tool answers about transcripts only. Whether the meeting was RECORDED is a separate question \
+with a separate answer — list_meeting_recordings, which takes the same `meeting_uri` — because \
+Microsoft gates the two independently: the tenant setting below blocks transcripts and leaves \
+recordings alone, so when this call is refused that one may still answer. No video is returned or \
+reachable anywhere in this connector; a transcript is the better artifact for a question about a \
+meeting anyway, being text with who said what and when.
 
 Two things can refuse this call outright, and both are somebody's decision rather than a bug. \
 Reading transcripts over Microsoft Graph is an organisation-wide Teams setting that is OFF by \
@@ -518,18 +525,86 @@ call re-fetches the whole transcript from Microsoft, so a wider `limit` (up to \
 summarised as the whole meeting.\
 """
 
+_LIST_MEETING_RECORDINGS = f"""\
+Find out whether a Teams meeting was recorded, how long the recording runs, and whether the \
+signed-in user is allowed to download it. Takes the same `meeting_uri` that list_chats reports on \
+a meeting chat.
+
+This is the only tool here that answers "was Tuesday's call recorded" — and it answers it with \
+metadata, never with video. **No video is returned or reachable anywhere in this connector.** A \
+Teams meeting can run 30 hours, Microsoft serves a recording as one MP4 byte stream, and a model \
+cannot watch video, so returning it would be neither possible nor useful. What comes back is what \
+can actually be acted on: that a recording exists, when it started and stopped, how long it runs, \
+who may download it, and which transcript is the same call.
+
+**`content_access` is the "can I get at it" answer, and it is not about this connector.** \
+Microsoft documents recording download as ORGANISER-ONLY under delegated access — "Meeting \
+participants don't have permission to download meeting recordings" — unless a tenant administrator \
+has unblocked participants. So `organizer_only` means the recording is real and its video is out \
+of this user's reach: say it exists, say who has it (`organizer_user_id`, comparable with get_me's \
+`user_id`), and offer the transcript instead. \
+Never report an `organizer_only` recording as a missing one. \
+`you_are_the_organizer` means Microsoft permits this user to download it in Teams or SharePoint — \
+not here, and an administrator can still have blocked recording downloads tenant-wide.
+
+**The readable artifact is the transcript, and `content_correlation_id` is the exact link to it.** \
+For any question about what was said, call list_meeting_transcripts for the same meeting and read \
+the transcript whose `content_correlation_id` matches this recording's: that is Microsoft's own \
+identifier for "these two are the same call". Reach for this tool when the question is about the \
+recording itself — was there one, how long, who has it — or when list_meeting_transcripts has \
+already said `not_transcribed` and the remaining question is whether anything was captured at all.
+
+**Read `status` before anything else. It has four values and they mean four different actions:**
+- `available` — recordings are listed, with durations and access.
+- `not_ready` — nothing has landed for the window you asked about and something still might: that \
+window has only just closed, or you asked for no window and the meeting has not ended or ended \
+recently. Wait and call again later. This is NOT "the call was not recorded", and reporting it as \
+one is wrong: Microsoft publishes no availability SLA for a recording, so this tool infers it from \
+how recently the window (or the meeting) ended and errs towards telling you to wait. An occurrence \
+window that is already well past never answers this.
+- `not_recorded` — the window you asked about is over and nothing is there: nobody recorded it. \
+Retrying will not help. (One other cause is indistinguishable: Microsoft stops serving a meeting's \
+artifacts once the meeting expires, roughly 60 days after a one-off.)
+- `meeting_not_found` — Microsoft matched the join URL in the handle to no meeting this user can \
+see. Not an error, and not proof the meeting is gone. Do not retry and do not rebuild the handle.
+
+`duration_seconds` is computed from the recording's own start and end, because Microsoft publishes \
+no duration property at all; it is null where either timestamp is missing, and it is the \
+recording's length rather than the meeting's. Scope a recurring series to one occurrence with \
+`started_after`/`started_before`, exactly as with list_meeting_transcripts — a whole series is one \
+meeting to Microsoft, so every occurrence's recording is in the same collection. Both bounds take \
+a date (`2026-08-11`, meaning that whole UTC day) or a timestamp with or without an offset; one \
+without is read as UTC.
+
+Unlike transcripts, recordings are NOT behind the tenant-wide Teams switch for Graph transcript \
+access, so this tool can succeed in an organisation where list_meeting_transcripts is refused \
+outright. Reading recordings does need its own admin-consented permission \
+({recordings.RECORDING_PERMISSION}); when Microsoft refuses this call the error names it.\
+"""
+
 # What each reader says when its `uri` is not one of its own handles. Separate texts because the two
 # handle families are separate: pointing a caller at the wrong tool is the failure these prevent.
-_NOT_A_MEETING_HANDLE = (
-    "list_meeting_transcripts takes the `meeting_uri` that list_chats reports on a meeting chat, "
-    + "and this is not one. A meeting handle has exactly one shape:\n"
-    + "  teams:///meetings/{join_web_url}\n"
-    + "with the join URL percent-encoded. It cannot be assembled — Microsoft addresses a meeting "
-    + "by the join URL of the Teams meeting itself, which only Microsoft can supply — so call "
-    + "list_chats, find the `meeting` chat for the meeting in question, and pass its `meeting_uri` "
-    + "verbatim. A chat id, a chat topic, a Teams web link and a `teams:///transcripts/...` handle "
-    + "are none of them a meeting handle. Retrying this value will fail identically."
-)
+
+
+def _not_a_meeting_handle(tool: str) -> str:
+    """The refusal for a `meeting_uri` that is not a meeting handle, named for the tool that got it.
+
+    One text with the tool's name substituted rather than one per tool: both meeting listers take
+    the same handle from the same place, so the advice differs in exactly one word and two copies of
+    it would be free to drift.
+    """
+    return (
+        f"{tool} takes the `meeting_uri` that list_chats reports on a meeting chat, "
+        + "and this is not one. A meeting handle has exactly one shape:\n"
+        + "  teams:///meetings/{join_web_url}\n"
+        + "with the join URL percent-encoded. It cannot be assembled — Microsoft addresses a "
+        + "meeting by the join URL of the Teams meeting itself, which only Microsoft can supply — "
+        + "so call list_chats, find the `meeting` chat for the meeting in question, and pass its "
+        + "`meeting_uri` verbatim. A chat id, a chat topic, a Teams web link and a "
+        + "`teams:///transcripts/...` handle are none of them a meeting handle. Retrying this "
+        + "value will fail identically."
+    )
+
 
 _NOT_A_TRANSCRIPT_HANDLE = (
     "read_transcript takes the `uri` of a transcript that list_meeting_transcripts returned, and "
@@ -988,7 +1063,7 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> transcripts.MeetingTranscripts:
         handle = transcripts.meeting_handle(meeting_uri)
         if handle is None:
-            raise ToolError(_NOT_A_MEETING_HANDLE)
+            raise ToolError(_not_a_meeting_handle("list_meeting_transcripts"))
         with graph_tool_errors(*transcripts.LISTING_PERMISSIONS):
             return await transcripts.list_meeting_transcripts(
                 graph_client_for(transport, graph_token),
@@ -1105,6 +1180,84 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 from_seconds=from_seconds,
                 to_seconds=to_seconds,
                 speaker=speaker,
+            )
+
+    @mcp.tool(
+        name="list_meeting_recordings",
+        title="List a Meeting's Recordings",
+        description=_LIST_MEETING_RECORDINGS,
+        annotations=_READ_ONLY,
+    )
+    async def list_meeting_recordings(
+        meeting_uri: Annotated[
+            str,
+            Field(
+                min_length=1,
+                description=(
+                    "The meeting whose recordings to list, exactly as list_chats reported "
+                    + "`meeting_uri` on a meeting chat: `teams:///meetings/{join_web_url}` — the "
+                    + "same handle list_meeting_transcripts takes. Copy it verbatim; it carries "
+                    + "the meeting's join URL, which Microsoft matches character for character."
+                ),
+            ),
+        ],
+        started_after: Annotated[
+            date | datetime | None,
+            Field(
+                description=(
+                    "Only recordings that began at or after this moment. This is how to reach one "
+                    + "occurrence of a recurring meeting, whose occurrences all share a single "
+                    + "meeting and therefore a single recording collection. Three shapes are "
+                    + "accepted and none of them fails: `2026-08-11T09:00:00+02:00` (or `...Z`) "
+                    + "means the instant it names; `2026-08-11T09:00:00`, which names no offset, "
+                    + "IS READ AS UTC; and a bare `2026-08-11` means that whole UTC day, starting "
+                    + "at its first instant here. Pass the offset whenever what you know is a "
+                    + "local time — 09:00 in Zurich is 07:00Z. A window with no recording inside "
+                    + "it is an answer and not an error: `not_recorded` once the window is past, "
+                    + "`not_ready` while it is recent."
+                )
+            ),
+        ] = None,
+        started_before: Annotated[
+            date | datetime | None,
+            Field(
+                description=(
+                    "Only recordings that began at or before this moment. Pair it with "
+                    + "`started_after` to bracket one occurrence; the same three shapes are "
+                    + "accepted on the same UTC assumption, except that a bare `2026-08-11` here "
+                    + "means the END of that UTC day — so the same date in both bounds is that one "
+                    + "whole day. This bound is also what decides an empty answer: a window whose "
+                    + "end is already well past reports `not_recorded` rather than sending you "
+                    + "back to wait, even for a recurring series with occurrences still to come."
+                )
+            ),
+        ] = None,
+        limit: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=recordings.MAX_RECORDINGS,
+                description=(
+                    "How many recordings to return, newest first. Default 20, maximum "
+                    + f"{recordings.MAX_RECORDINGS}. A meeting has one recording per occurrence "
+                    + "that was recorded — two if somebody stopped and restarted — so only a "
+                    + "long-running recurring series reaches this; `truncated` says when the "
+                    + "window was too small."
+                ),
+            ),
+        ] = 20,
+        graph_token: str = _RECORDING_LIST_TOKEN,
+    ) -> recordings.MeetingRecordings:
+        handle = transcripts.meeting_handle(meeting_uri)
+        if handle is None:
+            raise ToolError(_not_a_meeting_handle("list_meeting_recordings"))
+        with graph_tool_errors(*recordings.LISTING_PERMISSIONS):
+            return await recordings.list_meeting_recordings(
+                graph_client_for(transport, graph_token),
+                handle=handle,
+                started_after=started_after,
+                started_before=started_before,
+                limit=limit,
             )
 
 

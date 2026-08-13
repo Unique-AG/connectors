@@ -120,6 +120,66 @@ def meeting_payload(
     }
 
 
+# The signed-in user, and somebody else, as `GET /me` answers and as a recording's organiser is
+# named. Two ids rather than one because the whole of the organiser-only rule is which of them the
+# recording belongs to.
+SIGNED_IN_USER_ID = "00000000-0000-4000-8000-000000000001"
+OTHER_USER_ID = "00000000-0000-4000-8000-000000000002"
+
+ME: dict[str, object] = {
+    "id": SIGNED_IN_USER_ID,
+    "displayName": "Ada Lovelace",
+    "mail": "ada@example.invalid",
+    "userPrincipalName": "ada@corp.example.invalid",
+    "jobTitle": "Analyst",
+}
+
+
+def recording_payload(
+    *,
+    recording_id: str = "7e31db25-bc6e-4fd8-96c7-e01264e9b6fc",
+    meeting_id: str = MEETING_ID,
+    created_at: str | None = "2026-02-10T14:02:41.204Z",
+    ended_at: str | None = "2026-02-10T14:49:53.117Z",
+    content_correlation_id: str | None = "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+    organizer_user_id: str | None = OTHER_USER_ID,
+    organizer_odata_type: str = "#microsoft.graph.teamworkUserIdentity",
+) -> dict[str, object]:
+    """One `callRecording`, which is metadata only — the bytes are an MP4 nothing here fetches.
+
+    `organizer_odata_type` is a parameter because Microsoft's own list-recordings sample sends
+    `#Microsoft.Teams.GraphSvc.teamworkUserIdentity` on this property, which is not a type the SDK
+    knows: an unknown discriminator has to keep deserializing rather than take the listing down.
+    There is no duration, size or media-type property on this resource; that is not an omission
+    here.
+    """
+    user = (
+        None
+        if organizer_user_id is None
+        else {
+            "@odata.type": organizer_odata_type,
+            "id": organizer_user_id,
+            # Null in every documented sample, which is why a recording's organiser can only be
+            # reported as an id.
+            "displayName": None,
+            "userIdentityType": "aadUser",
+            "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+        }
+    )
+    return {
+        "id": recording_id,
+        "meetingId": meeting_id,
+        "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+        "createdDateTime": created_at,
+        "endDateTime": ended_at,
+        "contentCorrelationId": content_correlation_id,
+        "recordingContentUrl": (
+            f"{GRAPH_V1}/me/onlineMeetings/{meeting_id}/recordings/{recording_id}/content"
+        ),
+        "meetingOrganizer": {"application": None, "device": None, "user": user},
+    }
+
+
 def transcript_payload(
     *,
     transcript_id: str = "MSMjMCMjSYNTHETIC0001",

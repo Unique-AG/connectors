@@ -55,7 +55,21 @@
    nothing to do with the one a message is read under. Widening it to "any feature may write a
    handle" is what it must never become. `server/` is not subject to this: a tool description names
    the shapes so a model knows what it may pass, and that is prose rather than a second
-implementation.
+   implementation.
+
+10. **No module may address a single meeting recording.** The listing is the whole of the
+    recordings surface, because there are exactly two reasons to reach an individual `callRecording`
+    and both are defects: its `content`, which is an MP4 of a meeting that can run thirty hours and
+    which a model cannot watch, and its `recordingContentUrl`, which is a Graph URL that only this
+    connector's bearer token opens — so handing it to a caller is either useless or a token leak.
+    (Delegated download is organiser-only anyway, so it would also fail for most callers.) "Return
+    metadata and availability, never the bytes" is the whole shape of `features/recordings.py`, and
+    the change that breaks it is a small-looking convenience someone adds later, which is why it is
+    a failing test rather than a paragraph. Enforced on the two SDK names that reach one recording:
+    `by_call_recording_id` and `recording_content_url`. Matched as attribute names through the AST,
+    so a docstring naming Graph's own `recordingContentUrl` property — as `features/recordings.py`
+    does, to say why it is not returned — is prose and not a violation.
+
 Every rule is paired with a guard that fails if the rule has become vacuous — an empty tree to walk,
 a missing file to forbid reaching for, a framework nothing imports any more. None of them is
 conditional: every package these rules are about now exists, so a rule that stops running is a
@@ -99,6 +113,12 @@ _HANDLE_OWNERS: dict[str, frozenset[str]] = {
     "transcripts.py": frozenset({"meetings", "transcripts"}),
 }
 _HANDLE_FAMILY = re.compile(re.escape(_HANDLE_SCHEME) + r"([A-Za-z_]*)")
+
+# The two names in the generated SDK that address one `callRecording` rather than the collection:
+# the item builder (`…recordings.by_call_recording_id(id)`, whose only child worth having is
+# `.content`) and the entity's own content URL. Rule 10 forbids both anywhere under `src/`.
+_RECORDING_ITEM_NAMES = frozenset({"by_call_recording_id", "recording_content_url"})
+_RECORDINGS_MODULE = _FEATURES / "recordings.py"
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
@@ -270,6 +290,20 @@ def _config_construction_violations(source: pathlib.Path) -> list[str]:
     ]
 
 
+def _attribute_names(source: str) -> set[str]:
+    """Every attribute name `source` reads or calls: `recordings` and `get` in `x.recordings.get()`.
+
+    Attribute names rather than text so that rule 10 constrains code and leaves prose alone: the
+    module it guards has to be able to name the Graph property it deliberately does not return.
+    """
+    return {node.attr for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Attribute)}
+
+
+def _recording_item_violations(source: pathlib.Path) -> list[str]:
+    reached = sorted(_attribute_names(source.read_text()) & _RECORDING_ITEM_NAMES)
+    return [f"{source.relative_to(_SRC)} reaches {name}" for name in reached]
+
+
 def _internal_module_violations(source: pathlib.Path) -> list[str]:
     return [
         f"{source.relative_to(_SRC)}:{line} imports {module}"
@@ -437,6 +471,28 @@ class TestTheDetectionItself:
         """`model_validate` is handed its values; it does not go looking for them."""
         assert not _config_constructions("AppConfig.model_validate({'port': 1})")
 
+    def test_catches_the_violation_the_recording_content_rule_exists_for(self) -> None:
+        """The exact line someone writes when adding a "just check the video is there" convenience,
+        and the property read that would leak a token-bearing Graph URL to a caller."""
+        found = _attribute_names(
+            "async def fetch(client, meeting_id, recording_id):\n"
+            + "    item = client.me.online_meetings.by_online_meeting_id(meeting_id)"
+            + ".recordings.by_call_recording_id(recording_id)\n"
+            + "    return await item.content.get(), item.recording_content_url\n"
+        )
+
+        assert found & _RECORDING_ITEM_NAMES == _RECORDING_ITEM_NAMES
+
+    def test_the_recording_content_rule_leaves_the_collection_and_the_prose_alone(self) -> None:
+        """Listing recordings is the whole point of the module the rule protects, and that module
+        has to be able to explain in words why Graph's `recordingContentUrl` is not passed on."""
+        found = _attribute_names(
+            '"""Not returned: recordingContentUrl needs our own bearer token."""\n'
+            + "page = await client.me.online_meetings.by_online_meeting_id(m).recordings.get()\n"
+        )
+
+        assert not found & _RECORDING_ITEM_NAMES
+
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
         assert not _imports_under("from office_mcp.serverless import thing", _SERVER_PREFIX)
         assert not _imports_under("from office_mcp.featureset import thing", _FEATURES_PREFIX)
@@ -584,6 +640,28 @@ class TestEachHandleFamilyHasOneHome:
             + f"not own — each family is minted and parsed in one module ({_HANDLE_OWNERS}), and a "
             + "second speller is free to disagree with it. Build that module's handle type and "
             + "read its `uri` instead."
+        )
+
+
+class TestNoModuleReachesForRecordingBytes:
+    def test_the_recordings_listing_is_actually_there(self) -> None:
+        """Guards the guard: the rule is that the *collection* is the whole surface, so if nothing
+        listed recordings any more it would be forbidding something nothing does."""
+        assert _RECORDINGS_MODULE.is_file(), f"no such file: {_RECORDINGS_MODULE}"
+        assert "recordings" in _attribute_names(_RECORDINGS_MODULE.read_text()), (
+            "features/recordings.py no longer reads the recordings collection"
+        )
+
+    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
+    def test_no_module_addresses_a_single_recording(self, source: pathlib.Path) -> None:
+        violations = _recording_item_violations(source)
+        assert not violations, (
+            "nothing here may address one meeting recording — the only things behind that door are "
+            + "an MP4 of a meeting up to 30 hours long, which cannot enter a model's context and "
+            + "which delegated callers other than the organiser may not download at all, and a "
+            + "content URL that only this connector's token opens. List the collection and report "
+            + "metadata, duration and access instead:\n  "
+            + "\n  ".join(violations)
         )
 
 

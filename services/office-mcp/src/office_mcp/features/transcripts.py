@@ -89,19 +89,29 @@ and a window quietly built in the wrong zone is worse than one that was refused.
   that has demonstrably passed is answered `not_transcribed` even for a series still running, or a
   model is sent back to poll for an occurrence that ended last month. Graph publishes no status for
   availability and no latency SLA, so both halves are an inference over one generous allowance;
-  `OccurrenceWindow.absence` is the whole of it and `MeetingTranscripts.status` admits it as one.
+  `OccurrenceWindow.settled` is the whole of it and `MeetingTranscripts.status` admits it as one.
 
 `SpeakerAttributionNotAllowed` is a fourth Graph answer and the one this module handles rather than
 reports: a tenant may permit transcripts and forbid speaker names, and the documented response is
 to ask again for the unattributed format. That degrades the answer instead of losing it, and
 `Transcript.speaker_attribution` says which one came back.
+
+## What `recordings` borrows from here, and why it is a separate module
+
+A meeting's recordings are answered by `features/recordings.py`, which takes `MeetingHandle`,
+`resolve_meeting`, `OccurrenceWindow` and the two helpers below from here: this module owns the
+meeting handle family (layering rule 9), so the join URL, the escaping and the window have exactly
+one home whichever artifact is being asked about. What it does not share is the outcome word — "was
+not transcribed" and "was not recorded" are different facts — or the refusal above, which Microsoft
+scopes to transcripts alone. That asymmetry is why the two artifacts are two tools;
+`features/recordings.py` argues it where the decision was made.
 """
 
 import html
 import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Self
+from typing import Protocol, Self
 from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -139,13 +149,14 @@ MAX_TRANSCRIPTS = 50
 MAX_TURNS = 500
 
 # How long after a window closes — or after a meeting ends, where no window was asked for — a
-# missing transcript is still called "not ready" rather than "never transcribed". Microsoft
-# publishes no SLA and no "processing" status for transcript availability, so this is not a promise
-# about Graph — it is which of two opposite pieces of advice to give when the evidence is the same
-# empty collection. Generous on purpose: telling a caller to wait once when nothing will ever
-# arrive costs one call, while telling it a transcript does not exist when it is ten minutes away
-# is a wrong answer it cannot detect.
-TRANSCRIPT_DELAY_ALLOWANCE = timedelta(hours=4)
+# missing artifact is still called "not ready" rather than "never made". Microsoft publishes no SLA
+# and no "processing" status for the availability of a transcript or of a recording, so this is not
+# a promise about Graph — it is which of two opposite pieces of advice to give when the evidence is
+# the same empty collection. Generous on purpose: telling a caller to wait once when nothing will
+# ever arrive costs one call, while telling it a transcript does not exist when it is ten minutes
+# away is a wrong answer it cannot detect. Named for artifacts rather than for transcripts because
+# `OccurrenceWindow.settled` is what recordings answer their own absence with too.
+ARTIFACT_DELAY_ALLOWANCE = timedelta(hours=4)
 
 # The inner code Graph sends when a tenant permits transcripts but forbids speaker names. Branched
 # on rather than the message, as Microsoft's own documentation instructs.
@@ -245,6 +256,19 @@ def _segment(value: str) -> str:
     return quote(value, safe="")
 
 
+class MeetingArtifact(Protocol):
+    """The one property a window needs of a meeting artifact: when it began.
+
+    Structural rather than nominal because there are two of these and they are unrelated generated
+    classes: `callTranscript` and `callRecording` both carry `createdDateTime` and nothing else
+    below is read. Naming the protocol instead of one of them is what lets recordings scope a
+    recurring series with the same window rather than with a second implementation of it.
+    """
+
+    @property
+    def created_date_time(self) -> datetime | None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class OccurrenceWindow:
     """Which occurrence was asked about, as two instants that are always timezone-aware.
@@ -275,39 +299,42 @@ class OccurrenceWindow:
         """
         return cls(_first_instant(started_after), _last_instant(started_before))
 
-    def holds(self, transcript: CallTranscript) -> bool:
-        """Whether this transcript began inside the window.
+    def holds(self, artifact: MeetingArtifact) -> bool:
+        """Whether this transcript or recording began inside the window.
 
-        A transcript Graph gave no `createdDateTime` for is kept when no window was asked for and
+        An artifact Graph gave no `createdDateTime` for is kept when no window was asked for and
         dropped when one was: it cannot be shown to be the occurrence the caller meant.
         """
         if self.started_after is None and self.started_before is None:
             return True
-        began = transcript.created_date_time
+        began = artifact.created_date_time
         if began is None:
             return False
         # Aware even though Graph's own timestamps carry `Z`: this comparison is the one that used
         # to raise, and it must not depend on a payload's punctuation to stay safe.
-        began = _utc(began)
+        began = as_utc(began)
         if self.started_after is not None and began < self.started_after:
             return False
         return not (self.started_before is not None and began > self.started_before)
 
-    def absence(self, meeting: OnlineMeeting) -> str:
-        """Which of the two empty answers this is, for the window that was actually asked about.
+    def settled(self, meeting: OnlineMeeting) -> bool:
+        """Whether an empty answer for this window means "there is none" rather than "not yet".
 
         Two independent pieces of evidence, either of which settles it: the window's own end is far
         enough past that anything falling inside it would have landed, or the *meeting* is — the
         second being what answers a caller who asked for no window at all, and what stops a window
-        mistakenly set in the future promising a transcript for a meeting that is long over.
+        mistakenly set in the future promising an artifact for a meeting that is long over.
 
         Absent evidence never settles anything: no `started_before` and no `endDateTime` both mean
-        nothing says transcription has finished, and of the two wrong answers the one that costs a
-        caller a second call is the cheaper one.
+        nothing says the meeting's artifacts have finished being made, and of the two wrong answers
+        the one that costs a caller a second call is the cheaper one.
+
+        A predicate rather than the verdict itself, because the verdict is a different word per
+        artifact and each lister owns its own vocabulary — the *inference* is what must not exist
+        twice.
         """
         now = datetime.now(UTC)
-        settled = _settled_by(self.started_before, now) or _settled_by(meeting.end_date_time, now)
-        return "not_transcribed" if settled else "not_ready"
+        return _settled_by(self.started_before, now) or _settled_by(meeting.end_date_time, now)
 
 
 def _first_instant(bound: date | datetime | None) -> datetime | None:
@@ -316,7 +343,7 @@ def _first_instant(bound: date | datetime | None) -> datetime | None:
         return None
     # `datetime` subclasses `date`, so this order is the whole of the distinction.
     if isinstance(bound, datetime):
-        return _utc(bound)
+        return as_utc(bound)
     return datetime.combine(bound, time.min, tzinfo=UTC)
 
 
@@ -325,18 +352,23 @@ def _last_instant(bound: date | datetime | None) -> datetime | None:
     if bound is None:
         return None
     if isinstance(bound, datetime):
-        return _utc(bound)
+        return as_utc(bound)
     return datetime.combine(bound, time.max, tzinfo=UTC)
 
 
-def _utc(moment: datetime) -> datetime:
-    """`moment` as an aware datetime, reading one that named no timezone as already being UTC."""
+def as_utc(moment: datetime) -> datetime:
+    """`moment` as an aware datetime, reading one that named no timezone as already being UTC.
+
+    Public because the UTC assumption belongs to the window and the window has one home: anything
+    comparing or subtracting Graph timestamps — here, or in the recordings lister deriving a
+    duration from two of them — resolves them through this and cannot meet a naive one.
+    """
     return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
 
 
 def _settled_by(moment: datetime | None, now: datetime) -> bool:
-    """Whether `moment` is far enough past that a transcript belonging to it would have arrived."""
-    return moment is not None and _utc(moment) + TRANSCRIPT_DELAY_ALLOWANCE < now
+    """Whether `moment` is far enough past that an artifact belonging to it would have arrived."""
+    return moment is not None and as_utc(moment) + ARTIFACT_DELAY_ALLOWANCE < now
 
 
 class TranscriptSummary(BaseModel):
@@ -517,7 +549,7 @@ async def list_meeting_transcripts(
     window = OccurrenceWindow.of(started_after, started_before)
 
     with graph_errors():
-        meeting = await _resolve_meeting(client, handle)
+        meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingTranscripts(
                 status="meeting_not_found",
@@ -535,9 +567,9 @@ async def list_meeting_transcripts(
         assert first_page is not None, "Graph answered a transcript listing with no collection"
         collected = await collect_pages(first_page, client, limit=limit, matches=window.holds)
 
-    found = sorted(collected.items, key=_started_at, reverse=True)
+    found = sorted(collected.items, key=began_at, reverse=True)
     return MeetingTranscripts(
-        status="available" if found else window.absence(meeting),
+        status="available" if found else _absence(window.settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
         # `OnlineMeetingBase.meetingType` is a generated enum subclassing `str`, so the member is
@@ -550,10 +582,24 @@ async def list_meeting_transcripts(
     )
 
 
-async def _resolve_meeting(
+def _absence(settled: bool) -> str:
+    """Which of the two empty answers to give: the one that means stop, or the one that means wait.
+
+    The evidence is `OccurrenceWindow.settled` and the word is this module's, because a meeting that
+    was recorded but not transcribed is answered `not_transcribed` here and `available` by the
+    recordings lister — the same evidence about two different artifacts.
+    """
+    return "not_transcribed" if settled else "not_ready"
+
+
+async def resolve_meeting(
     client: GraphServiceClient, handle: MeetingHandle
 ) -> OnlineMeeting | None:
     """The meeting whose stored `joinWebUrl` is `handle`'s, or None if Graph matched none.
+
+    Public because every meeting-side feature needs it and the `$filter` below must exist once:
+    this module owns the meeting handle family, so it owns the one request that redeems a handle.
+    Its permission is `MEETING_PERMISSION`, which is why the two travel together.
 
     The filter is built with the join URL doubled-quote-escaped and otherwise untouched: the SDK
     percent-encodes a query parameter's value on expansion, which is precisely the single encoding
@@ -575,14 +621,16 @@ async def _resolve_meeting(
     return meetings[0] if meetings else None
 
 
-def _started_at(transcript: CallTranscript) -> datetime:
-    """The sort key: when transcription began, or the beginning of time where Graph did not say.
+def began_at(artifact: MeetingArtifact) -> datetime:
+    """The sort key: when the artifact began, or the beginning of time where Graph did not say.
 
     Aware for the same reason `OccurrenceWindow.holds` is — one naive value among aware ones makes
     the sort itself raise, which is a crash in the middle of an answer that was already complete.
+    Shared with the recordings lister so that both artifacts come back newest first by the same
+    rule: Graph documents no `$orderby` on either collection, so the order is ours either way.
     """
-    began = transcript.created_date_time
-    return _utc(began) if began is not None else datetime.min.replace(tzinfo=UTC)
+    began = artifact.created_date_time
+    return as_utc(began) if began is not None else datetime.min.replace(tzinfo=UTC)
 
 
 def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
