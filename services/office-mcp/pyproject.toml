@@ -1,0 +1,76 @@
+[project]
+name = "office-mcp"
+version = "0.1.0"
+description = "Microsoft 365 (Office) FastMCP server"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp==3.4.5",
+    "uvicorn[standard]==0.52.0",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "python-dotenv==1.2.2",
+    "httpx==0.28.1",
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-exporter-prometheus==0.65b0",
+    "opentelemetry-instrumentation-asgi==0.65b0",
+    "sqlalchemy[asyncio]==2.0.51",
+    "asyncpg==0.31.0",
+    "alembic==1.18.5",
+    "cryptography==49.0.0",
+    "tenacity==9.1.4",
+    "typing-extensions==4.16.0",
+    "unique-mcp==2026.34.0.dev3",
+]
+
+[project.scripts]
+office-mcp = "office_mcp.main:main"
+
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/office_mcp"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/office_mcp" = "office_mcp"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "hatchling==1.31.0",
+    "ruff==0.16.0",
+    "basedpyright==1.39.9",
+    "respx==0.23.1",
+    "testcontainers[postgres]==4.15.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+# ANN: requires type annotations on function arguments (ANN001-003) and return
+# values (ANN2xx) — enforced everywhere, not just public functions.
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "all"
+include = ["src", "tests"]
+extraPaths = ["src", "."]
+reportUnusedCallResult = false
+reportMissingTypeStubs = false
+reportUnusedFunction = false

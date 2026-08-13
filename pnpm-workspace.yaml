@@ -2,6 +2,7 @@ packages:
   - services/*
   - "!services/hello-mcp"
   - "!services/kb-mcp"
+  - "!services/office-mcp"
   - packages/*
 
 injectWorkspacePackages: true
