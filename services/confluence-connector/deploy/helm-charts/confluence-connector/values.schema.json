@@ -2147,7 +2147,7 @@
                           },
                           "username": {
                             "type": "string",
-                            "description": "Confluence username for Basic auth"
+                            "description": "Confluence username for Basic auth. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           },
                           "password": {
                             "type": "string",
