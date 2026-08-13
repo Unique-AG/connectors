@@ -62,8 +62,7 @@ class AuthorizationCode(Base):
 
     Field shape mirrors `mcp.server.auth.provider.AuthorizationCode` exactly. `subject` is the
     resolved `user_id` — the SDK's own term for "resource owner", propagated through to the
-    issued access/refresh tokens so `features/auth/context.py` can resolve "whose Backstop
-    credential".
+    issued access/refresh tokens so `auth/context.py` can resolve "whose Backstop credential".
     """
 
     __tablename__: str = "authorization_codes"
@@ -138,10 +137,10 @@ class LoginAttempt(Base):
 
     Rows rather than a counter column: a counter needs a window boundary baked in at write time,
     while rows let the window be a pure read (`attempted_at >= now - window`) and make the limit
-    hold across replicas without any coordination. `features/auth/cleanup.py` purges old rows.
+    hold across replicas without any coordination. `auth/cleanup.py` purges old rows.
 
     `source_ip` is recorded for diagnosis only and is deliberately *not* rate-limited on — see
-    `features/auth/throttle.py` for why.
+    `auth/throttle.py` for why.
     """
 
     __tablename__: str = "login_attempts"
