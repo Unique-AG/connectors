@@ -21,10 +21,23 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+
+def _configparser_escape(value: str) -> str:
+    """Double any literal `%` so `ConfigParser`'s `BasicInterpolation` doesn't choke on it.
+
+    `Config.set_main_option`/`get_main_option` go through a `configparser.ConfigParser`, whose
+    default interpolation treats `%` as the start of a `%(name)s` reference and raises on any
+    other use — including the `%40`-style percent-encoding SQLAlchemy's `render_as_string` puts
+    in a DSN's credentials. Doubling here is undone by the interpolation on read, so
+    `get_main_option`/`get_section` hand back the original (still percent-encoded) URL.
+    """
+    return value.replace("%", "%%")
+
+
 # Office-mcp reads its DB connection from env vars (DB_URL or DB_HOST/DB_NAME/...),
 # same as the running app — not from the static `sqlalchemy.url` in alembic.ini.
 _db_config = DatabaseConfig()
-config.set_main_option("sqlalchemy.url", _db_config.connection_url)
+config.set_main_option("sqlalchemy.url", _configparser_escape(_db_config.connection_url))
 
 target_metadata = Base.metadata
 
