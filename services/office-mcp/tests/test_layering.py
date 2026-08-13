@@ -41,8 +41,10 @@
    those are reachable without ever spelling `msgraph`. A tool that builds one has put the shape of
    a Graph call in the layer whose only job is to expose it, and rule 6 alone would not notice.
 
-Rule 1's "the tree actually has feature packages" guard still skips until a feature grows into a
-subpackage; the import-direction check itself runs against every module under `features/`.
+Every rule is paired with a guard that fails if the rule has become vacuous — an empty tree to walk,
+a missing file to forbid reaching for, a framework nothing imports any more. None of them is
+conditional: every package these rules are about now exists, so a rule that stops running is a
+failure and not a skip.
 
 All rules are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
@@ -87,11 +89,6 @@ _CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig"})
 # Files allowed to construct one, relative to `_SRC`. Both are the root of a program: `app.py` is
 # the composition root, and `main.py` is the server entrypoint that hands it its `AppConfig`.
 _COMPOSITION_ROOTS = frozenset({"app.py", "main.py"})
-
-
-def _feature_packages() -> set[str]:
-    """The subpackages under `features/`. Empty in this PR — the first ones land later."""
-    return {p.name for p in _FEATURES.iterdir() if p.is_dir() and p.name != "__pycache__"}
 
 
 def _imported_modules(tree: ast.AST, package: str | None = None) -> list[tuple[str, int]]:
@@ -419,13 +416,15 @@ class TestTheDetectionItself:
 
 
 class TestFeaturesDoNotImportServer:
-    @pytest.mark.skipif(not _feature_packages(), reason="feature packages land in later PRs")
     def test_the_feature_tree_is_actually_there(self) -> None:
-        """Guards the guard: a moved/renamed tree must not silently vacate the rule below."""
-        sources = sorted(_FEATURES.rglob("*.py"))
-        assert sources, f"no python sources found under {_FEATURES}"
-        packages = {p.relative_to(_FEATURES).parts[0] for p in sources if p.name != "__init__.py"}
-        assert packages, f"no feature packages found under {_FEATURES}"
+        """Guards the guard: a moved or renamed tree must not silently vacate the rule below.
+
+        The rule is parametrized over `features/`, so an empty tree makes it zero tests that pass
+        by not existing. What has to be there is feature *modules* — `features/` is a grouping and
+        its units are modules, not subpackages (see rule 4) — so that is what is asserted.
+        """
+        modules = [p for p in sorted(_FEATURES.rglob("*.py")) if p.name != "__init__.py"]
+        assert modules, f"no feature modules found under {_FEATURES}"
 
     @pytest.mark.parametrize("source", sorted(_FEATURES.rglob("*.py")), ids=_source_id)
     def test_no_feature_module_imports_from_server(self, source: pathlib.Path) -> None:
@@ -456,7 +455,6 @@ class TestFeaturesDoNotImportTheMcpFramework:
         )
 
 
-@pytest.mark.skipif(not _GRAPH_CLIENT.is_dir(), reason="graph_client/ lands in a later PR")
 class TestGraphClientDoesNotImportFeatures:
     def test_the_client_tree_is_actually_there(self) -> None:
         """Guards the guard, same as above."""
@@ -476,7 +474,6 @@ class TestGraphClientDoesNotImportFeatures:
         )
 
 
-@pytest.mark.skipif(not _GRAPH_CLIENT.is_dir(), reason="graph_client/ lands in a later PR")
 class TestGraphClientDoesNotImportConfig:
     def test_the_settings_module_is_actually_there(self) -> None:
         """Guards the guard: without somewhere to put them, the rule below is unsatisfiable."""

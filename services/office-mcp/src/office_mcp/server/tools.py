@@ -6,6 +6,20 @@ no registry, no base class and no decorator of our own: `register_tools` closes 
 `create_app` built, which is the whole of what FastMCP's plain-function tool signature would
 otherwise need a process-wide service holder for.
 
+Three conventions hold across every tool here, and a new one is expected to keep them, because a
+model reads this surface as one thing:
+
+* **A name is `verb_noun`** — `get_me`, `list_chats`, `search_messages`, `read_message` — naming
+  what the tool does and what it does it to. `whoami` was the one exception and is now `get_me`:
+  the shell idiom made the odd tool out of the very tool a model calls first, and renaming a tool
+  is a breaking change best spent before there are more of them. (Microsoft's own M365 connector
+  arrived at `get_me` independently, which is one less name for a model to have to learn twice.)
+* **One word for "there is more".** Every tool that answers with a list reports `truncated`, and
+  says in its own description how to get the rest — a wider `limit` where there is no cursor, the
+  `next_offset` where there is. Two words for one idea is how a model comes to guess.
+* **A description teaches the traps, and the neighbours.** Each one says what it answers, when to
+  reach for it rather than for another tool here, and what its answer does *not* mean.
+
 The token comes from `EntraOBOToken`, FastMCP's own On-Behalf-Of dependency: it takes the Entra
 token the caller presented (audience `api://{client_id}`, useless against Graph) and exchanges it
 for a Graph one in the scopes named here. It is a dependency default, so it never appears in the
@@ -131,21 +145,22 @@ _CHATS_TOKEN: str = _graph_token(chats.GRAPH_PERMISSION)
 _SEARCH_TOKEN: str = _graph_token(*message_search.GRAPH_PERMISSIONS)
 _READ_TOKEN: str = _graph_token(*message_read.GRAPH_PERMISSIONS)
 
-_WHOAMI = """\
-Return the signed-in Microsoft 365 user's own profile: `id`, `display_name`, `mail`, \
+_GET_ME = """\
+Return the signed-in Microsoft 365 user's own profile: `user_id`, `display_name`, `email`, \
 `user_principal_name` and `job_title`.
 
-Call this before anything that turns on who "I", "me" or "my" is: filtering a mail or message \
-search to the signed-in user, deciding which participant of a chat is them, or addressing them by \
-name. It is one cheap request and its answer is stable for the session.
+Call this before anything that turns on who "I", "me" or "my" is: filtering a message search to \
+the signed-in user, deciding which participant of a chat is them, or addressing them by name. It \
+is one cheap request and its answer is stable for the session.
 
-`mail` is the canonical primary SMTP address and the right value to match a sender or recipient \
-against — but it is null for guest and unlicensed accounts, and `user_principal_name` (Microsoft's \
-`userPrincipalName`) is then the best available identifier. Do not treat the two as \
-interchangeable when both are present: a tenant can issue a user_principal_name on a different \
-domain from the mail address, so matching message addresses against it can silently return \
-nothing. Compare `id` — the immutable directory object id — against user ids from other tools; \
-compare `mail` against addresses.\
+`email` is the canonical primary SMTP address (Microsoft's `mail`) and the right value to match a \
+sender or recipient against — but it is null for guest and unlicensed accounts, and \
+`user_principal_name` (Microsoft's `userPrincipalName`) is then the best available identifier. Do \
+not treat the two as interchangeable when both are present: a tenant can issue a \
+user_principal_name on a different domain from the email address, so matching message addresses \
+against it can silently return nothing. Compare `user_id` — the immutable directory object id — \
+against the `user_id` of a message's sender or of a mention; compare `email` against an address, \
+which is all a chat's member list gives you to match on.\
 """
 
 _LIST_CHATS = f"""\
@@ -153,8 +168,13 @@ List the Microsoft Teams chats the signed-in user is a member of — one-to-one,
 chats — most recently active first, with each chat's id, type, topic, last-message time and (for \
 unnamed chats) its members.
 
-Use it to find the `chat_id` that a chat-scoped tool needs, or to see which conversations are \
-live. This returns chats only: Teams channels live inside teams and are not part of this list.
+Reach for this to see which conversations are live, who is in them, and when each was last posted \
+in — never for what was said in them: no message text is returned here, and search_messages is the \
+only route to any. The other use is naming: a `chat_id` here is the same id search_messages puts \
+on every chat message it finds, so this list is how a found message gets a topic and a set of \
+participants. It is not an argument to anything — no tool here takes a chat id, and a search \
+cannot be narrowed to one chat. This returns chats only: Teams channels live inside teams and are \
+not part of this list.
 
 Ordering and `last_message_at` both come from the last message actually sent in the chat, which is \
 the only notion of recency Microsoft Graph will sort this collection by. The chat property that \
@@ -171,14 +191,17 @@ two members share a display name.
 There is no pagination. `limit` is a window on the most recent chats and `truncated` says whether \
 the user has more than fit in it — widen `limit` (up to {chats.MAX_CHATS}, Graph's own maximum \
 for this collection) rather than looking for a cursor. The signed-in user's own notes-to-self \
-chat is usually the oneOnOne chat whose only member is them (call whoami to know who that is).\
+chat is usually the oneOnOne chat whose only member is them (call get_me to know who that is; a \
+member is matched by display name or, with `include_member_emails`, by email — this list carries \
+no user ids).\
 """
 
 _SEARCH_MESSAGES = f"""\
 Search the Microsoft Teams messages the signed-in user can see — every one-to-one chat, group \
 chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
-and read state. Messages from ANY participant match, not only the user's own; call whoami if you \
-need to know who the user is.
+and read state. Messages from ANY participant match, not only the user's own; call get_me if you \
+need to know who the user is. This is the only tool here that returns messages at all, and the \
+only way to reach a message's text: it finds them, read_message reads one.
 
 A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
 view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
@@ -188,10 +211,16 @@ mentions. Never present `summary` as the whole message, and never conclude from 
 message does not say more.
 
 There is no result total, and this is not an omission: Microsoft Graph reports a per-page count \
-rather than a match count for Teams messages, so a total would be a fabrication. Page by passing \
-`next_offset` back as `offset` while `more_results_available` is true. A page can hold fewer than \
-`size` messages — offsets index Graph's own results, and system messages ("Ada joined the chat") \
-are dropped from ours because Graph gives them neither an author nor any text.
+rather than a match count for Teams messages, so a total would be a fabrication. `truncated` says \
+there is more — as it does on every list-shaped tool here — and here the way to get it is to pass \
+`next_offset` back as `offset`. A page can hold fewer than `size` messages: offsets index Graph's \
+own results, and system messages ("Ada joined the chat") are dropped from ours because Graph gives \
+them neither an author nor any text.
+
+The search covers every chat and channel the user belongs to and cannot be narrowed to one of \
+them — Microsoft's index offers no such scope, so there is no chat or channel parameter and a \
+`chat_id` from list_chats is not one. Narrow with `sender`, dates or more words instead, and read \
+`chat_id` (or `team_id`/`channel_id`) on each hit to see where it came from.
 
 Results cannot be sorted: Graph refuses sort options on a message search. Its documented default \
 for message results is newest first and relevance can be mixed in, so compare `created_at` \
@@ -287,13 +316,16 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     below borrow it per call and never own it. `create_app` closes it on shutdown.
     """
 
-    @mcp.tool(name="whoami", title="Who Am I", description=_WHOAMI, annotations=_READ_ONLY)
-    async def whoami(graph_token: str = _IDENTITY_TOKEN) -> identity.SignedInUser:
+    @mcp.tool(name="get_me", title="Get My Profile", description=_GET_ME, annotations=_READ_ONLY)
+    async def get_me(graph_token: str = _IDENTITY_TOKEN) -> identity.SignedInUser:
         with graph_tool_errors(identity.GRAPH_PERMISSION):
             return await identity.get_signed_in_user(graph_client_for(transport, graph_token))
 
     @mcp.tool(
-        name="list_chats", title="List My Chats", description=_LIST_CHATS, annotations=_READ_ONLY
+        name="list_chats",
+        title="List My Teams Chats",
+        description=_LIST_CHATS,
+        annotations=_READ_ONLY,
     )
     async def list_chats(
         limit: Annotated[
@@ -377,7 +409,7 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Only messages that @-mention this user, by Microsoft Entra object id (the "
-                    + "`user_id` of a sender here, or `id` from whoami). A name will not work: "
+                    + "`user_id` of a sender here, or from get_me). A name will not work: "
                     + "Microsoft matches this term on the id alone."
                 )
             ),
@@ -494,7 +526,9 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ],
         graph_token: str = _READ_TOKEN,
     ) -> message_read.TeamsMessage:
-        handle = message_read.message_handle(uri)
+        # The parser lives with `message_search` because the handle does: search is the only thing
+        # that mints one, and one definition of the shape is what makes a search result readable.
+        handle = message_search.message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
         # One permission, not both: the handle says which surface is being read, and Graph's 403

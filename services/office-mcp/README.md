@@ -3,7 +3,7 @@
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
 Users sign in with their own Microsoft account and the server acts as them. It exposes four tools
-so far — `whoami`, `list_chats`, `search_messages` and `read_message` — and more land in later PRs,
+so far — `get_me`, `list_chats`, `search_messages` and `read_message` — and more land in later PRs,
 stacked on top of this one.
 
 ## Layout
@@ -26,6 +26,13 @@ A feature module owns three things that belong together: the Graph request it ma
 answers with, and the delegated Graph permissions that request needs. `server/tools.py` declares the
 MCP tools over them and is the only place that knows about MCP.
 
+Where two features answer about the same thing, the shared vocabulary lives in one of them rather
+than in both: `message_search` owns the `teams:///` message handle — its two shapes, its parser and
+which permission each surface is read under — and the sender shape, and `message_read` imports both.
+Search is where a handle and a search-shaped sender are minted, and two modules that each knew how
+to spell a handle would be free to disagree; the disagreement would surface as a search result that
+cannot be read.
+
 The layering rules are that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse — nor **from FastMCP**, since deciding what an MCP client
 is told (a `ToolError`, a schema, an annotation) is the tool layer's job; that **`graph_client/`
@@ -34,8 +41,10 @@ imports neither `features/` nor `config`**, taking its own frozen `GraphSettings
 underneath it, which is how a Graph call gets shaped without ever spelling `msgraph` — since a tool
 declares and exposes while the request belongs to a feature, and that
 **only `create_app` constructs a config**, so nothing downstream can quietly re-read the
-environment and disagree with the app it runs in. `tests/test_layering.py` enforces all of them,
-and grows as each package arrives.
+environment and disagree with the app it runs in. `tests/test_layering.py` enforces all of them, and
+each rule is paired with a guard that fails if the rule has gone vacuous — an empty tree to walk, a
+missing file to forbid reaching past. None of them is conditional on a package that has yet to land,
+because they all have now: a rule that stops running is a failure there and not a skip.
 
 ## Auth
 
@@ -75,7 +84,7 @@ consented to, which is why sign-in has to ask for it:
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `whoami` |
+| `User.Read` | Delegated | No | `get_me` |
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
 
@@ -132,26 +141,40 @@ gets that string onto the wire.
 
 | Tool | What it answers | Graph |
 | --- | --- | --- |
-| `whoami` | Who the signed-in user is: `id`, `display_name`, `mail`, `user_principal_name`, `job_title` | `GET /me` |
+| `get_me` | Who the signed-in user is: `user_id`, `display_name`, `email`, `user_principal_name`, `job_title` | `GET /me` |
 | `list_chats` | The user's Teams chats, most recently active first | `GET /me/chats` |
 | `search_messages` | Teams messages matching keywords, a sender, mentions, a date range, attachment or read state | `POST /search/query` |
 | `read_message` | One Teams message in full — text, sender, mentions, attachments, edits, deletion | `GET /chats/{id}/messages/{id}`, `GET /teams/{id}/channels/{id}/messages/{id}` |
 
 All are read-only, all take their caller's identity from the token rather than from a parameter, and
-all are described to the model in prose that names the traps rather than only the fields — `mail` is
+all are described to the model in prose that names the traps rather than only the fields — `email` is
 null for guests (use `user_principal_name`, which may be on a different domain), a chat's recency is
 its last message rather than the `lastUpdatedDateTime` that Graph moves on a rename, and a search
 hit's `summary` is a snippet rather than the message.
 
 Decisions worth knowing:
 
+- **The four tools are one surface, and the conventions are asserted, not just intended.** A name is
+  `verb_noun` — which is why the identity tool is `get_me` and not `whoami`, the shell idiom having
+  made the odd one out of the tool a model calls first (Microsoft's own M365 connector landed on
+  `get_me` too). A result field is snake_case, and one thing has one name across every tool: a
+  person's Entra id is `user_id` wherever it appears, an address is `email`, a time is `…_at`. Every
+  tool whose answer is a list says "there is more" with the same word, `truncated`, and says in its
+  own description how to get the rest — a wider `limit` where there is no cursor, `next_offset` where
+  there is. `tests/test_mcp_tools.py` checks all of that against the live schemas, because a
+  convention nothing enforces is how the fifth tool comes out different from the first four.
 - **Every result has a declared output schema.** So `truncated` and `members_may_be_incomplete` are
   typed fields rather than prose or, worse, an extra object appended to the results array that a
   model can mistake for a result.
 - **`list_chats` does not paginate.** `limit` (max 50, which is Graph's own `$top` ceiling on that
   collection) is a window on the most recent chats, and `truncated` says when there are more. A
   cursor over a collection that reorders itself on every message returns duplicates and gaps, and
-  the window is what "recent chats" means; `services/teams-mcp` ships the same shape.
+  the window is what "recent chats" means; `services/teams-mcp` ships the same shape. What the
+  `chat_id` it returns is *for* is naming: it is the same id `search_messages` puts on every chat
+  message it finds, so the list is how a found message gets a topic and a set of participants. No
+  tool here takes a chat id as an argument, a search cannot be narrowed to one chat, and a handle
+  cannot be assembled out of one — so the description says all three rather than promising a
+  chat-scoped tool that does not exist.
 - **`search_messages` is one Graph request, always.** No fan-out, and specifically no per-chat scan
   when a date filter is set or a permission is missing — which is what the connector this replaces
   falls back to, up to 50 chats × 50 messages. Graph's read budget is "one request per second per
@@ -160,9 +183,9 @@ Decisions worth knowing:
   note from that path in a live tenant. Date bounds go into the query string as `sent>=` / `sent<=`
   instead, where Microsoft's index applies them — inclusive, and covering channels as well as chats.
 - **`search_messages` reports no result total,** because Graph does not give one: for Teams messages
-  the `total` it returns is the count on the page. `more_results_available` plus `next_offset` are
-  the whole of the paging contract, and a page can be shorter than `size` because system messages
-  (`from: null`, a body of `<systemEventMessage/>`) are dropped and offsets index Graph's own hits.
+  the `total` it returns is the count on the page. `truncated` plus `next_offset` are the whole of the
+  paging contract, and a page can be shorter than `size` because system messages (`from: null`, a
+  body of `<systemEventMessage/>`) are dropped and offsets index Graph's own hits.
 - **`query` is words, not a phrase.** Multi-word free text reaches Microsoft's index as separate
   terms, which KQL ANDs: every word must appear, anywhere in the message and in any order. Wrapping
   the whole query in the quotes that guard a *filter value* would make it an exact-adjacency phrase
@@ -210,10 +233,14 @@ Decisions worth knowing:
   attribute — what someone searched their own messages for names people and deals. `teams-mcp` had
   to remove query terms from its spans and logs after the fact; a test here asserts they never
   arrive.
-- **A refusal names its remedy.** `server/errors.py` maps each Graph failure onto the one thing a
-  model can do about it: 401 → ask the user to sign in again, 403 → ask an administrator for *this
-  named permission*, 429 → wait Graph's own `Retry-After`, 5xx → retry once. The Graph request id
-  rides along, because that is what Microsoft support asks for. A permission that was never
+- **A refusal names its remedy, in one voice.** `server/errors.py` maps each Graph failure onto the
+  one thing a model can do about it: 401 → ask the user to sign in again, 403 → ask an administrator
+  for *this named permission*, 429 → wait Graph's own `Retry-After`, 5xx → retry once. Every one of
+  them is written to the same shape, because a model reads them all as one server: "Microsoft 365"
+  is what refused and is named first (not "Microsoft Graph", which is an API the caller is not
+  calling), then the remedy and whether retrying could possibly help, then the diagnostics in a
+  parenthesis at the end. The Graph request id rides along there, because that is what Microsoft
+  support asks for, by that name. A permission that was never
   consented to fails earlier still — Entra refuses the On-Behalf-Of exchange (AADSTS65001) while
   FastMCP is resolving the tool's token, before the tool body runs — so `server/tools.py` wraps that
   exchange to give it the same named-permission remedy instead of "Failed to resolve dependency".

@@ -16,10 +16,23 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_mcp.features import message_search
-from office_mcp.features.message_search import SearchCriteria
+from office_mcp.features.message_search import MessageHandle, SearchCriteria
 from office_mcp.graph_client import GraphForbidden
 
 from .conftest import channel_hit, chat_hit, search_response
+
+_CHAT_ID = "19:release@thread.v2"
+_MESSAGE_ID = "1770000000000"
+_TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CHANNEL_ID = "19:general@thread.tacv2"
+
+_CHAT_URI = f"teams:///chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
+_CHANNEL_URI = (
+    f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
+)
+
+_CHAT_HANDLE = MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID)
+_CHANNEL_HANDLE = MessageHandle(message_id=_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID)
 
 _MENTIONED = UUID("497b7a2a-9e1a-48d7-80e8-2965d2fc3a81")
 
@@ -312,6 +325,65 @@ class TestCriteriaThatAskForNothing:
             )
 
 
+class TestTheHandleItMints:
+    def test_it_reads_the_two_shapes_search_emits_and_decodes_their_ids(self) -> None:
+        """A handle is this module's contract with `read_message`, which is why the shape and its
+        parser live here: the ids in it are percent-encoded because a Teams id is full of `:` and
+        `@`, so reading one back means decoding them."""
+        chat = message_search.message_handle(_CHAT_URI)
+        channel = message_search.message_handle(_CHANNEL_URI)
+
+        assert chat == _CHAT_HANDLE
+        assert channel == _CHANNEL_HANDLE
+
+    def test_a_handle_survives_the_round_trip_it_came_from(self) -> None:
+        chat = message_search.message_handle(_CHAT_URI)
+        channel = message_search.message_handle(_CHANNEL_URI)
+
+        assert chat is not None and chat.uri == _CHAT_URI
+        assert channel is not None and channel.uri == _CHANNEL_URI
+
+    def test_an_unencoded_id_still_resolves(self) -> None:
+        """A caller that copied a handle out of a log rather than out of a response has ids that
+        were never encoded; `:` and `@` are unambiguous in a path segment, so those are read too."""
+        handle = message_search.message_handle(f"teams:///chats/{_CHAT_ID}/messages/{_MESSAGE_ID}")
+
+        assert handle == _CHAT_HANDLE
+
+    def test_it_says_which_permission_each_shape_is_read_under(self) -> None:
+        """Graph's permissions for a message read are per surface and the handle is the only
+        thing that knows which surface, so a 403 on a chat read can only be about `Chat.Read` —
+        naming the channel permission alongside it would send an administrator after one that was
+        never missing."""
+        assert _CHAT_HANDLE.permission == "Chat.Read"
+        assert _CHANNEL_HANDLE.permission == "ChannelMessage.Read.All"
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The schemes a polymorphic reader would advertise and this connector cannot serve.
+            "mail:///messages/AAMkAGI2",
+            "calendar:///events/AAMkAGI2",
+            "drive:///items/01ABC",
+            "site:///sites/contoso/pages/1",
+            # Right scheme, wrong shape.
+            "teams:///chats/19%3Arelease%40thread.v2",
+            "teams:///messages/1770000000000",
+            "teams:///chats//messages/1770000000000",
+            "teams:///chats/19%3Arelease%40thread.v2/messages/",
+            "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000/replies/1770000000001",
+            "teams:///teams/8a9c3c47/messages/1770000000000",
+            "teams:///chats/19%3Arelease%40thread.v2/messages/%20",
+            # A Teams web link, which is what a model reaches for when it has no handle.
+            "https://teams.microsoft.com/l/message/19%3Ageneral/1770000000000",
+            "1770000000000",
+            "",
+        ],
+    )
+    def test_it_refuses_everything_else(self, uri: str) -> None:
+        assert message_search.message_handle(uri) is None
+
+
 class TestWhatTheCallerIsTold:
     async def test_a_chat_hit_carries_a_chat_handle_and_a_channel_hit_a_channel_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -343,8 +415,8 @@ class TestWhatTheCallerIsTold:
             "teams:///teams/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
             + "/channels/19%3Ageneral%40thread.tacv2/messages/1770000000002",
         ]
-        # The raw ids are returned alongside, unencoded, for tools that take an id rather than a
-        # handle — a caller must never have to unpick the handle to get one back.
+        # The raw ids are returned alongside, unencoded, so a hit can be lined up with the
+        # `chat_id` list_chats reports without anyone unpicking the handle to get one back.
         assert found.messages[0].chat_id == "19:release@thread.v2"
         assert (found.messages[1].team_id, found.messages[1].channel_id) == (
             "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
@@ -516,7 +588,7 @@ class TestWhatTheCallerIsTold:
 
 
 class TestPagingAndItsHonesty:
-    async def test_more_results_available_drives_paging_and_total_is_ignored(
+    async def test_truncated_drives_paging_and_total_is_ignored(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Microsoft documents `total` as the count of results on the page for Teams messages, not
@@ -537,7 +609,7 @@ class TestPagingAndItsHonesty:
             client, criteria=SearchCriteria(query="release"), offset=50, size=25
         )
 
-        assert found.more_results_available is True
+        assert found.truncated is True
         assert found.next_offset == 53
         assert "total" not in message_search.MessageSearchResults.model_fields
 
@@ -595,7 +667,7 @@ class TestPagingAndItsHonesty:
         )
 
         assert found.messages == []
-        assert (found.more_results_available, found.next_offset) == (False, None)
+        assert (found.truncated, found.next_offset) == (False, None)
 
 
 class TestGraphFailures:

@@ -15,6 +15,7 @@ Every payload is synthesised: fake ids, `.invalid` domains, public-domain names.
 
 import json
 import logging
+import re
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from typing import cast
 
@@ -327,15 +328,15 @@ class TestTheToolsThisServerAdvertises:
         schema, a model would try to invent one."""
         tools = _named(await mcp_client.list_tools())
 
-        assert set(tools) == {"whoami", "list_chats", "search_messages", "read_message"}
+        assert set(tools) == {"get_me", "list_chats", "search_messages", "read_message"}
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
 
-    async def test_whoami_takes_no_arguments(self, mcp_client: Client[FastMCPTransport]) -> None:
+    async def test_get_me_takes_no_arguments(self, mcp_client: Client[FastMCPTransport]) -> None:
         tools = _named(await mcp_client.list_tools())
 
-        assert _properties(tools["whoami"].inputSchema) == {}
-        assert tools["whoami"].inputSchema.get("required", []) == []
+        assert _properties(tools["get_me"].inputSchema) == {}
+        assert tools["get_me"].inputSchema.get("required", []) == []
 
     async def test_list_chats_bounds_its_limit_where_graph_bounds_it(
         self, mcp_client: Client[FastMCPTransport]
@@ -355,17 +356,17 @@ class TestTheToolsThisServerAdvertises:
         be pagination metadata. A declared output schema is how `truncated` stops being prose."""
         tools = _named(await mcp_client.list_tools())
 
-        assert set(_properties(tools["whoami"].outputSchema)) == {
-            "id",
+        assert set(_properties(tools["get_me"].outputSchema)) == {
+            "user_id",
             "display_name",
-            "mail",
+            "email",
             "user_principal_name",
             "job_title",
         }
         assert set(_properties(tools["list_chats"].outputSchema)) == {"chats", "truncated"}
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
-            "more_results_available",
+            "truncated",
             "next_offset",
         }
         assert set(_properties(tools["read_message"].outputSchema)) == {
@@ -387,6 +388,25 @@ class TestTheToolsThisServerAdvertises:
             "mentions",
             "attachments",
         }
+
+    async def test_the_whole_surface_speaks_one_language(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """These tools arrived one at a time and are read all at once, by a model choosing between
+        them. So the conventions are asserted rather than merely written down: a name is verb_noun
+        (`whoami` was the one exception and is now `get_me`), a result field is snake_case, and a
+        tool whose answer is a list says "there is more" with the one word `truncated` — two words
+        for that would be two things for a model to learn, and a reason for it to guess.
+        """
+        tools = _named(await mcp_client.list_tools())
+
+        for name in tools:
+            assert re.fullmatch(r"[a-z]+(_[a-z]+)+", name), f"{name} is not verb_noun"
+        for tool in tools.values():
+            for field in _properties(tool.outputSchema):
+                assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
+        for name in ("list_chats", "search_messages"):
+            assert "truncated" in _properties(tools[name].outputSchema), name
 
     async def test_read_message_takes_exactly_one_required_handle(
         self, mcp_client: Client[FastMCPTransport]
@@ -503,7 +523,7 @@ class TestTheToolsThisServerAdvertises:
 
 
 class TestCallingThem:
-    async def test_whoami_calls_graph_with_the_exchanged_token(
+    async def test_get_me_calls_graph_with_the_exchanged_token(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
@@ -511,9 +531,9 @@ class TestCallingThem:
     ) -> None:
         route = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
-        result = await mcp_client.call_tool("whoami", {})
+        result = await mcp_client.call_tool("get_me", {})
 
-        assert _structured(result)["mail"] == "ada@example.invalid"
+        assert _structured(result)["email"] == "ada@example.invalid"
         assert route.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
         assert obo.requested_scopes == [("https://graph.microsoft.com/User.Read",)]
 
@@ -547,7 +567,7 @@ class TestCallingThem:
         result = await mcp_client.call_tool("search_messages", {"query": "release"})
 
         body = _structured(result)
-        assert body["more_results_available"] is False
+        assert body["truncated"] is False
         assert body["next_offset"] is None
         assert "total" not in body, "Graph's `total` is a page count for Teams, not a match count"
         found = cast("Sequence[Mapping[str, object]]", body["messages"])

@@ -61,8 +61,11 @@ class ChatMember(BaseModel):
 class ChatSummary(BaseModel):
     chat_id: str = Field(
         description=(
-            "The chat's Graph id, e.g. `19:...@thread.v2`. Pass it verbatim to any tool that "
-            + "takes a chat id; it cannot be reconstructed from a topic or a member's name."
+            "The chat's Graph id, e.g. `19:...@thread.v2`. It is the same id search_messages "
+            + "reports as `chat_id` on a chat message, so it is how to tell which of these chats a "
+            + "found message came from. No tool here takes a chat id as an argument — a message is "
+            + "read by the `uri` handle search_messages emits, which this id cannot be assembled "
+            + "into — and it cannot be reconstructed from a topic or a member's name either."
         )
     )
     chat_type: str = Field(
@@ -115,9 +118,10 @@ class ChatList(BaseModel):
     )
     truncated: bool = Field(
         description=(
-            "True when the user has more chats than the `limit` returned here. There is no "
-            + f"cursor: raise `limit` (up to {MAX_CHATS}) to widen the window. Chats less recent "
-            + "than the window are not reachable from this tool."
+            "True when the user has more chats than this `limit` holds — the same 'there is more' "
+            + "flag every list-shaped tool here reports. There is no cursor to page with: raise "
+            + f"`limit` (up to {MAX_CHATS}) to widen the window. Chats less recent than the window "
+            + "are not reachable from this tool."
         )
     )
 

@@ -27,19 +27,23 @@ class SignedInUser(BaseModel):
 
     Field names are snake_case here and in every other tool payload, which is the one place this
     connector deliberately does not echo Graph's spelling — the field descriptions name the Graph
-    property wherever the two differ.
+    property wherever the two differ. Two of them differ by more than case, so that one thing has
+    one name across this server's whole surface: a person's Entra object id is `user_id` here as it
+    is on a message's sender and on a mention, and an email address is `email` here as it is on a
+    sender and on a chat member. Graph calls them `id` and `mail`.
     """
 
-    id: str = Field(
+    user_id: str = Field(
         description=(
-            "The user's immutable Microsoft Entra object id (Graph `id`). The only identifier "
-            + "safe to compare against user ids from other tools; names and addresses change."
+            "The user's immutable Microsoft Entra object id (Graph `id`). The only identifier safe "
+            + "to compare against the `user_id` of a message's sender or of a mention; names and "
+            + "addresses change."
         )
     )
     display_name: str | None = Field(
         description="The user's name as Microsoft 365 shows it. Null only on incomplete accounts."
     )
-    mail: str | None = Field(
+    email: str | None = Field(
         description=(
             "The canonical primary SMTP address (Graph `mail`), and the right thing to match a "
             + "sender or recipient address against. Null for guest and unlicensed accounts — "
@@ -50,7 +54,7 @@ class SignedInUser(BaseModel):
         description=(
             "The sign-in name (Graph `userPrincipalName`). Usually looks like an email address "
             + "but is not guaranteed to be one: a tenant may issue it on a different domain than "
-            + "`mail`, so treat it as an identifier rather than an address unless `mail` is null."
+            + "`email`, so treat it as an identifier rather than an address unless `email` is null."
         )
     )
     job_title: str | None = Field(
@@ -71,9 +75,9 @@ async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
     assert user is not None, "Graph answered GET /me with no user object"
     assert user.id is not None, "Graph answered GET /me with a user that has no id"
     return SignedInUser(
-        id=user.id,
+        user_id=user.id,
         display_name=user.display_name,
-        mail=user.mail,
+        email=user.mail,
         user_principal_name=user.user_principal_name,
         job_title=user.job_title,
     )

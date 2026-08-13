@@ -1,4 +1,4 @@
-"""`whoami`'s feature half: what `GET /me` is asked for, and what the caller is told."""
+"""`get_me`'s feature half: what `GET /me` is asked for, and what the caller is told."""
 
 import httpx
 import pytest
@@ -31,18 +31,23 @@ class TestTheProfileItReturns:
         selected = route.calls.last.request.url.params["$select"]
         assert selected.split(",") == ["id", "displayName", "mail", "userPrincipalName", "jobTitle"]
 
-    async def test_it_reports_mail_and_upn_separately(
+    async def test_it_reports_the_email_and_the_upn_separately(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The fixture's `mail` and `userPrincipalName` are on different domains on purpose —
-        that is the live-tenant shape, and collapsing the two is how "my messages" mis-filters."""
+        that is the live-tenant shape, and collapsing the two is how "my messages" mis-filters.
+
+        Graph's `mail` and `id` are reported as `email` and `user_id`: an address is `email` and a
+        person's Entra id is `user_id` everywhere on this server's surface, and this profile is the
+        one payload a model correlates the rest against.
+        """
         graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         user = await identity.get_signed_in_user(client)
 
-        assert user.mail == "ada@example.invalid"
+        assert user.email == "ada@example.invalid"
         assert user.user_principal_name == "ada@corp.example.invalid"
-        assert user.id == "00000000-0000-4000-8000-000000000001"
+        assert user.user_id == "00000000-0000-4000-8000-000000000001"
         assert user.display_name == "Ada Lovelace"
         assert user.job_title == "Analyst"
 
@@ -66,7 +71,7 @@ class TestTheProfileItReturns:
 
         user = await identity.get_signed_in_user(client)
 
-        assert user.mail is None
+        assert user.email is None
         assert user.user_principal_name == "grace_example.invalid#EXT#@corp.example.invalid"
 
     async def test_it_calls_as_the_caller(

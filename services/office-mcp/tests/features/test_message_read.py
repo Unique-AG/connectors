@@ -1,11 +1,13 @@
-"""`read_message`' feature half: which handle addresses what, and what a Teams body really holds.
+"""`read_message`' feature half: what a read asks Graph for, and what a Teams body really holds.
 
 Every payload is synthesised from Microsoft's own documented shapes — the Teams-identity sender, the
 authorless `<systemEventMessage/>`, the `<at>`/`<emoji>`/`<attachment>` decorations a Teams body
 carries. Nothing here came from a tenant.
-"""
 
-from typing import cast
+Which strings are handles at all is `message_search`'s question, since search is what mints them:
+`TestTheHandleItMints` in `test_message_search.py` covers the two shapes and everything that is not
+one of them. What is covered here is what a read does with a handle it was given.
+"""
 
 import httpx
 import pytest
@@ -13,8 +15,7 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_mcp.features import message_read, message_search
-from office_mcp.features.message_read import MessageHandle
-from office_mcp.features.message_search import SearchCriteria
+from office_mcp.features.message_search import MessageHandle, SearchCriteria
 from office_mcp.graph_client import GraphForbidden, GraphNotFound
 
 from .conftest import chat_hit, message_payload, search_response
@@ -25,9 +26,6 @@ _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CHANNEL_ID = "19:general@thread.tacv2"
 
 _CHAT_URI = f"teams:///chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
-_CHANNEL_URI = (
-    f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
-)
 
 # The path the ids above address once Graph has them. The SDK re-encodes them for the URL, so this
 # is what a percent-decoded handle has to come back out as.
@@ -40,61 +38,6 @@ _CHANNEL_HANDLE = MessageHandle(message_id=_MESSAGE_ID, team_id=_TEAM_ID, channe
 
 def _reads(graph: respx.MockRouter, payload: dict[str, object], path: str = _CHAT_PATH) -> None:
     _ = graph.get(path).mock(return_value=httpx.Response(200, json=payload))
-
-
-class TestTheHandlesItAccepts:
-    def test_it_reads_the_two_shapes_search_emits_and_decodes_their_ids(self) -> None:
-        """The handle is `search_messages`' contract: the ids in it are percent-encoded because a
-        Teams id is full of `:` and `@`, so parsing it means decoding them back."""
-        chat = message_read.message_handle(_CHAT_URI)
-        channel = message_read.message_handle(_CHANNEL_URI)
-
-        assert chat == _CHAT_HANDLE
-        assert channel == _CHANNEL_HANDLE
-
-    def test_a_handle_survives_the_round_trip_it_came_from(self) -> None:
-        assert message_read.message_handle(_CHAT_URI) is not None
-        assert cast("MessageHandle", message_read.message_handle(_CHAT_URI)).uri == _CHAT_URI
-        assert cast("MessageHandle", message_read.message_handle(_CHANNEL_URI)).uri == _CHANNEL_URI
-
-    def test_an_unencoded_id_still_resolves(self) -> None:
-        """A caller that copied a handle out of a log rather than out of a response has ids that
-        were never encoded; `:` and `@` are unambiguous in a path segment, so those are read too."""
-        handle = message_read.message_handle(f"teams:///chats/{_CHAT_ID}/messages/{_MESSAGE_ID}")
-
-        assert handle == _CHAT_HANDLE
-
-    def test_it_says_which_permission_each_shape_is_read_under(self) -> None:
-        """Graph's permissions for a message read are per surface, so a 403 on a chat read can
-        only be about `Chat.Read` — naming the channel permission alongside it would send an
-        administrator after one that was never missing."""
-        assert _CHAT_HANDLE.permission == "Chat.Read"
-        assert _CHANNEL_HANDLE.permission == "ChannelMessage.Read.All"
-
-    @pytest.mark.parametrize(
-        "uri",
-        [
-            # The schemes a polymorphic reader would advertise and this connector cannot serve.
-            "mail:///messages/AAMkAGI2",
-            "calendar:///events/AAMkAGI2",
-            "drive:///items/01ABC",
-            "site:///sites/contoso/pages/1",
-            # Right scheme, wrong shape.
-            "teams:///chats/19%3Arelease%40thread.v2",
-            "teams:///messages/1770000000000",
-            "teams:///chats//messages/1770000000000",
-            "teams:///chats/19%3Arelease%40thread.v2/messages/",
-            "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000/replies/1770000000001",
-            "teams:///teams/8a9c3c47/messages/1770000000000",
-            "teams:///chats/19%3Arelease%40thread.v2/messages/%20",
-            # A Teams web link, which is what a model reaches for when it has no handle.
-            "https://teams.microsoft.com/l/message/19%3Ageneral/1770000000000",
-            "1770000000000",
-            "",
-        ],
-    )
-    def test_it_refuses_everything_else(self, uri: str) -> None:
-        assert message_read.message_handle(uri) is None
 
 
 class TestTheRequestItMakes:
@@ -841,7 +784,7 @@ class TestTheRoundTripFromASearchResult:
         )
         uri = found.messages[0].uri
         assert uri is not None
-        handle = message_read.message_handle(uri)
+        handle = message_search.message_handle(uri)
         assert handle is not None, f"search produced a handle read_message rejects: {uri}"
         message = await message_read.read_message(client, handle=handle)
 

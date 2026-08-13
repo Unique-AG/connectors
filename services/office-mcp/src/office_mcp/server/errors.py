@@ -5,6 +5,14 @@ because the caller is a language model and its only options are: retry, retry la
 to sign in, ask an administrator for a permission, or stop. A message that does not name one of
 those is a message it will answer by calling the same tool again.
 
+Every message here is written to one shape, because a model reads them all as one voice. The thing
+that refused comes first and is always "Microsoft 365" — not "Microsoft Graph", which is the name of
+an API the caller is not calling. Then the remedy, and whether retrying could possibly help. Then,
+in a parenthesis at the end rather than woven through the advice, the evidence an operator needs.
+Graph is named after that opening only where it is the explanation (one 404 meaning three different
+things, a 500 that recurs) or where an operator needs its own label — `Graph request id` is what
+Microsoft support asks for, by that name.
+
 Two of them are only distinguishable with information Graph does not send. `GraphForbidden`
 covers both 401 and 403 and carries `status` for exactly this reason: 401 means the token was
 rejected (sign in again), 403 means the token was fine and the permission is missing (ask an
@@ -161,7 +169,7 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             + "particular content rather than transient."
         )
     return (
-        "Microsoft Graph rejected this request. This is a bad request rather than an outage or a "
+        "Microsoft 365 rejected this request. This is a bad request rather than an outage or a "
         + "permission problem, so retrying it unchanged will fail identically."
     )
 

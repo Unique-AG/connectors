@@ -6,15 +6,11 @@ properties defined in chatMessage. You can use the Teams API to retrieve more de
 single message" (https://learn.microsoft.com/en-us/graph/search-concept-chat-messages) — so a hit
 is metadata plus a handle, and this is the module that turns the handle back into a message.
 
-The handle is `message_search`'s contract, and exactly two shapes exist because Graph addresses a
-Teams message two ways (https://learn.microsoft.com/en-us/graph/api/chatmessage-get):
-
-    teams:///chats/{chatId}/messages/{messageId}
-    teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}
-
-Nothing else is accepted. `mail:///`, `site:///` and friends are not "not yet implemented" — this
-connector is scoped to Teams, and a reader that advertises schemes it cannot serve teaches a model
-to ask for things that will always fail.
+The handle is `message_search`'s contract, so `MessageHandle` and its parser live there, with the
+search that mints them, and this module takes them from there rather than spelling the two shapes a
+second time. `MessageSender` and `sender_of` arrive the same way and for the same reason: a message
+means the same thing whichever of the two tools produced it, and that is a property of there being
+one definition rather than of two agreeing.
 
 What a read has to survive, all of it documented and none of it optional:
 
@@ -28,8 +24,8 @@ What a read has to survive, all of it documented and none of it optional:
 * **The sender is a different shape from search's.** A read gives `teamworkUserIdentity`
   (https://learn.microsoft.com/en-us/graph/api/resources/teamworkuseridentity): an id, an
   *optional* display name, and **no email property at all**. Search gives a mailbox-shaped
-  `emailAddress`. Both go through `message_search.sender_of`, so a sender means the same thing
-  whichever tool produced it.
+  `emailAddress`. Both go through `sender_of`, which is why a `sender` here has the same three
+  fields as a search hit's, with different ones filled in.
 * **System / event messages have no text anywhere.** `from` is null and `body.content` is the
   literal `<systemEventMessage/>`; the "Ada joined the chat" sentence is rendered by the Teams
   client and Graph never sends it (https://learn.microsoft.com/en-us/graph/system-messages). Search
@@ -46,10 +42,8 @@ What a read has to survive, all of it documented and none of it optional:
 import html
 import json
 import re
-from dataclasses import dataclass
 from datetime import datetime
 from typing import cast
-from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -67,19 +61,20 @@ from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.features.message_search import MessageSender, sender_of
+from office_mcp.features.message_search import (
+    CHANNEL_PERMISSION,
+    CHAT_PERMISSION,
+    MessageHandle,
+    MessageSender,
+    sender_of,
+)
 from office_mcp.graph_client import graph_errors
 
-# Reading a message is `Chat.Read` in a chat and `ChannelMessage.Read.All` in a channel — the
-# permissions are per surface (https://learn.microsoft.com/en-us/graph/api/chatmessage-get), and a
-# handle says which surface it addresses. That is why `MessageHandle.permission` exists: a 403 on a
-# chat read can only be about `Chat.Read`, and naming the other one alongside it would send an
-# administrator after a permission that was never missing.
-CHAT_PERMISSION = "Chat.Read"
-CHANNEL_PERMISSION = "ChannelMessage.Read.All"
-
-# What the token exchange has to ask for. Both, because the exchange happens before the tool sees
-# its argument and so before anything knows which surface this call will read.
+# What the token exchange has to ask for: both, because the exchange happens before the tool sees
+# its argument and so before anything knows which surface this call will read. Reading a message is
+# `Chat.Read` in a chat and `ChannelMessage.Read.All` in a channel — the permissions are per surface
+# (https://learn.microsoft.com/en-us/graph/api/chatmessage-get) — and `MessageHandle.permission` is
+# what names the one a given read was actually made under.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 # `messageType` is an evolvable enum: without this header Graph answers `systemEventMessage` as
@@ -107,10 +102,10 @@ class MessageMention(BaseModel):
     )
     user_id: str | None = Field(
         description=(
-            "The mentioned person's Microsoft Entra object id, comparable against `id` from whoami "
-            + "and the `mentions` parameter of search_messages. Null when the mention was not a "
-            + "person — Teams also mentions teams, channels, chats, tags and everyone at once — so "
-            + "a null here is not a failure to resolve a user."
+            "The mentioned person's Microsoft Entra object id, comparable against `user_id` from "
+            + "get_me and the `mentions` parameter of search_messages. Null when the mention was "
+            + "not a person — Teams also mentions teams, channels, chats, tags and everyone at "
+            + "once — so a null here is not a failure to resolve a user."
         )
     )
 
@@ -242,71 +237,6 @@ class TeamsMessage(BaseModel):
             + "not unpacked."
         )
     )
-
-
-@dataclass(frozen=True, slots=True)
-class MessageHandle:
-    """A parsed `teams:///` handle: which message, and under which permission it is read."""
-
-    message_id: str
-    chat_id: str | None = None
-    team_id: str | None = None
-    channel_id: str | None = None
-
-    @property
-    def permission(self) -> str:
-        """The one delegated Graph permission the read this handle addresses is made under."""
-        return CHAT_PERMISSION if self.chat_id is not None else CHANNEL_PERMISSION
-
-    @property
-    def uri(self) -> str:
-        """The handle again, canonically — identical to the `uri` a search hit carried."""
-        if self.chat_id is not None:
-            return f"teams:///chats/{_segment(self.chat_id)}/messages/{_segment(self.message_id)}"
-        assert self.team_id is not None and self.channel_id is not None, (
-            "a handle addresses either a chat or a team channel"
-        )
-        return (
-            f"teams:///teams/{_segment(self.team_id)}/channels/{_segment(self.channel_id)}"
-            + f"/messages/{_segment(self.message_id)}"
-        )
-
-
-# The two handle shapes, and only those. Ids are matched as "anything but a separator" because
-# `message_search` percent-encodes each one — a Teams id is full of `:` and `@` and would otherwise
-# be ambiguous — but the encoding is not *required* here: `unquote` leaves an id that was already
-# readable exactly as it is, so a handle a caller copied out of a log still resolves.
-_CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
-_CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
-
-
-def message_handle(uri: str) -> MessageHandle | None:
-    """`uri` as a handle, or None if it is not one this connector can read.
-
-    None rather than an exception with a message: what to tell the caller about a malformed handle
-    is the tool boundary's business, and this module is not allowed to speak MCP.
-    """
-    chat = _CHAT_HANDLE.match(uri)
-    if chat is not None:
-        chat_id, message_id = (unquote(part) for part in chat.groups())
-        return _handle(MessageHandle(message_id=message_id, chat_id=chat_id))
-    channel = _CHANNEL_HANDLE.match(uri)
-    if channel is not None:
-        team_id, channel_id, message_id = (unquote(part) for part in channel.groups())
-        return _handle(MessageHandle(message_id=message_id, team_id=team_id, channel_id=channel_id))
-    return None
-
-
-def _handle(handle: MessageHandle) -> MessageHandle | None:
-    """The handle, unless a segment decoded to nothing — `%20` is not an id."""
-    ids = (handle.message_id, handle.chat_id, handle.team_id, handle.channel_id)
-    if any(value is not None and not value.strip() for value in ids):
-        return None
-    return handle
-
-
-def _segment(value: str) -> str:
-    return quote(value, safe="")
 
 
 async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:

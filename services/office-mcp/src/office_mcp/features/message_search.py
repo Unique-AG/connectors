@@ -33,7 +33,7 @@ import re
 from dataclasses import dataclass, fields
 from datetime import date, datetime
 from typing import cast
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from uuid import UUID
 
 from msgraph.generated.models.chat_message import ChatMessage
@@ -54,15 +54,110 @@ from office_mcp.graph_client import graph_errors
 # overview promises a search never returns more than the equivalent GET would, and every
 # channel-message GET in v1.0 requires `ChannelMessage.Read.All` — so without it a search silently
 # covers chats only. Both are requested rather than one, so a tenant that withholds the broad one
-# is refused at consent time instead of being served half an answer at query time. The broad one is
-# named separately because the tool's description has to tell a model what channel coverage costs.
+# is refused at consent time instead of being served half an answer at query time. Each is named
+# separately because both a tool description and a handle's own surface have to speak about one of
+# them alone: channel coverage is what the broad one buys, and `MessageHandle.permission` below
+# picks whichever one the surface a handle addresses is read under.
+CHAT_PERMISSION = "Chat.Read"
 CHANNEL_PERMISSION = "ChannelMessage.Read.All"
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Chat.Read", CHANNEL_PERMISSION)
+GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 # Graph documents `size` as defaulting to 25 with a maximum of 1000, but the paragraph that caps a
 # page at 25 names only the `message` and `event` entities, and no chatMessage-specific ceiling is
 # published. 50 is the largest page this connector will claim on undocumented ground.
 MAX_RESULTS = 50
+
+
+@dataclass(frozen=True, slots=True)
+class MessageHandle:
+    """Which message, in the one form this connector passes between tools.
+
+    A handle is minted here — a search hit is the only thing that produces one — which is why the
+    shape lives in this module and `message_read` takes it from here rather than spelling it a
+    second time. Two modules that each knew how to write `teams:///chats/…` would be free to
+    disagree, and the disagreement would look like a message that cannot be read.
+
+    Exactly two shapes exist, because Graph addresses a Teams message exactly two ways
+    (https://learn.microsoft.com/en-us/graph/api/chatmessage-get):
+
+        teams:///chats/{chatId}/messages/{messageId}
+        teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}
+
+    Nothing else is a handle. `mail:///`, `site:///` and friends are not "not yet implemented" —
+    this connector is scoped to Teams, and advertising a scheme it cannot serve teaches a model to
+    ask for things that will always fail.
+    """
+
+    message_id: str
+    chat_id: str | None = None
+    team_id: str | None = None
+    channel_id: str | None = None
+
+    @property
+    def permission(self) -> str:
+        """The one delegated Graph permission the message this handle addresses is read under.
+
+        Graph's permissions for a message read are per surface, and the handle is the only thing
+        that knows which surface: a 403 reading a chat can only be about `Chat.Read`, and naming
+        the channel permission alongside it would send an administrator after one that was never
+        missing.
+        """
+        return CHAT_PERMISSION if self.chat_id is not None else CHANNEL_PERMISSION
+
+    @property
+    def uri(self) -> str:
+        """The handle as a string — what a search hit carries and a read echoes back.
+
+        Ids are percent-encoded because Teams ids are full of `:`, `@` and `/`-adjacent characters
+        (`19:...@thread.v2`), and a handle that has to be parsed back apart cannot afford
+        ambiguity.
+        """
+        if self.chat_id is not None:
+            return f"teams:///chats/{_segment(self.chat_id)}/messages/{_segment(self.message_id)}"
+        assert self.team_id is not None and self.channel_id is not None, (
+            "a handle addresses either a chat or a team channel"
+        )
+        return (
+            f"teams:///teams/{_segment(self.team_id)}/channels/{_segment(self.channel_id)}"
+            + f"/messages/{_segment(self.message_id)}"
+        )
+
+
+# The two handle shapes, and only those. Ids are matched as "anything but a separator" because
+# `MessageHandle.uri` percent-encodes each one — a Teams id is full of `:` and `@` and would
+# otherwise be ambiguous — but the encoding is not *required* here: `unquote` leaves an id that was
+# already readable exactly as it is, so a handle a caller copied out of a log still resolves.
+_CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
+_CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
+
+
+def message_handle(uri: str) -> MessageHandle | None:
+    """`uri` as a handle, or None if it is not one this connector can read.
+
+    None rather than an exception with a message: what to tell the caller about a malformed handle
+    is the tool boundary's business, and a feature module is not allowed to speak MCP.
+    """
+    chat = _CHAT_HANDLE.match(uri)
+    if chat is not None:
+        chat_id, message_id = (unquote(part) for part in chat.groups())
+        return _handle(MessageHandle(message_id=message_id, chat_id=chat_id))
+    channel = _CHANNEL_HANDLE.match(uri)
+    if channel is not None:
+        team_id, channel_id, message_id = (unquote(part) for part in channel.groups())
+        return _handle(MessageHandle(message_id=message_id, team_id=team_id, channel_id=channel_id))
+    return None
+
+
+def _handle(handle: MessageHandle) -> MessageHandle | None:
+    """The handle, unless a segment decoded to nothing — `%20` is not an id."""
+    ids = (handle.message_id, handle.chat_id, handle.team_id, handle.channel_id)
+    if any(value is not None and not value.strip() for value in ids):
+        return None
+    return handle
+
+
+def _segment(value: str) -> str:
+    return quote(value, safe="")
 
 
 class MessageSender(BaseModel):
@@ -108,10 +203,10 @@ class MessageHit(BaseModel):
             "A handle for this exact message, e.g. "
             + "`teams:///chats/{chatId}/messages/{messageId}` or "
             + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
-            + "percent-encoded. Pass it verbatim to a tool that reads a message resource; this "
-            + "search returns no message body, so it is the only route to the full text, the "
-            + "attachments and the mentions. Null in the rare case where Graph returned a hit "
-            + "with neither a chat nor a channel identity, which cannot be addressed."
+            + "percent-encoded. Pass it verbatim to read_message; this search returns no message "
+            + "body, so it is the only route to the full text, the attachments and the mentions. "
+            + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
+            + "identity, which cannot be addressed."
         )
     )
     message_id: str = Field(
@@ -123,8 +218,10 @@ class MessageHit(BaseModel):
     )
     chat_id: str | None = Field(
         description=(
-            "The chat this message is in, unencoded, e.g. `19:...@thread.v2`. Null for a channel "
-            + "message; `team_id` and `channel_id` are set instead."
+            "The chat this message is in, unencoded, e.g. `19:...@thread.v2`. It is the same id "
+            + "list_chats reports as `chat_id`, which is how to put a topic and members to the "
+            + "chat a hit came from. Null for a channel message; `team_id` and `channel_id` are "
+            + "set instead."
         )
     )
     team_id: str | None = Field(
@@ -157,7 +254,9 @@ class MessageHit(BaseModel):
     last_modified_at: datetime | None = Field(
         description=(
             "When the message was last modified. Microsoft counts adding or removing a reaction "
-            + "as a modification, so a difference from `created_at` is not evidence of an edit."
+            + "as a modification, so a difference from `created_at` is not evidence of an edit — "
+            + "read_message reports `last_edited_at`, which is the property behind Teams' own "
+            + "'Edited' flag and is what to read when an edit is the question."
         )
     )
     importance: str | None = Field(
@@ -173,17 +272,18 @@ class MessageHit(BaseModel):
 
 class MessageSearchResults(BaseModel):
     messages: list[MessageHit] = Field(description="The matching messages on this page of results.")
-    more_results_available: bool = Field(
+    truncated: bool = Field(
         description=(
-            "Whether Microsoft's index has further matches beyond this page. This is the only "
-            + "signal Graph gives: it reports no match total for Teams messages, so neither does "
-            + "this tool."
+            "True when Microsoft's index has more matches than this page holds — the same "
+            + "'there is more' flag every list-shaped tool here reports. Page on with "
+            + "`next_offset`. It is the only completeness signal Graph gives for a message "
+            + "search: it reports no match total for Teams messages, so neither does this tool."
         )
     )
     next_offset: int | None = Field(
         description=(
-            "The `offset` that reaches the next page, or null when there is none. It counts the "
-            + "hits Graph returned rather than the messages listed here, because offsets index "
+            "The `offset` that reaches the next page, or null when `truncated` is false. It counts "
+            + "the hits Graph returned rather than the messages listed here, because offsets index "
             + "Graph's own unfiltered results."
         )
     )
@@ -379,12 +479,12 @@ async def search_messages(
     assert response is not None, "Graph answered POST /search/query with no response"
     container = _hits_container(response)
     hits = (container.hits or []) if container is not None else []
-    more_results_available = bool(container.more_results_available) if container else False
+    truncated = bool(container.more_results_available) if container else False
 
     return MessageSearchResults(
         messages=[message for message in (_message(hit) for hit in hits) if message is not None],
-        more_results_available=more_results_available,
-        next_offset=offset + len(hits) if more_results_available else None,
+        truncated=truncated,
+        next_offset=offset + len(hits) if truncated else None,
     )
 
 
@@ -418,7 +518,7 @@ def _message(hit: SearchHit) -> MessageHit | None:
     team_id = channel.team_id if channel is not None else None
     channel_id = channel.channel_id if channel is not None else None
     return MessageHit(
-        uri=_uri(
+        uri=_hit_uri(
             message_id=resource.id,
             chat_id=resource.chat_id,
             team_id=team_id,
@@ -439,26 +539,15 @@ def _message(hit: SearchHit) -> MessageHit | None:
     )
 
 
-def _uri(
+def _hit_uri(
     *, message_id: str, chat_id: str | None, team_id: str | None, channel_id: str | None
 ) -> str | None:
-    """The handle a reader resolves back into this message.
-
-    Ids are percent-encoded because Teams ids are full of `:`, `@` and `/`-adjacent characters
-    (`19:...@thread.v2`), and a handle that has to be parsed back apart cannot afford ambiguity.
-    """
+    """This hit's handle, or None for a hit Graph gave nothing addressable."""
     if team_id is not None and channel_id is not None:
-        return (
-            f"teams:///teams/{_segment(team_id)}/channels/{_segment(channel_id)}"
-            + f"/messages/{_segment(message_id)}"
-        )
+        return MessageHandle(message_id=message_id, team_id=team_id, channel_id=channel_id).uri
     if chat_id is not None:
-        return f"teams:///chats/{_segment(chat_id)}/messages/{_segment(message_id)}"
+        return MessageHandle(message_id=message_id, chat_id=chat_id).uri
     return None
-
-
-def _segment(value: str) -> str:
-    return quote(value, safe="")
 
 
 def sender_of(identity: ChatMessageFromIdentitySet | None) -> MessageSender | None:
