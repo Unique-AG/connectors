@@ -12,6 +12,7 @@ place to reset.
 from dataclasses import dataclass
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
+from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
 
@@ -23,6 +24,7 @@ class Services:
     backstop: BackstopClientFactory
     custom_fields: CustomFieldsService
     employment_index_factory: EmploymentIndexFactory
+    activity_history: ActivityHistorySettings
 
 
 _services: Services | None = None
@@ -73,3 +75,7 @@ def get_custom_fields_service() -> CustomFieldsService:
 
 def get_employment_index_factory() -> EmploymentIndexFactory:
     return get_services().employment_index_factory
+
+
+def get_activity_history_settings() -> ActivityHistorySettings:
+    return get_services().activity_history

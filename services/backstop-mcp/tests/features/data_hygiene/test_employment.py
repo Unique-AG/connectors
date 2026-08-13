@@ -316,10 +316,16 @@ class TestMultiOrg:
 
         index = person_index(relationships, checks=checks)
 
-        former_pairs = index.pairs(status=EmploymentStatus.FORMER)
-        current_pairs = index.pairs(status=EmploymentStatus.CURRENT)
+        former_pairs = index.former()
+        current_pairs = index.current()
         assert len(former_pairs) == 1
         assert len(current_pairs) == 1
+        assert former_pairs[0].person_id == "p1"
+        assert former_pairs[0].person_type == "people"
+        assert former_pairs[0].organization_id == "orgA"
+        assert current_pairs[0].organization_id == "orgB"
+        assert index.get(person_id="p1", organization_id="orgA") is former_pairs[0]
+        assert index.get(person_id="p1", organization_id="missing") is None
 
 
 class TestOrganizationSideIndex:
@@ -393,7 +399,7 @@ class TestOrganizationSideIndex:
         index = organization_index(relationships, checks=checks, types=types)
 
         # No employment evidence at all for this pair: neither edge was admitted.
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
+        assert index.status(person_id="p1", organization_id="o1") is None
         assert index.departure(person_id="p1", organization_id="o1") is None
 
 
@@ -470,7 +476,7 @@ class TestMalformedInput:
 
         # Type id present but name never side-loaded: not employment evidence (must not clear a
         # real departure elsewhere). Edge is dropped before indexing.
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
+        assert index.status(person_id="p1", organization_id="o1") is None
         assert index.departure(person_id="p1", organization_id="o1") is None
 
     def test_no_relationships_at_all(self) -> None:
@@ -522,7 +528,7 @@ class TestMalformedInput:
 
         index = person_index(relationships, checks=checks, types=types)
 
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
+        assert index.status(person_id="p1", organization_id="o1") is None
 
     def test_unreadable_type_resource_is_dropped(self) -> None:
         """No id to key the name under, so the relationship is left with no type name."""
@@ -534,7 +540,7 @@ class TestMalformedInput:
 
         index = person_index(relationships, checks=checks, types=types)
 
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
+        assert index.status(person_id="p1", organization_id="o1") is None
 
 
 class TestFormerRelationshipType:
@@ -646,7 +652,7 @@ class TestPortalAccessIsNotEmployment:
 
         # `has portal access to` classifies IRRELEVANT, so the edge is dropped before it ever
         # reaches an end-date check: no evidence for the pair at all, not a cleared departure.
-        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.IRRELEVANT
+        assert index.status(person_id="p1", organization_id="o1") is None
 
 
 class TestEndDateParsing:

@@ -26,6 +26,7 @@ src/backstop_mcp/
     custom_fields/         CRM custom-field schema discovery, caching and resolution
     party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
     data_hygiene/          employment edges, departed contacts, as-of provenance
+    activity_history/      merged meeting/call/note/document/email timeline, paged by cursor
   server/                how it's exposed over MCP
     runtime.py             the process-wide service holder tools reach through
     tools/                 tool functions + the single registry declaring them
