@@ -14,16 +14,21 @@ one reason: a dependency is resolved *outside* the tool body, so an exchange Ent
 be explained by anything the body does.
 """
 
+from datetime import date
 from types import TracebackType
 from typing import Annotated, cast, override
+from uuid import UUID
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.dependencies import Dependency
+from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
+from fastmcp.tools import Tool
+from fastmcp.tools import tool as tool_metadata
 from pydantic import Field
 
-from office_mcp.features import chats, identity
+from office_mcp.features import chats, identity, message_search
 from office_mcp.graph_client import graph_client_for
 from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
@@ -39,42 +44,59 @@ def _scope(permission: str) -> str:
 
 # What sign-in must ask Entra for, so that the On-Behalf-Of exchange has something to redeem: a
 # Graph permission the user (or an administrator) never consented to cannot be obtained later, and
-# the exchange fails with AADSTS65001 rather than with anything a tool could explain. `create_app`
+# the exchange fails with AADSTS65001 before the tool body runs. `_GraphToken` below turns that into
+# advice, but a failure avoided at consent time beats one explained per call. `create_app`
 # passes this to the auth provider — which is why it is the union of every tool's permission, and
 # why it lives beside the tools that determine it.
-GRAPH_SCOPES: tuple[str, ...] = (
-    _scope(identity.GRAPH_PERMISSION),
-    _scope(chats.GRAPH_PERMISSION),
+GRAPH_SCOPES: tuple[str, ...] = tuple(
+    # `dict.fromkeys` rather than a set: two tools sharing a permission must not make the scope
+    # list a different string on every process start, or the consent screen and every cached
+    # On-Behalf-Of token key change with it.
+    dict.fromkeys(
+        _scope(permission)
+        for permission in (
+            identity.GRAPH_PERMISSION,
+            chats.GRAPH_PERMISSION,
+            *message_search.GRAPH_PERMISSIONS,
+        )
+    )
 )
 
 
 class _GraphToken(Dependency[str]):
-    """`EntraOBOToken` for one permission, with the refusal explained in terms of it.
+    """`EntraOBOToken` for a tool's permissions, with the refusal explained in terms of them.
 
     The wrapping exists because of *where* the exchange happens. FastMCP resolves a dependency
     before it calls the tool, so a failure there never enters the tool body and never reaches the
     `graph_tool_errors` block inside it; FastMCP reports it as "Failed to resolve dependency
     'graph_token' for list_chats", which tells a model nothing it can act on. The one thing it
     does pass through untouched is a `FastMCPError` — so raising `ToolError` here, from the
-    permission this instance was built for, is what makes an unconsented permission as fixable
+    permissions this instance was built for, is what makes an unconsented permission as fixable
     before the Graph call as a 403 is after it.
+
+    One instance covers one exchange, however many permissions that exchange asks for, because
+    Entra redeems them together and refuses them together: a tool needing two gets one token or
+    none. Naming all of them is therefore the same requirement as it is for a 403 — the refusal
+    does not say which one was missing.
 
     The exchange itself is untouched: `__aenter__` delegates to FastMCP's dependency, which owns
     the credential cache, and `__aexit__` delegates so any cleanup it grows is not dropped.
     """
 
-    def __init__(self, permission: str) -> None:
-        self._permission: str = permission
+    def __init__(self, *permissions: str) -> None:
+        assert permissions, "a token is exchanged for at least one permission"
+        self._permissions: tuple[str, ...] = permissions
         # `EntraOBOToken` is annotated `-> str` (a lie for the type checker's benefit, so a tool
         # can annotate the token as the string it receives); the value is the dependency object.
         # Casting back to what it is has to go through `object` — the two types do not overlap.
         self._exchange: Dependency[str] = cast(
-            "Dependency[str]", cast("object", EntraOBOToken([_scope(permission)]))
+            "Dependency[str]",
+            cast("object", EntraOBOToken([_scope(permission) for permission in permissions])),
         )
 
     @override
     async def __aenter__(self) -> str:
-        with entra_token_errors(self._permission):
+        with entra_token_errors(*self._permissions):
             return await self._exchange.__aenter__()
 
     @override
@@ -87,7 +109,7 @@ class _GraphToken(Dependency[str]):
         await self._exchange.__aexit__(exc_type, exc_value, traceback)
 
 
-def _graph_token(permission: str) -> str:
+def _graph_token(*permissions: str) -> str:
     """A `_GraphToken` typed as the token FastMCP will inject in its place.
 
     The same annotation `EntraOBOToken` uses, for the same reason: the tool body is handed a
@@ -95,15 +117,17 @@ def _graph_token(permission: str) -> str:
     cast at every declaration site. The cast goes through `object` for the same reason it does
     above — a dependency is not a string, which is precisely why FastMCP replaces it with one.
     """
-    return cast("str", cast("object", _GraphToken(permission)))
+    return cast("str", cast("object", _GraphToken(*permissions)))
 
 
-# The dependency each tool declares as its token parameter's default, one per Graph permission.
-# Built here rather than inline because a call inside a parameter default rebuilds the descriptor
-# on every registration and is a lint error in both of this repo's checkers. Sharing one instance
-# is safe: FastMCP enters it per call and it holds nothing but its permission.
+# The On-Behalf-Of dependency each tool declares as its token parameter's default, one per set of
+# Graph permissions a tool calls under. Built here rather than inline because a call inside a
+# parameter default rebuilds the descriptor on every registration and is a lint error in both of
+# this repo's checkers. Sharing one instance is safe: FastMCP enters it per call and it holds
+# nothing but its permissions.
 _IDENTITY_TOKEN: str = _graph_token(identity.GRAPH_PERMISSION)
 _CHATS_TOKEN: str = _graph_token(chats.GRAPH_PERMISSION)
+_SEARCH_TOKEN: str = _graph_token(*message_search.GRAPH_PERMISSIONS)
 
 _WHOAMI = """\
 Return the signed-in Microsoft 365 user's own profile: `id`, `display_name`, `mail`, \
@@ -147,6 +171,52 @@ the user has more than fit in it — widen `limit` (up to {chats.MAX_CHATS}, Gra
 for this collection) rather than looking for a cursor. The signed-in user's own notes-to-self \
 chat is usually the oneOnOne chat whose only member is them (call whoami to know who that is).\
 """
+
+_SEARCH_MESSAGES = f"""\
+Search the Microsoft Teams messages the signed-in user can see — every one-to-one chat, group \
+chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
+and read state. Messages from ANY participant match, not only the user's own; call whoami if you \
+need to know who the user is.
+
+A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
+view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
+truncated with `...` where it was cut — is the only text here. Every hit carries a `uri` handle \
+identifying that exact message; read that resource for the real text, the attachments and the \
+mentions. Never present `summary` as the whole message, and never conclude from it that the \
+message does not say more.
+
+There is no result total, and this is not an omission: Microsoft Graph reports a per-page count \
+rather than a match count for Teams messages, so a total would be a fabrication. Page by passing \
+`next_offset` back as `offset` while `more_results_available` is true. A page can hold fewer than \
+`size` messages — offsets index Graph's own results, and system messages ("Ada joined the chat") \
+are dropped from ours because Graph gives them neither an author nor any text.
+
+Results cannot be sorted: Graph refuses sort options on a message search. Its documented default \
+for message results is newest first and relevance can be mixed in, so compare `created_at` \
+whenever order matters to the answer.
+
+At least one criterion is required and all criteria given are ANDed. `query` is matched as plain \
+words and every word must appear, anywhere in the message and in any order — the words do not have \
+to be next to each other. To require that they are, quote them yourself: `"release notes"` matches \
+only where those two words are adjacent. Search operators typed into `query` are searched for \
+literally, so put a sender in `sender`, a date in `sent_after`/`sent_before`, and so on. Those two \
+dates are inclusive whole days and are \
+applied by the index itself, so a date-bounded search still costs one request and still covers \
+channels. `recipient` is honoured by Microsoft only for one-to-one chats and will hide group and \
+channel matches, so prefer `sender`. Channel matches need the delegated \
+{message_search.CHANNEL_PERMISSION} permission, which this connector requires at sign-in rather \
+than degrading to chats-only search without saying so.\
+"""
+
+# What the tool says when it is called with nothing to look for. Graph would answer such a request
+# with an arbitrary slice of everything the user can read, which reads like a real result set and
+# is the one failure mode a model cannot detect from the response.
+_NO_CRITERIA = (
+    "search_messages needs at least one of "
+    + ", ".join(message_search.CRITERIA)
+    + ". Searching with none of them would return an arbitrary sample of every message the user "
+    + "can see, not an answer. Add the keywords, person or date range the question is about."
+)
 
 _READ_ONLY = {"readOnlyHint": True, "openWorldHint": True}
 
@@ -196,3 +266,161 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 limit=limit,
                 include_member_emails=include_member_emails,
             )
+
+    # Declared and registered in two steps rather than with `@mcp.tool`, which does both and hands
+    # back the function: `add_tool` returns the registered tool, which is the only way to reach the
+    # schema `_require_a_criterion` has to add to. Same registration, same metadata.
+    @tool_metadata(
+        name="search_messages",
+        title="Search Teams Messages",
+        description=_SEARCH_MESSAGES,
+        annotations=_READ_ONLY,
+    )
+    async def search_messages(
+        query: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Keywords to find in the message text or in an attachment's contents. Every "
+                    + "word must appear, anywhere in the message and in any order; they are not "
+                    + "matched as a phrase unless you quote them, so `release notes` finds "
+                    + 'messages containing both words and `"release notes"` only messages where '
+                    + "they are adjacent. Never a query language — a search operator written here "
+                    + "is searched for as literal text, so use the other parameters for filters."
+                ),
+            ),
+        ] = None,
+        sender: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only messages from this person, by name, alias or email address. Prefer this "
+                    + "over naming the person in `query`, which would match messages that merely "
+                    + "mention them."
+                ),
+            ),
+        ] = None,
+        recipient: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only messages addressed to this person. Microsoft supports this only "
+                    + "partially, for one-to-one chats, so it hides group-chat and channel "
+                    + "matches: an empty result here is not evidence that no such message exists."
+                ),
+            ),
+        ] = None,
+        mentions: Annotated[
+            UUID | None,
+            Field(
+                description=(
+                    "Only messages that @-mention this user, by Microsoft Entra object id (the "
+                    + "`user_id` of a sender here, or `id` from whoami). A name will not work: "
+                    + "Microsoft matches this term on the id alone."
+                )
+            ),
+        ] = None,
+        sent_after: Annotated[
+            date | None,
+            Field(
+                description=(
+                    "Only messages sent on or after this date (YYYY-MM-DD), inclusive. Applied by "
+                    + "Microsoft's index, so it costs nothing extra and narrows chats and "
+                    + "channels alike."
+                )
+            ),
+        ] = None,
+        sent_before: Annotated[
+            date | None,
+            Field(description="Only messages sent on or before this date (YYYY-MM-DD), inclusive."),
+        ] = None,
+        has_attachment: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "True for only messages carrying an attachment, false for only messages "
+                    + "without one. Omit to search both."
+                )
+            ),
+        ] = None,
+        is_read: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "True for only messages the signed-in user has read, false for only unread "
+                    + "ones. Omit to search both."
+                )
+            ),
+        ] = None,
+        mentions_me: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "True for only messages that @-mention the signed-in user, false for only "
+                    + "messages that do not. Omit to search both."
+                )
+            ),
+        ] = None,
+        offset: Annotated[
+            int,
+            Field(
+                ge=0,
+                description=(
+                    "How many results to skip. Start at 0 and pass the previous response's "
+                    + "`next_offset` to advance; it is an index into Microsoft's results, not "
+                    + "into the messages this tool returned."
+                ),
+            ),
+        ] = 0,
+        size: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=message_search.MAX_RESULTS,
+                description=(
+                    "How many results to ask Microsoft for. Default 25, maximum "
+                    + f"{message_search.MAX_RESULTS} — Microsoft documents no page size above "
+                    + "that for message search."
+                ),
+            ),
+        ] = 25,
+        graph_token: str = _SEARCH_TOKEN,
+    ) -> message_search.MessageSearchResults:
+        criteria = message_search.SearchCriteria(
+            query=query,
+            sender=sender,
+            recipient=recipient,
+            mentions=mentions,
+            sent_after=sent_after,
+            sent_before=sent_before,
+            has_attachment=has_attachment,
+            is_read=is_read,
+            mentions_me=mentions_me,
+        )
+        if criteria.is_empty:
+            raise ToolError(_NO_CRITERIA)
+        with graph_tool_errors(*message_search.GRAPH_PERMISSIONS):
+            return await message_search.search_messages(
+                graph_client_for(transport, graph_token),
+                criteria=criteria,
+                offset=offset,
+                size=size,
+            )
+
+    _require_a_criterion(mcp.add_tool(search_messages))
+
+
+def _require_a_criterion(tool: Tool) -> None:
+    """Put "at least one criterion" in the tool's schema, where a client can enforce it.
+
+    FastMCP derives an input schema from the function signature, and a signature has no way to say
+    that a set of optional parameters cannot all be omitted — so the rule would otherwise live only
+    in the description and in the tool's own runtime check. `anyOf` over one-element `required`
+    lists is the JSON Schema spelling of it, and the registered tool's schema is where it goes.
+    The runtime check stays: FastMCP validates arguments against the signature rather than against
+    this schema, so a client that ignores it must still be refused.
+    """
+    tool.parameters["anyOf"] = [{"required": [name]} for name in message_search.CRITERIA]

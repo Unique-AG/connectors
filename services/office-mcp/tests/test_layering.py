@@ -29,6 +29,12 @@
    which permission — ends up spread across the layer whose job is only to expose it, and the
    tool's request then escapes every test that covers the feature.
 
+7. **`features/` must not import FastMCP.** The mirror of rule 1 for the framework rather than for
+   this package: a feature answers with its own types or raises a Graph failure, and turning either
+   into something an MCP client sees — a `ToolError`, a tool annotation, a schema — is `server/`'s
+   job. Without this, "reject a search with no criteria" would sit in the feature as a `ToolError`,
+   and the layer that owns the boundary would no longer own its refusals.
+
 Rule 1's "the tree actually has feature packages" guard still skips until a feature grows into a
 subpackage; the import-direction check itself runs against every module under `features/`.
 
@@ -51,6 +57,7 @@ _SERVER_PREFIX = "office_mcp.server"
 _FEATURES_PREFIX = "office_mcp.features"
 _CONFIG_MODULE = "office_mcp.config"
 _GRAPH_SDK = "msgraph"
+_MCP_FRAMEWORK = "fastmcp"
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
@@ -295,6 +302,18 @@ class TestTheDetectionItself:
             _GRAPH_SDK,
         )
 
+    def test_catches_the_violation_the_mcp_framework_rule_exists_for(self) -> None:
+        assert _imports_under(
+            "from fastmcp.exceptions import ToolError\nimport fastmcp\n", _MCP_FRAMEWORK
+        ) == ["fastmcp.exceptions", "fastmcp"]
+
+    def test_the_mcp_framework_rule_leaves_the_protocol_types_alone(self) -> None:
+        """`mcp` is the protocol SDK, a different distribution from the server framework, and a
+        name that merely begins with `fastmcp` is not it either."""
+        assert not _imports_under(
+            "from mcp.types import TextContent\nfrom fastmcpx import thing\n", _MCP_FRAMEWORK
+        )
+
     def test_catches_the_violation_the_config_rule_exists_for(self) -> None:
         assert _imports_under("from office_mcp.config import AppConfig", _CONFIG_MODULE) == [
             "office_mcp.config"
@@ -372,6 +391,25 @@ class TestFeaturesDoNotImportServer:
         assert not violations, (
             "features/ must not import from server/ — the server wires features together, "
             + "not the reverse. Inject the collaborator from create_app() instead:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestFeaturesDoNotImportTheMcpFramework:
+    def test_the_tool_layer_does_import_it(self) -> None:
+        """Guards the guard: the rule is about which layer talks to FastMCP, not about the
+        framework being unused — if `server/` stopped importing it, this rule would be vacuous."""
+        assert _imports_under(
+            (_SERVER / "tools.py").read_text(), _MCP_FRAMEWORK, _package_of(_SERVER / "tools.py")
+        )
+
+    @pytest.mark.parametrize("source", sorted(_FEATURES.rglob("*.py")), ids=_source_id)
+    def test_no_feature_module_imports_the_mcp_framework(self, source: pathlib.Path) -> None:
+        violations = _violations(source, _MCP_FRAMEWORK)
+        assert not violations, (
+            "features/ must not import FastMCP — a feature returns its own types or raises a "
+            + "Graph failure, and turning either into something an MCP client sees belongs to "
+            + "server/. Return the fact (or raise) and let the tool decide what to say:\n  "
             + "\n  ".join(violations)
         )
 

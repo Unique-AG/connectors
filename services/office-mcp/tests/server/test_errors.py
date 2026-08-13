@@ -18,6 +18,7 @@ from office_mcp.graph_client import (
 from office_mcp.server.errors import entra_token_errors, graph_tool_errors
 
 _PERMISSION = "Chat.Read"
+_CHANNELS = "ChannelMessage.Read.All"
 
 # What azure-identity's `OnBehalfOfCredential.get_token` reports when the delegated permission was
 # never consented to, trimmed of its trace ids.
@@ -172,6 +173,20 @@ class TestTheRefusalThatHappensBeforeGraph:
         assert _PERMISSION in message
         assert "AADSTS" not in message, "no code was invented"
         assert "ValueError" in message
+
+    def test_an_exchange_for_several_permissions_names_them_all(self) -> None:
+        """A tool needing two permissions gets one token or none: Entra redeems the scopes together
+        and refuses them together, saying no more about which one was unconsented than a Graph 403
+        does. Naming one of two would send an administrator to grant a permission that may already
+        be there, and the second attempt fails identically."""
+        with pytest.raises(ToolError) as raised, entra_token_errors(_PERMISSION, _CHANNELS):
+            raise RuntimeError(_UNCONSENTED)
+        message = str(raised.value)
+
+        assert _PERMISSION in message
+        assert _CHANNELS in message
+        assert "grant the delegated permissions" in message, "plural, or it reads as one of them"
+        assert "administrator" in message
 
     def test_a_token_that_arrives_passes_through_untouched(self) -> None:
         with entra_token_errors(_PERMISSION):
