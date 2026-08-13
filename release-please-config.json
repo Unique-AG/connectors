@@ -142,6 +142,26 @@
           "path": "deploy/helm-charts/kb-mcp/values.yaml"
         }
       ]
+    },
+    "services/office-mcp": {
+      "release-type": "python",
+      "component": "office-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/office-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/office-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/office-mcp/values.yaml"
+        }
+      ]
     }
   }
 }

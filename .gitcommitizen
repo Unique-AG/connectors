@@ -33,6 +33,7 @@ teams-mcp = services/teams-mcp/**
 temenos-mcp = services/temenos-mcp/**
 hello-mcp = services/hello-mcp/**
 kb-mcp = services/kb-mcp/**
+office-mcp = services/office-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**
