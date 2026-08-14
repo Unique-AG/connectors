@@ -2,8 +2,8 @@
 
 Each test targets one behaviour from the task: the default-stream fan-out (all five streams,
 including `document`), that a resumed call (`type="next"`) skips resolution and only re-fetches
-streams present in `next`, that invalid `next` inputs raise pydantic `ValidationError`, that one
-failing stream fails the whole call, and the person/organization hygiene-decoration split.
+streams present in `next`, that invalid `next` inputs raise pydantic `ValidationError`, and that
+one failing stream fails the whole call.
 """
 
 from collections.abc import Callable, Sequence
@@ -21,26 +21,17 @@ from backstop_mcp.features.activity_history import (
     ActivityRecordResponse,
     ActivityType,
     EmailRecordResponse,
+    ResolvedPartyAsOfResponse,
     TimelineRecord,
 )
 from backstop_mcp.features.data_hygiene import AsOf
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.party_resolver import (
-    PartyAmbiguousResponse,
-    PartyCandidateResponse,
-    ResolvedPartyResponse,
-)
+from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, PartyCandidateResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools.get_activity_history import (
     ActivityHistoryFirstPageInput,
     ActivityHistoryNextPageInput,
     get_activity_history,
-)
-from tests.features.data_hygiene.helpers import (
-    FORMER_MIRROR_TYPE,
-    FORMER_TYPE,
-    person_org,
-    relationship_types,
 )
 from tests.features.party_resolver.helpers import (
     BASE_URL,
@@ -67,67 +58,6 @@ def _org_document(
                 "modifiedBy": modified_by,
             },
         }
-    }
-
-
-def _org_document_with_former_employee(
-    *, org_id: str = "o42", person_id: str = "p1", name: str = "Capstone"
-) -> dict[str, object]:
-    """Organization GET with a mirror former-employee relationship side-loaded."""
-    relationship = person_org(
-        "er0",
-        type_id=FORMER_MIRROR_TYPE,
-        source_type="organizations",
-        source_id=org_id,
-        dest_type="people",
-        dest_id=person_id,
-    )
-    types = relationship_types(FORMER_MIRROR_TYPE)
-    return {
-        "data": {
-            "type": "organizations",
-            "id": org_id,
-            "attributes": {
-                "name": name,
-                "modifiedTimestamp": "2025-03-01T10:00:00Z",
-                "modifiedBy": "ops",
-            },
-            "relationships": {
-                "entityRelationships": {
-                    "data": [{"type": "entity-relationships", "id": relationship["id"]}]
-                }
-            },
-        },
-        "included": [relationship, *types],
-    }
-
-
-def _person_document(
-    *type_ids: str, person_id: str = "p9", name: str = "Jane Doe"
-) -> dict[str, object]:
-    relationships = [
-        person_org(f"er{index}", type_id=type_id, source_id=person_id)
-        for index, type_id in enumerate(type_ids)
-    ]
-    types = relationship_types(*dict.fromkeys(type_ids))
-    return {
-        "data": {
-            "type": "people",
-            "id": person_id,
-            "attributes": {
-                "name": name,
-                "modifiedTimestamp": "2023-01-01T00:00:00Z",
-                "modifiedBy": "crm-admin",
-            },
-            "relationships": {
-                "entityRelationships": {
-                    "data": [
-                        {"type": "entity-relationships", "id": item["id"]} for item in relationships
-                    ]
-                }
-            },
-        },
-        "included": [*relationships, *types],
     }
 
 
@@ -206,11 +136,12 @@ class TestFirstCallByTrustedPartyId:
             ActivityHistoryResolvedResponse,
         )
 
-        assert result.resolved == ResolvedPartyResponse(
-            id="o42", search_type="organizations", name="Capstone"
+        assert result.resolved == ResolvedPartyAsOfResponse(
+            id="o42",
+            search_type="organizations",
+            name="Capstone",
+            as_of=AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
         )
-        assert result.employments == []
-        assert result.as_of == AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops")
         assert documents.call_count == 1
         assert set(result.groups) == {"meeting", "call", "note", "email", "document"}
         assert _record_keys(result.groups["meeting"].items) == [("meeting", "m1")]
@@ -387,7 +318,7 @@ class TestFirstCallBySearch:
             ActivityHistoryResolvedResponse,
         )
 
-        assert result.resolved == ResolvedPartyResponse(
+        assert result.resolved == ResolvedPartyAsOfResponse(
             id="c9", search_type="contacts", name="Jane Contact"
         )
         assert contact_get.call_count == 1
@@ -602,65 +533,6 @@ class TestRequestShape:
                     },
                 }
             )
-
-
-class TestHygieneDecoration:
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_person_party_gets_employments(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ah-8", "person-ivan")  # pyright: ignore[reportGeneralTypeIssues]
-
-        respx.get(f"{BASE_URL}/people/p9").mock(
-            return_value=httpx.Response(200, json=_person_document(FORMER_TYPE))
-        )
-        respx.get(f"{BASE_URL}/entity-relationship-types").mock(
-            return_value=httpx.Response(200, json={"data": [], "links": {}})
-        )
-        _activities_route("people", "p9", "meetings").mock(
-            return_value=httpx.Response(200, json=collection())
-        )
-
-        result = tool_model(
-            await get_activity_history(
-                ctx_never_elicit(),
-                _first(party_type="person", party_id="p9", activity_types=["meeting"]),
-            ),
-            ActivityHistoryResolvedResponse,
-        )
-
-        assert len(result.employments) == 1
-        assert result.employments[0].status == "former"
-        assert result.employments[0].organization_id == "o1"
-        assert result.employments[0].person_id == "p9"
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_organization_party_gets_employments(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ah-9", "org-jill")  # pyright: ignore[reportGeneralTypeIssues]
-
-        respx.get(f"{BASE_URL}/organizations/o42").mock(
-            return_value=httpx.Response(200, json=_org_document_with_former_employee())
-        )
-        _activities_route("organizations", "o42", "meetings").mock(
-            return_value=httpx.Response(200, json=collection())
-        )
-
-        result = tool_model(
-            await get_activity_history(
-                ctx_never_elicit(),
-                _first(
-                    party_type="organization",
-                    party_id="o42",
-                    activity_types=["meeting"],
-                ),
-            ),
-            ActivityHistoryResolvedResponse,
-        )
-
-        assert len(result.employments) == 1
-        assert result.employments[0].status == "former"
-        assert result.employments[0].person_id == "p1"
-        assert result.employments[0].organization_id == "o42"
 
 
 class TestPartialFailurePropagates:

@@ -6,7 +6,7 @@ page. On a `type="next"` request, `search_type` / `entity_id` / per-stream conti
 from a prior response — no resolve, no `/quick-search` round trip — and only those streams are
 re-fetched.
 
-The party record is fetched first (it also side-loads employments). Active stream fetches then go
+The party record is fetched first (name + `as_of` provenance). Active stream fetches then go
 through one `asyncio.gather` call so a partial upstream failure fails the whole tool call rather
 than silently dropping a stream (see the design doc's Error Handling section).
 """
@@ -30,20 +30,10 @@ from backstop_mcp.features.activity_history import (
     TimelineRecord,
     fetch_activities_page_by_type,
     group_page,
+    resolved_party_as_of_response,
     to_timeline_record,
 )
-from backstop_mcp.features.data_hygiene import (
-    EntityRelationshipInclude,
-    as_of_response,
-    entity_relationships,
-    extract_as_of,
-)
-from backstop_mcp.features.party_resolver import party_response
-from backstop_mcp.server.runtime import (
-    get_activity_history_settings,
-    get_backstop_client,
-    get_employment_index_factory,
-)
+from backstop_mcp.server.runtime import get_activity_history_settings, get_backstop_client
 from backstop_mcp.server.tools.results import tool_result
 from backstop_mcp.server.tools.utils.get_activity_history_utils import (
     ActivityHistoryFirstPageInput,
@@ -95,11 +85,8 @@ async def get_activity_history(
     each requested stream regardless of age, which may be old — activity history in this CRM is
     often sparse.
 
-    Side-loads `entityRelationships` for both person and organization parties and returns
-    `employments` (current and former person↔organization links) — always relay them; do not
-    present a person as a current contact at an organization whose link has `status="former"`
-    unless the user explicitly asked for historical contacts. `as_of` is plain provenance from
-    the party's own record; relay it, do not treat record age as a staleness verdict.
+    `resolved.as_of` is plain provenance from the party's own record; relay it, do not treat
+    record age as a staleness verdict.
     """
     client = await get_backstop_client()
     args = await extract_fetch_activity_history_args(ctx, client, request)
@@ -116,7 +103,6 @@ async def get_activity_history(
     )
     document = await client.get(
         f"/{args.segment}/{quote(args.entity_id, safe='')}",
-        params={"include": EntityRelationshipInclude.for_employment()},
         schema=BackstopApiResourceDocument[PartyAttributes],
     )
     page_calls: dict[ActivityType, Coroutine[None, None, ActivityPage | EmailPage]] = {
@@ -156,7 +142,6 @@ async def get_activity_history(
         groups[activity_type] = grouped.model_copy(update={"items": wire_items})
 
     attributes = document.data.attributes
-    employments = get_employment_index_factory().index(**entity_relationships(document)).links()
     open_streams = [
         activity_type for activity_type, group in groups.items() if group.next is not None
     ]
@@ -167,18 +152,13 @@ async def get_activity_history(
             "segment": args.segment,
             "entity_id": args.entity_id,
             "streams": list(groups),
-            "employments": len(employments),
             "open_streams": open_streams,
         },
     )
     return tool_result(
         ActivityHistoryResolvedResponse(
-            resolved=party_response(
-                args.party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
-            ),
+            resolved=resolved_party_as_of_response(args.party, attributes),
             groups=groups,
-            as_of=as_of_response(extract_as_of(attributes)),
-            employments=employments,
         ),
         exclude_none=True,
     )
