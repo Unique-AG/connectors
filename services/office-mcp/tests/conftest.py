@@ -8,12 +8,12 @@ from testcontainers.community.postgres import PostgresContainer
 def postgres_container() -> Generator[PostgresContainer]:
     """Start a PostgreSQL container, once per test session.
 
-    The service owns no schema yet — nothing creates tables, so there is nothing to migrate.
-    The container exists so the tests that talk to Postgres (readiness, and the DSN checks that
-    prove asyncpg actually accepts what `asyncpg_dsn` produces) run against a real server.
+    Nothing is applied to it: this service owns no schema. Its one table (`oauth_kv`) belongs to
+    the OAuth state store, which creates it on first use — so the app under test builds it
+    itself, the same way it does in production.
 
-    The underlying container is shared across every test in the session and its data persists —
-    rows aren't reset between tests or files. Use IDs unique across the whole suite.
+    The container is shared across every test in the session and its data persists, so use IDs
+    that are unique across the whole suite (a prefix per test file, or a random uuid).
     """
     with PostgresContainer("postgres:17-alpine") as postgres:
         yield postgres

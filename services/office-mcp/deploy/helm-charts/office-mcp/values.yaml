@@ -16,10 +16,15 @@ env:
   LOG_LEVEL: info
   PORT: "8000"
   # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
+  # ENTRA_TENANT_ID and ENTRA_CLIENT_ID identify the app registration users sign in through;
+  # both are required and set in the overlay (not secrets). ENTRA_TENANT_ID must be a single
+  # tenant's ID — a multi-tenant authority is rejected at startup.
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
 # - DB_URL (or rely on base-chart DATABASE_URL when postgresql.enabled — app accepts both)
+# - ENTRA_CLIENT_SECRET, the app registration's client secret. Also the key material for the
+#   OAuth state rows in Postgres, so rotating it costs every signed-in user one re-login.
 
 image:
   registry: ghcr.io
@@ -101,6 +106,9 @@ routes:
   hostname: ""
   auth:
     jwt: false
+
+# No migration hook: this service has no schema of its own. Its one table (`oauth_kv`) is created
+# by the OAuth state store on first use, so the app's database user needs CREATE on its schema.
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 networkPolicy:
