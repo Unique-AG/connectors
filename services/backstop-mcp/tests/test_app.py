@@ -2,7 +2,7 @@
 
 Everything else in this suite builds its collaborators the way `create_app` does; nothing was
 testing `create_app` itself, which is where the wiring lives that is easiest to get wrong — the
-`attach_auth` cycle, the nested lifespans, middleware registration, the route table.
+`attach_auth` cycle, the lifespan, middleware registration, the route table.
 
 These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
 """
@@ -89,11 +89,7 @@ def _configs(postgres: PostgresContainer) -> dict[str, object]:
 
 @pytest.fixture
 def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
-    """The real app, with its lifespan run.
-
-    No `BACKSTOP_SERVICE_USERNAME` is configured, so the startup schema warm short-circuits
-    without touching Backstop — see `custom_fields/warmup.py`.
-    """
+    """The real app, with its lifespan run."""
     app = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
     with TestClient(app) as client:
         yield client
@@ -224,18 +220,13 @@ class TestRoutes:
         assert response.json() == {"status": "ok"}
 
     def test_ready_reports_the_checks_it_ran(self, app_client: TestClient) -> None:
-        """Postgres is reachable here, and the schema is absent — ready, but honest about it."""
+        """Postgres is reachable here, so the app is ready."""
         response = _get(app_client, "/ready")
 
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "healthy"
-
-        checks = _checks(body)
-        assert checks["database"] is True
-        # No service account and no snapshot row, so the custom-field schema hasn't loaded —
-        # and that must not gate readiness.
-        assert checks["custom_field_schema"] is False
+        assert _checks(body) == {"database": True}
 
     def test_metrics_is_served(self, app_client: TestClient) -> None:
         response = _get(app_client, "/metrics")
@@ -339,13 +330,11 @@ class TestConfigTranslation:
         assert settings.max_attempts == config.max_retry_attempts
         assert settings.max_wait_ms == config.max_retry_wait_ms
 
-    def test_the_transport_is_not_handed_the_service_account(self) -> None:
+    def test_the_transport_is_not_handed_custom_field_knobs(self) -> None:
         """The knobs it has no business seeing must not have leaked in with the rest."""
         field_names = set(type(transport_settings(BackstopConfig())).model_fields)
 
         assert not field_names & {
-            "service_username",
-            "service_api_token",
             "custom_field_overrides",
             "custom_field_schema_ttl_minutes",
         }

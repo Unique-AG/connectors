@@ -98,16 +98,12 @@ class CustomFieldsService:
         return entry is not None and entry.freshness.within()
 
     def has_definitions(self, subject: str | None = None) -> bool:
-        """Whether anything is loaded for this subject (or any subject, when unscoped).
-
-        An unscoped call is for readiness probes: True if at least one caller's schema is in
-        memory. Scoped calls never fall back to another subject's catalog.
-        """
+        """Whether this subject's in-memory schema has any definitions loaded."""
         resolved = self._resolve_subject(subject)
-        if resolved is not None:
-            entry = self._by_subject.get(resolved)
-            return entry is not None and bool(entry.index)
-        return any(bool(entry.index) for entry in self._by_subject.values())
+        if resolved is None:
+            return False
+        entry = self._by_subject.get(resolved)
+        return entry is not None and bool(entry.index)
 
     def index_for(self, subject: str | None = None) -> DefinitionIndex:
         """The in-memory schema index for one subject. Empty when unknown / unauthenticated."""

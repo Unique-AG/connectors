@@ -17,7 +17,7 @@
    `BackstopTransportSettings`/`RetrySettings` — its own frozen types, translated from
    `BackstopConfig` by `create_app`. It used to take the `pydantic-settings` model directly, which
    coupled the layer to the env-parsing shape and to every knob on it, including the ones it has
-   no business seeing (the service account, the custom-field overrides). `features/` is
+   no business seeing (the custom-field overrides). `features/` is
    deliberately *not* subject to this rule: it may read config freely (see `features/__init__.py`),
    because a feature is allowed to be configured — a transport is only allowed to be told.
 
