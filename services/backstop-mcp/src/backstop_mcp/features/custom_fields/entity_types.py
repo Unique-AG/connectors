@@ -1,9 +1,7 @@
-"""Custom-field tool entity types and re-exports of the party-search vocabulary."""
+"""Custom-field tool entity types and Bean lookup."""
 
 from enum import StrEnum
 from typing import Final
-
-from backstop_mcp.features.entity_types import KNOWN_ENTITY_TYPES, EntityType, normalize_entity_type
 
 
 class CustomFieldEntityType(StrEnum):
@@ -49,9 +47,6 @@ def custom_field_entity_type(value: str) -> CustomFieldEntityType | None:
 __all__ = [
     "CUSTOM_FIELD_BEANS",
     "CustomFieldEntityType",
-    "EntityType",
-    "KNOWN_ENTITY_TYPES",
     "custom_field_entity_type",
     "custom_field_entity_type_from_bean",
-    "normalize_entity_type",
 ]
