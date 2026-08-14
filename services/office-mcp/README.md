@@ -2,8 +2,8 @@
 
 An MCP server over Microsoft 365, via the Microsoft Graph API.
 
-This PR is scaffolding only: app wiring, config, logging, telemetry, database engine, and Alembic
-migrations. The service starts, reports readiness against Postgres, and exposes no MCP tools yet.
+This PR is scaffolding only: app wiring, config, logging, and telemetry. The service starts,
+reports readiness against Postgres, and exposes no MCP tools yet.
 Entra auth, the Microsoft Graph client, and the feature packages and tools that use them land in
 later PRs, stacked on top of this.
 
@@ -16,8 +16,11 @@ src/office_mcp/
   logging.py metrics.py  cross-cutting, used by both sides below
   features/              what the connector does — empty until the first feature lands
   server/                how it's exposed over MCP — empty until the first tool lands
-  db/                    SQLAlchemy engine/session helpers, alembic migrations
 ```
+
+The whole database surface is one string: `DatabaseConfig.driver_dsn`, which every caller hands
+to `asyncpg.connect`. There is deliberately no engine, pool or session layer here, and no second
+rendering of the same settings — two shapes are two places TLS can be negotiated differently.
 
 The layering rule is that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse. `tests/test_layering.py` enforces it, and grows as
@@ -29,7 +32,6 @@ each package arrives.
 cd services/office-mcp
 cp .env.example .env   # fill DB_*
 uv sync
-uv run alembic upgrade head
 uv run office-mcp
 ```
 
@@ -39,21 +41,10 @@ uv run office-mcp
 - Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
-## Migrations
-
-```bash
-uv run alembic upgrade head                          # apply
-uv run alembic revision --autogenerate -m "message"  # create
-uv run alembic downgrade -1                          # roll back one
-```
-
-There are no versions under `db/migrations/versions/` yet — `upgrade head` is a no-op until the
-first feature adds tables.
-
 ## Tests
 
-Integration tests start a Postgres container and run the migrations against it, so Docker must be
-running.
+Integration tests start a Postgres container, so Docker must be running. The service owns no
+schema, so nothing is created in it.
 
 ```bash
 uv run pytest

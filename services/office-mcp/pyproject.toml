@@ -14,9 +14,7 @@ dependencies = [
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-prometheus==0.65b0",
     "opentelemetry-instrumentation-asgi==0.65b0",
-    "sqlalchemy[asyncio]==2.0.51",
     "asyncpg==0.31.0",
-    "alembic==1.18.5",
     "cryptography==49.0.0",
     "tenacity==9.1.4",
     "typing-extensions==4.16.0",
@@ -45,6 +43,7 @@ dev = [
     "basedpyright==1.39.9",
     "respx==0.23.1",
     "testcontainers==4.15.0",
+    "certifi==2026.7.22",
 ]
 
 [tool.pytest.ini_options]
