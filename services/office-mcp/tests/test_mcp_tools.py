@@ -654,7 +654,8 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """The oracle connector returns an unschematised stream of objects whose last element may
-        be pagination metadata. A declared output schema is how `truncated` stops being prose."""
+        be pagination metadata. A declared output schema is how a `next_offset` or a
+        `members_may_be_incomplete` stops being prose."""
         tools = _named(await mcp_client.list_tools())
 
         assert set(_properties(tools["get_me"].outputSchema)) == {
@@ -664,13 +665,12 @@ class TestTheToolsThisServerAdvertises:
             "user_principal_name",
             "job_title",
         }
-        assert set(_properties(tools["list_chats"].outputSchema)) == {"chats", "truncated"}
-        assert set(_properties(tools["list_teams"].outputSchema)) == {"teams", "truncated"}
-        assert set(_properties(tools["list_channels"].outputSchema)) == {"channels", "truncated"}
-        assert set(_properties(tools["browse_channel"].outputSchema)) == {"messages", "truncated"}
+        assert set(_properties(tools["list_chats"].outputSchema)) == {"chats"}
+        assert set(_properties(tools["list_teams"].outputSchema)) == {"teams"}
+        assert set(_properties(tools["list_channels"].outputSchema)) == {"channels"}
+        assert set(_properties(tools["browse_channel"].outputSchema)) == {"messages"}
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
-            "truncated",
             "next_offset",
         }
         assert set(_properties(tools["list_meeting_transcripts"].outputSchema)) == {
@@ -681,7 +681,7 @@ class TestTheToolsThisServerAdvertises:
             "started_at",
             "ended_at",
             "transcripts",
-            "truncated",
+            "scan_incomplete",
         }
         assert set(_properties(tools["read_transcript"].outputSchema)) == {
             "uri",
@@ -689,7 +689,6 @@ class TestTheToolsThisServerAdvertises:
             "transcript_id",
             "speaker_attribution",
             "turns",
-            "truncated",
             "next_offset",
         }
         assert set(_properties(tools["list_meeting_recordings"].outputSchema)) == {
@@ -700,7 +699,7 @@ class TestTheToolsThisServerAdvertises:
             "started_at",
             "ended_at",
             "recordings",
-            "truncated",
+            "scan_incomplete",
         }
         assert set(_properties(tools["read_message"].outputSchema)) == {
             "uri",
@@ -727,9 +726,16 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         """These tools arrived one at a time and are read all at once, by a model choosing between
         them. So the conventions are asserted rather than merely written down: a name is verb_noun
-        (`whoami` was the one exception and is now `get_me`), a result field is snake_case, and a
-        tool whose answer is a list says "there is more" with the one word `truncated` — two words
-        for that would be two things for a model to learn, and a reason for it to guess.
+        (`whoami` was the one exception and is now `get_me`), a result field is snake_case, and no
+        list-shaped answer carries a "there is more" flag of its own.
+
+        That last convention replaced its opposite. Every list-shaped tool used to report
+        `truncated`, and clients did not want it: a window filled to `limit` already says there may
+        be more and a short one says there is not, `next_offset` says it outright where paging
+        exists, and on the two meeting listers the one flag had come to mean either "raise `limit`"
+        or "nothing will help" with no way to tell which. So the word is gone from every answer, and
+        what is asserted now is that it stays gone — a new tool re-introducing it would be
+        re-introducing the ambiguity — and that the tools which page say so with `next_offset`.
         """
         tools = _named(await mcp_client.list_tools())
 
@@ -738,17 +744,10 @@ class TestTheToolsThisServerAdvertises:
         for tool in tools.values():
             for field in _properties(tool.outputSchema):
                 assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
-        for name in (
-            "list_chats",
-            "list_teams",
-            "list_channels",
-            "browse_channel",
-            "search_messages",
-            "list_meeting_transcripts",
-            "read_transcript",
-            "list_meeting_recordings",
-        ):
-            assert "truncated" in _properties(tools[name].outputSchema), name
+        for name, tool in tools.items():
+            assert "truncated" not in _properties(tool.outputSchema), name
+        for name in ("search_messages", "read_transcript"):
+            assert "next_offset" in _properties(tools[name].outputSchema), name
 
     async def test_the_two_meeting_listers_answer_in_the_same_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -879,13 +878,22 @@ class TestTheToolsThisServerAdvertises:
         properties = _properties(schema)
         limit = _object(properties["limit"])
 
-        assert set(properties) == {"meeting_uri", "started_after", "started_before", "limit"}
+        assert set(properties) == {
+            "meeting_uri",
+            "started_after",
+            "started_before",
+            "limit",
+            "include_scan_completeness",
+        }
         assert schema.get("required") == ["meeting_uri"]
         assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
             "integer",
             1,
             50,
             20,
+        )
+        assert _object(properties["include_scan_completeness"])["default"] is False, (
+            "the completeness of the scan is opt-in: a client that does not want it never sees it"
         )
 
     @pytest.mark.parametrize("bound", ["started_after", "started_before"], ids=["after", "before"])
@@ -945,7 +953,13 @@ class TestTheToolsThisServerAdvertises:
         properties = _properties(schema)
         limit = _object(properties["limit"])
 
-        assert set(properties) == {"meeting_uri", "started_after", "started_before", "limit"}
+        assert set(properties) == {
+            "meeting_uri",
+            "started_after",
+            "started_before",
+            "limit",
+            "include_scan_completeness",
+        }
         assert schema.get("required") == ["meeting_uri"]
         assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
             "integer",
@@ -953,6 +967,7 @@ class TestTheToolsThisServerAdvertises:
             50,
             20,
         )
+        assert _object(properties["include_scan_completeness"])["default"] is False
         for bound in ("started_after", "started_before"):
             assert _optional_types(properties[bound]) == [
                 {"type": "string", "format": "date"},
@@ -1301,7 +1316,7 @@ class TestCallingThem:
         result = await mcp_client.call_tool("list_chats", {"limit": 5})
 
         body = _structured(result)
-        assert body["truncated"] is False
+        assert "truncated" not in body, "a window says whether it may have more by being full"
         listed = cast("Sequence[Mapping[str, object]]", body["chats"])
         assert [chat["chat_id"] for chat in listed] == ["19:release@thread.v2"]
         assert listed[0]["last_message_at"] == "2026-02-11T09:15:22.310000Z"
@@ -1320,8 +1335,8 @@ class TestCallingThem:
         result = await mcp_client.call_tool("search_messages", {"query": "release"})
 
         body = _structured(result)
-        assert body["truncated"] is False
-        assert body["next_offset"] is None
+        assert body["next_offset"] is None, "the last page of results, and the whole of saying so"
+        assert "truncated" not in body
         assert "total" not in body, "Graph's `total` is a page count for Teams, not a match count"
         found = cast("Sequence[Mapping[str, object]]", body["messages"])
         assert [message["uri"] for message in found] == [
@@ -1476,7 +1491,7 @@ class TestCallingThem:
             ("Ada Lovelace", 62.0),
         ]
         assert turns[0]["text"] == "We should raise the floor price by three per cent."
-        assert read["truncated"] is False
+        assert read["next_offset"] is None
         assert content.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
         assert content.calls.last.request.headers["accept"] == "text/vtt"
         assert obo.requested_scopes == [
@@ -1531,13 +1546,24 @@ class TestCallingThem:
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         answer = _structured(
-            await mcp_client.call_tool(tool, {"meeting_uri": _MEETING_URI, "limit": 1})
+            await mcp_client.call_tool(
+                tool,
+                {
+                    "meeting_uri": _MEETING_URI,
+                    "limit": 1,
+                    "include_scan_completeness": True,
+                },
+            )
         )
 
         listed = cast("Sequence[Mapping[str, object]]", answer[collection])
         assert [item[identifier] for item in listed] == ["week-3"], "the newest, not the first"
         assert answer["status"] == "available"
-        assert answer["truncated"] is True, "the two older occurrences are the 'more' there is"
+        assert len(listed) == 1, "a full window: the two older occurrences are behind it"
+        assert answer["scan_incomplete"] is False, (
+            "and the collection was read to the end, so this IS the meeting's latest — the two "
+            "facts the one old flag could not tell apart"
+        )
 
     @pytest.mark.parametrize(
         ("tool", "path", "collection", "identifier"),
@@ -1562,8 +1588,9 @@ class TestCallingThem:
 
         Two things are asserted, and they are the two defects this shape found. Asking for the
         newest returns the newest of the artifacts READ — `day-199` — and never the meeting's
-        actual newest, which sits past the cap where nothing here can see it; `truncated` is the
-        answer's own admission of that. And a window over the part that was not read answers
+        actual newest, which sits past the cap where nothing here can see it, and the opt-in
+        `scan_incomplete` is the answer's own admission of that. And a window over the part that was
+        not read answers
         `scan_incomplete` whether it is wide or narrow, because the window is applied to what came
         back: narrowing it is not a remedy, which is why the tool no longer offers it as one.
         """
@@ -1572,7 +1599,14 @@ class TestCallingThem:
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         newest = _structured(
-            await mcp_client.call_tool(tool, {"meeting_uri": _MEETING_URI, "limit": 1})
+            await mcp_client.call_tool(
+                tool,
+                {
+                    "meeting_uri": _MEETING_URI,
+                    "limit": 1,
+                    "include_scan_completeness": True,
+                },
+            )
         )
         wide = _structured(
             await mcp_client.call_tool(
@@ -1598,13 +1632,14 @@ class TestCallingThem:
         listed = cast("Sequence[Mapping[str, object]]", newest[collection])
         assert len(obo.requested_scopes) == 3, "one delegated exchange per call, all three made"
         assert [item[identifier] for item in listed] == ["day-199"], "the newest of what was read"
-        assert newest["truncated"] is True, "the read stopped at the cap, and the answer says so"
+        assert newest["scan_incomplete"] is True, (
+            "the read stopped at the cap, and a caller that asked has to be told"
+        )
         assert wide["status"] == "scan_incomplete"
-        assert (narrow["status"], narrow["truncated"], narrow[collection]) == (
-            wide["status"],
-            wide["truncated"],
-            wide[collection],
-        ), "a narrower window is the same call over the same artifacts, so it is not a remedy"
+        assert wide["scan_incomplete"] is None, "nothing asked about the scan on these two calls"
+        assert (narrow["status"], narrow[collection]) == (wide["status"], wide[collection]), (
+            "a narrower window is the same call over the same artifacts, so it is not a remedy"
+        )
 
     async def test_a_model_walks_from_a_meeting_chat_to_whether_the_call_was_recorded(
         self,
@@ -1645,7 +1680,7 @@ class TestCallingThem:
         assert not video.called, "listing a recording must never fetch it"
         assert available["status"] == "available"
         assert available["subject"] == "Pricing review"
-        assert available["truncated"] is False
+        assert available["scan_incomplete"] is None, "nobody asked how far the read got"
         recorded = cast("Sequence[Mapping[str, object]]", available["recordings"])
         assert len(recorded) == 1
         assert recorded[0]["duration_seconds"] == pytest.approx(2831.913)
@@ -1911,7 +1946,7 @@ class TestCallingThem:
             turn["speaker"] for turn in cast("Sequence[Mapping[str, object]]", by_speaker["turns"])
         ] == ["Grace Hopper"]
         assert by_speaker["speaker_attribution"] is True
-        assert by_speaker["truncated"] is False, "one turn matched and one turn came back"
+        assert by_speaker["next_offset"] is None, "one turn matched and one turn came back"
         turns = cast("Sequence[Mapping[str, object]]", by_time["turns"])
         assert [turn["start_seconds"] for turn in turns] == [62.0]
         assert content.call_count == 2, "paging and filtering are over the parsed turns, not Graph"

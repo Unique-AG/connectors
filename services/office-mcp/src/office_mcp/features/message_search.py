@@ -313,19 +313,14 @@ class MessageHit(BaseModel):
 
 class MessageSearchResults(BaseModel):
     messages: list[MessageHit] = Field(description="The matching messages on this page of results.")
-    truncated: bool = Field(
-        description=(
-            "True when Microsoft's index has more matches than this page holds — the same "
-            + "'there is more' flag every list-shaped tool here reports. Page on with "
-            + "`next_offset`. It is the only completeness signal Graph gives for a message "
-            + "search: it reports no match total for Teams messages, so neither does this tool."
-        )
-    )
     next_offset: int | None = Field(
         description=(
-            "The `offset` that reaches the next page, or null when `truncated` is false. It counts "
-            + "the hits Graph returned rather than the messages listed here, because offsets index "
-            + "Graph's own unfiltered results."
+            "The `offset` that reaches the next page of matches, or null when this page is the "
+            + "last. It is both how to page on and the whole completeness signal: a value here "
+            + "means Microsoft's index holds more matches than this page, and null means it does "
+            + "not. Graph reports no match total for Teams messages, so there is no other. It "
+            + "counts the hits Graph returned rather than the messages listed here, because "
+            + "offsets index Graph's own unfiltered results."
         )
     )
 
@@ -520,12 +515,11 @@ async def search_messages(
     assert response is not None, "Graph answered POST /search/query with no response"
     container = _hits_container(response)
     hits = (container.hits or []) if container is not None else []
-    truncated = bool(container.more_results_available) if container else False
+    more_to_come = bool(container.more_results_available) if container else False
 
     return MessageSearchResults(
         messages=[message for message in (_message(hit) for hit in hits) if message is not None],
-        truncated=truncated,
-        next_offset=offset + len(hits) if truncated else None,
+        next_offset=offset + len(hits) if more_to_come else None,
     )
 
 

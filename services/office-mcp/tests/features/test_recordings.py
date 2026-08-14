@@ -125,6 +125,7 @@ async def _listing(
     started_after: date | datetime | None = None,
     started_before: date | datetime | None = None,
     limit: int = 20,
+    include_scan_completeness: bool = False,
 ) -> recordings.MeetingRecordings:
     return await recordings.list_meeting_recordings(
         client,
@@ -132,6 +133,7 @@ async def _listing(
         started_after=started_after,
         started_before=started_before,
         limit=limit,
+        include_scan_completeness=include_scan_completeness,
     )
 
 
@@ -154,7 +156,7 @@ class TestWhatOneRecordingIsReportedAs:
         assert found.status == "available"
         assert found.meeting_id == MEETING_ID
         assert found.subject == "Pricing review"
-        assert found.truncated is False
+        assert found.scan_incomplete is None, "nobody asked how far the read got"
         assert listing.called
         recording = found.recordings[0]
         assert recording.recording_id == _RECORDING_ID
@@ -413,7 +415,6 @@ class TestScopingToOneOccurrence:
 
         assert found.meeting_type == "recurring"
         assert [item.recording_id for item in found.recordings] == ["week-2"]
-        assert found.truncated is False
 
     @pytest.mark.parametrize(
         ("started_after", "started_before", "expected"),
@@ -461,11 +462,13 @@ class TestScopingToOneOccurrence:
 
         assert [item.recording_id for item in found.recordings] == ["newer", "older"]
 
-    async def test_a_full_window_with_more_behind_it_says_so(
+    async def test_a_window_holding_more_than_the_limit_is_a_full_window_and_a_complete_scan(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """More recordings in the window than `limit` holds: the newest of them come back, and
-        `truncated` says the rest are older ones rather than a next page to fetch."""
+        """The two facts the old flag ran together, in the lister that shared it: the window holds
+        more recordings than `limit`, which a full window says, and the scan reached the end of the
+        collection, which is what must not be denied — the first entry here IS the meeting's own
+        latest."""
         _resolved(graph)
         _pages(
             graph,
@@ -474,11 +477,12 @@ class TestScopingToOneOccurrence:
         )
         _me(graph)
 
-        found = await _listing(client, limit=1)
+        found = await _listing(client, limit=1, include_scan_completeness=True)
 
-        assert found.truncated is True
         assert found.status == "available"
         assert [item.recording_id for item in found.recordings] == ["week-2"]
+        assert len(found.recordings) == 1, "a window filled to `limit`: there may be older ones"
+        assert found.scan_incomplete is False, "and no cap was reached, so nothing suggests one was"
 
     async def test_the_newest_are_returned_and_not_the_first_graph_answered_with(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -499,7 +503,6 @@ class TestScopingToOneOccurrence:
         found = await _listing(client, limit=1)
 
         assert [item.recording_id for item in found.recordings] == ["newest"]
-        assert found.truncated is True
 
     async def test_the_newest_is_found_even_when_it_is_on_a_later_page(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -520,9 +523,10 @@ class TestScopingToOneOccurrence:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The self-contradicting answer, in the lister that shares the code it came from:
-        `not_recorded` ("retrying will not help") could be reported alongside `truncated: true`
-        ("there is more"). A collection that was not read to the end settles nothing, so the answer
-        is `scan_incomplete` and no absence is claimed.
+        `not_recorded` ("retrying will not help") could be reported alongside "there is more". A
+        collection that was not read to the end settles nothing, so the answer is `scan_incomplete`
+        — reported by `status` whether or not the caller asked about the scan, because an empty
+        answer is worth nothing without it — and no absence is claimed.
         """
         ended = datetime.now(UTC) - timedelta(days=30)
         _resolved(graph, meeting_type="recurring", end=ended.isoformat())
@@ -544,8 +548,8 @@ class TestScopingToOneOccurrence:
         )
 
         assert found.recordings == []
-        assert found.truncated is True
         assert found.status == "scan_incomplete"
+        assert found.scan_incomplete is None, "and still only `status` says it, unless asked"
         assert found.status not in ("not_recorded", "not_ready"), (
             "a window whose collection was not read to the end settles nothing either way"
         )
@@ -575,8 +579,8 @@ class TestScopingToOneOccurrence:
         )
         narrow_request = listing.calls.last.request.url
 
-        assert (wide.status, wide.truncated, wide.recordings) == ("scan_incomplete", True, [])
-        assert (narrow.status, narrow.truncated, narrow.recordings) == (wide.status, True, [])
+        assert (wide.status, wide.recordings) == ("scan_incomplete", [])
+        assert (narrow.status, narrow.recordings) == (wide.status, [])
         assert str(wide_request) == str(narrow_request), "two windows, one request"
         for asked in (wide_request, narrow_request):
             assert not {"$filter", "$orderby", "$top"} & set(asked.params), (
@@ -603,10 +607,10 @@ class TestScopingToOneOccurrence:
         _daily_series(graph)
         _me(graph)
 
-        found = await _listing(client, limit=3)
+        found = await _listing(client, limit=3, include_scan_completeness=True)
 
         assert found.status == "available"
-        assert found.truncated is True, "the cap was reached, and the answer has to say so"
+        assert found.scan_incomplete is True, "the cap was reached, and the answer has to say so"
         returned = [item.recording_id for item in found.recordings]
         assert returned == ["day-199", "day-198", "day-197"], "the newest of the ones read"
         assert f"day-{_PAST_THE_CAP - 1}" not in returned, (

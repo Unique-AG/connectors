@@ -630,7 +630,7 @@ class TestWhatTheCallerIsTold:
 
 
 class TestPagingAndItsHonesty:
-    async def test_truncated_drives_paging_and_total_is_ignored(
+    async def test_the_next_offset_drives_paging_and_total_is_ignored(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Microsoft documents `total` as the count of results on the page for Teams messages, not
@@ -651,9 +651,14 @@ class TestPagingAndItsHonesty:
             client, criteria=SearchCriteria(query="release"), offset=50, size=25
         )
 
-        assert found.truncated is True
-        assert found.next_offset == 53
+        assert found.next_offset == 53, (
+            "the offset is both the cursor and the whole 'there is more' signal: Graph said more "
+            "results were available, so it is set"
+        )
         assert "total" not in message_search.MessageSearchResults.model_fields
+        assert "truncated" not in message_search.MessageSearchResults.model_fields, (
+            "a flag saying what a non-null `next_offset` already says is a second thing to learn"
+        )
 
     async def test_the_next_offset_counts_graphs_hits_not_the_messages_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -709,7 +714,7 @@ class TestPagingAndItsHonesty:
         )
 
         assert found.messages == []
-        assert (found.truncated, found.next_offset) == (False, None)
+        assert found.next_offset is None
 
 
 class TestGraphFailures:

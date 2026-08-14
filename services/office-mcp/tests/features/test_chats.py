@@ -303,9 +303,12 @@ class TestTheWindowAndItsHonesty:
         listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
 
         assert [chat.chat_id for chat in listed.chats] == ["19:a@thread.v2", "19:b@thread.v2"]
-        assert listed.truncated is False, "the walk reached the end of the collection"
+        assert len(listed.chats) < 25, (
+            "the walk reached the end of the collection, and a window short of `limit` is how that "
+            "is reported now that there is no flag saying it"
+        )
 
-    async def test_a_full_window_with_more_behind_it_says_so(
+    async def test_a_full_window_is_all_a_full_window_promises(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         graph.get("/me/chats").mock(
@@ -320,8 +323,11 @@ class TestTheWindowAndItsHonesty:
 
         listed = await chats.list_recent_chats(client, limit=2, include_member_emails=False)
 
-        assert len(listed.chats) == 2
-        assert listed.truncated is True
+        assert len(listed.chats) == 2, (
+            "a window filled to `limit` is the whole of what a caller is told: Graph had a next "
+            "link here, and the second page is not fetched to be discarded"
+        )
+        assert len(graph.calls) == 1
 
 
 class TestGraphFailures:

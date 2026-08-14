@@ -198,7 +198,6 @@ class TestTheInventoryItReports:
         assert [team.is_archived for team in listed.teams] == [False, True], (
             "the flag that tells two teams of the same name apart"
         )
-        assert listed.truncated is False
 
     async def test_a_team_graph_gave_no_archive_flag_for_is_not_claimed_to_be_live(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -213,7 +212,7 @@ class TestTheInventoryItReports:
 
         assert listed.teams[0].is_archived is None
 
-    async def test_a_full_window_of_teams_with_more_behind_it_says_so(
+    async def test_a_full_window_of_teams_is_all_a_full_window_promises(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         graph.get("/me/joinedTeams").mock(
@@ -228,8 +227,11 @@ class TestTheInventoryItReports:
 
         listed = await channels.list_teams(client, limit=2)
 
-        assert len(listed.teams) == 2
-        assert listed.truncated is True
+        assert len(listed.teams) == 2, (
+            "a window filled to `limit` is the whole of what a caller is told; Graph had a next "
+            "link here and the page behind it is not fetched to be discarded"
+        )
+        assert len(graph.calls) == 1
 
     async def test_the_channel_pages_are_followed_rather_than_read_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -259,7 +261,7 @@ class TestTheInventoryItReports:
             _CHANNEL_ID,
             "19:second@thread.tacv2",
         ]
-        assert listed.truncated is False
+        assert len(listed.channels) < 25, "the walk reached the end of the collection"
 
     async def test_a_channels_membership_type_comes_through_and_an_unknown_one_does_not_fail(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -314,7 +316,6 @@ class TestBrowsingOneChannel:
         assert (post.team_id, post.channel_id) == (_TEAM_ID, _CHANNEL_ID)
         assert post.chat_id is None
         assert post.reply_to_id is None, "a root post answers nothing"
-        assert browsed.truncated is False
 
     async def test_one_browse_is_one_graph_request_whatever_the_channel_holds(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -324,7 +325,7 @@ class TestBrowsingOneChannel:
         that is not its own — and this is the collection where a page walk is most tempting, because
         system messages are filtered out after Graph has counted them into the page. A walk bounded
         by items scanned rather than by requests would keep asking for pages until it had `limit`
-        posts; this asks once and lets `truncated` carry the rest.
+        posts; this asks once, and the answer is described as one window rather than flagged.
         """
         second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
@@ -344,7 +345,6 @@ class TestBrowsingOneChannel:
         )
 
         assert [message.message_id for message in browsed.messages] == ["1770000000000"]
-        assert browsed.truncated is True, "the page Graph said was not the last one"
         assert len(graph.calls) == 1, "one browse is one request against the channel"
         assert not second_page.called, "the collection's cursor is deliberately not followed"
 
@@ -441,8 +441,9 @@ class TestBrowsingOneChannel:
     async def test_replies_are_sorted_and_the_newest_of_a_long_thread_are_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph publishes no order for replies, so they are sorted here; and a thread longer than
-        the cap is reported truncated rather than silently shortened."""
+        """Graph publishes no order for replies, so they are sorted here, and a thread longer than
+        the window comes back full to it — which is the only thing said about a thread's older
+        replies now, and all that can be said: they are out of reach either way."""
         replies = [
             _reply_payload(
                 f"177000000{index:04d}",
@@ -466,18 +467,23 @@ class TestBrowsingOneChannel:
         assert kept == [reply["id"] for reply in replies[-channels.MAX_REPLIES_PER_POST :]], (
             "the newest replies, oldest first"
         )
-        assert browsed.truncated is True
+        assert len(kept) == channels.MAX_REPLIES_PER_POST, (
+            "a thread filled to the window is how a caller sees that it may have older replies"
+        )
 
-    async def test_a_thread_graph_itself_paged_is_reported_truncated_and_not_chased(
+    async def test_a_thread_graph_itself_paged_is_not_chased(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`$expand=replies` has its own cursor per post. Not following it is a deliberate choice —
-        it is a request per post against a channel that allows the whole app one a second, and a
-        thread of hundreds is not a tool response — but hiding that it exists is not.
+        """`$expand=replies` has its own cursor per post, and not following it is a deliberate
+        choice: it is a request per post against a channel that allows the whole app one a second,
+        and a thread of hundreds is not a tool response.
 
-        The request count is asserted because this is the half of the reply story every description
-        depends on: browsing reaches the newest replies of a post and no further, which is why no
-        surface here may tell a model to browse for an older one.
+        The cursor needs no reporting of its own — Graph expands up to 200 replies before it pages
+        them, so a thread it paged has far more than this window holds and the window comes back
+        full either way. The request count is what matters and is asserted, because this is the half
+        of the reply story every description depends on: browsing reaches the newest replies of a
+        post and no further, which is why no surface here may tell a model to browse for an older
+        one.
         """
         replies = graph.get(f"{_MESSAGES_PATH}/1770000000000/replies").mock(
             return_value=httpx.Response(200, json={"value": []})
@@ -508,7 +514,6 @@ class TestBrowsingOneChannel:
         )
 
         assert len(browsed.messages) == 2
-        assert browsed.truncated is True
         assert not replies.called, "a post's own replies cursor is not followed either"
         assert len(graph.calls) == 1
 
@@ -561,7 +566,6 @@ class TestBrowsingOneChannel:
         )
 
         assert browsed.messages == []
-        assert browsed.truncated is False
 
 
 class TestGraphFailures:

@@ -137,14 +137,12 @@ class ChatSummary(BaseModel):
 
 class ChatList(BaseModel):
     chats: list[ChatSummary] = Field(
-        description="The signed-in user's chats, most recently active first."
-    )
-    truncated: bool = Field(
         description=(
-            "True when the user has more chats than this `limit` holds — the same 'there is more' "
-            + "flag every list-shaped tool here reports. There is no cursor to page with: raise "
-            + f"`limit` (up to {MAX_CHATS}) to widen the window. Chats less recent than the window "
-            + "are not reachable from this tool."
+            "The signed-in user's chats, most recently active first. As many as `limit` means the "
+            + "user may have more; fewer than `limit` is every chat there is, because the walk "
+            + "follows Microsoft's paging to the end of the collection rather than believing a "
+            + f"short page. There is no cursor: raise `limit` (up to {MAX_CHATS}) to widen the "
+            + "window, and chats less recent than it are not reachable from this tool."
         )
     )
 
@@ -152,7 +150,12 @@ class ChatList(BaseModel):
 async def list_recent_chats(
     client: GraphServiceClient, *, limit: int, include_member_emails: bool
 ) -> ChatList:
-    """The `limit` most recently active chats, and whether the user has more than that."""
+    """The `limit` most recently active chats.
+
+    Whether the user has more than that is not reported as a flag: the walk follows Graph's paging
+    to the end of the collection, so a full window may hold more behind it and a short one is the
+    whole of it — which is what a page size means everywhere else and what a model reads it as.
+    """
     assert 1 <= limit <= MAX_CHATS, f"limit must be within 1..{MAX_CHATS}, got {limit}"
 
     configuration = RequestConfiguration[_ChatsQuery](
@@ -169,10 +172,7 @@ async def list_recent_chats(
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
 
-    return ChatList(
-        chats=[_summarise(chat, include_member_emails) for chat in collected.items],
-        truncated=collected.truncated,
-    )
+    return ChatList(chats=[_summarise(chat, include_member_emails) for chat in collected.items])
 
 
 def _summarise(chat: Chat, include_member_emails: bool) -> ChatSummary:

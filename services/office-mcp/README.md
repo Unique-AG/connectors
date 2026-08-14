@@ -170,16 +170,29 @@ gets that string onto the wire.
 - **Errors are four categories**, because those are the four remedies: `GraphThrottled` (429),
   `GraphForbidden` (401/403), `GraphNotFound` (404) and `GraphUnavailable` (5xx, or never reached).
   Wrap Graph work in `with graph_errors():`. Anything else stays the base `GraphFailure`.
-- **Paging follows `@odata.nextLink`** via `collect_pages`, replaying the URL verbatim, with both an
-  item cap and a *scan* cap — the teams-mcp lesson that a filtered collection can walk a long way
-  for very few kept items — and a `truncated` flag so a partial answer never looks complete. There
-  are three ways a read is bounded here and `graph_client/pagination.py` sets all three out
-  together: an inventory walks until it has `limit` items, a meeting's artifacts are walked to a
-  tighter *scan* cap (they are filtered and ordered here, so the walk cannot stop at `limit`), and
-  a channel's messages are not walked at all — Graph allows about one request a second on a given
-  channel for the whole app, so `browse_channel` makes exactly one and `$top` is its window. Search
-  is not paged this way either: `POST /search/query` takes stateless `from`/`size` offsets, so a
-  search tool resumes by re-issuing rather than by carrying a cursor.
+- **Paging follows `@odata.nextLink`** via `collect_pages`, replaying the URL verbatim, with an item
+  cap, a *scan* cap — the teams-mcp lesson that a filtered collection can walk a long way for very
+  few kept items — and a request budget. There are three ways a read is bounded here and
+  `graph_client/pagination.py` sets all three out together: an inventory walks until it has `limit`
+  items, a meeting's artifacts are walked to a tighter *scan* cap (they are filtered and ordered
+  here, so the walk cannot stop at `limit`), and a channel's messages are not walked at all — Graph
+  allows about one request a second on a given channel for the whole app, so `browse_channel` makes
+  exactly one and `$top` is its window. Search is not paged this way either: `POST /search/query`
+  takes stateless `from`/`size` offsets, so a search tool resumes by re-issuing rather than by
+  carrying a cursor.
+- **An empty page carrying a next link means keep going, and the walk is ours because of it.** The
+  SDK's `PageIterator.enumerate` returns `False` for a page whose `value` is empty and its `iterate`
+  reads that as the end of the collection — so a collection Graph answers `[3 items + nextLink]`,
+  `[nothing + nextLink]`, `[the newest one]` was walked as far as the middle page and then reported
+  as having been cut by a cap. Downstream that put "this meeting has more transcripts than one call
+  reads (200)" on a four-transcript meeting: a fabricated claim about the user's own meeting, from a
+  flag whose two causes nobody could tell apart. `collect_pages` therefore drives the pages itself
+  (keeping `enumerate` and `next`, which are the parts worth having) and stops only on a cap or on
+  the end of the collection. Following empty pages needs a bound of its own, so requests are bounded
+  as well as items: `max_scanned` requests — the most that pages carrying items can spend, since
+  each spends scan budget — plus a fixed allowance for pages that carry none. A collection answering
+  with items therefore cannot reach the budget, and one that exhausts it is refused rather than
+  answered short, because a short answer means a cap everywhere above and that would not be one.
 - **The caller's token goes to `graph.microsoft.com` and nowhere else.** The SDK's bearer provider
   does not check its own allowed-hosts validator, so a redirect or an off-Graph `nextLink` would
   otherwise be handed a user's delegated credential.
@@ -211,16 +224,31 @@ Decisions worth knowing:
   `verb_noun` — which is why the identity tool is `get_me` and not `whoami`, the shell idiom having
   made the odd one out of the tool a model calls first (Microsoft's own M365 connector landed on
   `get_me` too). A result field is snake_case, and one thing has one name across every tool: a
-  person's Entra id is `user_id` wherever it appears, an address is `email`, a time is `…_at`. Every
-  tool whose answer is a list says "there is more" with the same word, `truncated`, and says in its
-  own description how to get the rest — a wider `limit` where there is no cursor, `next_offset` where
-  there is. `tests/test_mcp_tools.py` checks all of that against the live schemas, because a
-  convention nothing enforces is how a new tool comes out different from the ones before it.
-- **Every result has a declared output schema.** So `truncated` and `members_may_be_incomplete` are
+  person's Entra id is `user_id` wherever it appears, an address is `email`, a time is `…_at`. No
+  answer carries a "there is more" flag: a window filled to `limit` may have more behind it and a
+  short one is all there was, and where paging exists a `next_offset` says it outright and says
+  where to continue. `tests/test_mcp_tools.py` checks all of that against the live schemas, because
+  a convention nothing enforces is how a new tool comes out different from the ones before it.
+- **`truncated` came off all eight tools that reported it, and it is the one field clients asked to
+  lose.** Six of them lost it outright: on `list_chats`, `list_teams`, `list_channels` and
+  `browse_channel` a full window is the "there may be more" and a short one is the answer (which is
+  only exactly true because of the empty-page fix above — before it, a short page could be a paging
+  artefact), and on `search_messages` and `read_transcript` a non-null `next_offset` already said it
+  and said where to continue. The two meeting listers kept the information and made it opt-in, as
+  `include_scan_completeness` → `scan_incomplete`, because there the flag had come to mean two
+  things with opposite remedies: "the window held more than your `limit`" (raise it) and "the read
+  stopped at the 200-artifact cap" (nothing helps, and the first entry may not be the meeting's
+  latest). The first is what a full window says; the second is the one a caller cannot work out, has
+  no remedy for, and only meets on a series recorded daily for most of a year — so it is asked for
+  rather than carried, and the caveat it forced no longer lands on every ordinary answer. Nothing
+  was made quieter where it mattered: an empty answer over a scan that stopped short is still
+  `status: scan_incomplete` whether or not anybody asked.
+- **Every result has a declared output schema.** So `next_offset` and `members_may_be_incomplete` are
   typed fields rather than prose or, worse, an extra object appended to the results array that a
   model can mistake for a result.
 - **`list_chats` does not paginate.** `limit` (max 50, which is Graph's own `$top` ceiling on that
-  collection) is a window on the most recent chats, and `truncated` says when there are more. A
+  collection) is a window on the most recent chats, and getting fewer than that many back is how a
+  caller sees it has them all. A
   cursor over a collection that reorders itself on every message returns duplicates and gaps, and
   the window is what "recent chats" means; `services/teams-mcp` ships the same shape. What the
   `chat_id` it returns is *for* is naming: it is the same id `search_messages` puts on every chat
@@ -261,9 +289,10 @@ Decisions worth knowing:
   note from that path in a live tenant. Date bounds go into the query string as `sent>=` / `sent<=`
   instead, where Microsoft's index applies them — inclusive, and covering channels as well as chats.
 - **`search_messages` reports no result total,** because Graph does not give one: for Teams messages
-  the `total` it returns is the count on the page. `truncated` plus `next_offset` are the whole of the
-  paging contract, and a page can be shorter than `size` because system messages (`from: null`, a
-  body of `<systemEventMessage/>`) are dropped and offsets index Graph's own hits.
+  the `total` it returns is the count on the page. `next_offset` is the whole of the paging contract
+  and the whole completeness signal — set while the index holds more, null on the last page — and a
+  page can be shorter than `size` because system messages (`from: null`, a body of
+  `<systemEventMessage/>`) are dropped and offsets index Graph's own hits.
 - **`query` is words, not a phrase.** Multi-word free text reaches Microsoft's index as separate
   terms, which KQL ANDs: every word must appear, anywhere in the message and in any order. Wrapping
   the whole query in the quotes that guard a *filter value* would make it an exact-adjacency phrase
@@ -346,16 +375,17 @@ Decisions worth knowing:
   wasted call is cheaper than telling a caller a transcript will never exist ten minutes before it
   arrives. `scan_incomplete` is the fifth because an absence is only knowable from a collection
   that was read to the end: a meeting with more artifacts than one call looks through, none of them
-  in the window, used to answer "there is none" *and* `truncated: true` in the same breath, which
+  in the window, used to answer "there is none" *and* "there is more" in the same breath, which
   cannot both be true and which a caller cannot see through. Now the scan that stopped short is the
-  answer, and it claims nothing.
+  answer, it claims nothing, and — since the walk underneath it no longer stops for any reason but
+  the cap — the sentence it gives a model about the meeting's size is simply true.
 - **"Newest first" is a promise about the collection, not about a page of it.** Both meeting
   listers take the whole window (up to a 200-artifact scan cap, which is this call's whole cost),
   order it, and only then cut it to `limit` — because Graph documents no `$orderby` on either
   collection, so a `limit` applied to the order Graph chose returns an arbitrary handful sorted
   among themselves and calls them the latest. "The latest transcript of this series" is the
   question the tools exist for, and that shape answered it wrongly with the shape of a right
-  answer. The order, the cut, the scan cap and the `truncated` flag are one function
+  answer. The order, the cut, the scan cap and what the cap is worth admitting to are one function
   (`features/transcripts.newest_in_window`) shared by both, which is why the recordings lister
   inherited the bug and why both were fixed at once.
 - **The tenant switch gets its own remedy, keyed on the inner error code.** `403` +

@@ -247,7 +247,12 @@ class TestTheFilterOnTheWire:
         route = graph.get(_MEETINGS).mock(return_value=httpx.Response(200, json={"value": []}))
 
         _ = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=20
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         url = route.calls.last.request.url
@@ -284,6 +289,7 @@ class TestTheFilterOnTheWire:
             started_after=None,
             started_before=None,
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert route.calls.last.request.url.params["$filter"] == f"JoinWebUrl eq '{join_web_url}'"
@@ -302,6 +308,7 @@ class TestTheFilterOnTheWire:
             started_after=None,
             started_before=None,
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert (
@@ -323,13 +330,21 @@ class TestNoMatchIsNotAnError:
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=20
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "meeting_not_found"
         assert found.meeting_id is None
         assert found.transcripts == []
-        assert found.truncated is False
+        assert found.scan_incomplete is None, (
+            "the completeness of a scan nobody asked about is not reported, and this call made no "
+            "scan at all"
+        )
         assert not listing.called, "there is no meeting to list transcripts of"
 
     async def test_a_404_is_still_a_failure(
@@ -342,7 +357,12 @@ class TestNoMatchIsNotAnError:
 
         with pytest.raises(GraphNotFound):
             _ = await transcripts.list_meeting_transcripts(
-                client, handle=_handle(), started_after=None, started_before=None, limit=20
+                client,
+                handle=_handle(),
+                started_after=None,
+                started_before=None,
+                limit=20,
+                include_scan_completeness=False,
             )
 
 
@@ -360,7 +380,12 @@ class TestTheThreeAbsences:
 
         with pytest.raises(GraphForbidden) as raised:
             _ = await transcripts.list_meeting_transcripts(
-                client, handle=_handle(), started_after=None, started_before=None, limit=20
+                client,
+                handle=_handle(),
+                started_after=None,
+                started_before=None,
+                limit=20,
+                include_scan_completeness=False,
             )
 
         assert raised.value.inner_code == "GraphAccessToTranscriptsDisabled"
@@ -373,7 +398,12 @@ class TestTheThreeAbsences:
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=20
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "not_transcribed"
@@ -399,7 +429,12 @@ class TestTheThreeAbsences:
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=20
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "not_ready"
@@ -449,11 +484,11 @@ class TestScopingToOneOccurrence:
             started_after=datetime(2026, 2, 10, tzinfo=UTC),
             started_before=datetime(2026, 2, 11, tzinfo=UTC),
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.meeting_type == "recurring"
         assert [t.transcript_id for t in found.transcripts] == ["week-2"]
-        assert found.truncated is False
 
     async def test_a_window_with_nothing_in_it_is_not_ready_or_not_transcribed_not_an_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -471,6 +506,7 @@ class TestScopingToOneOccurrence:
             started_after=datetime(2026, 3, 1, tzinfo=UTC),
             started_before=None,
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "not_transcribed"
@@ -499,16 +535,28 @@ class TestScopingToOneOccurrence:
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=20
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         assert [t.transcript_id for t in found.transcripts] == ["newer", "older"]
 
-    async def test_a_full_window_with_more_behind_it_says_so(
+    async def test_a_window_holding_more_than_the_limit_is_a_full_window_and_a_complete_scan(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """More transcripts in the window than `limit` holds: the newest of them come back, and
-        `truncated` says the rest are older ones rather than a next page to fetch."""
+        """The half of the old `truncated` flag that is gone, and the half that is not.
+
+        More transcripts in the window than `limit` holds: the newest of them come back, and a
+        caller sees `limit` of them, which is what "there may be older ones" looks like everywhere
+        else here — the remedy being a wider `limit`. What must NOT be reported is a scan that
+        stopped short, because none did: the collection was read to the end, so the first entry is
+        the meeting's own latest. One flag used to say both, which is why every full window carried
+        the caveat belonging to this one's opposite.
+        """
         _resolved(graph)
         _pages(
             graph,
@@ -517,12 +565,17 @@ class TestScopingToOneOccurrence:
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=1
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=1,
+            include_scan_completeness=False,
         )
 
-        assert found.truncated is True
         assert found.status == "available"
         assert [t.transcript_id for t in found.transcripts] == ["week-2"]
+        assert len(found.transcripts) == 1, "a window filled to `limit`: there may be older ones"
 
     async def test_the_newest_are_returned_and_not_the_first_graph_answered_with(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -554,11 +607,15 @@ class TestScopingToOneOccurrence:
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=1
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=1,
+            include_scan_completeness=False,
         )
 
         assert [t.transcript_id for t in found.transcripts] == ["newest"]
-        assert found.truncated is True
 
     async def test_the_newest_is_found_even_when_it_is_on_a_later_page(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -573,7 +630,12 @@ class TestScopingToOneOccurrence:
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=1
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=1,
+            include_scan_completeness=False,
         )
 
         assert [t.transcript_id for t in found.transcripts] == ["newest"]
@@ -582,9 +644,10 @@ class TestScopingToOneOccurrence:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The answer that used to contradict itself: `not_transcribed` ("retrying will not help")
-        alongside `truncated: true` ("there is more"). Both cannot be true, and a caller cannot see
-        which one is wrong. A meeting with more transcripts than one call looks through, none of
-        them in the window, is now `scan_incomplete` — which claims nothing about absence.
+        alongside "there is more". Both cannot be true, and a caller cannot see which one is wrong.
+        A meeting with more transcripts than one call looks through, none of them in the window, is
+        `scan_incomplete` — which claims nothing about absence, and which is reported whether or not
+        the caller asked about the scan, because an empty answer is worthless without it.
         """
         ended = datetime.now(UTC) - timedelta(days=30)
         _resolved(graph, meeting_type="recurring", end=ended.isoformat())
@@ -608,11 +671,15 @@ class TestScopingToOneOccurrence:
             started_after=datetime(2026, 3, 1, tzinfo=UTC),
             started_before=datetime(2026, 3, 2, tzinfo=UTC),
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.transcripts == []
-        assert found.truncated is True
-        assert found.status == "scan_incomplete"
+        assert found.status == "scan_incomplete", (
+            "the one place a scan that stopped short reaches a caller who did not ask: an absence "
+            "over a prefix is no absence"
+        )
+        assert found.scan_incomplete is None, "and still only `status` says it, unless asked"
         assert found.status not in ("not_transcribed", "not_ready"), (
             "a window whose collection was not read to the end settles nothing either way"
         )
@@ -638,6 +705,7 @@ class TestScopingToOneOccurrence:
             started_after=_day(transcripts.MAX_ARTIFACT_SCAN).date(),
             started_before=_day(_PAST_THE_CAP - 1).date(),
             limit=20,
+            include_scan_completeness=False,
         )
         wide_request = listing.calls.last.request.url
         narrow = await transcripts.list_meeting_transcripts(
@@ -646,11 +714,12 @@ class TestScopingToOneOccurrence:
             started_after=_day(250).date(),
             started_before=_day(250).date(),
             limit=20,
+            include_scan_completeness=False,
         )
         narrow_request = listing.calls.last.request.url
 
-        assert (wide.status, wide.truncated, wide.transcripts) == ("scan_incomplete", True, [])
-        assert (narrow.status, narrow.truncated, narrow.transcripts) == (wide.status, True, [])
+        assert (wide.status, wide.transcripts) == ("scan_incomplete", [])
+        assert (narrow.status, narrow.transcripts) == (wide.status, [])
         assert str(wide_request) == str(narrow_request), "two windows, one request"
         for asked in (wide_request, narrow_request):
             assert not {"$filter", "$orderby", "$top"} & set(asked.params), (
@@ -676,23 +745,130 @@ class TestScopingToOneOccurrence:
         A daily series recorded for most of a year has its genuinely newest occurrence past
         `MAX_ARTIFACT_SCAN`, and Graph offers no `$orderby` to ask for it — so asking for 3 gives
         the 3 newest of the 200 that were read, not the 3 newest of the meeting. That is the honest
-        answer; the dishonest part was ever calling them "the 3 latest", so the flag that says the
-        read stopped short is asserted here alongside it.
+        answer; the dishonest part was ever calling them "the 3 latest", so the field that says the
+        read stopped short is asked for here and asserted alongside it. It is the one thing about
+        this answer a caller cannot work out from the answer — three entries for a `limit` of three
+        is what an ordinary full window looks like too — which is why it is what survived of the old
+        flag, and why it is opt-in rather than gone.
         """
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=3
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=3,
+            include_scan_completeness=True,
         )
 
         assert found.status == "available"
-        assert found.truncated is True, "the cap was reached, and the answer has to say so"
+        assert found.scan_incomplete is True, "the cap was reached, and the answer has to say so"
         returned = [item.transcript_id for item in found.transcripts]
         assert returned == ["day-199", "day-198", "day-197"], "the newest of the ones read"
         assert f"day-{_PAST_THE_CAP - 1}" not in returned, (
             "the meeting's genuinely newest transcript was never read, which is the whole point"
         )
+
+    async def test_a_caller_who_did_not_ask_about_the_scan_is_told_nothing_about_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The same meeting, unasked: the field is null rather than false.
+
+        This is what "opt-in" has to mean for it to be worth anything — a client that does not want
+        the signal never sees it, and a null is not a claim that the scan finished. What does not
+        change is the read: the same transcripts come back in the same order, so the parameter is
+        about the answer's shape and never about the work.
+        """
+        _resolved(graph, meeting_type="recurring")
+        _daily_series(graph)
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=3,
+            include_scan_completeness=False,
+        )
+
+        assert found.scan_incomplete is None
+        assert [item.transcript_id for item in found.transcripts] == [
+            "day-199",
+            "day-198",
+            "day-197",
+        ]
+
+    async def test_a_meeting_graph_pages_through_nothing_is_read_to_its_end(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The four-transcript meeting that used to be told it had more than two hundred.
+
+        Graph answers this collection `[3 + nextLink]`, `[nothing + nextLink]`, `[the newest]`, and
+        the SDK's own page walker reads the empty middle page as the end of the collection — so the
+        walk stopped one page short of the newest transcript and reported a cap it had never
+        reached, which `scan_incomplete` and the `status` of the same name then blamed on the
+        meeting's size. Nothing about a four-transcript meeting is incomplete, and the fix is in the
+        walk rather than in the wording: an empty page carrying a next link means keep going.
+        """
+        _resolved(graph, meeting_type="recurring")
+        listing = graph.get(_TRANSCRIPTS).mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "value": [
+                            transcript_payload(
+                                transcript_id=f"week-{index}",
+                                created_at=f"2026-02-0{index}T14:00:00Z",
+                            )
+                            for index in (1, 2, 3)
+                        ],
+                        "@odata.nextLink": f"{GRAPH_V1}{_TRANSCRIPTS}?$skiptoken=page-2",
+                    },
+                ),
+                httpx.Response(
+                    200,
+                    json={
+                        "value": [],
+                        "@odata.nextLink": f"{GRAPH_V1}{_TRANSCRIPTS}?$skiptoken=page-3",
+                    },
+                ),
+                httpx.Response(
+                    200,
+                    json={
+                        "value": [
+                            transcript_payload(
+                                transcript_id="week-4", created_at="2026-02-24T14:00:00Z"
+                            )
+                        ]
+                    },
+                ),
+            ]
+        )
+
+        found = await transcripts.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=True,
+        )
+
+        assert [item.transcript_id for item in found.transcripts] == [
+            "week-4",
+            "week-3",
+            "week-2",
+            "week-1",
+        ], "every page was walked, and the newest is the one behind the empty page"
+        assert found.status == "available"
+        assert found.scan_incomplete is False, (
+            "no cap was reached, so nothing may claim this meeting holds more transcripts than one "
+            "call reads"
+        )
+        assert len(listing.calls) == 3
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         """The sentence the case above makes false if it drifts back. A model reads this field's
@@ -714,6 +890,7 @@ class TestScopingToOneOccurrence:
                 started_after=None,
                 started_before=None,
                 limit=transcripts.MAX_TRANSCRIPTS + 1,
+                include_scan_completeness=False,
             )
 
     async def test_each_transcript_carries_a_handle_and_the_link_to_its_recording(
@@ -725,7 +902,12 @@ class TestScopingToOneOccurrence:
         )
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=None, started_before=None, limit=20
+            client,
+            handle=_handle(),
+            started_after=None,
+            started_before=None,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         summary = found.transcripts[0]
@@ -807,6 +989,7 @@ class TestTheWindowShapesAModelActuallySends:
             started_after=started_after,
             started_before=started_before,
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "available"
@@ -839,6 +1022,7 @@ class TestTheWindowShapesAModelActuallySends:
             started_after=date(2026, 2, 10),
             started_before=date(2026, 2, 10),
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert [summary.transcript_id for summary in found.transcripts] == ["dusk", "dawn"]
@@ -867,6 +1051,7 @@ class TestTheWindowShapesAModelActuallySends:
             started_after=date(2026, 2, 10),
             started_before=date(2026, 2, 10),
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert [summary.transcript_id for summary in found.transcripts] == ["naive"]
@@ -892,7 +1077,12 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         _weekly_series(graph, end=end)
 
         found = await transcripts.list_meeting_transcripts(
-            client, handle=_handle(), started_after=past, started_before=past, limit=20
+            client,
+            handle=_handle(),
+            started_after=past,
+            started_before=past,
+            limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.transcripts == []
@@ -913,6 +1103,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
             started_after=datetime.now(UTC) - timedelta(hours=1),
             started_before=datetime.now(UTC) - timedelta(minutes=5),
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "not_ready"
@@ -931,6 +1122,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
             started_after=datetime.now(UTC) - timedelta(days=30),
             started_before=None,
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "not_ready"
@@ -949,6 +1141,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
             started_after=(datetime.now(UTC) + timedelta(days=7)).date(),
             started_before=None,
             limit=20,
+            include_scan_completeness=False,
         )
 
         assert found.status == "not_transcribed"
@@ -985,7 +1178,7 @@ class TestReadingTheWords:
         assert read.turns[0].start_seconds == -2.5, "transcription began mid-conversation"
         assert (read.turns[1].start_seconds, read.turns[1].end_seconds) == (16.246, 19.9)
         assert read.turns[3].start_seconds == 3600.0, "an hour in, from the HH:MM:SS form"
-        assert read.truncated is False
+        assert read.next_offset is None
         assert read.next_offset is None
         assert route.calls.last.request.headers["accept"] == "text/vtt"
 
@@ -1000,9 +1193,9 @@ class TestReadingTheWords:
             client, handle=handle, offset=first.next_offset or 0, limit=2
         )
 
-        assert (first.truncated, first.next_offset) == (True, 2)
+        assert first.next_offset == 2, "the offset is the whole of 'there are more turns'"
         assert [turn.speaker for turn in first.turns] == ["Ada Lovelace", "Grace Hopper"]
-        assert second.truncated is False
+        assert second.next_offset is None
         assert second.next_offset is None
         assert [turn.speaker for turn in second.turns] == ["Ada Lovelace", None]
 
@@ -1069,7 +1262,7 @@ class TestReadingTheWords:
         )
 
         assert read.turns == []
-        assert read.truncated is False
+        assert read.next_offset is None
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
         self, client: GraphServiceClient
@@ -1122,7 +1315,7 @@ class TestNarrowingWhatComesBack:
         )
 
         assert [turn.speaker for turn in read.turns] == ["Grace Hopper", "Ada Lovelace", None]
-        assert read.truncated is False
+        assert read.next_offset is None
 
     async def test_an_upper_bound_keeps_the_turn_that_starts_exactly_on_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1204,7 +1397,7 @@ class TestNarrowingWhatComesBack:
     async def test_a_page_is_cut_from_what_survived_the_filter(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`truncated` counted over the whole transcript would say there is more where the filter
+        """A `next_offset` counted over the whole transcript would offer more where the filter
         already returned everything it matched, and a model would page for turns that cannot come.
         """
         _spoken(graph)
@@ -1217,8 +1410,7 @@ class TestNarrowingWhatComesBack:
             "Sorry, joining late & muted.",
             "Agreed <that> works.",
         ]
-        assert read.truncated is False, "two matched, two returned; the other turns are not more"
-        assert read.next_offset is None
+        assert read.next_offset is None, "two matched, two returned; the other turns are not more"
 
     async def test_the_next_offset_of_a_filtered_page_continues_the_filtered_sequence(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1237,10 +1429,9 @@ class TestNarrowingWhatComesBack:
             client, handle=handle, offset=first.next_offset or 0, limit=2, from_seconds=2.0
         )
 
-        assert (first.truncated, first.next_offset) == (True, 2)
+        assert first.next_offset == 2
         assert [turn.speaker for turn in first.turns] == ["Grace Hopper", "Ada Lovelace"]
         assert [turn.text for turn in second.turns] == ["Nobody was attributed for this one."]
-        assert second.truncated is False
         assert second.next_offset is None
 
     async def test_a_window_nothing_falls_in_is_no_turns_rather_than_a_refusal(
@@ -1253,7 +1444,6 @@ class TestNarrowingWhatComesBack:
         )
 
         assert read.turns == []
-        assert read.truncated is False
         assert read.next_offset is None
 
     async def test_a_speaker_filter_in_a_tenant_with_no_speakers_matches_nothing_and_says_why(
@@ -1271,7 +1461,7 @@ class TestNarrowingWhatComesBack:
 
         assert read.turns == []
         assert read.speaker_attribution is False, "the reason the page is empty"
-        assert read.truncated is False
+        assert read.next_offset is None
 
     async def test_time_still_filters_where_the_speakers_are_gone(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1307,7 +1497,6 @@ class TestNarrowingWhatComesBack:
             "Ada Lovelace",
             None,
         ]
-        assert read.truncated is False
         assert read.next_offset is None
 
     async def test_a_window_that_ends_before_it_starts_is_a_programming_error(

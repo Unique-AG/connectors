@@ -89,10 +89,21 @@ worded to that bound rather than to "the newest of this meeting". Up to that man
 read, in whatever order Graph chose; for a meeting with no more than that they are the whole
 collection and the first entry is the latest outright, which covers every meeting but a series
 recorded daily for the better part of a year. Past it the first entry is the newest of the
-artifacts that were *read*, a newer one can sit in the part that was not, and `truncated` is true.
-Raising the cap would move that boundary rather than remove it: with no `$orderby` to ask the
-newest for, nothing short of reading the whole collection makes the word exact, and Graph publishes
-no ceiling on how large that collection can be.
+artifacts that were *read*, and a newer one can sit in the part that was not. Raising the cap would
+move that boundary rather than remove it: with no `$orderby` to ask the newest for, nothing short of
+reading the whole collection makes the word exact, and Graph publishes no ceiling on how large that
+collection can be.
+
+That one case is what `include_scan_completeness` is for, and it is opt-in because it is the only
+thing here a caller cannot work out for itself. "The window held more artifacts than your `limit`"
+it can: a full window may have more behind it and a short one is all there was, which is what a page
+size means everywhere. "The read stopped at the cap" it cannot, and the two used to be one flag with
+opposite remedies — raise `limit` for the first, nothing at all for the second — which forced the
+caveat belonging to the rare case onto every answer that filled its window. So they are separated:
+the count carries the ordinary one, and the rare one is a field a caller asks for when the answer
+turns on whether the first entry is the meeting's own latest. Where nothing came back at all it is
+not opt-in and never was: `status` is `scan_incomplete`, because an absence asserted over a
+collection nobody read to the end is the wrong answer that started all of this.
 
 ## Four failures a caller must act on differently
 
@@ -114,8 +125,13 @@ fourth:
 * **Not known** — the walk hit `MAX_ARTIFACT_SCAN` before the collection ended, so the transcripts
   it did not reach might hold the one asked for. Neither absence verdict above is available here:
   both assert something about a collection that was not read to the end, and the caller cannot tell
-  from the outside. `scan_incomplete` is that answer, and it is exactly the case where `truncated`
-  is true — an answer saying both "there is more" and "there is none" is one no caller can act on.
+  from the outside. `scan_incomplete` is that answer — an answer saying both "there is more" and
+  "there is none" is one no caller can act on. The sentence it gives a model, "this meeting has more
+  transcripts than one call reads", is a claim about the meeting, and it is true because the walk
+  underneath it can no longer stop for any other reason: `graph_client/pagination.py` follows an
+  empty page carrying a next link rather than reading it as the end, and refuses a collection that
+  exhausts its request budget rather than answering short. Before that, a four-transcript meeting
+  Graph paged `[3, nothing, 1]` was told the same thing.
   It is also the one answer here with **no remedy**, and every place it is described says so. The
   window is applied to the artifacts *after* they are read: Graph documents no filterable date on
   either collection — the one filterable property either reference shows by example is
@@ -486,7 +502,7 @@ class MeetingTranscripts(BaseModel):
             + "narrower, wider, anything — reads the same transcripts and returns this same "
             + "status. Stop, and report that whether a transcript exists for that occurrence could "
             + "not be determined. Never report this as 'there is no transcript', and do not ask "
-            + "again. `truncated` is true for the same reason.\n"
+            + "again.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Not an error and not proof the meeting is gone; a meeting created outside a "
             + "calendar, or one this user was never invited to, answers the same way. Do not retry "
@@ -532,27 +548,26 @@ class MeetingTranscripts(BaseModel):
             + "transcript of the window outright, which for a recurring series is how to reach the "
             + "most recent occurrence. Past that cap the first entry is the latest of what was "
             + "READ: Microsoft returns this collection in an order of its own and offers no way to "
-            + "ask for the newest, so a newer transcript can sit among the ones never read. "
-            + "`truncated` is true whenever that happened. Empty for every status other than "
-            + "`available`."
+            + "ask for the newest, so a newer transcript can sit among the ones never read; set "
+            + "`include_scan_completeness` when the answer turns on that. As many entries as "
+            + "`limit` means the window may hold older ones too — raise `limit`, up to "
+            + f"{MAX_TRANSCRIPTS} — and fewer than `limit` means these are the whole window. There "
+            + "is no cursor. Empty for every status other than `available`."
         )
     )
-    truncated: bool = Field(
+    scan_incomplete: bool | None = Field(
         description=(
-            "True when there is more — the same 'there is more' flag every list-shaped tool here "
-            + "reports. Two things set it, and they differ in what you may conclude:\n"
-            + "- The window holds more transcripts than this `limit`. The ones here are still the "
-            + f"newest of the window; raise `limit`, up to {MAX_TRANSCRIPTS}.\n"
-            + "- The meeting has more transcripts in total than one call reads "
-            + f"({MAX_ARTIFACT_SCAN}). Then `transcripts` is ordered over the ones read and not "
-            + "over the meeting, so the first entry may not be the meeting's latest, and no "
-            + "argument to this tool reads further — the window is applied after the read, so "
-            + "narrowing it changes nothing.\n"
-            + "Which of the two happened is not always visible, so do not call the first entry the "
-            + "meeting's most recent transcript while this is true unless you say it is the most "
-            + "recent of what was read. Fewer entries than you asked for with this true is always "
-            + "the second case. There is no cursor. When this is true and nothing came back, "
-            + "`status` is `scan_incomplete` and no absence is claimed."
+            "Whether the read stopped at the cap on how many of this meeting's transcripts one "
+            + f"call looks through ({MAX_ARTIFACT_SCAN}), or null when "
+            + "`include_scan_completeness` was not set — which is the default, because it only "
+            + "matters for a meeting with more transcripts than that.\n"
+            + "True means `transcripts` is ordered over the ones READ and not over the meeting, so "
+            + "the first entry may not be the meeting's latest and nothing here reads further: no "
+            + "argument to this tool changes it, the window being applied after the read. False "
+            + "means the whole collection was read, so the order and any absence within it are "
+            + "exact. This says nothing about `limit` — that the window held more than you asked "
+            + "for is what a full `transcripts` list means. You never need this to tell whether an "
+            + "empty answer is trustworthy: `status` is `scan_incomplete` in exactly that case."
         )
     )
 
@@ -597,22 +612,14 @@ class Transcript(BaseModel):
             + "was asked for, which is not the same as the meeting having no words in it."
         )
     )
-    truncated: bool = Field(
-        description=(
-            "True when more turns match than this page holds — the same 'there is more' flag every "
-            + "list-shaped tool here reports. It is counted over the turns left after "
-            + "`from_seconds`, `to_seconds` and `speaker` were applied, so 'there is more' always "
-            + "means more of what was asked for rather than more of the meeting. Pass "
-            + "`next_offset` back as `offset` to continue. Never summarise a truncated transcript "
-            + "as the whole meeting."
-        )
-    )
     next_offset: int | None = Field(
         description=(
-            "The `offset` that reaches the next matching turns, or null when `truncated` is false. "
-            + "It indexes the turns the filters kept, so send the same `from_seconds`, "
-            + "`to_seconds` and `speaker` with it — changing one of them renumbers what it points "
-            + "at."
+            "The `offset` that reaches the next matching turns, or null when these are the last of "
+            + "them. A value here is what says more turns match than this page holds: pass it back "
+            + "as `offset` to continue, and never summarise a page with one set as the whole "
+            + "meeting. It counts the turns left after `from_seconds`, `to_seconds` and `speaker` "
+            + "were applied, so it indexes what was asked for rather than the meeting — send the "
+            + "same filters back with it, since changing one renumbers what it points at."
         )
     )
 
@@ -624,6 +631,7 @@ async def list_meeting_transcripts(
     started_after: date | datetime | None,
     started_before: date | datetime | None,
     limit: int,
+    include_scan_completeness: bool,
 ) -> MeetingTranscripts:
     """The transcripts of the meeting `handle` addresses, and what a caller should do about them.
 
@@ -638,6 +646,12 @@ async def list_meeting_transcripts(
 
     The bounds are whatever the caller passed — `OccurrenceWindow.of` is what makes them instants —
     and the same window then decides both which transcripts are kept and what an empty answer means.
+
+    `include_scan_completeness` decides only whether `scan_incomplete` is reported, never what is
+    read: it is the same two requests either way. Off by default because it answers a question
+    about one rare meeting shape, and a field that is null for all but that shape is a field a
+    model does not have to reason about — while `status` still reports a scan that stopped short
+    whenever it is the difference between "there is none" and "nobody looked".
     """
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -653,7 +667,7 @@ async def list_meeting_transcripts(
                 started_at=None,
                 ended_at=None,
                 transcripts=[],
-                truncated=False,
+                scan_incomplete=False if include_scan_completeness else None,
             )
         first_page = await client.me.online_meetings.by_online_meeting_id(
             meeting.id
@@ -665,7 +679,7 @@ async def list_meeting_transcripts(
     return MeetingTranscripts(
         status="available"
         if found
-        else _absence(scan_stopped_short=collected.truncated, settled=window.settled(meeting)),
+        else _absence(scan_stopped_short=collected.capped, settled=window.settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
         # `OnlineMeetingBase.meetingType` is a generated enum subclassing `str`, so the member is
@@ -674,7 +688,7 @@ async def list_meeting_transcripts(
         started_at=meeting.start_date_time,
         ended_at=meeting.end_date_time,
         transcripts=[_summary(meeting.id, transcript) for transcript in found],
-        truncated=collected.truncated,
+        scan_incomplete=collected.capped if include_scan_completeness else None,
     )
 
 
@@ -684,9 +698,11 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
     A scan that stopped short is checked first, and it is the whole of the second fix here: the
     walk having been cut means the artifacts it did not reach might hold the one asked for, so
     nothing about absence is known — and "not transcribed / retrying will not help" is exactly the
-    assertion that must not be made. Reported instead as `scan_incomplete`, alongside the
-    `truncated: true` that comes from the same value, so that "there is more" and "there is none"
-    can never both be said of one answer.
+    assertion that must not be made. Reported instead as `scan_incomplete`, so that "there is more"
+    and "there is none" can never both be said of one answer. This is the one place the scan's
+    completeness reaches a caller whether or not it was asked for: an empty answer is only worth
+    anything with it, whereas the same fact about a non-empty answer is the rare caveat behind
+    `include_scan_completeness`.
 
     It is also the one verdict here that offers a caller nothing to do, and its description says so
     in as many words: the window is applied after the artifacts are read, so no window sends the
@@ -751,8 +767,8 @@ async def newest_in_window[T: MeetingArtifact](
     """The `limit` newest artifacts of a meeting that fall inside `window`, newest first.
 
     Shared by both meeting listers, and the reason it is one function rather than four lines
-    written twice: the order, the bound and the meaning of `truncated` are the same promise about
-    two artifacts, and the two got it wrong the same way.
+    written twice: the order, the bound and what `capped` is worth are the same promise about two
+    artifacts, and the two got it wrong the same way.
 
     **Newest first is a property of what was read, not of the page Graph chose to answer with.**
     Graph documents no `$orderby` on either collection, so it answers in an order of its own; a
@@ -768,15 +784,17 @@ async def newest_in_window[T: MeetingArtifact](
     never read are in Graph's arbitrary order and can hold a newer one. Nothing in this function
     can close that gap — with no `$orderby`, the only way to know the newest is to read everything,
     and the cap exists because a collection with no documented ceiling must not turn one tool call
-    into an unbounded walk. So the gap is not hidden: it is what the second `truncated` cause
-    below means, and every description over these two listers is worded to the prefix rather than
-    to the collection.
+    into an unbounded walk. So the gap is not hidden: it is what `capped` means below, and every
+    description over these two listers is worded to the prefix rather than to the collection.
 
-    **`truncated` means "there is more", and both ways of there being more set it**: matching
-    artifacts older than the ones returned, and a collection larger than the scan cap. The second
-    is the case in which the order is only over the prefix, and the same case in which an empty
-    answer proves nothing — which is why the flag and the verdict are read from the same value; see
-    `_absence` in each lister.
+    **`capped` means the scan stopped at the cap, and nothing else.** It used to mean that *or*
+    "the window held more than `limit`", which is two facts with opposite remedies — raise `limit`
+    for the second, nothing for the first — under one flag, so a caller told "there is more" could
+    not tell whether the first entry was the meeting's latest and had to be warned that it might not
+    be even in the ordinary case. The ordinary case is what the returned count already says (a full
+    `limit` may have more behind it), so it is dropped here rather than merged in, and what comes
+    back is the cap alone: the one thing a caller cannot see and the one with no remedy. Each
+    lister's `_absence` reads it for the same reason, an absence over a prefix being no absence.
     """
     collected = await collect_pages(
         first_page,
@@ -786,9 +804,7 @@ async def newest_in_window[T: MeetingArtifact](
         max_scanned=MAX_ARTIFACT_SCAN,
     )
     newest = sorted(collected.items, key=_began_at, reverse=True)
-    return CollectedItems(
-        items=newest[:limit], truncated=collected.truncated or len(newest) > limit
-    )
+    return CollectedItems(items=newest[:limit], capped=collected.capped)
 
 
 def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
@@ -820,11 +836,11 @@ async def read_transcript(
     than looping. The filters are the same bargain: the whole transcript is fetched and parsed
     whatever they are, so they make the answer smaller and never the call cheaper.
 
-    They are applied *before* the page is cut, and `truncated`/`next_offset` are counted over what
-    they left. That is the only version of "there is more" a caller can act on: paging the whole
-    transcript while filtering each page would make the flag mean "more of the meeting" while the
-    turns meant "the ones you asked for", and a caller following `next_offset` to the end would
-    walk pages that hold nothing.
+    They are applied *before* the page is cut, and `next_offset` is counted over what they left.
+    That is the only version of "there is more" a caller can act on: paging the whole transcript
+    while filtering each page would make the offset mean "more of the meeting" while the turns
+    meant "the ones you asked for", and a caller following `next_offset` to the end would walk
+    pages that hold nothing.
     """
     assert 1 <= limit <= MAX_TURNS, f"limit must be within 1..{MAX_TURNS}, got {limit}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
@@ -843,15 +859,14 @@ async def read_transcript(
         speaker=speaker,
     )
     page = turns[offset : offset + limit]
-    truncated = offset + len(page) < len(turns)
+    more_to_come = offset + len(page) < len(turns)
     return Transcript(
         uri=handle.uri,
         meeting_id=handle.meeting_id,
         transcript_id=handle.transcript_id,
         speaker_attribution=attributed,
         turns=page,
-        truncated=truncated,
-        next_offset=offset + len(page) if truncated else None,
+        next_offset=offset + len(page) if more_to_come else None,
     )
 
 

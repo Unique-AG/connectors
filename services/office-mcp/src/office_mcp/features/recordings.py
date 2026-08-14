@@ -34,9 +34,9 @@ request was made under, so an administrator is sent after the permission that wa
 
 What is shared is shared for real rather than copied: the meeting handle, the join-URL resolve, the
 occurrence window and the windowed newest-first walk (`newest_in_window`, which is also where both
-listers' `truncated` and their "the scan stopped short, so nothing about absence is known" verdict
-come from) all live in `transcripts`, which owns that handle family (layering rule 9), and this
-module imports them. The bridge between the two answers is `content_correlation_id`,
+listers' `scan_incomplete` and their "the scan stopped short, so nothing about absence is known"
+verdict come from) all live in `transcripts`, which owns that handle family (layering rule 9), and
+this module imports them. The bridge between the two answers is `content_correlation_id`,
 Microsoft's own "unique identifier that links the transcript with its corresponding recording" —
 present on both artifacts, so a model holding one list can pair it with the other.
 
@@ -209,8 +209,7 @@ class MeetingRecordings(BaseModel):
             + "by Microsoft while answering, so changing `started_after`/`started_before` — "
             + "narrower, wider, anything — reads the same recordings and returns this same status. "
             + "Stop, and report that whether that occurrence was recorded could not be determined. "
-            + "Never report this as 'the call was not recorded', and do not ask again. `truncated` "
-            + "is true for the same reason.\n"
+            + "Never report this as 'the call was not recorded', and do not ask again.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Not an error and not proof the meeting is gone; a meeting created outside a "
             + "calendar, or one this user was never invited to, answers the same way. Do not retry "
@@ -256,27 +255,26 @@ class MeetingRecordings(BaseModel):
             + "recording of the window outright, which for a recurring series is how to reach the "
             + "most recent occurrence. Past that cap the first entry is the latest of what was "
             + "READ: Microsoft returns this collection in an order of its own and offers no way to "
-            + "ask for the newest, so a newer recording can sit among the ones never read. "
-            + "`truncated` is true whenever that happened. Empty for every status other than "
-            + "`available`."
+            + "ask for the newest, so a newer recording can sit among the ones never read; set "
+            + "`include_scan_completeness` when the answer turns on that. As many entries as "
+            + "`limit` means the window may hold older ones too — raise `limit`, up to "
+            + f"{MAX_RECORDINGS} — and fewer than `limit` means these are the whole window. There "
+            + "is no cursor. Empty for every status other than `available`."
         )
     )
-    truncated: bool = Field(
+    scan_incomplete: bool | None = Field(
         description=(
-            "True when there is more — the same 'there is more' flag every list-shaped tool here "
-            + "reports. Two things set it, and they differ in what you may conclude:\n"
-            + "- The window holds more recordings than this `limit`. The ones here are still the "
-            + f"newest of the window; raise `limit`, up to {MAX_RECORDINGS}.\n"
-            + "- The meeting has more recordings in total than one call reads "
-            + f"({MAX_ARTIFACT_SCAN}). Then `recordings` is ordered over the ones read and not "
-            + "over the meeting, so the first entry may not be the meeting's latest, and no "
-            + "argument to this tool reads further — the window is applied after the read, so "
-            + "narrowing it changes nothing.\n"
-            + "Which of the two happened is not always visible, so do not call the first entry the "
-            + "meeting's most recent recording while this is true unless you say it is the most "
-            + "recent of what was read. Fewer entries than you asked for with this true is always "
-            + "the second case. There is no cursor. When this is true and nothing came back, "
-            + "`status` is `scan_incomplete` and no absence is claimed."
+            "Whether the read stopped at the cap on how many of this meeting's recordings one call "
+            + f"looks through ({MAX_ARTIFACT_SCAN}), or null when `include_scan_completeness` was "
+            + "not set — which is the default, because it only matters for a meeting with more "
+            + "recordings than that.\n"
+            + "True means `recordings` is ordered over the ones READ and not over the meeting, so "
+            + "the first entry may not be the meeting's latest and nothing here reads further: no "
+            + "argument to this tool changes it, the window being applied after the read. False "
+            + "means the whole collection was read, so the order and any absence within it are "
+            + "exact. This says nothing about `limit` — that the window held more than you asked "
+            + "for is what a full `recordings` list means. You never need this to tell whether an "
+            + "empty answer is trustworthy: `status` is `scan_incomplete` in exactly that case."
         )
     )
 
@@ -288,6 +286,7 @@ async def list_meeting_recordings(
     started_after: date | datetime | None,
     started_before: date | datetime | None,
     limit: int,
+    include_scan_completeness: bool,
 ) -> MeetingRecordings:
     """The recordings of the meeting `handle` addresses, and what a caller should do about them.
 
@@ -303,6 +302,11 @@ async def list_meeting_recordings(
     failing. The same window then decides both which recordings are kept and what an empty answer
     means, exactly as it does for transcripts — and, exactly as there, it is no route further into
     a collection the scan cap cut short, because it is applied to what came back.
+
+    `include_scan_completeness` decides only whether `scan_incomplete` is reported and never what is
+    read, on the same reasoning as the transcript lister: it answers about one rare meeting shape,
+    while `status` reports a scan that stopped short whenever it is the difference between "nobody
+    recorded it" and "nobody looked".
     """
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -318,7 +322,7 @@ async def list_meeting_recordings(
                 started_at=None,
                 ended_at=None,
                 recordings=[],
-                truncated=False,
+                scan_incomplete=False if include_scan_completeness else None,
             )
         first_page = await client.me.online_meetings.by_online_meeting_id(
             meeting.id
@@ -333,14 +337,14 @@ async def list_meeting_recordings(
     return MeetingRecordings(
         status="available"
         if found
-        else _absence(scan_stopped_short=collected.truncated, settled=window.settled(meeting)),
+        else _absence(scan_stopped_short=collected.capped, settled=window.settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
         meeting_type=meeting.meeting_type,
         started_at=meeting.start_date_time,
         ended_at=meeting.end_date_time,
         recordings=[_summary(recording, caller) for recording in found],
-        truncated=collected.truncated,
+        scan_incomplete=collected.capped if include_scan_completeness else None,
     )
 
 

@@ -36,13 +36,13 @@ request per second per app per tenant … on a given channel"
 (https://learn.microsoft.com/en-us/graph/throttling-limits) and that budget is per *app*, so
 walking every channel of a team degrades every other user in the tenant, and following
 `@odata.nextLink` down one channel spends the tenant's whole budget for that channel on one
-caller. `browse_channel` therefore issues exactly one request: `$top` is the window, the single
-page Graph answers with is the answer, and `truncated` says when there was more. A caller who
-needs a wider window raises `limit`; searching across channels is `message_search`'s job.
+caller. `browse_channel` therefore issues exactly one request: `$top` is the window and the single
+page Graph answers with is the answer, which is why the answer is described as a window rather than
+flagged as a partial one. A caller who needs a wider window raises `limit`; searching across
+channels is `message_search`'s job.
 """
 
 from datetime import UTC, datetime
-from typing import cast
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.channel import Channel
@@ -79,16 +79,19 @@ MAX_POSTS = 50
 
 # How many of a post's replies are returned. `$expand=replies` brings back up to 200 replies per
 # post, and 50 posts of 200 replies is a response no caller has a budget for — so the newest of
-# each thread are kept and `truncated` says when a thread had more.
+# each thread are kept, and a thread that came back full to this window is one that may have older
+# replies, exactly as a full page is elsewhere here.
 #
 # This window is the end of the line rather than a first page. Graph puts its own cursor on a post
 # whose expanded replies were themselves paged, and following it is a request per post against a
 # channel that allows the whole app one a second — the same reason the channel's own pages are not
-# walked. So a reply older than this window has no route to its full text here: `message_search`
-# can find it and report Microsoft's snippet, but Graph addresses a reply under the post it answers
-# and the search index does not name that post, so such a hit cannot be read. Browsing again
-# returns the same newest replies, which is why every surface that mentions this says so rather
-# than sending a caller back round.
+# walked. That cursor needs no separate reporting: Graph expands up to 200 replies before it pages
+# them, so a thread it paged has far more than this window holds and the window comes back full. So
+# a reply older than this window has no route to its full text here: `message_search` can find it
+# and report Microsoft's snippet, but Graph addresses a reply under the post it answers and the
+# search index does not name that post, so such a hit cannot be read. Browsing again returns the
+# same newest replies, which is why every surface that mentions this says so rather than sending a
+# caller back round.
 MAX_REPLIES_PER_POST = 10
 
 # What a channel listing asks for, which is everything Graph populates that identifies a channel.
@@ -96,10 +99,6 @@ MAX_REPLIES_PER_POST = 10
 # documents `layoutType` as coming back null on this collection and archived channels are a Teams
 # preview concept, so neither is claimed here.
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
-
-# The cursor Graph puts on a post whose expanded replies are themselves only a page. The SDK has no
-# field for it, so it arrives in `additional_data`.
-_REPLIES_NEXT_LINK = "replies@odata.nextLink"
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
@@ -132,14 +131,14 @@ class TeamSummary(BaseModel):
 
 
 class TeamList(BaseModel):
-    teams: list[TeamSummary] = Field(description="The teams the signed-in user is a member of.")
-    truncated: bool = Field(
+    teams: list[TeamSummary] = Field(
         description=(
-            "True when the user is in more teams than this `limit` holds — the same 'there is "
-            + "more' flag every list-shaped tool here reports. There is no cursor: raise `limit` "
-            + f"(up to {MAX_LISTED}) to widen the window. Microsoft Graph applies no order to this "
-            + "collection, so the teams beyond the window are an arbitrary rest rather than the "
-            + "least important ones."
+            "The teams the signed-in user is a member of. As many as `limit` means there may be "
+            + "more; fewer than `limit` is all of them, because the walk follows Microsoft's "
+            + "paging to the end of the collection. There is no cursor: raise `limit` (up to "
+            + f"{MAX_LISTED}) to widen the window. Microsoft Graph applies no order here, so the "
+            + "teams beyond a full window are an arbitrary rest rather than the least important "
+            + "ones."
         )
     )
 
@@ -176,13 +175,11 @@ class ChannelSummary(BaseModel):
 
 class ChannelList(BaseModel):
     channels: list[ChannelSummary] = Field(
-        description="The channels of this team that the signed-in user can see."
-    )
-    truncated: bool = Field(
         description=(
-            "True when the team has more channels than this `limit` holds — the same 'there is "
-            + "more' flag every list-shaped tool here reports. There is no cursor: raise `limit` "
-            + f"(up to {MAX_LISTED}). Microsoft Graph applies no order to this collection either."
+            "The channels of this team that the signed-in user can see. As many as `limit` means "
+            + "there may be more; fewer than `limit` is all of them the user can see. There is no "
+            + f"cursor: raise `limit` (up to {MAX_LISTED}). Microsoft Graph applies no order to "
+            + "this collection either."
         )
     )
 
@@ -193,21 +190,18 @@ class ChannelPosts(BaseModel):
             "The channel's posts and their replies, in thread order: each root post is followed by "
             + "the replies to it, oldest first, and a reply carries the post it answers in "
             + "`reply_to_id`. Every message is complete — the same shape and the same normalised "
-            + "text read_message answers with — so nothing here needs a second read."
-        )
-    )
-    truncated: bool = Field(
-        description=(
-            "True when this page is not everything — the same 'there is more' flag every "
-            + "list-shaped tool here reports. It covers both ways this answer can be short: the "
-            + f"channel has more posts than `limit` (raise it, up to {MAX_POSTS}), or a thread had "
-            + f"more than {MAX_REPLIES_PER_POST} replies and only its newest are here. There is no "
-            + "cursor, and paging deeper is not a way to reach older posts: Microsoft orders this "
-            + "collection by reply-chain activity rather than by date, so use search_messages with "
-            + "`sent_before` to reach back in time. The older replies of a thread are a dead end "
-            + "rather than a next page — browsing again returns the same newest ones, and a search "
-            + "can find such a reply but cannot read its text — so report what is here and say the "
-            + "rest of the thread could not be retrieved."
+            + "text read_message answers with — so nothing here needs a second read.\n"
+            + "This is one window on the channel and never the whole of it, whatever comes back. "
+            + f"Up to `limit` posts are returned (raise it, up to {MAX_POSTS}) and up to "
+            + f"{MAX_REPLIES_PER_POST} of the newest replies per post, so a post carrying that "
+            + "many replies may have older ones — and those are a dead end rather than a next "
+            + "page, because browsing again returns the same newest ones. FEWER posts than "
+            + "`limit` is NOT evidence that the channel holds no more: Microsoft counts system "
+            + "messages into the page it answers with and they are dropped from this list, and "
+            + "the same is true of a thread's replies. There is no cursor and paging deeper is "
+            + "not a route to older posts: Microsoft orders this collection by reply-chain "
+            + "activity rather than by date, so reaching back in time is search_messages with "
+            + "`sent_before`."
         )
     )
 
@@ -226,7 +220,7 @@ async def list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
         assert first_page is not None, "Graph answered GET /me/joinedTeams with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
 
-    return TeamList(teams=[_team(team) for team in collected.items], truncated=collected.truncated)
+    return TeamList(teams=[_team(team) for team in collected.items])
 
 
 def _team(team: Team) -> TeamSummary:
@@ -255,10 +249,7 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
         assert first_page is not None, "Graph answered a channel listing with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
 
-    return ChannelList(
-        channels=[_channel(channel) for channel in collected.items],
-        truncated=collected.truncated,
-    )
+    return ChannelList(channels=[_channel(channel) for channel in collected.items])
 
 
 def _channel(channel: Channel) -> ChannelSummary:
@@ -288,8 +279,10 @@ async def browse_channel(
 
     The system messages — somebody joining, a call ending, a channel being renamed — are dropped,
     and Graph offers no `$filter` to drop them at the source, so they are filtered out of the page
-    Graph counted them into: a page can hold fewer posts than `limit`, and `truncated` reports that
-    alongside a page Graph itself said was not the last.
+    Graph counted them into: a page can hold fewer posts than `limit` without the channel having
+    run out of them. There is no flag saying so, because there is nothing a caller would do
+    differently — this call is one window either way and `ChannelPosts.messages` says so — and a
+    flag whose two causes have no remedy between them is a caveat, not a signal.
     """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
@@ -309,18 +302,13 @@ async def browse_channel(
     # `$top` is `limit`, so Graph returning more posts than were asked for should not happen — but
     # the window is this tool's promise rather than Graph's, so it is applied rather than trusted.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
-    kept = posts[:limit]
-    more_posts = len(kept) < len(posts) or bool(page.odata_next_link)
 
     messages: list[TeamsMessage] = []
-    threads_cut = False
-    for post in kept:
+    for post in posts[:limit]:
         assert post.id is not None, "Graph returned a channel message with no id"
         messages.append(
             message_of(post, handle=MessageHandle(post.id, team_id=team_id, channel_id=channel_id))
         )
-        replies, cut = _replies(post)
-        threads_cut = threads_cut or cut
         messages.extend(
             message_of(
                 reply,
@@ -328,10 +316,10 @@ async def browse_channel(
                     _reply_id(reply), team_id=team_id, channel_id=channel_id, reply_to_id=post.id
                 ),
             )
-            for reply in replies
+            for reply in _replies(post)
         )
 
-    return ChannelPosts(messages=messages, truncated=more_posts or threads_cut)
+    return ChannelPosts(messages=messages)
 
 
 def _is_a_post(message: ChatMessage) -> bool:
@@ -339,16 +327,20 @@ def _is_a_post(message: ChatMessage) -> bool:
     return event_of(message) is None
 
 
-def _replies(post: ChatMessage) -> tuple[list[ChatMessage], bool]:
-    """The replies to `post`, oldest first, and whether older ones were left behind.
+def _replies(post: ChatMessage) -> list[ChatMessage]:
+    """The newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
 
     Sorted here because Graph publishes no order for replies — the reply collection documents
     `$top` and nothing else — so the order they arrive in is not a contract to preserve. The newest
     are the ones kept: a thread's recent turns are what a question about it is usually about.
+
+    Whether older ones were left behind is not reported, because a full window says it: Graph
+    expands up to 200 replies per post, so a thread it paged had more than 200 of them and the
+    window returned is full either way. That leaves the same reading as everywhere else here — this
+    many replies means there may be more, fewer means that was the thread.
     """
     replies = sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
-    kept = replies[-MAX_REPLIES_PER_POST:]
-    return kept, len(kept) < len(replies) or _has_more_replies(post)
+    return replies[-MAX_REPLIES_PER_POST:]
 
 
 def _sent_at(message: ChatMessage) -> datetime:
@@ -359,9 +351,3 @@ def _sent_at(message: ChatMessage) -> datetime:
 def _reply_id(reply: ChatMessage) -> str:
     assert reply.id is not None, "Graph returned a channel reply with no id"
     return reply.id
-
-
-def _has_more_replies(post: ChatMessage) -> bool:
-    """Whether Graph said this post's expanded replies were only the first page of them."""
-    extra = cast("dict[str, object]", post.additional_data)
-    return _REPLIES_NEXT_LINK in extra

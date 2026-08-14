@@ -16,9 +16,13 @@ model reads this surface as one thing:
   the shell idiom made the odd tool out of the very tool a model calls first, and renaming a tool
   is a breaking change best spent before there are more of them. (Microsoft's own M365 connector
   arrived at `get_me` independently, which is one less name for a model to have to learn twice.)
-* **One word for "there is more".** Every tool that answers with a list reports `truncated`, and
-  says in its own description how to get the rest — a wider `limit` where there is no cursor, the
-  `next_offset` where there is. Two words for one idea is how a model comes to guess.
+* **No tool reports "there is more" as a field.** Every list-shaped answer here is a window, and
+  what a window holds says whether it might have more behind it: as many items as `limit` may, fewer
+  than `limit` is all there was. Where paging exists it is a `next_offset` that is null on the last
+  page, which says the same thing and says where to continue. This replaced a `truncated` on eight
+  tools, which clients did not want and which had come to carry two facts with opposite remedies on
+  the two meeting listers — so the remedy-less half of it is what survives, as the opt-in
+  `include_scan_completeness` there and nowhere else.
 * **A description teaches the traps, and the neighbours.** Each one says what it answers, when to
   reach for it rather than for another tool here, and what its answer does *not* mean.
 
@@ -222,9 +226,12 @@ total, so `members_may_be_incomplete` says when a list came back full to that ca
 be missing from it, and Graph will not say whether they are. Set `include_member_emails` when \
 two members share a display name.
 
-There is no pagination. `limit` is a window on the most recent chats and `truncated` says whether \
-the user has more than fit in it — widen `limit` (up to {chats.MAX_CHATS}, Graph's own maximum \
-for this collection) rather than looking for a cursor. The signed-in user's own notes-to-self \
+There is no pagination and no cursor. `limit` is a window on the most recent chats: getting that \
+many back means the user may have more, and getting fewer back means those are all of their \
+chats — this walks Microsoft's paging to the end of the collection rather than trusting a short \
+page. Widen \
+`limit` (up to {chats.MAX_CHATS}, Graph's own maximum for this collection) to see further back. \
+The signed-in user's own notes-to-self \
 chat is usually the oneOnOne chat whose only member is them (call get_me to know who that is; a \
 member is matched by display name or, with `include_member_emails`, by email — this list carries \
 no user ids).\
@@ -246,9 +253,9 @@ shared channel the user belongs to are not listed — Microsoft returns only tea
 member of.
 
 There is no pagination and no ordering: Microsoft Graph accepts no page size on this collection, \
-and applies no order to it, so `limit` is a window over whatever order it answered in and \
-`truncated` says the user is in more teams than fit. Widen `limit` (up to {channels.MAX_LISTED}) \
-rather than looking for a cursor.\
+and applies no order to it, so `limit` is a window over whatever order it answered in. As many \
+teams as `limit` means the user may be in more; fewer than `limit` is all of them. Widen `limit` \
+(up to {channels.MAX_LISTED}) rather than looking for a cursor.\
 """
 
 _LIST_CHANNELS = f"""\
@@ -265,8 +272,8 @@ channels they are not a member of, so an absent channel is not evidence that the
 channel. `membership_type` says which kind each one is — `standard`, `private` or `shared`.
 
 There is no pagination and no ordering, for the same reason as list_teams: Microsoft accepts no \
-page size on this collection either. `truncated` says the team has more channels than this `limit` \
-holds; widen it (up to {channels.MAX_LISTED}).\
+page size on this collection either. As many channels as `limit` means the team may have more; \
+fewer than `limit` is all of them this user can see. Widen `limit` (up to {channels.MAX_LISTED}).\
 """
 
 _BROWSE_CHANNEL = f"""\
@@ -293,12 +300,18 @@ report the top of the list as "the latest news in the channel".
 It cannot be date-filtered, and this is Microsoft's limit rather than a missing parameter: this \
 collection accepts no filter and no sort at all. To bound by date use search_messages with \
 `sent_after`/`sent_before`, which the search index applies and which covers channels. For the same \
-reason, paging deeper is not a way to reach older posts — there is no cursor, and `truncated` is \
-answered by a wider `limit` (up to {channels.MAX_POSTS}, Microsoft's own maximum) or by searching.
+reason, paging deeper is not a way to reach older posts — there is no cursor, and a wider `limit` \
+(up to {channels.MAX_POSTS}, Microsoft's own maximum) or a search is the only way to see more.
+
+**Never report this as the whole of a channel, however few posts come back.** There is no "there \
+is more" flag because there is nothing else this tool can be: it reads one page and stops. A page \
+holding fewer than `limit` posts is not evidence that the channel has no more — Microsoft counts \
+the system messages into that page before they are dropped here — and the older posts of a busy \
+channel are reached by searching, not by asking again.
 
 Replies come with their posts: up to {channels.MAX_REPLIES_PER_POST} of the newest per post, \
-oldest first, each carrying the post it answers in `reply_to_id`. `truncated` is also set when a \
-thread had more replies than that, and those older replies are out of reach rather than one call \
+oldest first, each carrying the post it answers in `reply_to_id`. A post carrying that many \
+replies may have older ones, and those are out of reach rather than one call \
 away — Microsoft's cursor into a thread is a request per post against the same one-a-second \
 budget, so it is not followed and browsing again returns the same newest replies. Every message is \
 complete — the same fields, and the same plain text normalised out of Teams' HTML, that \
@@ -330,11 +343,12 @@ mentions. Never present `summary` as the whole message, and never conclude from 
 message does not say more.
 
 There is no result total, and this is not an omission: Microsoft Graph reports a per-page count \
-rather than a match count for Teams messages, so a total would be a fabrication. `truncated` says \
-there is more — as it does on every list-shaped tool here — and here the way to get it is to pass \
-`next_offset` back as `offset`. A page can hold fewer than `size` messages: offsets index Graph's \
-own results, and system messages ("Ada joined the chat") are dropped from ours because Graph gives \
-them neither an author nor any text.
+rather than a match count for Teams messages, so a total would be a fabrication. `next_offset` is \
+the whole of the paging contract and the whole completeness signal: a value there means the index \
+holds more matches, and null means this page is the last. Pass it back as `offset` to continue. A \
+page can hold fewer than `size` messages: offsets index Graph's own results, and system messages \
+("Ada joined the chat") are dropped from ours because Graph gives them neither an author nor any \
+text.
 
 The search covers every chat and channel the user belongs to and cannot be narrowed to one of \
 them — Microsoft's index offers no such scope, so there is no chat or channel parameter and a \
@@ -457,8 +471,8 @@ from a local time.
 
 **Read `status` before anything else. It has five values and they mean five different actions:**
 - `available` — transcripts are listed, newest first; read one with read_transcript. "Newest" is \
-over the transcripts this call read, which is every transcript the meeting has unless `truncated` \
-says the read stopped at the cap below.
+over the transcripts this call read, which is every transcript the meeting has unless the meeting \
+holds more of them than the cap below — set `include_scan_completeness` if the answer turns on that.
 - `not_ready` — nothing has landed for the window you asked about and something still might: that \
 window has only just closed, or you asked for no window and the meeting has not ended or ended \
 recently. Wait and call again later. This is NOT "there is no transcript", and reporting it as one \
@@ -524,18 +538,18 @@ read an empty answer next to this flag before reporting that the person never sp
 filter to see the turns themselves.
 
 `from_seconds`/`to_seconds` and `speaker` narrow what comes back, and everything else is counted \
-over what they left: `truncated` and `next_offset` page through the MATCHING turns rather than \
-through the meeting. The time bounds are inclusive and match by overlap, so a turn already under \
+over what they left: `next_offset` pages through the MATCHING turns rather than through the \
+meeting. The time bounds are inclusive and match by overlap, so a turn already under \
 way at `from_seconds` is kept whole instead of being cut at it; `speaker` matches any part of the \
 name Teams shows, ignoring case, because a display name is not something to spell from memory. \
 Filtering does not make the call cheaper — the whole transcript is fetched and parsed either \
 way — it makes the answer smaller.
 
-A long meeting is more turns than fit in one answer. `truncated` says there are more and \
-`next_offset` is where to continue — the same convention every list-shaped tool here uses. Each \
-call re-fetches the whole transcript from Microsoft, so a wider `limit` (up to \
-{transcripts.MAX_TURNS}) costs less than paging through it, and a truncated page must never be \
-summarised as the whole meeting.\
+A long meeting is more turns than fit in one answer. `next_offset` says both that there are more \
+and where to continue: it is null on the last page and set on every other, which is the same \
+convention search_messages pages by. Each call re-fetches the whole transcript from Microsoft, so \
+a wider `limit` (up to {transcripts.MAX_TURNS}) costs less than paging through it, and a page with \
+`next_offset` set must never be summarised as the whole meeting.\
 """
 
 _LIST_MEETING_RECORDINGS = f"""\
@@ -569,8 +583,8 @@ already said `not_transcribed` and the remaining question is whether anything wa
 
 **Read `status` before anything else. It has five values and they mean five different actions:**
 - `available` — recordings are listed, newest first, with durations and access. "Newest" is over \
-the recordings this call read, which is every recording the meeting has unless `truncated` says \
-the read stopped at the cap below.
+the recordings this call read, which is every recording the meeting has unless the meeting holds \
+more of them than the cap below — set `include_scan_completeness` if the answer turns on that.
 - `not_ready` — nothing has landed for the window you asked about and something still might: that \
 window has only just closed, or you asked for no window and the meeting has not ended or ended \
 recently. Wait and call again later. This is NOT "the call was not recorded", and reporting it as \
@@ -1086,11 +1100,27 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "meeting has one transcript per occurrence that was transcribed. Past the "
                     + "cap the read stops mid-collection, in whatever order Microsoft answered in "
                     + "(it offers no way to ask for the newest), so a newer transcript can be one "
-                    + "that was never read — `truncated` is true whenever either bound was "
-                    + "reached, and raising `limit` does not read further."
+                    + "that was never read — `include_scan_completeness` is how to find out, and "
+                    + "raising `limit` does not read further. Getting `limit` transcripts back "
+                    + "means the window may hold older ones; getting fewer means it does not."
                 ),
             ),
         ] = 20,
+        include_scan_completeness: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Report whether the read reached the end of this meeting's transcripts, as "
+                    + "`scan_incomplete` in the answer. Off by default, and worth setting for one "
+                    + "question: whether the first transcript listed is the meeting's own latest. "
+                    + "It is, for every meeting with no more transcripts than one call reads "
+                    + f"({transcripts.MAX_ARTIFACT_SCAN}) — which is every meeting bar a series "
+                    + "recorded daily for most of a year — and past that the order is over the "
+                    + "ones read. You do not need it to trust an empty answer: `status` already "
+                    + "reports `scan_incomplete` when nothing was found and the read stopped short."
+                )
+            ),
+        ] = False,
         graph_token: str = _TRANSCRIPT_LIST_TOKEN,
     ) -> transcripts.MeetingTranscripts:
         handle = transcripts.meeting_handle(meeting_uri)
@@ -1103,6 +1133,7 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 started_after=started_after,
                 started_before=started_before,
                 limit=limit,
+                include_scan_completeness=include_scan_completeness,
             )
 
     @mcp.tool(
@@ -1281,11 +1312,28 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "one recording per occurrence that was recorded, two if somebody stopped and "
                     + "restarted. Past the cap the read stops mid-collection, in whatever order "
                     + "Microsoft answered in (it offers no way to ask for the newest), so a newer "
-                    + "recording can be one that was never read — `truncated` is true whenever "
-                    + "either bound was reached, and raising `limit` does not read further."
+                    + "recording can be one that was never read — `include_scan_completeness` is "
+                    + "how to find out, and raising `limit` does not read further. Getting `limit` "
+                    + "recordings back means the window may hold older ones; fewer means it does "
+                    + "not."
                 ),
             ),
         ] = 20,
+        include_scan_completeness: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Report whether the read reached the end of this meeting's recordings, as "
+                    + "`scan_incomplete` in the answer. Off by default, and worth setting for one "
+                    + "question: whether the first recording listed is the meeting's own latest. "
+                    + "It is, for every meeting with no more recordings than one call reads "
+                    + f"({transcripts.MAX_ARTIFACT_SCAN}) — which is every meeting bar a series "
+                    + "recorded daily for most of a year — and past that the order is over the "
+                    + "ones read. You do not need it to trust an empty answer: `status` already "
+                    + "reports `scan_incomplete` when nothing was found and the read stopped short."
+                )
+            ),
+        ] = False,
         graph_token: str = _RECORDING_LIST_TOKEN,
     ) -> recordings.MeetingRecordings:
         handle = transcripts.meeting_handle(meeting_uri)
@@ -1298,6 +1346,7 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 started_after=started_after,
                 started_before=started_before,
                 limit=limit,
+                include_scan_completeness=include_scan_completeness,
             )
 
 
