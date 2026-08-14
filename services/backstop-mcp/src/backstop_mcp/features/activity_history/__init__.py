@@ -67,7 +67,9 @@ from backstop_mcp.features.activity_history.responses import (
     ActivityRecordResponse,
     EmailRecordResponse,
     GetActivityHistoryResponse,
+    ResolvedPartyAsOfResponse,
     TimelineRecord,
+    resolved_party_as_of_response,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
@@ -92,6 +94,7 @@ __all__ = [
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
     "Gist",
+    "ResolvedPartyAsOfResponse",
     "Segment",
     "TimelineRecord",
     "fetch_activity_detail",
@@ -101,6 +104,7 @@ __all__ = [
     "fetch_email_page",
     "group_page",
     "is_meeting_or_call",
+    "resolved_party_as_of_response",
     "to_activity_detail_response",
     "to_gist",
     "to_timeline_record",

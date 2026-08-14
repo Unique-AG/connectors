@@ -30,8 +30,18 @@ from backstop_mcp.features.activity_history.fetch_activities import (
 )
 from backstop_mcp.features.activity_history.gist_from_html import to_gist
 from backstop_mcp.features.activity_history.models import ActivityGroup
-from backstop_mcp.features.data_hygiene import AsOf, EmploymentLinkResponse
-from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, ResolvedPartyResponse
+from backstop_mcp.features.data_hygiene import (
+    AsOf,
+    ProvenanceFields,
+    as_of_response,
+    extract_as_of,
+)
+from backstop_mcp.features.party_resolver import (
+    PartyAmbiguousResponse,
+    ResolvedParty,
+    ResolvedPartyResponse,
+    party_response,
+)
 from backstop_mcp.features.resolution import NotFoundResponse
 
 logger = logging.getLogger(__name__)
@@ -41,7 +51,9 @@ __all__ = [
     "ActivityRecordResponse",
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
+    "ResolvedPartyAsOfResponse",
     "TimelineRecord",
+    "resolved_party_as_of_response",
     "to_timeline_record",
 ]
 
@@ -128,18 +140,31 @@ def to_timeline_record(item: ActivityItem | EmailItem, *, gist_max_chars: int) -
     )
 
 
-class ActivityHistoryResolvedResponse(BaseModel):
-    """`get_activity_history` once the party was resolved and its timeline fetched.
+class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
+    """Resolved party identity plus `as_of` provenance from the same record."""
 
-    `employments` lists current and former person↔organization links from side-loaded
-    `entityRelationships` on either a person or an organization party.
-    """
+    as_of: AsOf | None = None
+
+
+def resolved_party_as_of_response(
+    party: ResolvedParty,
+    attributes: ProvenanceFields,
+) -> ResolvedPartyAsOfResponse:
+    resolved = party_response(
+        party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
+    )
+    return ResolvedPartyAsOfResponse(
+        **resolved.model_dump(),
+        as_of=as_of_response(extract_as_of(attributes)),
+    )
+
+
+class ActivityHistoryResolvedResponse(BaseModel):
+    """`get_activity_history` once the party was resolved and its timeline fetched."""
 
     status: Literal["resolved"] = "resolved"
-    resolved: ResolvedPartyResponse
+    resolved: ResolvedPartyAsOfResponse
     groups: dict[ActivityType, ActivityGroup[TimelineRecord]]
-    as_of: AsOf | None = None
-    employments: list[EmploymentLinkResponse] = Field(default_factory=list)
 
 
 type GetActivityHistoryResponse = (

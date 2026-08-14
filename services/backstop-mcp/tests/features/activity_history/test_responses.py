@@ -16,10 +16,13 @@ from backstop_mcp.features.activity_history import (
     ActivityRecordResponse,
     EmailItem,
     EmailRecordResponse,
+    ResolvedPartyAsOfResponse,
+    resolved_party_as_of_response,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
-from backstop_mcp.features.party_resolver import ResolvedPartyResponse
+from backstop_mcp.features.data_hygiene import AsOf, ProvenanceFields
+from backstop_mcp.features.party_resolver import ResolvedParty
 
 _DEFAULT_ACTIVITY_DATE = date(2026, 1, 15)
 _DEFAULT_EMAIL_TIMESTAMP = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
@@ -162,10 +165,25 @@ class TestActivityHistoryResolvedResponse:
             next=None,
         )
         response = ActivityHistoryResolvedResponse(
-            resolved=ResolvedPartyResponse(id="1", search_type="people", name="Ada"),
+            resolved=ResolvedPartyAsOfResponse(id="1", search_type="people", name="Ada"),
             groups={"meeting": group},
         )
 
         assert response.groups["meeting"].items == (record,)
         assert not hasattr(response, "records")
         assert not hasattr(response, "next_cursor")
+        assert not hasattr(response, "employments")
+        assert not hasattr(response, "as_of")
+
+    def test_merges_party_identity_and_as_of(self) -> None:
+        resolved = resolved_party_as_of_response(
+            ResolvedParty(id="1", search_type="people", name="Ada"),
+            ProvenanceFields(modified_timestamp="2024-01-01", modified_by="alice"),
+        )
+
+        assert resolved == ResolvedPartyAsOfResponse(
+            id="1",
+            search_type="people",
+            name="Ada",
+            as_of=AsOf(modified_timestamp="2024-01-01", modified_by="alice"),
+        )
