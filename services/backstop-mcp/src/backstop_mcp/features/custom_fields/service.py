@@ -11,6 +11,8 @@ from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
 
+type CatalogResult = tuple[list[CustomFieldDefinition], Literal["ok", "stale"]]
+
 
 class CustomFieldsService:
     """Process-wide custom-field schema catalog.
@@ -24,6 +26,7 @@ class CustomFieldsService:
         self._definitions: list[CustomFieldDefinition] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._lock: asyncio.Lock = asyncio.Lock()
+        self._in_flight: asyncio.Future[CatalogResult] | None = None
 
     async def get(
         self, client: BackstopClient, *, refresh: bool = False
@@ -36,33 +39,60 @@ class CustomFieldsService:
             cached = self._definitions
             if cached is not None and self._freshness.within() and not refresh:
                 return list(cached), "ok"
-            try:
-                definitions = await fetch_custom_field_definitions(client)
-            except Exception:
-                if self._definitions is not None:
-                    logger.warning(
-                        "custom_fields.schema.refresh_failed_serving_stale",
-                        extra={
-                            "fetched_at": (
-                                self._freshness.marked_at.isoformat()
-                                if self._freshness.marked_at
-                                else None
-                            ),
-                        },
-                        exc_info=True,
-                    )
-                    CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "stale"})
-                    return list(self._definitions), "stale"
-                raise
+            if self._in_flight is not None:
+                in_flight = self._in_flight
+                owner = False
+            else:
+                in_flight = asyncio.get_running_loop().create_future()
+                self._in_flight = in_flight
+                owner = True
 
-            self._definitions = definitions
-            self._freshness.mark()
-            CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "backstop"})
-            logger.info(
-                "custom_fields.schema.refreshed",
-                extra={"definitions": len(definitions)},
-            )
-            return list(definitions), "ok"
+        if not owner:
+            definitions, status = await in_flight
+            return list(definitions), status
+
+        try:
+            return await self._fetch(client, in_flight)
+        finally:
+            async with self._lock:
+                if self._in_flight is in_flight:
+                    self._in_flight = None
+
+    async def _fetch(
+        self, client: BackstopClient, in_flight: asyncio.Future[CatalogResult]
+    ) -> CatalogResult:
+        try:
+            definitions = await fetch_custom_field_definitions(client)
+        except Exception as error:
+            if self._definitions is not None:
+                logger.warning(
+                    "custom_fields.schema.refresh_failed_serving_stale",
+                    extra={
+                        "fetched_at": (
+                            self._freshness.marked_at.isoformat()
+                            if self._freshness.marked_at
+                            else None
+                        ),
+                    },
+                    exc_info=True,
+                )
+                CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "stale"})
+                result: CatalogResult = (list(self._definitions), "stale")
+                in_flight.set_result(result)
+                return result
+            in_flight.set_exception(error)
+            raise
+
+        self._definitions = definitions
+        self._freshness.mark()
+        CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "backstop"})
+        logger.info(
+            "custom_fields.schema.refreshed",
+            extra={"definitions": len(definitions)},
+        )
+        result = (list(definitions), "ok")
+        in_flight.set_result(result)
+        return result
 
 
 def create_custom_fields_service(*, ttl_minutes: int) -> CustomFieldsService:
