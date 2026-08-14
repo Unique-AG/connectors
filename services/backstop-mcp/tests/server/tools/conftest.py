@@ -81,7 +81,7 @@ async def connect_user(
             ),
         )
         built.append(factory)
-        service = custom_fields_service(session_factory, base_url=base_url)
+        service = custom_fields_service()
         install_services(backstop=factory, custom_fields=service)
         return ConnectedUser(subject=subject, custom_fields=service, clients=factory)
 

@@ -4,15 +4,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.db import read_session, transaction
 from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
 from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
-from backstop_mcp.features.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
 from backstop_mcp.timed_gate import TimedGate
@@ -22,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _SubjectSchema:
-    """In-memory schema state for one `(base_url, subject)` cache entry."""
+    """In-memory schema state for one subject."""
 
     index: DefinitionIndex = field(default_factory=dict)
     freshness: TimedGate = field(default_factory=lambda: TimedGate(duration=timedelta(0)))
@@ -32,8 +28,8 @@ class _SubjectSchema:
 class CustomFieldsService:
     """Per-caller custom-field schema cache.
 
-    Definitions only ever come from a real Backstop fetch, persisted as a snapshot keyed by
-    `(base_url, subject)` so one caller's refresh cannot populate another's catalog.
+    Definitions only ever come from a real Backstop fetch, held in memory per subject so one
+    caller's refresh cannot populate another's catalog.
     Until a fetch succeeds this service serves nothing.
 
     Name → definition resolution (including elicitation) lives in `resolve.py`, mirroring
@@ -50,17 +46,7 @@ class CustomFieldsService:
     # forced refreshes, never the ordinary TTL-driven one.
     MIN_REFRESH_INTERVAL: ClassVar[timedelta] = timedelta(minutes=1)
 
-    def __init__(
-        self,
-        *,
-        session_factory: async_sessionmaker[AsyncSession],
-        base_url: str,
-        ttl: timedelta,
-    ) -> None:
-        self._session_factory: async_sessionmaker[AsyncSession] = session_factory
-        # Already normalised by `BackstopConfig.base_url` (`HttpUrlStr`), and it is half of the
-        # snapshot key, so re-trimming here would only hide a base URL that disagreed with it.
-        self._base_url: str = base_url
+    def __init__(self, *, ttl: timedelta) -> None:
         self._ttl: timedelta = ttl
         self._by_subject: dict[str, _SubjectSchema] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -117,23 +103,6 @@ class CustomFieldsService:
             return []
         return list(entry.index.get(entity, []))
 
-    async def load_cached(self, subject: str | None = None) -> None:
-        """Populate this subject's index from the persisted snapshot. Never contacts Backstop.
-
-        Safe for callers with no credential when `subject` is known (e.g. enriching a tool
-        listing for the active MCP user). Re-reads the row whenever the in-memory copy isn't
-        fresh; once fresh it's a pure memory read. No-ops when no subject is available —
-        never falls back to another caller's catalog.
-        """
-        resolved = self._resolve_subject(subject)
-        if resolved is None:
-            return
-        if self.is_fresh(resolved):
-            return
-        async with self._lock:
-            if not self.is_fresh(resolved):
-                await self._load_from_db_unlocked(resolved)
-
     async def ensure_fresh(self, client: BackstopClient, *, subject: str | None = None) -> None:
         """Bring this subject's schema within `ttl`, tolerating a failed refresh when a copy exists.
 
@@ -153,9 +122,6 @@ class CustomFieldsService:
         if self.is_fresh(resolved):
             return
         async with self._lock:
-            if self.is_fresh(resolved):
-                return
-            await self._load_from_db_unlocked(resolved)
             if self.is_fresh(resolved):
                 return
             if self._entry(resolved).refresh_floor.within():
@@ -214,18 +180,6 @@ class CustomFieldsService:
     def _all_definitions(self, entry: _SubjectSchema) -> list[CustomFieldDefinition]:
         return [definition for group in entry.index.values() for definition in group]
 
-    async def _load_from_db_unlocked(self, subject: str) -> None:
-        async with read_session(self._session_factory) as session:
-            snapshot = await load_snapshot(session, self._base_url, subject)
-        if snapshot is None:
-            # Keep whatever is already in memory: an absent or unreadable row is not evidence
-            # that this subject's own definitions are wrong.
-            return
-        entry = self._entry(subject)
-        entry.index = build_index(snapshot.definitions)
-        entry.freshness.mark(snapshot.fetched_at)
-        CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "snapshot"})
-
     async def _refresh_unlocked(
         self, client: BackstopClient, subject: str
     ) -> list[CustomFieldDefinition]:
@@ -235,8 +189,6 @@ class CustomFieldsService:
         entry.refresh_floor.mark()
         definitions = await fetch_custom_field_definitions(client)
         fetched_at = datetime.now(UTC)
-        async with transaction(self._session_factory) as session:
-            await save_snapshot(session, self._base_url, subject, definitions, fetched_at)
         entry.index = build_index(definitions)
         entry.freshness.mark(fetched_at)
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "backstop"})
@@ -247,14 +199,5 @@ class CustomFieldsService:
         return definitions
 
 
-def create_custom_fields_service(
-    *,
-    session_factory: async_sessionmaker[AsyncSession],
-    base_url: str,
-    ttl_minutes: int,
-) -> CustomFieldsService:
-    return CustomFieldsService(
-        session_factory=session_factory,
-        base_url=base_url,
-        ttl=timedelta(minutes=ttl_minutes),
-    )
+def create_custom_fields_service(*, ttl_minutes: int) -> CustomFieldsService:
+    return CustomFieldsService(ttl=timedelta(minutes=ttl_minutes))

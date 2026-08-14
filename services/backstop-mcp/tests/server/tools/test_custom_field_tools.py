@@ -16,12 +16,7 @@ type ConnectUser = Callable[..., object]
 
 
 def tenant(name: str) -> str:
-    """A distinct Backstop base URL per test.
-
-    Schema snapshots are keyed by base URL and the test Postgres persists for the whole
-    session, so sharing one URL would let an earlier test's snapshot satisfy a later test's
-    `ensure_fresh` and skip the fetch under test.
-    """
+    """A distinct Backstop base URL per test so mocked routes cannot leak across cases."""
     return f"{BASE_URL}/{name}"
 
 

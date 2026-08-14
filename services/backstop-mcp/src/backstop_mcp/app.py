@@ -101,8 +101,6 @@ def create_app(
     )
 
     custom_fields_service = create_custom_fields_service(
-        session_factory=session_factory,
-        base_url=backstop_config.base_url,
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
     employment_index_factory = create_employment_index_factory(

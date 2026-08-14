@@ -56,7 +56,7 @@ class TestGetSystemInfo:
                 revoke_tokens_for_subject=_noop_revoke,
             ),
         )
-        install_services(backstop=factory, custom_fields=custom_fields_service(session_factory))
+        install_services(backstop=factory, custom_fields=custom_fields_service())
         monkeypatch.setattr(
             "backstop_mcp.features.auth.context.get_access_token",
             lambda: _fake_access_token("user-never-connected"),
@@ -100,7 +100,7 @@ class TestGetSystemInfo:
                 revoke_tokens_for_subject=_record_revoke,
             ),
         )
-        install_services(backstop=factory, custom_fields=custom_fields_service(session_factory))
+        install_services(backstop=factory, custom_fields=custom_fields_service())
         monkeypatch.setattr(
             "backstop_mcp.features.auth.context.get_access_token",
             lambda: _fake_access_token("user-tool-2"),
