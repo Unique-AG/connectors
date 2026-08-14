@@ -74,6 +74,16 @@ class ActivityHistoryFirstPageInput(BaseModel):
             ),
         ),
     ] = None
+    search_type: Annotated[
+        SearchType | None,
+        Field(
+            description=(
+                "Collection to resolve against. Echo `search_type` from a prior resolve when "
+                "retrying with `party_id` — a contact or employee id is not a people id. "
+                "Defaults from `party_type` (people or organizations)."
+            ),
+        ),
+    ] = None
     activity_types: Annotated[
         list[ActivityType] | None,
         Field(
@@ -129,6 +139,18 @@ class ActivityHistoryFirstPageInput(BaseModel):
             raise ValueError("Exactly one of party_id or search must be provided")
         if self.party_id is not None and "/" in self.party_id:
             raise ValueError(f"party_id {self.party_id!r} must not contain '/'")
+        return self
+
+    @model_validator(mode="after")
+    def _search_type_matches_party_type(self) -> Self:
+        if self.search_type is None:
+            return self
+        if self.party_type == "organization" and self.search_type != "organizations":
+            raise ValueError("search_type must be organizations when party_type is organization")
+        if self.party_type == "person" and self.search_type == "organizations":
+            raise ValueError(
+                "search_type must be people, contacts, or employees when party_type is person"
+            )
         return self
 
     @model_validator(mode="after")
@@ -263,6 +285,7 @@ async def extract_fetch_activity_history_args(
             party_type=party_type,
             party_id=party_id,
             search=search,
+            search_type=search_type,
             activity_types=activity_types,
             since=since,
             until=until,
@@ -271,7 +294,7 @@ async def extract_fetch_activity_history_args(
             result = await resolve_party(
                 ctx,
                 client,
-                search_type=segment_for(party_type),
+                search_type=search_type if search_type is not None else segment_for(party_type),
                 party_id=party_id,
                 search=search,
             )

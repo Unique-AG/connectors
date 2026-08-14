@@ -68,10 +68,12 @@ async def get_activity_history(
     """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
 
     Pass `request.type="first"` with `party_type` plus a trusted `party_id` (from a prior resolve
-    echo — never invent or guess one) or `search` to start. Default `activity_types` are all five
-    streams including `document`. The response is `groups`: one entry per requested stream, not a
-    single merged timeline. Each group's `date_range` is that page's span (min/max `occurred_at`
-    among its dated items), not a cumulative window.
+    echo — never invent or guess one) or `search` to start. When retrying with `party_id`, echo
+    that resolve's `search_type` too if it is not `people`/`organizations` — a contact or
+    employee id is not a people id. Default `activity_types` are all five streams including
+    `document`. The response is `groups`: one entry per requested stream, not a single merged
+    timeline. Each group's `date_range` is that page's span (min/max `occurred_at` among its
+    dated items), not a cumulative window.
 
     To continue, call again with `request.type="next"`, echoing `resolved.search_type`,
     `resolved.id` as `entity_id`, and a `next` map built from each `groups[type].next` that is

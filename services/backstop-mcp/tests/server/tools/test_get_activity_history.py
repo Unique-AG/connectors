@@ -325,6 +325,59 @@ class TestFirstCallBySearch:
         assert people_get.call_count == 0
         assert _record_keys(result.groups["meeting"].items) == [("meeting", "m1")]
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_trusted_contact_party_id_fetches_contacts_collection(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-ah-trusted-contact", "person-trusted-contact")  # pyright: ignore[reportGeneralTypeIssues]
+
+        contact_get = respx.get(f"{BASE_URL}/contacts/c9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "contacts",
+                        "id": "c9",
+                        "attributes": {"name": "Jane Contact"},
+                        "relationships": {"entityRelationships": {"data": []}},
+                    },
+                    "included": [],
+                },
+            )
+        )
+        people_get = respx.get(url__regex=rf"{BASE_URL}/people/\w+").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        _activities_route("contacts", "c9", "meetings").mock(
+            return_value=httpx.Response(200, json=collection(_activity("m1", "2026-01-05")))
+        )
+        for activity_type in ("calls", "notes"):
+            _activities_route("contacts", "c9", activity_type).mock(
+                return_value=httpx.Response(200, json=collection())
+            )
+        _emails_route("contacts", "c9").mock(return_value=httpx.Response(200, json=collection()))
+
+        result = tool_model(
+            await get_activity_history(
+                ctx_never_elicit(),
+                _first(
+                    party_type="person",
+                    party_id="c9",
+                    search_type="contacts",
+                    activity_types=["meeting"],
+                ),
+            ),
+            ActivityHistoryResolvedResponse,
+        )
+
+        assert result.resolved == ResolvedPartyAsOfResponse(
+            id="c9", search_type="contacts", name="Jane Contact"
+        )
+        assert contact_get.call_count == 1
+        assert people_get.call_count == 0
+        assert _record_keys(result.groups["meeting"].items) == [("meeting", "m1")]
+
 
 class TestResumedCall:
     @pytest.mark.asyncio
@@ -522,6 +575,26 @@ class TestRequestShape:
                     "party_id": "o42",
                     "since": "2026-02-01",
                     "until": "2026-01-01",
+                }
+            )
+
+    def test_first_page_input_rejects_search_type_that_does_not_match_party_type(self) -> None:
+        with pytest.raises(ValidationError):
+            ActivityHistoryFirstPageInput.model_validate(
+                {
+                    "type": "first",
+                    "party_type": "person",
+                    "party_id": "c9",
+                    "search_type": "organizations",
+                }
+            )
+        with pytest.raises(ValidationError):
+            ActivityHistoryFirstPageInput.model_validate(
+                {
+                    "type": "first",
+                    "party_type": "organization",
+                    "party_id": "o42",
+                    "search_type": "contacts",
                 }
             )
 
