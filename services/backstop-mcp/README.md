@@ -51,9 +51,7 @@ uv run backstop-mcp
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
-- Ready: `GET /ready` — 503 when Postgres is unreachable. Also reports whether the
-  custom-field schema has loaded, which never gates readiness: it fills lazily per caller,
-  and tools degrade to `list_custom_fields` without it
+- Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
 Generate an encryption key with:

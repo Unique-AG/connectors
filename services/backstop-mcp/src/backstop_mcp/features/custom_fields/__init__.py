@@ -21,7 +21,6 @@ from backstop_mcp.features.custom_fields.service import (
 )
 from backstop_mcp.features.custom_fields.types import AllowedValue, CustomFieldDefinition
 from backstop_mcp.features.custom_fields.values import CustomFieldValueRead, read_custom_field_value
-from backstop_mcp.features.custom_fields.warmup import warmup_lifespan
 
 __all__ = [
     "KNOWN_ENTITY_TYPES",
@@ -44,5 +43,4 @@ __all__ = [
     "read_custom_field_value",
     "resolve_field",
     "unresolved_field_response",
-    "warmup_lifespan",
 ]

@@ -14,7 +14,6 @@ from unique_mcp.monitoring import setup_ops
 
 from backstop_mcp.backstop_client import (
     BackstopClientFactory,
-    BackstopCredentialSecret,
     BackstopTransportSettings,
     RetrySettings,
 )
@@ -39,7 +38,6 @@ from backstop_mcp.features.auth import (
 from backstop_mcp.features.custom_fields import (
     FieldOverride,
     create_custom_fields_service,
-    warmup_lifespan,
 )
 from backstop_mcp.features.data_hygiene import create_employment_index_factory
 from backstop_mcp.logging import configure_logging
@@ -64,8 +62,8 @@ def create_app(
     injected. Nothing downstream re-reads the environment, and no layer below this one sees a
     `config` type at all: each env-parsed shape is translated into the owning layer's own domain
     type here (`BackstopTransportSettings`, `RetrySettings`, `FieldOverride`,
-    `BackstopCredentialSecret`, `ActivityHistorySettings`), so the tuning knobs a deployment
-    sets are the ones every request actually uses.
+    `ActivityHistorySettings`), so the tuning knobs a deployment sets are the ones every request
+    actually uses.
     """
     config = config or AppConfig()
     backstop_config = backstop_config or BackstopConfig()
@@ -132,17 +130,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
-        # Stop background tasks (auth sweep, warmup) before disposing the engine — otherwise
+        # Stop background tasks (auth sweep) before disposing the engine — otherwise
         # `cleanup_lifespan`'s cancel/await runs after the pool is already closed.
         try:
-            async with (
-                warmup_lifespan(
-                    custom_fields_service,
-                    backstop_clients,
-                    _service_account_credential(backstop_config),
-                ),
-                cleanup_lifespan(session_factory, auth_config),
-            ):
+            async with cleanup_lifespan(session_factory, auth_config):
                 yield
         finally:
             await reset_services()
@@ -163,9 +154,7 @@ def create_app(
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:
         """Postgres readiness — stock `setup_ops` `/probe` is process-up only."""
-        return await _ready_response(
-            engine, custom_fields_schema_loaded=custom_fields_service.has_definitions()
-        )
+        return await _ready_response(engine)
 
     @mcp.custom_route(auth_provider.login_path, methods=["GET"])
     async def login_get(request: Request) -> Response:
@@ -188,7 +177,7 @@ def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
 
     Field-for-field, and deliberately explicit rather than derived by reflection: adding a knob
     to `BackstopConfig` that the transport should see is then a visible edit here, and one it
-    should *not* see (the service account, the custom-field overrides) simply never appears.
+    should *not* see (custom-field overrides, schema TTL) simply never appears.
     """
     return BackstopTransportSettings(
         base_url=config.base_url,
@@ -205,20 +194,6 @@ def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
 def retry_settings(config: BackstopConfig) -> RetrySettings:
     return RetrySettings(
         max_attempts=config.max_retry_attempts, max_wait_ms=config.max_retry_wait_ms
-    )
-
-
-def _service_account_credential(config: BackstopConfig) -> BackstopCredentialSecret | None:
-    """The optional startup-warming credential, or None when none is configured.
-
-    Assembled here so `custom_fields/warmup.py` is handed a credential rather than reaching
-    through the client factory for a config object — `BackstopConfig` validates that the two
-    halves are set together, so one `None` check covers both.
-    """
-    if config.service_username is None or config.service_api_token is None:
-        return None
-    return BackstopCredentialSecret(
-        username=config.service_username, api_token=config.service_api_token
     )
 
 
@@ -240,14 +215,11 @@ def _field_overrides(
     }
 
 
-async def _ready_response(
-    engine: AsyncEngine, *, custom_fields_schema_loaded: bool
-) -> JSONResponse:
+async def _ready_response(engine: AsyncEngine) -> JSONResponse:
     """Readiness, reporting the checks it actually ran.
 
     Postgres is a hard dependency — OAuth token validation reads it on every request — so an
-    unreachable database means not ready. The custom-field schema is reported but never gates
-    readiness: it fills lazily by design, and tools degrade to `list_custom_fields` without it.
+    unreachable database means not ready.
     """
     database_ok = True
     try:
@@ -257,7 +229,7 @@ async def _ready_response(
         database_ok = False
         logger.warning("ready.database_unreachable", exc_info=True)
 
-    checks = {"database": database_ok, "custom_field_schema": custom_fields_schema_loaded}
+    checks = {"database": database_ok}
     return JSONResponse(
         {"status": "healthy" if database_ok else "unhealthy", "checks": checks},
         status_code=200 if database_ok else 503,
