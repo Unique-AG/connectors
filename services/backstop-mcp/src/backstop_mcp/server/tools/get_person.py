@@ -101,7 +101,7 @@ async def get_person(
     record age as a staleness verdict.
 
     When you need custom field names for this person, call `list_custom_fields` with
-    entity_type=people.
+    entity_types including people.
     """
     client = await get_backstop_client()
     result = await resolve_party(

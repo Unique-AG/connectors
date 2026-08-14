@@ -98,7 +98,7 @@ async def get_organization(
     Relay that provenance to the user; do not treat record age as a staleness verdict.
 
     When you need custom field names for this organization, call `list_custom_fields` with
-    entity_type=organizations.
+    entity_types including organizations.
     """
     client = await get_backstop_client()
     result = await resolve_party(
