@@ -184,9 +184,7 @@ async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[
         schema=BackstopApiResource[_AttendeeAttributes],
         max_records=None,
     )
-    attendees = tuple(
-        Attendee(name=resource.attributes.display_name()) for resource in page.items
-    )
+    attendees = tuple(Attendee(name=resource.attributes.display_name()) for resource in page.items)
     nameless = sum(1 for attendee in attendees if not attendee.name)
     if nameless:
         logger.debug(

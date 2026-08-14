@@ -311,9 +311,7 @@ async def extract_fetch_activity_history_args(
                 return tool_result(unresolved_party_response(result))
             party = result.value
             effective_types = effective_activity_types(activity_types)
-            page_size = (
-                limit if limit is not None else get_activity_history_settings().page_size
-            )
+            page_size = limit if limit is not None else get_activity_history_settings().page_size
             # Person quick-search uses shared PERSON_* types, so a hit may be contacts/
             # employees — follow `party.search_type` like `get_person`, not `party_type`.
             args = FetchArgs(
