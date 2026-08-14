@@ -497,6 +497,62 @@ class TestInMemoryTtl:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_failed_refresh_restamps_ttl_so_the_next_get_does_not_refetch(
+        self, clients: ClientBuilder
+    ) -> None:
+        base_url = f"{BASE_URL}/ttl-stale-cooldown"
+        service = _service()
+        self._definitions_route(base_url, "Stale Field", definition_id="old-1")
+        await service.get(clients(base_url))
+        self._age_past_ttl(service)
+
+        failed = respx.get(f"{base_url}/custom-field-definitions").mock(
+            side_effect=httpx.ConnectError("backstop down")
+        )
+
+        first, first_cache = await service.get(clients(base_url))
+        calls_after_failure = failed.call_count
+        second, second_cache = await service.get(clients(base_url))
+
+        assert calls_after_failure >= 1
+        assert failed.call_count == calls_after_failure
+        assert first_cache == "stale"
+        assert second_cache == "ok"
+        assert [d.name for d in first] == ["Stale Field"]
+        assert [d.name for d in second] == ["Stale Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_cancelled_fetch_unblocks_waiters(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/ttl-cancel-waiters"
+        service = _service()
+        client = clients(base_url)
+        refresh_started = asyncio.Event()
+        release_refresh = asyncio.Event()
+
+        async def blocked_definitions(_request: httpx.Request) -> httpx.Response:
+            refresh_started.set()
+            await release_refresh.wait()
+            return httpx.Response(200, json={"data": [], "links": {"next": None}})
+
+        respx.get(f"{base_url}/custom-field-definitions").mock(side_effect=blocked_definitions)
+
+        owner = asyncio.create_task(service.get(client))
+        await asyncio.wait_for(refresh_started.wait(), timeout=5)
+        waiter = asyncio.create_task(service.get(client))
+        for _ in range(20):
+            await asyncio.sleep(0)
+
+        owner.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(owner, timeout=5)
+        with pytest.raises(RuntimeError, match="cancelled"):
+            await asyncio.wait_for(waiter, timeout=1)
+
+        release_refresh.set()
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_failed_fetch_with_no_cache_raises(self, clients: ClientBuilder) -> None:
         base_url = f"{BASE_URL}/ttl-cold-failure"
         service = _service()

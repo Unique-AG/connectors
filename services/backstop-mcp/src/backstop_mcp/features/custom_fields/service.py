@@ -53,6 +53,15 @@ class CustomFieldsService:
 
         try:
             return await self._fetch(client, in_flight)
+        except BaseException as error:
+            if not in_flight.done():
+                # Don't stamp CancelledError onto the shared future — waiters would then
+                # look cancelled themselves. A regular exception lets them fail and retry.
+                waiter_error: BaseException = error
+                if isinstance(error, asyncio.CancelledError):
+                    waiter_error = RuntimeError("custom-field catalog fetch was cancelled")
+                in_flight.set_exception(waiter_error)
+            raise
         finally:
             async with self._lock:
                 if self._in_flight is in_flight:
@@ -77,6 +86,7 @@ class CustomFieldsService:
                     exc_info=True,
                 )
                 CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "stale"})
+                self._freshness.mark()
                 result: CatalogResult = (list(self._definitions), "stale")
                 in_flight.set_result(result)
                 return result
