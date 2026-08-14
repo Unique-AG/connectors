@@ -1,9 +1,10 @@
-"""`get_activity_history`: party resolution plus concurrent stream fan-out for a timeline.
+"""`get_activity_history`: party resolution plus concurrent stream fan-out.
 
 On a `type="first"` request, resolves the party (`party_type` + `party_id`/`search`, exactly like
 `get_person`/`get_organization`), then fetches the party record and every requested stream's first
-page. On a `type="next"` request, the cursor already carries the full query state — no resolve, no
-`/quick-search` round trip — and only the streams the cursor says are still open get re-fetched.
+page. On a `type="next"` request, `search_type` / `entity_id` / per-stream continuations are echoed
+from a prior response — no resolve, no `/quick-search` round trip — and only those streams are
+re-fetched.
 
 The party record is fetched first (it also side-loads employments). Active stream fetches then go
 through one `asyncio.gather` call so a partial upstream failure fails the whole tool call rather
@@ -21,13 +22,14 @@ from mcp.types import CallToolResult, ToolAnnotations
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.activity_history import (
+    ActivityGroup,
     ActivityHistoryResolvedResponse,
     ActivityPage,
     ActivityType,
     EmailPage,
-    encode_cursor,
+    TimelineRecord,
     fetch_activities_page_by_type,
-    merge_page,
+    group_page,
     to_timeline_record,
 )
 from backstop_mcp.features.data_hygiene import (
@@ -73,21 +75,21 @@ async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
 ) -> CallToolResult:
-    """Fetch a party's activity timeline: meetings, calls, notes, and emails.
+    """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
 
     Pass `request.type="first"` with `party_type` plus a trusted `party_id` (from a prior resolve
-    echo — never invent or guess one) or `search` to start a timeline. To get more results, call
-    again with `request.type="next"` and only `next_cursor` — the cursor already carries the full
-    query state (party, streams, date bounds, per-stream pagination offsets).
+    echo — never invent or guess one) or `search` to start. Default `activity_types` are all five
+    streams including `document`. The response is `groups`: one entry per requested stream, not a
+    single merged timeline. Each group's `date_range` is that page's span (min/max `occurred_at`
+    among its dated items), not a cumulative window.
 
-    `document` activities are excluded by default; pass `activity_types` explicitly to include
-    them. Records are ordered newest-first by `occurred_at`, with one wart: activity dates
-    (meeting/call/note/document) are date-only and sort at midnight, while an email carries a
-    real time-of-day timestamp — so on a day with both an email and a meeting/call/note, the
-    email sorts above the other activity even if that activity happened earlier the same day.
+    To continue, call again with `request.type="next"`, echoing `resolved.search_type`,
+    `resolved.id` as `entity_id`, and a `next` map built from each `groups[type].next` that is
+    present. Drop exhausted streams (`next` omitted, or null). A one-entry map deepens a
+    single stream; several entries continue those streams together.
 
     Future-dated meetings and calls are included, not filtered — Backstop schedules carry real
-    future `effectiveDate`s, so an upcoming meeting can appear at the top of the timeline.
+    future `effectiveDate`s, so an upcoming meeting can appear at the top of its stream.
 
     There is no default date window: omitting `since`/`until` returns the newest activity in
     each requested stream regardless of age, which may be old — activity history in this CRM is
@@ -109,10 +111,7 @@ async def get_activity_history(
         extra={
             "segment": args.segment,
             "entity_id": args.entity_id,
-            "streams": list(args.active_activity_types),
-            "limit": args.limit,
-            "since": args.since.isoformat() if args.since is not None else None,
-            "until": args.until.isoformat() if args.until is not None else None,
+            "streams": list(args.continuations),
         },
     )
     document = await client.get(
@@ -126,48 +125,50 @@ async def get_activity_history(
             activity_type=activity_type,
             segment=args.segment,
             entity_id=args.entity_id,
-            limit=args.limit,
-            offset=args.consumed.get(activity_type, 0),
-            since=args.since,
-            until=args.until,
+            limit=continuation.limit,
+            offset=continuation.offset,
+            since=continuation.since,
+            until=continuation.until,
         )
-        for activity_type in args.active_activity_types
+        for activity_type, continuation in args.continuations.items()
     }
     activities = await asyncio.gather(*page_calls.values())
     pages: dict[ActivityType, ActivityPage | EmailPage] = dict(
         zip(page_calls.keys(), activities, strict=True)
     )
 
-    merged = merge_page(
-        {activity_type: (page.items, page.end_of_stream) for activity_type, page in pages.items()},
-        args.consumed,
-    )
-    records = [
-        to_timeline_record(record, gist_max_chars=get_activity_history_settings().gist_max_chars)
-        for record in merged.records
-    ]
-    next_cursor_out = encode_cursor(
-        segment=args.segment,
-        entity_id=args.entity_id,
-        limit=args.limit,
-        activity_types=args.activity_types,
-        since=args.since,
-        until=args.until,
-        consumed=merged.consumed,
-    )
+    gist_max_chars = get_activity_history_settings().gist_max_chars
+    groups: dict[ActivityType, ActivityGroup[TimelineRecord]] = {}
+    for activity_type, continuation in args.continuations.items():
+        page = pages[activity_type]
+        grouped = group_page(
+            page.items,
+            activity_type=activity_type,
+            end_of_stream=page.end_of_stream,
+            limit=continuation.limit,
+            offset=continuation.offset,
+            since=continuation.since,
+            until=continuation.until,
+        )
+        wire_items = tuple(
+            to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items
+        )
+        groups[activity_type] = grouped.model_copy(update={"items": wire_items})
 
     attributes = document.data.attributes
     employments = get_employment_index_factory().index(**entity_relationships(document)).links()
+    open_streams = [
+        activity_type for activity_type, group in groups.items() if group.next is not None
+    ]
 
     logger.info(
         "activity_history.get.completed",
         extra={
             "segment": args.segment,
             "entity_id": args.entity_id,
-            "records": len(records),
+            "streams": list(groups),
             "employments": len(employments),
-            "has_next_cursor": next_cursor_out is not None,
-            "open_streams": sorted(merged.consumed),
+            "open_streams": open_streams,
         },
     )
     return tool_result(
@@ -175,8 +176,7 @@ async def get_activity_history(
             resolved=party_response(
                 args.party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
             ),
-            records=records,
-            next_cursor=next_cursor_out,
+            groups=groups,
             as_of=as_of_response(extract_as_of(attributes)),
             employments=employments,
         ),

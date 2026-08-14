@@ -1,5 +1,5 @@
-"""Wire response models for an activity-history tool payload, and the pure conversion from an
-already-merged record (`ActivityWithType`) to its wire shape (`TimelineRecord`).
+"""Wire response models for an activity-history tool payload, and the pure conversion from a
+fetched item (`ActivityItem` / `EmailItem`) to its wire shape (`TimelineRecord`).
 
 Standing caveats (documents excluded from the token budget concerns, same-day email-vs-activity
 ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
@@ -24,11 +24,12 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityItem,
+    ActivityType,
     BackstopActivityType,
     EmailItem,
 )
 from backstop_mcp.features.activity_history.gist_from_html import to_gist
-from backstop_mcp.features.activity_history.merge import ActivityWithType
+from backstop_mcp.features.activity_history.models import ActivityGroup
 from backstop_mcp.features.data_hygiene import AsOf, EmploymentLinkResponse
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, ResolvedPartyResponse
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -100,11 +101,9 @@ def _cap_recipients(emails: tuple[str, ...]) -> tuple[tuple[str, ...], int | Non
     return emails[:_MAX_RECIPIENTS], len(emails)
 
 
-def to_timeline_record(merged: ActivityWithType, *, gist_max_chars: int) -> TimelineRecord:
-    """Convert one merged record to its wire shape. Pure: no HTTP, no config lookups."""
-    if merged.stream == "email":
-        item = merged.item
-        assert isinstance(item, EmailItem), "stream 'email' must carry an EmailItem"
+def to_timeline_record(item: ActivityItem | EmailItem, *, gist_max_chars: int) -> TimelineRecord:
+    """Convert one fetched item to its wire shape. Pure: no HTTP, no config lookups."""
+    if isinstance(item, EmailItem):
         to_emails, to_emails_count = _cap_recipients(item.to_emails)
         cc_emails, cc_emails_count = _cap_recipients(item.cc_emails)
         return EmailRecordResponse.model_validate(item).model_copy(
@@ -116,8 +115,7 @@ def to_timeline_record(merged: ActivityWithType, *, gist_max_chars: int) -> Time
             }
         )
 
-    item = merged.item
-    assert isinstance(item, ActivityItem), f"stream {merged.stream!r} must carry an ActivityItem"
+    assert isinstance(item, ActivityItem)
     gist = to_gist(item.description or "", max_chars=gist_max_chars)
     return ActivityRecordResponse.model_validate(
         {
@@ -139,8 +137,7 @@ class ActivityHistoryResolvedResponse(BaseModel):
 
     status: Literal["resolved"] = "resolved"
     resolved: ResolvedPartyResponse
-    records: list[TimelineRecord]
-    next_cursor: str | None = None
+    groups: dict[ActivityType, ActivityGroup[TimelineRecord]]
     as_of: AsOf | None = None
     employments: list[EmploymentLinkResponse] = Field(default_factory=list)
 

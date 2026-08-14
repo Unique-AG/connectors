@@ -1,13 +1,12 @@
-"""`get_activity_history`: party resolution, stream fan-out, and cursor round-trip.
+"""`get_activity_history`: party resolution, stream fan-out, and grouped-page round-trip.
 
-Each test targets one behaviour from the task: the default-stream fan-out (and that `document`
-is excluded from it), that a resumed call (`type="next"`) skips resolution and only re-fetches
-streams the cursor says are still open, that a malformed cursor degrades to a structured
-`tool_error` rather than an unhandled exception, that one failing stream fails the whole call,
-and the person/organization hygiene-decoration split.
+Each test targets one behaviour from the task: the default-stream fan-out (all five streams,
+including `document`), that a resumed call (`type="next"`) skips resolution and only re-fetches
+streams present in `next`, that invalid `next` inputs raise pydantic `ValidationError`, that one
+failing stream fails the whole call, and the person/organization hygiene-decoration split.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date
 
 import httpx
@@ -17,12 +16,15 @@ from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_history import (
+    ActivityContinuation,
     ActivityHistoryResolvedResponse,
     ActivityRecordResponse,
+    ActivityType,
     EmailRecordResponse,
-    encode_cursor,
+    TimelineRecord,
 )
 from backstop_mcp.features.data_hygiene import AsOf
+from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,
@@ -47,7 +49,7 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
-from tests.server.tools.helpers import tool_model, tool_model_union
+from tests.server.tools.helpers import tool_model, tool_model_union, tool_payload
 
 type ConnectUser = Callable[..., object]
 
@@ -152,20 +154,25 @@ def _first(**kwargs: object) -> ActivityHistoryFirstPageInput:
     return ActivityHistoryFirstPageInput.model_validate({"type": "first", **kwargs})
 
 
-def _next(*, next_cursor: str) -> ActivityHistoryNextPageInput:
-    return ActivityHistoryNextPageInput(type="next", next_cursor=next_cursor)
+def _next(
+    *,
+    search_type: SearchType,
+    entity_id: str,
+    next: dict[ActivityType, ActivityContinuation],
+) -> ActivityHistoryNextPageInput:
+    return ActivityHistoryNextPageInput(
+        type="next", search_type=search_type, entity_id=entity_id, next=next
+    )
 
 
-def _record_keys(
-    records: list[ActivityRecordResponse | EmailRecordResponse],
-) -> list[tuple[str, str]]:
-    return [(record.type, record.activity_id) for record in records]
+def _record_keys(items: Sequence[TimelineRecord]) -> list[tuple[str, str]]:
+    return [(record.type, record.activity_id) for record in items]
 
 
 class TestFirstCallByTrustedPartyId:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_returns_default_streams_newest_first_excluding_document(
+    async def test_returns_default_streams_including_document(
         self, connect_user: ConnectUser
     ) -> None:
         await connect_user("user-ah-1", "org-bob")  # pyright: ignore[reportGeneralTypeIssues]
@@ -204,18 +211,21 @@ class TestFirstCallByTrustedPartyId:
         )
         assert result.employments == []
         assert result.as_of == AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops")
-        assert documents.call_count == 0
-        assert _record_keys(result.records) == [
-            *[("email", f"e{i}") for i in range(10)],
-            ("meeting", "m1"),
-            ("call", "c1"),
-            ("note", "n1"),
-        ]
-        assert all(isinstance(record, EmailRecordResponse) for record in result.records[:10])
-        assert all(isinstance(record, ActivityRecordResponse) for record in result.records[10:])
-        assert result.records[10].occurred_at == date(2026, 1, 5)
-        # A full email page leaves the stream open — opaque cursor for the next call.
-        assert result.next_cursor is not None
+        assert documents.call_count == 1
+        assert set(result.groups) == {"meeting", "call", "note", "email", "document"}
+        assert _record_keys(result.groups["meeting"].items) == [("meeting", "m1")]
+        assert _record_keys(result.groups["call"].items) == [("call", "c1")]
+        assert _record_keys(result.groups["note"].items) == [("note", "n1")]
+        assert _record_keys(result.groups["document"].items) == [("document", "d1")]
+        assert _record_keys(result.groups["email"].items) == [("email", f"e{i}") for i in range(10)]
+        assert all(
+            isinstance(record, EmailRecordResponse) for record in result.groups["email"].items
+        )
+        meeting = result.groups["meeting"].items[0]
+        assert isinstance(meeting, ActivityRecordResponse)
+        assert meeting.occurred_at == date(2026, 1, 5)
+        assert result.groups["email"].next is not None
+        assert result.groups["meeting"].next is None
 
 
 class TestFirstCallBySearch:
@@ -251,12 +261,12 @@ class TestFirstCallBySearch:
         )
 
         assert result.resolved.id == "o7"
-        assert _record_keys(result.records) == [("meeting", "m1")]
-        first = result.records[0]
+        assert set(result.groups) == {"meeting"}
+        assert _record_keys(result.groups["meeting"].items) == [("meeting", "m1")]
+        first = result.groups["meeting"].items[0]
         assert isinstance(first, ActivityRecordResponse)
         assert first.title == "Item m1"
-        # Short page → stream exhausted → no next page.
-        assert result.next_cursor is None
+        assert result.groups["meeting"].next is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -382,7 +392,7 @@ class TestFirstCallBySearch:
         )
         assert contact_get.call_count == 1
         assert people_get.call_count == 0
-        assert _record_keys(result.records) == [("meeting", "m1")]
+        assert _record_keys(result.groups["meeting"].items) == [("meeting", "m1")]
 
 
 class TestResumedCall:
@@ -392,18 +402,6 @@ class TestResumedCall:
         self, connect_user: ConnectUser
     ) -> None:
         await connect_user("user-ah-5", "org-frank")  # pyright: ignore[reportGeneralTypeIssues]
-
-        # Fixture cursor: meeting still open at offset 3; note already exhausted (absent).
-        cursor = encode_cursor(
-            segment="organizations",
-            entity_id="o42",
-            limit=10,
-            activity_types=["meeting", "note"],
-            since=None,
-            until=None,
-            consumed={"meeting": 3},
-        )
-        assert cursor is not None
 
         quick = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
@@ -419,7 +417,14 @@ class TestResumedCall:
         )
 
         result = tool_model(
-            await get_activity_history(ctx_never_elicit(), _next(next_cursor=cursor)),
+            await get_activity_history(
+                ctx_never_elicit(),
+                _next(
+                    search_type="organizations",
+                    entity_id="o42",
+                    next={"meeting": ActivityContinuation(limit=10, offset=3)},
+                ),
+            ),
             ActivityHistoryResolvedResponse,
         )
 
@@ -428,12 +433,13 @@ class TestResumedCall:
         assert meetings.call_count == 1
         assert result.resolved.id == "o42"
         assert result.resolved.search_type == "organizations"
-        assert _record_keys(result.records) == [("meeting", "m4")]
-        assert result.next_cursor is None
+        assert set(result.groups) == {"meeting"}
+        assert _record_keys(result.groups["meeting"].items) == [("meeting", "m4")]
+        assert result.groups["meeting"].next is None
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_opaque_cursor_from_first_page_resumes_open_email_stream(
+    async def test_first_page_email_next_resumes_only_the_email_stream(
         self, connect_user: ConnectUser
     ) -> None:
         await connect_user("user-ah-5b", "org-frank2")  # pyright: ignore[reportGeneralTypeIssues]
@@ -441,14 +447,18 @@ class TestResumedCall:
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
         )
-        for activity_type, item in (
-            ("meetings", _activity("m1", "2026-01-05")),
-            ("calls", _activity("c1", "2026-01-04")),
-            ("notes", _activity("n1", "2026-01-03")),
-        ):
-            _activities_route("organizations", "o42", activity_type).mock(
-                return_value=httpx.Response(200, json=collection(item))
-            )
+        meetings = _activities_route("organizations", "o42", "meetings").mock(
+            return_value=httpx.Response(200, json=collection(_activity("m1", "2026-01-05")))
+        )
+        calls = _activities_route("organizations", "o42", "calls").mock(
+            return_value=httpx.Response(200, json=collection(_activity("c1", "2026-01-04")))
+        )
+        notes = _activities_route("organizations", "o42", "notes").mock(
+            return_value=httpx.Response(200, json=collection(_activity("n1", "2026-01-03")))
+        )
+        documents = _activities_route("organizations", "o42", "documents").mock(
+            return_value=httpx.Response(200, json=collection(_activity("d1", "2026-02-15")))
+        )
         first_emails = collection(
             *(_email(f"e{i}", f"2026-02-{10 - i:02d}T00:00:00.000-0500") for i in range(10))
         )
@@ -460,35 +470,53 @@ class TestResumedCall:
             ]
         )
 
-        first = tool_model(
-            await get_activity_history(
-                ctx_never_elicit(), _first(party_type="organization", party_id="o42")
-            ),
-            ActivityHistoryResolvedResponse,
+        first_result = await get_activity_history(
+            ctx_never_elicit(), _first(party_type="organization", party_id="o42")
         )
-        assert first.next_cursor is not None
+        first_payload = tool_payload(first_result)
 
-        second = tool_model(
-            await get_activity_history(ctx_never_elicit(), _next(next_cursor=first.next_cursor)),
-            ActivityHistoryResolvedResponse,
+        groups = first_payload["groups"]
+        assert isinstance(groups, dict)
+        meeting_group = groups["meeting"]
+        assert isinstance(meeting_group, dict)
+        assert "next" not in meeting_group
+
+        email_group = groups["email"]
+        assert isinstance(email_group, dict)
+        raw_email_next = email_group["next"]
+        assert isinstance(raw_email_next, dict)
+        assert "since" not in raw_email_next
+        assert "until" not in raw_email_next
+
+        resolved = first_payload["resolved"]
+        assert isinstance(resolved, dict)
+        second_result = await get_activity_history(
+            ctx_never_elicit(),
+            ActivityHistoryNextPageInput.model_validate(
+                {
+                    "type": "next",
+                    "search_type": resolved["search_type"],
+                    "entity_id": resolved["id"],
+                    "next": {"email": raw_email_next},
+                }
+            ),
         )
+        second_payload = tool_payload(second_result)
+        second = tool_model(second_result, ActivityHistoryResolvedResponse)
+        second_groups = second_payload["groups"]
+        assert isinstance(second_groups, dict)
+        second_email = second_groups["email"]
+        assert isinstance(second_email, dict)
+        assert "next" not in second_email
 
         assert emails.call_count == 2
-        assert _record_keys(second.records) == [("email", "e10")]
-        assert second.next_cursor is None
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_malformed_cursor_returns_tool_error_not_an_exception(
-        self, connect_user: ConnectUser
-    ) -> None:
-        await connect_user("user-ah-6", "org-grace")  # pyright: ignore[reportGeneralTypeIssues]
-
-        result = await get_activity_history(
-            ctx_never_elicit(), _next(next_cursor="not-a-valid-cursor-at-all-!!!")
-        )
-
-        assert result.isError is True
+        assert meetings.call_count == 1
+        assert calls.call_count == 1
+        assert notes.call_count == 1
+        assert documents.call_count == 1
+        assert set(second.groups) == {"email"}
+        assert _record_keys(second.groups["email"].items) == [("email", "e10")]
+        assert second.groups["email"].next is None
 
 
 class TestRequestShape:
@@ -506,9 +534,74 @@ class TestRequestShape:
                 {"type": "first", "party_type": "organization", "party_id": "o42", "limit": -1}
             )
 
-    def test_next_page_input_requires_next_cursor(self) -> None:
+    def test_first_page_input_rejects_since_after_until(self) -> None:
+        with pytest.raises(ValidationError):
+            ActivityHistoryFirstPageInput.model_validate(
+                {
+                    "type": "first",
+                    "party_type": "organization",
+                    "party_id": "o42",
+                    "since": "2026-02-01",
+                    "until": "2026-01-01",
+                }
+            )
+
+    def test_next_page_input_requires_next_search_type_and_entity_id(self) -> None:
+        continuation = {"meeting": {"limit": 10, "offset": 0}}
         with pytest.raises(ValidationError):
             ActivityHistoryNextPageInput.model_validate({"type": "next"})
+        with pytest.raises(ValidationError):
+            ActivityHistoryNextPageInput.model_validate(
+                {"type": "next", "entity_id": "o42", "next": continuation}
+            )
+        with pytest.raises(ValidationError):
+            ActivityHistoryNextPageInput.model_validate(
+                {"type": "next", "search_type": "organizations", "next": continuation}
+            )
+        with pytest.raises(ValidationError):
+            ActivityHistoryNextPageInput.model_validate(
+                {"type": "next", "search_type": "organizations", "entity_id": "o42"}
+            )
+
+    def test_next_page_input_rejects_empty_next_dict(self) -> None:
+        with pytest.raises(ValidationError):
+            ActivityHistoryNextPageInput.model_validate(
+                {
+                    "type": "next",
+                    "search_type": "organizations",
+                    "entity_id": "o42",
+                    "next": {},
+                }
+            )
+
+    def test_next_page_input_rejects_slash_in_entity_id(self) -> None:
+        with pytest.raises(ValidationError):
+            ActivityHistoryNextPageInput.model_validate(
+                {
+                    "type": "next",
+                    "search_type": "organizations",
+                    "entity_id": "o42/evil",
+                    "next": {"meeting": {"limit": 10, "offset": 0}},
+                }
+            )
+
+    def test_next_page_input_rejects_since_after_until(self) -> None:
+        with pytest.raises(ValidationError):
+            ActivityHistoryNextPageInput.model_validate(
+                {
+                    "type": "next",
+                    "search_type": "organizations",
+                    "entity_id": "o42",
+                    "next": {
+                        "meeting": {
+                            "limit": 10,
+                            "offset": 0,
+                            "since": "2026-02-01",
+                            "until": "2026-01-01",
+                        }
+                    },
+                }
+            )
 
 
 class TestHygieneDecoration:
@@ -624,7 +717,37 @@ class TestDocumentInclusion:
             ActivityHistoryResolvedResponse,
         )
 
-        assert _record_keys(result.records) == [("document", "d1")]
-        first = result.records[0]
+        assert set(result.groups) == {"document"}
+        assert _record_keys(result.groups["document"].items) == [("document", "d1")]
+        first = result.groups["document"].items[0]
         assert isinstance(first, ActivityRecordResponse)
         assert first.title == "Item d1"
+
+
+class TestWireOmitsNone:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_empty_page_omits_date_range(self, connect_user: ConnectUser) -> None:
+        await connect_user("user-ah-wire-omit", "org-wire-omit")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/organizations/o42").mock(
+            return_value=httpx.Response(200, json=_org_document())
+        )
+        _activities_route("organizations", "o42", "meetings").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        payload = tool_payload(
+            await get_activity_history(
+                ctx_never_elicit(),
+                _first(party_type="organization", party_id="o42", activity_types=["meeting"]),
+            )
+        )
+
+        groups = payload["groups"]
+        assert isinstance(groups, dict)
+        meeting_group = groups["meeting"]
+        assert isinstance(meeting_group, dict)
+        assert meeting_group["items"] == []
+        assert "date_range" not in meeting_group
+        assert "next" not in meeting_group

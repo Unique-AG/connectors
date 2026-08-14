@@ -1,4 +1,4 @@
-"""`to_timeline_record`: the pure conversion from a merged record to its wire shape.
+"""`to_timeline_record`: the pure conversion from a fetched item to its wire shape.
 
 Each test targets one behaviour from the design doc's "Token budget" section: an activity
 record's gist/truncation/`description_length` wiring, email recipient capping (both under- and
@@ -10,14 +10,16 @@ gist rather than an error.
 from datetime import UTC, date, datetime
 
 from backstop_mcp.features.activity_history import (
+    ActivityGroup,
+    ActivityHistoryResolvedResponse,
     ActivityItem,
     ActivityRecordResponse,
-    ActivityWithType,
     EmailItem,
     EmailRecordResponse,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
+from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 
 _DEFAULT_ACTIVITY_DATE = date(2026, 1, 15)
 _DEFAULT_EMAIL_TIMESTAMP = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
@@ -67,22 +69,10 @@ def _email_item(
     )
 
 
-def _merged_activity(item: ActivityItem) -> ActivityWithType:
-    return ActivityWithType(
-        stream=item.stream, item=item, occurred_at=datetime(2026, 1, 15, tzinfo=UTC)
-    )
-
-
-def _merged_email(item: EmailItem) -> ActivityWithType:
-    return ActivityWithType(
-        stream="email", item=item, occurred_at=datetime(2026, 1, 15, tzinfo=UTC)
-    )
-
-
 class TestActivityRecord:
     def test_untruncated_gist_omits_description_length(self) -> None:
         item = _activity_item(description="<p>short body</p>")
-        record = to_timeline_record(_merged_activity(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, ActivityRecordResponse)
         assert record.gist == "short body"
@@ -92,7 +82,7 @@ class TestActivityRecord:
     def test_truncated_gist_reports_full_length(self) -> None:
         body = "word " * 200
         item = _activity_item(description=f"<p>{body}</p>")
-        record = to_timeline_record(_merged_activity(item), gist_max_chars=20)
+        record = to_timeline_record(item, gist_max_chars=20)
 
         assert isinstance(record, ActivityRecordResponse)
         assert record.gist_truncated is True
@@ -101,7 +91,7 @@ class TestActivityRecord:
 
     def test_no_description_yields_empty_gist_not_an_error(self) -> None:
         item = _activity_item(description=None)
-        record = to_timeline_record(_merged_activity(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, ActivityRecordResponse)
         assert record.gist == ""
@@ -110,14 +100,14 @@ class TestActivityRecord:
 
     def test_occurred_at_is_a_plain_date(self) -> None:
         item = _activity_item(effective_date=date(2026, 3, 4))
-        record = to_timeline_record(_merged_activity(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, ActivityRecordResponse)
         assert record.occurred_at == date(2026, 3, 4)
 
     def test_carries_type_activity_id_and_resource_id(self) -> None:
         item = _activity_item(item_id="meeting-or-calls_76280387", resource_id="76280387")
-        record = to_timeline_record(_merged_activity(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, ActivityRecordResponse)
         assert record.type == "meeting"
@@ -128,7 +118,7 @@ class TestActivityRecord:
 class TestEmailRecord:
     def test_recipient_list_under_cap_has_no_count(self) -> None:
         item = _email_item(to_emails=("a@example.com", "b@example.com"))
-        record = to_timeline_record(_merged_email(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, EmailRecordResponse)
         assert record.to_emails == ("a@example.com", "b@example.com")
@@ -137,7 +127,7 @@ class TestEmailRecord:
     def test_recipient_list_over_cap_is_truncated_with_count(self) -> None:
         addresses = tuple(f"user{i}@example.com" for i in range(5))
         item = _email_item(to_emails=addresses, cc_emails=addresses)
-        record = to_timeline_record(_merged_email(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, EmailRecordResponse)
         assert record.to_emails == addresses[:3]
@@ -148,15 +138,34 @@ class TestEmailRecord:
     def test_occurred_at_is_a_full_timestamp(self) -> None:
         sent = datetime(2026, 3, 4, 8, 15, tzinfo=UTC)
         item = _email_item(sent_timestamp=sent)
-        record = to_timeline_record(_merged_email(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, EmailRecordResponse)
         assert record.occurred_at == sent
 
     def test_carries_type_email_and_activity_id(self) -> None:
         item = _email_item(item_id="email_42")
-        record = to_timeline_record(_merged_email(item), gist_max_chars=300)
+        record = to_timeline_record(item, gist_max_chars=300)
 
         assert isinstance(record, EmailRecordResponse)
         assert record.type == "email"
         assert record.activity_id == "email_42"
+
+
+class TestActivityHistoryResolvedResponse:
+    def test_accepts_groups_and_has_no_flat_records_or_cursor(self) -> None:
+        record = to_timeline_record(_activity_item(), gist_max_chars=300)
+        group = ActivityGroup(
+            activity_type="meeting",
+            items=(record,),
+            date_range=None,
+            next=None,
+        )
+        response = ActivityHistoryResolvedResponse(
+            resolved=ResolvedPartyResponse(id="1", search_type="people", name="Ada"),
+            groups={"meeting": group},
+        )
+
+        assert response.groups["meeting"].items == (record,)
+        assert not hasattr(response, "records")
+        assert not hasattr(response, "next_cursor")
