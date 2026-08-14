@@ -1,9 +1,12 @@
+import inspect
 from collections.abc import Callable
+from typing import get_args
 
 import httpx
 import pytest
 import respx
 from pydantic import TypeAdapter, ValidationError
+from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.custom_fields import CustomFieldEntityType
 from backstop_mcp.server.tools.list_custom_fields import (
@@ -178,3 +181,13 @@ class TestListCustomFieldsInput:
     def test_rejects_empty_entity_types(self) -> None:
         with pytest.raises(ValidationError):
             TypeAdapter(list_custom_fields).validate_python({"entity_types": []})
+
+    def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
+        doc = list_custom_fields.__doc__ or ""
+        assert "refresh=true" in doc
+        assert "missing field" in doc
+
+        refresh = inspect.signature(list_custom_fields).parameters["refresh"]
+        field_info = next(arg for arg in get_args(refresh.annotation) if isinstance(arg, FieldInfo))
+        assert field_info.description is not None
+        assert "missing field" in field_info.description

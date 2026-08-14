@@ -233,3 +233,27 @@ class TestGetPerson:
         doc = get_person.__doc__ or ""
         assert "employments" in doc
         assert "relay" in doc.lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_does_not_declare_glossary_meta(self, connect_user: ConnectUser) -> None:
+        await connect_user("user-person-glossary", "person-glossary")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p9", "people", name="Jane Doe")),
+            )
+        )
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(200, json=_person_document(FORMER_TYPE))
+        )
+
+        result = tool_model(
+            await get_person(ctx_never_elicit(), search="Jane Doe"),
+            PersonResolvedResponse,
+        )
+
+        assert "glossary_meta" not in PersonResolvedResponse.model_fields
+        assert "glossary_meta" not in result.model_dump()
+        assert "glossary_meta" not in (get_person.__doc__ or "")

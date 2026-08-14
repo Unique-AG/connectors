@@ -84,8 +84,8 @@ class ResolvedParty(BaseModel):
     name: str | None = None
 
 
-# Party resolution is one instance of the shared algebra in `resolution.py`: same result types,
-# same ambiguity policy, same status strings as custom-field resolution.
+# Party resolution is an instance of the shared algebra in `resolution.py`: same result types,
+# same ambiguity policy, same status strings.
 type PartyCandidate = Candidate[ResolvedParty]
 type PartyResolution = Resolution[ResolvedParty]
 type BatchPartyResolution = BatchResolution[ResolvedParty]

@@ -172,6 +172,7 @@ class TestCatalogGet:
         params = route.calls.last.request.url.params
         assert params["page[limit]"] == "1000"
         assert "include" not in params
+        assert not any("/lov-entries" in str(call.request.url) for call in respx.calls)
 
         assert cache == "ok"
         assert len(definitions) == 1
