@@ -34,7 +34,7 @@ from urllib.parse import quote
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import (
-    BackstopApiCollectionDocument,
+    BackstopApiResource,
     BackstopApiResourceDocument,
     BackstopClient,
 )
@@ -93,7 +93,6 @@ class _AttendeeAttributes(BaseModel):
 
 
 _ActivityDetailDocument = BackstopApiResourceDocument[_ActivityDetailAttributes]
-_AttendeeDocument = BackstopApiCollectionDocument[_AttendeeAttributes]
 
 
 class ActivityDetail(BaseModel):
@@ -179,13 +178,14 @@ async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[
         "activity_history.attendees.fetch",
         extra={"activity_id": activity_id, "resource_id": resource_id},
     )
-    document = await client.get(
+    page = await client.paginate(
         f"/meeting-or-calls/{quote(resource_id, safe='')}/attendees",
         params={"fields": _ATTENDEE_FIELDS},
-        schema=_AttendeeDocument,
+        schema=BackstopApiResource[_AttendeeAttributes],
+        max_records=None,
     )
     attendees = tuple(
-        Attendee(name=resource.attributes.display_name()) for resource in document.data
+        Attendee(name=resource.attributes.display_name()) for resource in page.items
     )
     nameless = sum(1 for attendee in attendees if not attendee.name)
     if nameless:

@@ -232,6 +232,38 @@ class TestDefensiveParsing:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_walks_attendee_pages(self, connect_user: ConnectUser) -> None:
+        await connect_user("user-ad-7", "org-gina-ad")  # pyright: ignore[reportGeneralTypeIssues]
+
+        activity_id = "meeting-or-calls_888"
+        _details_route(activity_id).mock(
+            return_value=httpx.Response(200, json=_detail_document(activity_id, type="meeting"))
+        )
+        _attendees_route("888").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        **collection(resource("att1", "people", name="Jane Doe")),
+                        "links": {"next": "/meeting-or-calls/888/attendees?page[offset]=100"},
+                    },
+                ),
+                httpx.Response(
+                    200,
+                    json=collection(resource("att2", "people", name="John Smith")),
+                ),
+            ]
+        )
+
+        result = tool_model(
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            ActivityDetailResponse,
+        )
+
+        assert [attendee.name for attendee in result.attendees] == ["Jane Doe", "John Smith"]
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_activity_id_path_segment_is_percent_encoded(
         self, connect_user: ConnectUser
     ) -> None:

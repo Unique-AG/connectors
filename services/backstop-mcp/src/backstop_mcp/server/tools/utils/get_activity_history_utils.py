@@ -9,6 +9,7 @@ from typing import Annotated, ClassVar, Literal, Self
 from fastmcp import Context
 from mcp.types import CallToolResult
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -191,12 +192,19 @@ class PartyAttributes(ProvenanceFields):
 
     `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
     surfaces the raw attribute dump, only `name` (for the resolve echo) and provenance (for
-    `as_of`).
+    `as_of`). People records often omit `name` and send `firstName`/`lastName` instead; keep
+    those so a `type="next"` page (where `ResolvedParty.name` is None) can still rebuild it.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str | None = None
+    first_name: str | None = Field(
+        default=None, validation_alias=AliasChoices("firstName", "first_name")
+    )
+    last_name: str | None = Field(
+        default=None, validation_alias=AliasChoices("lastName", "last_name")
+    )
 
 
 @dataclass(frozen=True, slots=True)

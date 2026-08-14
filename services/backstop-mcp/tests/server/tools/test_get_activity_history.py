@@ -231,14 +231,14 @@ class TestFirstCallBySearch:
             scope="organizations",
             candidates=[
                 PartyCandidateResponse(
-                    key="o1",
+                    key="organizations:o1",
                     label="Capstone A",
                     id="o1",
                     search_type="organizations",
                     name="Capstone A",
                 ),
                 PartyCandidateResponse(
-                    key="o2",
+                    key="organizations:o2",
                     label="Capstone B",
                     id="o2",
                     search_type="organizations",
@@ -367,6 +367,54 @@ class TestResumedCall:
         assert set(result.groups) == {"meeting"}
         assert _record_keys(result.groups["meeting"].items) == [("meeting", "m4")]
         assert result.groups["meeting"].next is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rebuilds_person_name_from_first_and_last_on_next_page(
+        self, connect_user: ConnectUser
+    ) -> None:
+        """Next pages omit ResolvedParty.name; the party GET often has firstName/lastName only."""
+        await connect_user("user-ah-5c", "person-gina")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "people",
+                        "id": "p9",
+                        "attributes": {
+                            "firstName": "Jane",
+                            "lastName": "Doe",
+                            "modifiedTimestamp": "2025-03-01T10:00:00Z",
+                            "modifiedBy": "ops",
+                        },
+                    }
+                },
+            )
+        )
+        _activities_route("people", "p9", "meetings").mock(
+            return_value=httpx.Response(200, json=collection(_activity("m4", "2026-01-01")))
+        )
+
+        result = tool_model(
+            await get_activity_history(
+                ctx_never_elicit(),
+                _next(
+                    search_type="people",
+                    entity_id="p9",
+                    next={"meeting": ActivityContinuation(limit=10, offset=3)},
+                ),
+            ),
+            ActivityHistoryResolvedResponse,
+        )
+
+        assert result.resolved == ResolvedPartyAsOfResponse(
+            id="p9",
+            search_type="people",
+            name="Jane Doe",
+            as_of=AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
+        )
 
     @pytest.mark.asyncio
     @respx.mock
