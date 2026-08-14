@@ -21,10 +21,9 @@ def _definition(
     definition_id: str, *, is_time_series: bool, name: str = "Grade"
 ) -> CustomFieldDefinition:
     return CustomFieldDefinition(
-        definition_id=definition_id,
-        entity_type="organizations",
-        crm_name=name,
-        display_name=name,
+        id=definition_id,
+        entity_type="OrganizationBean",
+        name=name,
         is_time_series=is_time_series,
     )
 

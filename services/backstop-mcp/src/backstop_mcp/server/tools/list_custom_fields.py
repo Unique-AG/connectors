@@ -53,7 +53,7 @@ async def list_custom_fields(
 ) -> CallToolResult:
     """List custom-field definitions for one Backstop entity type.
 
-    Use when you need the custom-field catalog (ids, types, aliases, allowed values) for
+    Use when you need the custom-field catalog (ids, types, layout, select options) for
     organizations, people, contacts, employees, opportunities, or accounts. Pass refresh=true
     to re-fetch definitions from Backstop into the cache.
     """

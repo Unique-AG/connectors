@@ -134,7 +134,7 @@ async def _read_time_series_value(
     # seeing every entry. A cap would silently return the newest of an arbitrary prefix.
     page = await client.paginate(
         f"/{entity}/{safe_id}/timeSeriesCustomFieldValues",
-        params={"filter[definitionId][eq]": definition.definition_id},
+        params={"filter[definitionId][eq]": definition.id},
         max_records=None,
         schema=BackstopApiResource[TimeSeriesCustomFieldValueAttributes],
     )
@@ -143,7 +143,7 @@ async def _read_time_series_value(
     logger.debug(
         "custom_fields.time_series.read",
         extra={
-            "definition_id": definition.definition_id,
+            "definition_id": definition.id,
             "entries": len(page.items),
         },
     )
@@ -166,6 +166,6 @@ async def _read_regular_value(
     as_of = extract_as_of(attrs)
     values = attrs.regular_custom_field_values or []
     for entry in values:
-        if entry.definition_id == definition.definition_id:
+        if entry.definition_id == definition.id:
             return CustomFieldValueRead(value=entry.value, as_of=as_of)
     return CustomFieldValueRead(value=None, as_of=as_of)

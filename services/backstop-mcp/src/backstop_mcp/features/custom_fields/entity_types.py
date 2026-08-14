@@ -26,14 +26,24 @@ CUSTOM_FIELD_BEANS: Final[dict[CustomFieldEntityType, str]] = {
     CustomFieldEntityType.PARTY: "PartyBean",
 }
 
+_TOOL_NAME_TO_ENTITY_TYPE: Final[dict[str, CustomFieldEntityType]] = {
+    member.value.casefold(): member for member in CustomFieldEntityType
+}
+
 _BEAN_TO_CUSTOM_FIELD_ENTITY_TYPE: Final[dict[str, CustomFieldEntityType]] = {
-    bean: entity_type for entity_type, bean in CUSTOM_FIELD_BEANS.items()
+    bean.casefold(): entity_type for entity_type, bean in CUSTOM_FIELD_BEANS.items()
 }
 
 
 def custom_field_entity_type_from_bean(bean: str) -> CustomFieldEntityType | None:
     """Map a Backstop Bean `entityType` to a tool name, or None if unknown."""
-    return _BEAN_TO_CUSTOM_FIELD_ENTITY_TYPE.get(bean)
+    return _BEAN_TO_CUSTOM_FIELD_ENTITY_TYPE.get(bean.casefold())
+
+
+def custom_field_entity_type(value: str) -> CustomFieldEntityType | None:
+    """Map a tool name or Bean to a custom-field entity type, or None if unknown."""
+    folded = value.casefold()
+    return _TOOL_NAME_TO_ENTITY_TYPE.get(folded) or _BEAN_TO_CUSTOM_FIELD_ENTITY_TYPE.get(folded)
 
 
 __all__ = [
@@ -41,6 +51,7 @@ __all__ = [
     "CustomFieldEntityType",
     "EntityType",
     "KNOWN_ENTITY_TYPES",
+    "custom_field_entity_type",
     "custom_field_entity_type_from_bean",
     "normalize_entity_type",
 ]

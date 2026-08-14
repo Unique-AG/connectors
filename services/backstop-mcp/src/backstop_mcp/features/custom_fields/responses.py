@@ -20,38 +20,33 @@ from backstop_mcp.features.resolution import (
 )
 
 
-class AllowedValueResponse(BaseModel):
-    """One picklist option, returned so a caller can validate a write before attempting it."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
-
-    id: str | None = None
-    label: str
-
-
 class CustomFieldDefinitionResponse(BaseModel):
     """A resolved field definition, returned so a wrong resolution is visible rather than silent."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
-    definition_id: str
+    id: str
+    name: str
     entity_type: str
-    crm_name: str
-    display_name: str
-    aliases: list[str] = Field(default_factory=list)
-    description: str | None = None
     field_type: str | None = None
     field_type_display: str | None = None
     is_time_series: bool
-    allowed_values: list[AllowedValueResponse] = Field(default_factory=list)
+    select_options: list[object] = Field(default_factory=list)
+    tab_name: str | None = None
+    group_name: str | None = None
+    layout_name: str | None = None
+    resource_type: str | None = None
+    required: bool | None = None
+    client_required: bool | None = None
+    system_defined: bool | None = None
+    description: str | None = None
 
 
 class FieldCandidateResponse(CandidateResponse):
     """One ambiguous field match, returned so the model can ask the user to pick one."""
 
-    definition_id: str
-    display_name: str
-    crm_name: str
+    id: str
+    name: str
     entity_type: str
 
 
@@ -69,9 +64,8 @@ def field_candidate_response(candidate: FieldCandidate) -> FieldCandidateRespons
     return FieldCandidateResponse(
         key=candidate.key,
         label=candidate.label,
-        definition_id=definition.definition_id,
-        display_name=definition.display_name,
-        crm_name=definition.crm_name,
+        id=definition.id,
+        name=definition.name,
         entity_type=definition.entity_type,
     )
 
@@ -88,7 +82,6 @@ def unresolved_field_response(
 
 
 __all__ = [
-    "AllowedValueResponse",
     "CustomFieldDefinitionResponse",
     "FieldAmbiguousResponse",
     "FieldCandidateResponse",
