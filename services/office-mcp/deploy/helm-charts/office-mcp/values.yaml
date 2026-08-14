@@ -102,12 +102,6 @@ routes:
   auth:
     jwt: false
 
-hooks:
-  migration:
-    enabled: true
-    command: |
-      alembic upgrade head
-
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 networkPolicy:
   enabled: false

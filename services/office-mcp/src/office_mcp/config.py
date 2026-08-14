@@ -1,8 +1,8 @@
 import os
-import ssl
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
-from typing import ClassVar, Self, TypedDict, cast
+from typing import ClassVar, Self, cast
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from pydantic import (
     Field,
@@ -12,73 +12,61 @@ from pydantic import (
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.engine.url import URL, make_url
 
 PKG_VERSION = pkg_version("office-mcp")
 
+# libpq `sslmode` values asyncpg understands verbatim. `verify` is libpq's own alias for
+# `verify-full` and is the one value asyncpg rejects outright, so it — and only it — is rewritten.
+# `verify-ca` is a genuinely weaker mode (CA chain, no hostname) that asyncpg supports, so
+# widening it to `verify-full` would silently change what the connection checks.
+_ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
 
-class AsyncpgConnectArgs(TypedDict, total=False):
-    ssl: ssl.SSLContext | str
-
-
-def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | str | None:
-    """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
-    if sslmode in ("disable", "allow"):
-        return None
-    if sslmode == "prefer":
-        # Libpq `prefer` means "try TLS, fall back to plaintext". An SSLContext would make
-        # asyncpg treat the connection as mandatory TLS, so pass its own `"prefer"` string
-        # through instead to keep the fallback-to-plaintext behavior.
-        return "prefer"
-    if sslmode == "require":
-        # Encrypt the connection but do not verify the server certificate.
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        return ctx
-    if sslmode == "verify-ca":
-        # Libpq verify-ca checks the CA chain only — not the hostname (that is verify-full).
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        return ctx
-    if sslmode in ("verify", "verify-full"):
-        return ssl.create_default_context()
-    raise ValueError(f"Unsupported sslmode={sslmode!r} in database URL")
+# libpq params asyncpg has no equivalent for, and does not merely ignore: any query key it does
+# not recognise is passed through as a *server setting* in the startup packet, so leaving
+# `channel_binding=require` in the DSN makes Postgres refuse the connection with
+# `unrecognized configuration parameter "channel_binding"`. Dropped here instead.
+_UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 
 
-def _query_param(query: dict[str, str | tuple[str, ...]], key: str) -> str | None:
-    value = query.get(key)
-    if value is None:
-        return None
-    if isinstance(value, tuple):
-        return value[0] if value else None
-    return value
+def asyncpg_dsn(url: str) -> str:
+    """Rewrite a libpq Postgres URL into the DSN asyncpg itself accepts.
 
+    One DSN is the whole database surface of this service: the readiness probe and (once it
+    lands) FastMCP's OAuth store both hand this exact string to `asyncpg.connect`, so there is
+    no second connection shape that can negotiate TLS differently from the first.
 
-def normalize_asyncpg_url(url: str) -> tuple[str, AsyncpgConnectArgs]:
-    """Rewrite a libpq Postgres URL for SQLAlchemy/asyncpg.
-
-    Helm injects `DATABASE_URL` with libpq query params (`sslmode=...`). asyncpg rejects
-    those params, so strip them and return equivalent `connect_args` instead.
+    Built on `urllib.parse` rather than a URL library that reassembles from decoded parts:
+    `urlsplit` leaves `netloc` — userinfo, host and port together — as written, so a
+    percent-encoded password (`p%40ss`), a bracketed IPv6 host and an absent port all survive
+    verbatim. Only the scheme and the query are rewritten.
     """
-    parsed = make_url(url)
-    if parsed.drivername in ("postgresql", "postgres"):
+    parts = urlsplit(url)
+    scheme = parts.scheme
+    if scheme in ("postgres", "postgresql+asyncpg"):
         # `postgres://` is the libpq short form (Heroku/Azure and many operator-generated
-        # secrets emit it); pydantic's `PostgresDsn` accepts it verbatim without rewriting it,
-        # so it's normalized here alongside the long form.
-        parsed = parsed.set(drivername="postgresql+asyncpg")
-    elif not parsed.drivername.startswith("postgresql"):
+        # secrets emit it) and `postgresql+asyncpg://` is SQLAlchemy's driver-qualified form
+        # (what a Helm chart or a copied connection string may carry). asyncpg rejects both.
+        scheme = "postgresql"
+    elif scheme != "postgresql":
         raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
 
-    sslmode = _query_param(dict(parsed.query), "sslmode")
-    parsed = parsed.difference_update_query(["sslmode", "channel_binding"])
+    query = urlencode(
+        [
+            (key, _asyncpg_sslmode(value) if key == "sslmode" else value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            if key not in _UNSUPPORTED_PARAMS
+        ]
+    )
+    return urlunsplit((scheme, parts.netloc, parts.path, query, parts.fragment))
 
-    connect_args: AsyncpgConnectArgs = {}
-    if sslmode is not None:
-        ssl_arg = _ssl_connect_arg(sslmode)
-        if ssl_arg is not None:
-            connect_args["ssl"] = ssl_arg
-    return parsed.render_as_string(hide_password=False), connect_args
+
+def _asyncpg_sslmode(sslmode: str) -> str:
+    """The asyncpg spelling of a libpq `sslmode`. Only `verify` differs."""
+    if sslmode == "verify":
+        return "verify-full"
+    if sslmode not in _ASYNCPG_SSLMODES:
+        raise ValueError(f"Unsupported sslmode={sslmode!r} in database URL")
+    return sslmode
 
 
 class AppEnv(StrEnum):
@@ -177,7 +165,11 @@ class DatabaseConfig(BaseSettings):
 
     Provide either `url` / `DB_URL` (or Helm's `DATABASE_URL` alias) **or** the discrete
     `host`/`name`/`user`/`password` fields. The discrete fields may be `None` when a URL is
-    set — `_resolve_connection_url` only requires them when building a DSN from parts.
+    set — `_resolve_driver_dsn` only requires them when building a DSN from parts.
+
+    Exactly one thing comes out: `driver_dsn`, the string every caller passes to
+    `asyncpg.connect`. There is deliberately no second, engine-shaped rendering of the same
+    settings — two shapes are two places TLS can be negotiated differently.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
@@ -188,8 +180,7 @@ class DatabaseConfig(BaseSettings):
     name: str | None = None
     user: str | None = None
     password: str | None = None
-    _connection_url: str = PrivateAttr(default="")
-    _connect_args: AsyncpgConnectArgs = PrivateAttr(default_factory=lambda: AsyncpgConnectArgs())
+    _driver_dsn: str = PrivateAttr(default="")
 
     @model_validator(mode="before")
     @classmethod
@@ -215,9 +206,9 @@ class DatabaseConfig(BaseSettings):
         return values
 
     @model_validator(mode="after")
-    def _resolve_connection_url(self) -> Self:
+    def _resolve_driver_dsn(self) -> Self:
         if self.url is not None:
-            self._connection_url, self._connect_args = normalize_asyncpg_url(str(self.url))
+            self._driver_dsn = asyncpg_dsn(str(self.url))
             return self
 
         missing = [
@@ -233,23 +224,20 @@ class DatabaseConfig(BaseSettings):
         if missing:
             raise ValueError(f"DB_URL not set; missing required fields: {', '.join(missing)}")
 
-        self._connection_url = URL.create(
-            drivername="postgresql+asyncpg",
-            username=self.user,
-            password=self.password,
-            host=self.host,
-            port=self.port,
-            database=self.name,
-        ).render_as_string(hide_password=False)
-        self._connect_args = AsyncpgConnectArgs()
+        assert self.user is not None and self.password is not None and self.name is not None, (
+            "the missing-field check above must leave every discrete part set"
+        )
+
+        # `safe=""` because `quote`'s default leaves `/` (and more) unescaped, and each of these
+        # is a single URL component: anything reserved inside one has to be encoded or the DSN
+        # reparses with the delimiter in the wrong place. The host is interpolated as written,
+        # so a bracketed IPv6 literal keeps its brackets.
+        userinfo = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}"
+        database = quote(self.name, safe="")
+        self._driver_dsn = f"postgresql://{userinfo}@{self.host}:{self.port}/{database}"
         return self
 
     @property
-    def connection_url(self) -> str:
-        """SQLAlchemy/asyncpg URL after driver rewrite and libpq-param stripping."""
-        return self._connection_url
-
-    @property
-    def connect_args(self) -> AsyncpgConnectArgs:
-        """asyncpg connect args derived from libpq query params (e.g. sslmode)."""
-        return self._connect_args
+    def driver_dsn(self) -> str:
+        """The DSN to hand `asyncpg.connect`. The only database surface this config exposes."""
+        return self._driver_dsn
