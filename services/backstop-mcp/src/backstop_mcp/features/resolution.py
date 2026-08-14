@@ -1,8 +1,7 @@
 """One resolution algebra, one ambiguity policy, shared by every name-to-record lookup.
 
-Two subsystems answer "the user said X — which record is that?": party resolution
-(`party_resolver`) and custom-field resolution (`custom_fields`). Both are instances of the
-policy below, so a third resolver has an obvious shape to adopt.
+Party resolution (`party_resolver`) answers "the user said X — which record is that?"
+A later resolver has an obvious shape to adopt.
 
 Vocabulary, used identically on the wire and in the internal types:
 

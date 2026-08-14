@@ -248,3 +248,41 @@ class TestGetOrganization:
         assert result.status == "not_found"
         assert getattr(result, "query", None) == "Capstoen"
         assert getattr(result, "scope", None) == "organizations"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_does_not_declare_glossary_meta(self, connect_user: ConnectUser) -> None:
+        await connect_user("user-org-glossary", "org-glossary")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("o42", "organizations", name="Capstone")),
+            )
+        )
+        respx.get(f"{BASE_URL}/organizations/o42").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "o42",
+                        "attributes": {
+                            "name": "Capstone",
+                            "status": "active",
+                            "modifiedTimestamp": "2025-03-01T10:00:00Z",
+                            "modifiedBy": "ops",
+                        },
+                    }
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_organization(ctx_never_elicit(), search="Capstone"),
+            OrganizationResolvedResponse,
+        )
+
+        assert "glossary_meta" not in OrganizationResolvedResponse.model_fields
+        assert "glossary_meta" not in result.model_dump()
+        assert "glossary_meta" not in (get_organization.__doc__ or "")

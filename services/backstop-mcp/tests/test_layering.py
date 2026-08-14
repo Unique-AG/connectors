@@ -3,8 +3,9 @@
 1. **`features/` must not import `server/`.** `features/` is what the connector does; `server/`
    is how it's exposed over MCP. The server wires features together, so it imports them freely —
    the reverse is an inversion. This used to be a convention and it was already broken once:
-   `custom_fields/middleware.py` imported `tools.registry`, which only avoided a circular import
-   because `custom_fields/__init__.py` happened not to import the middleware.
+   a glossary middleware living under `custom_fields/` imported `tools.registry`, which only
+   avoided a circular import because `custom_fields/__init__.py` happened not to import it.
+   That middleware is gone; the rule remains.
 
 2. **`backstop_client/` must not import `features/`.** The HTTP client is infrastructure that
    features consume; it importing one back is the same inversion, and it had the same near-miss.
@@ -67,7 +68,6 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.custom_fields",
     "backstop_mcp.features.data_hygiene",
     "backstop_mcp.features.party_resolver",
-    "backstop_mcp.server.middleware",
     "backstop_mcp.server.tools",
 )
 
@@ -110,8 +110,7 @@ def _violations(source: pathlib.Path, prefix: str) -> list[str]:
 def _declares_dunder_all(node: ast.AST) -> bool:
     """Both spellings: bare `__all__ = [...]` and annotated `__all__: list[str] = [...]`.
 
-    The annotated form parses as `AnnAssign`, not `Assign`, and a package that starts out
-    deliberately empty is exactly the one that needs the annotation to type-check.
+    The annotated form parses as `AnnAssign`, not `Assign`.
     """
     if isinstance(node, ast.Assign):
         return any(
@@ -159,7 +158,7 @@ class TestTheDetectionItself:
     """The rules are only worth having if they fail on the things they're meant to catch."""
 
     def test_catches_the_violation_the_server_rule_exists_for(self) -> None:
-        # Verbatim shape of the import that `custom_fields/middleware.py` used to carry.
+        # Verbatim shape of the import the old custom-field glossary middleware used to carry.
         assert _imports_under(
             "from backstop_mcp.server.tools.registry import TOOLS",
             _SERVER_PREFIX,

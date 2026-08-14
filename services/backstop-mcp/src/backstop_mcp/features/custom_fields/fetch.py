@@ -23,7 +23,7 @@ def definition_from_resource(resource: DefinitionResource) -> CustomFieldDefinit
     """Map one CRM definition resource onto Backstop attributes.
 
     Returns None when `name` or `entityType` is missing, or `entityType` is not one of the
-    six known Beans — neither is recoverable, and an unnameable field can't be resolved.
+    six known Beans.
     """
     attrs = resource.attributes
     name = attrs.name
