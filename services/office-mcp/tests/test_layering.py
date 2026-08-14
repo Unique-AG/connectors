@@ -13,10 +13,15 @@
    configured — a transport is only allowed to be told.
 
 4. **A package is entered through its `__init__`, never through its modules.** Applies to the
-   packages listed in `_PUBLIC_SURFACE_PACKAGES`, which is empty in this PR — no package under
-   `src/` exports anything yet. `features/` and `server/` are never among them: they are
-   groupings whose `__init__` is documentation. The walk still runs over every source file, and
-   `TestTheDetectionItself` keeps the checker itself honest against a stand-in package.
+   packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` is not among them: it is a
+   grouping whose `__init__` is documentation.
+
+5. **A config class is only instantiated at the composition root.** `create_app` builds each one
+   exactly once and injects it; anything downstream constructing its own re-reads the
+   environment and so silently ignores what it was given — which is how a tool ends up
+   configured differently from the app it runs in. Reading config types (annotations, imports)
+   is unrestricted; only *calling* them is the violation. `main.py` is exempt as a process
+   entrypoint: it is the root of its own program and hands `create_app` the config it built.
 
 Rules 2 and 3 only apply to `graph_client/`, which doesn't exist yet in this PR — those test
 classes no-op (skip) until it lands. Rule 1's "the tree actually has feature packages" guard
@@ -45,19 +50,16 @@ _CONFIG_MODULE = "office_mcp.config"
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
 # directly testable without being callable from production code that should go through the front
-# door. A new package belongs here as soon as its `__init__` exports anything.
-#
-# Empty in this PR, and honestly so: `db/` was the only entry and this scaffold no longer has one
-# (the database surface is a single DSN on `DatabaseConfig`). No package under `src/` exports
-# anything from its `__init__` yet — `features/` and `server/` are groupings, exempt by rule 4.
-# The rule below still walks every source file, so it starts failing the moment a package is
-# listed and something reaches past its front door; `TestTheDetectionItself` keeps the checker
-# itself under test against `graph_client/`, the first package that will join this tuple.
-_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ()
+# door. A new package belongs here as soon as its `__init__` exports anything: `server/` earned
+# its place by exporting `ready_response`, and the feature packages join as they land.
+_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.server",)
 
-# The stand-in `TestTheDetectionItself` exercises the checker with, so those tests keep proving
-# it catches what it exists for while the real tuple is empty.
-_EXAMPLE_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.graph_client",)
+# The `BaseSettings` classes in config.py, which read the environment when constructed.
+_CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig"})
+
+# Files allowed to construct one, relative to `_SRC`. Both are the root of a program: `app.py` is
+# the composition root, and `main.py` is the server entrypoint that hands it its `AppConfig`.
+_COMPOSITION_ROOTS = frozenset({"app.py", "main.py"})
 
 
 def _feature_packages() -> set[str]:
@@ -170,25 +172,49 @@ def _is_inside(directory: pathlib.Path, package: str) -> bool:
     )
 
 
-def _internal_imports(
-    source: str,
-    directory: pathlib.Path,
-    packages: tuple[str, ...] = _PUBLIC_SURFACE_PACKAGES,
-) -> list[tuple[str, int]]:
+def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, int]]:
     """Modules of a public-surface package that `source` reaches past the `__init__` for.
 
     A file inside a package may import its own package's modules freely — that is the package
     composing itself — so the directory the file lives in, not its name, decides.
-
-    `packages` defaults to the real tuple; `TestTheDetectionItself` passes a stand-in so the
-    checker stays under test while that tuple is empty.
     """
     return [
         (module, line)
-        for package in packages
+        for package in _PUBLIC_SURFACE_PACKAGES
         if not _is_inside(directory, package)
         for module, line in _imported_modules(ast.parse(source))
         if module.startswith(f"{package}.")
+    ]
+
+
+def _config_constructions(source: str) -> list[tuple[str, int]]:
+    """Calls in `source` that construct a config class, with the line each is on.
+
+    Only calls count. Importing a config type, annotating a parameter with one, or handing one
+    to `isinstance` are all how an injected config is *used*, and none of them read the
+    environment. `AppConfig.model_validate({...})` is likewise left alone: it validates the data
+    it is given rather than gathering its own.
+    """
+    found: list[tuple[str, int]] = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        called = node.func
+        if isinstance(called, ast.Name) and called.id in _CONFIG_CLASSES:
+            found.append((called.id, node.lineno))
+        # `config.EntraConfig()` — the same construction reached through its module.
+        elif isinstance(called, ast.Attribute) and called.attr in _CONFIG_CLASSES:
+            found.append((called.attr, node.lineno))
+    return found
+
+
+def _config_construction_violations(source: pathlib.Path) -> list[str]:
+    relative = source.relative_to(_SRC)
+    if relative.as_posix() in _COMPOSITION_ROOTS:
+        return []
+    return [
+        f"{relative}:{line} constructs {name}()"
+        for name, line in _config_constructions(source.read_text())
     ]
 
 
@@ -253,36 +279,56 @@ class TestTheDetectionItself:
         ]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
+        # `_PUBLIC_SURFACE_PACKAGES` only lists `server` for now, so that's the package under
+        # test here; once the first feature package lands and joins the list, its own modules
+        # serve this same role. The importing directory is `_SRC` — i.e. `app.py`, the
+        # composition root, which is the likeliest place to reach past a front door.
         assert _internal_imports(
-            "from office_mcp.graph_client.client import GraphClient",
-            _SRC / "server",
-            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
-        ) == [("office_mcp.graph_client.client", 1)]
+            "from office_mcp.server.readiness import ready_response",
+            _SRC,
+        ) == [("office_mcp.server.readiness", 1)]
 
     def test_the_same_import_is_fine_inside_the_package(self) -> None:
         assert not _internal_imports(
-            "from office_mcp.graph_client.client import GraphClient",
-            _package_directory("office_mcp.graph_client"),
-            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
+            "from office_mcp.server.readiness import ready_response",
+            _package_directory("office_mcp.server"),
         )
 
     def test_catches_reaching_past_the_init_for_a_service_too(self) -> None:
         """Not only one module: every module inside a public-surface package is behind the
-        front door, not only the ones with an obviously "internal" name."""
+        front door, not only the ones with an obviously "internal" name — including the ones
+        not written yet, which is why `server.tools` (a later PR's) is named here."""
         assert _internal_imports(
-            "from office_mcp.graph_client.settings import GraphSettings",
+            "from office_mcp.server.tools import TOOLS",
             _SRC / "features",
-            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
-        ) == [("office_mcp.graph_client.settings", 1)]
+        ) == [("office_mcp.server.tools", 1)]
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
-            "from office_mcp.graph_client import GraphClient\n"
-            + "from office_mcp.server.runtime import get_services\n"
+            "from office_mcp.features.calendar import CalendarService\n"
+            + "from office_mcp.server import ready_response\n"
             + "from office_mcp.features.resolution import Resolved\n",
-            _SRC / "server" / "tools",
-            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
+            _SRC,
         )
+
+    def test_catches_the_violation_the_config_construction_rule_exists_for(self) -> None:
+        assert _config_constructions(
+            "def graph_settings() -> None:\n    entra = EntraConfig()\n"
+        ) == [("EntraConfig", 2)]
+
+    def test_catches_a_config_built_through_its_module_too(self) -> None:
+        assert _config_constructions("cfg = config.AppConfig()") == [("AppConfig", 1)]
+
+    def test_does_not_fire_on_using_an_injected_config(self) -> None:
+        assert not _config_constructions(
+            "from office_mcp.config import EntraConfig\n"
+            + "def build_auth(entra: EntraConfig) -> str:\n"
+            + "    return entra.client_id\n"
+        )
+
+    def test_does_not_fire_on_validating_supplied_data(self) -> None:
+        """`model_validate` is handed its values; it does not go looking for them."""
+        assert not _config_constructions("AppConfig.model_validate({'port': 1})")
 
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
         assert not _imports_under("from office_mcp.serverless import thing", _SERVER_PREFIX)
@@ -342,6 +388,30 @@ class TestGraphClientDoesNotImportConfig:
             "graph_client/ must not import config — it takes its own frozen settings types "
             + "from graph_client/settings.py, which create_app translates the app config into. "
             + "Add the field to those settings and map it in create_app instead:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestConfigIsBuiltOnlyAtTheCompositionRoot:
+    def test_every_exempt_file_actually_exists(self) -> None:
+        """Guards the guard: a renamed entrypoint would silently widen the exemption."""
+        for relative in sorted(_COMPOSITION_ROOTS):
+            assert (_SRC / relative).is_file(), f"no such file: {relative}"
+
+    def test_the_composition_root_really_does_build_every_config(self) -> None:
+        """And guards it from the other side: if `app.py` stopped constructing the config
+        classes, they would be built somewhere else and this rule would be vacuous."""
+        built = {name for name, _line in _config_constructions((_SRC / "app.py").read_text())}
+
+        assert built >= _CONFIG_CLASSES, f"app.py does not build {_CONFIG_CLASSES - built}"
+
+    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
+    def test_no_module_outside_the_root_builds_its_own_config(self, source: pathlib.Path) -> None:
+        violations = _config_construction_violations(source)
+        assert not violations, (
+            "only create_app() may construct a config — building one here re-reads the "
+            + "environment and quietly ignores whatever create_app was given. Take the value "
+            + "as a parameter and let the composition root pass it in:\n  "
             + "\n  ".join(violations)
         )
 

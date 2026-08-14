@@ -12,9 +12,13 @@ from office_mcp.config import (
     AppConfig,
     AppEnv,
     DatabaseConfig,
+    EntraConfig,
     LogLevel,
     asyncpg_dsn,
 )
+
+_TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
 
 # asyncpg ships no type information, so both seams into it are narrowed once here rather than
@@ -214,6 +218,59 @@ class TestAsyncpgItselfAcceptsWhatWeProduce:
             asyncpg_dsn("postgresql://u:p@h:5432/db?channel_binding=require"),
         )
         assert not rewritten.server_settings
+
+
+class TestEntraConfig:
+    def test_reads_the_app_registration_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ENTRA_TENANT_ID", _TENANT_ID)
+        monkeypatch.setenv("ENTRA_CLIENT_ID", _CLIENT_ID)
+        monkeypatch.setenv("ENTRA_CLIENT_SECRET", "s3cr3t")
+
+        # Required fields with no defaults read as missing arguments to pyright; the whole point
+        # of this test is that pydantic-settings supplies them from the environment.
+        config = EntraConfig()  # pyright: ignore[reportCallIssue]
+
+        assert config.tenant_id == _TENANT_ID
+        assert config.client_id == _CLIENT_ID
+        assert config.client_secret.get_secret_value() == "s3cr3t"
+
+    def test_the_secret_is_not_in_the_repr(self) -> None:
+        """It ends up in log lines and pydantic error output otherwise."""
+        config = EntraConfig.model_validate(
+            {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        )
+
+        assert "s3cr3t" not in repr(config)
+
+    @pytest.mark.parametrize("field", ["tenant_id", "client_id", "client_secret"])
+    def test_every_field_is_required(self, field: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        supplied = {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        del supplied[field]
+        for name in ("ENTRA_TENANT_ID", "ENTRA_CLIENT_ID", "ENTRA_CLIENT_SECRET"):
+            monkeypatch.delenv(name, raising=False)
+
+        with pytest.raises(ValidationError, match=field):
+            EntraConfig.model_validate(supplied)
+
+    @pytest.mark.parametrize("field", ["tenant_id", "client_id", "client_secret"])
+    def test_an_empty_value_is_not_a_value(self, field: str) -> None:
+        """An unset variable in a Helm overlay arrives as an empty string, not as absent."""
+        supplied = {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        supplied[field] = ""
+
+        with pytest.raises(ValidationError, match=field):
+            EntraConfig.model_validate(supplied)
+
+    @pytest.mark.parametrize("tenant_id", ["common", "organizations", "consumers", "Common"])
+    def test_rejects_a_multi_tenant_authority(self, tenant_id: str) -> None:
+        """The provider derives one expected issuer from this value and cannot be told not to,
+        so these would reject every token instead of allowing every tenant."""
+        with pytest.raises(ValidationError, match="ENTRA_TENANT_ID"):
+            EntraConfig.model_validate(
+                {"tenant_id": tenant_id, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+            )
 
 
 class TestPublicBaseUrl:

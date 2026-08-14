@@ -9,6 +9,7 @@ from pydantic import (
     HttpUrl,
     PostgresDsn,
     PrivateAttr,
+    SecretStr,
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,9 +32,11 @@ _UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 def asyncpg_dsn(url: str) -> str:
     """Rewrite a libpq Postgres URL into the DSN asyncpg itself accepts.
 
-    One DSN is the whole database surface of this service: the readiness probe and (once it
-    lands) FastMCP's OAuth store both hand this exact string to `asyncpg.connect`, so there is
-    no second connection shape that can negotiate TLS differently from the first.
+    One DSN is the whole database surface of this service. FastMCP's OAuth state store builds
+    its own asyncpg pool from this exact string and accepts no connect args, so TLS has to ride
+    the DSN — and the readiness probe reads through that same store rather than opening a
+    connection of its own, so there is no second connection shape that can negotiate TLS
+    differently from the first.
 
     Built on `urllib.parse` rather than a URL library that reassembles from decoded parts:
     `urlsplit` leaves `netloc` — userinfo, host and port together — as written, so a
@@ -160,6 +163,41 @@ class AppConfig(BaseSettings):
         return str(self.public_base_url).rstrip("/")
 
 
+# Entra authority aliases that let any tenant sign in. `AzureProvider` derives exactly one
+# expected issuer from `tenant_id` (`https://{authority}/{tenant_id}/v2.0`) and offers no way to
+# turn that check off, but a real token's `iss` names the *caller's* tenant — so with one of these
+# every token fails verification and every login fails identically, with nothing in the logs
+# pointing at the tenant id.
+_MULTI_TENANT_AUTHORITIES = frozenset({"common", "organizations", "consumers"})
+
+
+class EntraConfig(BaseSettings):
+    """The Microsoft Entra app registration this service authenticates users against.
+
+    These three values are the whole of what FastMCP's `AzureProvider` needs from this service:
+    it owns the authorization endpoint, PKCE, the redirect callback, token refresh, and the
+    On-Behalf-Of exchange that turns a user's token into a Microsoft Graph one. `client_secret`
+    is required here even though the provider itself allows omitting it, because On-Behalf-Of
+    cannot be performed without one — and calling Graph as the signed-in user is the point.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ENTRA_")
+
+    tenant_id: str = Field(min_length=1)
+    client_id: str = Field(min_length=1)
+    client_secret: SecretStr = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _reject_multi_tenant_authority(self) -> Self:
+        if self.tenant_id.lower() in _MULTI_TENANT_AUTHORITIES:
+            raise ValueError(
+                f"ENTRA_TENANT_ID must name a single tenant, not {self.tenant_id!r}: the auth "
+                + "provider validates every token against one issuer derived from this value, "
+                + "so a multi-tenant authority rejects all of them. Use the tenant's ID."
+            )
+        return self
+
+
 class DatabaseConfig(BaseSettings):
     """Where office-mcp stores its state.
 
@@ -167,9 +205,9 @@ class DatabaseConfig(BaseSettings):
     `host`/`name`/`user`/`password` fields. The discrete fields may be `None` when a URL is
     set — `_resolve_driver_dsn` only requires them when building a DSN from parts.
 
-    Exactly one thing comes out: `driver_dsn`, the string every caller passes to
-    `asyncpg.connect`. There is deliberately no second, engine-shaped rendering of the same
-    settings — two shapes are two places TLS can be negotiated differently.
+    Exactly one thing comes out: `driver_dsn`, the string the OAuth state store hands asyncpg.
+    There is deliberately no second, engine-shaped rendering of the same settings — two shapes
+    are two places TLS can be negotiated differently.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
@@ -239,5 +277,10 @@ class DatabaseConfig(BaseSettings):
 
     @property
     def driver_dsn(self) -> str:
-        """The DSN to hand `asyncpg.connect`. The only database surface this config exposes."""
+        """The configured database, as a URL asyncpg's own DSN parser accepts.
+
+        The only database surface this config exposes, and the only shape any consumer needs:
+        the OAuth state store builds its own pool from this string and takes no connect args.
+        See `asyncpg_dsn`.
+        """
         return self._driver_dsn
