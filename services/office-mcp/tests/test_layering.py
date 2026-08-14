@@ -13,8 +13,10 @@
    configured — a transport is only allowed to be told.
 
 4. **A package is entered through its `__init__`, never through its modules.** Applies to the
-   packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are not among them:
-   they are groupings whose `__init__` is documentation.
+   packages listed in `_PUBLIC_SURFACE_PACKAGES`, which is empty in this PR — no package under
+   `src/` exports anything yet. `features/` and `server/` are never among them: they are
+   groupings whose `__init__` is documentation. The walk still runs over every source file, and
+   `TestTheDetectionItself` keeps the checker itself honest against a stand-in package.
 
 Rules 2 and 3 only apply to `graph_client/`, which doesn't exist yet in this PR — those test
 classes no-op (skip) until it lands. Rule 1's "the tree actually has feature packages" guard
@@ -44,7 +46,18 @@ _CONFIG_MODULE = "office_mcp.config"
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
 # directly testable without being callable from production code that should go through the front
 # door. A new package belongs here as soon as its `__init__` exports anything.
-_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.db",)
+#
+# Empty in this PR, and honestly so: `db/` was the only entry and this scaffold no longer has one
+# (the database surface is a single DSN on `DatabaseConfig`). No package under `src/` exports
+# anything from its `__init__` yet — `features/` and `server/` are groupings, exempt by rule 4.
+# The rule below still walks every source file, so it starts failing the moment a package is
+# listed and something reaches past its front door; `TestTheDetectionItself` keeps the checker
+# itself under test against `graph_client/`, the first package that will join this tuple.
+_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ()
+
+# The stand-in `TestTheDetectionItself` exercises the checker with, so those tests keep proving
+# it catches what it exists for while the real tuple is empty.
+_EXAMPLE_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("office_mcp.graph_client",)
 
 
 def _feature_packages() -> set[str]:
@@ -157,15 +170,22 @@ def _is_inside(directory: pathlib.Path, package: str) -> bool:
     )
 
 
-def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, int]]:
+def _internal_imports(
+    source: str,
+    directory: pathlib.Path,
+    packages: tuple[str, ...] = _PUBLIC_SURFACE_PACKAGES,
+) -> list[tuple[str, int]]:
     """Modules of a public-surface package that `source` reaches past the `__init__` for.
 
     A file inside a package may import its own package's modules freely — that is the package
     composing itself — so the directory the file lives in, not its name, decides.
+
+    `packages` defaults to the real tuple; `TestTheDetectionItself` passes a stand-in so the
+    checker stays under test while that tuple is empty.
     """
     return [
         (module, line)
-        for package in _PUBLIC_SURFACE_PACKAGES
+        for package in packages
         if not _is_inside(directory, package)
         for module, line in _imported_modules(ast.parse(source))
         if module.startswith(f"{package}.")
@@ -233,34 +253,35 @@ class TestTheDetectionItself:
         ]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
-        # `_PUBLIC_SURFACE_PACKAGES` only lists `db` for now, so that's the stand-in package
-        # here; once the first feature package lands and joins the list, its own modules serve
-        # this same role.
         assert _internal_imports(
-            "from office_mcp.db.engine import create_engine",
+            "from office_mcp.graph_client.client import GraphClient",
             _SRC / "server",
-        ) == [("office_mcp.db.engine", 1)]
+            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
+        ) == [("office_mcp.graph_client.client", 1)]
 
-    def test_the_same_import_is_fine_inside_the_feature(self) -> None:
+    def test_the_same_import_is_fine_inside_the_package(self) -> None:
         assert not _internal_imports(
-            "from office_mcp.db.engine import create_engine",
-            _package_directory("office_mcp.db"),
+            "from office_mcp.graph_client.client import GraphClient",
+            _package_directory("office_mcp.graph_client"),
+            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
         )
 
     def test_catches_reaching_past_the_init_for_a_service_too(self) -> None:
         """Not only one module: every module inside a public-surface package is behind the
         front door, not only the ones with an obviously "internal" name."""
         assert _internal_imports(
-            "from office_mcp.db.models import Base",
+            "from office_mcp.graph_client.settings import GraphSettings",
             _SRC / "features",
-        ) == [("office_mcp.db.models", 1)]
+            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
+        ) == [("office_mcp.graph_client.settings", 1)]
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
-            "from office_mcp.features.calendar import CalendarService\n"
+            "from office_mcp.graph_client import GraphClient\n"
             + "from office_mcp.server.runtime import get_services\n"
             + "from office_mcp.features.resolution import Resolved\n",
             _SRC / "server" / "tools",
+            _EXAMPLE_PUBLIC_SURFACE_PACKAGES,
         )
 
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
