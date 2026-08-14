@@ -39,7 +39,7 @@ class CustomFieldsService:
             cached = self._definitions
             if cached is not None and self._freshness.within() and not refresh:
                 return list(cached), "ok"
-            if self._in_flight is not None:
+            if self._in_flight is not None and not self._in_flight.done():
                 in_flight = self._in_flight
                 owner = False
             else:
@@ -63,9 +63,14 @@ class CustomFieldsService:
                 in_flight.set_exception(waiter_error)
             raise
         finally:
-            async with self._lock:
-                if self._in_flight is in_flight:
-                    self._in_flight = None
+            # Shield so a CancelledError cannot skip unpinning and leave later
+            # get()s joining a finished future until process restart.
+            await asyncio.shield(self._unpin_in_flight(in_flight))
+
+    async def _unpin_in_flight(self, in_flight: asyncio.Future[CatalogResult]) -> None:
+        async with self._lock:
+            if self._in_flight is in_flight:
+                self._in_flight = None
 
     async def _fetch(
         self, client: BackstopClient, in_flight: asyncio.Future[CatalogResult]

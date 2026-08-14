@@ -551,6 +551,31 @@ class TestInMemoryTtl:
 
         release_refresh.set()
 
+        self._definitions_route(base_url, "After Cancel")
+        definitions, cache = await asyncio.wait_for(service.get(client), timeout=5)
+        assert cache == "ok"
+        assert [d.name for d in definitions] == ["After Cancel"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_done_in_flight_future_does_not_block_the_next_get(
+        self, clients: ClientBuilder
+    ) -> None:
+        """If unpinning is skipped, a finished future must not pin the catalog forever."""
+        base_url = f"{BASE_URL}/ttl-stale-in-flight"
+        service = _service()
+        done = asyncio.get_running_loop().create_future()
+        done.set_exception(RuntimeError("custom-field catalog fetch was cancelled"))
+        service._in_flight = done  # pyright: ignore[reportPrivateUsage]
+        route = self._definitions_route(base_url, "Recovered Field")
+
+        definitions, cache = await service.get(clients(base_url))
+
+        assert cache == "ok"
+        assert [d.name for d in definitions] == ["Recovered Field"]
+        assert route.call_count == 1
+        assert service._in_flight is None  # pyright: ignore[reportPrivateUsage]
+
     @pytest.mark.asyncio
     @respx.mock
     async def test_failed_fetch_with_no_cache_raises(self, clients: ClientBuilder) -> None:
