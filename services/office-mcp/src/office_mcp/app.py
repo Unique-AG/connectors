@@ -1,9 +1,6 @@
-import logging
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Protocol, cast
 
-import asyncpg
 from fastmcp import FastMCP
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
@@ -14,34 +11,31 @@ from starlette.responses import JSONResponse
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 
-from office_mcp.config import AppConfig, DatabaseConfig
+from office_mcp.auth import build_auth, build_oauth_storage
+from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig
 from office_mcp.logging import configure_logging
 from office_mcp.metrics import configure_metrics
-
-logger = logging.getLogger(__name__)
-
-
-# asyncpg has no type stubs; narrowed here for type checking the readiness path.
-class _Connection(Protocol):
-    async def fetchval(self, query: str, /) -> object: ...
-    async def close(self) -> None: ...
-
-
-_connect = cast("Callable[[str], Awaitable[_Connection]]", asyncpg.connect)
+from office_mcp.server import ready_response
 
 
 def create_app(
     config: AppConfig | None = None,
     database_config: DatabaseConfig | None = None,
+    entra_config: EntraConfig | None = None,
 ) -> Starlette:
-    """Build the app.
+    """The composition root.
 
-    All config objects and long-lived collaborators are built here once, then injected.
-    Nothing downstream re-reads the environment.
-    Scaffolding only: no OAuth, no Graph client, no tools yet.
+    Every config object and every long-lived collaborator is built exactly once here and then
+    injected. Nothing downstream re-reads the environment. The Microsoft Graph client and the
+    tools that use it land in later PRs, wired in here the same way — so the MCP endpoint below
+    authenticates callers but exposes no tools yet.
     """
     config = config or AppConfig()
     database_config = database_config or DatabaseConfig()
+    # `EntraConfig`'s fields are required with no defaults, which pyright reads as missing
+    # arguments; pydantic-settings fills them from the environment. Deliberately not given
+    # placeholder defaults: a missing app registration must fail at startup, by name.
+    entra_config = entra_config or EntraConfig()  # pyright: ignore[reportCallIssue]
 
     configure_logging(config)
     configure_metrics(config)
@@ -56,13 +50,29 @@ def create_app(
     # Self-disabling when no OTEL_* variable is set, so a test process stays untraced.
     configure_tracing(service_name="office-mcp", service_version=config.version)
 
+    # The OAuth state store is this service's only connection to Postgres. It is built here
+    # rather than inside `build_auth` so that one object serves both consumers: the auth
+    # provider that depends on it, and the readiness probe that has to prove it works.
+    oauth_storage = build_oauth_storage(entra_config, database_config)
+    auth = build_auth(entra_config, base_url=config.issuer, client_storage=oauth_storage)
+
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
-        yield
+        try:
+            yield
+        finally:
+            # One On-Behalf-Of credential is cached per signed-in user, each holding an open
+            # HTTP transport of its own. The OAuth state store is deliberately not closed here:
+            # its asyncpg pool dies with the process, and the wrapper chain `oauth_storage`
+            # names publishes get/put/delete only — no close — so shutting the pool down would
+            # mean reaching through the encryption wrapper for a store the process is about to
+            # drop anyway.
+            await auth.close_obo_credentials()
 
     mcp = FastMCP(
         "Office MCP",
         version=config.version,
+        auth=auth,
         middleware=[],
         lifespan=lifespan,
     )
@@ -72,8 +82,12 @@ def create_app(
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:
-        """Check if Postgres is reachable. The `/probe` route checks process up only."""
-        return await _ready_response(database_config.driver_dsn)
+        """Postgres readiness — stock `setup_ops` `/probe` is process-up only.
+
+        Asks the OAuth state store, which is the connection every sign-in goes through. See
+        `server/readiness.py` for why it must not be a connection of its own.
+        """
+        return await ready_response(oauth_storage)
 
     return mcp.http_app(
         middleware=[
@@ -87,28 +101,4 @@ def create_app(
             Middleware(OpenTelemetryMiddleware, meter_provider=NoOpMeterProvider()),
             ops_middleware,
         ]
-    )
-
-
-async def _ready_response(dsn: str) -> JSONResponse:
-    """Check readiness and report results. Open one connection per probe to match production path.
-
-    Trap: No engine and no pool. A probe that uses a different connection path than
-    the code doing real work can report healthy while that work fails.
-    """
-    database_ok = True
-    try:
-        connection = await _connect(dsn)
-        try:
-            _ = await connection.fetchval("SELECT 1")
-        finally:
-            await connection.close()
-    except Exception:
-        database_ok = False
-        logger.warning("ready.database_unreachable", exc_info=True)
-
-    checks = {"database": database_ok}
-    return JSONResponse(
-        {"status": "healthy" if database_ok else "unhealthy", "checks": checks},
-        status_code=200 if database_ok else 503,
     )

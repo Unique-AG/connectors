@@ -9,6 +9,7 @@ from pydantic import (
     HttpUrl,
     PostgresDsn,
     PrivateAttr,
+    SecretStr,
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -140,6 +141,41 @@ class AppConfig(BaseSettings):
         own and restores the slash there.
         """
         return str(self.public_base_url).rstrip("/")
+
+
+# Entra authority aliases that let any tenant sign in. `AzureProvider` derives exactly one
+# expected issuer from `tenant_id` (`https://{authority}/{tenant_id}/v2.0`) and offers no way to
+# turn that check off, but a real token's `iss` names the *caller's* tenant — so with one of these
+# every token fails verification and every login fails identically, with nothing in the logs
+# pointing at the tenant id.
+_MULTI_TENANT_AUTHORITIES = frozenset({"common", "organizations", "consumers"})
+
+
+class EntraConfig(BaseSettings):
+    """The Microsoft Entra app registration this service authenticates users against.
+
+    These three values are the whole of what FastMCP's `AzureProvider` needs from this service:
+    it owns the authorization endpoint, PKCE, the redirect callback, token refresh, and the
+    On-Behalf-Of exchange that turns a user's token into a Microsoft Graph one. `client_secret`
+    is required here even though the provider itself allows omitting it, because On-Behalf-Of
+    cannot be performed without one — and calling Graph as the signed-in user is the point.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ENTRA_")
+
+    tenant_id: str = Field(min_length=1)
+    client_id: str = Field(min_length=1)
+    client_secret: SecretStr = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _reject_multi_tenant_authority(self) -> Self:
+        if self.tenant_id.lower() in _MULTI_TENANT_AUTHORITIES:
+            raise ValueError(
+                f"ENTRA_TENANT_ID must name a single tenant, not {self.tenant_id!r}: the auth "
+                + "provider validates every token against one issuer derived from this value, "
+                + "so a multi-tenant authority rejects all of them. Use the tenant's ID."
+            )
+        return self
 
 
 class DatabaseConfig(BaseSettings):
