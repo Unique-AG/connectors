@@ -60,6 +60,8 @@ from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
 from msgraph_core.tasks import PageIterator
 
+from office_mcp.graph_client.errors import GraphPagingUnending
+
 
 class GraphCollection[T](Protocol):
     """The two members of a Graph collection response that paging needs.
@@ -193,11 +195,17 @@ async def collect_pages[T](
         # again; only a run of pages carrying nothing at all is bounded — see `MAX_EMPTY_PAGES` for
         # why that is the run and not the walk, and why it is not pooled with `max_scanned`.
         empty_pages_in_a_row = 0 if scanned > looked_at_before else empty_pages_in_a_row + 1
-        assert empty_pages_in_a_row <= MAX_EMPTY_PAGES, (
-            f"Microsoft Graph answered {empty_pages_in_a_row} pages in a row with nothing in them "
-            f"and still advertised more of this collection ({scanned} items looked at, "
-            f"{len(items)} kept)"
-        )
+        if empty_pages_in_a_row > MAX_EMPTY_PAGES:
+            # A raise and not an `assert`: this is Microsoft Graph misbehaving, which is the
+            # system boundary this package's exceptions are for, and `python -O` strips asserts —
+            # which would leave this walk following an endless collection with nothing to stop it,
+            # the exact failure the constant above exists to bound.
+            raise GraphPagingUnending(
+                f"Microsoft Graph answered {empty_pages_in_a_row} pages in a row with nothing in "
+                + "them and still advertised more of this collection "
+                + f"({scanned} items looked at, {len(items)} kept)",
+                empty_pages=empty_pages_in_a_row,
+            )
         page = await iterator.next()
         assert page is not None, "Graph advertised a next link and then had no next page"
         iterator.current_page = page

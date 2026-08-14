@@ -1,12 +1,16 @@
 """Paging `/me/chats`, against synthesised multi-page responses."""
 
+import subprocess
+import sys
+from pathlib import Path
+
 import httpx
 import pytest
 import respx
 from msgraph.generated.models.chat import Chat
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_mcp.graph_client import collect_pages
+from office_mcp.graph_client import GraphPagingUnending, collect_pages
 from office_mcp.graph_client.pagination import MAX_EMPTY_PAGES, MAX_SCANNED_ITEMS
 
 from .conftest import GRAPH_V1
@@ -185,7 +189,7 @@ class TestTheCaps:
         first = await client.me.chats.get()
         assert first is not None
 
-        with pytest.raises(AssertionError, match="in a row"):
+        with pytest.raises(GraphPagingUnending, match="in a row"):
             _ = await collect_pages(first, client, limit=10, max_scanned=3)
 
         assert len(graph.calls) == MAX_EMPTY_PAGES + 1 == 11, (
@@ -210,7 +214,7 @@ class TestTheCaps:
         first = await client.me.chats.get()
         assert first is not None
 
-        with pytest.raises(AssertionError, match="in a row"):
+        with pytest.raises(GraphPagingUnending, match="in a row"):
             _ = await collect_pages(first, client, limit=10, max_scanned=MAX_SCANNED_ITEMS)
 
         assert len(graph.calls) == MAX_EMPTY_PAGES + 1
@@ -261,3 +265,77 @@ class TestTheCaps:
 
         assert len(collected.items) == pages, "every item page was reached"
         assert not collected.capped, "nothing stopped this walk but the end of the collection"
+
+
+# The one test the run below re-runs under `-O`. Named once, here, so that renaming the test cannot
+# silently turn that run into a no-op: `pytest` exits non-zero on a node id it cannot collect.
+_ENDLESS_COLLECTION = (
+    "tests/graph_client/test_pagination.py::TestTheCaps"
+    "::test_a_collection_answering_only_empty_pages_gives_up_in_a_run_of_them"
+)
+
+_PROJECT_ROOT = Path(__file__).parents[2]
+
+
+class TestTheBoundIsNotAnAssertion:
+    """The bound on empty pages has to hold in the interpreter production runs, `-O` included."""
+
+    async def test_the_refusal_names_the_run_and_what_graph_was_still_advertising(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """What an operator gets, and what a model gets: `server.errors` maps `GraphFailure` and
+        nothing else onto tool advice, so the type is what makes this reach the caller as something
+        it can act on rather than as a crash, and the count is the whole of the evidence."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
+            )
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        with pytest.raises(GraphPagingUnending) as raised:
+            _ = await collect_pages(first, client, limit=10)
+
+        assert raised.value.empty_pages == MAX_EMPTY_PAGES + 1
+        message = str(raised.value)
+        assert f"{MAX_EMPTY_PAGES + 1} pages in a row" in message, "the count, for an operator"
+        assert "still advertised more of this collection" in message, "and why that is a refusal"
+        assert raised.value.status is None, "no request failed; every one of those pages was a 200"
+
+    def test_the_bound_still_stops_the_walk_under_python_O(self) -> None:
+        """`python -O` strips `assert` statements, so a bound written as one is not a bound at all.
+
+        This is the whole point of the change and it cannot be tested in-process: `__debug__` is
+        fixed when the interpreter starts. So the empty-page test is re-run in a child interpreter
+        started with `-O`, where a walk with nothing to stop it follows a collection that never
+        ends — which is why the child is given a deadline and why running out of it is reported as
+        the failure it is. Put the `assert` back and this test fails: either the child hangs on the
+        endless collection, or `pytest.raises` reports that nothing was raised.
+        """
+        stripped = subprocess.run(
+            [sys.executable, "-O", "-c", "print(__debug__)"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert stripped.stdout.strip() == "False", "the child really does drop its assertions"
+
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-O", "-m", "pytest", "-q", "-p", "no:cacheprovider", "-x"]
+                + [_ENDLESS_COLLECTION],
+                cwd=_PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except subprocess.TimeoutExpired:
+            pytest.fail(
+                "the walk never stopped under `python -O`: the bound on empty pages is written as "
+                + "something the optimiser removed, which is the defect this test exists for"
+            )
+
+        assert completed.returncode == 0, (
+            "the bound did not hold under `python -O`:\n" + completed.stdout + completed.stderr
+        )

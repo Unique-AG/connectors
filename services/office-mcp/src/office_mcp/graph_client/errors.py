@@ -16,6 +16,13 @@ Anything else (a 400 from a malformed `$filter`, a 409) raises the base `GraphFa
 Graph failure with a status and a code, and inventing a category per status code Graph might
 return would be guessing at remedies that don't exist.
 
+One of them is not a failed request at all. `GraphPagingUnending` is Graph answering 200 after 200
+with nothing in them while still advertising more of a collection, which no status code describes
+and the SDK therefore cannot report — only the walk in `pagination` sees it. It belongs here
+anyway, because "what Graph did wrong" is what this vocabulary is and because being a
+`GraphFailure` is what carries it through `server.errors` to the caller as advice rather than as a
+crash.
+
 One thing above the status code is carried too: `inner_code`, Graph's `error.innerError.code`.
 Where a status and an outer code are the same for two failures with opposite remedies, that is
 the only field that tells them apart — the transcript APIs answer both "your tenant has switched
@@ -115,6 +122,25 @@ class GraphUnavailable(GraphFailure):
     chat contains content Graph itself cannot serialize (Loop components, some cards). A caller
     that retries this forever will spin on those.
     """
+
+
+class GraphPagingUnending(GraphFailure):
+    """Graph would not end a collection: a run of empty pages, every one advertising more.
+
+    Not a failed request — each of those pages was a 200 — so it carries no status, no code and no
+    request id, and `_classify` never produces it. `pagination.collect_pages` raises it directly
+    when the run exceeds `pagination.MAX_EMPTY_PAGES`, and `empty_pages` is how long that run was.
+
+    A raise rather than the `assert` this used to be, for two reasons that are both about the bound
+    being real. `python -O` strips asserts, and the bound is the only thing between a collection
+    that answers nothing but empty pages and a walk that follows them until throttling or a timeout
+    ends it — the thousand-page walk `MAX_EMPTY_PAGES` exists to prevent. And Graph misbehaving is
+    the boundary this module exists to describe, not an invariant of this connector's own code.
+    """
+
+    def __init__(self, message: str, *, empty_pages: int) -> None:
+        super().__init__(message, status=None, code=None, request_id=None)
+        self.empty_pages: int = empty_pages
 
 
 @contextmanager

@@ -12,6 +12,7 @@ from office_mcp.graph_client import (
     GraphFailure,
     GraphForbidden,
     GraphNotFound,
+    GraphPagingUnending,
     GraphThrottled,
     GraphUnavailable,
 )
@@ -94,6 +95,21 @@ class TestRetryAdvice:
         message = _message(GraphUnavailable("boom", status=503, code=None, request_id=None))
 
         assert "Retry once" in message
+
+    def test_a_collection_graph_will_not_end_reaches_the_caller_as_advice(self) -> None:
+        """The one failure here that no request produced: Graph answering page after empty page
+        while still advertising more, which `collect_pages` refuses. It is a `GraphFailure` so that
+        it arrives the way a 429 or a 403 does — as a tool error a model can act on — and the count
+        has to survive into the message, because it is the only evidence there is.
+        """
+        message = _message(
+            GraphPagingUnending("11 empty pages in a row, and Graph says more", empty_pages=11)
+        )
+
+        assert "11 pages in a row" in message
+        assert "nothing in them" in message
+        assert "no other arguments will avoid it" in message, "not a bad-request remedy"
+        assert "None" not in message, "no status, no code, nothing invented in their place"
 
     def test_a_bad_request_is_not_worth_retrying(self) -> None:
         message = _message(GraphFailure("bad filter", status=400, code=None, request_id=None))
