@@ -294,6 +294,38 @@ class TestQuickSearch:
         assert not isinstance(response, NotFoundResponse)
         assert [c.id for c in response.candidates] == ["p1", "o2"]
         assert [c.search_type for c in response.candidates] == ["people", "organizations"]
+        assert [c.key for c in response.candidates] == ["people:p1", "organizations:o2"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_enhanced_same_id_across_types_keeps_both_candidates(
+        self, client: BackstopClient
+    ) -> None:
+        """Backstop ids are per-collection; the elicit key must not collapse cross-type hits."""
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("1", "people", name="Jane"),
+                    resource("1", "organizations", name="Jane"),
+                ),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Jane",
+            quick_search_options=QuickSearchOptions(enhance_search_types=True),
+        )
+        assert isinstance(result, Ambiguous)
+
+        response = unresolved_party_response(result)
+        assert not isinstance(response, NotFoundResponse)
+        assert [c.id for c in response.candidates] == ["1", "1"]
+        assert [c.search_type for c in response.candidates] == ["people", "organizations"]
+        assert [c.key for c in response.candidates] == ["people:1", "organizations:1"]
 
     @pytest.mark.asyncio
     @respx.mock

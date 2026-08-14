@@ -189,8 +189,10 @@ def _candidate_from_resource(
     resolved_search_type = party_search_type(resource_type) or search_type
     name = resource.attributes.display_name()
     label = name if name is not None else f"{resource_type} #{resource.id}"
+    # Backstop ids are not unique across collections. Namespace the elicit key by
+    # search_type so `enhance_search_types` hits that share an id stay distinct options.
     return Candidate(
-        key=resource.id,
+        key=f"{resolved_search_type}:{resource.id}",
         label=label,
         value=ResolvedParty(id=resource.id, search_type=resolved_search_type, name=name),
     )
