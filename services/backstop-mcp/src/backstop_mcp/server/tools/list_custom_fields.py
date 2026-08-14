@@ -6,10 +6,8 @@ from pydantic import BaseModel, Field
 
 from backstop_mcp.features.custom_fields import (
     CustomFieldDefinition,
-    CustomFieldDefinitionResponse,
     CustomFieldEntityType,
-    custom_field_entity_type,
-    definition_response,
+    custom_field_entity_type_from_bean,
 )
 from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
 from backstop_mcp.server.tools.results import tool_result
@@ -20,16 +18,16 @@ class ListCustomFieldsResponse(BaseModel):
 
     status: Literal["ok"] = "ok"
     cache: Literal["ok", "stale"]
-    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinitionResponse]]
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]]
 
 
 def _definitions_for(
     catalog: list[CustomFieldDefinition], entity_type: CustomFieldEntityType
-) -> list[CustomFieldDefinitionResponse]:
+) -> list[CustomFieldDefinition]:
     return [
-        definition_response(definition)
+        definition
         for definition in catalog
-        if custom_field_entity_type(definition.entity_type) == entity_type
+        if custom_field_entity_type_from_bean(definition.entity_type) == entity_type
     ]
 
 

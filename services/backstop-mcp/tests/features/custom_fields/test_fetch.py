@@ -1,6 +1,7 @@
 import asyncio
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Sequence
 from datetime import UTC, datetime, timedelta
+from typing import Protocol, cast
 
 import httpx
 import pytest
@@ -16,6 +17,11 @@ from backstop_mcp.features.custom_fields.types import CustomFieldDefinitionAttri
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
+
+
+class _RecordedCall(Protocol):
+    @property
+    def request(self) -> httpx.Request: ...
 
 
 @pytest.fixture
@@ -172,7 +178,8 @@ class TestCatalogGet:
         params = route.calls.last.request.url.params
         assert params["page[limit]"] == "1000"
         assert "include" not in params
-        assert not any("/lov-entries" in str(call.request.url) for call in respx.calls)
+        recorded = cast("Sequence[_RecordedCall]", respx.calls)
+        assert not any("/lov-entries" in str(call.request.url) for call in recorded)
 
         assert cache == "ok"
         assert len(definitions) == 1
@@ -380,6 +387,95 @@ class TestInMemoryTtl:
         for definitions, cache in results:
             assert cache == "ok"
             assert [d.name for d in definitions] == ["Fresh Field"]
+
+    @staticmethod
+    async def _join_in_flight(started: asyncio.Event, release: asyncio.Event) -> None:
+        """Unblock Backstop only after sibling refresh tasks have had a turn to join."""
+        await started.wait()
+        for _ in range(20):
+            await asyncio.sleep(0)
+        release.set()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_concurrent_refreshes_produce_one_walk(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/ttl-refresh-single-flight"
+        service = _service()
+        client = clients(base_url)
+        self._definitions_route(base_url, "Cached Field")
+        await service.get(client)
+
+        refresh_started = asyncio.Event()
+        release_refresh = asyncio.Event()
+
+        async def blocked_definitions(_request: httpx.Request) -> httpx.Response:
+            refresh_started.set()
+            await release_refresh.wait()
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "2",
+                            "custom-field-definitions",
+                            name="Refreshed Field",
+                            entityType="OrganizationBean",
+                            fieldType="text",
+                            isTimeSeries=False,
+                        )
+                    ],
+                    "links": {"next": None},
+                },
+            )
+
+        route = respx.get(f"{base_url}/custom-field-definitions").mock(
+            side_effect=blocked_definitions
+        )
+
+        warm_calls = route.call_count
+        results = await asyncio.gather(
+            service.get(client, refresh=True),
+            service.get(client, refresh=True),
+            service.get(client, refresh=True),
+            self._join_in_flight(refresh_started, release_refresh),
+        )
+
+        assert route.call_count == warm_calls + 1
+        for definitions, cache in results[:3]:
+            assert cache == "ok"
+            assert [d.name for d in definitions] == ["Refreshed Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_concurrent_failed_refreshes_share_stale(self, clients: ClientBuilder) -> None:
+        base_url = f"{BASE_URL}/ttl-refresh-fail-single-flight"
+        service = _service()
+        client = clients(base_url)
+        self._definitions_route(base_url, "Cached Field")
+        await service.get(client)
+
+        refresh_started = asyncio.Event()
+        release_refresh = asyncio.Event()
+
+        async def blocked_failure(_request: httpx.Request) -> httpx.Response:
+            refresh_started.set()
+            await release_refresh.wait()
+            raise httpx.ConnectError("backstop down")
+
+        route = respx.get(f"{base_url}/custom-field-definitions").mock(side_effect=blocked_failure)
+
+        warm_calls = route.call_count
+        results = await asyncio.gather(
+            service.get(client, refresh=True),
+            service.get(client, refresh=True),
+            service.get(client, refresh=True),
+            self._join_in_flight(refresh_started, release_refresh),
+        )
+
+        assert route.call_count == warm_calls + 1
+        for definitions, cache in results[:3]:
+            assert cache == "stale"
+            assert [d.name for d in definitions] == ["Cached Field"]
 
     @pytest.mark.asyncio
     @respx.mock

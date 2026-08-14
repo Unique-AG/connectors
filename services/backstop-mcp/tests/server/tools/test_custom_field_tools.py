@@ -1,6 +1,5 @@
-import inspect
 from collections.abc import Callable
-from typing import get_args
+from typing import cast, get_args
 
 import httpx
 import pytest
@@ -187,7 +186,11 @@ class TestListCustomFieldsInput:
         assert "refresh=true" in doc
         assert "missing field" in doc
 
-        refresh = inspect.signature(list_custom_fields).parameters["refresh"]
-        field_info = next(arg for arg in get_args(refresh.annotation) if isinstance(arg, FieldInfo))
+        annotations = cast("dict[str, object]", list_custom_fields.__annotations__)
+        field_info = next(
+            item
+            for item in cast("tuple[object, ...]", get_args(annotations["refresh"]))
+            if isinstance(item, FieldInfo)
+        )
         assert field_info.description is not None
         assert "missing field" in field_info.description
