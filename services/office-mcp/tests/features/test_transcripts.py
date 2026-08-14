@@ -89,6 +89,34 @@ def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:
     )
 
 
+def _transcript() -> transcripts.TranscriptHandle:
+    """The handle `list_meeting_transcripts` would have minted for the transcript below."""
+    return transcripts.TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID)
+
+
+def _spoken(graph: respx.MockRouter) -> respx.Route:
+    """The words, answered to every read: `/content` is one stream and each call fetches it all."""
+    return graph.get(_CONTENT).mock(
+        return_value=httpx.Response(200, content=TRANSCRIPT_VTT.encode())
+    )
+
+
+def _spoken_by_nobody(graph: respx.MockRouter) -> respx.Route:
+    """The same endpoint in a tenant with speaker attribution off, which is where it is decided.
+
+    The attributed format is refused and the plain one served, exactly as Graph does it — serving
+    unattributed bytes to the attributed request would say `speaker_attribution` is true, which is
+    the field a caller reads to find out why a speaker filter matched nothing.
+    """
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.headers["accept"] == "text/vtt":
+            return httpx.Response(403, json=_ATTRIBUTION_OFF)
+        return httpx.Response(200, content=TRANSCRIPT_UNATTRIBUTED.encode())
+
+    return graph.get(_CONTENT).mock(side_effect=respond)
+
+
 class TestTheHandleGrammar:
     def test_a_meeting_handle_survives_the_join_url_it_carries(self) -> None:
         """A join URL is full of `:`, `/`, `?`, `&` and `%` and must come back byte-identical:
@@ -817,3 +845,250 @@ class TestReadingTheWords:
                 offset=0,
                 limit=transcripts.MAX_TURNS + 1,
             )
+
+
+class TestNarrowingWhatComesBack:
+    """The filters, over the one transcript that carries every shape the parser survives.
+
+    An hour of meeting is thousands of turns and a model reads it to answer one question, so the
+    narrowing has to happen here rather than in the model's context. What is asserted is the part a
+    caller cannot check for itself: which turns a bound admits, and that the page and its
+    `next_offset` are counted over what survived the filter rather than over the whole transcript.
+    """
+
+    async def test_a_lower_bound_keeps_everything_still_running_at_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Overlap and not containment: the turn that was mid-sentence when the clock struck is the
+        one a caller asking "from here" most wants, and dropping it would silently cut the sentence
+        their question is about."""
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, from_seconds=1.0
+        )
+
+        assert [turn.text for turn in read.turns] == [
+            "Sorry, joining late & muted.",
+            "We should raise the floor price by three per cent.",
+            "Agreed <that> works.",
+            "Nobody was attributed for this one.",
+        ], "the first turn started at -2.5 and was still running at 1.0"
+        assert read.turns[0].start_seconds == -2.5
+
+    async def test_a_lower_bound_drops_what_had_finished_before_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, from_seconds=16.0
+        )
+
+        assert [turn.speaker for turn in read.turns] == ["Grace Hopper", "Ada Lovelace", None]
+        assert read.truncated is False
+
+    async def test_an_upper_bound_keeps_the_turn_that_starts_exactly_on_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Inclusive at both ends, for the same reason: a bound a caller read off a previous answer
+        names a turn that exists, and excluding it would make the two ends disagree."""
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, to_seconds=62.0
+        )
+
+        assert [turn.start_seconds for turn in read.turns] == [-2.5, 16.246, 62.0]
+
+    async def test_both_bounds_together_cut_a_window_out_of_the_middle(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, from_seconds=20.0, to_seconds=64.0
+        )
+
+        assert [turn.text for turn in read.turns] == ["Agreed <that> works."]
+
+    async def test_a_speaker_filter_keeps_only_that_speakers_turns(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, speaker="Ada Lovelace"
+        )
+
+        assert [turn.text for turn in read.turns] == [
+            "Sorry, joining late & muted.",
+            "Agreed <that> works.",
+        ]
+        assert read.speaker_attribution is True
+
+    @pytest.mark.parametrize(
+        "speaker",
+        ["ada", "ADA LOVELACE", "lovelace", "Lovelace"],
+        ids=["given", "shouted", "sur", "cased"],
+    )
+    async def test_a_speaker_is_matched_case_insensitively_and_by_part_of_the_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter, speaker: str
+    ) -> None:
+        """A model writes the name it read in a previous answer, or the half of it the caller said.
+        An exact, case-sensitive match would answer "nobody said that" to a question about somebody
+        who spoke — a wrong answer with the shape of a right one."""
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, speaker=speaker
+        )
+
+        assert [turn.speaker for turn in read.turns] == ["Ada Lovelace", "Ada Lovelace"]
+
+    async def test_a_speaker_and_a_window_narrow_together(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """All three at once, which is the question this exists for: what did she say in that
+        stretch. Each filter has to hold, not the last one written."""
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client,
+            handle=_transcript(),
+            offset=0,
+            limit=200,
+            from_seconds=10.0,
+            to_seconds=100.0,
+            speaker="ada",
+        )
+
+        assert [turn.text for turn in read.turns] == ["Agreed <that> works."]
+
+    async def test_a_page_is_cut_from_what_survived_the_filter(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`truncated` counted over the whole transcript would say there is more where the filter
+        already returned everything it matched, and a model would page for turns that cannot come.
+        """
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=2, speaker="ada"
+        )
+
+        assert [turn.text for turn in read.turns] == [
+            "Sorry, joining late & muted.",
+            "Agreed <that> works.",
+        ]
+        assert read.truncated is False, "two matched, two returned; the other turns are not more"
+        assert read.next_offset is None
+
+    async def test_the_next_offset_of_a_filtered_page_continues_the_filtered_sequence(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The offset a caller sends back has to index the same sequence it was cut from. Counted
+        over the unfiltered turns it would land in the middle of them: offset 2 of this transcript
+        is Ada's second turn, and offset 2 of what `from_seconds=2.0` matched is the unattributed
+        one."""
+        _spoken(graph)
+        handle = _transcript()
+
+        first = await transcripts.read_transcript(
+            client, handle=handle, offset=0, limit=2, from_seconds=2.0
+        )
+        second = await transcripts.read_transcript(
+            client, handle=handle, offset=first.next_offset or 0, limit=2, from_seconds=2.0
+        )
+
+        assert (first.truncated, first.next_offset) == (True, 2)
+        assert [turn.speaker for turn in first.turns] == ["Grace Hopper", "Ada Lovelace"]
+        assert [turn.text for turn in second.turns] == ["Nobody was attributed for this one."]
+        assert second.truncated is False
+        assert second.next_offset is None
+
+    async def test_a_window_nothing_falls_in_is_no_turns_rather_than_a_refusal(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, from_seconds=7200.0
+        )
+
+        assert read.turns == []
+        assert read.truncated is False
+        assert read.next_offset is None
+
+    async def test_a_speaker_filter_in_a_tenant_with_no_speakers_matches_nothing_and_says_why(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The one empty answer that must not read as "she never spoke". Where the tenant forbids
+        attribution every `speaker` is null, so the filter legitimately matches nothing — and
+        `speaker_attribution` false is the field that explains it. Refusing the call instead would
+        deny a filter the transcript itself supports for time."""
+        _spoken_by_nobody(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, speaker="ada"
+        )
+
+        assert read.turns == []
+        assert read.speaker_attribution is False, "the reason the page is empty"
+        assert read.truncated is False
+
+    async def test_time_still_filters_where_the_speakers_are_gone(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _spoken_by_nobody(graph)
+
+        read = await transcripts.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, from_seconds=30.0
+        )
+
+        assert [turn.start_seconds for turn in read.turns] == [62.0]
+
+    async def test_filters_left_unset_return_the_whole_transcript(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The default is the answer this tool gave before the filters existed, and passing the
+        absent value explicitly is what a model does when it has nothing to narrow by."""
+        _spoken(graph)
+
+        read = await transcripts.read_transcript(
+            client,
+            handle=_transcript(),
+            offset=0,
+            limit=200,
+            from_seconds=None,
+            to_seconds=None,
+            speaker=None,
+        )
+
+        assert [turn.speaker for turn in read.turns] == [
+            "Ada Lovelace",
+            "Grace Hopper",
+            "Ada Lovelace",
+            None,
+        ]
+        assert read.truncated is False
+        assert read.next_offset is None
+
+    async def test_a_window_that_ends_before_it_starts_is_a_programming_error(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """No transcript can satisfy it, so it is a mistake in the caller rather than an empty
+        answer — and the tool layer refuses it before this is ever reached."""
+        content = _spoken(graph)
+
+        with pytest.raises(AssertionError):
+            _ = await transcripts.read_transcript(
+                client,
+                handle=_transcript(),
+                offset=0,
+                limit=200,
+                from_seconds=60.0,
+                to_seconds=30.0,
+            )
+
+        assert not content.called, "an impossible window costs no Graph request"

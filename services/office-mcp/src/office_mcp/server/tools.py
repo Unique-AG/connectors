@@ -498,7 +498,18 @@ which Microsoft defines as transcription having started after the conversation d
 
 `speaker_attribution` is false when the organisation has turned speaker names off. The words and \
 timings still come back and every `speaker` is null: do not infer who spoke from the content, and \
-say the transcript is unattributed if the answer turns on who said something.
+say the transcript is unattributed if the answer turns on who said something. **A `speaker` filter \
+matches nothing at all on such a transcript** — there is no name on any turn for it to match — so \
+read an empty answer next to this flag before reporting that the person never spoke, and drop the \
+filter to see the turns themselves.
+
+`from_seconds`/`to_seconds` and `speaker` narrow what comes back, and everything else is counted \
+over what they left: `truncated` and `next_offset` page through the MATCHING turns rather than \
+through the meeting. The time bounds are inclusive and match by overlap, so a turn already under \
+way at `from_seconds` is kept whole instead of being cut at it; `speaker` matches any part of the \
+name Teams shows, ignoring case, because a display name is not something to spell from memory. \
+Filtering does not make the call cheaper — the whole transcript is fetched and parsed either \
+way — it makes the answer smaller.
 
 A long meeting is more turns than fit in one answer. `truncated` says there are more and \
 `next_offset` is where to continue — the same convention every list-shaped tool here uses. Each \
@@ -528,6 +539,27 @@ _NOT_A_TRANSCRIPT_HANDLE = (
     + "`meeting_uri` and pass the `uri` of the transcript you want, verbatim. A `meeting_uri` is "
     + "not a transcript handle — one meeting can have many transcripts — and neither is a Teams "
     + "message handle. Retrying this value will fail identically."
+)
+
+# The two things `read_transcript`'s filters can be asked that a signature cannot refuse. A schema
+# bounds one argument at a time, so neither a window whose ends are the wrong way round nor a filter
+# value that is nothing but spaces is expressible in it — and both would otherwise be answered with
+# an empty page, which is the one failure a model reads as a real answer.
+_INVERTED_TIME_WINDOW = (
+    "read_transcript was given a `from_seconds` later than its `to_seconds`, which selects no part "
+    + "of the meeting: no turn can both end after the one and start before the other, so this "
+    + "would come back empty and read like a silent meeting. Both are offsets in seconds from the "
+    + "moment transcription began, counting upwards, so the earlier moment is the smaller number — "
+    + "swap them if they were written the wrong way round, or drop one to leave that end open."
+)
+
+_BLANK_SPEAKER = (
+    "read_transcript was given a blank `speaker`. A blank filter is not the same as no filter, and "
+    + "it is not treated as one: omit `speaker` entirely to read every turn, or pass any part of "
+    + "the name Teams shows for the person — matching ignores case and matches anywhere in the "
+    + "display name, so `ada` finds `Ada Lovelace`. Note that a transcript whose "
+    + "`speaker_attribution` is false carries no names at all, and any `speaker` filter matches "
+    + "nothing on it."
 )
 
 # Graph's 404 on a well-formed transcript handle. Distinct advice from the message reader's, because
@@ -1002,18 +1034,77 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "How many turns to return. Default 200, maximum "
                     + f"{transcripts.MAX_TURNS}. Every call fetches the whole transcript from "
-                    + "Microsoft, so widening this is cheaper than paging."
+                    + "Microsoft, so widening this is cheaper than paging. It counts the turns "
+                    + "left after `from_seconds`, `to_seconds` and `speaker`, not the meeting's."
                 ),
             ),
         ] = 200,
+        from_seconds: Annotated[
+            float | None,
+            Field(
+                description=(
+                    "Only turns reaching this moment or later, in seconds from when transcription "
+                    + "began — the same scale as a turn's `start_seconds`, which is NOT a "
+                    + "wall-clock time and NOT an offset from the start of the meeting. Inclusive, "
+                    + "and matched by overlap: a turn already under way at this moment is kept "
+                    + "whole rather than cut at it, which is usually the sentence that says what "
+                    + "the stretch is about. Negative values are legal — Microsoft uses them for "
+                    + "transcription that began after the conversation did. This narrows the "
+                    + "answer, not the call: the whole transcript is fetched and parsed either way."
+                )
+            ),
+        ] = None,
+        to_seconds: Annotated[
+            float | None,
+            Field(
+                description=(
+                    "Only turns beginning at this moment or earlier, on the same scale and the "
+                    + "same inclusive overlap rule: a turn still running at this moment is kept "
+                    + "whole. Pair it with `from_seconds` to read one stretch of a long meeting, "
+                    + "and keep the two in that order — a `from_seconds` later than this is "
+                    + "refused rather than answered with an empty page."
+                )
+            ),
+        ] = None,
+        speaker: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only turns whose speaker's name contains this, ignoring case — `ada` matches "
+                    + "`Ada Lovelace`. A substring rather than a whole name on purpose: Teams "
+                    + "display names carry middle names, titles and tenant suffixes, and an exact "
+                    + "match would answer 'they said nothing' to a spelling difference. **If the "
+                    + "transcript's `speaker_attribution` is false this matches NOTHING** — that "
+                    + "organisation records no speaker names, so every turn's `speaker` is null "
+                    + "and no filter can match one. Read an empty answer together with that flag "
+                    + "before concluding the person did not speak, and drop this filter to see the "
+                    + "turns themselves. Omit it to read every speaker; a blank value is refused "
+                    + "rather than read as 'everyone'."
+                ),
+            ),
+        ] = None,
         graph_token: str = _TRANSCRIPT_TOKEN,
     ) -> transcripts.Transcript:
         handle = transcripts.transcript_handle(uri)
         if handle is None:
             raise ToolError(_NOT_A_TRANSCRIPT_HANDLE)
+        # The two rules a schema cannot carry, refused here for the reason search_messages refuses
+        # a criterion-less search: each would otherwise be answered with an empty page, and an
+        # empty page is indistinguishable from a meeting in which nobody said anything.
+        if from_seconds is not None and to_seconds is not None and from_seconds > to_seconds:
+            raise ToolError(_INVERTED_TIME_WINDOW)
+        if speaker is not None and not speaker.strip():
+            raise ToolError(_BLANK_SPEAKER)
         with graph_tool_errors(transcripts.TRANSCRIPT_PERMISSION, not_found=_TRANSCRIPT_UNREADABLE):
             return await transcripts.read_transcript(
-                graph_client_for(transport, graph_token), handle=handle, offset=offset, limit=limit
+                graph_client_for(transport, graph_token),
+                handle=handle,
+                offset=offset,
+                limit=limit,
+                from_seconds=from_seconds,
+                to_seconds=to_seconds,
+                speaker=speaker,
             )
 
 

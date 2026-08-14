@@ -468,17 +468,30 @@ class Transcript(BaseModel):
         )
     )
     turns: list[TranscriptTurn] = Field(
-        description="What was said, in order, one turn per utterance Microsoft timestamped."
+        description=(
+            "What was said, in order, one turn per utterance Microsoft timestamped — the turns "
+            + "matching `from_seconds`, `to_seconds` and `speaker` where any of those was given, "
+            + "and every turn of the transcript where none was. Empty means nothing matched what "
+            + "was asked for, which is not the same as the meeting having no words in it."
+        )
     )
     truncated: bool = Field(
         description=(
-            "True when the transcript has more turns than this page holds — the same 'there is "
-            + "more' flag every list-shaped tool here reports. Pass `next_offset` back as `offset` "
-            + "to continue. Never summarise a truncated transcript as the whole meeting."
+            "True when more turns match than this page holds — the same 'there is more' flag every "
+            + "list-shaped tool here reports. It is counted over the turns left after "
+            + "`from_seconds`, `to_seconds` and `speaker` were applied, so 'there is more' always "
+            + "means more of what was asked for rather than more of the meeting. Pass "
+            + "`next_offset` back as `offset` to continue. Never summarise a truncated transcript "
+            + "as the whole meeting."
         )
     )
     next_offset: int | None = Field(
-        description="The `offset` that reaches the next turns, or null when `truncated` is false."
+        description=(
+            "The `offset` that reaches the next matching turns, or null when `truncated` is false. "
+            + "It indexes the turns the filters kept, so send the same `from_seconds`, "
+            + "`to_seconds` and `speaker` with it — changing one of them renumbers what it points "
+            + "at."
+        )
     )
 
 
@@ -584,21 +597,45 @@ def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
 
 
 async def read_transcript(
-    client: GraphServiceClient, *, handle: TranscriptHandle, offset: int, limit: int
+    client: GraphServiceClient,
+    *,
+    handle: TranscriptHandle,
+    offset: int,
+    limit: int,
+    from_seconds: float | None = None,
+    to_seconds: float | None = None,
+    speaker: str | None = None,
 ) -> Transcript:
-    """The turns of one transcript, from `offset`, up to `limit` of them.
+    """The turns of one transcript matching the filters, from `offset`, up to `limit` of them.
 
     One Graph request, or two where the tenant refuses speaker attribution. Paging is over the
     parsed turns rather than over Graph — `/content` is a single stream with no ranged contract —
     so a later page costs the same fetch again, which is what makes `limit` worth widening rather
-    than looping.
+    than looping. The filters are the same bargain: the whole transcript is fetched and parsed
+    whatever they are, so they make the answer smaller and never the call cheaper.
+
+    They are applied *before* the page is cut, and `truncated`/`next_offset` are counted over what
+    they left. That is the only version of "there is more" a caller can act on: paging the whole
+    transcript while filtering each page would make the flag mean "more of the meeting" while the
+    turns meant "the ones you asked for", and a caller following `next_offset` to the end would
+    walk pages that hold nothing.
     """
     assert 1 <= limit <= MAX_TURNS, f"limit must be within 1..{MAX_TURNS}, got {limit}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
+    assert from_seconds is None or to_seconds is None or from_seconds <= to_seconds, (
+        f"from_seconds must not be after to_seconds, got {from_seconds} and {to_seconds}"
+    )
 
+    # TODO: every page refetches and reparses the whole transcript, because `/content` has no
+    # ranged contract. Caching the parsed turns per handle is the fix.
     content, attributed = await _content(client, handle)
 
-    turns = _turns(content, attributed=attributed)
+    turns = _matching(
+        _turns(content, attributed=attributed),
+        from_seconds=from_seconds,
+        to_seconds=to_seconds,
+        speaker=speaker,
+    )
     page = turns[offset : offset + limit]
     truncated = offset + len(page) < len(turns)
     return Transcript(
@@ -610,6 +647,43 @@ async def read_transcript(
         truncated=truncated,
         next_offset=offset + len(page) if truncated else None,
     )
+
+
+def _matching(
+    turns: list[TranscriptTurn],
+    *,
+    from_seconds: float | None,
+    to_seconds: float | None,
+    speaker: str | None,
+) -> list[TranscriptTurn]:
+    """The turns of `turns` that all of the given filters keep, in the order they were said.
+
+    **The time test is overlap, and both bounds are inclusive.** A turn is one utterance of a
+    sentence or two, and the moment a caller asks about lands in the middle of one about as often
+    as it lands between two — so a turn that straddles a bound is kept whole rather than dropped or
+    cut. Comparing a turn's *start* to both bounds instead would silently lose the sentence already
+    under way at `from_seconds`, which is exactly the sentence that says what the stretch is about.
+
+    **The speaker test is a case-insensitive substring of the display name.** A model asking about
+    a person has a name it read somewhere, not the string Teams stores, and those differ by case,
+    by a middle name, by a title or by the parenthesised suffix a tenant appends. An exact match
+    would answer "that person said nothing" to a spelling difference.
+
+    A turn Microsoft attributed to nobody never matches a speaker filter: `speaker` is null there,
+    and there is nothing to compare. Neither does *any* turn of a transcript from a tenant with
+    speaker attribution switched off, where every `speaker` is null by construction — this is not
+    refused and not degraded to "everything", because a filter that quietly stopped filtering would
+    be worse than an empty answer. `Transcript.speaker_attribution` is the flag that explains that
+    answer, and every description over this argument says to read the two together.
+    """
+    wanted = speaker.casefold() if speaker is not None else None
+    return [
+        turn
+        for turn in turns
+        if (from_seconds is None or turn.end_seconds >= from_seconds)
+        and (to_seconds is None or turn.start_seconds <= to_seconds)
+        and (wanted is None or (turn.speaker is not None and wanted in turn.speaker.casefold()))
+    ]
 
 
 async def _content(client: GraphServiceClient, handle: TranscriptHandle) -> tuple[bytes, bool]:

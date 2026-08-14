@@ -680,11 +680,34 @@ class TestTheToolsThisServerAdvertises:
         description = tools["read_transcript"].description
         assert description is not None
 
-        assert set(_properties(schema)) == {"uri", "offset", "limit"}
+        assert set(_properties(schema)) == {
+            "uri",
+            "offset",
+            "limit",
+            "from_seconds",
+            "to_seconds",
+            "speaker",
+        }
         assert schema.get("required") == ["uri"]
         assert "teams:///transcripts/{meeting_id}/{transcript_id}" in description
         assert "list_meeting_transcripts" in description
         assert "read_message" in description, "the two readers must not be confusable"
+
+    async def test_read_transcript_narrows_by_seconds_and_by_speaker_in_its_own_schema(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The turns are already timestamped and attributed in the answer, so the filters are named
+        in the same units the answer reports: seconds from the meeting's start, and the speaker as
+        the transcript spells them. A model narrows only what it can see, and every one of these is
+        optional — the unfiltered read stays the default."""
+        tools = _named(await mcp_client.list_tools())
+        properties = _properties(tools["read_transcript"].inputSchema)
+
+        for bound in ("from_seconds", "to_seconds"):
+            assert _optional_type(properties[bound])["type"] == "number", bound
+        assert _optional_type(properties["speaker"])["type"] == "string"
+        for name in ("from_seconds", "to_seconds", "speaker"):
+            assert _object(properties[name]).get("description"), f"{name} is undescribed"
 
     async def test_list_meeting_transcripts_names_the_four_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
@@ -1281,6 +1304,72 @@ class TestCallingThem:
         assert result.is_error
         assert "started_after" in _error_text(result)
         assert not meetings.called
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_transcript_is_read_narrowed_to_a_speaker_and_to_a_stretch_of_the_meeting(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """Over the real protocol, in the two shapes a model reaches for: "what did she say" and
+        "what was said after that point". An hour of meeting is thousands of turns and a model that
+        can only ask for all of them spends its context on the transcript instead of the answer.
+        """
+        content = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_TRANSCRIPT_VTT.encode())
+        )
+        uri = f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"
+
+        by_speaker = _structured(
+            await mcp_client.call_tool("read_transcript", {"uri": uri, "speaker": "grace"})
+        )
+        by_time = _structured(
+            await mcp_client.call_tool("read_transcript", {"uri": uri, "from_seconds": 20})
+        )
+
+        assert [
+            turn["speaker"] for turn in cast("Sequence[Mapping[str, object]]", by_speaker["turns"])
+        ] == ["Grace Hopper"]
+        assert by_speaker["speaker_attribution"] is True
+        assert by_speaker["truncated"] is False, "one turn matched and one turn came back"
+        turns = cast("Sequence[Mapping[str, object]]", by_time["turns"])
+        assert [turn["start_seconds"] for turn in turns] == [62.0]
+        assert content.call_count == 2, "paging and filtering are over the parsed turns, not Graph"
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        ("filters", "named"),
+        [
+            ({"from_seconds": 60, "to_seconds": 30}, "from_seconds"),
+            ({"speaker": ""}, "speaker"),
+            ({"speaker": "   "}, "speaker"),
+        ],
+        ids=["inverted-window", "empty-speaker", "blank-speaker"],
+    )
+    async def test_a_filter_no_transcript_could_satisfy_is_refused_before_any_graph_request(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        filters: Mapping[str, object],
+        named: str,
+    ) -> None:
+        """A window that ends before it starts, and a speaker that names nobody, both match nothing
+        by construction — answering them with an empty page would read as "she said nothing in the
+        meeting", which is a wrong answer nobody can detect. The refusal names the parameter, and it
+        costs no Graph request."""
+        content = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_TRANSCRIPT_VTT.encode())
+        )
+
+        result = await mcp_client.call_tool(
+            "read_transcript",
+            {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}", **filters},
+            raise_on_error=False,
+        )
+
+        assert result.is_error
+        assert named in _error_text(result), _error_text(result)
+        assert not content.called
 
     @pytest.mark.usefixtures("obo")
     async def test_a_channel_post_reaches_the_caller_and_no_log_or_span(
