@@ -17,7 +17,6 @@ FROM python:3.12-slim-trixie@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1
 WORKDIR /app
 RUN groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --from=builder --chown=app:app /app/alembic.ini /app/alembic.ini
 COPY --from=builder --chown=app:app /app/src /app/src
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=8000
 USER app

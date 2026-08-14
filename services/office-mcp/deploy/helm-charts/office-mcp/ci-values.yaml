@@ -2,10 +2,6 @@
 postgresql:
   enabled: false
 
-hooks:
-  migration:
-    enabled: false
-
 # Placeholder so `helm template` clears office-mcp.validateValues at the chart's real
 # APP_ENV: production default, instead of masking it behind a non-production override.
 env:
