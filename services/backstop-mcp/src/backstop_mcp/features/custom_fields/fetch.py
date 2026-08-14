@@ -1,93 +1,70 @@
+from typing import cast
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
-from backstop_mcp.features.custom_fields.lov import (
-    LovEntryIndex,
-    allowed_values_for,
-    fetch_lov_entry_index,
-)
+from backstop_mcp.features.custom_fields.entity_types import custom_field_entity_type_from_bean
 from backstop_mcp.features.custom_fields.types import (
-    LOV_SET_RELATIONSHIP,
     CustomFieldDefinition,
     CustomFieldDefinitionAttributes,
 )
 
 _DEFINITIONS_PATH = "/custom-field-definitions"
+_DEFINITIONS_PAGE_SIZE = 1000
 
 type DefinitionResource = BackstopApiResource[CustomFieldDefinitionAttributes]
 
 
-def definition_from_resource(
-    resource: DefinitionResource,
-    *,
-    lov_index: LovEntryIndex,
-    included: list[dict[str, object]],
-) -> CustomFieldDefinition | None:
-    """Map one CRM definition resource onto Backstop attributes and allowed values.
+def _select_options(value: object | None) -> list[object]:
+    if isinstance(value, list):
+        return list(cast(list[object], value))
+    return []
 
-    Returns None for a definition with no usable name or entity type — neither is recoverable,
-    and an unnameable field can't be resolved by name anyway.
+
+def definition_from_resource(resource: DefinitionResource) -> CustomFieldDefinition | None:
+    """Map one CRM definition resource onto Backstop attributes.
+
+    Returns None when `name` or `entityType` is missing, or `entityType` is not one of the
+    six known Beans — neither is recoverable, and an unnameable field can't be resolved.
     """
     attrs = resource.attributes
-    # `name` / `entity_type` are already stripped by `CustomFieldDefinitionAttributes`.
-    crm_name = attrs.name
-    if not crm_name:
+    name = attrs.name
+    if not name:
         return None
 
-    entity_raw = attrs.entity_type
-    if not entity_raw:
+    entity_type = attrs.entity_type
+    if not entity_type or custom_field_entity_type_from_bean(entity_type) is None:
         return None
-    entity_type = normalize_entity_type(entity_raw)
-    if entity_type is None:
-        return None
-
-    lov_set_ids = resource.related_ids(LOV_SET_RELATIONSHIP)
-    lov_set_id = lov_set_ids[0] if lov_set_ids else None
 
     return CustomFieldDefinition(
-        definition_id=resource.id,
+        id=resource.id,
+        name=name,
         entity_type=entity_type,
-        crm_name=crm_name,
-        display_name=crm_name,
-        aliases=(),
-        description=attrs.description,
         field_type=attrs.field_type,
         field_type_display=attrs.field_type_display,
         is_time_series=bool(attrs.is_time_series),
-        allowed_values=allowed_values_for(
-            lov_set_id=lov_set_id,
-            lov_index=lov_index,
-            included=included,
-            inline_lov_set=attrs.lov_set,
-            inline_select_options=attrs.select_options,
-        ),
-        lov_set_id=lov_set_id,
-        raw={
-            "id": resource.id,
-            "type": resource.type,
-            "attributes": attrs.model_dump(by_alias=True, exclude_none=True),
-        },
+        select_options=_select_options(attrs.select_options),
+        tab_name=attrs.tab_name,
+        group_name=attrs.group_name,
+        layout_name=attrs.layout_name,
+        resource_type=attrs.resource_type,
+        required=attrs.required,
+        client_required=attrs.client_required,
+        system_defined=attrs.system_defined,
+        description=attrs.description,
     )
 
 
 async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomFieldDefinition]:
-    """Fetch the instance's full custom-field schema, allowed values included.
-
-    Two paginated calls, not one per field: the definitions (with `?include=lovSet`, so the
-    side-loaded sets arrive in `included`), and every LOV entry, indexed by set id. See `lov.py`
-    for why the entries need their own call.
-    """
-    lov_index = await fetch_lov_entry_index(client)
-
+    """Fetch the instance's full custom-field schema in one paginated walk."""
     page = await client.paginate(
         _DEFINITIONS_PATH,
-        params={"include": LOV_SET_RELATIONSHIP},
-        max_records=None,
         schema=BackstopApiResource[CustomFieldDefinitionAttributes],
+        max_records=None,
+        page_size=_DEFINITIONS_PAGE_SIZE,
     )
 
     definitions: list[CustomFieldDefinition] = []
     for resource in page.items:
-        definition = definition_from_resource(resource, lov_index=lov_index, included=page.included)
+        definition = definition_from_resource(resource)
         if definition is not None:
             definitions.append(definition)
     return definitions

@@ -20,14 +20,7 @@ def tenant(name: str) -> str:
     return f"{BASE_URL}/{name}"
 
 
-def _lov_entries_route(base_url: str) -> respx.Route:
-    return respx.get(f"{base_url}/lov-entries").mock(
-        return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
-    )
-
-
 def _definitions_route(base_url: str, *definitions: dict[str, object]) -> respx.Route:
-    _lov_entries_route(base_url)
     return respx.get(f"{base_url}/custom-field-definitions").mock(
         return_value=httpx.Response(200, json={"data": list(definitions), "links": {"next": None}})
     )
@@ -38,7 +31,7 @@ def _investor_status(**extra: object) -> dict[str, object]:
         "99",
         "custom-field-definitions",
         name="is1",
-        entityType="Organization",
+        entityType="OrganizationBean",
         fieldType="picklist",
         isTimeSeries=False,
         **extra,
@@ -60,9 +53,9 @@ class TestListCustomFieldsTool:
 
         assert result.entity_type == EntityType.ORGANIZATIONS
         assert result.count == 1
-        assert result.definitions[0].definition_id == "99"
-        assert result.definitions[0].display_name == "is1"
-        assert result.definitions[0].allowed_values[0].label == "Active"
+        assert result.definitions[0].id == "99"
+        assert result.definitions[0].name == "is1"
+        assert result.definitions[0].select_options == [{"label": "Active"}]
 
     @pytest.mark.asyncio
     @respx.mock

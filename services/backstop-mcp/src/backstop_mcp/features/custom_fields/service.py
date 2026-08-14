@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.auth import current_subject
-from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
+from backstop_mcp.features.custom_fields.entity_types import custom_field_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
 from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
@@ -38,8 +38,8 @@ class CustomFieldsService:
     """
 
     # Floor on how often an upstream fetch can be attempted, whatever the caller asked for.
-    # `list_custom_fields` exposes `refresh` to the model, and one refresh is two uncapped
-    # paginations taken under the lock every other caller's cold path waits on — so without a
+    # `list_custom_fields` exposes `refresh` to the model, and one refresh is an uncapped
+    # pagination taken under the lock every other caller's cold path waits on — so without a
     # floor a model that habitually passes `refresh=true` serializes every concurrent caller
     # behind repeated full re-fetches and spends the user's Backstop concurrency budget on a
     # schema that changes when an admin adds a field. Well below `ttl`, so it only ever bounds
@@ -98,10 +98,10 @@ class CustomFieldsService:
         entry = self._by_subject.get(resolved)
         if entry is None:
             return []
-        entity = normalize_entity_type(entity_type)
+        entity = custom_field_entity_type(entity_type)
         if entity is None:
             return []
-        return list(entry.index.get(entity, []))
+        return list(entry.index.get(entity.value, []))
 
     async def ensure_fresh(self, client: BackstopClient, *, subject: str | None = None) -> None:
         """Bring this subject's schema within `ttl`, tolerating a failed refresh when a copy exists.
