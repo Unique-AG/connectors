@@ -1,6 +1,9 @@
 from backstop_mcp.features.custom_fields.entity_types import (
+    CUSTOM_FIELD_BEANS,
     KNOWN_ENTITY_TYPES,
+    CustomFieldEntityType,
     EntityType,
+    custom_field_entity_type_from_bean,
     normalize_entity_type,
 )
 from backstop_mcp.features.custom_fields.index import FieldCandidate, FieldResolution
@@ -22,11 +25,13 @@ from backstop_mcp.features.custom_fields.types import AllowedValue, CustomFieldD
 from backstop_mcp.features.custom_fields.values import CustomFieldValueRead, read_custom_field_value
 
 __all__ = [
+    "CUSTOM_FIELD_BEANS",
     "KNOWN_ENTITY_TYPES",
     "AllowedValue",
     "AllowedValueResponse",
     "CustomFieldDefinition",
     "CustomFieldDefinitionResponse",
+    "CustomFieldEntityType",
     "CustomFieldValueRead",
     "CustomFieldsService",
     "EntityType",
@@ -35,6 +40,7 @@ __all__ = [
     "FieldCandidateResponse",
     "FieldResolution",
     "create_custom_fields_service",
+    "custom_field_entity_type_from_bean",
     "definition_response",
     "field_candidate_response",
     "normalize_entity_type",
