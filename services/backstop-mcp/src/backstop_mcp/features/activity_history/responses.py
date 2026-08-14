@@ -154,7 +154,9 @@ def resolved_party_as_of_response(
         party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
     )
     return ResolvedPartyAsOfResponse(
-        **resolved.model_dump(),
+        id=resolved.id,
+        search_type=resolved.search_type,
+        name=resolved.name,
         as_of=as_of_response(extract_as_of(attributes)),
     )
 

@@ -178,7 +178,9 @@ class TestActivityHistoryResolvedResponse:
     def test_merges_party_identity_and_as_of(self) -> None:
         resolved = resolved_party_as_of_response(
             ResolvedParty(id="1", search_type="people", name="Ada"),
-            ProvenanceFields(modified_timestamp="2024-01-01", modified_by="alice"),
+            ProvenanceFields.model_validate(
+                {"modifiedTimestamp": "2024-01-01", "modifiedBy": "alice"}
+            ),
         )
 
         assert resolved == ResolvedPartyAsOfResponse(

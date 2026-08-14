@@ -200,9 +200,7 @@ class TestDateRangeBounds:
 class TestActivityContinuationBounds:
     def test_rejects_since_after_until(self) -> None:
         with pytest.raises(ValidationError, match="since must not be after until"):
-            ActivityContinuation(
-                limit=10, offset=0, since=date(2026, 2, 1), until=date(2026, 1, 1)
-            )
+            ActivityContinuation(limit=10, offset=0, since=date(2026, 2, 1), until=date(2026, 1, 1))
 
     def test_rejects_non_positive_limit(self) -> None:
         with pytest.raises(ValidationError):
