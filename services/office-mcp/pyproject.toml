@@ -5,6 +5,9 @@ description = "Microsoft 365 (Office) FastMCP server"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp==3.4.5",
+    # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
+    # the postgresql extra and because auth.py imports it directly (OAuth state store).
+    "py-key-value-aio[postgresql]==0.4.5",
     "uvicorn[standard]==0.52.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
