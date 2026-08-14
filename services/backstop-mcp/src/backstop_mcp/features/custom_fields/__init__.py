@@ -4,7 +4,6 @@ from backstop_mcp.features.custom_fields.entity_types import (
     normalize_entity_type,
 )
 from backstop_mcp.features.custom_fields.index import FieldCandidate, FieldResolution
-from backstop_mcp.features.custom_fields.overrides import FieldOverride
 from backstop_mcp.features.custom_fields.resolve import resolve_field
 from backstop_mcp.features.custom_fields.responses import (
     AllowedValueResponse,
@@ -34,7 +33,6 @@ __all__ = [
     "FieldAmbiguousResponse",
     "FieldCandidate",
     "FieldCandidateResponse",
-    "FieldOverride",
     "FieldResolution",
     "create_custom_fields_service",
     "definition_response",

@@ -1,11 +1,5 @@
-import json
-
-import pytest
-
-from backstop_mcp.config import BackstopConfig, CustomFieldOverrideConfig
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.index import build_index, resolve_in_index
-from backstop_mcp.features.custom_fields.overrides import parse_override_key
 from backstop_mcp.features.custom_fields.types import AllowedValue, CustomFieldDefinition
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 
@@ -31,21 +25,7 @@ def _def(
     )
 
 
-class TestOverridesParsing:
-    def test_parse_override_key(self) -> None:
-        assert parse_override_key("organizations:is1") == (
-            "organizations",
-            "is1",
-        )
-
-    def test_parse_override_key_rejects_bad_shape(self) -> None:
-        with pytest.raises(ValueError, match="entityType:crmName"):
-            parse_override_key("organizations")
-
-    def test_parse_override_key_splits_on_first_colon_only(self) -> None:
-        """crmName may itself contain colons, so only the first separator is significant."""
-        assert parse_override_key("organizations:1:is1") == ("organizations", "1:is1")
-
+class TestNormalizeEntityType:
     def test_normalize_entity_type(self) -> None:
         assert normalize_entity_type("Organization") == "organizations"
         assert normalize_entity_type("people") == "people"
@@ -61,24 +41,6 @@ class TestOverridesParsing:
         assert is_party_search_type("Organization")
         assert not is_party_search_type("opportunities")
 
-    def test_backstop_config_parses_overrides_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(
-            "BACKSTOP_CUSTOM_FIELD_OVERRIDES",
-            json.dumps(
-                {
-                    "organizations:is1": {
-                        "display_name": "Investor Status",
-                        "aliases": ["investor status", "status"],
-                    }
-                }
-            ),
-        )
-        config = BackstopConfig()
-        override = config.custom_field_overrides["organizations:is1"]
-        assert isinstance(override, CustomFieldOverrideConfig)
-        assert override.display_name == "Investor Status"
-        assert override.aliases == ["investor status", "status"]
-
 
 class TestResolveInIndex:
     def test_exact_crm_name(self) -> None:
@@ -87,7 +49,7 @@ class TestResolveInIndex:
         assert isinstance(result, Resolved)
         assert result.value.definition_id == "1"
 
-    def test_alias_from_override_display(self) -> None:
+    def test_alias_match(self) -> None:
         index = build_index(
             [
                 _def(

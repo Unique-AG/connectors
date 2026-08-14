@@ -6,9 +6,7 @@ from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, TypedDict, cast
 
 from pydantic import (
-    BaseModel,
     BeforeValidator,
-    ConfigDict,
     Field,
     HttpUrl,
     PostgresDsn,
@@ -20,22 +18,6 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
-
-
-class CustomFieldOverrideConfig(BaseModel):
-    """Human-facing overlay for a CRM custom-field definition (env JSON value).
-
-    The deserialization shape only. `create_app` converts these to
-    `features.custom_fields.FieldOverride` — the domain's own type — so the custom-field feature
-    never imports this module for something that isn't configuration.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
-
-    display_name: str | None = None
-    aliases: list[str] = Field(default_factory=list)
-    description: str | None = None
-
 
 PKG_VERSION = pkg_version("backstop-mcp")
 
@@ -227,13 +209,6 @@ class BackstopConfig(BaseSettings):
     # stop bounding report pages without any error to notice.
     page_limit_param: str = Field(default="page[limit]", min_length=1)
     page_offset_param: str = Field(default="page[offset]", min_length=1)
-
-    # Optional human overlays for weird CRM custom-field names (e.g. `is1` → Investor Status).
-    # Env value is JSON: {"organizations:is1": {"display_name": "...", "aliases": [...]}}.
-    # Keys are entityType:crmName — see custom_fields/overrides.py. crmName is the CRM's own
-    # field identifier, unique per entity type and stable across tenants, unlike the numeric
-    # definitionId (which is opaque and differs per Backstop instance).
-    custom_field_overrides: dict[str, CustomFieldOverrideConfig] = Field(default_factory=dict)
 
     # How long a fetched custom-field catalog stays usable before it is re-fetched. Definitions
     # change rarely; the default is one hour. Capped at 24 hours so a stale catalog cannot sit

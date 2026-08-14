@@ -12,12 +12,6 @@ from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
 from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
-from backstop_mcp.features.custom_fields.overrides import (
-    FieldOverride,
-    OverrideIndex,
-    apply_overrides,
-    index_overrides,
-)
 from backstop_mcp.features.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
@@ -40,8 +34,7 @@ class CustomFieldsService:
 
     Definitions only ever come from a real Backstop fetch, persisted as a snapshot keyed by
     `(base_url, subject)` so one caller's refresh cannot populate another's catalog.
-    `overrides` are a display overlay reapplied on every load — never a source of fields on
-    their own, so until a fetch succeeds this service serves nothing.
+    Until a fetch succeeds this service serves nothing.
 
     Name → definition resolution (including elicitation) lives in `resolve.py`, mirroring
     `party_resolver.resolve`. Constructed by `create_app()` and reached via
@@ -62,15 +55,12 @@ class CustomFieldsService:
         *,
         session_factory: async_sessionmaker[AsyncSession],
         base_url: str,
-        overrides: dict[str, FieldOverride],
         ttl: timedelta,
     ) -> None:
         self._session_factory: async_sessionmaker[AsyncSession] = session_factory
         # Already normalised by `BackstopConfig.base_url` (`HttpUrlStr`), and it is half of the
         # snapshot key, so re-trimming here would only hide a base URL that disagreed with it.
         self._base_url: str = base_url
-        self._overrides: dict[str, FieldOverride] = overrides
-        self._override_index: OverrideIndex = index_overrides(overrides)
         self._ttl: timedelta = ttl
         self._by_subject: dict[str, _SubjectSchema] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -231,9 +221,8 @@ class CustomFieldsService:
             # Keep whatever is already in memory: an absent or unreadable row is not evidence
             # that this subject's own definitions are wrong.
             return
-        definitions = apply_overrides(snapshot.definitions, self._override_index)
         entry = self._entry(subject)
-        entry.index = build_index(definitions)
+        entry.index = build_index(snapshot.definitions)
         entry.freshness.mark(snapshot.fetched_at)
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "snapshot"})
 
@@ -244,8 +233,7 @@ class CustomFieldsService:
         # Stamped before the call, not after, so a fetch that fails or hangs still counts against
         # the floor — otherwise an unreachable Backstop would be retried on every request.
         entry.refresh_floor.mark()
-        definitions = await fetch_custom_field_definitions(client, self._overrides)
-        definitions = apply_overrides(definitions, self._override_index)
+        definitions = await fetch_custom_field_definitions(client)
         fetched_at = datetime.now(UTC)
         async with transaction(self._session_factory) as session:
             await save_snapshot(session, self._base_url, subject, definitions, fetched_at)
@@ -263,12 +251,10 @@ def create_custom_fields_service(
     *,
     session_factory: async_sessionmaker[AsyncSession],
     base_url: str,
-    overrides: dict[str, FieldOverride],
     ttl_minutes: int,
 ) -> CustomFieldsService:
     return CustomFieldsService(
         session_factory=session_factory,
         base_url=base_url,
-        overrides=overrides,
         ttl=timedelta(minutes=ttl_minutes),
     )
