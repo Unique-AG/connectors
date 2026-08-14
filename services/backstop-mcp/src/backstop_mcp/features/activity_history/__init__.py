@@ -1,4 +1,4 @@
-"""HTML-to-gist conversion, per-stream fetch, and the k-way merge/cursor, for activity history.
+"""HTML-to-gist conversion, per-stream fetch, and per-stream grouping, for activity history.
 
 `to_gist`/`Gist`: convert HTML to Markdown with `markdownify`, squeeze its own conversion
 artifacts (synthetic empty-header table rows, blank-line runs), and truncate at a word boundary
@@ -10,15 +10,12 @@ returning typed items (`ActivityItem`/`EmailItem`) plus whether that type is now
 `fetch_activities_page_by_type` dispatches email vs activity. See `fetch_activities.py`'s module
 docstring for the Backstop quirks this layer absorbs.
 
-`merge_page`: merges already-fetched pages into a deterministically-ordered result plus the
-updated `consumed` map (`consumed[s]` is the next `page[offset]` for that stream). See
-`merge.py`.
-
-`encode_cursor`/`decode_cursor`: self-contained pagination cursor carrying the full query state
-so the next page needs only the cursor string. See `cursor.py`.
+`group_page`: computes one stream page's `date_range` (min/max `occurred_at` among this page's
+items) and `next` continuation (`None` once that stream is exhausted). Items pass through in
+fetch order — no client-side re-sort. See `group.py`.
 
 `ActivityRecordResponse`/`EmailRecordResponse`/`TimelineRecord`/`to_timeline_record`: the wire
-shape of one merged record and the pure conversion into it. `ActivityHistoryResolvedResponse`/
+shape of one fetched item and the pure conversion into it. `ActivityHistoryResolvedResponse`/
 `GetActivityHistoryResponse`: the top-level tool response union. See `responses.py`.
 
 `fetch_activity_detail`/`fetch_attendees`/`is_meeting_or_call`: the `get_activity_detail` fetch
@@ -38,12 +35,6 @@ from backstop_mcp.features.activity_history.activity_detail_responses import (
     ActivityDetailResponse,
     AttendeeResponse,
     to_activity_detail_response,
-)
-from backstop_mcp.features.activity_history.cursor import (
-    ActivityCursor,
-    InvalidCursor,
-    decode_cursor,
-    encode_cursor,
 )
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityItem,
@@ -65,10 +56,11 @@ from backstop_mcp.features.activity_history.fetch_activity_detail import (
     is_meeting_or_call,
 )
 from backstop_mcp.features.activity_history.gist_from_html import Gist, to_gist
-from backstop_mcp.features.activity_history.merge import (
-    ActivityWithType,
-    UnifiedActivities,
-    merge_page,
+from backstop_mcp.features.activity_history.group import group_page
+from backstop_mcp.features.activity_history.models import (
+    ActivityContinuation,
+    ActivityGroup,
+    DateRange,
 )
 from backstop_mcp.features.activity_history.responses import (
     ActivityHistoryResolvedResponse,
@@ -81,37 +73,34 @@ from backstop_mcp.features.activity_history.responses import (
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
 
 __all__ = [
-    "ActivityCursor",
+    "ActivityContinuation",
     "ActivityDetail",
     "ActivityDetailResponse",
+    "ActivityGroup",
     "ActivityHistoryResolvedResponse",
     "ActivityHistorySettings",
     "ActivityItem",
     "ActivityPage",
     "ActivityRecordResponse",
     "ActivityType",
-    "ActivityWithType",
     "Attendee",
     "AttendeeResponse",
     "BackstopActivityType",
+    "DateRange",
     "EmailItem",
     "EmailPage",
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
     "Gist",
-    "InvalidCursor",
     "Segment",
     "TimelineRecord",
-    "UnifiedActivities",
-    "decode_cursor",
-    "encode_cursor",
     "fetch_activity_detail",
     "fetch_activity_page",
     "fetch_activities_page_by_type",
     "fetch_attendees",
     "fetch_email_page",
+    "group_page",
     "is_meeting_or_call",
-    "merge_page",
     "to_activity_detail_response",
     "to_gist",
     "to_timeline_record",
