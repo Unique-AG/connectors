@@ -9,6 +9,11 @@ from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel, TypeAdapter
 
 
+def object_dict(value: object) -> dict[str, object]:
+    assert isinstance(value, dict)
+    return cast(dict[str, object], value)
+
+
 def tool_payload(result: CallToolResult) -> dict[str, object]:
     assert isinstance(result, CallToolResult)
     assert result.isError is not True
@@ -16,8 +21,7 @@ def tool_payload(result: CallToolResult) -> dict[str, object]:
     block = result.content[0]
     assert isinstance(block, TextContent)
     payload = cast(object, json.loads(block.text))
-    assert isinstance(payload, dict)
-    return cast(dict[str, object], payload)
+    return object_dict(payload)
 
 
 def tool_model[T: BaseModel](result: CallToolResult, model: type[T]) -> T:

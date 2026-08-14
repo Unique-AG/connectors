@@ -141,7 +141,12 @@ async def get_activity_history(
         wire_items = tuple(
             to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items
         )
-        groups[activity_type] = grouped.model_copy(update={"items": wire_items})
+        groups[activity_type] = ActivityGroup(
+            activity_type=grouped.activity_type,
+            items=wire_items,
+            date_range=grouped.date_range,
+            next=grouped.next,
+        )
 
     attributes = document.data.attributes
     open_streams = [

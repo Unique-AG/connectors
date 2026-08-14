@@ -40,7 +40,7 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
-from tests.server.tools.helpers import tool_model, tool_model_union, tool_payload
+from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
 
 type ConnectUser = Callable[..., object]
 
@@ -507,21 +507,16 @@ class TestResumedCall:
         )
         first_payload = tool_payload(first_result)
 
-        groups = first_payload["groups"]
-        assert isinstance(groups, dict)
-        meeting_group = groups["meeting"]
-        assert isinstance(meeting_group, dict)
+        groups = object_dict(first_payload["groups"])
+        meeting_group = object_dict(groups["meeting"])
         assert "next" not in meeting_group
 
-        email_group = groups["email"]
-        assert isinstance(email_group, dict)
-        raw_email_next = email_group["next"]
-        assert isinstance(raw_email_next, dict)
+        email_group = object_dict(groups["email"])
+        raw_email_next = object_dict(email_group["next"])
         assert "since" not in raw_email_next
         assert "until" not in raw_email_next
 
-        resolved = first_payload["resolved"]
-        assert isinstance(resolved, dict)
+        resolved = object_dict(first_payload["resolved"])
         second_result = await get_activity_history(
             ctx_never_elicit(),
             ActivityHistoryNextPageInput.model_validate(
@@ -535,10 +530,8 @@ class TestResumedCall:
         )
         second_payload = tool_payload(second_result)
         second = tool_model(second_result, ActivityHistoryResolvedResponse)
-        second_groups = second_payload["groups"]
-        assert isinstance(second_groups, dict)
-        second_email = second_groups["email"]
-        assert isinstance(second_email, dict)
+        second_groups = object_dict(second_payload["groups"])
+        second_email = object_dict(second_groups["email"])
         assert "next" not in second_email
 
         assert emails.call_count == 2
@@ -737,10 +730,8 @@ class TestWireOmitsNone:
             )
         )
 
-        groups = payload["groups"]
-        assert isinstance(groups, dict)
-        meeting_group = groups["meeting"]
-        assert isinstance(meeting_group, dict)
+        groups = object_dict(payload["groups"])
+        meeting_group = object_dict(groups["meeting"])
         assert meeting_group["items"] == []
         assert "date_range" not in meeting_group
         assert "next" not in meeting_group
