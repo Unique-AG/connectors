@@ -114,10 +114,9 @@ def main_module() -> Iterator[_MainModule]:
 
     `office_mcp.main` calls `load_dotenv()` at import time — right for an operator launching the
     process, but it would otherwise push this service's local `.env` into `os.environ` for the
-    rest of the test session the first time anything imports this module (the same hazard the
-    `postgres_container` fixture in conftest.py works around for `env.py`'s `load_dotenv()`).
-    The module is only ever exec'd once per process, so the whole environment — not just the
-    handful of vars `.env` sets — is snapshotted and restored around that one import.
+    rest of the test session the first time anything imports this module. The module is only ever
+    exec'd once per process, so the whole environment — not just the handful of vars `.env`
+    sets — is snapshotted and restored around that one import.
     """
     environment_before = os.environ.copy()
     try:
@@ -125,8 +124,8 @@ def main_module() -> Iterator[_MainModule]:
         # `DatabaseConfig()` too — so the import needs a complete environment or it raises.
         # Set one here rather than relying on the developer's local `.env`: CI has no `.env`,
         # and `load_dotenv()` doesn't override variables that are already set, so these win in
-        # both places. Postgres is never reached — `create_engine` is lazy and the app's
-        # lifespan doesn't run in these tests — so an unroutable URL is enough.
+        # both places. The app's lifespan doesn't run in these tests, so an unroutable URL
+        # is enough — the database is never connected to.
         os.environ["PUBLIC_BASE_URL"] = "https://office-mcp.example"
         os.environ["DB_URL"] = "postgresql://user:pass@127.0.0.1:1/nope"
 
@@ -144,9 +143,9 @@ class TestMainEntrypoint:
     """`office_mcp.main.main()`, exercised without ever letting uvicorn actually serve.
 
     A string target (`"office_mcp.main:app"`) makes uvicorn re-import this module under its own
-    name when run as a script rather than through the `office-mcp` console script — re-running
-    `create_app()` a second time, with a second engine the first one's lifespan never disposes.
-    Passing the already-built `app` object avoids the re-import entirely.
+    name when run as a script — re-running `create_app()` a second time and creating a
+    duplicate app instance whose lifespan context would never be disposed. Passing the
+    already-built `app` object avoids the re-import entirely.
     """
 
     def test_uvicorn_is_given_the_app_object_not_a_string_target(
