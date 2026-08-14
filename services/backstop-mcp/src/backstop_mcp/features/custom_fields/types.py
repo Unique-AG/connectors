@@ -57,7 +57,7 @@ class AllowedValue(BaseModel):
 
 
 class CustomFieldDefinition(BaseModel):
-    """Merged CRM definition + optional human override."""
+    """A CRM custom-field definition from Backstop attributes."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 

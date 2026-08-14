@@ -22,7 +22,6 @@ from backstop_mcp.config import (
     AppConfig,
     AuthConfig,
     BackstopConfig,
-    CustomFieldOverrideConfig,
     DatabaseConfig,
     EncryptionConfig,
 )
@@ -35,10 +34,7 @@ from backstop_mcp.features.auth import (
     cleanup_lifespan,
     load_key,
 )
-from backstop_mcp.features.custom_fields import (
-    FieldOverride,
-    create_custom_fields_service,
-)
+from backstop_mcp.features.custom_fields import create_custom_fields_service
 from backstop_mcp.features.data_hygiene import create_employment_index_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
@@ -61,7 +57,7 @@ def create_app(
     Every config object and every long-lived collaborator is built exactly once here and then
     injected. Nothing downstream re-reads the environment, and no layer below this one sees a
     `config` type at all: each env-parsed shape is translated into the owning layer's own domain
-    type here (`BackstopTransportSettings`, `RetrySettings`, `FieldOverride`,
+    type here (`BackstopTransportSettings`, `RetrySettings`,
     `ActivityHistorySettings`), so the tuning knobs a deployment sets are the ones every request
     actually uses.
     """
@@ -107,7 +103,6 @@ def create_app(
     custom_fields_service = create_custom_fields_service(
         session_factory=session_factory,
         base_url=backstop_config.base_url,
-        overrides=_field_overrides(backstop_config.custom_field_overrides),
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
     employment_index_factory = create_employment_index_factory(
@@ -177,7 +172,7 @@ def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
 
     Field-for-field, and deliberately explicit rather than derived by reflection: adding a knob
     to `BackstopConfig` that the transport should see is then a visible edit here, and one it
-    should *not* see (custom-field overrides, schema TTL) simply never appears.
+    should *not* see (schema TTL) simply never appears.
     """
     return BackstopTransportSettings(
         base_url=config.base_url,
@@ -195,24 +190,6 @@ def retry_settings(config: BackstopConfig) -> RetrySettings:
     return RetrySettings(
         max_attempts=config.max_retry_attempts, max_wait_ms=config.max_retry_wait_ms
     )
-
-
-def _field_overrides(
-    configured: dict[str, CustomFieldOverrideConfig],
-) -> dict[str, FieldOverride]:
-    """Translate the env-parsed override shape into the custom-field feature's own type.
-
-    The composition root is where a config shape becomes a domain one, which is what lets
-    `features/custom_fields` stay free of any `config` import.
-    """
-    return {
-        key: FieldOverride(
-            display_name=override.display_name,
-            aliases=tuple(override.aliases),
-            description=override.description,
-        )
-        for key, override in configured.items()
-    }
 
 
 async def _ready_response(engine: AsyncEngine) -> JSONResponse:

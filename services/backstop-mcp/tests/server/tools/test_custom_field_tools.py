@@ -4,7 +4,6 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.custom_fields import FieldOverride
 from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.server.tools.list_custom_fields import (
     ListCustomFieldsResponse,
@@ -14,13 +13,6 @@ from tests.features.party_resolver.helpers import BASE_URL, resource
 from tests.server.tools.helpers import tool_model
 
 type ConnectUser = Callable[..., object]
-
-_OVERRIDES: dict[str, FieldOverride] = {
-    "organizations:is1": FieldOverride(
-        display_name="Investor Status",
-        aliases=("investor status",),
-    )
-}
 
 
 def tenant(name: str) -> str:
@@ -63,7 +55,7 @@ class TestListCustomFieldsTool:
     @respx.mock
     async def test_lists_definitions_for_entity_type(self, connect_user: ConnectUser) -> None:
         base_url = tenant("cf-list")
-        await connect_user("user-cf-list-1", "cf-list-bob", base_url=base_url, overrides=_OVERRIDES)  # pyright: ignore[reportGeneralTypeIssues]
+        await connect_user("user-cf-list-1", "cf-list-bob", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
         _definitions_route(base_url, _investor_status(selectOptions=[{"label": "Active"}]))
 
         result = tool_model(
@@ -74,7 +66,7 @@ class TestListCustomFieldsTool:
         assert result.entity_type == EntityType.ORGANIZATIONS
         assert result.count == 1
         assert result.definitions[0].definition_id == "99"
-        assert result.definitions[0].display_name == "Investor Status"
+        assert result.definitions[0].display_name == "is1"
         assert result.definitions[0].allowed_values[0].label == "Active"
 
     @pytest.mark.asyncio

@@ -5,11 +5,6 @@ from backstop_mcp.features.custom_fields.lov import (
     allowed_values_for,
     fetch_lov_entry_index,
 )
-from backstop_mcp.features.custom_fields.overrides import (
-    FieldOverride,
-    OverrideIndex,
-    index_overrides,
-)
 from backstop_mcp.features.custom_fields.types import (
     LOV_SET_RELATIONSHIP,
     CustomFieldDefinition,
@@ -23,12 +18,11 @@ type DefinitionResource = BackstopApiResource[CustomFieldDefinitionAttributes]
 
 def definition_from_resource(
     resource: DefinitionResource,
-    overrides: OverrideIndex,
     *,
     lov_index: LovEntryIndex,
     included: list[dict[str, object]],
 ) -> CustomFieldDefinition | None:
-    """Merge one CRM definition with its human override and allowed values.
+    """Map one CRM definition resource onto Backstop attributes and allowed values.
 
     Returns None for a definition with no usable name or entity type — neither is recoverable,
     and an unnameable field can't be resolved by name anyway.
@@ -46,20 +40,6 @@ def definition_from_resource(
     if entity_type is None:
         return None
 
-    override = overrides.get((entity_type, crm_name))
-
-    display_name = (
-        override.display_name.strip()
-        if override is not None and override.display_name
-        else crm_name
-    )
-    aliases = tuple(
-        a.strip() for a in (override.aliases if override is not None else ()) if a.strip()
-    )
-    description = (
-        override.description if override is not None and override.description else attrs.description
-    )
-
     lov_set_ids = resource.related_ids(LOV_SET_RELATIONSHIP)
     lov_set_id = lov_set_ids[0] if lov_set_ids else None
 
@@ -67,9 +47,9 @@ def definition_from_resource(
         definition_id=resource.id,
         entity_type=entity_type,
         crm_name=crm_name,
-        display_name=display_name,
-        aliases=aliases,
-        description=description,
+        display_name=crm_name,
+        aliases=(),
+        description=attrs.description,
         field_type=attrs.field_type,
         field_type_display=attrs.field_type_display,
         is_time_series=bool(attrs.is_time_series),
@@ -89,10 +69,7 @@ def definition_from_resource(
     )
 
 
-async def fetch_custom_field_definitions(
-    client: BackstopClient,
-    overrides: dict[str, FieldOverride],
-) -> list[CustomFieldDefinition]:
+async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomFieldDefinition]:
     """Fetch the instance's full custom-field schema, allowed values included.
 
     Two paginated calls, not one per field: the definitions (with `?include=lovSet`, so the
@@ -108,12 +85,9 @@ async def fetch_custom_field_definitions(
         schema=BackstopApiResource[CustomFieldDefinitionAttributes],
     )
 
-    override_index = index_overrides(overrides)
     definitions: list[CustomFieldDefinition] = []
     for resource in page.items:
-        definition = definition_from_resource(
-            resource, override_index, lov_index=lov_index, included=page.included
-        )
+        definition = definition_from_resource(resource, lov_index=lov_index, included=page.included)
         if definition is not None:
             definitions.append(definition)
     return definitions

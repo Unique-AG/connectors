@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.db.engine import read_session, transaction
-from backstop_mcp.features.custom_fields import FieldOverride
 from backstop_mcp.features.custom_fields.lov import inline_allowed_values
 from backstop_mcp.features.custom_fields.resolve import resolve_field
 from backstop_mcp.features.custom_fields.service import (
@@ -124,9 +123,7 @@ class TestDefinitionFromResource:
                 "attributes": {"name": "Grade", "entityType": "spaceship"},
             }
         )
-        assert (
-            definition_from_resource(resource, {}, lov_index=EMPTY_LOV_INDEX, included=[]) is None
-        )
+        assert definition_from_resource(resource, lov_index=EMPTY_LOV_INDEX, included=[]) is None
 
     def test_snapshot_round_trip_without_db(self) -> None:
         from backstop_mcp.features.custom_fields.snapshot import dump_definitions, load_definitions
@@ -151,21 +148,14 @@ class TestDefinitionFromResource:
 class TestFetchStoreResolve:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_refresh_persists_snapshot_and_applies_overrides(
+    async def test_refresh_persists_snapshot(
         self, db: DatabaseFixture, clients: ClientBuilder
     ) -> None:
         _, session_factory = db
-        base_url = f"{BASE_URL}/overrides"
-        overrides = {
-            "organizations:is1": FieldOverride(
-                display_name="Investor Status",
-                aliases=("investor status",),
-            )
-        }
+        base_url = f"{BASE_URL}/refresh-snapshot"
         service = create_custom_fields_service(
             session_factory=session_factory,
             base_url=base_url,
-            overrides=overrides,
             ttl_minutes=60,
         )
 
@@ -193,8 +183,8 @@ class TestFetchStoreResolve:
         definitions = await service.refresh(clients(base_url), subject=SUBJECT)
 
         assert len(definitions) == 1
-        assert definitions[0].display_name == "Investor Status"
-        assert definitions[0].aliases == ("investor status",)
+        assert definitions[0].display_name == "is1"
+        assert definitions[0].aliases == ()
         assert definitions[0].allowed_values[0].label == "Active"
 
         async with read_session(session_factory) as session:
@@ -208,7 +198,7 @@ class TestFetchStoreResolve:
             service,
             clients(base_url),
             entity_type="organizations",
-            query="Investor Status",
+            query="is1",
             subject=SUBJECT,
         )
         assert isinstance(result, Resolved)
@@ -224,7 +214,6 @@ class TestFetchStoreResolve:
         service = create_custom_fields_service(
             session_factory=session_factory,
             base_url=base_url,
-            overrides={},
             ttl_minutes=60,
         )
 
@@ -276,7 +265,7 @@ class TestLovSetRelationship:
         _, session_factory = db
         base_url = f"{BASE_URL}/lov-relationship"
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
 
         lov_entries_route(
@@ -326,7 +315,7 @@ class TestLovSetRelationship:
         _, session_factory = db
         base_url = f"{BASE_URL}/lov-hidden"
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
 
         respx.get(f"{base_url}/lov-entries").mock(
@@ -381,7 +370,7 @@ class TestLovSetRelationship:
         _, session_factory = db
         base_url = f"{BASE_URL}/lov-unavailable"
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
 
         respx.get(f"{base_url}/lov-entries").mock(side_effect=httpx.ConnectError("lov down"))
@@ -415,7 +404,7 @@ class TestLovSetRelationship:
         _, session_factory = db
         base_url = f"{BASE_URL}/lov-included-entries"
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
 
         lov_entries_route(base_url)
@@ -512,7 +501,7 @@ class TestSnapshotStaleness:
         base_url = f"{BASE_URL}/ttl-warm-read-not-blocked"
         await self._seed_snapshot(session_factory, base_url, timedelta(minutes=5))
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         await service.load_cached(SUBJECT)
         assert service.is_fresh(SUBJECT) is True
@@ -550,7 +539,7 @@ class TestSnapshotStaleness:
         base_url = f"{BASE_URL}/ttl-fresh"
         await self._seed_snapshot(session_factory, base_url, timedelta(minutes=5))
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         route = self._fresh_definitions_route(base_url)
 
@@ -570,7 +559,7 @@ class TestSnapshotStaleness:
         base_url = f"{BASE_URL}/ttl-expired"
         await self._seed_snapshot(session_factory, base_url, timedelta(minutes=90))
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         route = self._fresh_definitions_route(base_url)
 
@@ -589,7 +578,7 @@ class TestSnapshotStaleness:
         base_url = f"{BASE_URL}/ttl-cached-only"
         await self._seed_snapshot(session_factory, base_url, timedelta(minutes=90))
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         route = self._fresh_definitions_route(base_url)
 
@@ -616,7 +605,6 @@ class TestSnapshotStaleness:
             return create_custom_fields_service(
                 session_factory=session_factory,
                 base_url=base_url,
-                overrides={},
                 ttl_minutes=60,
             )
 
@@ -650,7 +638,6 @@ class TestSnapshotStaleness:
             service = create_custom_fields_service(
                 session_factory=session_factory,
                 base_url=base_url,
-                overrides={},
                 ttl_minutes=60,
             )
             await service.ensure_fresh(clients(base_url), subject=SUBJECT)
@@ -677,7 +664,7 @@ class TestSnapshotStaleness:
         base_url = f"{BASE_URL}/ttl-refresh-fails"
         await self._seed_snapshot(session_factory, base_url, timedelta(minutes=90))
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         lov_entries_route(base_url)
         respx.get(f"{base_url}/custom-field-definitions").mock(
@@ -700,7 +687,7 @@ class TestSnapshotStaleness:
         _, session_factory = db
         base_url = f"{BASE_URL}/ttl-cold-failure"
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         lov_entries_route(base_url)
         respx.get(f"{base_url}/custom-field-definitions").mock(
@@ -720,7 +707,7 @@ class TestSnapshotStaleness:
         base_url = f"{BASE_URL}/ttl-explicit-refresh-fails"
         await self._seed_snapshot(session_factory, base_url, timedelta(minutes=1))
         service = create_custom_fields_service(
-            session_factory=session_factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=session_factory, base_url=base_url, ttl_minutes=60
         )
         lov_entries_route(base_url)
         respx.get(f"{base_url}/custom-field-definitions").mock(
@@ -813,7 +800,7 @@ class TestRefreshFloor:
             )
         )
         service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=factory, base_url=base_url, ttl_minutes=60
         )
 
         first = await service.refresh(clients(base_url), subject=SUBJECT)
@@ -835,7 +822,7 @@ class TestRefreshFloor:
             return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
         )
         service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=factory, base_url=base_url, ttl_minutes=60
         )
 
         _ = await service.refresh(clients(base_url), subject=SUBJECT)
@@ -860,7 +847,7 @@ class TestRefreshFloor:
             side_effect=httpx.ConnectError("backstop down")
         )
         service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+            session_factory=factory, base_url=base_url, ttl_minutes=60
         )
 
         with pytest.raises(httpx.ConnectError):
