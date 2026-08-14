@@ -91,12 +91,23 @@ async def get_person(
             ),
         ),
     ] = None,
+    search_type: Annotated[
+        Literal["people", "contacts", "employees"] | None,
+        Field(
+            description=(
+                "Collection to resolve against. Echo `search_type` from a prior resolve "
+                "when retrying with `party_id` — a contact or employee id is not a people "
+                "id. Defaults to people."
+            ),
+        ),
+    ] = None,
 ) -> CallToolResult:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
-    by this server's resolve echo (`id` / `search_type` / `name`). Otherwise pass `search`
-    (person name or email) and let the server resolve it.
+    by this server's resolve echo (`id` / `search_type` / `name`), and pass that echo's
+    `search_type` too when it is not `people`. Otherwise pass `search` (person name or
+    email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
 
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
@@ -115,7 +126,7 @@ async def get_person(
     result = await resolve_party(
         ctx,
         client,
-        search_type="people",
+        search_type=search_type if search_type is not None else "people",
         party_id=party_id,
         search=search,
     )

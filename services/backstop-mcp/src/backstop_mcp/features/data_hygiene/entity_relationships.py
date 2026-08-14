@@ -46,7 +46,8 @@ def _parse_resources[AttrT](
         except ValidationError as exc:
             logger.warning(
                 "data_hygiene.side_load.unreadable",
-                extra={"kind": kind, "error": str(exc)},
+                extra={"kind": kind},
+                exc_info=exc,
             )
     return parsed
 

@@ -181,6 +181,46 @@ class TestGetPerson:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_trusted_contact_party_id_fetches_contacts_collection(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-person-5", "person-frank")  # pyright: ignore[reportGeneralTypeIssues]
+
+        contact_get = respx.get(f"{BASE_URL}/contacts/c9").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "contacts",
+                        "id": "c9",
+                        "attributes": {"name": "Jane Contact"},
+                        "relationships": {"entityRelationships": {"data": []}},
+                    },
+                    "included": [],
+                },
+            )
+        )
+        people_get = respx.get(url__regex=rf"{BASE_URL}/people/\w+").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = tool_model(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="c9",
+                search_type="contacts",
+            ),
+            PersonResolvedResponse,
+        )
+
+        assert result.resolved == ResolvedPartyResponse(
+            id="c9", search_type="contacts", name="Jane Contact"
+        )
+        assert contact_get.call_count == 1
+        assert people_get.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_ambiguous_search_skips_person_get(self, connect_user: ConnectUser) -> None:
         await connect_user("user-person-2", "person-carol")  # pyright: ignore[reportGeneralTypeIssues]
 
@@ -207,14 +247,14 @@ class TestGetPerson:
             scope="people",
             candidates=[
                 PartyCandidateResponse(
-                    key="p1",
+                    key="people:p1",
                     label="Jane A",
                     id="p1",
                     search_type="people",
                     name="Jane A",
                 ),
                 PartyCandidateResponse(
-                    key="p2",
+                    key="people:p2",
                     label="Jane B",
                     id="p2",
                     search_type="people",

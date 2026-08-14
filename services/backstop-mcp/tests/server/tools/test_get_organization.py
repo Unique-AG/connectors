@@ -114,14 +114,14 @@ class TestGetOrganization:
             scope="organizations",
             candidates=[
                 PartyCandidateResponse(
-                    key="o1",
+                    key="organizations:o1",
                     label="Capstone A",
                     id="o1",
                     search_type="organizations",
                     name="Capstone A",
                 ),
                 PartyCandidateResponse(
-                    key="o2",
+                    key="organizations:o2",
                     label="Capstone B",
                     id="o2",
                     search_type="organizations",
