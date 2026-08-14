@@ -148,7 +148,13 @@ class TestTheQueriesTheySend:
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
 
-        _ = await channels.browse_channel(client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=7)
+        _ = await channels.browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=7,
+            include_window_completeness=False,
+        )
 
         params = route.calls.last.request.url.params
         assert params["$top"] == "7"
@@ -172,7 +178,11 @@ class TestTheQueriesTheySend:
     ) -> None:
         with pytest.raises(AssertionError):
             _ = await channels.browse_channel(
-                client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=channels.MAX_POSTS + 1
+                client,
+                team_id=_TEAM_ID,
+                channel_id=_CHANNEL_ID,
+                limit=channels.MAX_POSTS + 1,
+                include_window_completeness=False,
             )
 
 
@@ -308,7 +318,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         post = browsed.messages[0]
@@ -325,7 +339,7 @@ class TestBrowsingOneChannel:
         that is not its own — and this is the collection where a page walk is most tempting, because
         system messages are filtered out after Graph has counted them into the page. A walk bounded
         by items scanned rather than by requests would keep asking for pages until it had `limit`
-        posts; this asks once, and the answer is described as one window rather than flagged.
+        posts; this asks once, and the cursor is read rather than followed.
         """
         second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
@@ -341,7 +355,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         assert [message.message_id for message in browsed.messages] == ["1770000000000"]
@@ -380,7 +398,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         assert [message.message_id for message in browsed.messages] == [
@@ -421,7 +443,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         reply = browsed.messages[1]
@@ -460,7 +486,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         kept = [message.message_id for message in browsed.messages[1:]]
@@ -510,7 +540,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         assert len(browsed.messages) == 2
@@ -547,7 +581,11 @@ class TestBrowsingOneChannel:
         )
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         assert [message.message_id for message in browsed.messages] == [
@@ -556,13 +594,143 @@ class TestBrowsingOneChannel:
         ]
         assert all(message.event is None for message in browsed.messages)
 
+    async def test_microsofts_own_cursor_is_what_says_the_channel_holds_more(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The completeness signal this tool cannot do without, and the one it can read accurately.
+
+        Every other list here answers whether it was everything by its own length, because the
+        walk underneath it followed Graph's paging to the end of the collection. This tool follows
+        nothing — one request is the whole budget — and system messages are dropped out of the page
+        after
+        Graph counted them into it, so its length says neither thing. Graph's `@odata.nextLink` on
+        that page does, so it is reported: read, never followed.
+        """
+        second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
+            return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
+        )
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [_post_payload("1770000000000")],
+                    "@odata.nextLink": f"{GRAPH_V1}{_MESSAGES_PATH}?$skiptoken=synthetic",
+                },
+            )
+        )
+
+        browsed = await channels.browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=True,
+        )
+
+        assert browsed.more_posts_in_channel is True
+        assert browsed.posts_cut_to_limit is False, "the window closed over nothing Graph sent"
+        assert len(browsed.messages) == 1, "a short answer, and Graph said there is more"
+        assert len(graph.calls) == 1 and not second_page.called, "the cursor is read, not followed"
+
+    async def test_the_same_page_without_a_cursor_says_that_was_the_channel(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The other half, and the reason the field is worth its place: these two answers used to be
+        byte-identical, so a caller could not tell "that was the whole channel" from "Microsoft says
+        there is more". This is the page above with its cursor taken off, and nothing else changed.
+        """
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
+        )
+
+        browsed = await channels.browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=True,
+        )
+
+        assert browsed.more_posts_in_channel is False
+        assert browsed.posts_cut_to_limit is False
+
+    async def test_a_page_holding_more_posts_than_the_window_is_the_other_fact(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Two causes, two fields, because the remedies are opposite. Raising `limit` returns the
+        posts this window closed over; nothing here returns the posts behind Microsoft's cursor. One
+        boolean over both is the flag this surface spent a piece removing, so a page Graph
+        over-served without advertising more must report the second and not the first.
+        """
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _post_payload("1770000000000"),
+                        _post_payload("1770000000001"),
+                        _post_payload("1770000000002"),
+                    ]
+                },
+            )
+        )
+
+        browsed = await channels.browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=2,
+            include_window_completeness=True,
+        )
+
+        assert [message.message_id for message in browsed.messages] == [
+            "1770000000000",
+            "1770000000001",
+        ]
+        assert browsed.posts_cut_to_limit is True, "raise `limit` and the third post comes back"
+        assert browsed.more_posts_in_channel is False, "Microsoft offered no continuation"
+
+    async def test_neither_fact_is_reported_unless_it_was_asked_for(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Opt-in on the same reasoning as the meeting listers' `scan_incomplete`: a field that is
+        null for almost every answer is one a model need not reason about, so only the caller whose
+        question turns on completeness pays for it. The default answer is the messages and nothing
+        else.
+        """
+        graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [_post_payload("1770000000000")],
+                    "@odata.nextLink": f"{GRAPH_V1}{_MESSAGES_PATH}?$skiptoken=synthetic",
+                },
+            )
+        )
+
+        browsed = await channels.browse_channel(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=1,
+            include_window_completeness=False,
+        )
+
+        assert browsed.more_posts_in_channel is None
+        assert browsed.posts_cut_to_limit is None
+        assert len(browsed.messages) == 1, "the answer itself is unchanged either way"
+
     async def test_a_channel_nobody_has_posted_in_is_an_empty_page_not_a_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         graph.get(_MESSAGES_PATH).mock(return_value=httpx.Response(200, json={"value": []}))
 
         browsed = await channels.browse_channel(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            limit=20,
+            include_window_completeness=False,
         )
 
         assert browsed.messages == []
@@ -588,7 +756,11 @@ class TestGraphFailures:
             _ = await channels.list_channels(client, team_id=_TEAM_ID, limit=25)
         with pytest.raises(GraphForbidden):
             _ = await channels.browse_channel(
-                client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, limit=20
+                client,
+                team_id=_TEAM_ID,
+                channel_id=_CHANNEL_ID,
+                limit=20,
+                include_window_completeness=False,
             )
 
     def test_the_three_permissions_are_the_ones_microsoft_documents(self) -> None:

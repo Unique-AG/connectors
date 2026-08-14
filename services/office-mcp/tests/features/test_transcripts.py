@@ -1179,7 +1179,6 @@ class TestReadingTheWords:
         assert (read.turns[1].start_seconds, read.turns[1].end_seconds) == (16.246, 19.9)
         assert read.turns[3].start_seconds == 3600.0, "an hour in, from the HH:MM:SS form"
         assert read.next_offset is None
-        assert read.next_offset is None
         assert route.calls.last.request.headers["accept"] == "text/vtt"
 
     async def test_the_turns_page_without_refusing_a_long_meeting(
@@ -1195,8 +1194,7 @@ class TestReadingTheWords:
 
         assert first.next_offset == 2, "the offset is the whole of 'there are more turns'"
         assert [turn.speaker for turn in first.turns] == ["Ada Lovelace", "Grace Hopper"]
-        assert second.next_offset is None
-        assert second.next_offset is None
+        assert second.next_offset is None, "and null on the last page is the whole of saying so"
         assert [turn.speaker for turn in second.turns] == ["Ada Lovelace", None]
 
     async def test_a_tenant_that_forbids_speaker_names_degrades_instead_of_failing(

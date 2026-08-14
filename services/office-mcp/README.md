@@ -172,7 +172,8 @@ gets that string onto the wire.
   Wrap Graph work in `with graph_errors():`. Anything else stays the base `GraphFailure`.
 - **Paging follows `@odata.nextLink`** via `collect_pages`, replaying the URL verbatim, with an item
   cap, a *scan* cap — the teams-mcp lesson that a filtered collection can walk a long way for very
-  few kept items — and a request budget. There are three ways a read is bounded here and
+  few kept items — and a bound on how many pages of nothing it will follow in a row. There are three
+  ways a read is bounded here and
   `graph_client/pagination.py` sets all three out together: an inventory walks until it has `limit`
   items, a meeting's artifacts are walked to a tighter *scan* cap (they are filtered and ordered
   here, so the walk cannot stop at `limit`), and a channel's messages are not walked at all — Graph
@@ -188,11 +189,16 @@ gets that string onto the wire.
   reads (200)" on a four-transcript meeting: a fabricated claim about the user's own meeting, from a
   flag whose two causes nobody could tell apart. `collect_pages` therefore drives the pages itself
   (keeping `enumerate` and `next`, which are the parts worth having) and stops only on a cap or on
-  the end of the collection. Following empty pages needs a bound of its own, so requests are bounded
-  as well as items: `max_scanned` requests — the most that pages carrying items can spend, since
-  each spends scan budget — plus a fixed allowance for pages that carry none. A collection answering
-  with items therefore cannot reach the budget, and one that exhausts it is refused rather than
-  answered short, because a short answer means a cap everywhere above and that would not be one.
+  the end of the collection. Following empty pages needs a bound of its own, and *its own* is the
+  point: `MAX_EMPTY_PAGES` counts empty pages **in a row**, and counts them against nothing else. It
+  used to be half of one pooled request budget (`max_scanned` requests plus an allowance), which
+  bounded the walk but not the empty pages — a collection answering nothing but empty pages spends no
+  scan budget, so the whole pool was theirs and `list_chats` followed 1010 of them before giving up.
+  Counted on their own, an endlessly empty collection costs 11 requests. Counted per run rather than
+  per walk, a large collection that sprinkles the odd empty page is not killed for making progress: a
+  page carrying an item starts the count again, and what a run of nothing means is that Graph will
+  not end this collection. That is refused rather than answered short, because a short answer means a
+  cap everywhere above and that would not be one.
 - **The caller's token goes to `graph.microsoft.com` and nowhere else.** The SDK's bearer provider
   does not check its own allowed-hosts validator, so a redirect or an off-Graph `nextLink` would
   otherwise be handed a user's delegated credential.
@@ -225,24 +231,33 @@ Decisions worth knowing:
   made the odd one out of the tool a model calls first (Microsoft's own M365 connector landed on
   `get_me` too). A result field is snake_case, and one thing has one name across every tool: a
   person's Entra id is `user_id` wherever it appears, an address is `email`, a time is `…_at`. No
-  answer carries a "there is more" flag: a window filled to `limit` may have more behind it and a
-  short one is all there was, and where paging exists a `next_offset` says it outright and says
-  where to continue. `tests/test_mcp_tools.py` checks all of that against the live schemas, because
+  answer carries an unasked-for "there is more" flag: a window filled to `limit` may have more behind
+  it and a short one is all there was, and where paging exists a `next_offset` says it outright and
+  says where to continue — the exceptions are opt-in, null unless asked for, and are the two facts no
+  answer could carry implicitly (see `truncated` below). `tests/test_mcp_tools.py` checks all of that against the live schemas, because
   a convention nothing enforces is how a new tool comes out different from the ones before it.
 - **`truncated` came off all eight tools that reported it, and it is the one field clients asked to
-  lose.** Six of them lost it outright: on `list_chats`, `list_teams`, `list_channels` and
-  `browse_channel` a full window is the "there may be more" and a short one is the answer (which is
-  only exactly true because of the empty-page fix above — before it, a short page could be a paging
-  artefact), and on `search_messages` and `read_transcript` a non-null `next_offset` already said it
-  and said where to continue. The two meeting listers kept the information and made it opt-in, as
-  `include_scan_completeness` → `scan_incomplete`, because there the flag had come to mean two
-  things with opposite remedies: "the window held more than your `limit`" (raise it) and "the read
-  stopped at the 200-artifact cap" (nothing helps, and the first entry may not be the meeting's
-  latest). The first is what a full window says; the second is the one a caller cannot work out, has
-  no remedy for, and only meets on a series recorded daily for most of a year — so it is asked for
-  rather than carried, and the caveat it forced no longer lands on every ordinary answer. Nothing
-  was made quieter where it mattered: an empty answer over a scan that stopped short is still
-  `status: scan_incomplete` whether or not anybody asked.
+  lose.** Five of them lost it outright: on `list_chats`, `list_teams` and `list_channels` a full
+  window is the "there may be more" and a short one is the answer (which is only exactly true because
+  of the empty-page fix above — before it, a short page could be a paging artefact), and on
+  `search_messages` and `read_transcript` a non-null `next_offset` already said it and said where to
+  continue. The other three kept the information a caller could *not* work out and made it opt-in and
+  null by default, with one field per fact rather than one field over several:
+  - The two meeting listers report `include_scan_completeness` → `scan_incomplete`, because there the
+    flag had come to mean two things with opposite remedies: "the window held more than your `limit`"
+    (raise it) and "the read stopped at the 200-artifact cap" (nothing helps, and the first entry may
+    not be the meeting's latest). The first is what a full window says; the second is the one a
+    caller cannot work out, has no remedy for, and only meets on a series recorded daily for most of
+    a year. Nothing was made quieter where it mattered: an empty answer over a scan that stopped
+    short is still `status: scan_incomplete` whether or not anybody asked.
+  - `browse_channel` reports `include_window_completeness` → `more_posts_in_channel` and
+    `posts_cut_to_limit`. It is the one tool that follows no paging — one request, because Graph
+    allows about one a second on a channel for the whole connector — so it is also the one whose
+    short answer means nothing either way: system messages are dropped out of the page after Graph
+    counted them into it. Graph's `@odata.nextLink` on that page is an accurate "there is more of
+    this channel" and is the only thing that says so, so it is reported rather than inferred; the
+    ordinary "more posts on the page than your `limit`" is the second field, because a wider `limit`
+    fixes that one and reaches none of the first.
 - **Every result has a declared output schema.** So `next_offset` and `members_may_be_incomplete` are
   typed fields rather than prose or, worse, an extra object appended to the results array that a
   model can mistake for a result.

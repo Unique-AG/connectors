@@ -37,9 +37,15 @@ request per second per app per tenant … on a given channel"
 walking every channel of a team degrades every other user in the tenant, and following
 `@odata.nextLink` down one channel spends the tenant's whole budget for that channel on one
 caller. `browse_channel` therefore issues exactly one request: `$top` is the window and the single
-page Graph answers with is the answer, which is why the answer is described as a window rather than
-flagged as a partial one. A caller who needs a wider window raises `limit`; searching across
-channels is `message_search`'s job.
+page Graph answers with is the answer. A caller who needs a wider window raises `limit`; searching
+across channels is `message_search`'s job.
+
+That one page is also the one place in this connector where "was that everything?" is not something
+a caller can work out from what came back. Everywhere else a page short of `limit` is the end of the
+collection, because the walk underneath followed Graph's paging to it; here nothing is followed, and
+system messages are dropped out of the page after Graph counted them into it, so a short answer says
+nothing either way. What does say something is Graph's own `@odata.nextLink` on that page — an
+accurate read, and the only one available — so it is reported, opt-in, as `ChannelPosts` explains.
 """
 
 from datetime import UTC, datetime
@@ -198,10 +204,38 @@ class ChannelPosts(BaseModel):
             + "page, because browsing again returns the same newest ones. FEWER posts than "
             + "`limit` is NOT evidence that the channel holds no more: Microsoft counts system "
             + "messages into the page it answers with and they are dropped from this list, and "
-            + "the same is true of a thread's replies. There is no cursor and paging deeper is "
-            + "not a route to older posts: Microsoft orders this collection by reply-chain "
-            + "activity rather than by date, so reaching back in time is search_messages with "
-            + "`sent_before`."
+            + "the same is true of a thread's replies. Whether the channel does hold more is the "
+            + "one thing here you cannot read off this list, and Microsoft's own answer to it is "
+            + "reported when you ask: set `include_window_completeness` for "
+            + "`more_posts_in_channel`. There is no cursor and paging deeper is not a route to "
+            + "older posts: Microsoft orders this collection by reply-chain activity rather than "
+            + "by date, so reaching back in time is search_messages with `sent_before`."
+        )
+    )
+    more_posts_in_channel: bool | None = Field(
+        description=(
+            "Whether Microsoft said this channel holds posts beyond the page it answered with — "
+            + "its `@odata.nextLink` on that page, reported as it came — or null when "
+            + "`include_window_completeness` was not set, which is the default.\n"
+            + "True means there ARE more posts and this window is not the channel. It is not a "
+            + "cursor and there is nothing here to page with: this tool spends one request against "
+            + "a channel Microsoft rate-limits to about one a second for the whole connector, so "
+            + "the remedy is a wider `limit` for a little more, and search_messages with "
+            + "`sent_before` to reach back in time. False means Microsoft offered no continuation "
+            + f"of the collection, so — subject to `limit` and to {MAX_REPLIES_PER_POST} replies a "
+            + "post — this window was the whole channel. This is the only thing that says either "
+            + "way: a short list does NOT mean the channel ran out."
+        )
+    )
+    posts_cut_to_limit: bool | None = Field(
+        description=(
+            "Whether Microsoft's page held more posts than `limit` and this answer was cut to it, "
+            + "or null when `include_window_completeness` was not set. A different fact from "
+            + f"`more_posts_in_channel` with a different remedy: raise `limit` (up to {MAX_POSTS}) "
+            + "and the cut posts are in the next answer, where more of the channel is not "
+            + "reachable at all. Normally false whatever the channel holds — `$top` is set to "
+            + "`limit`, so Microsoft answers with no more than that — and reported rather than "
+            + "assumed because the window is this tool's promise rather than Microsoft's."
         )
     )
 
@@ -266,7 +300,12 @@ def _channel(channel: Channel) -> ChannelSummary:
 
 
 async def browse_channel(
-    client: GraphServiceClient, *, team_id: str, channel_id: str, limit: int
+    client: GraphServiceClient,
+    *,
+    team_id: str,
+    channel_id: str,
+    limit: int,
+    include_window_completeness: bool,
 ) -> ChannelPosts:
     """Up to `limit` posts from one channel's first page, each with the newest of its replies.
 
@@ -279,10 +318,25 @@ async def browse_channel(
 
     The system messages — somebody joining, a call ending, a channel being renamed — are dropped,
     and Graph offers no `$filter` to drop them at the source, so they are filtered out of the page
-    Graph counted them into: a page can hold fewer posts than `limit` without the channel having
-    run out of them. There is no flag saying so, because there is nothing a caller would do
-    differently — this call is one window either way and `ChannelPosts.messages` says so — and a
-    flag whose two causes have no remedy between them is a caveat, not a signal.
+    Graph counted them into: a page can hold fewer posts than `limit` without the channel having run
+    out of them. That is what makes this the one tool here whose answer cannot say whether it was
+    everything, and the reason `include_window_completeness` exists at all. Elsewhere a short
+    answer is the end of the collection — `collect_pages` followed Graph's paging to it — so "there
+    is more" is derivable and is not reported; here nothing was followed and a short answer says
+    nothing.
+
+    Two facts are reported for it, separately, because their remedies are opposite ones and one
+    boolean over both is the flag this surface spent a piece removing. `more_posts_in_channel` is
+    Graph's own `@odata.nextLink` on the page, read as it came: the channel holds more, and nothing
+    here reaches it — a wider `limit` buys a little more of the same page and `message_search` is
+    the route back in time. `posts_cut_to_limit` is this function's own window closing over posts
+    Graph did send, which a wider `limit` does fix. Both are null unless asked for, on the same
+    reasoning as the meeting listers' `scan_incomplete`: a field that is null for almost every
+    answer is one a model need not reason about, and only a caller whose question turns on it pays
+    that price.
+
+    The reply window is deliberately not a third fact here. A thread's older replies are out of
+    reach whether or not Graph paged them, so nothing acts on it — see `_replies`.
     """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
@@ -302,9 +356,10 @@ async def browse_channel(
     # `$top` is `limit`, so Graph returning more posts than were asked for should not happen — but
     # the window is this tool's promise rather than Graph's, so it is applied rather than trusted.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
+    kept = posts[:limit]
 
     messages: list[TeamsMessage] = []
-    for post in posts[:limit]:
+    for post in kept:
         assert post.id is not None, "Graph returned a channel message with no id"
         messages.append(
             message_of(post, handle=MessageHandle(post.id, team_id=team_id, channel_id=channel_id))
@@ -319,7 +374,11 @@ async def browse_channel(
             for reply in _replies(post)
         )
 
-    return ChannelPosts(messages=messages)
+    return ChannelPosts(
+        messages=messages,
+        more_posts_in_channel=bool(page.odata_next_link) if include_window_completeness else None,
+        posts_cut_to_limit=len(kept) < len(posts) if include_window_completeness else None,
+    )
 
 
 def _is_a_post(message: ChatMessage) -> bool:

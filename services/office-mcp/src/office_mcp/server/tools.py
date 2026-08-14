@@ -16,13 +16,17 @@ model reads this surface as one thing:
   the shell idiom made the odd tool out of the very tool a model calls first, and renaming a tool
   is a breaking change best spent before there are more of them. (Microsoft's own M365 connector
   arrived at `get_me` independently, which is one less name for a model to have to learn twice.)
-* **No tool reports "there is more" as a field.** Every list-shaped answer here is a window, and
-  what a window holds says whether it might have more behind it: as many items as `limit` may, fewer
-  than `limit` is all there was. Where paging exists it is a `next_offset` that is null on the last
-  page, which says the same thing and says where to continue. This replaced a `truncated` on eight
-  tools, which clients did not want and which had come to carry two facts with opposite remedies on
-  the two meeting listers — so the remedy-less half of it is what survives, as the opt-in
-  `include_scan_completeness` there and nowhere else.
+* **No tool reports "there is more" unasked.** Every list-shaped answer here is a window, and what a
+  window holds says whether it might have more behind it: as many items as `limit` may, fewer than
+  `limit` is all there was. Where paging exists it is a `next_offset` that is null on the last page,
+  which says the same thing and says where to continue. This replaced a `truncated` on eight tools,
+  which clients did not want and which had come to carry facts with opposite remedies under one
+  boolean. What survives is opt-in, is null unless asked for, and exists only where the fact is not
+  derivable from the answer: `include_scan_completeness` on the two meeting listers (the
+  200-artifact scan cap, which has no remedy), and `include_window_completeness` on `browse_channel`
+  (Microsoft's own cursor on the one page it reads, that tool being the only one here that follows
+  no paging, so the only one whose short answer means nothing either way). Neither reports two facts
+  as one field.
 * **A description teaches the traps, and the neighbours.** Each one says what it answers, when to
   reach for it rather than for another tool here, and what its answer does *not* mean.
 
@@ -303,11 +307,15 @@ collection accepts no filter and no sort at all. To bound by date use search_mes
 reason, paging deeper is not a way to reach older posts — there is no cursor, and a wider `limit` \
 (up to {channels.MAX_POSTS}, Microsoft's own maximum) or a search is the only way to see more.
 
-**Never report this as the whole of a channel, however few posts come back.** There is no "there \
-is more" flag because there is nothing else this tool can be: it reads one page and stops. A page \
-holding fewer than `limit` posts is not evidence that the channel has no more — Microsoft counts \
-the system messages into that page before they are dropped here — and the older posts of a busy \
-channel are reached by searching, not by asking again.
+**Never report this as the whole of a channel unless you asked and were told.** A page holding \
+fewer than `limit` posts is not evidence that the channel has no more — Microsoft counts the \
+system messages into that page before they are dropped here — so, unlike every other list here, \
+what comes back cannot tell you whether it was everything. Microsoft's page does say, and \
+`include_window_completeness` is how to have it reported: `more_posts_in_channel` is Microsoft's \
+own "there is more of this channel", which no `limit` here reaches — the older posts of a busy \
+channel are reached by searching, not by asking again — and `posts_cut_to_limit` is the separate \
+case of this window closing over posts Microsoft did send, which a wider `limit` does fix. Both \
+are null unless you set it.
 
 Replies come with their posts: up to {channels.MAX_REPLIES_PER_POST} of the newest per post, \
 oldest first, each carrying the post it answers in `reply_to_id`. A post carrying that many \
@@ -840,6 +848,22 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = 20,
+        include_window_completeness: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Report whether this window was the whole channel, as `more_posts_in_channel` "
+                    + "and `posts_cut_to_limit` in the answer. Off by default; set it when the "
+                    + "answer turns on completeness, because this is the one tool here where a "
+                    + "short answer tells you nothing — it reads a single page, and Microsoft "
+                    + "counts system messages into that page before they are dropped. "
+                    + "`more_posts_in_channel` is Microsoft's own cursor on that page: the channel "
+                    + "holds more, and nothing here pages to it. `posts_cut_to_limit` is the "
+                    + "separate, ordinary case of more posts on the page than `limit`, which a "
+                    + "wider `limit` fixes. Both are null when this is not set."
+                )
+            ),
+        ] = False,
         graph_token: str = _POSTS_TOKEN,
     ) -> channels.ChannelPosts:
         with graph_tool_errors(channels.POSTS_PERMISSION):
@@ -848,6 +872,7 @@ def register_tools(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 team_id=team_id,
                 channel_id=channel_id,
                 limit=limit,
+                include_window_completeness=include_window_completeness,
             )
 
     # Declared and registered in two steps rather than with `@mcp.tool`, which does both and hands

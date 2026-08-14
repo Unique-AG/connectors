@@ -130,8 +130,8 @@ fourth:
   transcripts than one call reads", is a claim about the meeting, and it is true because the walk
   underneath it can no longer stop for any other reason: `graph_client/pagination.py` follows an
   empty page carrying a next link rather than reading it as the end, and refuses a collection that
-  exhausts its request budget rather than answering short. Before that, a four-transcript meeting
-  Graph paged `[3, nothing, 1]` was told the same thing.
+  answers nothing but empty pages rather than answering short. Before that, a four-transcript
+  meeting Graph paged `[3, nothing, 1]` was told the same thing.
   It is also the one answer here with **no remedy**, and every place it is described says so. The
   window is applied to the artifacts *after* they are read: Graph documents no filterable date on
   either collection — the one filterable property either reference shows by example is

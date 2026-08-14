@@ -7,7 +7,7 @@ from msgraph.generated.models.chat import Chat
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_mcp.graph_client import collect_pages
-from office_mcp.graph_client.pagination import MAX_EMPTY_PAGES
+from office_mcp.graph_client.pagination import MAX_EMPTY_PAGES, MAX_SCANNED_ITEMS
 
 from .conftest import GRAPH_V1
 
@@ -162,17 +162,20 @@ class TestTheCaps:
         assert topics(collected.items) == ["keep", "keep"]
         assert not collected.capped
 
-    async def test_a_collection_answering_only_empty_pages_stops_inside_a_request_budget(
+    async def test_a_collection_answering_only_empty_pages_gives_up_in_a_run_of_them(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Following an empty page means a run of them must be bounded, and bounding items does not
         bound it: a page with nothing in it spends a request and no scan budget at all.
 
-        So there is a request budget — `max_scanned` requests, which is the most that pages carrying
-        items can spend, plus `MAX_EMPTY_PAGES` for the ones that carry none. Exhausting it means
-        Graph answered that many pages of nothing while still advertising more, which is refused
-        rather than answered short: a short answer here means a cap everywhere above, and this is
-        not one.
+        `MAX_EMPTY_PAGES` is that bound, and it is counted against nothing else. It used to be half
+        of one pooled request budget — `max_scanned` requests plus this allowance — defended as "at
+        most `max_scanned` requests can go on pages that carried anything, so this bounds the rest".
+        A collection answering nothing but empty pages spends *no* scan budget, so the whole pool
+        was theirs: this same walk followed 13 pages of nothing with `max_scanned=3`, and
+        `list_chats` followed 1010 of them at the default. So the count is pinned to the requests it
+        actually costs, not to the formula: the caller's own first page plus `MAX_EMPTY_PAGES`
+        followed after it, whatever `max_scanned` is.
         """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -182,10 +185,79 @@ class TestTheCaps:
         first = await client.me.chats.get()
         assert first is not None
 
-        with pytest.raises(AssertionError, match="budget"):
+        with pytest.raises(AssertionError, match="in a row"):
             _ = await collect_pages(first, client, limit=10, max_scanned=3)
 
-        assert len(graph.calls) == 3 + MAX_EMPTY_PAGES + 1, (
-            "the whole budget was spent — the caller's own first page, the scan cap's worth of "
-            "requests and the empty-page allowance — and not one request more"
+        assert len(graph.calls) == MAX_EMPTY_PAGES + 1 == 11, (
+            "the caller's own first page and the run of empty ones this walk will follow, and not "
+            "one request more — the scan cap lends it nothing"
         )
+
+    async def test_the_scan_cap_does_not_lend_the_empty_pages_a_longer_run(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The same collection at the module's own `max_scanned`, which is what production passes.
+
+        This is the measurement the pooled budget got wrong by two orders of magnitude: the bound
+        has to be the same 11 requests whether the walk was allowed 3 items or 1000, because neither
+        number says anything about pages that carried none.
+        """
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
+            )
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        with pytest.raises(AssertionError, match="in a row"):
+            _ = await collect_pages(first, client, limit=10, max_scanned=MAX_SCANNED_ITEMS)
+
+        assert len(graph.calls) == MAX_EMPTY_PAGES + 1
+
+    async def test_a_collection_sprinkling_empty_pages_between_items_is_walked_to_its_end(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Why the bound is per run rather than per walk. Graph does answer the occasional empty
+        page in the middle of a collection that is otherwise fine, so a walk over more of them *in
+        total*
+        than the allowance — with an item between each — is making progress and must not be given up
+        on. A page carrying an item starts the count again; only a run of nothing is refused.
+        """
+        pages = MAX_EMPTY_PAGES + 4
+        for index in range(pages):
+            last = index == pages - 1
+            graph.get("/me/chats", params={"$skiptoken": f"page-{index}"}).mock(
+                return_value=httpx.Response(
+                    200,
+                    json={"value": [chat(index, "keep")]}
+                    if last
+                    # One item, then nothing, then on: the empty page carries the cursor to the next
+                    # pair, so `pages` runs of length one add up to more empties than the allowance.
+                    else {
+                        "value": [chat(index, "keep")],
+                        "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=empty-{index}",
+                    },
+                )
+            )
+            graph.get("/me/chats", params={"$skiptoken": f"empty-{index}"}).mock(
+                return_value=httpx.Response(
+                    200,
+                    json={
+                        "value": [],
+                        "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=page-{index + 1}",
+                    },
+                )
+            )
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=page-0"}
+            )
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        collected = await collect_pages(first, client, limit=100)
+
+        assert len(collected.items) == pages, "every item page was reached"
+        assert not collected.capped, "nothing stopped this walk but the end of the collection"

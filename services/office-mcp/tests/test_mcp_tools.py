@@ -668,7 +668,11 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(tools["list_chats"].outputSchema)) == {"chats"}
         assert set(_properties(tools["list_teams"].outputSchema)) == {"teams"}
         assert set(_properties(tools["list_channels"].outputSchema)) == {"channels"}
-        assert set(_properties(tools["browse_channel"].outputSchema)) == {"messages"}
+        assert set(_properties(tools["browse_channel"].outputSchema)) == {
+            "messages",
+            "more_posts_in_channel",
+            "posts_cut_to_limit",
+        }
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
             "next_offset",
@@ -736,6 +740,11 @@ class TestTheToolsThisServerAdvertises:
         or "nothing will help" with no way to tell which. So the word is gone from every answer, and
         what is asserted now is that it stays gone — a new tool re-introducing it would be
         re-introducing the ambiguity — and that the tools which page say so with `next_offset`.
+
+        Where a completeness fact is NOT derivable from the answer it survives as an opt-in field,
+        which is asserted too: the flag that asks for it defaults to off, so no ordinary answer
+        carries the caveat, and each tool that has one carries one field per fact rather than one
+        boolean over several.
         """
         tools = _named(await mcp_client.list_tools())
 
@@ -748,6 +757,13 @@ class TestTheToolsThisServerAdvertises:
             assert "truncated" not in _properties(tool.outputSchema), name
         for name in ("search_messages", "read_transcript"):
             assert "next_offset" in _properties(tools[name].outputSchema), name
+        for name, flag in (
+            ("browse_channel", "include_window_completeness"),
+            ("list_meeting_transcripts", "include_scan_completeness"),
+            ("list_meeting_recordings", "include_scan_completeness"),
+        ):
+            asked_for = _object(_properties(tools[name].inputSchema)[flag])
+            assert asked_for["default"] is False, f"{name} would report completeness unasked"
 
     async def test_the_two_meeting_listers_answer_in_the_same_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -1154,7 +1170,12 @@ class TestTheToolsThisServerAdvertises:
         schema = tools["browse_channel"].inputSchema
         limit = _object(_properties(schema)["limit"])
 
-        assert set(_properties(schema)) == {"team_id", "channel_id", "limit"}
+        assert set(_properties(schema)) == {
+            "team_id",
+            "channel_id",
+            "limit",
+            "include_window_completeness",
+        }
         assert schema.get("required") == ["team_id", "channel_id"]
         assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
             "integer",
@@ -1321,6 +1342,59 @@ class TestCallingThem:
         assert [chat["chat_id"] for chat in listed] == ["19:release@thread.v2"]
         assert listed[0]["last_message_at"] == "2026-02-11T09:15:22.310000Z"
         assert obo.requested_scopes == [("https://graph.microsoft.com/Chat.Read",)]
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The bound on pages carrying nothing, measured where it is actually spent rather than read
+        off the constant that claims it.
+
+        An empty page carrying a cursor means keep going, so a collection that answers only those
+        has to be given up on — and the count is the point. It used to be one pooled request budget
+        (`max_scanned` requests plus a ten-page allowance), which bounded the walk and not the empty
+        pages: a collection that never carries an item never spends scan budget, so the pool was
+        theirs. Driven over this protocol against exactly that collection, `list_chats` made 1011
+        requests and this tool 211 — minutes of sequential Graph calls that would have tripped
+        throttling long before either gave up, from a constant that said ten. Counting empty pages
+        against their own bound is what makes both of them eleven: the caller's own first page and
+        the run this walk will follow.
+
+        Both tools are here because the old number differed per tool (each passes its own
+        `max_scanned`) and the new one must not: neither cap says anything about a page that carried
+        nothing. And both must still FAIL rather than answer, because every short answer above this
+        means a cap — `list_meeting_transcripts` would otherwise report a meeting as having no
+        transcript for the window on the strength of a collection nobody reached the end of.
+        """
+        chats = graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
+            )
+        )
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        listing = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [],
+                    "@odata.nextLink": f"{GRAPH_V1}{_TRANSCRIPTS_PATH}?$skiptoken=loop",
+                },
+            )
+        )
+
+        listed = await mcp_client.call_tool("list_chats", {}, raise_on_error=False)
+        transcribed = await mcp_client.call_tool(
+            "list_meeting_transcripts",
+            {"meeting_uri": f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"},
+            raise_on_error=False,
+        )
+
+        assert listed.is_error, "a walk that gave up must not answer short: a short answer is a cap"
+        assert transcribed.is_error
+        assert chats.call_count == 11, "the caller's own page and the run of empty ones followed"
+        assert listing.call_count == 11, "the same eleven, whatever `max_scanned` this tool passes"
 
     async def test_search_messages_returns_hits_with_handles_and_no_invented_total(
         self,
@@ -2022,6 +2096,55 @@ class TestCallingThem:
             assert secret not in _record_text(record), f"logged by {record.name}"
         for span in exporter.get_finished_spans():
             assert secret not in str(span.attributes)
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_same_channel_page_answers_differently_with_and_without_microsofts_cursor(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The signal this tool cannot infer, over the real protocol. These two answers were
+        byte-identical: one page of posts WITH an `@odata.nextLink` and the same page without one,
+        so a caller could not tell "that was the whole channel" from "Microsoft says there is more".
+
+        It is the one list here where that is not derivable. Everywhere else the walk underneath
+        followed Microsoft's paging to the end of the collection, so a short answer IS the end; this
+        tool makes one request against a channel Microsoft rate-limits to about one a second for the
+        whole connector, and drops system messages out of the page after Microsoft counted them into
+        it. So the cursor is read and reported when asked for — and, asked for, it is accurate.
+        """
+        posts = {"value": [{**_CHANNEL_POSTS["value"][0], "replies": []}]}
+        with_more = {
+            **posts,
+            "@odata.nextLink": f"{GRAPH_V1}{_CHANNEL_MESSAGES_PATH}?$skiptoken=synthetic",
+        }
+        route = graph.get(_CHANNEL_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json=with_more)
+        )
+        ids = {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}
+
+        unasked = _structured(await mcp_client.call_tool("browse_channel", ids))
+        told = _structured(
+            await mcp_client.call_tool(
+                "browse_channel", {**ids, "include_window_completeness": True}
+            )
+        )
+        route.mock(return_value=httpx.Response(200, json=posts))
+        whole = _structured(
+            await mcp_client.call_tool(
+                "browse_channel", {**ids, "include_window_completeness": True}
+            )
+        )
+
+        assert unasked["more_posts_in_channel"] is None, "null unless a caller asks"
+        assert unasked["posts_cut_to_limit"] is None
+        assert told["more_posts_in_channel"] is True, "Microsoft's own cursor, read as it came"
+        assert whole["more_posts_in_channel"] is False, "the same page, its cursor taken off"
+        assert told["posts_cut_to_limit"] is False, "the window closed over nothing Microsoft sent"
+        assert told["messages"] == unasked["messages"] == whole["messages"], (
+            "asking about completeness changes what is reported and never what was read"
+        )
+        assert route.call_count == 3, "one request per call, and the cursor still never followed"
 
     @pytest.mark.usefixtures("obo")
     async def test_reading_a_system_event_says_what_happened_rather_than_nothing(
