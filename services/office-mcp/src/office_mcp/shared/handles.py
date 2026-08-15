@@ -5,7 +5,7 @@ shape must exist. Two modules spelling `teams:///meetings/…` would silently di
 lives here, not in tool files. This is the only module that spells or parses these URIs (enforced
 by tests/test_layering.py).
 
-## The four shapes, and why they are four
+## The five shapes, and why they are five
 
 Three of them are Graph's three ways to address a Teams message
 (https://learn.microsoft.com/en-us/graph/api/chatmessage-get):
@@ -20,13 +20,23 @@ reply becomes the second shape, which Graph answers 404 to. `browse_channel` wal
 by post and therefore knows each reply's parent, which is why it is what mints this shape and why
 the shape lives here rather than there.
 
-The fourth shape: `teams:///meetings/{joinWebUrl}`. A meeting is addressed by join URL because that
-is the only route Microsoft Graph gives a delegated caller from chat to meeting. The chat
-collection's default projection carries `onlineMeetingInfo.joinWebUrl` and Graph's onlineMeetings
-lookup matches it byte-for-byte. Nothing else—no chat id, topic, or date—turns into one.
+The fourth and fifth address the meeting side:
+
+    teams:///meetings/{joinWebUrl}
+    teams:///transcripts/{meetingId}/{transcriptId}
+
+A meeting is addressed by join URL because that is the only route Microsoft Graph gives a delegated
+caller from chat to meeting. The chat collection's default projection carries
+`onlineMeetingInfo.joinWebUrl` and Graph's onlineMeetings lookup matches it byte-for-byte. Nothing
+else—no chat id, topic, or date—turns into one.
 
 A handle (not bare URL) because Graph warns "don't parse URLs". The tool takes something that came
 from a tool result, not something the model composed.
+
+A transcript is addressed by the two ids its content path is built from, and not by the join URL
+that reached it, because by then the resolve has already happened: a handle carrying the join URL
+would make whoever reads a transcript repeat that lookup, spend a second request and a second
+permission on it, and answer a 403 that could be about either of them.
 
 The family name is the first segment. `teams:///meetings/{x}/transcripts/{y}` would make `{x}` a
 join URL in one shape and a meeting id in another. A parser cannot tell them apart. Distinct first
@@ -103,6 +113,23 @@ class MeetingHandle:
         return f"teams:///meetings/{_segment(self.join_web_url)}"
 
 
+@dataclass(frozen=True, slots=True)
+class TranscriptHandle:
+    """Which transcript, by the two ids Graph's content path is built from.
+
+    Graph's own `transcriptContentUrl` is not used — the published samples are malformed
+    (`…/transcripts/('…')/content`) — so the path is built from the ids, which is what Microsoft's
+    reference shows.
+    """
+
+    meeting_id: str
+    transcript_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"teams:///transcripts/{_segment(self.meeting_id)}/{_segment(self.transcript_id)}"
+
+
 # Every shape, and only those. Ids are matched as "anything but a separator" because the spellers
 # above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
@@ -111,6 +138,7 @@ _REPLY_HANDLE = re.compile(
     r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)/replies/([^/]+)\Z"
 )
 _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
+_TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///transcripts/([^/]+)/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -155,6 +183,17 @@ def meeting_handle(uri: str) -> MeetingHandle | None:
         return None
     join_web_url = unquote(match.group(1))
     return MeetingHandle(join_web_url) if join_web_url.strip() else None
+
+
+def transcript_handle(uri: str) -> TranscriptHandle | None:
+    """`uri` as a transcript handle, or None if it is not one."""
+    match = _TRANSCRIPT_HANDLE.match(uri)
+    if match is None:
+        return None
+    meeting_id, transcript_id = (unquote(part) for part in match.groups())
+    if not meeting_id.strip() or not transcript_id.strip():
+        return None
+    return TranscriptHandle(meeting_id, transcript_id)
 
 
 def meeting_uri_for(join_web_url: str | None) -> str | None:
