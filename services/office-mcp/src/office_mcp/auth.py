@@ -10,6 +10,8 @@ each pod restart and breaks at the second replica. Postgres, which this service 
 the deployment horizontally scalable.
 """
 
+from collections.abc import Sequence
+
 from fastmcp.server.auth.providers.azure import AzureProvider
 from key_value.aio.protocols import AsyncKeyValue
 from key_value.aio.stores.postgresql import PostgreSQLStore
@@ -22,8 +24,7 @@ from office_mcp.config import DatabaseConfig, EntraConfig
 _OAUTH_TABLE_NAME = "oauth_kv"
 
 # Trap: AzureProvider requires a non-OIDC scope. Entra omits OIDC scopes from `scp` claim, so
-# they cannot be enforced. Graph permissions (requested per tool via On-Behalf-Of) are separate;
-# none exist yet.
+# they cannot be enforced. Graph permissions (requested per tool via On-Behalf-Of) are separate.
 _REQUIRED_SCOPES = ("access_as_user",)
 
 _ENCRYPTION_SALT = "office-mcp-oauth-storage"
@@ -54,7 +55,12 @@ def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKe
     )
 
 
-def build_auth(entra: EntraConfig, base_url: str, client_storage: AsyncKeyValue) -> AzureProvider:
+def build_auth(
+    entra: EntraConfig,
+    base_url: str,
+    client_storage: AsyncKeyValue,
+    graph_scopes: Sequence[str],
+) -> AzureProvider:
     """Build the auth provider.
 
     `base_url` must be the externally-reachable URL of this service. OAuth metadata and the
@@ -65,12 +71,21 @@ def build_auth(entra: EntraConfig, base_url: str, client_storage: AsyncKeyValue)
     `client_storage` is passed rather than built here so the readiness probe uses the same object,
     proving the provider's connection to Postgres works. A separate readiness connection would pass
     while the provider's connection fails, masking sign-in outages.
+
+    `graph_scopes` are the Microsoft Graph permissions the tools need, which is why they arrive
+    from outside rather than being listed here — the tools decide them. They ride the authorize
+    request only: Entra issues one token per resource (AADSTS28000), so the code exchange asks
+    only for this API's own scope, and the Graph ones are redeemed later, per tool call, by the
+    On-Behalf-Of exchange. Sending them at authorize time is what makes that possible at all —
+    OBO can only redeem a permission the user or an administrator has already consented to, and
+    a permission that is never requested is never consented to.
     """
     return AzureProvider(
         client_id=entra.client_id,
         client_secret=entra.client_secret.get_secret_value(),
         tenant_id=entra.tenant_id,
         required_scopes=list(_REQUIRED_SCOPES),
+        additional_authorize_scopes=list(graph_scopes),
         base_url=base_url,
         client_storage=client_storage,
     )
