@@ -28,7 +28,14 @@ import httpx
 from fastmcp import FastMCP
 
 from office_mcp.shared.seam import ToolAdvice, graph_scope
-from office_mcp.tools import get_me, list_chats, list_teams, read_message, search_messages
+from office_mcp.tools import (
+    get_me,
+    list_channels,
+    list_chats,
+    list_teams,
+    read_message,
+    search_messages,
+)
 
 # The whole of what this package promises, and the reason it is entered through here: a caller
 # that imported `tools/get_me.py` directly would be naming a tool module somewhere other than
@@ -88,6 +95,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     get_me,
     list_chats,
     list_teams,
+    list_channels,
     search_messages,
     read_message,
 )
