@@ -1,9 +1,11 @@
 """The meeting vocabulary: the `$filter` that reaches a meeting, and the window that scopes it.
 
-Everything tested here is a promise about a meeting rather than about one artifact of it, which is
-why it is tested where it lives rather than through the tool that calls it: a caller cannot see two
-tools disagreeing about "the latest occurrence", it can only see one of them being wrong, so the
-assertions have to hold for whoever asks next.
+Three tools ask about one meeting — `list_meeting_transcripts`, `list_meeting_recordings`, and
+`read_transcript` through a handle one of them minted — and everything tested here is a promise
+about the meeting rather than about one artifact of it, which is why it is tested where it lives
+rather than once per lister: a caller cannot see two tools disagreeing about "the latest
+occurrence", it can only see one of them being wrong, so the assertions have to hold for whoever
+asks next too.
 
 Every payload is synthesised: the ids are obviously fake and the domains are `.invalid`.
 """

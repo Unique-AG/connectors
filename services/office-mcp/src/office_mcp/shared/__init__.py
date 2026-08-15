@@ -2,7 +2,7 @@
 
 Every tool in `tools/` is a file of its own — its name, its description, its Graph permissions, its
 arguments, its answer shape, its Graph request and its own error wording all in one place, so that
-adding the tenth tool is adding one file and reading the ninth is reading one file. That is the
+adding the eleventh tool is adding one file and reading the tenth is reading one file. That is the
 whole point, and it has exactly one cost: two files are free to disagree. This package is the list
 of things they must not.
 
@@ -24,14 +24,16 @@ difference between the copies would be a bug a caller could see:
   search found may have no handle that reads.
 * `meetings.py` — how a meeting is reached, which occurrence was asked about, and how far "newest
   first" is true. None of those is a fact about transcripts: they are facts about a meeting and the
-  artifact collections Graph hangs off one, and a second tool over the same meeting would otherwise
-  re-derive all of them. `read_transcript` is the first tool to arrive and take a name from here
-  without touching the rest, which is what the split was for — the permission a transcript resource
-  costs is the resource's rather than one tool's request's, so it is spelled where neither of the
-  two tools that name it owns it.
-* `identity.py` — who the signed-in user is. `get_me` reports it; it is also the fact every other
-  answer on this connector is correlated against, so a second tool asking it with a `GET /me` of
-  its own would be a second answer to one question.
+  artifact collections Graph hangs off one. `list_meeting_transcripts` and `list_meeting_recordings`
+  ask about the same meeting with the same handle over the same window, so "newest first" and "this
+  absence is settled" are promises the two would keep differently if each made its own.
+  `read_transcript` takes a name from here without touching the rest, which is what the split was
+  for — the permission a transcript resource costs is the resource's rather than one tool's
+  request's, so it is spelled where neither of the two tools that name it owns it.
+* `identity.py` — who the signed-in user is. `get_me` reports it and `list_meeting_recordings`
+  compares a recording's organiser against it; it is also the fact every other answer on this
+  connector is correlated against, so a second `GET /me` under a different projection would be a
+  second answer to one question.
 * `seam.py` — how a tool is attached to the outside: the On-Behalf-Of token it calls under and the
   advice a Graph refusal becomes. A model reads every refusal on this server as one voice, so the
   wording cannot be per tool.

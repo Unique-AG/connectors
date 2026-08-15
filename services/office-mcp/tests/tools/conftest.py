@@ -40,22 +40,11 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
     return graph_client_for(transport, CALLER_TOKEN)
 
 
-# The signed-in user, as `GET /me` answers. Here rather than in a test file because it is the
-# unrelated call a tool's tests reach for when what they are proving is that a request configuration
-# built for one call did not change every other one.
-ME: dict[str, object] = {
-    "id": "00000000-0000-4000-8000-000000000001",
-    "displayName": "Ada Lovelace",
-    "mail": "ada@example.invalid",
-    "userPrincipalName": "ada@corp.example.invalid",
-    "jobTitle": "Analyst",
-}
-
-
-# The meeting side: the same join URL, the same `onlineMeeting`, and one artifact payload. Builders
-# rather than literals per test so that the fields a test is *about* are the ones it names, and here
-# rather than in the tool's own file because a meeting is answered about by whatever asks next and
-# two copies of one meeting would let a round trip pass over two different meetings.
+# The meeting side, shared by the two listers' test files because it is one meeting answered about
+# twice: the same join URL, the same `onlineMeeting`, and one artifact payload per collection.
+# Builders rather than literals per test so that the fields a test is *about* are the ones it names,
+# and here rather than in either tool's own file because two copies of one meeting would let a round
+# trip pass over two different meetings.
 
 # A join URL shaped like the ones Graph actually stores, and the reason the escaping is a bug class:
 # it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b`/`%22`
@@ -68,6 +57,22 @@ JOIN_WEB_URL = (
 )
 
 MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+
+# The signed-in user, and somebody else, as `GET /me` answers and as a recording's organiser is
+# named. Two ids rather than one because the whole of the organiser-only rule is which of them the
+# recording belongs to, and `ME` is here for a second reason besides: it is the unrelated call a
+# tool's tests reach for when what they are proving is that a request configuration built for one
+# call did not change every other one.
+SIGNED_IN_USER_ID = "00000000-0000-4000-8000-000000000001"
+OTHER_USER_ID = "00000000-0000-4000-8000-000000000002"
+
+ME: dict[str, object] = {
+    "id": SIGNED_IN_USER_ID,
+    "displayName": "Ada Lovelace",
+    "mail": "ada@example.invalid",
+    "userPrincipalName": "ada@corp.example.invalid",
+    "jobTitle": "Analyst",
+}
 
 
 def meeting_payload(
@@ -105,6 +110,51 @@ def transcript_payload(
         "createdDateTime": created_at,
         "endDateTime": ended_at,
         "contentCorrelationId": content_correlation_id,
+    }
+
+
+def recording_payload(
+    *,
+    recording_id: str = "7e31db25-bc6e-4fd8-96c7-e01264e9b6fc",
+    meeting_id: str = MEETING_ID,
+    created_at: str | None = "2026-02-10T14:02:41.204Z",
+    ended_at: str | None = "2026-02-10T14:49:53.117Z",
+    content_correlation_id: str | None = "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+    organizer_user_id: str | None = OTHER_USER_ID,
+    organizer_odata_type: str = "#microsoft.graph.teamworkUserIdentity",
+) -> dict[str, object]:
+    """One `callRecording`, which is metadata only — the bytes are an MP4 nothing here fetches.
+
+    `organizer_odata_type` is a parameter because Microsoft's own list-recordings sample sends
+    `#Microsoft.Teams.GraphSvc.teamworkUserIdentity` on this property, which is not a type the SDK
+    knows: an unknown discriminator has to keep deserializing rather than take the listing down.
+    There is no duration, size or media-type property on this resource; that is not an omission
+    here.
+    """
+    user = (
+        None
+        if organizer_user_id is None
+        else {
+            "@odata.type": organizer_odata_type,
+            "id": organizer_user_id,
+            # Null in every documented sample, which is why a recording's organiser can only be
+            # reported as an id.
+            "displayName": None,
+            "userIdentityType": "aadUser",
+            "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+        }
+    )
+    return {
+        "id": recording_id,
+        "meetingId": meeting_id,
+        "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+        "createdDateTime": created_at,
+        "endDateTime": ended_at,
+        "contentCorrelationId": content_correlation_id,
+        "recordingContentUrl": (
+            f"{GRAPH_V1}/me/onlineMeetings/{meeting_id}/recordings/{recording_id}/content"
+        ),
+        "meetingOrganizer": {"application": None, "device": None, "user": user},
     }
 
 

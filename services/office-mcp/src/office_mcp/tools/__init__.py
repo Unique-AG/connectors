@@ -31,6 +31,7 @@ from office_mcp.tools import (
     get_me,
     list_channels,
     list_chats,
+    list_meeting_recordings,
     list_meeting_transcripts,
     list_teams,
     read_message,
@@ -101,6 +102,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     read_message,
     list_meeting_transcripts,
     read_transcript,
+    list_meeting_recordings,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
