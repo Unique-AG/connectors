@@ -58,11 +58,13 @@ _DESCRIPTION = f"""\
 List the signed-in user's Microsoft Teams chats: one-to-one, group, and meeting chats, most recent \
 first. Returns each chat's id, type, topic, last-message time, and members (for unnamed chats).
 
-Use this to see which conversations are live, who is in them, and when each was last posted in. Do \
-not use for message content—no tool on this server reads messages. Also use to name a chat: \
-`chat_id` is the id Microsoft puts on every message in that chat, so this is how to get a topic \
-and participant list for a message found elsewhere. No tool takes a chat id as an argument. \
-Returns chats only—Teams channels are inside teams and are a separate surface not listed here.
+Reach for this to see which conversations are live, who is in them, and when each was last posted \
+in — never for what was said in them: no message text is returned here, and search_messages is the \
+route to any. The other use is naming: a `chat_id` here is the id Microsoft puts on \
+every message in that chat, so this list is how a message found elsewhere gets a topic and a set \
+of participants. It is not an argument to anything — no tool here takes a chat id. This returns \
+chats only: Teams channels live inside teams and are a different surface, which this server does \
+not list.
 
 Meeting discovery: A `meeting` chat is the conversation attached to a Teams meeting. Its `topic` \
 is the meeting subject and it carries `meeting_uri`—a handle for the meeting. There is no separate \
