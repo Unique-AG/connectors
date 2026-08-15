@@ -3,7 +3,7 @@
 A tool is a file. It owns its name, the prose that teaches a model when to reach for it, the Graph
 delegated permissions it calls under, its arguments and their descriptions, the shape it answers
 with, the Graph request it makes and the wording of every refusal only it can explain. Adding the
-second tool is adding one file and one line to `_TOOL_MODULES`; reading the first is reading one
+third tool is adding one file and one line to `_TOOL_MODULES`; reading the second is reading one
 file. Nothing here is a base class and nothing is a decorator of our own — a tool module publishes
 three names (`TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`) and that is the whole of the contract,
 which is what `ToolModule` says in the only place it could be checked. All three were already on
@@ -14,7 +14,7 @@ has to hand the auth provider every Graph permission any registered tool might r
 before any tool has been called: a permission the user (or an administrator) never consented to
 cannot be obtained later — the On-Behalf-Of exchange fails with AADSTS65001 before the tool body
 runs. So the union is assembled here, *from the modules*, and never written by hand. A hand-written
-list is a list somebody forgets: the second tool file would be added, registered, called, and
+list is a list somebody forgets: the third tool file would be added, registered, called, and
 refused at sign-in for a permission nobody asked for. Deriving it means a tool that is registered
 has its permissions consented to by construction.
 
@@ -32,12 +32,13 @@ The order is the registry's own and never the operator's, and that is load-beari
 filtered over that same order, because `TOOLS_ENABLED=a,b` and `b,a` must not make the scope list a
 different string — the consent screen and every cached On-Behalf-Of token key are keyed by it.
 
-There is one tool here, so nothing is deduplicated yet, and the machinery is still the whole of
-what this module is for: two tools naming the same permission is normal and is not duplication to
-remove — a lister wanting to know whose meeting recording it is spends the same `User.Read` `get_me`
-does. Each has to declare what its own request is made under, because that tuple is also what its
-403 and its AADSTS65001 are worded from. Deduplication is this module's job, not theirs, and doing
-it here is what lets the second tool arrive without knowing the first exists.
+The two tools here declare a permission each and nothing is deduplicated yet, but the machinery is
+still the whole of what this module is for: two tools naming the same permission is normal and is
+not duplication to remove — a lister wanting to know whose meeting recording it is spends the same
+`User.Read` `get_me` does, and every tool that reads a chat spends `list_chats`'s `Chat.Read`. Each
+has to declare what its own request is made under, because that tuple is also what its 403 and its
+AADSTS65001 are worded from. Deduplication is this module's job, not theirs, and doing it here is
+what let the second tool arrive without knowing the first exists.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -48,7 +49,7 @@ import httpx
 from fastmcp import FastMCP
 
 from office_mcp.shared.seam import ToolAdvice, graph_scope
-from office_mcp.tools import get_me
+from office_mcp.tools import get_me, list_chats
 
 # The whole of what this package promises, and the reason it is entered through here: a caller
 # that imported `tools/get_me.py` directly would be naming a tool module somewhere other than
@@ -56,12 +57,9 @@ from office_mcp.tools import get_me
 #
 # `ToolModule` is deliberately not one of them. It is the contract a tool file satisfies, and the
 # only place it can be checked is the `_TOOL_MODULES` annotation below — a tool file could not
-# import it even to declare it, because this module imports every tool module above the line that
-# defines `ToolModule`, so a tool file importing it back is a circular import that fails at
-# collection. (The no-sibling-imports rule does not catch this one: it is asserted over `shared/`
-# and `graph_client/`, and the package's own front door is explicitly allowed.) A name on the front
-# door that nothing may walk through is a promise to nobody, so it stays private to this module and
-# documents itself where it bites.
+# import it even to declare it, since reaching for `office_mcp.tools` from inside `tools/` is what
+# layering rule 4 forbids. A name on the front door that nothing may walk through is a promise to
+# nobody, so it stays private to this module and documents itself where it bites.
 __all__ = [
     "ALWAYS_ON",
     "PRESETS",
@@ -101,7 +99,7 @@ class ToolModule(Protocol):
 
 # Every tool this server has, in the order they are registered and the order their permissions are
 # asked for. One line per file, and the line is the whole of what adding a tool costs.
-_TOOL_MODULES: tuple[ToolModule, ...] = (get_me,)
+_TOOL_MODULES: tuple[ToolModule, ...] = (get_me, list_chats)
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
 
