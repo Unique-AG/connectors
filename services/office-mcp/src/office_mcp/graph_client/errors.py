@@ -10,6 +10,13 @@ caller must re-derive remedies from the status code. This module draws distincti
 
 Anything else (400, 409) raises base GraphFailure. Inventing categories per status code would
 guess at remedies that do not exist.
+
+One of them is not a failed request at all. `GraphPagingUnending` is Graph answering 200 after 200
+with nothing in them while still advertising more of a collection, which no status code describes
+and the SDK therefore cannot report — only the walk in `pagination` sees it. It belongs here
+anyway, because "what Graph did wrong" is what this vocabulary is and because being a
+`GraphFailure` is what carries it through `shared/seam.py` to the caller as advice rather than as a
+crash.
 """
 
 from collections.abc import Generator
@@ -89,6 +96,25 @@ class GraphUnavailable(GraphFailure):
     Usually transient. TRAP: teams-mcp found recurring 500s on every attempt when a chat contains
     Loop components or certain cards that Graph cannot serialize. Callers that retry forever spin.
     """
+
+
+class GraphPagingUnending(GraphFailure):
+    """Graph would not end a collection: a run of empty pages, every one advertising more.
+
+    Not a failed request — each of those pages was a 200 — so it carries no status, no code and no
+    request id, and `_classify` never produces it. `pagination.collect_pages` raises it directly
+    when the run exceeds `pagination.MAX_EMPTY_PAGES`, and `empty_pages` is how long that run was.
+
+    A raise rather than an `assert`, for two reasons that are both about the bound being real.
+    `python -O` strips asserts, and the bound is the only thing between a collection that answers
+    nothing but empty pages and a walk that follows them until throttling or a timeout ends it —
+    the thousand-page walk `MAX_EMPTY_PAGES` exists to prevent. And Graph misbehaving is the
+    boundary this module exists to describe, not an invariant of this connector's own code.
+    """
+
+    def __init__(self, message: str, *, empty_pages: int) -> None:
+        super().__init__(message, status=None, code=None, request_id=None)
+        self.empty_pages: int = empty_pages
 
 
 @contextmanager
