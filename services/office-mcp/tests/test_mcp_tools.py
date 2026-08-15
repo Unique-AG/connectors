@@ -202,6 +202,37 @@ def _object(value: object) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
+# What a tool being *named* in prose looks like, as opposed to a field being named. Both are
+# `verb_noun` — that is the convention asserted below — so the discriminator is the verb: these are
+# the ones a tool on this connector is named with, and no answer field starts with any of them.
+# Deliberately not a list of the tools still to come: a stop-list of names nothing declares yet is
+# a list somebody forgets to add to, which is the failure it would exist to prevent.
+_TOOL_MENTION = re.compile(r"\b(?:get|list|read|search|browse|find)_[a-z]+(?:_[a-z]+)*\b")
+
+
+def _described(schema: Mapping[str, object] | None) -> list[str]:
+    """Every `description` anywhere in a JSON schema — parameters, fields, nested objects.
+
+    A model reads all of them, so all of them are protocol surface; a stale promise is as harmful
+    in one field's description as in the tool's own.
+    """
+    if schema is None:
+        return []
+    found: list[str] = []
+    pending: list[object] = [schema]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, dict):
+            for key, value in cast("Mapping[str, object]", node).items():
+                if key == "description" and isinstance(value, str):
+                    found.append(value)
+                else:
+                    pending.append(value)
+        elif isinstance(node, list):
+            pending.extend(cast("Sequence[object]", node))
+    return found
+
+
 def _optional_types(schema: object) -> list[dict[str, object]]:
     """Every non-null branch of an optional parameter's schema, in the order it declares them."""
     branches = cast("Sequence[object]", _object(schema)["anyOf"])
@@ -395,6 +426,44 @@ class TestTheToolsThisServerAdvertises:
         assert "maximum" not in offset, (
             "Microsoft documents no offset ceiling for message search; inventing one would refuse "
             + "a page Graph would have served"
+        )
+
+    async def test_no_description_names_a_tool_this_server_does_not_advertise(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """A description is protocol surface a model reads as fact, so a tool named in one has to
+        exist. These tools arrive one per PR and each is written knowing the shape of the ones
+        still to come, which is exactly how a description comes to promise `read_message` a
+        deployment of this commit does not have — and the failure is the worst kind: the model
+        stops treating what it was given as the answer and calls something that is not there.
+
+        Read off the advertised list rather than a written-down one, so the day a tool lands the
+        assertion widens by itself and only the stale promise fails.
+        """
+        tools = _named(await mcp_client.list_tools())
+        advertised = set(tools)
+        mentioned: set[str] = set()
+
+        for name, tool in tools.items():
+            described = " ".join(
+                [
+                    tool.description or "",
+                    *_described(tool.inputSchema),
+                    *_described(tool.outputSchema),
+                ]
+            )
+            named = set(_TOOL_MENTION.findall(described))
+            mentioned |= named
+            assert not named - advertised, (
+                f"{name} tells a model about {sorted(named - advertised)}, which this server does "
+                + "not advertise — cut the reference, or land the tool in the same PR"
+            )
+
+        # Guards the guard, the way `tests/test_layering.py` guards each of its rules: these tools
+        # do point a model at one another, so a check that found nothing to check would be passing
+        # by a pattern that had stopped matching rather than by the descriptions being honest.
+        assert len(mentioned) > 1, (
+            f"nothing names another tool any more, so this proves nothing: {mentioned}"
         )
 
     async def test_the_tools_are_marked_read_only(
