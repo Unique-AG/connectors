@@ -29,6 +29,7 @@ from starlette.applications import Starlette
 from office_mcp.app import create_app
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.graph_client import GraphSettings, create_graph_transport
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -1571,6 +1572,39 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "not evidence that the message does not exist" in message
         assert "synthetic-request-id" in message, "the id Microsoft support asks for first"
         assert "verbatim" not in message, "the handle did come from a tool response"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_advice_for_an_unreadable_reply_terminates_instead_of_looping(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The one 404 this connector predicts, and the advice that must not be circular. A search
+        hit on a channel reply carries the root-post shape, because Microsoft's index does not say
+        which post the reply hangs under — so it 404s. browse_channel is the only tool that mints a
+        reply's own handle, but it returns the newest replies of each post on a channel's first page
+        and follows neither of Microsoft's cursors past them, since a given channel allows this
+        whole connector about one request a second across the tenant. "Browse the channel instead"
+        is therefore a route for a recent reply and a loop for an older one, so this text has to
+        name the window, say there is no route beyond it, and tell the model what to answer with.
+        """
+        _ = graph.get(_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                404,
+                headers={"request-id": "synthetic-request-id"},
+                json={"error": {"code": "NotFound", "message": "Not Found"}},
+            )
+        )
+
+        result = await mcp_client.call_tool(
+            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+        )
+
+        message = _error_text(result)
+        assert f"newest {MAX_REPLIES_PER_POST} replies" in message, message
+        assert "no route to its full text" in message
+        assert "a second browse returns the same window" in message
+        assert "stop looking" in message
 
     @pytest.mark.usefixtures("obo")
     async def test_a_refused_read_names_only_the_permission_that_surface_needs(
