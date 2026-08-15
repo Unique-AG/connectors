@@ -662,6 +662,42 @@ class TestScopingToOneOccurrence:
         )
         assert len(listing.calls) == 3
 
+    async def test_a_short_list_is_not_a_complete_window_when_the_scan_stopped_short(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The same claim the recordings lister proved false of the shared mechanism, checked here
+        too because the sentence was in both descriptions.
+
+        "Fewer than `limit` means these are the whole window" holds wherever a walk reaches the end
+        of its collection, and this walk stops at `MAX_ARTIFACT_SCAN` instead. A meeting past the
+        cap answers with two transcripts against a `limit` of twenty while transcripts of that same
+        window sit among the ones never read — a short list meaning the opposite of what the
+        convention says. Only `scan_incomplete` separates the two cases.
+        """
+        _resolved(graph, meeting_type="recurring")
+        _daily_series(graph)
+
+        found = await lister.list_meeting_transcripts(
+            client,
+            handle=_handle(),
+            started_after=_day(10).date(),
+            started_before=_day(11).date(),
+            limit=20,
+            include_scan_completeness=True,
+        )
+
+        assert found.status == "available"
+        assert 0 < len(found.transcripts) < 20, "a window shorter than the limit that was asked for"
+        assert found.scan_incomplete is True, (
+            "and yet the collection was not read to its end, so this short list is NOT the whole "
+            "window — the claim a caller would otherwise read off its length"
+        )
+        described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
+        assert "the whole window OF WHAT WAS READ" in described
+        assert "these are the whole window." not in described, (
+            "the unqualified claim, which this meeting is the counter-example to"
+        )
+
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
         """The sentence the case above makes false if it drifts back. A model reads this field's
         description to decide whether the first entry is "the latest transcript of the series", so

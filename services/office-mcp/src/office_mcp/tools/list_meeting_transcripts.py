@@ -18,9 +18,65 @@ Newest first: Graph has no orderby on transcripts. Read up to MAX_ARTIFACT_SCAN,
 limit. For meetings under the cap, first entry is latest. A walk stopped at limit before sorting
 would return wrong answer with right shape. This is what makes newest_in_window a named function.
 
-include_scan_completeness is opt-in: it reports one thing the caller cannot see: did the read
-reach the end? Full limit means older ones may exist; fewer than limit means this is the whole
-window. The "read hit the cap" fact must be explicit.
+`GET …/transcripts` returning nothing is not one answer but three, and the tenant switch is a
+fourth:
+
+* **`GraphAccessToTranscriptsDisabled`** — a `403` whose remedy names a Teams administrator, not a
+  Graph permission. Microsoft Graph access to meeting transcripts is off by default and "no app can
+  access meeting transcripts, regardless of app-level permissions"; there is "no request-side
+  workaround", so re-consent is explicitly ruled out. It is recognised by inner code in
+  `shared/seam.py`, where every other refusal is worded. Microsoft scopes the switch to transcript
+  resources, so it does **not** cover recordings, which is why `list_meeting_recordings` is a second
+  tool rather than a second field here: in a tenant that has never touched the switch, this call
+  fails and that one answers.
+* **No transcript** — the meeting was never recorded or never transcribed. Retrying is pointless.
+* **Not ready yet** — nothing has landed for the window asked about and something still might.
+  Retrying is the *only* thing that helps, which is why this must never be reported as the case
+  above — and, just as importantly, why the case above must not be reported as this one: a window
+  that has demonstrably passed is answered `not_transcribed` even for a series still running, or a
+  model is sent back to poll for an occurrence that ended last month. Graph publishes no status for
+  availability and no latency SLA, so both halves are an inference over one generous allowance;
+  `OccurrenceWindow.settled` is the whole of it and `MeetingTranscripts.status` admits it as one.
+  `not_ready` and a settled absence are the same empty collection from Graph with opposite advice.
+* **Not known** — the walk hit `MAX_ARTIFACT_SCAN` before the collection ended, so the transcripts
+  it did not reach might hold the one asked for. Neither absence verdict above is available here:
+  both assert something about a collection that was not read to the end, and the caller cannot tell
+  from the outside. `scan_incomplete` is that answer — an answer saying both "there is more" and
+  "there is none" is one no caller can act on. The sentence it gives a model, "this meeting has more
+  transcripts than one call reads", is a claim about the meeting, and it is true only because the
+  walk underneath it can no longer stop for any other reason: `graph_client/pagination.py` follows
+  an empty page carrying a next link rather than reading it as the end, and refuses a collection
+  that answers nothing but empty pages rather than answering short. Without that, a four-transcript
+  meeting Graph paged `[3, nothing, 1]` would be told the same thing — which is why this file's
+  tests page one that way and assert every transcript comes back.
+  It is also the one answer here with **no remedy**, and every place it is described says so. The
+  window is applied to the artifacts *after* they are read: Graph documents no filterable date on
+  either collection — the one filterable property either reference shows by example is
+  `contentCorrelationId` (https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example
+  11) — so the request is bare and the same `MAX_ARTIFACT_SCAN` artifacts are read whatever window
+  is asked for. "Narrow `started_after`/`started_before` and ask again" was therefore advice a model
+  could follow forever without progress: the next call reads the same artifacts and answers the same
+  way. That is the defect class the channel browser already paid for with its circular reply advice,
+  and the fix is the same one — a dead end stated plainly beats an actionable-sounding loop, so what
+  a caller is told is to stop and report that it is not known.
+
+## Newest first is a promise about the collection, not about a page of it
+
+Graph documents `$select`, `$filter` and `$top` on this collection and no `$orderby` at all, so it
+answers in an order of its own. The window is therefore taken whole — to the scan cap — ordered, and
+only then cut to `limit`. A walk that stopped at `limit` before sorting would return an arbitrary
+`limit` transcripts sorted among themselves and call them the newest, which is a wrong answer with
+the shape of a right one. `newest_in_window` is where that happens, for both listers.
+
+`include_scan_completeness` is opt-in because it is the only thing here a caller cannot work out for
+itself. "The window held more transcripts than your `limit`" it can: a full window may have more
+behind it, which is what a page size means everywhere. "The read stopped at the cap" it cannot, and
+merging the two into one flag would give one name to two facts with opposite remedies — raise
+`limit` for the first, nothing at all for the second. A *short* window is where the two touch, and
+the descriptions are worded for it: fewer than `limit` means the window holds no more than was
+read, which is the whole window only while the read reached the end of the collection. Where nothing
+came back at all it is not opt-in: `status` is `scan_incomplete`, because an absence asserted over a
+collection nobody read to the end is the wrong answer all of this exists to avoid.
 """
 
 from datetime import date, datetime
@@ -161,10 +217,22 @@ class MeetingTranscripts(BaseModel):
     ended_at: datetime | None = Field(description="Meeting end (same caveat as `started_at`).")
     transcripts: list[TranscriptSummary] = Field(
         description=(
-            "Transcripts in the window, newest first. Ordered over those read (up to "
-            f"{MAX_ARTIFACT_SCAN}), not a Microsoft page. Full `limit` means older may exist; "
-            "fewer than `limit` means this is the whole window. Empty except when status is "
-            "`available`."
+            "The transcripts of this meeting that fall inside the requested window, newest first. "
+            + "The order is over every transcript this call read rather than over one page of "
+            + f"Microsoft's answer, and one call reads up to {MAX_ARTIFACT_SCAN} of them. For a "
+            + "meeting with no more transcripts than that — every meeting bar a series recorded "
+            + "daily for most of a year — those are all of them, so the first entry is the latest "
+            + "transcript of the window outright, which for a recurring series is how to reach the "
+            + "most recent occurrence. Past that cap the first entry is the latest of what was "
+            + "READ: Microsoft returns this collection in an order of its own and offers no way to "
+            + "ask for the newest, so a newer transcript can sit among the ones never read; set "
+            + "`include_scan_completeness` when the answer turns on that. As many entries as "
+            + "`limit` means the window may hold older ones too — raise `limit`, up to "
+            + f"{MAX_TRANSCRIPTS}. Fewer than `limit` means these are the whole window OF WHAT "
+            + "WAS READ, which is the whole window itself for any meeting inside that cap and for "
+            + "no meeting past it: a transcript of your window can be one that was never read, and "
+            + "a short list cannot tell you which case you are in — `include_scan_completeness` "
+            + "can. There is no cursor. Empty for every status other than `available`."
         )
     )
     scan_incomplete: bool | None = Field(
@@ -299,9 +367,21 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_TRANSCRIPTS,
                 description=(
-                    f"Max to return (default 20, max {MAX_TRANSCRIPTS}). Newest of window. Read "
-                    f"(up to {MAX_ARTIFACT_SCAN}) and sorted before cutting. Full list means "
-                    "older may exist; fewer means none beyond."
+                    "How many transcripts to return. Default 20, maximum "
+                    + f"{MAX_TRANSCRIPTS}. They are the NEWEST that many of the "
+                    + "window, not the first that many Microsoft happens to answer with: the "
+                    + f"meeting's transcripts are read (up to {MAX_ARTIFACT_SCAN} of "
+                    + "them, which is this call's whole cost) and ordered before this cuts them, "
+                    + "so asking for 3 gives the 3 newest OF THE ONES READ. Those are the 3 latest "
+                    + "outright whenever the meeting has no more transcripts than that cap, which "
+                    + "is every meeting except a series recorded daily for most of a year: one "
+                    + "meeting has one transcript per occurrence that was transcribed. Past the "
+                    + "cap the read stops mid-collection, in whatever order Microsoft answered in "
+                    + "(it offers no way to ask for the newest), so a newer transcript can be one "
+                    + "that was never read — `include_scan_completeness` is how to find out, and "
+                    + "raising `limit` does not read further. Getting `limit` transcripts back "
+                    + "means the window may hold older ones; getting fewer means the window holds "
+                    + "no more THAN WAS READ, which is the whole window except past that cap."
                 ),
             ),
         ] = 20,
