@@ -52,6 +52,62 @@ ME: dict[str, object] = {
 }
 
 
+# The meeting side: the same join URL, the same `onlineMeeting`, and one artifact payload. Builders
+# rather than literals per test so that the fields a test is *about* are the ones it names, and here
+# rather than in the tool's own file because a meeting is answered about by whatever asks next and
+# two copies of one meeting would let a round trip pass over two different meetings.
+
+# A join URL shaped like the ones Graph actually stores, and the reason the escaping is a bug class:
+# it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b`/`%22`
+# in its value, and an `&` parameter after it. Every one of those breaks a `$filter` that is encoded
+# too little, too much, or not at all — and breaks it into `200 OK` with an empty result.
+JOIN_WEB_URL = (
+    "https://teams.microsoft.invalid/l/meetup-join/"
+    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
+    + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
+)
+
+MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+
+
+def meeting_payload(
+    *,
+    meeting_id: str = MEETING_ID,
+    subject: str | None = "Pricing review",
+    meeting_type: str | None = "scheduled",
+    start: str | None = "2026-02-10T14:00:00Z",
+    end: str | None = "2026-02-10T15:00:00Z",
+) -> dict[str, object]:
+    """One `onlineMeeting`, as the `JoinWebUrl` filter returns it: inside a one-element list."""
+    return {
+        "id": meeting_id,
+        "subject": subject,
+        "meetingType": meeting_type,
+        "joinWebUrl": JOIN_WEB_URL,
+        "startDateTime": start,
+        "endDateTime": end,
+    }
+
+
+def transcript_payload(
+    *,
+    transcript_id: str = "MSMjMCMjSYNTHETIC0001",
+    meeting_id: str = MEETING_ID,
+    created_at: str | None = "2026-02-10T14:03:11.204Z",
+    ended_at: str | None = "2026-02-10T14:58:02.117Z",
+    content_correlation_id: str | None = "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+) -> dict[str, object]:
+    """One `callTranscript`, which is metadata only — the words come from `/content`."""
+    return {
+        "id": transcript_id,
+        "meetingId": meeting_id,
+        "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+        "createdDateTime": created_at,
+        "endDateTime": ended_at,
+        "contentCorrelationId": content_correlation_id,
+    }
+
+
 # The Teams-message payloads, here rather than in one of the two test files that use them: a search
 # hit and a full message are what `search_messages` and `read_message` are respectively about, and
 # each tool's tests need one of the other's — a hit to read by its own handle, a message to read it

@@ -20,6 +20,7 @@ from office_mcp.tools import (
     get_me,
     list_channels,
     list_chats,
+    list_meeting_transcripts,
     list_teams,
     read_message,
     search_messages,
@@ -45,6 +46,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     browse_channel,
     search_messages,
     read_message,
+    list_meeting_transcripts,
 )
 
 GRAPH_SCOPES: tuple[str, ...] = tuple(
