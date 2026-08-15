@@ -2,7 +2,7 @@
 
 Every tool in `tools/` is a file of its own — its name, its description, its Graph permissions, its
 arguments, its answer shape, its Graph request and its own error wording all in one place, so that
-adding the eighth tool is adding one file and reading the seventh is reading one file. That is the
+adding the ninth tool is adding one file and reading the eighth is reading one file. That is the
 whole point, and it has exactly one cost: two files are free to disagree. This package is the list
 of things they must not.
 
@@ -22,6 +22,12 @@ difference between the copies would be a bug a caller could see:
   It also holds `MAX_REPLIES_PER_POST`, the window on a channel thread: `browse_channel` applies
   it, and `search_messages` and `read_message` both have to describe it to explain why a reply a
   search found may have no handle that reads.
+* `meetings.py` — how a meeting is reached, which occurrence was asked about, and how far "newest
+  first" is true. The only entry here whose second caller has not landed yet, and deliberately so:
+  none of the three is a fact about transcripts, they are facts about a meeting and the artifact
+  collections Graph hangs off one, and a second tool over the same meeting would otherwise re-derive
+  all of them. Leaving them in the tool file would make their eventual move a refactor rather than a
+  decision, and a tool's private helper is exactly what a second tool copies rather than imports.
 * `identity.py` — who the signed-in user is. `get_me` reports it; it is also the fact every other
   answer on this connector is correlated against, so a second tool asking it with a `GET /me` of
   its own would be a second answer to one question.
