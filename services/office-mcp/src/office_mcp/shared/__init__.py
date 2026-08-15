@@ -2,7 +2,7 @@
 
 Every tool in `tools/` is a file of its own — its name, its description, its Graph permissions, its
 arguments, its answer shape, its Graph request and its own error wording all in one place, so that
-adding the ninth tool is adding one file and reading the eighth is reading one file. That is the
+adding the tenth tool is adding one file and reading the ninth is reading one file. That is the
 whole point, and it has exactly one cost: two files are free to disagree. This package is the list
 of things they must not.
 
@@ -23,11 +23,12 @@ difference between the copies would be a bug a caller could see:
   it, and `search_messages` and `read_message` both have to describe it to explain why a reply a
   search found may have no handle that reads.
 * `meetings.py` — how a meeting is reached, which occurrence was asked about, and how far "newest
-  first" is true. The only entry here whose second caller has not landed yet, and deliberately so:
-  none of the three is a fact about transcripts, they are facts about a meeting and the artifact
-  collections Graph hangs off one, and a second tool over the same meeting would otherwise re-derive
-  all of them. Leaving them in the tool file would make their eventual move a refactor rather than a
-  decision, and a tool's private helper is exactly what a second tool copies rather than imports.
+  first" is true. None of those is a fact about transcripts: they are facts about a meeting and the
+  artifact collections Graph hangs off one, and a second tool over the same meeting would otherwise
+  re-derive all of them. `read_transcript` is the first tool to arrive and take a name from here
+  without touching the rest, which is what the split was for — the permission a transcript resource
+  costs is the resource's rather than one tool's request's, so it is spelled where neither of the
+  two tools that name it owns it.
 * `identity.py` — who the signed-in user is. `get_me` reports it; it is also the fact every other
   answer on this connector is correlated against, so a second tool asking it with a `GET /me` of
   its own would be a second answer to one question.

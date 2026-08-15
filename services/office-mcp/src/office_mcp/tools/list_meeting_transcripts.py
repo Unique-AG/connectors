@@ -1,16 +1,16 @@
 """`list_meeting_transcripts` — whether a Teams meeting was transcribed, and a handle for each.
 
-Reports what exists and none of what was said. A transcript is large, so this tool answers as a
-separate step, not as a field on the meeting. A recurring series is one meeting to Graph, so every
-occurrence's transcript lands in one collection. No default occurrence exists. Distinguish
-occurrences with `started_after`/`started_before`.
+This is the first half of reading a meeting. It says what exists; `read_transcript` returns what was
+said. Two tools rather than one because a transcript is large and because a recurring series is a
+single meeting to Graph — every occurrence's transcript lands in the same collection, distinguished
+only by when transcription started — so which one to read is a decision rather than a default.
 
-Shared code in `shared/meetings.py` and `shared/handles.py` documents how meetings are reached,
-how the join URL encodes, what an occurrence window is, and how "newest first" is bounded. These
-are facts about the meeting, not about transcripts, so they live outside this file. Handle grammar
-lives there too, for the same reason. A second spelling of a handle would work in the tool that
-mints it and fail in the tool that reads it. This file owns the answer's vocabulary: "was not
-transcribed" is a fact about one artifact, never about the meeting.
+How a meeting is addressed, how the join URL is escaped onto the wire, what an occurrence window is,
+and how far "newest first" is true are all `shared/meetings.py`: they are promises about the meeting
+rather than about its transcripts, and this file is only the first tool to need them. The handle
+grammar itself is `shared/handles.py`, for the same reason one step further out: the transcript
+handle this file mints is the one `read_transcript` parses, and a second speller would look like a
+handle one tool produced and another answers 404 to.
 
 ## Five answers that need different action
 
@@ -74,14 +74,17 @@ from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "list_meeting_transcripts"
 
-# Both permissions come from `shared/meetings.py`, not typed here. A permission belongs to its
-# resource. No sibling module may import this file to learn its spelling (see
-# tests/test_layering.py, rule 4).
+# Reading a transcript resource is an admin-consented permission, and a different one from the
+# resolve that precedes it: a tenant can grant one and withhold the other. `read_transcript` names
+# this same one, because it reads the same resource — two tools declaring one permission is what the
+# registry's deduplication is for, and neither may leave it out. The name comes from
+# `shared/meetings.py` for that reason: rule 4 forbids the two tools sharing a constant of their
+# own, so a permission each of them declares is spelled where neither owns it.
 #
-# The resolve and list are redeemed together, under one token, or not at all. The transcript
-# handle minted below already carries the resolved meeting id. A future tool that reads
-# transcript content needs only TRANSCRIPT_PERMISSION. Withholding OnlineMeetings.Read would not
-# block that.
+# What listing a meeting's transcripts costs: the resolve and the list, in that order, under one
+# token — Entra redeems them together or not at all. Reading content needs only the second, since
+# the handle minted below already carries the resolved meeting id, which is why `read_transcript`
+# declares that one alone and can still answer in a tenant that withholds `OnlineMeetings.Read`.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 # Built at import: a call inside a parameter default rebuilds it on every registration.
@@ -94,19 +97,31 @@ _DESCRIPTION = f"""\
 Find whether a Teams meeting was transcribed, and get a handle for each transcript. Takes the \
 `meeting_uri` that list_chats reports on a meeting chat.
 
-Reports what exists, none of what was said. A recurring meeting is one meeting to Microsoft — \
-every occurrence's transcript lands in the same collection. Use \
-`started_after`/`started_before` to reach one occurrence when `meeting_type` is `recurring`.
+This is the first half of reading a meeting: this tool says what exists, read_transcript returns \
+what was said. Two calls rather than one because a transcript is large and because a recurring \
+meeting is a single meeting to Microsoft — every occurrence's transcript lands in the same \
+collection, distinguished only by when transcription started — so which one to read is a decision, \
+not a default. Scope to one occurrence with `started_after`/`started_before` when \
+`meeting_type` comes back `recurring`; a one-off meeting has a single transcript and needs \
+neither. Both bounds take a date (`2026-08-11`, meaning that whole UTC day) or a timestamp, with \
+or without a timezone offset — one without is read as UTC, so pass the offset when you are working \
+from a local time.
 
-**Read `status` first. It has five values, each meaning a different action:**
-- `available` — transcripts are listed, newest first. "Newest" is over the transcripts this call \
-read, up to {MAX_ARTIFACT_SCAN} — set `include_scan_completeness` if the answer turns on that.
-- `not_ready` — nothing is there for the window you asked about and something still might. Wait \
-and call again later. This is NOT "there is no transcript". A window that is already well past \
-never answers this — a series whose end date is in the future does not make a last-month \
-occurrence "still processing".
-- `not_transcribed` — the window is over, nothing is there. It was not recorded or not \
-transcribed. Retrying will not help.
+**Read `status` before anything else. It has five values and they mean five different actions:**
+- `available` — transcripts are listed, newest first; read one with read_transcript. "Newest" is \
+over the transcripts this call read, which is every transcript the meeting has unless the meeting \
+holds more of them than the cap below — set `include_scan_completeness` if the answer turns on that.
+- `not_ready` — nothing has landed for the window you asked about and something still might: that \
+window has only just closed, or you asked for no window and the meeting has not ended or ended \
+recently. Wait and call again later. This is NOT "there is no transcript", and reporting it as one \
+is wrong: Microsoft publishes no availability SLA, so this tool infers it from how recently the \
+window (or the meeting) ended and errs towards telling you to wait. An occurrence window that is \
+already well past never answers this — a series whose end date is in the future does not make a \
+last-month occurrence "still processing".
+- `not_transcribed` — the window you asked about is over and nothing is there: it was not recorded \
+or not transcribed. Retrying will not help. Say the meeting has no transcript rather than that the \
+meeting did not happen. (One other cause is indistinguishable: Microsoft stops serving a meeting's \
+transcripts once the meeting expires, roughly 60 days after a one-off.)
 - `scan_incomplete` — this meeting has more transcripts than one call reads \
 ({MAX_ARTIFACT_SCAN}) and none of the ones read fall in your window, so whether one \
 exists there is not known. The window is applied after Microsoft has answered, not in the request, \
@@ -129,8 +144,7 @@ separately: a tenant can grant one and withhold the other.\
 """
 
 # Error message for invalid meeting_uri. Unique to this tool to prevent a caller being sent to
-# the wrong tool. A shared message would rebuild a shared tools module one import at a time (see
-# tests/test_layering.py, rule 4).
+# the wrong tool.
 _NOT_A_MEETING_HANDLE = (
     "list_meeting_transcripts takes the `meeting_uri` that list_chats reports on a meeting chat, "
     + "and this is not one. A meeting handle has exactly one shape:\n"
@@ -140,7 +154,7 @@ _NOT_A_MEETING_HANDLE = (
     + "so call list_chats, find the `meeting` chat for the meeting in question, and pass its "
     + "`meeting_uri` verbatim. A chat id, a chat topic, a Teams web link and a "
     + "`teams:///transcripts/...` handle are none of them a meeting handle — that last one is "
-    + "what this tool produces rather than what it takes. Retrying this value will fail "
+    + "read_transcript's, and this tool is what produces it. Retrying this value will fail "
     + "identically."
 )
 
@@ -148,8 +162,8 @@ _NOT_A_MEETING_HANDLE = (
 class TranscriptSummary(BaseModel):
     uri: str = Field(
         description=(
-            "This connector's handle for the transcript: what identifies it across calls. "
-            + "Nothing here contains the words that were said."
+            "A handle for this transcript. Pass it verbatim to read_transcript, which is the only "
+            + "route to the words that were said — nothing here contains any of them."
         )
     )
     transcript_id: str = Field(
@@ -259,15 +273,12 @@ async def list_meeting_transcripts(
     """Transcripts of the meeting `handle` addresses, and what a caller should do about them.
 
     Makes at most two Graph requests: resolve the join URL, then list transcripts. Lists all
-    transcripts without filtering. Graph documents no date filter on this collection, and an
-    unsupported filter can still answer `200 OK` with an empty list, not an error. A caller could
-    not tell a bad filter from a true absence, so no filter is sent. The window is applied while
-    paging instead. The window bounds are instants (naive ones read as UTC). The same window
+    transcripts without filtering (Graph documents no date filter on transcripts), then applies the
+    window while paging. The window bounds are instants (naive ones read as UTC). The same window
     decides which transcripts are kept and what an empty answer means.
 
     `include_scan_completeness` only changes whether `scan_incomplete` is reported, not what is
-    read. It defaults to false. The field matters for one rare meeting shape only, and a field
-    that is null everywhere else is one a model can ignore.
+    read.
     """
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -333,11 +344,7 @@ def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Declare this tool against the shared Graph transport.
-
-    `transport` is a shared, long-lived client. This tool borrows it per call and does not own
-    it. `create_app` closes it on shutdown.
-    """
+    """Declare this tool against the shared Graph transport."""
 
     @mcp.tool(
         name=TOOL_NAME,
