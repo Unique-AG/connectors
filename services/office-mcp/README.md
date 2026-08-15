@@ -2,13 +2,14 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes seven MCP
+Users sign in with their own Microsoft account and the server acts as them. It exposes eight MCP
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
-`search_messages`, full-text search across every Teams message they can see; and `read_message`,
-one of those messages in full — each one a file of its own, and more land in later PRs, stacked on
-top of this one, one tool per PR.
+`search_messages`, full-text search across every Teams message they can see; `read_message`,
+one of those messages in full; and `list_meeting_transcripts`, whether a Teams meeting was
+transcribed and a handle for each transcript — each one a file of its own, and more land in later
+PRs, stacked on top of this one, one tool per PR.
 
 ## Layout
 
@@ -33,7 +34,9 @@ Entra at startup. A forgotten permission means sign-in fails. `tests/test_app.py
 
 **`shared/` is the cost of file-per-tool architecture.** It holds the things two files must agree on:
 `handles.py` (the `teams:///` grammar), `messages.py` (Teams message shape, sender normalization,
-HTML unwinding), `identity.py` (signed-in user profile), `seam.py` (token exchange, error advice).
+HTML unwinding), `meetings.py` (join URL to meeting, which occurrence a window means, how far
+"newest first" holds), `identity.py` (signed-in user profile), `seam.py` (token exchange, error
+advice).
 Use `shared/` when two tools would otherwise need identical copies and differing copies would be
 visible bugs: handles one tool mints and another rejects; two answers to "who am I"; refusals that
 sound inconsistent. Don't put tool-specific things there: descriptions, parameters, output, requests.
@@ -81,6 +84,8 @@ Tools redeem permissions per call via On-Behalf-Of. No permission = no consent =
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
+| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts` (resolving a join URL to a meeting) |
+| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts` |
 
 Multiple tools naming the same permission is normal. It is not duplication to remove. Each tool
 declares its own tuple because that tuple words its own 403 and AADSTS65001 messages.
@@ -89,6 +94,23 @@ declares its own tuple because that tuple words its own 403 and AADSTS65001 mess
 `Team.ReadBasic.All` is least-privileged for `/me/joinedTeams` (Microsoft's docs). Separate from
 the broad channel permission: a tenant refusing `ChannelMessage.Read.All` still lists teams.
 `list_teams` 403 names only its own permission.
+
+**Transcripts need a tenant setting as well as a permission, and this is the one that surprises
+people.** Microsoft Graph access to Teams meeting transcripts is off by default and *"agents and
+apps can't access meeting transcripts, regardless of app-level permissions"* until a Teams
+administrator turns it on — Teams admin centre → Meetings → Meeting settings → Transcript API
+access, or `Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`.
+There is no Graph API to set it and no request-side workaround, so it is an onboarding step next to
+admin consent rather than something this connector can fix; `services/teams-mcp` learned this in PR
+#762 and `docs/recordings-and-transcripts/operator.md` documents it. Until it is on, every call to
+`list_meeting_transcripts` fails with that remedy named — and only that tool: Microsoft scopes the
+setting to transcript resources, so nothing else here is affected.
+
+The two meeting permissions are separate scopes and are granted independently, which is the point of
+asking for both: `OnlineMeetings.Read` is the least privilege Microsoft documents for resolving a
+join URL to a meeting and needs no administrator, while reading the transcript collection needs one.
+A tenant can grant the first and withhold the second, and the tool's 403 then names the one its own
+request was made under.
 
 `Chat.Read` not `Chat.ReadBasic`: listing chats by recency needs `$expand=lastMessagePreview`.
 A preview is a message; "read chat names" doesn't cover it.
