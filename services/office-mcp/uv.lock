@@ -659,6 +659,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c6/4f/73450a436c963c0382d15a882fc5d08f15aadc329194df1b54495a7c8383/fastmcp-3.4.5-py3-none-any.whl", hash = "sha256:5d3d438eb2917e63e6faf53e8cb8fe26d887ec3232f848093a4eecad7fa34861", size = 8017, upload-time = "2026-07-27T19:19:57.942Z" },
 ]
 
+[package.optional-dependencies]
+azure = [
+    { name = "fastmcp-slim", extra = ["azure"] },
+]
+
 [[package]]
 name = "fastmcp-slim"
 version = "3.4.5"
@@ -677,6 +682,10 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+azure = [
+    { name = "azure-identity" },
+    { name = "pyjwt" },
+]
 client = [
     { name = "authlib" },
     { name = "exceptiongroup" },
@@ -1768,7 +1777,7 @@ source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
     { name = "cryptography" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["azure"] },
     { name = "httpx", extra = ["http2"] },
     { name = "msgraph-sdk" },
     { name = "opentelemetry-api" },
@@ -1803,7 +1812,7 @@ dev = [
 requires-dist = [
     { name = "asyncpg", specifier = "==0.31.0" },
     { name = "cryptography", specifier = "==50.0.0" },
-    { name = "fastmcp", specifier = "==3.4.5" },
+    { name = "fastmcp", extras = ["azure"], specifier = "==3.4.5" },
     { name = "httpx", extras = ["http2"], specifier = "==0.28.1" },
     { name = "msgraph-sdk", specifier = "==1.61.0" },
     { name = "opentelemetry-api", specifier = "==1.44.0" },
