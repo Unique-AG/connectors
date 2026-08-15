@@ -2227,6 +2227,26 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "fail identically" in message, "and it is not worth retrying"
 
     @pytest.mark.usefixtures("obo")
+    async def test_the_transcript_listers_refusal_keeps_the_sentence_only_it_can_say(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The one sentence in that refusal no other tool could write: the shape it just rejected
+        is read by read_transcript, and this is the tool that produces one. Before the reader
+        existed the sentence had to stop at "what this tool produces rather than what it takes",
+        which named the shape and left a model with nowhere to take it."""
+        result = await mcp_client.call_tool(
+            "list_meeting_transcripts",
+            {"meeting_uri": "teams:///transcripts/a/b"},
+            raise_on_error=False,
+        )
+
+        assert result.is_error
+        assert (
+            "that last one is read_transcript's, and this tool is what produces it"
+            in _error_text(result)
+        )
+
+    @pytest.mark.usefixtures("obo")
     async def test_a_transcript_graph_will_not_return_blames_the_meeting_window_not_the_handle(
         self,
         mcp_client: Client[FastMCPTransport],
