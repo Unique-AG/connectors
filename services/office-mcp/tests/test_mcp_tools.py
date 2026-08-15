@@ -142,6 +142,22 @@ _SYSTEM_MESSAGE = {
     },
 }
 
+_TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+
+# Only the five properties `GET /me/joinedTeams` populates; every other property of a team comes
+# back null on that endpoint, asked for or not.
+_TEAMS = {
+    "value": [
+        {
+            "id": _TEAM_ID,
+            "displayName": "Engineering",
+            "description": "Ships the product",
+            "isArchived": False,
+            "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+        }
+    ]
+}
+
 _CHATS = {
     "value": [
         {
@@ -370,7 +386,13 @@ class TestTheToolsThisServerAdvertises:
         """Graph token is a dependency, not a parameter."""
         tools = _named(await mcp_client.list_tools())
 
-        assert set(tools) == {"get_me", "list_chats", "search_messages", "read_message"}
+        assert set(tools) == {
+            "get_me",
+            "list_chats",
+            "list_teams",
+            "search_messages",
+            "read_message",
+        }
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
 
@@ -405,6 +427,7 @@ class TestTheToolsThisServerAdvertises:
             "job_title",
         }
         assert set(_properties(tools["list_chats"].outputSchema)) == {"chats"}
+        assert set(_properties(tools["list_teams"].outputSchema)) == {"teams"}
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
             "next_offset",
@@ -680,6 +703,35 @@ class TestCallingThem:
         assert [chat["chat_id"] for chat in listed] == ["19:release@thread.v2"]
         assert listed[0]["last_message_at"] == "2026-02-11T09:15:22.310000Z"
         assert obo.requested_scopes == [("https://graph.microsoft.com/Chat.Read",)]
+
+    async def test_list_teams_sends_no_query_and_spends_only_its_own_permission(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The whole of this tool over the real protocol, and both halves are things only an
+        end-to-end call can show.
+
+        Nothing on the wire: `/me/joinedTeams` supports no OData query parameter at all, so a
+        `$top` or a `$select` reaching Graph is a 400 rather than a narrower answer — and a request
+        configuration built by one tool has been able to leak into another's call before, which is
+        a leak only a real registration exercises. One scope on the exchange: the token is redeemed
+        per tool, so a tenant that withholds the broad channel permission still lists its teams,
+        and a tool that quietly asked for the registry's union would take that away without any
+        schema changing.
+        """
+        route = graph.get("/me/joinedTeams").mock(return_value=httpx.Response(200, json=_TEAMS))
+
+        listed = _structured(await mcp_client.call_tool("list_teams", {}))
+
+        assert "truncated" not in listed, "a window says whether it may have more by being full"
+        found = cast("Sequence[Mapping[str, object]]", listed["teams"])
+        assert [team["team_id"] for team in found] == [_TEAM_ID]
+        assert [team["is_archived"] for team in found] == [False]
+        assert not route.calls.last.request.url.params
+        assert route.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert obo.requested_scopes == [("https://graph.microsoft.com/Team.ReadBasic.All",)]
 
     @pytest.mark.usefixtures("obo")
     async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(

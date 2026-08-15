@@ -3,7 +3,7 @@
 A tool is a file. It owns its name, the prose that teaches a model when to reach for it, the Graph
 delegated permissions it calls under, its arguments and their descriptions, the shape it answers
 with, the Graph request it makes and the wording of every refusal only it can explain. Adding the
-fifth tool is adding one file and one line to `_TOOL_MODULES`; reading the fourth is reading one
+sixth tool is adding one file and one line to `_TOOL_MODULES`; reading the fifth is reading one
 file. Nothing here is a base class and nothing is a decorator of our own — a tool module publishes
 two names (`GRAPH_PERMISSIONS` and `register`) and that is the whole of the contract, which is what
 `ToolModule` says in the only place it could be checked.
@@ -13,7 +13,7 @@ has to hand the auth provider every Graph permission any tool might redeem, at s
 tool has been called: a permission the user (or an administrator) never consented to cannot be
 obtained later — the On-Behalf-Of exchange fails with AADSTS65001 before the tool body runs. So the
 union is assembled here, *from the modules*, and never written by hand. A hand-written list is a
-list somebody forgets: the fifth tool file would be added, registered, called, and refused at
+list somebody forgets: the sixth tool file would be added, registered, called, and refused at
 sign-in for a permission nobody asked for. Deriving it means a tool that is registered has its
 permissions consented to by construction.
 
@@ -37,7 +37,7 @@ import httpx
 from fastmcp import FastMCP
 
 from office_mcp.shared.seam import graph_scope
-from office_mcp.tools import get_me, list_chats, read_message, search_messages
+from office_mcp.tools import get_me, list_chats, list_teams, read_message, search_messages
 
 # The whole of what this package promises, and the reason it is entered through here: a caller
 # that imported `tools/get_me.py` directly would be naming a tool module somewhere other than
@@ -68,7 +68,13 @@ class ToolModule(Protocol):
 
 # Every tool this server exposes, in the order they are registered and the order their permissions
 # are asked for. One line per file, and the line is the whole of what adding a tool costs.
-_TOOL_MODULES: tuple[ToolModule, ...] = (get_me, list_chats, search_messages, read_message)
+_TOOL_MODULES: tuple[ToolModule, ...] = (
+    get_me,
+    list_chats,
+    list_teams,
+    search_messages,
+    read_message,
+)
 
 # What sign-in must ask Entra for, so that every tool's On-Behalf-Of exchange has something to
 # redeem. Derived from the modules above — see the module docstring for why it may never be

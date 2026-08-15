@@ -57,7 +57,7 @@ _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
 REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
-    {"User.Read", "Chat.Read", "ChannelMessage.Read.All"}
+    {"User.Read", "Chat.Read", "Team.ReadBasic.All", "ChannelMessage.Read.All"}
 )
 
 
