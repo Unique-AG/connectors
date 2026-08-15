@@ -37,6 +37,31 @@ _ME = {
     "jobTitle": "Analyst",
 }
 
+_CHATS = {
+    "value": [
+        {
+            "id": "19:release@thread.v2",
+            "chatType": "group",
+            "topic": "Release planning",
+            "createdDateTime": "2026-01-04T12:00:00Z",
+            "lastUpdatedDateTime": "2026-02-11T09:15:22.31Z",
+            "members": [
+                {
+                    "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                    "id": "member-ada",
+                    "displayName": "Ada Lovelace",
+                    "email": "ada@example.invalid",
+                }
+            ],
+            "lastMessagePreview": {
+                "id": "1770000000000",
+                "createdDateTime": "2026-02-11T09:15:22.31Z",
+                "body": {"contentType": "text", "content": "synthetic preview"},
+            },
+        }
+    ]
+}
+
 
 class _StubOboCredential:
     """Stub for azure.identity.aio.OnBehalfOfCredential.
@@ -129,6 +154,11 @@ def _properties(schema: Mapping[str, object] | None) -> dict[str, object]:
     return cast("dict[str, object]", properties)
 
 
+def _object(value: object) -> dict[str, object]:
+    assert isinstance(value, dict), f"expected an object, got {value!r}"
+    return cast("dict[str, object]", value)
+
+
 def _structured(result: CallToolResult) -> dict[str, object]:
     data = cast("dict[str, object] | None", result.structured_content)
     assert data is not None, "the tool returned no structured content"
@@ -147,7 +177,7 @@ class TestTheToolsThisServerAdvertises:
         """Graph token is a dependency, not a parameter."""
         tools = _named(await mcp_client.list_tools())
 
-        assert set(tools) == {"get_me"}
+        assert set(tools) == {"get_me", "list_chats"}
         for tool in tools.values():
             assert "graph_token" not in _properties(tool.inputSchema)
 
@@ -156,6 +186,17 @@ class TestTheToolsThisServerAdvertises:
 
         assert _properties(tools["get_me"].inputSchema) == {}
         assert tools["get_me"].inputSchema.get("required", []) == []
+
+    async def test_list_chats_bounds_its_limit_where_graph_bounds_it(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """Prose ("max 50") is advice; the schema is enforcement — an out-of-range call has to
+        fail loudly rather than be silently clamped to something else."""
+        tools = _named(await mcp_client.list_tools())
+        limit = _object(_properties(tools["list_chats"].inputSchema)["limit"])
+
+        assert limit["type"] == "integer", "not `number`: a fractional page size is meaningless"
+        assert (limit["minimum"], limit["maximum"], limit["default"]) == (1, 50, 25)
 
     async def test_every_tool_declares_its_result_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -170,11 +211,21 @@ class TestTheToolsThisServerAdvertises:
             "user_principal_name",
             "job_title",
         }
+        assert set(_properties(tools["list_chats"].outputSchema)) == {"chats"}
 
     async def test_the_whole_surface_speaks_one_language(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Tool names are verb_noun, fields are snake_case, no truncated flag."""
+        """Tool names are verb_noun, fields are snake_case, no truncated flag.
+
+        The last of those was written down before there was a list-shaped tool to break it. There
+        is one now, and it is the reason the convention was worth asserting early: a window filled
+        to `limit` says there may be more and a short one says there is not, `next_offset` says it
+        outright where paging exists, and `truncated` on top of either means "raise `limit`" or
+        "nothing will help" with no way to tell which. `list_chats` says it by the length of its
+        window, which is only honest because its walk follows Microsoft's paging to the end of the
+        collection.
+        """
         tools = _named(await mcp_client.list_tools())
 
         for name in tools:
@@ -209,6 +260,49 @@ class TestCallingThem:
         assert _structured(result)["email"] == "ada@example.invalid"
         assert route.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
         assert obo.requested_scopes == [("https://graph.microsoft.com/User.Read",)]
+
+    async def test_list_chats_returns_a_structured_page(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        graph.get("/me/chats").mock(return_value=httpx.Response(200, json=_CHATS))
+
+        result = await mcp_client.call_tool("list_chats", {"limit": 5})
+
+        body = _structured(result)
+        assert "truncated" not in body, "a window says whether it may have more by being full"
+        listed = cast("Sequence[Mapping[str, object]]", body["chats"])
+        assert [chat["chat_id"] for chat in listed] == ["19:release@thread.v2"]
+        assert listed[0]["last_message_at"] == "2026-02-11T09:15:22.310000Z"
+        assert obo.requested_scopes == [("https://graph.microsoft.com/Chat.Read",)]
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The bound on pages carrying nothing, measured over the real protocol where it is
+        actually spent rather than read off the constant that claims it.
+
+        An empty page carrying a cursor means keep going, so a collection that answers only those
+        has to be given up on — and it must FAIL rather than answer, because a short answer from
+        this tool means the user has no more chats. Eleven requests: the caller's own first page,
+        and the run of empty ones this walk will follow before refusing.
+        """
+        chats = graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
+            )
+        )
+
+        listed = await mcp_client.call_tool("list_chats", {}, raise_on_error=False)
+
+        assert listed.is_error, "a walk that gave up must not answer short: a short answer is a cap"
+        assert "pages in a row" in _error_text(listed), "and the count is what an operator needs"
+        assert chats.call_count == 11, "the caller's own page and the run of empty ones followed"
 
     async def test_an_argument_this_tool_does_not_have_is_refused(
         self,

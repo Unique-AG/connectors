@@ -102,7 +102,7 @@ READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 # asks for today rather than what it might ask for one day: a name no tool declares is a name
 # nothing has checked the spelling of, and it weakens the check above by exactly the permissions it
 # would wave through.
-REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset({"User.Read"})
+REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset({"User.Read", "Chat.Read"})
 
 
 def graph_scope(permission: str) -> str:

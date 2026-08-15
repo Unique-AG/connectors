@@ -2,8 +2,10 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account. The server acts as each user. It exposes `get_me`
-(the signed-in user's profile) now, with more tools in future PRs.
+Users sign in with their own Microsoft account and the server acts as them. It exposes two MCP tools
+so far — `get_me`, the signed-in user's own profile, and `list_chats`, their Microsoft Teams chats
+most recently active first — each one a file of its own, and more land in later PRs, stacked on top
+of this one, one tool per PR.
 
 ## Layout
 
@@ -31,10 +33,17 @@ Graph permissions at startup. A forgotten permission cannot be obtained later. T
 tool *files* from disk to ensure every registered tool declares its permissions, and `tests/test_app.py`
 verifies this.
 
-**`shared/` is code that two tools cannot disagree on:** `identity.py` (who the signed-in user is—
-every other answer correlates against this) and `seam.py` (On-Behalf-Of token and Graph error
-messages). A thing belongs here when two tools need it and a difference between them breaks callers.
-Nothing else belongs here.
+**`shared/` is what a file-per-tool costs.** Two files are free to disagree, and this package is the
+list of things they must not: `handles.py` (the `teams:///` grammar — every shape this connector
+mints, its parser and its speller, and the permission each Teams surface is read under),
+`identity.py` (who the signed-in user is — `get_me` reports it, and it is the fact every other
+answer gets correlated against, so a second tool asking with a `GET /me` of its own would be a
+second answer to one question) and `seam.py` (the per-tool On-Behalf-Of token and the
+Graph-failure-to-advice mapping, because a model reads every refusal on this server as one voice). A
+thing belongs there when two tools would otherwise each need a copy *and* a difference between the
+copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
+answers to "who am I", a refusal that sounds like a different server. What does not belong there is
+anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
 
 **Layering rules:**
 - `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP.
@@ -72,6 +81,17 @@ requested at sign-in cannot be consented to.
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me` |
+| `Chat.Read` | Delegated | No | `list_chats` |
+
+`Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
+`$expand=lastMessagePreview`, and a message preview is a message — which "read the names and members
+of chats" does not cover. It is spelled in `shared/handles.py` rather than in the tool file, because
+which Teams surface a permission covers is the handle grammar's knowledge; the tool still declares
+its own tuple, which is what its 403 is worded from. `shared/seam.py` writes the same names out once more, by hand, as
+`REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
+those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
+an authorize request carrying a scope it does not know, which fails every sign-in for every user.
+Adding a name there is the deliberate act this table records.
 
 **State.** Every token is re-validated on each request. FastMCP defaults to an encrypted file tree (resets
 on restart, breaks at replicas). This service uses Postgres. The store creates table `oauth_kv` on first
