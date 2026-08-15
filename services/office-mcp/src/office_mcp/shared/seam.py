@@ -117,7 +117,9 @@ READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 # `Chat.Raed`, passes every check. Each check compares the typo against itself, never against the
 # correct name. Entra rejects an unknown scope at the authorize endpoint. One typo here stops
 # sign-in for every user of this connector.
-REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset({"User.Read", "Chat.Read"})
+REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
+    {"User.Read", "Chat.Read", "ChannelMessage.Read.All"}
+)
 
 
 def graph_scope(permission: str) -> str:
