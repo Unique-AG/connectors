@@ -71,7 +71,7 @@ class SignedInUser(BaseModel):
 
     Field names are snake_case here and in every other tool payload, which is the one place this
     connector deliberately does not echo Graph's spelling — the field descriptions name the Graph
-    property wherever the two differ. Two of them differ by more than case, so that one thing has
+    property wherever it differs by more than case. Two of them do, so that one thing has
     one name across this server's whole surface: a person's Entra object id is `user_id` and an
     email address is `email`, here and on every payload that follows. Graph calls them `id` and
     `mail`, and this is the payload the others will be read against.
