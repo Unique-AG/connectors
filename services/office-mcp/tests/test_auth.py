@@ -15,6 +15,8 @@ from office_mcp.config import DatabaseConfig, EntraConfig
 
 _DATABASE_URL = "postgresql://user:pass@db:5432/office"
 
+_GRAPH_SCOPES = ("https://graph.microsoft.com/User.Read",)
+
 
 def _entra_config() -> EntraConfig:
     return EntraConfig.model_validate(
@@ -72,6 +74,7 @@ def _build_auth(entra: EntraConfig | None = None) -> AzureProvider:
         entra,
         base_url=_BASE_URL,
         client_storage=build_oauth_storage(entra, _database_config()),
+        graph_scopes=_GRAPH_SCOPES,
     )
 
 
@@ -85,12 +88,26 @@ class TestAuthProvider:
 
     def test_the_server_gates_access_on_its_own_scope_not_a_graph_one(self) -> None:
         """Entra omits OIDC scopes from `scp`, so the provider requires a custom API scope to
-        enforce. Graph permissions are a separate channel, requested by the tools that need
-        them — so nothing Graph-shaped should be gating access to the server itself.
+        enforce. Graph permissions are the separate channel below — a Graph scope among the
+        required ones would be validated on every token and would fail every request, because
+        this API's tokens never carry Graph permissions.
         """
         provider = _build_auth()
 
         assert provider.required_scopes == ["access_as_user"]
+
+    def test_the_graph_permissions_ride_the_authorize_request(self) -> None:
+        """Without this, sign-in never asks for Graph consent, and the On-Behalf-Of exchange each
+        tool performs fails with AADSTS65001 — a failure that happens per tool call, long after
+        the sign-in that would have fixed it, and that no tool can explain to its caller.
+
+        Containment rather than equality: the provider adds `offline_access` to this list itself,
+        which is its business and not something this service should be pinning.
+        """
+        provider = _build_auth()
+
+        assert set(_GRAPH_SCOPES) <= set(provider.additional_authorize_scopes)
+        assert not set(_GRAPH_SCOPES) & set(provider.required_scopes)
 
     def test_it_uses_the_exact_storage_it_was_given(self) -> None:
         """White-box on purpose: passing `client_storage` is the whole difference between a
@@ -103,6 +120,11 @@ class TestAuthProvider:
         """
         storage = build_oauth_storage(_entra_config(), _database_config())
 
-        provider = build_auth(_entra_config(), base_url=_BASE_URL, client_storage=storage)
+        provider = build_auth(
+            _entra_config(),
+            base_url=_BASE_URL,
+            client_storage=storage,
+            graph_scopes=_GRAPH_SCOPES,
+        )
 
         assert provider._client_storage is storage  # pyright: ignore[reportPrivateUsage]
