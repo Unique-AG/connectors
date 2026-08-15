@@ -8,10 +8,13 @@ a second tool over the same meeting would otherwise make for itself, and the cos
 test for belonging here: a caller cannot see two tools disagreeing about "the latest occurrence", it
 can only see one of them being wrong.
 
-That is also why this is here while one tool calls it. The alternative is not "keep it in the tool
-file and move it when a second caller arrives" — it is a later diff that moves a promise, reviewed
-as a refactor rather than as a decision, with the window spending that whole time as one tool's
-private helper. A private helper is exactly what the second caller copies.
+`read_transcript` is the second caller, and it takes exactly one name from here — the permission a
+transcript resource costs — while the resolve, the window and the ordering stay the lister's to
+call. That is the split working rather than an argument for undoing it: the reader is handed a
+meeting id somebody else resolved, so it must not repeat the resolve, and the permission it declares
+is still the permission the *resource* costs rather than the permission one tool's request costs.
+Had that name lived in the tool file it would have been a string spelled twice, because rule 4
+forbids the second tool importing the first to find out how the first spelled it.
 
 ## How a meeting is addressed, and the one place the chain can break
 
@@ -135,14 +138,14 @@ from office_mcp.shared.handles import MeetingHandle
 MEETING_PERMISSION = "OnlineMeetings.Read"
 
 # Reading a transcript resource, which is admin-consented and grantable independently of the
-# resolve above. Spelled here rather than in the tool file that declares it because it is the
-# permission the *resource* costs rather than the permission one tool's request costs: anything
-# else reaching a `callTranscript` needs exactly this one, and rule 4 forbids it importing a tool
-# file to find out. A tool-side constant is therefore a string spelled twice by construction, and
-# two spellings of a permission is not a tidiness problem — the authorize request carries whatever
-# they say, and a typo in one of them is a scope Entra rejects and a sign-in that fails for
-# everybody (see `shared/seam.py`'s `REQUESTABLE_PERMISSIONS`, which is what holds the spelling to
-# Microsoft's).
+# resolve above. Spelled here rather than in a tool file because it is the permission the *resource*
+# costs rather than the permission one tool's request costs, and two tools reach that resource:
+# `list_meeting_transcripts` lists a meeting's transcripts under it and `read_transcript` reads one
+# of them. Rule 4 forbids the second importing the first to find out how it was spelled, so a
+# tool-side constant is a string spelled twice by construction — and two spellings of a permission
+# is not a tidiness problem: the authorize request carries whatever they say, and a typo in one of
+# them is a scope Entra rejects and a sign-in that fails for everybody (see `shared/seam.py`'s
+# `REQUESTABLE_PERMISSIONS`, which is what holds the spelling to Microsoft's).
 #
 # Declaring is still each tool's own: a tool's `GRAPH_PERMISSIONS` tuple is what its 403 and its
 # AADSTS65001 are worded from, so it names the permissions its own request is made under and takes
