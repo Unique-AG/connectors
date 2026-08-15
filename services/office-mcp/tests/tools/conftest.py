@@ -40,16 +40,38 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
     return graph_client_for(transport, CALLER_TOKEN)
 
 
-# The Teams-message payloads. Here rather than in the one test file that reads them today because a
-# search hit is the shape every tool that reports a message is measured against: the next one to
-# arrive needs a hit to read by its own handle, and two copies of one would let a round trip pass
-# over two different messages. A builder rather than a literal per test so that the fields a test is
-# *about* are the ones it names.
+# The signed-in user, as `GET /me` answers. Here rather than in a test file because it is the
+# unrelated call a tool's tests reach for when what they are proving is that a request configuration
+# built for one call did not change every other one.
+ME: dict[str, object] = {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "displayName": "Ada Lovelace",
+    "mail": "ada@example.invalid",
+    "userPrincipalName": "ada@corp.example.invalid",
+    "jobTitle": "Analyst",
+}
+
+
+# The Teams-message payloads, here rather than in one of the two test files that use them: a search
+# hit and a full message are what `search_messages` and `read_message` are respectively about, and
+# each tool's tests need one of the other's — a hit to read by its own handle, a message to read it
+# into. Two copies of either would let the round trip pass over two different messages.
 
 # The sender shape a search hit carries: Teams messages are indexed out of the substrate mailbox,
 # so `from` is an Exchange `emailAddress` rather than a Teams identity.
 MAILBOX_SENDER: dict[str, object] = {
     "emailAddress": {"name": "Ada Lovelace", "address": "ada@example.invalid"}
+}
+
+# The sender shape every Teams *read* API answers with: a `teamworkUserIdentity`, which has an id,
+# an optional display name and no email property at all.
+TEAMS_SENDER: dict[str, object] = {
+    "user": {
+        "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "displayName": "Ada Lovelace",
+        "userIdentityType": "aadUser",
+    }
 }
 
 
@@ -96,6 +118,50 @@ def _chat_message(*, message_id: str, sender: Mapping[str, object] | None) -> di
         "importance": "normal",
         "subject": None,
         "from": dict(sender) if sender is not None else None,
+    }
+
+
+def message_payload(
+    *,
+    message_id: str = "1770000000000",
+    content: str = "<div><p>cut the release on Friday</p></div>",
+    content_type: str = "html",
+    sender: Mapping[str, object] | None = TEAMS_SENDER,
+    message_type: str = "message",
+    last_modified_at: str = "2026-02-11T09:15:22.31Z",
+    last_edited_at: str | None = None,
+    deleted_at: str | None = None,
+    reply_to_id: str | None = None,
+    web_url: str | None = None,
+    mentions: Sequence[Mapping[str, object]] = (),
+    attachments: Sequence[Mapping[str, object]] = (),
+    event_detail: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """One full `chatMessage`, as `GET /chats/{id}/messages/{id}` returns it.
+
+    Unlike a search hit this carries a `body` — which is the whole reason a reader exists — and the
+    Teams-shaped sender rather than the mailbox-shaped one.
+    """
+    return {
+        "@odata.type": "#microsoft.graph.chatMessage",
+        "id": message_id,
+        "etag": message_id,
+        "messageType": message_type,
+        "createdDateTime": "2026-02-11T09:15:22.31Z",
+        "lastModifiedDateTime": last_modified_at,
+        "lastEditedDateTime": last_edited_at,
+        "deletedDateTime": deleted_at,
+        "subject": None,
+        "importance": "normal",
+        "locale": "en-us",
+        "webUrl": web_url,
+        "replyToId": reply_to_id,
+        "from": dict(sender) if sender is not None else None,
+        "body": {"contentType": content_type, "content": content},
+        "mentions": [dict(mention) for mention in mentions],
+        "attachments": [dict(attachment) for attachment in attachments],
+        "reactions": [],
+        "eventDetail": dict(event_detail) if event_detail is not None else None,
     }
 
 

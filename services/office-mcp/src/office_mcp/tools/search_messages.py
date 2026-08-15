@@ -9,8 +9,8 @@ properties shape everything below.
   `createdDateTime`, `etag`, `from`, `id`, `importance`, `lastModifiedDateTime`, `subject` and
   `webUrl` — no `body`. Graph says so outright: "The search Teams API doesn't return all
   properties defined in chatMessage." The only text a hit carries is the `summary` snippet. A
-  result is therefore metadata plus a handle by necessity: the handle names the exact message
-  Graph matched, which is the one thing about it a later answer can be lined up against.
+  result is therefore metadata plus a handle by necessity, and the handle is what `read_message`
+  resolves into the message itself.
 * **`total` is not a match count.** "For Teams messages, the total property of the
   searchHitsContainer type contains the number of results on the page, not the total number of
   matching results." It is not read here and no total is reported: `moreResultsAvailable` is the
@@ -38,9 +38,9 @@ words (whitespace, punctuation only) contributes nothing and may cause a refusal
 criterion is set.
 
 What this file does not own is the handle grammar (`shared/handles.py`, so the handle minted here is
-the handle a reader of one will parse — two spellers would look like a search result that cannot be
-read) and the sender shape (`shared/messages.py`, so a hit and a read of the same message agree
-about who sent it). Everything else — the name, the description, the arguments, the answer shape,
+the handle `read_message` parses — two spellers would look like a search result that cannot be read)
+and the sender shape (`shared/messages.py`, so a hit and a read agree about who sent something).
+Everything else — the name, the description, the arguments, the answer shape,
 the request, the query builder, the injection guard and every refusal below — is here.
 """
 
@@ -88,13 +88,18 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 MAX_RESULTS = 50
 
 _DESCRIPTION = f"""\
-Search Teams messages the user can see across all chats and channels — by keywords, sender, \
-mentions, date, attachments and read state. Matches include messages from any participant, not \
-only the user.
+Search the Microsoft Teams messages the signed-in user can see — every one-to-one chat, group \
+chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
+and read state. Messages from ANY participant match, not only the user's own; call get_me if you \
+need to know who the user is. It is the only tool here that searches: it finds messages anywhere, \
+and read_message reads one of them in full.
 
-Results are metadata and a snippet only. The search index returns no message body; `summary` is \
-the only text. Each hit carries a `uri` handle naming that message. No tool here reads it yet: \
-there is no route to the full body. Do not quote `summary` as the whole message.
+A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
+view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
+truncated with `...` where it was cut — is the only text here. Every hit carries a `uri` handle \
+identifying that exact message; pass it to read_message for the real text, the attachments and the \
+mentions. Never present `summary` as the whole message, and never conclude from it that the \
+message does not say more.
 
 There is no result total — Graph gives a per-page count, not a match count. Use `next_offset` to \
 page: a value means more matches, null means there is no page to advance to. Pass it back as \
@@ -118,15 +123,17 @@ requires at sign-in.\
 
 
 class MessageHit(BaseModel):
-    """One matched message: all Graph's search index will say about it, and how to name the rest."""
+    """One matched message: all Graph's search index will say about it, and how to read the rest."""
 
     uri: str | None = Field(
         description=(
-            "Handle naming this message. Format: `teams:///chats/{chatId}/messages/{messageId}` "
-            + "or `teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each "
-            + "id percent-encoded. No tool here accepts it as an argument; no route to the body. "
-            + "`summary` is the whole of the text this tool returns. "
-            + "Null if Graph returned a hit with no chat or channel identity."
+            "A handle for this exact message, e.g. "
+            + "`teams:///chats/{chatId}/messages/{messageId}` or "
+            + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
+            + "percent-encoded. Pass it verbatim to read_message; this search returns no message "
+            + "body, so it is the only route to the full text, the attachments and the mentions. "
+            + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
+            + "identity, which cannot be addressed at all."
         )
     )
     message_id: str = Field(
@@ -152,9 +159,10 @@ class MessageHit(BaseModel):
     )
     summary: str | None = Field(
         description=(
-            "Graph's excerpt from the match, truncated with `...`. This is the only message body "
-            + "text this search returns. Do not quote it as the whole message or infer from its "
-            + "absence."
+            "Microsoft's own snippet of the matching text, truncated with `...` where it was cut. "
+            + "This is the ONLY message content this search returns — Graph's search projection "
+            + "has no body — so do not quote it as the whole message or infer from its absence. "
+            + "Read `uri` for the real text."
         )
     )
     sender: MessageSender = Field(description="Who sent the message.")
@@ -165,14 +173,20 @@ class MessageHit(BaseModel):
     )
     last_modified_at: datetime | None = Field(
         description=(
-            "Last modification time. Includes reactions added or removed; not the 'Edited' flag."
+            "When the message was last modified. Microsoft counts adding or removing a reaction "
+            + "as a modification, so a difference from `created_at` is not evidence of an edit — "
+            + "read_message reports `last_edited_at`, which is the property behind Teams' own "
+            + "'Edited' flag and is what to read when an edit is the question."
         )
     )
     importance: str | None = Field(
         description="`normal`, `high` or `urgent`, as the sender marked the message."
     )
     web_url: str | None = Field(
-        description="Link to open the message in Teams. Set for channel messages, null for chats."
+        description=(
+            "A link that opens the message in Microsoft Teams. Populated for channel messages and "
+            + "null for chat messages, which Graph gives no such link — use `uri` to read those."
+        )
     )
 
 
@@ -370,7 +384,7 @@ async def search_messages(
     """One page of matches for `criteria`, starting at `offset`.
 
     Exactly one Graph request, whatever the criteria: there is no fan-out and no second call to
-    fill in content.
+    fill in content. Callers that want the text of a match read its `uri`.
     """
     query = _query_string(criteria)
     assert query, "search_messages needs at least one criterion; the tool refuses an empty set"
