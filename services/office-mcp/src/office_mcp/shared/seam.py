@@ -122,7 +122,13 @@ READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 # correct name. Entra rejects an unknown scope at the authorize endpoint. One typo here stops
 # sign-in for every user of this connector.
 REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
-    {"User.Read", "Chat.Read", "Team.ReadBasic.All", "ChannelMessage.Read.All"}
+    {
+        "User.Read",
+        "Chat.Read",
+        "Team.ReadBasic.All",
+        "Channel.ReadBasic.All",
+        "ChannelMessage.Read.All",
+    }
 )
 
 
