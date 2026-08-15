@@ -65,6 +65,14 @@ class TestTheMessageHandleGrammar:
 
         assert handle == _CHAT_HANDLE
 
+    def test_it_says_which_permission_each_shape_is_read_under(self) -> None:
+        """Graph's permissions for a message read are per surface and the handle is the only
+        thing that knows which surface, so a 403 on a chat read can only be about `Chat.Read` —
+        naming the channel permission alongside it would send an administrator after one that was
+        never missing."""
+        assert _CHAT_HANDLE.permission == "Chat.Read"
+        assert _CHANNEL_HANDLE.permission == "ChannelMessage.Read.All"
+
     @pytest.mark.parametrize(
         "uri",
         [
