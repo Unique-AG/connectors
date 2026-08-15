@@ -363,22 +363,29 @@ class TestCriteriaThatAskForNothing:
 
 
 class TestTheHandleItMints:
-    def test_the_handle_promises_no_reader_this_server_does_not_have(self) -> None:
-        """A description is live protocol surface, and the expensive mistake is the generous one.
+    def test_the_handle_names_the_reader_that_now_takes_it(self) -> None:
+        """A description is live protocol surface, and this sentence has had to be both things.
 
-        The handle names the message; nothing on this server opens one yet. A description that
-        said "pass it to a reader" would teach a model to call a tool that is not advertised, and
-        the failure is not a clean "no such tool" — the model has already decided the snippet is
-        not the answer and now has no way to get one. So the sentence has to say the opposite
-        outright, and it is asserted rather than written down because the tool that makes it false
-        is the one that must come back and change it.
+        While nothing on this server opened a handle, it said so outright — "no tool on this server
+        takes it as an argument", "there is no route from here to the message body" — because a
+        description that promised a reader would have taught a model to call something that was not
+        advertised, and the failure is not a clean "no such tool": the model has already decided the
+        snippet is not the answer and now has nowhere to go. That sentence was asserted rather than
+        merely written down precisely because the tool that makes it false is the one that must come
+        back and change it, and `read_message` is that tool.
+
+        The flip has to go the whole way. A model told the snippet is all there is stops looking, so
+        leaving the old wording in place would hide the reader as effectively as not shipping it —
+        a defect nothing else here can see, since every other assertion about this tool passes
+        either way.
         """
         described = search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
-        assert "No tool here accepts it as an argument" in described
-        assert "no route to the body" in described
-        assert "`summary` is the whole of the text" in described
+        assert "read_message" in described
+        assert "only route to the full text" in described
+        assert "no tool on this server takes it as an argument" not in described
+        assert "no route from here to the message body" not in described
 
     def test_the_summary_warns_against_inference_from_truncation(self) -> None:
         """Summary is an excerpt, not the message. Users must not treat it as complete."""
