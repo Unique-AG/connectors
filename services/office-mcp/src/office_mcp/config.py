@@ -22,13 +22,13 @@ PKG_VERSION = pkg_version("office-mcp")
 # silently changes what the connection checks.
 _ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
 
-# asyncpg forwards unrecognized query params as server settings, causing Postgres errors.
-# `channel_binding` is dropped to prevent startup failure.
+# Trap: asyncpg forwards unknown params as server settings, causing Postgres errors.
+# channel_binding is dropped to prevent startup failure.
 _UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 
 
 def asyncpg_dsn(url: str) -> str:
-    """Convert a libpq PostgreSQL URL to asyncpg DSN format. Rewrites scheme and sslmode values.
+    """Convert a libpq PostgreSQL URL to asyncpg DSN format.
 
     Trap: `urlsplit` keeps `netloc` intact, so a percent-encoded password, a bracketed IPv6
     host, and a missing port all survive unchanged. A library that decodes and reassembles
@@ -38,8 +38,7 @@ def asyncpg_dsn(url: str) -> str:
     parts = urlsplit(url)
     scheme = parts.scheme
     if scheme in ("postgres", "postgresql+asyncpg"):
-        # `postgres://` (libpq) and `postgresql+asyncpg://` (SQLAlchemy) are not
-        # recognized by asyncpg.
+        # postgres:// (libpq) and postgresql+asyncpg:// (SQLAlchemy) are not asyncpg schemes.
         scheme = "postgresql"
     elif scheme != "postgresql":
         raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
@@ -55,7 +54,7 @@ def asyncpg_dsn(url: str) -> str:
 
 
 def _asyncpg_sslmode(sslmode: str) -> str:
-    """Convert libpq sslmode to asyncpg format. Rewrite `verify` to `verify-full`."""
+    """Convert libpq sslmode to asyncpg format."""
     if sslmode == "verify":
         return "verify-full"
     if sslmode not in _ASYNCPG_SSLMODES:
@@ -75,7 +74,7 @@ _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.
 
 
 class LogLevel(StrEnum):
-    """Matches `unique_mcp.logging.configure_logging` accepted names (case-insensitive)."""
+    """Case-insensitive names accepted by `unique_mcp.logging.configure_logging`."""
 
     DEBUG = "debug"
     INFO = "info"
@@ -92,8 +91,8 @@ class AppConfig(BaseSettings):
     port: int = Field(default=9544, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
 
-    # The externally-reachable URL of this service, used as the OAuth issuer URL.
-    # Kept as `HttpUrl` so `host` and `scheme` are parsed once and reused downstream.
+    # Externally-reachable URL of this service, used as OAuth issuer URL. HttpUrl so host
+    # and scheme are parsed once and reused downstream.
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
     @model_validator(mode="before")
@@ -143,22 +142,19 @@ class AppConfig(BaseSettings):
         return str(self.public_base_url).rstrip("/")
 
 
-# Entra authority aliases that let any tenant sign in. `AzureProvider` derives exactly one
-# expected issuer from `tenant_id` (`https://{authority}/{tenant_id}/v2.0`) and offers no way to
-# turn that check off, but a real token's `iss` names the *caller's* tenant — so with one of these
-# every token fails verification and every login fails identically, with nothing in the logs
-# pointing at the tenant id.
+# Trap: AzureProvider derives one expected issuer from tenant_id with no way to turn the check
+# off. A real token's iss names the caller's tenant, so these fail all tokens identically with
+# nothing in logs pointing at the tenant_id.
 _MULTI_TENANT_AUTHORITIES = frozenset({"common", "organizations", "consumers"})
 
 
 class EntraConfig(BaseSettings):
-    """The Microsoft Entra app registration this service authenticates users against.
+    """Microsoft Entra app registration for this service.
 
-    These three values are the whole of what FastMCP's `AzureProvider` needs from this service:
-    it owns the authorization endpoint, PKCE, the redirect callback, token refresh, and the
-    On-Behalf-Of exchange that turns a user's token into a Microsoft Graph one. `client_secret`
-    is required here even though the provider itself allows omitting it, because On-Behalf-Of
-    cannot be performed without one — and calling Graph as the signed-in user is the point.
+    AzureProvider owns the authorization endpoint, PKCE, redirect callback, token refresh, and
+    On-Behalf-Of exchange. client_secret is required here (though the provider allows omitting
+    it) because On-Behalf-Of cannot be done without one — and calling Graph as the signed-in
+    user is the point.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ENTRA_")
@@ -179,10 +175,10 @@ class EntraConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    """Hold PostgreSQL connection settings. Accept `DB_URL` or discrete fields.
+    """PostgreSQL connection settings. Accept DB_URL or discrete fields.
 
-    Expose `driver_dsn` only. Trap: deliberately no second, engine-shaped rendering.
-    Two shapes are two places TLS can be negotiated differently.
+    Expose driver_dsn only. Trap: no second engine-shaped rendering. Two shapes negotiate TLS
+    differently.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
@@ -198,7 +194,7 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def accept_database_url(cls, data: object) -> object:
-        """Accept DATABASE_URL (Helm alias) if neither `url` nor discrete fields are set.
+        """Accept DATABASE_URL (Helm alias) if url and discrete fields are not set.
 
         Explicit args win. Trap: without this guard, an explicit `DatabaseConfig(host=...)`
         call would silently lose its arguments to the ambient environment instead.
@@ -248,5 +244,5 @@ class DatabaseConfig(BaseSettings):
 
     @property
     def driver_dsn(self) -> str:
-        """Return the DSN string for `asyncpg.connect`. The only database surface exposed."""
+        """DSN string for asyncpg.connect. The only database surface exposed."""
         return self._driver_dsn

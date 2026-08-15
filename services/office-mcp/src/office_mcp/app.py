@@ -23,18 +23,16 @@ def create_app(
     database_config: DatabaseConfig | None = None,
     entra_config: EntraConfig | None = None,
 ) -> Starlette:
-    """The composition root.
+    """Composition root.
 
-    Every config object and every long-lived collaborator is built exactly once here and then
-    injected. Nothing downstream re-reads the environment. The Microsoft Graph client and the
-    tools that use it land in later PRs, wired in here the same way — so the MCP endpoint below
-    authenticates callers but exposes no tools yet.
+    Every config object and long-lived collaborator is built exactly once and injected. Nothing
+    downstream re-reads the environment. The Microsoft Graph client and tools land in later PRs,
+    wired the same way. The MCP endpoint authenticates callers but exposes no tools yet.
     """
     config = config or AppConfig()
     database_config = database_config or DatabaseConfig()
-    # `EntraConfig`'s fields are required with no defaults, which pyright reads as missing
-    # arguments; pydantic-settings fills them from the environment. Deliberately not given
-    # placeholder defaults: a missing app registration must fail at startup, by name.
+    # EntraConfig fields are required; pydantic-settings fills them from the environment.
+    # No placeholder defaults: a missing app registration fails at startup by name.
     entra_config = entra_config or EntraConfig()  # pyright: ignore[reportCallIssue]
 
     configure_logging(config)
@@ -50,9 +48,8 @@ def create_app(
     # Self-disabling when no OTEL_* variable is set, so a test process stays untraced.
     configure_tracing(service_name="office-mcp", service_version=config.version)
 
-    # The OAuth state store is this service's only connection to Postgres. It is built here
-    # rather than inside `build_auth` so that one object serves both consumers: the auth
-    # provider that depends on it, and the readiness probe that has to prove it works.
+    # OAuth store is the only Postgres connection. Built here (not in build_auth) so one
+    # object serves both the auth provider and the readiness probe.
     oauth_storage = build_oauth_storage(entra_config, database_config)
     auth = build_auth(entra_config, base_url=config.issuer, client_storage=oauth_storage)
 
@@ -61,12 +58,10 @@ def create_app(
         try:
             yield
         finally:
-            # One On-Behalf-Of credential is cached per signed-in user, each holding an open
-            # HTTP transport of its own. The OAuth state store is deliberately not closed here:
-            # its asyncpg pool dies with the process, and the wrapper chain `oauth_storage`
-            # names publishes get/put/delete only — no close — so shutting the pool down would
-            # mean reaching through the encryption wrapper for a store the process is about to
-            # drop anyway.
+            # Close per-user OBO credentials and their open HTTP transports. Don't close the
+            # OAuth store: reaching through the encryption wrapper for a store the process is
+            # about to drop anyway is not worth the complexity. Its asyncpg pool dies with the
+            # process.
             await auth.close_obo_credentials()
 
     mcp = FastMCP(
@@ -82,10 +77,10 @@ def create_app(
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:
-        """Postgres readiness — stock `setup_ops` `/probe` is process-up only.
+        """Postgres readiness. `setup_ops` `/probe` is process-up only.
 
-        Asks the OAuth state store, which is the connection every sign-in goes through. See
-        `server/readiness.py` for why it must not be a connection of its own.
+        Ask the OAuth store (the connection every sign-in uses). See `server/readiness.py`
+        for why not a separate connection.
         """
         return await ready_response(oauth_storage)
 
