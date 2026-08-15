@@ -117,6 +117,41 @@ class TestTheTwoRemediesGraphCannotTellApart:
         assert "administrator" in message
         assert "Retrying will not help" in message
 
+    def test_the_transcript_tenant_switch_is_neither_of_those_and_says_so(self) -> None:
+        """A third remedy behind the same status and the same outer code, and the one that is not
+        a permission at all: Graph access to Teams meeting transcripts is a tenant-wide Teams
+        setting, off by default, that no app can turn on. Naming a permission here would send an
+        administrator after one that was never missing, and telling the user to sign in again would
+        cost a re-consent that changes nothing — so the remedy names the Teams admin centre and the
+        cmdlet, and rules re-consent out in as many words.
+        """
+        message = _message(
+            GraphForbidden(
+                "nope",
+                status=403,
+                code="Forbidden",
+                request_id=None,
+                inner_code="GraphAccessToTranscriptsDisabled",
+            )
+        )
+
+        assert "Teams administrator" in message
+        assert "Set-CsTeamsMeetingConfiguration" in message
+        assert "sign in again will not change it" in message
+        assert _PERMISSION not in message, (
+            "no permission is missing, and naming one sends an administrator after nothing"
+        )
+
+    def test_an_ordinary_403_is_still_about_a_permission(self) -> None:
+        """The negative control: recognition is by inner code and never by status alone, or every
+        missing permission would be reported as a tenant setting nobody has switched off."""
+        message = _message(
+            GraphForbidden("nope", status=403, code="Forbidden", request_id=None, inner_code="Foo")
+        )
+
+        assert _PERMISSION in message
+        assert "Teams administrator" not in message
+
 
 class TestRetryAdvice:
     def test_throttling_passes_graphs_own_delay_through(self) -> None:

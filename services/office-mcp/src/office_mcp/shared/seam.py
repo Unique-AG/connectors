@@ -83,6 +83,16 @@ The same missing permission also has an earlier, uglier shape: if it was never c
 Entra refuses the On-Behalf-Of exchange (AADSTS65001) and Graph is never reached at all. That
 failure is worded by `_token_advice`, and it says the same thing as the 403 above — because from
 the caller's side it *is* the same thing, and the remedy is identical.
+
+One 403 is not about a permission at all, and naming one would send an administrator after
+something that was never missing. Microsoft Graph access to Teams meeting transcripts is a
+*tenant* switch, off by default, that "no app can access meeting transcripts, regardless of
+app-level permissions" until a Teams administrator turns it on — and Microsoft is explicit that
+there is "no request-side workaround". Graph marks it with an inner error code, which is the only
+thing distinguishing it from an ordinary refusal, so that is what it is recognised by (never the
+message text, which Microsoft documents as subject to change). This connector already learned this
+lesson once, in `services/teams-mcp` (PR #762) and in `docs/recordings-and-transcripts/`; the
+remedy names a person in the Teams admin centre and explicitly rules out re-consent.
 """
 
 import re
@@ -128,6 +138,8 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
         "ChannelMessage.Read.All",
+        "OnlineMeetings.Read",
+        "OnlineMeetingTranscript.Read.All",
     }
 )
 
@@ -409,6 +421,25 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
     )
 
 
+# Graph's inner error code for the tenant switch, and the advice for it. Branched on rather than the
+# message, as Microsoft's transcript reference instructs twice.
+_TRANSCRIPT_ACCESS_DISABLED = "GraphAccessToTranscriptsDisabled"
+
+_TRANSCRIPTS_SWITCHED_OFF = (
+    "Microsoft 365 refused this request because this organisation has Microsoft Graph access to "
+    + "Teams meeting transcripts switched OFF. This is a tenant-wide Teams setting, off by "
+    + "default, and it blocks every transcript read regardless of which permissions this connector "
+    + "holds — so it is NOT a consent problem and asking the user to sign in again will not change "
+    + "it. A Microsoft Teams administrator has to turn it on: Teams admin centre → Meetings → "
+    + "Meeting settings → Transcript API access → Microsoft Graph access, or "
+    + "`Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`. "
+    + "Microsoft documents no request-side workaround: until an administrator acts, every "
+    + "transcript call from this connector fails identically, so do not retry this one and do not "
+    + "try another meeting or another transcript. Everything else this connector does — chats, "
+    + "channels, message search — is unaffected."
+)
+
+
 def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
     return _remedy(failure, permissions, not_found) + _diagnostics(failure)
 
@@ -432,6 +463,8 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
                 + "in to this connector again; the request itself was fine, so retrying it "
                 + "unchanged will fail the same way."
             )
+        if failure.inner_code == _TRANSCRIPT_ACCESS_DISABLED:
+            return _TRANSCRIPTS_SWITCHED_OFF
         named = _named(permissions)
         noun = "permissions" if len(permissions) > 1 else "permission"
         return (
