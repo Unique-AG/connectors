@@ -104,6 +104,23 @@ two numbered rules that held those halves apart went with them.
    The class of thing this catches is the second speller somebody writes without thinking, which is
    the one that actually happens; somebody determined to hide one succeeds.
 
+7. **No module may address a single meeting recording.** The listing is the whole of the recordings
+   surface, because there are exactly two reasons to reach an individual `callRecording` and both
+   are defects: its `content`, which is an MP4 of a meeting that can run thirty hours and which a
+   model cannot watch, and its `recordingContentUrl`, which is a Graph URL that only this
+   connector's bearer token opens — so handing it to a caller is either useless or a token leak.
+   (Delegated download is organiser-only anyway, so it would also fail for most callers.) "Return
+   metadata and availability, never the bytes" is the whole shape of
+   `tools/list_meeting_recordings.py`, and the change that breaks it is a small-looking convenience
+   someone adds later, which is why it is a failing test rather than a paragraph. Enforced on the
+   two SDK names that reach one recording: `by_call_recording_id` and `recording_content_url`.
+   Matched as attribute names through the AST, so a docstring naming Graph's own
+   `recordingContentUrl` property — as the recordings module does, to say why it is not returned —
+   is prose and not a violation.
+   The rule is permanent, so its guard finds the recordings listing by what it *does* rather than by
+   where it lives: a listing that moves is a listing this guard still finds, where a guard anchored
+   on a path would fail on the move and read as "delete me" when what it meant was "it moved".
+
 8. **A package is entered through its `__init__`, never through its modules.** Applies to the
    packages in `_PUBLIC_SURFACE_PACKAGES`: `graph_client/`, `server/` and `tools/`, each of which
    publishes an `__all__` that is the whole of what it promises. Reaching past one means
@@ -120,24 +137,21 @@ two numbered rules that held those halves apart went with them.
    *for*, so an `__init__` re-exporting the lot would hide the one thing it exists to show. A
    package joins the list as soon as its `__init__` exports anything.
 
-**Rules 4 and 6 arrive here, and rule 7 is still absent, for the same reason in both directions.**
+**Rule 7 arrives with the tool it protects, which is the same discipline the rest arrived under.**
 Every rule here is paired with a guard that fails if the rule has stopped having anything to check —
 an empty tree to walk, a missing file to forbid reaching past, a framework nothing imports any more,
-a second tool module that stopped existing so that "another tool module" named nothing, a package
-with no `__all__` to insist on — and the same discipline says a rule may not arrive before its guard
-can pass. A rule that is written down while it forbids nothing is a rule that gets deleted for the
-wrong reason later, or worse, kept while the thing it covers quietly leaves.
+a second tool module that stopped existing so that "another tool module" named nothing, a recordings
+listing that went away so that "a single recording" addressed nothing, a package with no `__all__`
+to insist on — and the same discipline says a rule may not arrive before its guard can pass. A rule
+that is written down while it forbids nothing is a rule that gets deleted for the wrong reason
+later, or worse, kept while the thing it covers quietly leaves.
 
 Rule 4 needed two tool modules to have anything to say and rule 6 needed a handle, and `list_chats`
-is both: it is the second tool and the first whose answer carries a `teams:///` URI. So both are
-asserted from here, each with the guard that would fail if it went back to forbidding nothing.
+was both. Rule 7 needed a recordings listing to be the surface it protects, and
+`list_meeting_recordings` is it — so the rule lands with the tool, in the number the finished layout
+gives it, costing a class and changing nothing else. The whole set is now here.
 
-* **Rule 7, no module addresses a single meeting recording** — the permanent one, and the only door
-  to a recording's bytes — needs a recordings listing to be the surface it protects. It arrives with
-  the tool that lists them, and the numbering is left as the finished layout numbers it so that
-  arriving costs a class and changes nothing else.
-
-None of the rules that *are* here is conditional: every package they are about exists today, so a
+None of the rules is conditional: every package and every surface they are about exists today, so a
 rule that stops running is a failure and not a skip.
 
 All rules are asserted by walking the AST rather than importing anything, so a violation is
@@ -217,6 +231,17 @@ _REGEX_MODULE = "re"
 # assembled. Reaching the handover without whitespace is a handle (`f"teams:///meetings/{x}"`,
 # `"teams:///chats/" + chat_id`); wandering back into a sentence first is a paragraph. See rule 6.
 _WHITESPACE = re.compile(r"\s")
+
+# The two names in the generated SDK that address one `callRecording` rather than the collection:
+# the item builder (`…recordings.by_call_recording_id(id)`, whose only child worth having is
+# `.content`) and the entity's own content URL. Rule 7 forbids both anywhere under `src/`.
+_RECORDING_ITEM_NAMES = frozenset({"by_call_recording_id", "recording_content_url"})
+
+# What reading a meeting's recordings *collection* looks like, whichever module does it:
+# `client.me.online_meetings.by_online_meeting_id(id).recordings`. Rule 7's guard is written on this
+# rather than on a path because the rule is permanent and the listing's home need not be: a guard
+# that named the path would fail the day the listing moved.
+_RECORDINGS_COLLECTION = frozenset({"online_meetings", "recordings"})
 
 # The `BaseSettings` classes in config.py, which read the environment when constructed.
 _CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig", "SurfaceConfig"})
@@ -639,6 +664,33 @@ def _registry_imports() -> set[str]:
     return found
 
 
+def _attribute_names(source: str) -> set[str]:
+    """Every attribute name `source` reads or calls: `recordings` and `get` in `x.recordings.get()`.
+
+    Attribute names rather than text so that rule 7 constrains code and leaves prose alone: the
+    module it guards has to be able to name the Graph property it deliberately does not return.
+    """
+    return {node.attr for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Attribute)}
+
+
+def _recording_listings() -> list[pathlib.Path]:
+    """Every module that reads a meeting's recordings collection, wherever it happens to live.
+
+    Found by what the code does — `…online_meetings.by_online_meeting_id(id).recordings` — rather
+    than by path, because rule 7 outlives any particular home for the listing.
+    """
+    return [
+        source
+        for source in _sources(_SRC)
+        if _attribute_names(source.read_text()) >= _RECORDINGS_COLLECTION
+    ]
+
+
+def _recording_item_violations(source: pathlib.Path) -> list[str]:
+    reached = sorted(_attribute_names(source.read_text()) & _RECORDING_ITEM_NAMES)
+    return [f"{source.relative_to(_SRC)} reaches {name}" for name in reached]
+
+
 def _a_tool_file_containing(
     source: str, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> pathlib.Path:
@@ -992,6 +1044,28 @@ class TestTheDetectionItself:
             + '    return _HINT + " is the shape this tool takes"\n'
         )
 
+    def test_catches_the_violation_the_recording_content_rule_exists_for(self) -> None:
+        """The exact line someone writes when adding a "just check the video is there" convenience,
+        and the property read that would leak a token-bearing Graph URL to a caller."""
+        found = _attribute_names(
+            "async def fetch(client, meeting_id, recording_id):\n"
+            + "    item = client.me.online_meetings.by_online_meeting_id(meeting_id)"
+            + ".recordings.by_call_recording_id(recording_id)\n"
+            + "    return await item.content.get(), item.recording_content_url\n"
+        )
+
+        assert found & _RECORDING_ITEM_NAMES == _RECORDING_ITEM_NAMES
+
+    def test_the_recording_content_rule_leaves_the_collection_and_the_prose_alone(self) -> None:
+        """Listing recordings is the whole point of the module the rule protects, and that module
+        has to be able to explain in words why Graph's `recordingContentUrl` is not passed on."""
+        found = _attribute_names(
+            '"""Not returned: recordingContentUrl needs our own bearer token."""\n'
+            + "page = await client.me.online_meetings.by_online_meeting_id(m).recordings.get()\n"
+        )
+
+        assert not found & _RECORDING_ITEM_NAMES
+
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
         assert not _imports_under("from office_mcp.toolsmith import thing", _TOOLS_PREFIX)
         assert not _imports_under("from office_mcp.sharedish import thing", _SHARED_PREFIX)
@@ -1167,6 +1241,40 @@ class TestEachHandleFamilyHasOneHome:
             + "line that bound it. Showing the shape to a model is prose and is not this: a "
             + "description, an `examples=`, a `json_schema_extra` example, a docstring that is the "
             + "shape, and a refusal that quotes it are all left alone:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestNoModuleReachesForRecordingBytes:
+    """Rule 7."""
+
+    def test_the_recordings_listing_is_actually_there(self) -> None:
+        """Guards the guard: the rule is that the *collection* is the whole surface, so if nothing
+        listed recordings any more it would be forbidding something nothing does.
+
+        Looked for by what it does rather than by where it lives, so that a listing which moves
+        leaves this passing.
+        """
+        listings = _recording_listings()
+        assert listings, (
+            "nothing under src/ reads a meeting's recordings collection "
+            + f"({'.'.join(sorted(_RECORDINGS_COLLECTION))}), so rule 7 forbids something nothing "
+            + "does. This rule is PERMANENT and is not the thing to delete: it is the only door to "
+            + "a recording's bytes. If the listing moved, this guard should have found it wherever "
+            + "it went — check that the new home still walks the collection through "
+            + "`online_meetings.by_online_meeting_id(...).recordings`. If the listing was "
+            + "genuinely removed, the recordings surface is gone and that is the change to explain"
+        )
+
+    @pytest.mark.parametrize("source", _sources(_SRC), ids=_source_id)
+    def test_no_module_addresses_a_single_recording(self, source: pathlib.Path) -> None:
+        violations = _recording_item_violations(source)
+        assert not violations, (
+            "nothing here may address one meeting recording — the only things behind that door are "
+            + "an MP4 of a meeting up to 30 hours long, which cannot enter a model's context and "
+            + "which delegated callers other than the organiser may not download at all, and a "
+            + "content URL that only this connector's token opens. List the collection and report "
+            + "metadata, duration and access instead:\n  "
             + "\n  ".join(violations)
         )
 
