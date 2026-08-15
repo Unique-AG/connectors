@@ -17,6 +17,16 @@ anyway, because "what Graph did wrong" is what this vocabulary is and because be
 `GraphFailure` is what carries it through `shared/seam.py` to the caller as advice rather than as a
 crash.
 
+One thing above the status code is carried too: `inner_code`, Graph's `error.innerError.code`.
+Where a status and an outer code are the same for two failures with opposite remedies, that is
+the only field that tells them apart — the transcript APIs answer both "your tenant has switched
+Graph access to transcripts off, and no app can switch it back on" and "this tenant will not give
+you speaker names, ask for the unattributed format" as `403 Forbidden` / `code: Forbidden`, and
+Microsoft's own instruction is to "branch on the `innerError.code` value, not the message text.
+Messages are subject to change" (https://learn.microsoft.com/en-us/graph/api/calltranscript-get).
+It is data like `status` is, not a category: a subclass per inner code would be a subclass per
+Graph feature.
+
 `graph_errors` also counts and times the call it wraps. It is the seam every Graph call already
 goes through, and the categories above are exactly the `status` a counter wants — measuring
 anywhere else would mean re-deriving them. The instruments themselves live in
@@ -26,6 +36,7 @@ anywhere else would mean re-deriving them. The instruments themselves live in
 from collections.abc import Generator
 from contextlib import contextmanager
 from time import perf_counter
+from typing import cast
 
 import httpx
 from kiota_abstractions.api_error import APIError
@@ -40,7 +51,11 @@ from office_mcp.graph_client.observability import (
 
 
 class GraphFailure(Exception):
-    """Graph request failure. Subclass indicates remedy. Support needs request_id."""
+    """Graph request failure. Subclass indicates remedy. Support needs request_id.
+
+    `inner_code` defaults to `None` because most Graph errors carry no
+    inner code worth branching on; where one does, it is the whole of the difference.
+    """
 
     def __init__(
         self,
@@ -49,11 +64,13 @@ class GraphFailure(Exception):
         status: int | None,
         code: str | None,
         request_id: str | None,
+        inner_code: str | None = None,
     ) -> None:
         super().__init__(message)
         self.status: int | None = status
         self.code: str | None = code
         self.request_id: str | None = request_id
+        self.inner_code: str | None = inner_code
 
 
 class GraphThrottled(GraphFailure):
@@ -71,8 +88,11 @@ class GraphThrottled(GraphFailure):
         code: str | None,
         request_id: str | None,
         retry_after_seconds: float | None,
+        inner_code: str | None = None,
     ) -> None:
-        super().__init__(message, status=status, code=code, request_id=request_id)
+        super().__init__(
+            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+        )
         self.retry_after_seconds: float | None = retry_after_seconds
 
 
@@ -200,6 +220,7 @@ def _classify(error: APIError) -> GraphFailure:
     status = error.response_status_code
     headers = _lowercase_headers(error)
     code = error.error.code if isinstance(error, ODataError) and error.error else None
+    inner_code = _inner_code(error)
     request_id = headers.get("request-id")
     message = f"Microsoft Graph returned {status}" + (f" ({code})" if code else "")
 
@@ -209,15 +230,41 @@ def _classify(error: APIError) -> GraphFailure:
             status=status,
             code=code,
             request_id=request_id,
+            inner_code=inner_code,
             retry_after_seconds=_retry_after_seconds(headers),
         )
     if status in (401, 403):
-        return GraphForbidden(message, status=status, code=code, request_id=request_id)
+        return GraphForbidden(
+            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+        )
     if status == 404:
-        return GraphNotFound(message, status=status, code=code, request_id=request_id)
+        return GraphNotFound(
+            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+        )
     if status is not None and status >= 500:
-        return GraphUnavailable(message, status=status, code=code, request_id=request_id)
-    return GraphFailure(message, status=status, code=code, request_id=request_id)
+        return GraphUnavailable(
+            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+        )
+    return GraphFailure(
+        message, status=status, code=code, request_id=request_id, inner_code=inner_code
+    )
+
+
+def _inner_code(error: APIError) -> str | None:
+    """Graph's `error.innerError.code`, if it sent one.
+
+    The SDK's generated `innerError` has typed fields for `request-id`, `client-request-id` and
+    `date` and none for `code`, so the property Microsoft tells callers to branch on arrives in the
+    model's `additional_data` — untyped by construction, hence the narrowing.
+    """
+    if not isinstance(error, ODataError) or error.error is None:
+        return None
+    inner = error.error.inner_error
+    if inner is None:
+        return None
+    extra = cast("dict[str, object]", inner.additional_data)
+    value = extra.get("code")
+    return value if isinstance(value, str) else None
 
 
 def _lowercase_headers(error: APIError) -> dict[str, str]:
