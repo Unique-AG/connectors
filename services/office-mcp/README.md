@@ -2,10 +2,13 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account; the server acts as them. Six MCP tools are available:
-`get_me` (profile), `list_chats` (chats by recency), `list_teams` (teams the user is in), `list_channels`
-(channels in one team), `search_messages` (full-text search), and `read_message` (one message in full).
-Each tool is one file; more land in later PRs, one tool per PR.
+Users sign in with their own Microsoft account and the server acts as them. It exposes seven MCP
+tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
+most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
+channels of one of those teams; `browse_channel`, what was posted in one of those channels;
+`search_messages`, full-text search across every Teams message they can see; and `read_message`,
+one of those messages in full — each one a file of its own, and more land in later PRs, stacked on
+top of this one, one tool per PR.
 
 ## Layout
 
@@ -77,7 +80,7 @@ Tools redeem permissions per call via On-Behalf-Of. No permission = no consent =
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
-| `ChannelMessage.Read.All` | Delegated | Usually | `search_messages`, `read_message` (channels) |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
 
 Multiple tools naming the same permission is normal. It is not duplication to remove. Each tool
 declares its own tuple because that tuple words its own 403 and AADSTS65001 messages.
@@ -96,10 +99,23 @@ administrator handed two names may grant the one that was never missing. Search 
 surface beforehand, so it names both. `shared/seam.py` lists both in `REQUESTABLE_PERMISSIONS`:
 misspelling is on both sides.
 
-`ChannelMessage.Read.All` requested deliberately. `Chat.Read` alone lets Graph *accept* searches
-but Microsoft docs say searches never return more than GET would. All channel GET needs
-`ChannelMessage.Read.All`. Without it, searches silently cover chats only. Asking at sign-in makes
-tenants that withhold it fail visibly at consent, not serve incomplete results.
+`ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
+enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
+returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
+`ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
+missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
+than serve half an answer per query. It is also what `browse_channel` spends on its one request, and
+what `read_message` needs for a channel message. It is the first permission here that needs an
+administrator, and the first row where one tool needs
+two: neither Graph's 403 nor Entra's AADSTS65001 says which of the two was missing, so
+`search_messages` names both in every refusal — handed one name, an administrator may grant the
+permission that was never missing and watch the identical failure. A search has no choice about
+that, because a search happens before anything knows which surface a hit will be on; a *read* does,
+which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
+`REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
+those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
+an authorize request carrying a scope it does not know, which fails every sign-in for every user.
+Adding a name there is the deliberate act this table records.
 
 The channel inventory is two permissions, and they are separate scopes on purpose:
 `Channel.ReadBasic.All` lists a team's channels, `ChannelMessage.Read.All` reads what was posted in
@@ -116,24 +132,38 @@ with key from client secret. Rotating the secret requires each user to re-login 
 
 `graph_client/` wraps the official msgraph-sdk (no token acquisition; FastMCP provides token).
 
-- **One transport, many callers:** `create_graph_transport` builds the `httpx.AsyncClient` once.
-  `graph_client_for(transport, token)` wraps it per call. Per-call clients leak TLS and pools.
-
-- **Throttling built-in:** SDK retries 429/503/504 three times. Timeouts return `GraphThrottled`.
-
-- **Four error types:** `GraphThrottled` (429), `GraphForbidden` (401/403), `GraphNotFound` (404),
-  `GraphUnavailable` (5xx/unreachable). Wrap Graph work with `with graph_errors():`.
-
-- **Paging:** Follows `@odata.nextLink` via `collect_pages` (item/scan caps). Search uses offsets.
-
-- **TRAP: Empty pages with `@odata.nextLink` mean keep going.** SDK's `PageIterator` treats empty
-  pages as end-of-collection. A collection like `[1 item+link]`, `[empty+link]`, `[3 more]`
-  becomes one item. List tools here claim "end" only by returning short of `limit`.
-  `collect_pages` follows empties (bounded by `MAX_EMPTY_PAGES`, not scan budget) or raises
-  `GraphPagingUnending`—short answers mean the limit applied.
-
-- **TRAP:** SDK bearer provider doesn't validate allowed hosts. Redirects to non-Graph URLs send
-  delegated credentials. Restrict to `graph.microsoft.com`.
+- **One transport, many callers.** `create_graph_transport(settings)` builds the `httpx.AsyncClient`
+  — connection pool plus the SDK's middleware pipeline — once, and `graph_client_for(transport,
+  token)` wraps it per call. The token is the only thing that varies; a client per call would mean
+  a TLS handshake per call and a leaked pool.
+- **Throttling is the SDK's, deliberately.** Its retry middleware already waits out `Retry-After`
+  on 429/503/504 (on `asyncio.sleep`, not a blocking one) three times, which is exactly Graph's
+  documented contract. Nothing here re-implements it and there is no rate limiter. What is added is
+  the *typed* outcome: when the retries are outlasted, callers get `GraphThrottled` carrying
+  `retry_after_seconds`, not a status code to re-interpret.
+- **Errors are four categories**, because those are the four remedies: `GraphThrottled` (429),
+  `GraphForbidden` (401/403), `GraphNotFound` (404) and `GraphUnavailable` (5xx, or never reached).
+  Wrap Graph work in `with graph_errors():`. Anything else stays the base `GraphFailure`.
+- **Paging follows `@odata.nextLink`** via `collect_pages`, replaying the URL verbatim, with an item
+  cap, a *scan* cap — the teams-mcp lesson that a filtered collection can walk a long way for very
+  few kept items — a bound on how many pages of nothing it will follow in a row, and a `capped` flag
+  so a partial answer never looks complete. A channel's messages are the exception and are not
+  walked at all: Graph allows about one request a second on a given channel for the whole app across
+  the tenant, so `browse_channel` makes exactly one and `$top` is its window. Search is not paged
+  this way either: `POST /search/query` takes stateless `from`/`size` offsets, so a search tool
+  resumes by re-issuing rather than by carrying a cursor.
+- **An empty page carrying a next link means keep going, and the walk is ours because of it.** The
+  SDK's `PageIterator.enumerate` returns `False` for a page whose `value` is empty and its `iterate`
+  reads that as the end of the collection — so a collection Graph answers `[1 item + nextLink]`,
+  `[nothing + nextLink]`, `[3 more]` came back as one item. Every list-shaped tool here says "that
+  is all of it" by coming back short of `limit`, so believing an empty page does not merely lose
+  items: it turns a window with more behind it into a claim that there is not. `collect_pages` walks
+  through them, bounds a *run* of them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap:
+  an empty page spends no scan budget, so a shared budget is no bound on empty pages at all), and
+  raises `GraphPagingUnending` rather than answering short — because a short answer means a cap.
+- **The caller's token goes to `graph.microsoft.com` and nowhere else.** The SDK's bearer provider
+  does not check its own allowed-hosts validator, so a redirect or an off-Graph `nextLink` would
+  otherwise be handed a user's delegated credential.
 
 ## Run locally
 

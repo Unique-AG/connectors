@@ -32,8 +32,10 @@ from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "list_channels"
 
-# The cheap "basic" scope for channel identity. Reading messages needs `ChannelMessage.Read.All`;
-# a tenant often grants this one and withholds the broad one, so the two are named separately.
+# The delegated Graph permission this tool's one request needs — the cheap "basic" scope over a
+# channel's identity, which is all this collection returns. Reading what was *posted* in a channel
+# is the broad `ChannelMessage.Read.All` and is `browse_channel`'s to declare; a tenant commonly
+# grants this one and withholds that one, which is why the two are named separately.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 
 # Built at import, not in the parameter default: rebuilding the descriptor on every registration
@@ -52,9 +54,10 @@ type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParam
 _DESCRIPTION = f"""\
 List channels of a Microsoft Teams team. Pass the `team_id` from list_teams.
 
-Each channel's id, name, description, membership type, and creation date are returned. \
-Channel names are unique only inside their own team (every team has a `General`), so use both \
-ids to address a channel. `membership_type` is `standard`, `private`, or `shared`.
+Call this to find the channel to browse, then pass `team_id` and `channel_id` together to \
+browse_channel — a channel id alone addresses nothing. Channel names are unique only inside their \
+own team (every team has a `General`), which is why the pair is always needed. No message content \
+is returned here.
 
 The list shows only channels the signed-in user can access. An absent channel means the user \
 cannot access it, not that the team lacks it.
@@ -68,8 +71,9 @@ may exist; fewer than `limit` is all of them the user can see. Raise `limit` (up
 class ChannelSummary(BaseModel):
     channel_id: str = Field(
         description=(
-            "The channel's Graph id, e.g. `19:...@thread.tacv2`. Use it with `team_id` to "
-            + "address a channel. Opaque — copy it from responses rather than constructing it."
+            "The channel's Graph id, e.g. `19:...@thread.tacv2`. Pass it with its `team_id` to "
+            + "browse_channel; it is also the id search_messages reports as `channel_id` on a "
+            + "channel message. Opaque — copy it rather than constructing one from a name."
         )
     )
     display_name: str | None = Field(

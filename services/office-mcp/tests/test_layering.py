@@ -65,8 +65,8 @@ two numbered rules that held those halves apart went with them.
    `teams:///chats/…` would be free to disagree, and the disagreement would not look like a
    disagreement — it would look like a handle one tool produced and another answers 404 to. The
    owner is named once for every family rather than per family, which is strictly stronger than
-   letting each grammar live with the tool that mints it: two tools mint between them the three
-   shapes below and neither file spells one, so there is nothing for a second speller to be.
+   letting each grammar live with the tool that mints it: three tools mint between them the four
+   shapes below and no tool file spells one, so there is nothing for a second speller to be.
 
    *Spells or parses* is about what a literal is **used for**, not about how it is spaced. Prose is
    most of what the scheme is written in here and all of it is legitimate: a tool description shows
