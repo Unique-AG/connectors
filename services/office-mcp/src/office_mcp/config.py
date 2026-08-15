@@ -15,37 +15,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PKG_VERSION = pkg_version("office-mcp")
 
-# libpq `sslmode` values asyncpg understands verbatim. `verify` is libpq's own alias for
-# `verify-full` and is the one value asyncpg rejects outright, so it — and only it — is rewritten.
-# `verify-ca` is a genuinely weaker mode (CA chain, no hostname) that asyncpg supports, so
-# widening it to `verify-full` would silently change what the connection checks.
+# libpq `sslmode` values asyncpg accepts. Only `verify` (libpq's alias for
+# `verify-full`) is rewritten.
+# Trap: verify-ca is a genuinely weaker mode. Never widen it to verify-full—that
+# silently changes what the connection checks.
 _ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
 
-# libpq params asyncpg has no equivalent for, and does not merely ignore: any query key it does
-# not recognise is passed through as a *server setting* in the startup packet, so leaving
-# `channel_binding=require` in the DSN makes Postgres refuse the connection with
-# `unrecognized configuration parameter "channel_binding"`. Dropped here instead.
+# asyncpg forwards unrecognized query params as server settings, causing Postgres errors.
+# `channel_binding` is dropped to prevent startup failure.
 _UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 
 
 def asyncpg_dsn(url: str) -> str:
-    """Rewrite a libpq Postgres URL into the DSN asyncpg itself accepts.
+    """Convert a libpq PostgreSQL URL to asyncpg DSN format. Rewrites scheme and sslmode values.
 
-    One DSN is the whole database surface of this service: the readiness probe and (once it
-    lands) FastMCP's OAuth store both hand this exact string to `asyncpg.connect`, so there is
-    no second connection shape that can negotiate TLS differently from the first.
-
-    Built on `urllib.parse` rather than a URL library that reassembles from decoded parts:
-    `urlsplit` leaves `netloc` — userinfo, host and port together — as written, so a
-    percent-encoded password (`p%40ss`), a bracketed IPv6 host and an absent port all survive
-    verbatim. Only the scheme and the query are rewritten.
+    Trap: Use urllib.parse to preserve encoding and IPv6. There is no second connection
+    shape that can negotiate TLS differently from the first.
     """
     parts = urlsplit(url)
     scheme = parts.scheme
     if scheme in ("postgres", "postgresql+asyncpg"):
-        # `postgres://` is the libpq short form (Heroku/Azure and many operator-generated
-        # secrets emit it) and `postgresql+asyncpg://` is SQLAlchemy's driver-qualified form
-        # (what a Helm chart or a copied connection string may carry). asyncpg rejects both.
+        # `postgres://` (libpq) and `postgresql+asyncpg://` (SQLAlchemy) are not
+        # recognized by asyncpg.
         scheme = "postgresql"
     elif scheme != "postgresql":
         raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
@@ -61,7 +52,7 @@ def asyncpg_dsn(url: str) -> str:
 
 
 def _asyncpg_sslmode(sslmode: str) -> str:
-    """The asyncpg spelling of a libpq `sslmode`. Only `verify` differs."""
+    """Convert libpq sslmode to asyncpg format. Rewrite `verify` to `verify-full`."""
     if sslmode == "verify":
         return "verify-full"
     if sslmode not in _ASYNCPG_SSLMODES:
@@ -75,9 +66,7 @@ class AppEnv(StrEnum):
     TEST = "test"
 
 
-# Hosts that can't be what an external MCP client reaches this service on. `0.0.0.0`/`[::]` are a
-# bind address rather than a destination, so they're just as wrong as loopback here.
-# The IPv6 entries are bracketed because pydantic's `HttpUrl.host` keeps IPv6 brackets.
+# Hosts not reachable externally. `0.0.0.0` and `[::]` are bind addresses, not destinations.
 _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "[::]"})
 
 
@@ -99,24 +88,14 @@ class AppConfig(BaseSettings):
     port: int = Field(default=9544, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
 
-    # The externally-reachable URL of this service — used as the OAuth issuer/base URL
-    # (discovery metadata, /authorize, /token, and the redirect endpoints all hang off it).
-    # The local default is only usable in development; `_reject_local_base_url_in_production`
-    # below enforces that.
-    # Kept as the validated `HttpUrl` rather than a string: `host` and `scheme` are both read
-    # downstream (here, and by the auth layer once it lands), and one parse serving all of them
-    # is why none of those places re-parse it.
+    # The externally-reachable URL of this service, used as the OAuth issuer URL.
+    # Kept as `HttpUrl` so `host` and `scheme` are parsed once and reused downstream.
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
     @model_validator(mode="before")
     @classmethod
     def _lowercase_log_level_and_app_env(cls, data: object) -> object:
-        """Lowercase `log_level`/`app_env` before enum coercion.
-
-        Pydantic's `StrEnum` coercion is case-sensitive, but `LOG_LEVEL=INFO` — the canonical
-        spelling, and what `unique_mcp.logging.configure_logging` itself normalises — is a
-        reasonable thing for an operator to set. Without this, it aborts startup instead.
-        """
+        """Accept uppercase `LOG_LEVEL=INFO` and `APP_ENV=PRODUCTION` from operators."""
         if not isinstance(data, dict):
             return data
         values = cast(dict[str, object], data)
@@ -128,13 +107,7 @@ class AppConfig(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
-        """Fail fast when a production deploy never set `PUBLIC_BASE_URL`.
-
-        Left at the default, this service advertises a loopback issuer in its OAuth discovery
-        metadata and redirects browsers to a login form on the client's own machine. Nothing
-        errors server-side — clients just fail to connect for a reason nothing here reports. So
-        it's rejected at startup, the same way a missing encryption key is.
-        """
+        """Reject loopback URLs in production. Clients cannot reach localhost or 127.0.0.1."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
         host = self.public_base_url.host
@@ -149,27 +122,15 @@ class AppConfig(BaseSettings):
 
     @property
     def issuer(self) -> str:
-        """`public_base_url` as a string with no trailing slash, for joining paths onto.
-
-        `HttpUrl` renders a bare origin with a trailing `/`, so interpolating a path straight
-        onto it yields `https://host//authorize`. Callers build redirects that way, so the slash
-        is stripped once here rather than at each call site. Note the OAuth discovery document is
-        not this value: the MCP SDK re-parses the issuer into an `AnyHttpUrl` and advertises it
-        with the slash restored.
-        """
+        """Return `public_base_url` as a string without trailing slash for path joins."""
         return str(self.public_base_url).rstrip("/")
 
 
 class DatabaseConfig(BaseSettings):
-    """Where office-mcp stores its state.
+    """Hold PostgreSQL connection settings. Accept `DB_URL` or discrete fields.
 
-    Provide either `url` / `DB_URL` (or Helm's `DATABASE_URL` alias) **or** the discrete
-    `host`/`name`/`user`/`password` fields. The discrete fields may be `None` when a URL is
-    set — `_resolve_driver_dsn` only requires them when building a DSN from parts.
-
-    Exactly one thing comes out: `driver_dsn`, the string every caller passes to
-    `asyncpg.connect`. There is deliberately no second, engine-shaped rendering of the same
-    settings — two shapes are two places TLS can be negotiated differently.
+    Expose `driver_dsn` only. Trap: deliberately no second, engine-shaped rendering.
+    Two shapes are two places TLS can be negotiated differently.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
@@ -185,13 +146,9 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def accept_database_url(cls, data: object) -> object:
-        """Accept DATABASE_URL (injected by the base Helm chart) as an alias for DB_URL.
+        """Accept DATABASE_URL (Helm alias) if neither `url` nor discrete fields are set.
 
-        Only falls back to the ambient DATABASE_URL when neither `url` nor any discrete field
-        was supplied. Without that guard, this read applied on every construction path — not
-        just env-sourced ones — so an explicit `DatabaseConfig(host=..., name=..., ...)` call
-        would have its arguments silently discarded in favor of whatever happened to be in the
-        environment. Explicit arguments must win over the environment.
+        Explicit args win.
         """
         if not isinstance(data, dict):
             return data
@@ -228,10 +185,7 @@ class DatabaseConfig(BaseSettings):
             "the missing-field check above must leave every discrete part set"
         )
 
-        # `safe=""` because `quote`'s default leaves `/` (and more) unescaped, and each of these
-        # is a single URL component: anything reserved inside one has to be encoded or the DSN
-        # reparses with the delimiter in the wrong place. The host is interpolated as written,
-        # so a bracketed IPv6 literal keeps its brackets.
+        # Escape all reserved characters in user and password; unescaped delimiters reparse the DSN.
         userinfo = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}"
         database = quote(self.name, safe="")
         self._driver_dsn = f"postgresql://{userinfo}@{self.host}:{self.port}/{database}"
@@ -239,5 +193,5 @@ class DatabaseConfig(BaseSettings):
 
     @property
     def driver_dsn(self) -> str:
-        """The DSN to hand `asyncpg.connect`. The only database surface this config exposes."""
+        """Return the DSN string for `asyncpg.connect`. The only database surface exposed."""
         return self._driver_dsn

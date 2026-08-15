@@ -1,4 +1,4 @@
-"""Logging setup via `unique_mcp.logging` (pino-json on stderr)."""
+"""Configure structured logging via unique_mcp.logging."""
 
 from unique_mcp.logging import configure_logging as configure_pino_logging
 
