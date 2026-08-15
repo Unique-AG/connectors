@@ -65,7 +65,7 @@ two numbered rules that held those halves apart went with them.
    `teams:///chats/…` would be free to disagree, and the disagreement would not look like a
    disagreement — it would look like a handle one tool produced and another answers 404 to. The
    owner is named once for every family rather than per family, which is strictly stronger than
-   letting each grammar live with the tool that mints it: three tools mint between them the four
+   letting each grammar live with the tool that mints it: four tools mint between them the five
    shapes below and no tool file spells one, so there is nothing for a second speller to be.
 
    *Spells or parses* is about what a literal is **used for**, not about how it is spaced. Prose is
@@ -182,7 +182,7 @@ _SEAM = _SHARED / "seam.py"
 # it. See rule 6 for why the check is on building and matching rather than on the text.
 _HANDLE_SCHEME = "teams:///"
 _HANDLE_OWNER = _SHARED / "handles.py"
-_HANDLE_FAMILIES = frozenset({"chats", "teams", "meetings"})
+_HANDLE_FAMILIES = frozenset({"chats", "teams", "meetings", "transcripts"})
 _HANDLE_FAMILY = re.compile(re.escape(_HANDLE_SCHEME) + r"([A-Za-z_]*)")
 
 # What tells a string that *matches* a handle from a string that *shows* one. Regex syntax never
