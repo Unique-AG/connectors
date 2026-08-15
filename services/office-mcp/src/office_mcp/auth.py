@@ -1,18 +1,13 @@
-"""Microsoft Entra auth: FastMCP's own Azure provider, pointed at durable state.
+"""Microsoft Entra auth via FastMCP's AzureProvider with durable state.
 
-There is no OAuth code in this module and there should never be any. `AzureProvider` is a full
-OAuth 2.1 proxy — it presents a DCR-capable authorization server to MCP clients and translates it
-onto the Entra app registration, so the authorize endpoint, PKCE (enforced on both hops), the
-redirect callback, the consent screen, refresh-token rotation and the On-Behalf-Of exchange that
-turns a user's token into a Microsoft Graph one are all its own. What is left for this service to
-decide is the two things the library cannot know: which app registration to use, and where the
-resulting state is kept.
+This module holds no OAuth code — AzureProvider is a full OAuth 2.1 proxy that owns the authorize
+endpoint, PKCE on both hops, redirect callback, token refresh, and On-Behalf-Of exchange. This
+service only decides which app registration and state store to use.
 
-The second one is not a preference. Every token FastMCP issues is a reference token that is
-re-validated against this store on every single request, and the default store is an encrypted
-file tree under the *process's own* home directory — so on Kubernetes it would log every user out
-on each pod restart and fail outright as soon as a second replica served a request. Postgres,
-which this service already runs, is what makes the deployment horizontally scalable.
+The state store is critical. Every token is a reference token re-validated on each request. The
+default store is an encrypted file tree in the process's home directory, which logs users out on
+each pod restart and breaks at the second replica. Postgres, which this service already runs, makes
+the deployment horizontally scalable.
 """
 
 from fastmcp.server.auth.providers.azure import AzureProvider
@@ -22,34 +17,28 @@ from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 
 from office_mcp.config import DatabaseConfig, EntraConfig
 
-# Created by the store itself on first use (`auto_create`), so the app's database user needs
-# CREATE on its schema. Deliberately not a migration of ours: the columns are the store
-# library's to define, and a revision duplicating them would be ours to keep in sync.
+# Trap: created by the store on first use; database user needs CREATE on schema. No migration
+# because columns are the store library's to define and keep in sync.
 _OAUTH_TABLE_NAME = "oauth_kv"
 
-# The custom scope the app registration exposes under its Application ID URI, which is what
-# gates access to *this* server. `AzureProvider` refuses to start without at least one non-OIDC
-# scope here, because Entra omits OIDC scopes from the `scp` claim and they therefore cannot be
-# enforced. Graph permissions are a separate channel and are not listed here: they are requested
-# by the tools that need them, via the On-Behalf-Of exchange, and none exist yet.
+# Trap: AzureProvider requires a non-OIDC scope. Entra omits OIDC scopes from `scp` claim, so
+# they cannot be enforced. Graph permissions (requested per tool via On-Behalf-Of) are separate;
+# none exist yet.
 _REQUIRED_SCOPES = ("access_as_user",)
 
 _ENCRYPTION_SALT = "office-mcp-oauth-storage"
 
 
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
-    """Durable, encrypted storage for OAuth state.
+    """Durable encrypted OAuth state storage for Entra tokens.
 
-    Encryption is not optional here even though the rows never leave our own database: this
-    store holds users' upstream Entra access tokens and refresh-token material, and FastMCP
-    encrypts its *default* store — so handing it a bare table would quietly turn at-rest
-    encryption off while looking like pure configuration.
+    Encryption is mandatory, not optional. FastMCP's default store encrypts. Handing a bare table
+    would disable at-rest encryption silently while looking like configuration.
 
-    The client secret doubles as the key material (the wrapper derives the key with PBKDF2), so
-    there is no second secret for an operator to provision, lose, or leave out of a replica. The
-    cost of that choice is that rotating the client secret makes the existing rows unreadable —
-    which is why decryption errors are treated as cache misses: users re-authenticate once
-    instead of the server failing every request until the table is cleared by hand.
+    The client secret is the key material (derived via PBKDF2). No second secret is needed. Rotating
+    the secret makes existing rows unreadable. Decryption errors are treated as cache misses, so
+    users re-authenticate once instead of the server failing. This trade-off avoids a separate
+    secret provisioning path.
     """
     return FernetEncryptionWrapper(
         key_value=PostgreSQLStore(
@@ -64,17 +53,16 @@ def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKe
 
 
 def build_auth(entra: EntraConfig, base_url: str, client_storage: AsyncKeyValue) -> AzureProvider:
-    """The auth provider — `create_app` is its only caller.
+    """Build the auth provider.
 
-    `base_url` must be the externally-reachable URL of this service: the OAuth metadata clients
-    discover, and the redirect URI Entra sends the browser back to, are both derived from it. The
-    redirect path is the provider's default, `/auth/callback`, and the app registration must list
-    `{base_url}/auth/callback` verbatim as a Web platform redirect URI.
+    `base_url` must be the externally-reachable URL of this service. OAuth metadata and the
+    redirect URI Entra sends browsers to are derived from it. The redirect path is the provider's
+    default `/auth/callback`. The app registration must list `{base_url}/auth/callback` as a Web
+    redirect URI.
 
-    `client_storage` is what `build_oauth_storage` returns, taken as an argument rather than
-    built here: the readiness probe answers by reading through the very same object, so that a
-    200 means *this* provider's store can reach Postgres and not merely that some second
-    connection resembling it could.
+    `client_storage` is passed rather than built here so the readiness probe uses the same object,
+    proving the provider's connection to Postgres works. A separate readiness connection would pass
+    while the provider's connection fails, masking sign-in outages.
     """
     return AzureProvider(
         client_id=entra.client_id,
