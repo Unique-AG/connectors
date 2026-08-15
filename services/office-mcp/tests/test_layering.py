@@ -17,8 +17,8 @@ two numbered rules that held those halves apart went with them.
    one-way by construction. The FastMCP half is narrower than a blanket ban because it has to be:
    the On-Behalf-Of token dependency and the `ToolError` a Graph refusal becomes are exactly the
    things every tool must say identically, and they are FastMCP types. So they are allowed in one
-   named file — the seam — and nowhere else, which is what keeps the framework out of the rest of
-   the vocabulary: `identity.py` today, and everything that joins it.
+   named file — the seam — and nowhere else, which is what keeps the framework out of the handle
+   grammar, the message shape and the rest of the vocabulary.
 
 2. **`graph_client/` imports nothing of this application.** Not `shared/`, not `tools/`, not
    `config`, not anything else under `office_mcp` — the transport is infrastructure its callers
@@ -62,11 +62,11 @@ two numbered rules that held those halves apart went with them.
 6. **One speller per handle family: `shared/handles.py` alone spells or parses a `teams:///` URI.**
    A handle is how one tool's answer becomes another tool's argument, and that works only while
    there is one definition of each shape. Two modules that each knew how to write
-   `teams:///meetings/…` would be free to disagree, and the disagreement would not look like a
+   `teams:///chats/…` would be free to disagree, and the disagreement would not look like a
    disagreement — it would look like a handle one tool produced and another answers 404 to. The
    owner is named once for every family rather than per family, which is strictly stronger than
-   letting each grammar live with the tool that mints it and is the reason `handles.py` exists
-   before there are two families to disagree about.
+   letting each grammar live with the tool that mints it: two tools mint between them the three
+   shapes below and neither file spells one, so there is nothing for a second speller to be.
 
    *Spells or parses* is about what a literal is **used for**, not about how it is spaced. Prose is
    most of what the scheme is written in here and all of it is legitimate: a tool description shows
@@ -183,7 +183,7 @@ _SEAM = _SHARED / "seam.py"
 # it. See rule 6 for why the check is on building and matching rather than on the text.
 _HANDLE_SCHEME = "teams:///"
 _HANDLE_OWNER = _SHARED / "handles.py"
-_HANDLE_FAMILIES = frozenset({"meetings"})
+_HANDLE_FAMILIES = frozenset({"chats", "teams", "meetings"})
 _HANDLE_FAMILY = re.compile(re.escape(_HANDLE_SCHEME) + r"([A-Za-z_]*)")
 
 # What tells a string that *matches* a handle from a string that *shows* one. Regex syntax never
