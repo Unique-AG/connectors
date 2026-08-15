@@ -7,7 +7,9 @@ import json
 import logging
 import re
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import cast
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -29,6 +31,7 @@ from starlette.applications import Starlette
 from office_mcp.app import create_app
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.graph_client import GraphSettings, create_graph_transport
+from office_mcp.shared import meetings
 from office_mcp.shared.messages import MAX_REPLIES_PER_POST
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -264,6 +267,136 @@ _CHATS = {
         }
     ]
 }
+
+
+# The meeting side. The join URL is written the way Microsoft actually stores one — an already
+# percent-escaped `%3a`/`%40`, a `?context=` query, an `&` parameter — because that shape is what
+# the `$filter` has to survive. Nothing here is a real meeting.
+_JOIN_WEB_URL = (
+    "https://teams.microsoft.invalid/l/meetup-join/"
+    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
+    + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
+)
+_MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+_TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0001"
+_MEETINGS_PATH = "/me/onlineMeetings"
+_TRANSCRIPTS_PATH = f"/me/onlineMeetings/{_MEETING_ID}/transcripts"
+
+_MEETING_CHATS = {
+    "value": [
+        {
+            "id": "19:meeting_TjAwMDAwMDAwMDAwMA@thread.v2",
+            "chatType": "meeting",
+            "topic": "Pricing review",
+            "createdDateTime": "2026-02-10T13:55:00Z",
+            "lastUpdatedDateTime": "2026-02-10T15:01:00Z",
+            "onlineMeetingInfo": {
+                "calendarEventId": "AAMkAGSYNTHETIC",
+                "joinWebUrl": _JOIN_WEB_URL,
+                "organizer": {
+                    "user": {
+                        "id": "00000000-0000-4000-8000-000000000002",
+                        "displayName": "Grace Hopper",
+                    }
+                },
+            },
+            "lastMessagePreview": {
+                "id": "1770000000001",
+                "createdDateTime": "2026-02-10T15:01:00Z",
+                "body": {"contentType": "text", "content": "synthetic preview"},
+            },
+        }
+    ]
+}
+
+_MEETING = {
+    "value": [
+        {
+            "id": _MEETING_ID,
+            "subject": "Pricing review",
+            "meetingType": "scheduled",
+            "joinWebUrl": _JOIN_WEB_URL,
+            "startDateTime": "2026-02-10T14:00:00Z",
+            "endDateTime": "2026-02-10T15:00:00Z",
+        }
+    ]
+}
+
+_TRANSCRIPTS = {
+    "value": [
+        {
+            "id": _TRANSCRIPT_ID,
+            "meetingId": _MEETING_ID,
+            "callId": "af630fe0-04d3-4559-8cf9-91fe45e36296",
+            "createdDateTime": "2026-02-10T14:03:11.204Z",
+            "endDateTime": "2026-02-10T14:58:02.117Z",
+            "contentCorrelationId": "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
+        }
+    ]
+}
+
+# A recurring series as Microsoft holds it: one meeting, one collection, three occurrences — and
+# answered oldest-first, which is an order of Microsoft's own (it documents no `$orderby` here).
+# Written out in that order on purpose: it is what makes "the newest of a series" something the
+# lister has to work for rather than something it gets by accident.
+_SERIES_TRANSCRIPTS: dict[str, object] = {
+    "value": [
+        {
+            "id": f"week-{week}",
+            "meetingId": _MEETING_ID,
+            "createdDateTime": f"2026-02-0{2 + week}T14:00:00Z",
+            "endDateTime": f"2026-02-0{2 + week}T14:50:00Z",
+            "contentCorrelationId": f"bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e{week}",
+        }
+        for week in (1, 2, 3)
+    ]
+}
+
+# The one meeting shape that outgrows what a single call reads: a daily series, transcribed every
+# time, for the better part of a year. Oldest-first for the same reason the weekly series above is
+# — Microsoft's order is its own — which puts the genuinely newest occurrence past
+# `MAX_ARTIFACT_SCAN`, where the lister cannot see it and may not claim it has.
+_PAST_THE_CAP = meetings.MAX_ARTIFACT_SCAN + 60
+_DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
+
+# The tenant switch, as Graph marks it: a 403 whose outer code says nothing and whose inner code is
+# the whole of the difference from a missing permission.
+_TENANT_SWITCH_OFF = {
+    "error": {
+        "code": "Forbidden",
+        "message": "Graph API access to transcripts is disabled for this tenant.",
+        "innerError": {"code": "GraphAccessToTranscriptsDisabled"},
+    }
+}
+
+
+def _day(index: int) -> datetime:
+    """When occurrence `index` of the daily series ran."""
+    return _DAILY_SERIES_START + timedelta(days=index)
+
+
+def _daily_series() -> dict[str, object]:
+    """`_PAST_THE_CAP` transcripts in one page, as Microsoft would answer them."""
+    return {
+        "value": [
+            {
+                "id": f"day-{index}",
+                "meetingId": _MEETING_ID,
+                "createdDateTime": _day(index).isoformat().replace("+00:00", "Z"),
+                "endDateTime": (_day(index) + timedelta(minutes=50))
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "contentCorrelationId": f"bc842d7a-2f6e-4b18-a1c7-73ef91d5c8{index:03d}",
+            }
+            for index in range(_PAST_THE_CAP)
+        ]
+    }
+
+
+# The meeting handle `list_chats` mints for the chat above, written out rather than derived: that
+# the handle a model copies from one tool is the argument another takes is the contract between
+# them, and deriving it here would assert only that the test agrees with itself.
+_MEETING_URI = "teams:///meetings/" + quote(_JOIN_WEB_URL, safe="")
 
 
 class _StubOboCredential:
@@ -509,6 +642,7 @@ class TestTheToolsThisServerAdvertises:
             "browse_channel",
             "search_messages",
             "read_message",
+            "list_meeting_transcripts",
         }
         for tool in tools.values():
             arguments = _properties(tool.inputSchema)
@@ -576,6 +710,16 @@ class TestTheToolsThisServerAdvertises:
             "mentions",
             "attachments",
         }
+        assert set(_properties(tools["list_meeting_transcripts"].outputSchema)) == {
+            "status",
+            "meeting_id",
+            "subject",
+            "meeting_type",
+            "started_at",
+            "ended_at",
+            "transcripts",
+            "scan_incomplete",
+        }
 
     async def test_the_whole_surface_speaks_one_language(
         self, mcp_client: Client[FastMCPTransport]
@@ -595,9 +739,11 @@ class TestTheToolsThisServerAdvertises:
         Where a completeness fact is NOT derivable from the answer it survives as an opt-in field,
         which is asserted too: the flag that asks for it defaults to off, so no ordinary answer
         carries the caveat, and each tool that has one carries one field per fact rather than one
-        boolean over several. `browse_channel` is the tool that needs it — it reads a single page
+        boolean over several. `browse_channel` is one tool that needs it — it reads a single page
         and drops system messages out of it after Microsoft counted them in, so its length says
-        neither thing.
+        neither thing — and `list_meeting_transcripts` is the other, where the fact is whether the
+        read reached the end of a meeting's transcripts and therefore whether "newest" is a claim
+        about the meeting or only about what was read.
         """
         tools = _named(await mcp_client.list_tools())
 
@@ -610,7 +756,10 @@ class TestTheToolsThisServerAdvertises:
             assert "truncated" not in _properties(tool.outputSchema), name
         for name in ("search_messages",):
             assert "next_offset" in _properties(tools[name].outputSchema), name
-        for name, flag in (("browse_channel", "include_window_completeness"),):
+        for name, flag in (
+            ("browse_channel", "include_window_completeness"),
+            ("list_meeting_transcripts", "include_scan_completeness"),
+        ):
             asked_for = _object(_properties(tools[name].inputSchema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"
 
@@ -828,6 +977,130 @@ class TestTheToolsThisServerAdvertises:
             "the reply window is a dead end, not a first page"
         )
         assert "stop looking" in description
+
+    async def test_list_meeting_transcripts_names_its_five_answers_and_their_remedies(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The four absences that must stay distinct, plus "no such meeting". A model can only act
+        differently on them if the tool says what each one means, so the words are asserted: the
+        one that means wait must say wait and must say it is not the one that means stop, and the
+        one that means "this was not knowable" must not be reportable as either."""
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_transcripts"].description
+        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        assert description is not None
+        rendered = description + str(status.get("description"))
+
+        for value in (
+            "available",
+            "not_ready",
+            "not_transcribed",
+            "scan_incomplete",
+            "meeting_not_found",
+        ):
+            assert value in description, value
+        assert "Wait and call again later" in description
+        assert 'NOT "there is no transcript"' in description
+        assert "Retrying will not help" in description
+        assert "no availability SLA" in rendered, "the inference has to be admitted as one"
+        assert "recurring" in description and "started_after" in description
+        assert 'Never report it as "there is no transcript"' in description
+        assert "not known" in description, "the fifth answer claims nothing, and has to say so"
+
+    async def test_the_answer_with_no_remedy_says_it_has_none(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """Four of the five statuses tell a caller what to do next; `scan_incomplete` cannot,
+        because the window is applied after Microsoft has answered and so no argument sends the
+        next call further into the collection. Advice that sounds actionable and is not is worse
+        than a dead end stated plainly — it is a loop a model runs until something else stops it —
+        so both the tool and the field say to stop.
+        """
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_transcripts"].description
+        status = str(_object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"]))
+        assert description is not None
+
+        assert "nothing to try" in description and "Stop here" in description
+        assert "There is nothing to try" in status and "do not ask again" in status
+        assert "reads the same transcripts and returns this same answer" in description, (
+            "a narrower window is named only as the thing that does NOT help"
+        )
+
+    async def test_list_meeting_transcripts_takes_a_meeting_handle_and_an_occurrence_window(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await mcp_client.list_tools())
+        schema = tools["list_meeting_transcripts"].inputSchema
+        properties = _properties(schema)
+        limit = _object(properties["limit"])
+
+        assert set(properties) == {
+            "meeting_uri",
+            "started_after",
+            "started_before",
+            "limit",
+            "include_scan_completeness",
+        }
+        assert schema.get("required") == ["meeting_uri"]
+        assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
+            "integer",
+            1,
+            50,
+            20,
+        )
+        assert _object(properties["include_scan_completeness"])["default"] is False, (
+            "the completeness of the scan is opt-in: a client that does not want it never sees it"
+        )
+
+    @pytest.mark.parametrize("bound", ["started_after", "started_before"], ids=["after", "before"])
+    async def test_each_occurrence_bound_admits_a_bare_date_in_its_own_schema(
+        self, mcp_client: Client[FastMCPTransport], bound: str
+    ) -> None:
+        """A bare `2026-08-11` is what a model writes when scoping a series to one occurrence — the
+        only reason these parameters exist — so the schema has to say a date is legal. A schema
+        offering only `date-time` while the code accepted a date anyway is a disagreement the model
+        pays for: it is never told which shape was meant."""
+        tools = _named(await mcp_client.list_tools())
+        properties = _properties(tools["list_meeting_transcripts"].inputSchema)
+
+        assert _optional_types(properties[bound]) == [
+            {"type": "string", "format": "date"},
+            {"type": "string", "format": "date-time"},
+        ]
+
+    async def test_the_occurrence_window_states_the_zone_it_resolves_against(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """`09:00` is a different instant in every zone, so a tool that silently picks one has to
+        say which — in the parameter's own description, which is the only place a model reads before
+        writing the value. Both halves are asserted: what an offset-less timestamp means, and what a
+        bare date means at each end of the window."""
+        tools = _named(await mcp_client.list_tools())
+        properties = _properties(tools["list_meeting_transcripts"].inputSchema)
+        after = str(_object(properties["started_after"])["description"])
+        before = str(_object(properties["started_before"])["description"])
+
+        assert "READ AS UTC" in after, "the assumption a naive timestamp is resolved against"
+        assert "whole UTC day" in after and "first instant" in after
+        assert "END of that UTC day" in before, "the same date in both bounds must be that one day"
+        assert "07:00Z" in after, "a worked example beats the word 'timezone'"
+
+    async def test_list_meeting_transcripts_says_the_verdict_is_about_the_window(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The promise the `not_ready` inference has to keep. A recurring series' `endDateTime` can
+        be in the future for years, and a caller told to wait for a transcript of an occurrence that
+        ended last month polls forever — so both the tool and the field say the verdict follows the
+        window that was asked for, not the meeting."""
+        tools = _named(await mcp_client.list_tools())
+        description = tools["list_meeting_transcripts"].description
+        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        assert description is not None
+
+        assert "window you asked about" in description
+        assert "already well past never answers this" in description
+        assert "demonstrably passed is never reported this way" in str(status["description"])
 
     async def test_no_description_names_a_tool_this_server_does_not_advertise(
         self, mcp_client: Client[FastMCPTransport]
@@ -1062,9 +1335,13 @@ class TestCallingThem:
         actually spent rather than read off the constant that claims it.
 
         An empty page carrying a cursor means keep going, so a collection that answers only those
-        has to be given up on — and it must FAIL rather than answer, because a short answer from
-        this tool means the user has no more chats. Eleven requests: the caller's own first page,
-        and the run of empty ones this walk will follow before refusing.
+        has to be given up on — and it must FAIL rather than answer, because every short answer
+        above this walk means a cap: from `list_chats` it would mean the user has no more chats,
+        and from `list_meeting_transcripts` it would mean a meeting was never transcribed. Eleven
+        requests each: the caller's own first page, and the run of empty ones this walk will follow
+        before refusing. Both tools are here because they pass different `max_scanned` values and
+        this bound must not vary with either — an empty page spends no scan budget at all, which is
+        why it is counted against its own number and not against that one.
         """
         chats = graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -1072,11 +1349,34 @@ class TestCallingThem:
             )
         )
 
+        meeting = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        listing = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [],
+                    "@odata.nextLink": f"{GRAPH_V1}{_TRANSCRIPTS_PATH}?$skiptoken=loop",
+                },
+            )
+        )
+
         listed = await mcp_client.call_tool("list_chats", {}, raise_on_error=False)
+        transcribed = await mcp_client.call_tool(
+            "list_meeting_transcripts", {"meeting_uri": _MEETING_URI}, raise_on_error=False
+        )
 
         assert listed.is_error, "a walk that gave up must not answer short: a short answer is a cap"
         assert "pages in a row" in _error_text(listed), "and the count is what an operator needs"
         assert chats.call_count == 11, "the caller's own page and the run of empty ones followed"
+        assert transcribed.is_error, (
+            "and a transcript listing that answered short would report a meeting as never "
+            "transcribed on the strength of a collection nobody reached the end of"
+        )
+        assert meeting.called
+        assert listing.call_count == 11, (
+            "the same eleven, whatever `max_scanned` this tool passes: an empty page spends no "
+            "scan budget, so the two bounds are counted separately"
+        )
 
     async def test_search_messages_returns_hits_with_handles_and_no_invented_total(
         self,
@@ -1305,6 +1605,145 @@ class TestCallingThem:
         assert not route.called
         assert not obo.requested_scopes
 
+    async def test_a_model_walks_from_a_meeting_chat_to_the_meetings_transcripts(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The path this tool exists to complete, over the real protocol, with every value taken
+        from the previous answer exactly as a model would take it: which meetings are there
+        (list_chats, because a meeting chat *is* the index), and then what transcripts this one has.
+
+        The connector this was compared against reaches a meeting only through an opaque URI it got
+        from a calendar read; this walk needs no calendar permission at all.
+        """
+        chats_route = graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json=_MEETING_CHATS)
+        )
+        meeting = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        listing = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(200, json=_TRANSCRIPTS)
+        )
+
+        listed = _structured(await mcp_client.call_tool("list_chats", {"limit": 5}))
+        found = cast("Sequence[Mapping[str, object]]", listed["chats"])
+        meeting_uri = found[0]["meeting_uri"]
+        available = _structured(
+            await mcp_client.call_tool("list_meeting_transcripts", {"meeting_uri": meeting_uri})
+        )
+
+        assert all(route.called for route in (chats_route, meeting, listing))
+        assert found[0]["chat_type"] == "meeting"
+        assert meeting_uri == _MEETING_URI, "the handle one tool minted is what the other took"
+        assert available["status"] == "available"
+        assert available["subject"] == "Pricing review"
+        assert available["meeting_id"] == _MEETING_ID
+        assert available["scan_incomplete"] is None, "nobody asked how far the read got"
+        transcripts = cast("Sequence[Mapping[str, object]]", available["transcripts"])
+        assert [item["transcript_id"] for item in transcripts] == [_TRANSCRIPT_ID]
+        assert listing.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert obo.requested_scopes == [
+            ("https://graph.microsoft.com/Chat.Read",),
+            (
+                "https://graph.microsoft.com/OnlineMeetings.Read",
+                "https://graph.microsoft.com/OnlineMeetingTranscript.Read.All",
+            ),
+        ], "resolving the join URL and reading the collection are two permissions, one exchange"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_asking_for_the_latest_of_a_series_answers_with_the_latest(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """ "The latest transcript of this series", over the real protocol — the question this tool
+        exists for. Microsoft answers this collection in an order of its own, so a `limit` applied
+        before ordering returns an arbitrary handful sorted among themselves: a model asking for the
+        newest one gets whichever occurrence Microsoft happened to put first, with nothing in the
+        answer to say so. Microsoft's order here puts the oldest first, which is exactly what that
+        shape would return.
+        """
+        _ = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        _ = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(200, json=_SERIES_TRANSCRIPTS)
+        )
+
+        answer = _structured(
+            await mcp_client.call_tool(
+                "list_meeting_transcripts",
+                {"meeting_uri": _MEETING_URI, "limit": 1, "include_scan_completeness": True},
+            )
+        )
+
+        listed = cast("Sequence[Mapping[str, object]]", answer["transcripts"])
+        assert [item["transcript_id"] for item in listed] == ["week-3"], "the newest, not the first"
+        assert answer["status"] == "available"
+        assert len(listed) == 1, "a full window: the two older occurrences are behind it"
+        assert answer["scan_incomplete"] is False, (
+            "and the collection was read to the end, so this IS the meeting's latest — the two "
+            "facts one flag could not tell apart"
+        )
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_meeting_larger_than_one_call_reads_answers_within_what_it_read(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The rare meeting both promises have to be exact about, over the real protocol: a series
+        that ran daily for most of a year, so its collection is longer than one call reads.
+
+        Two things are asserted. Asking for the newest returns the newest of the transcripts READ —
+        `day-199` — and never the meeting's actual newest, which sits past the cap where nothing
+        here can see it, with the opt-in `scan_incomplete` as the answer's own admission of that.
+        And a window over the part that was not read answers `scan_incomplete` whether it is wide or
+        narrow, because the window is applied to what came back: narrowing it is not a remedy, which
+        is why the tool does not offer it as one.
+        """
+        _ = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        _ = graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(200, json=_daily_series())
+        )
+
+        newest = _structured(
+            await mcp_client.call_tool(
+                "list_meeting_transcripts",
+                {"meeting_uri": _MEETING_URI, "limit": 1, "include_scan_completeness": True},
+            )
+        )
+        wide = _structured(
+            await mcp_client.call_tool(
+                "list_meeting_transcripts",
+                {
+                    "meeting_uri": _MEETING_URI,
+                    "started_after": _day(meetings.MAX_ARTIFACT_SCAN).date().isoformat(),
+                    "started_before": _day(_PAST_THE_CAP - 1).date().isoformat(),
+                },
+            )
+        )
+        narrow = _structured(
+            await mcp_client.call_tool(
+                "list_meeting_transcripts",
+                {
+                    "meeting_uri": _MEETING_URI,
+                    "started_after": _day(250).date().isoformat(),
+                    "started_before": _day(250).date().isoformat(),
+                },
+            )
+        )
+
+        listed = cast("Sequence[Mapping[str, object]]", newest["transcripts"])
+        assert [item["transcript_id"] for item in listed] == ["day-199"], (
+            "the newest of what was read"
+        )
+        assert newest["scan_incomplete"] is True, (
+            "the read stopped at the cap, and a caller that asked has to be told"
+        )
+        assert wide["status"] == "scan_incomplete"
+        assert narrow["status"] == wide["status"], "a narrower window reads the same transcripts"
+        assert wide["transcripts"] == [] and narrow["transcripts"] == []
+
 
 class TestTheTransportTheToolsShare:
     async def test_it_is_closed_when_the_server_shuts_down(
@@ -1511,6 +1950,68 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "AADSTS65001" in message
         assert "resolve dependency" not in message
         assert not route.called, "no token means no search was ever made"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_the_transcript_tenant_switch_names_a_different_administrator(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """The refusal every other 403 on this server would be answered wrongly for, end to end.
+
+        Microsoft Graph access to Teams meeting transcripts is a tenant-wide Teams setting that is
+        OFF BY DEFAULT, and Graph reports it with the same status and the same outer code as a
+        missing permission. In the commonest tenant, therefore, this is the *first* answer a model
+        gets from this tool — so it has to name the Teams admin centre rather than a Graph
+        permission, and it has to rule out re-consent, which is what a model would otherwise infer
+        from every other refusal here.
+        """
+        graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+        graph.get(_TRANSCRIPTS_PATH).mock(
+            return_value=httpx.Response(
+                403, headers={"request-id": "synthetic-request-id"}, json=_TENANT_SWITCH_OFF
+            )
+        )
+
+        refused = await mcp_client.call_tool(
+            "list_meeting_transcripts", {"meeting_uri": _MEETING_URI}, raise_on_error=False
+        )
+
+        assert refused.is_error
+        message = _error_text(refused)
+        assert "EnableGraphTranscriptAccess" in message
+        assert "Teams administrator" in message
+        assert "sign in again will not change it" in message
+        assert "OnlineMeetingTranscript.Read.All" not in message, (
+            "no permission is missing; naming one sends an administrator after nothing"
+        )
+        assert "synthetic-request-id" in message, "an operator still needs the evidence"
+
+    async def test_a_meeting_handle_that_was_never_one_is_refused_before_graph(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """A handle this tool cannot use is its own failure to explain, and the explanation has to
+        send the caller back to where handles come from rather than invite a retry. The transcript
+        shape is named as *not* one, because it is the shape this tool emits and therefore the one
+        most likely to be passed back in."""
+        route = graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
+
+        refused = await mcp_client.call_tool(
+            "list_meeting_transcripts",
+            {"meeting_uri": "19:meeting_TjAwMDAwMDAwMDAwMA@thread.v2"},
+            raise_on_error=False,
+        )
+
+        assert refused.is_error
+        message = _error_text(refused)
+        assert "list_chats" in message, "where a meeting handle comes from"
+        assert "teams:///meetings/" in message
+        assert "fail identically" in message, "and it is not worth retrying"
+        assert not route.called, "nothing reached Graph"
+        assert obo.requested_scopes, "the handle is parsed inside the tool, after the exchange"
 
     @pytest.mark.parametrize(
         "uri",
