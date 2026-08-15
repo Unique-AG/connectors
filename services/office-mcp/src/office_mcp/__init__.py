@@ -1,1 +1,1 @@
-"""Office MCP — FastMCP server over Microsoft 365 (Microsoft Graph)."""
+"""Office MCP: FastMCP server over Microsoft 365 via Microsoft Graph."""

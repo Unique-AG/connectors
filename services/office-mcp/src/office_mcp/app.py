@@ -19,9 +19,7 @@ from office_mcp.metrics import configure_metrics
 logger = logging.getLogger(__name__)
 
 
-# asyncpg ships no type information, so this repo's strict checking sees every call on a
-# connection as unknown. Narrowed once here — to just the two methods the probe uses — so the
-# readiness path below is checked rather than silently untyped.
+# asyncpg has no type stubs; narrowed here for type checking the readiness path.
 class _Connection(Protocol):
     async def fetchval(self, query: str, /) -> object: ...
     async def close(self) -> None: ...
@@ -34,12 +32,10 @@ def create_app(
     config: AppConfig | None = None,
     database_config: DatabaseConfig | None = None,
 ) -> Starlette:
-    """The composition root.
+    """Build the app.
 
-    Every config object and every long-lived collaborator is built exactly once here and then
-    injected. Nothing downstream re-reads the environment. This is scaffolding only: no OAuth,
-    no Microsoft Graph client, and no tools yet — those land in later PRs, wired in here the
-    same way.
+    All config objects and long-lived collaborators are built here once, then injected.
+    Scaffolding only: no OAuth, no Graph client, no tools yet.
     """
     config = config or AppConfig()
     database_config = database_config or DatabaseConfig()
@@ -63,7 +59,7 @@ def create_app(
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:
-        """Postgres readiness — stock `setup_ops` `/probe` is process-up only."""
+        """Check if Postgres is reachable. The `/probe` route checks process up only."""
         return await _ready_response(database_config.driver_dsn)
 
     return mcp.http_app(
@@ -75,13 +71,10 @@ def create_app(
 
 
 async def _ready_response(dsn: str) -> JSONResponse:
-    """Readiness, reporting the checks it actually ran.
+    """Check readiness and report results. Open one connection per probe to match production path.
 
-    Postgres is a hard dependency, so an unreachable database means not ready.
-
-    One short-lived connection on the same DSN every other caller uses, opened and closed per
-    probe. No engine and no pool: a probe that connects by a different path than the code doing
-    real work can report healthy while that work fails.
+    Trap: No engine and no pool. A probe that uses a different connection path than
+    the code doing real work can report healthy while that work fails.
     """
     database_ok = True
     try:
