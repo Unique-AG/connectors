@@ -1,7 +1,8 @@
 """The composition root, exercised as a real ASGI app.
 
 Checks that the app starts, its lifespan runs, the process-health routes behave, and that Entra
-auth is actually mounted and enforced. No Microsoft Graph client and no tools yet.
+auth is actually mounted and enforced. The tools it exposes are exercised over the MCP protocol in
+`test_mcp_tools.py`.
 
 Nothing here reaches Entra: constructing the provider performs no I/O, and the assertions below
 only touch metadata this service serves itself plus one unauthenticated request that is rejected
@@ -10,7 +11,8 @@ before any upstream call would happen.
 
 import importlib
 import os
-from collections.abc import Callable, Iterator
+import pathlib
+from collections.abc import Callable, Iterator, Sequence
 from types import ModuleType
 from typing import Protocol, cast, final, override
 from unittest.mock import MagicMock
@@ -29,8 +31,42 @@ import office_mcp.app as app_module
 from office_mcp.app import create_app
 from office_mcp.auth import build_auth, build_oauth_storage
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig
+from office_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
+from office_mcp.tools import GRAPH_SCOPES as REGISTRY_SCOPES
 
 _PUBLIC_BASE_URL = "https://office-mcp.example"
+
+
+class _ToolModule(Protocol):
+    """The one thing this test reads off a tool file.
+
+    `tools/__init__.py` owns the whole of a tool module's contract; this is the part of it that
+    has to reach the consent screen.
+    """
+
+    GRAPH_PERMISSIONS: tuple[str, ...]
+
+
+def _tool_modules() -> list[tuple[str, _ToolModule]]:
+    """Every file under `src/office_mcp/tools/` that is a tool, found on disk, with its name.
+
+    `__init__.py` is the registry rather than a tool, and is what this deliberately does not ask:
+    the point of reading the directory is to see a tool file the registry forgot.
+    """
+    tools_dir = pathlib.Path(app_module.__file__).parent / "tools"
+    return [
+        (
+            source.stem,
+            cast(
+                "_ToolModule",
+                # Through `object`: a `ModuleType` never structurally overlaps a Protocol, which
+                # is the same widening `_MainModule` below needs for the same reason.
+                cast("object", importlib.import_module(f"office_mcp.tools.{source.stem}")),
+            ),
+        )
+        for source in sorted(tools_dir.glob("*.py"))
+        if source.name != "__init__.py"
+    ]
 
 
 def _entra_config() -> EntraConfig:
@@ -131,6 +167,139 @@ class TestAuthIsMountedAndEnforced:
         assert response.status_code == 200
 
 
+class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
+    """The scope list handed to the auth provider, which is the one thing a restart cannot fix.
+
+    `tools/__init__.py` derives it from the tool modules and is guarded where it is built. What is
+    guarded here is that the value actually reaching Entra *is* that derivation, and that every
+    tool file on disk is inside it. Either failure is silent and late: every tool still registers,
+    every schema is unchanged, every other test in this suite passes, and the failure only appears
+    in a live tenant as AADSTS65001 from the On-Behalf-Of exchange — before the tool body runs, for
+    a permission that cannot be obtained after sign-in.
+
+    A set comparison is not enough here, and that is not a stylistic preference. Two tools name the
+    same permission all over this registry, so a change that reordered the list — or that dropped a
+    tool whose every permission another tool also names — would leave the *set* identical and move
+    only the order. The tuple is therefore what is asserted, which is also the property that
+    matters in production: the consent screen and every cached On-Behalf-Of token key are keyed by
+    this list as a string.
+
+    What a derivation cannot check is the *names*: every assertion that reads the tool files and
+    compares them with a list built from those same files agrees with a typo, because the typo is
+    on both sides of it. So the last two assertions here compare them against
+    `shared/seam.py`'s `REQUESTABLE_PERMISSIONS`, which is written out by hand precisely so that it
+    is not a derivation, and against the one shape a permission tuple may not have.
+    """
+
+    def test_the_registry_has_something_to_contribute(self) -> None:
+        """Guards the guard: against an empty registry both assertions below hold vacuously —
+        `()` equals `()`, and every one of no tools is covered."""
+        assert REGISTRY_SCOPES, "tools/__init__.py derives no scopes"
+
+    def test_the_scope_list_is_the_registry_verbatim(self) -> None:
+        """`app.GRAPH_SCOPES` is the registry's tuple and not a copy assembled here: a second
+        derivation is a second place to forget a tool, and it would drift just as quietly."""
+        assert app_module.GRAPH_SCOPES == REGISTRY_SCOPES, (
+            "the scope list sign-in asks for is `tools/__init__.py`'s, in its order — anything "
+            + "else is a second derivation of the one value that cannot be corrected after "
+            + "consent"
+        )
+
+    def test_every_tool_file_has_its_permissions_on_that_list(self) -> None:
+        """Read off the files rather than off the registry, which is the whole point: a tool file
+        that was never added to `_TOOL_MODULES` registers nothing and asks for nothing, and a
+        registry compared against itself would never say so."""
+        asked_for = set(app_module.GRAPH_SCOPES)
+
+        missing = {
+            f"{name}: {permission}"
+            for name, module in _tool_modules()
+            for permission in module.GRAPH_PERMISSIONS
+            if graph_scope(permission) not in asked_for
+        }
+
+        assert not missing, (
+            "every permission a tool file declares has to reach the consent screen; these do "
+            + "not, so the tools naming them fail at sign-in and no later call can redeem "
+            + f"them: {sorted(missing)}"
+        )
+
+    def test_every_declared_permission_is_one_this_connector_may_ask_for(self) -> None:
+        """The check the two above cannot make. Both compare the tool files against a list derived
+        from those same files, so a misspelling is on both sides of the comparison and holds:
+        `GRAPH_PERMISSIONS = ("Chat.Raed",)` passes every other assertion in this suite while
+        putting a scope Entra does not know into `additional_authorize_scopes` — and Entra rejects
+        an authorize request carrying an unknown scope, so every sign-in fails, for every user, for
+        a tool nobody called. `shared/seam.py` writes the names out once, independently, which is
+        the only thing that can catch it.
+        """
+        unknown = {
+            f"{name}: {permission}"
+            for name, module in _tool_modules()
+            for permission in module.GRAPH_PERMISSIONS
+            if permission not in REQUESTABLE_PERMISSIONS
+        }
+
+        assert not unknown, (
+            "a permission a tool declares has to be one Microsoft defines and one this connector "
+            + "is willing to ask every user to consent to — check the spelling against "
+            + "`REQUESTABLE_PERMISSIONS` in shared/seam.py, and if the permission is genuinely "
+            + f"new, add it there deliberately and to the README's table: {sorted(unknown)}"
+        )
+
+    def test_no_tool_declares_an_empty_permission_tuple(self) -> None:
+        """`GRAPH_PERMISSIONS = ()` is the same failure spelled the other way and is just as quiet:
+        it contributes nothing to the union, so nothing is missing from it, and the tool's own
+        On-Behalf-Of exchange then asks for no scope at all. Every tool here reads a live tenant,
+        so there is no such thing as one that needs no permission."""
+        empty = [name for name, module in _tool_modules() if not module.GRAPH_PERMISSIONS]
+
+        assert not empty, (
+            "every tool calls Microsoft Graph on behalf of the signed-in user, so every tool "
+            + f"declares the permissions its own requests are made under: {sorted(empty)}"
+        )
+
+    def test_create_app_hands_the_provider_that_exact_list(self) -> None:
+        """And not a second union assembled at the call site: a re-derivation is a second place
+        to forget a registry, and it would drift in exactly the same way and just as quietly.
+        Identity rather than equality, because that is the whole of what is being asserted."""
+        given: list[Sequence[str]] = []
+
+        def _auth(
+            entra: EntraConfig,
+            base_url: str,
+            client_storage: AsyncKeyValue,
+            graph_scopes: Sequence[str],
+        ) -> AzureProvider:
+            given.append(graph_scopes)
+            return build_auth(
+                entra,
+                base_url=base_url,
+                client_storage=client_storage,
+                graph_scopes=graph_scopes,
+            )
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(app_module, "build_auth", _auth)
+            app = create_app(
+                config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
+                database_config=DatabaseConfig.model_validate(
+                    {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
+                ),
+                entra_config=_entra_config(),
+            )
+            # Run the lifespan so the Graph transport this builds is closed again; nothing here
+            # reaches Postgres, which is only touched by a request.
+            with TestClient(app):
+                pass
+
+        assert len(given) == 1, "the auth provider is built once, at the composition root"
+        assert given[0] is app_module.GRAPH_SCOPES, (
+            "create_app must pass the composition root's own GRAPH_SCOPES — a list rebuilt here "
+            + "is a second union to keep in step with the registries"
+        )
+
+
 @final
 class _ProbeRecordingStorage(BaseWrapper):
     """The OAuth state store, counting the reads made through it.
@@ -179,10 +348,18 @@ class TestReadyProbesTheConnectionSignInDependsOn:
             return storage
 
         def _auth(
-            entra: EntraConfig, base_url: str, client_storage: AsyncKeyValue
+            entra: EntraConfig,
+            base_url: str,
+            client_storage: AsyncKeyValue,
+            graph_scopes: Sequence[str],
         ) -> AzureProvider:
             provider_was_given.append(client_storage)
-            return build_auth(entra, base_url=base_url, client_storage=client_storage)
+            return build_auth(
+                entra,
+                base_url=base_url,
+                client_storage=client_storage,
+                graph_scopes=graph_scopes,
+            )
 
         monkeypatch.setattr(app_module, "build_oauth_storage", _storage)
         monkeypatch.setattr(app_module, "build_auth", _auth)
