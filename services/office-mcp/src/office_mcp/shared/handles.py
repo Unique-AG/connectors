@@ -54,9 +54,9 @@ import re
 from dataclasses import dataclass
 from urllib.parse import quote, unquote
 
-# The two delegated permissions a Teams message surface is read under, one per surface. Here rather
-# than in a tool file because they are facts about the surface a handle addresses rather than about
-# any one request made against it.
+# The two delegated permissions a Teams message is read under, one per surface. Here rather than in
+# a tool file because `MessageHandle.permission` picks between them, and the picking is the handle's
+# knowledge: which surface a handle addresses is the whole of what decides it.
 CHAT_PERMISSION = "Chat.Read"
 CHANNEL_PERMISSION = "ChannelMessage.Read.All"
 
@@ -69,6 +69,11 @@ class MessageHandle:
     chat_id: str | None = None
     team_id: str | None = None
     channel_id: str | None = None
+
+    @property
+    def permission(self) -> str:
+        """The one delegated Graph permission the message this handle addresses is read under."""
+        return CHAT_PERMISSION if self.chat_id is not None else CHANNEL_PERMISSION
 
     @property
     def uri(self) -> str:
