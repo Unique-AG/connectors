@@ -52,8 +52,10 @@ puts on every message in that chat, so this list names messages found elsewhere.
 to any tool. This returns chats only; channels live inside teams and are a different surface.
 
 Meeting chats are conversations attached to a Teams meeting. The `topic` is the meeting subject. \
-`meeting_uri` is the only route from conversation to meeting. No calendar permission needed. \
-`meeting_uri` is null for non-meeting chats and for meeting chats where Microsoft gave no join URL.
+`meeting_uri` is the only route from conversation to meeting — pass it verbatim to \
+list_meeting_transcripts to find out whether the meeting was transcribed. No calendar permission \
+needed. `meeting_uri` is null for non-meeting chats and for meeting chats where Microsoft gave no \
+join URL — that meeting's transcripts are then unreachable here.
 
 Order comes from the last message sent in each chat — the only recency Graph applies. \
 `last_message_at` is null if no one has posted yet. `members` returns only for unnamed chats \
@@ -103,7 +105,9 @@ class ChatSummary(BaseModel):
     meeting_uri: str | None = Field(
         description=(
             "For meeting chats: a handle for the Teams meeting. The only route from conversation "
-            + "to meeting. Null when no join URL exists."
+            + "to meeting. Pass it verbatim to list_meeting_transcripts to find out whether the "
+            + "meeting was transcribed. Null when no join URL exists, in which case that meeting's "
+            + "transcripts are unreachable from this connector."
         )
     )
     last_message_at: datetime | None = Field(
