@@ -143,6 +143,8 @@ _SYSTEM_MESSAGE = {
 }
 
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CHANNEL_ID = "19:general@thread.tacv2"
+_CHANNELS_PATH = f"/teams/{_TEAM_ID}/channels"
 
 # Only the five properties `GET /me/joinedTeams` populates; every other property of a team comes
 # back null on that endpoint, asked for or not.
@@ -154,6 +156,18 @@ _TEAMS = {
             "description": "Ships the product",
             "isArchived": False,
             "tenantId": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+        }
+    ]
+}
+
+_CHANNELS = {
+    "value": [
+        {
+            "id": _CHANNEL_ID,
+            "displayName": "General",
+            "description": "Everything and nothing",
+            "createdDateTime": "2026-01-04T12:00:00Z",
+            "membershipType": "standard",
         }
     ]
 }
@@ -390,6 +404,7 @@ class TestTheToolsThisServerAdvertises:
             "get_me",
             "list_chats",
             "list_teams",
+            "list_channels",
             "search_messages",
             "read_message",
         }
@@ -428,6 +443,7 @@ class TestTheToolsThisServerAdvertises:
         }
         assert set(_properties(tools["list_chats"].outputSchema)) == {"chats"}
         assert set(_properties(tools["list_teams"].outputSchema)) == {"teams"}
+        assert set(_properties(tools["list_channels"].outputSchema)) == {"channels"}
         assert set(_properties(tools["search_messages"].outputSchema)) == {
             "messages",
             "next_offset",
@@ -733,6 +749,42 @@ class TestCallingThem:
         assert route.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
         assert obo.requested_scopes == [("https://graph.microsoft.com/Team.ReadBasic.All",)]
 
+    async def test_a_model_walks_from_its_teams_to_the_channels_of_one_of_them(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        obo: _StubOboCredential,
+    ) -> None:
+        """The channel path as far as it goes today, over the real protocol, with the id taken from
+        the previous answer exactly as a model would take it: which teams am I in, then what
+        channels are in this team.
+
+        Two things only an end-to-end call shows. The `team_id` this server hands out is the one it
+        accepts back, in that spelling, through the MCP schema and out again — an inventory whose
+        ids no other tool takes is an inventory nothing can be done with. And the token is redeemed
+        per tool, so a tenant that grants the team scope and withholds the channel one is refused at
+        the second step rather than the first; a tool that quietly asked for the registry's union
+        would take that distinction away without any schema changing.
+        """
+        teams = graph.get("/me/joinedTeams").mock(return_value=httpx.Response(200, json=_TEAMS))
+        listing = graph.get(_CHANNELS_PATH).mock(return_value=httpx.Response(200, json=_CHANNELS))
+
+        listed = _structured(await mcp_client.call_tool("list_teams", {}))
+        found = cast("Sequence[Mapping[str, object]]", listed["teams"])
+        team_id = found[0]["team_id"]
+        channels = _structured(await mcp_client.call_tool("list_channels", {"team_id": team_id}))
+        in_team = cast("Sequence[Mapping[str, object]]", channels["channels"])
+
+        assert (team_id, in_team[0]["channel_id"]) == (_TEAM_ID, _CHANNEL_ID)
+        assert in_team[0]["display_name"] == "General"
+        assert in_team[0]["membership_type"] == "standard"
+        assert all(route.called for route in (teams, listing))
+        assert listing.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
+        assert obo.requested_scopes == [
+            ("https://graph.microsoft.com/Team.ReadBasic.All",),
+            ("https://graph.microsoft.com/Channel.ReadBasic.All",),
+        ], "each tool exchanges a token for the permissions its own request needs"
+
     @pytest.mark.usefixtures("obo")
     async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(
         self,
@@ -1003,6 +1055,52 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "administrator" in message
         assert "synthetic-request-id" in message
         assert obo.requested_scopes
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "path", "permission", "not_named"),
+        [
+            ("list_teams", {}, "/me/joinedTeams", "Team.ReadBasic.All", "Channel.ReadBasic.All"),
+            (
+                "list_channels",
+                {"team_id": _TEAM_ID},
+                _CHANNELS_PATH,
+                "Channel.ReadBasic.All",
+                "Team.ReadBasic.All",
+            ),
+        ],
+    )
+    @pytest.mark.usefixtures("obo")
+    async def test_each_channel_tool_names_only_the_permission_its_own_request_needs(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        tool: str,
+        arguments: dict[str, str],
+        path: str,
+        permission: str,
+        not_named: str,
+    ) -> None:
+        """Two requests, two delegated permissions, and the whole reason the channel inventory is
+        not one scope: a tenant can grant either without the other, so naming the wrong one sends an
+        administrator after a permission that was never missing, which is as useless as naming none.
+        Graph's 403 says only that something was forbidden.
+        """
+        _ = graph.get(path).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "synthetic-request-id"},
+                json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}},
+            )
+        )
+
+        result = await mcp_client.call_tool(tool, arguments, raise_on_error=False)
+
+        assert result.is_error
+        message = _error_text(result)
+        assert permission in message
+        assert not_named not in message
+        assert "administrator" in message
+        assert "synthetic-request-id" in message
 
     @pytest.mark.usefixtures("obo")
     async def test_a_refused_search_names_both_permissions_it_was_made_under(

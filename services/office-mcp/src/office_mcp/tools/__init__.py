@@ -16,7 +16,14 @@ import httpx
 from fastmcp import FastMCP
 
 from office_mcp.shared.seam import graph_scope
-from office_mcp.tools import get_me, list_chats, list_teams, read_message, search_messages
+from office_mcp.tools import (
+    get_me,
+    list_channels,
+    list_chats,
+    list_teams,
+    read_message,
+    search_messages,
+)
 
 __all__ = ["GRAPH_SCOPES", "register_tools"]
 
@@ -35,6 +42,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     get_me,
     list_chats,
     list_teams,
+    list_channels,
     search_messages,
     read_message,
 )
