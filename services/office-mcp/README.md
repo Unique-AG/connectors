@@ -162,6 +162,16 @@ exchange hands the caller's Graph token as a string; this package sends it.
 - **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. Search uses
   from/size offsets.
 
+- **An empty page carrying a next link means keep going, and the walk is ours because of it.** The
+  SDK's `PageIterator.enumerate` returns `False` for a page whose `value` is empty and its `iterate`
+  reads that as the end of the collection — so a collection Graph answers `[1 item + nextLink]`,
+  `[nothing + nextLink]`, `[3 more]` came back as one item. Every list-shaped tool here says "that
+  is all of it" by coming back short of `limit`, so believing an empty page does not merely lose
+  items: it turns a window with more behind it into a claim that there is not. `collect_pages` walks
+  through them, bounds a *run* of them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap:
+  an empty page spends no scan budget, so a shared budget is no bound on empty pages at all), and
+  raises `GraphPagingUnending` rather than answering short — because a short answer means a cap.
+
 - **Trap:** The SDK bearer provider does not validate allowed-hosts. Redirects to off-Graph URLs send
   the caller's delegated credential. Restrict to `graph.microsoft.com` only.
 

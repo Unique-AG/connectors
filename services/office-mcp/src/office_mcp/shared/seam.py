@@ -111,6 +111,7 @@ from office_mcp.graph_client import (
     GraphFailure,
     GraphForbidden,
     GraphNotFound,
+    GraphPagingUnending,
     GraphThrottled,
     GraphUnavailable,
     graph_client_for,
@@ -443,6 +444,19 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             "Microsoft 365 could not be reached or failed internally. Retry once; if it fails "
             + "again the same way, stop and report it — some Graph 500s are permanent for "
             + "particular content rather than transient."
+        )
+    if isinstance(failure, GraphPagingUnending):
+        # The only failure here that arrived without a status code, because no request failed: it
+        # is what a run of successful, empty, "there is more" pages means. The count is the whole
+        # of the evidence, so it goes in the sentence rather than in `_diagnostics`, which has
+        # nothing to append.
+        return (
+            "Microsoft 365 would not finish sending this list: it answered "
+            + f"{failure.empty_pages} pages in a row with nothing in them while still saying more "
+            + "of the list was coming, so this connector stopped instead of following it further. "
+            + "Nothing was wrong with the request and no other arguments will avoid it. Retry once "
+            + "if the list matters; if it happens again, stop and report it, because the list "
+            + "cannot be read while Microsoft answers this way."
         )
     return (
         "Microsoft 365 rejected this request. This is a bad request rather than an outage or a "
