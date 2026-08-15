@@ -12,6 +12,10 @@ difference between the copies would be a bug a caller could see:
 * `handles.py` — the `teams:///` grammar. A handle minted by one tool and read by another is only
   readable while there is one definition of it; two spellers would not look like a disagreement,
   they would look like a handle one tool produced and another answers 404 to.
+* `messages.py` — what a Teams message is. Graph answers with a different projection per API, and
+  the sender is where they visibly differ: a search hit carries a mailbox-shaped `emailAddress` and
+  every Teams read a `teamworkUserIdentity` with no email at all. One normalisation over both, or
+  the same message found and read is reported with two different senders.
 * `identity.py` — who the signed-in user is. `get_me` reports it; it is also the fact every other
   answer on this connector is correlated against, so a second tool asking it with a `GET /me` of
   its own would be a second answer to one question.

@@ -1,8 +1,8 @@
 """The `teams:///` grammar: what round-trips, and what is not a handle of a given family.
 
 The families are separate because the tools and the permissions behind them are, so the assertions
-that matter most here are the negative ones — anything that is not this family's shape has to come
-back as no handle rather than as a handle with a strange id in it. Every id below is invented.
+that matter most here are the negative ones — a message handle must not parse as a meeting's, and a
+meeting's must not parse as a message's. Every id below is invented.
 """
 
 import pytest
@@ -17,6 +17,82 @@ JOIN_WEB_URL = (
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
     + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
 )
+
+_CHAT_ID = "19:release@thread.v2"
+_MESSAGE_ID = "1770000000000"
+_TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CHANNEL_ID = "19:general@thread.tacv2"
+
+_CHAT_URI = f"teams:///chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
+_CHANNEL_URI = (
+    f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
+)
+
+_CHAT_HANDLE = handles.MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID)
+_CHANNEL_HANDLE = handles.MessageHandle(
+    message_id=_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID
+)
+
+
+class TestTheMessageHandleGrammar:
+    """The two shapes a Teams message is addressed by, and everything that is not one of them.
+
+    `search_messages` mints both. That is exactly why the grammar is not its file's — a handle one
+    tool minted and another answers 404 to does not look like a disagreement — so it is tested here,
+    once, rather than beside whichever tool happens to write it.
+    """
+
+    def test_it_reads_the_two_shapes_search_emits_and_decodes_their_ids(self) -> None:
+        """The ids in a handle are percent-encoded because a Teams id is full of `:` and `@`, so
+        reading one back means decoding them."""
+        chat = handles.message_handle(_CHAT_URI)
+        channel = handles.message_handle(_CHANNEL_URI)
+
+        assert chat == _CHAT_HANDLE
+        assert channel == _CHANNEL_HANDLE
+
+    def test_a_handle_survives_the_round_trip_it_came_from(self) -> None:
+        chat = handles.message_handle(_CHAT_URI)
+        channel = handles.message_handle(_CHANNEL_URI)
+
+        assert chat is not None and chat.uri == _CHAT_URI
+        assert channel is not None and channel.uri == _CHANNEL_URI
+
+    def test_an_unencoded_id_still_resolves(self) -> None:
+        """A caller that copied a handle out of a log rather than out of a response has ids that
+        were never encoded; `:` and `@` are unambiguous in a path segment, so those are read too."""
+        handle = handles.message_handle(f"teams:///chats/{_CHAT_ID}/messages/{_MESSAGE_ID}")
+
+        assert handle == _CHAT_HANDLE
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The schemes a polymorphic reader would advertise and this connector cannot serve.
+            "mail:///messages/AAMkAGI2",
+            "calendar:///events/AAMkAGI2",
+            "drive:///items/01ABC",
+            "site:///sites/contoso/pages/1",
+            # Right scheme, wrong shape.
+            "teams:///chats/19%3Arelease%40thread.v2",
+            "teams:///messages/1770000000000",
+            "teams:///chats//messages/1770000000000",
+            "teams:///chats/19%3Arelease%40thread.v2/messages/",
+            # A chat has no replies in Graph's addressing, and the reply shape a channel thread does
+            # have is not written yet — a search cannot tell a reply from a root post, so nothing
+            # here may answer as if it could.
+            "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000/replies/1770000000001",
+            "teams:///teams/8a9c3c47/channels/19%3Ageneral/messages/1770000000000/replies/17700001",
+            "teams:///teams/8a9c3c47/messages/1770000000000",
+            "teams:///chats/19%3Arelease%40thread.v2/messages/%20",
+            # A Teams web link, which is what a model reaches for when it has no handle.
+            "https://teams.microsoft.invalid/l/message/19%3Ageneral/1770000000000",
+            "1770000000000",
+            "",
+        ],
+    )
+    def test_it_refuses_everything_else(self, uri: str) -> None:
+        assert handles.message_handle(uri) is None
 
 
 class TestTheHandleGrammar:
