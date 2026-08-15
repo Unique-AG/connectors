@@ -45,14 +45,27 @@ copies would be a bug a caller could see — a handle one tool minted and anothe
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
 anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
 
-**Layering rules:**
-- `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP.
-- `graph_client/` imports nothing from this application.
-- `tools/` imports `shared/`, `graph_client/`, and FastMCP only.
-- Only `create_app` constructs config. Nothing downstream reads environment.
-- Packages are entered via `__init__`. (`graph_client/`, `server/`, `tools/` publish `__all__`.)
+The layering rules are that **`shared/` imports no tool module, and only `shared/seam.py` imports
+FastMCP** — the seam is where the framework is spoken, which is what keeps it out of the handle
+grammar and the rest of the vocabulary; that **`graph_client/` imports nothing of this application
+at all**, taking its own frozen `GraphSettings` instead of reading config; that **`tools/` imports
+`shared/`, `graph_client/` and FastMCP and nothing else of this package** — not `server/`, or the
+tool file is one in name only; that **no tool module imports another tool module**, which is what
+independent means and is the rule the whole layout exists for; that **only `create_app` constructs a
+config**, so nothing downstream can quietly re-read the environment and disagree with the app it
+runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///` URI**
+(showing the shape to a model in a description, an `examples=` or a refusal is prose and is not
+that); and that **a package is entered through its `__init__`** — `graph_client/`, `server/` and
+`tools/` each publish an `__all__`, and `shared/` deliberately does not, being a grouping whose
+modules are the units and whose consumers say which one they depend on at the import line.
 
-`tests/test_layering.py` enforces these rules.
+`tests/test_layering.py` enforces them, and each rule is paired with a guard that fails if the rule
+has gone vacuous — an empty tree to walk, a missing file to forbid reaching past, a framework
+nothing imports any more, a second tool module that stopped existing so that "another tool module"
+named nothing, a package with no `__all__` to insist on. One rule of the finished set is still
+absent for exactly that reason and is named in that module: nothing may address a single meeting
+recording, which needs a recordings listing to be the surface it protects. It arrives with the tool
+that lists them, and the numbering is the finished one so that arriving costs a class.
 
 ## Auth
 
