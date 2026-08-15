@@ -281,5 +281,5 @@ class TestGraphFailures:
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         """A tool owns the permission its own request needs, and listing channels is the cheap
-        "basic" scope — reading what was posted in one is the broader `ChannelMessage.Read.All`."""
+        "basic" scope — reading what was posted in one is browse_channel's broader permission."""
         assert lister.GRAPH_PERMISSIONS == ("Channel.ReadBasic.All",)

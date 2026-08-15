@@ -15,6 +15,13 @@ empty pages: if it carries nextLink, keep going.
 Empty run bound: Following empty pages needs its own bound separate from item cap. `MAX_EMPTY_PAGES`
 is that bound, counted per run on its own—never pooled with item budget.
 
+A channel's messages are deliberately not walked here at all, and they are the collection the scan
+cap was written against — which is worth saying in the same breath. Filtering them after the fact
+is exactly the shape that cap exists for, but the throttling limit above is per *app* per tenant on
+a given channel, so even a capped walk spends a budget that belongs to every other user of this
+connector. `browse_channel` therefore makes one request, uses `$top` as its window, and never comes
+here; the cap is for collections whose cost is the caller's own.
+
 Headers do not travel with the cursor: `PageIterator` starts with an empty header collection and
 stamps it onto every next-page request. A header the caller's own first request needed—`Prefer:
 include-unknown-enum-members`, say—reaches page two only if the walk is given it too. Without that,
