@@ -34,16 +34,18 @@ List the Microsoft Teams teams you are a member of, with each team's id, name, d
 and archived flag.
 
 This is the channel side of Teams. To read a channel message, first use this tool to find the \
-team. The `team_id` is the same id search_messages reports on channel messages. The `limit` is \
-a window over Microsoft's order; shorter than `limit` means end of list.\
+team, then list_channels to find the channel. The `team_id` is what list_channels takes, and the \
+same id search_messages reports on channel messages. The `limit` is a window over Microsoft's \
+order; shorter than `limit` means end of list.\
 """
 
 
 class TeamSummary(BaseModel):
     team_id: str = Field(
         description=(
-            "The team's Graph id. This is the same id search_messages reports on channel "
-            + "messages. Opaque—copy it verbatim, never build one from a name."
+            "The team's Graph id. This is what list_channels takes, and the same id "
+            + "search_messages reports on channel messages. Opaque—copy it verbatim, never "
+            + "build one from a name."
         )
     )
     display_name: str | None = Field(
