@@ -5,7 +5,7 @@ projection, the Exchange-shaped sender a search hit carries, the authorless syst
 Nothing here came from a tenant.
 
 Which strings are handles at all is `shared/handles.py`'s question, not this tool's:
-`TestTheMessageHandleGrammar` in `tests/shared/test_handles.py` covers the two shapes and
+`TestTheMessageHandleGrammar` in `tests/shared/test_handles.py` covers the three shapes and
 everything that is not one of them. What is covered here is which of them a hit carries.
 """
 
@@ -20,6 +20,7 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_mcp.graph_client import GraphForbidden
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST
 from office_mcp.tools import search_messages
 from office_mcp.tools.search_messages import SearchCriteria
 
@@ -438,14 +439,33 @@ class TestTheHandleItMints:
 
         assert "or infer from its absence" in described
 
+    def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
+        """A hit that is really a channel reply carries the root-post shape, which Graph answers 404
+        to — and the advice for that has to end somewhere. `browse_channel` mints a reply's own
+        handle but reaches only the newest replies of each post on a channel's first page and
+        follows no cursor past them, so "browse the channel instead" is a route for a recent reply
+        and a loop for an older one: browse, not find it, read the same advice, browse again. So the
+        window is named and the terminus is stated here, where the handle that can fail is minted.
+        """
+        described = search_messages.MessageHit.model_fields["uri"].description
+        assert described is not None
+
+        assert "browse_channel" in described, "the one tool that can, when the reply is recent"
+        assert f"only the newest {MAX_REPLIES_PER_POST} replies" in described, (
+            "and where it stops, in the number the browser actually applies rather than in prose "
+            + "of its own"
+        )
+        assert "no route to its full text" in described
+        assert "browsing again returns the same window" in described
+        assert "stop looking" in described
+
 
 class TestWhatTheCallerIsTold:
     async def test_a_chat_hit_carries_a_chat_handle_and_a_channel_hit_a_channel_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The handle is what names the exact message Graph matched, since the search projection
-        has no body — and the ids in it are percent-encoded because a Teams id is full of `:` and
-        `@`."""
+        """The handle is the whole route to the message text, since the search projection has no
+        body — and the ids in it are percent-encoded because a Teams id is full of `:` and `@`."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -483,8 +503,8 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph does occasionally return a hit with no chatId and no channelIdentity. Its snippet
-        is still an answer, so it is reported — with a null `uri` saying it cannot be addressed at
-        all, rather than being dropped or given a handle that names nothing."""
+        is still an answer, so it is reported — with a null `uri` saying it cannot be read in
+        full, rather than being dropped or given a handle that would 404."""
         hit = chat_hit(chat_id=None)
         graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([hit]))

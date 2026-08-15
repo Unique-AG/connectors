@@ -68,7 +68,7 @@ from pydantic import BaseModel, Field
 
 from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, MessageHandle
-from office_mcp.shared.messages import MessageSender, sender_of
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender, sender_of
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "search_messages"
@@ -92,7 +92,8 @@ Search the Microsoft Teams messages the signed-in user can see — every one-to-
 chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
 and read state. Messages from ANY participant match, not only the user's own; call get_me if you \
 need to know who the user is. It is the only tool here that searches: it finds messages anywhere, \
-and read_message reads one of them in full.
+and read_message reads one of them in full, and browse_channel is what walks a single channel when \
+the question is about that channel rather than about a keyword.
 
 A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
 view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
@@ -133,7 +134,17 @@ class MessageHit(BaseModel):
             + "percent-encoded. Pass it verbatim to read_message; this search returns no message "
             + "body, so it is the only route to the full text, the attachments and the mentions. "
             + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
-            + "identity, which cannot be addressed at all."
+            + "identity, which cannot be addressed at all. "
+            + "One handle here can fail to read: Microsoft "
+            + "addresses a reply in a channel thread under its parent post and its search index "
+            + "does not say which post that is, so a hit that is a reply gets the root-post form "
+            + "above and read_message may answer that it could not be read. browse_channel is the "
+            + "only tool that emits a reply's own handle, and it reaches only the newest "
+            + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page, following "
+            + "no cursor further back. If "
+            + "the reply is not in that window there is no route to its full text and browsing "
+            + "again returns the same window: report this `summary` with the sender and date "
+            + "here, say the full text could not be retrieved, and stop looking."
         )
     )
     message_id: str = Field(
