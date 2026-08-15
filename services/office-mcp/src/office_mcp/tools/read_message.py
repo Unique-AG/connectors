@@ -44,7 +44,7 @@ from office_mcp.shared.handles import (
     MessageHandle,
     message_handle,
 )
-from office_mcp.shared.messages import TeamsMessage, message_of
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage, message_of
 from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "read_message"
@@ -101,11 +101,22 @@ _BAD_HANDLE = (
 )
 
 _UNREADABLE = (
-    "Microsoft 365 would not return this message. The handle is well formed, so this is not a "
-    + "bad argument. This is not evidence that the message does not exist: Graph answers "
-    + "deleted, never existed, and invisible-to-user identically and does not say which. "
-    + "Report that the message could not be read. Retrying will not help. Report the search "
-    + "snippet with sender and date, say full text could not be retrieved, and stop looking."
+    "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
+    + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
+    + "'never existed' and 'the signed-in user may not see it' with the same 404, and does not say "
+    + "which of them it meant. Report that the message could not be read, never that it was never "
+    + "written. Retrying will not help and this connector has no other route to the text. One "
+    + "well-formed handle always fails this way: a reply in a channel thread is addressed under "
+    + "the post it answers, and a search result does not identify that post — so a search hit that "
+    + "is a reply cannot be read from its own handle. browse_channel is the only tool that emits a "
+    + "reply's own handle, and it reaches the newest "
+    + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page and no "
+    + "further: it follows neither Microsoft's cursor into an older part of a thread nor the one "
+    + "into older posts, because a given channel allows this whole connector about one request a "
+    + "second across the tenant. So browse that channel once; if the reply is not in what comes "
+    + "back there is no route to its full text, and a second browse returns the same window. "
+    + "Report the search snippet with its sender and date, say the full text could not be "
+    + "retrieved, and stop looking."
 )
 
 # Without this header, Graph answers systemEventMessage as unknownFutureValue.
