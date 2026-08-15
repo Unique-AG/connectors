@@ -31,6 +31,9 @@ from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_request_builder import (  # noqa: E501
     ChatMessageItemRequestBuilder as ChannelMessageRequestBuilder,
 )
+from msgraph.generated.teams.item.channels.item.messages.item.replies.item.chat_message_item_request_builder import (  # noqa: E501
+    ChatMessageItemRequestBuilder as ChannelReplyRequestBuilder,
+)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
@@ -56,15 +59,22 @@ _DESCRIPTION = """\
 Read one Microsoft Teams message in full, from the `uri` handle search_messages produces: the \
 whole text, sender, @-mentions, attachments, and edit/delete status.
 
-This is the other half of search_messages. Graph's search index has no message body, so a search \
-result carries only Microsoft's `summary` snippet. Read the message here to get the full text. \
-Never present a snippet as the message.
+This is the other half of search_messages, and the only route to the text of a message a search \
+found. Microsoft's search index answers with a reduced view of a message that contains no body at \
+all, so a search result carries only Microsoft's `summary` snippet. Read the message here whenever \
+the answer depends on what somebody actually said rather than on the fact that a matching message \
+exists — and never present a snippet as the message. A message browse_channel returned needs no \
+read: that tool answers with the whole message already.
 
-`uri` takes a handle this connector produced, exactly one of these shapes:
+`uri` takes a handle this connector produced, in one of exactly three shapes:
   teams:///chats/{chat_id}/messages/{message_id}
   teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
-Nothing else is readable. This connector does not address mail, calendar events, files or sites. \
-Pass the `uri` from a tool result verbatim — do not assemble one.
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
+Nothing else is readable here. No handle of this connector's names mail, a calendar event, a file \
+or a SharePoint page, and nothing turns a person's name or a chat topic into one — pass the `uri` \
+from a tool result verbatim. The third shape above is the one only browse_channel emits: Microsoft \
+addresses a reply in a channel thread under the post it answers, and a search result does not say \
+which post that is.
 
 `text` is plain text normalised from Teams HTML: mentions read as `@Name`, list items as `- `, \
 attachments as `[attachment: name]`, inline images as `[image]`, cards as `[card]`. The `mentions` \
@@ -78,15 +88,16 @@ happened. Do not invent the wording.\
 """
 
 _BAD_HANDLE = (
-    "read_message takes a `uri` handle search_messages produced. This is not one. A readable "
-    + "handle has one of exactly two shapes:\n"
+    "read_message takes a `uri` handle that search_messages or browse_channel produced, and this "
+    + "is not one. A readable handle has one of exactly three shapes:\n"
     + "  teams:///chats/{chat_id}/messages/{message_id}\n"
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
-    + "with ids percent-encoded, e.g. "
-    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. "
-    + "Copy the `uri` from a tool result — do not assemble one. "
-    + "This reader serves Teams messages only: "
-    + "no mail, files or sites. Retrying this value will fail identically."
+    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}\n"
+    + "with the ids percent-encoded, e.g. "
+    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool "
+    + "result rather than assembling one. This reader serves Teams messages only: no mail, files "
+    + "or sites are addressable in this connector at all. Retrying this value will fail "
+    + "identically."
 )
 
 _UNREADABLE = (
@@ -104,6 +115,7 @@ type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilder
 type _ChannelMessageQuery = (
     ChannelMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 )
+type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 
 
 async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
@@ -128,6 +140,15 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
     messages = (
         client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
     )
+    if handle.reply_to_id is not None:
+        # A reply is addressed under the post it replies to, never beside it — the reply id alone
+        # is a 404. `by_chat_message_id1` is the generated name for the second message id in that
+        # path, the first being the parent post's.
+        return await (
+            messages.by_chat_message_id(handle.reply_to_id)
+            .replies.by_chat_message_id1(handle.message_id)
+            .get(request_configuration=RequestConfiguration[_ChannelReplyQuery](headers=_headers()))
+        )
     return await messages.by_chat_message_id(handle.message_id).get(
         request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers())
     )
