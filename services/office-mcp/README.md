@@ -2,10 +2,13 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account; the server acts as them. Six MCP tools are available:
-`get_me` (profile), `list_chats` (chats by recency), `list_teams` (teams the user is in), `list_channels`
-(channels in one team), `search_messages` (full-text search), and `read_message` (one message in full).
-Each tool is one file; more land in later PRs, one tool per PR.
+Users sign in with their own Microsoft account and the server acts as them. It exposes seven MCP
+tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
+most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
+channels of one of those teams; `browse_channel`, what was posted in one of those channels;
+`search_messages`, full-text search across every Teams message they can see; and `read_message`,
+one of those messages in full — each one a file of its own, and more land in later PRs, stacked on
+top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
 user to consent to are exactly the union of what those tools need — see **Tool surface** below.
@@ -112,7 +115,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -149,10 +152,23 @@ those same files, so a misspelling is on both sides of the comparison and holds 
 an authorize request carrying a scope it does not know, which fails every sign-in for every user.
 Adding a name there is the deliberate act this table records.
 
-`ChannelMessage.Read.All` requested deliberately. `Chat.Read` alone lets Graph *accept* searches
-but Microsoft docs say searches never return more than GET would. All channel GET needs
-`ChannelMessage.Read.All`. Without it, searches silently cover chats only. Asking at sign-in makes
-tenants that withhold it fail visibly at consent, not serve incomplete results.
+`ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
+enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
+returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
+`ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
+missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
+than serve half an answer per query. It is also what `browse_channel` spends on its one request, and
+what `read_message` needs for a channel message. It is the first permission here that needs an
+administrator, and the first row where one tool needs
+two: neither Graph's 403 nor Entra's AADSTS65001 says which of the two was missing, so
+`search_messages` names both in every refusal — handed one name, an administrator may grant the
+permission that was never missing and watch the identical failure. A search has no choice about
+that, because a search happens before anything knows which surface a hit will be on; a *read* does,
+which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
+`REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
+those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
+an authorize request carrying a scope it does not know, which fails every sign-in for every user.
+Adding a name there is the deliberate act this table records.
 
 The channel inventory is two permissions, and they are separate scopes on purpose:
 `Channel.ReadBasic.All` lists a team's channels, `ChannelMessage.Read.All` reads what was posted in
@@ -236,8 +252,11 @@ exchange hands the caller's Graph token as a string; this package sends it.
   `GraphNotFound` (404), `GraphUnavailable` (5xx or unreachable). Wrap Graph work with
   `with graph_errors():`.
 
-- **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. Search uses
-  from/size offsets.
+- **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. A channel's
+  messages are the exception and are not walked at all: Graph allows about one request a second on
+  a given channel for the whole app across the tenant, so `browse_channel` makes exactly one and
+  `$top` is its window. Search uses from/size offsets.
+
 
 - **An empty page carrying a next link means keep going, and the walk is ours because of it.** The
   SDK's `PageIterator.enumerate` returns `False` for a page whose `value` is empty and its `iterate`
