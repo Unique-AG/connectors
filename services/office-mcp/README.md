@@ -2,12 +2,12 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes five MCP
+Users sign in with their own Microsoft account and the server acts as them. It exposes six MCP
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
-most recently active first; `list_teams`, the teams they are a member of; `search_messages`,
-full-text search across every Teams message they can see; and `read_message`, one of those messages
-in full — each one a file of its own, and more land in later PRs, stacked on top of this one, one
-tool per PR.
+most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
+channels of one of those teams; `search_messages`, full-text search across every Teams message they
+can see; and `read_message`, one of those messages in full — each one a file of its own, and more
+land in later PRs, stacked on top of this one, one tool per PR.
 
 ## Layout
 
@@ -78,6 +78,7 @@ Tools redeem permissions per call via On-Behalf-Of. No permission = no consent =
 | `User.Read` | Delegated | No | `get_me` |
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
+| `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Usually | `search_messages`, `read_message` (channels) |
 
 Multiple tools naming the same permission is normal. It is not duplication to remove. Each tool
@@ -101,6 +102,12 @@ misspelling is on both sides.
 but Microsoft docs say searches never return more than GET would. All channel GET needs
 `ChannelMessage.Read.All`. Without it, searches silently cover chats only. Asking at sign-in makes
 tenants that withhold it fail visibly at consent, not serve incomplete results.
+
+The channel inventory is two permissions, and they are separate scopes on purpose:
+`Channel.ReadBasic.All` lists a team's channels, `ChannelMessage.Read.All` reads what was posted in
+one. Each is the least-privileged permission Microsoft documents for its collection. A tenant
+refusing the message permission still lists teams and channels, and each tool's 403 names only the
+permission its own request needed.
 
 **State:** Tokens revalidated per request. FastMCP's default store is an encrypted file tree. It
 resets on restart. It breaks at replicas: each replica writes its own file, invisible to the
