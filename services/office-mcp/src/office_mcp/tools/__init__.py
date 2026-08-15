@@ -23,6 +23,7 @@ from office_mcp.tools import (
     list_meeting_transcripts,
     list_teams,
     read_message,
+    read_transcript,
     search_messages,
 )
 
@@ -47,6 +48,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     search_messages,
     read_message,
     list_meeting_transcripts,
+    read_transcript,
 )
 
 GRAPH_SCOPES: tuple[str, ...] = tuple(
