@@ -2,13 +2,14 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes seven MCP
+Users sign in with their own Microsoft account and the server acts as them. It exposes eight MCP
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
-`search_messages`, full-text search across every Teams message they can see; and `read_message`,
-one of those messages in full — each one a file of its own, and more land in later PRs, stacked on
-top of this one, one tool per PR.
+`search_messages`, full-text search across every Teams message they can see; `read_message`,
+one of those messages in full; and `list_meeting_transcripts`, whether a Teams meeting was
+transcribed and a handle for each transcript — each one a file of its own, and more land in later
+PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
 user to consent to are exactly the union of what those tools need — see **Tool surface** below.
@@ -47,7 +48,9 @@ mints, its parser and its speller, and the permission each Teams surface is read
 `messages.py` (what a Teams message is — the shape it is answered in, the sender normalised out of
 every identity shape Graph answers with, the Teams HTML a body is unwound from, and the test for
 "did a person write this", so that the same message found by one tool and read by another is one
-type normalised by one function rather than two that agree), `identity.py` (who the signed-in user
+type normalised by one function rather than two that agree), `meetings.py` (how a meeting is
+reached — a join URL resolved to the meeting it identifies, which occurrence of a series a time
+window means, and how far "newest first" holds), `identity.py` (who the signed-in user
 is — `get_me` reports
 it, and it is the fact every other answer gets correlated against, so a second tool asking with a
 `GET /me` of its own would be a second answer to one question) and `seam.py` (the Graph client a
@@ -116,6 +119,8 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
+| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts` (resolving a join URL to a meeting) |
+| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -134,6 +139,23 @@ The two rows a tool appears in *parenthesised* are the per-surface case, and it 
 `read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
 its 403 names only the one the read was actually made under. Naming both there would be the same
 defect as naming none: an administrator handed two names may grant the one that was never missing.
+
+**Transcripts need a tenant setting as well as a permission, and this is the one that surprises
+people.** Microsoft Graph access to Teams meeting transcripts is off by default and *"agents and
+apps can't access meeting transcripts, regardless of app-level permissions"* until a Teams
+administrator turns it on — Teams admin centre → Meetings → Meeting settings → Transcript API
+access, or `Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`.
+There is no Graph API to set it and no request-side workaround, so it is an onboarding step next to
+admin consent rather than something this connector can fix; `services/teams-mcp` learned this in PR
+#762 and `docs/recordings-and-transcripts/operator.md` documents it. Until it is on, every call to
+`list_meeting_transcripts` fails with that remedy named — and only that tool: Microsoft scopes the
+setting to transcript resources, so nothing else here is affected.
+
+The two meeting permissions are separate scopes and are granted independently, which is the point of
+asking for both: `OnlineMeetings.Read` is the least privilege Microsoft documents for resolving a
+join URL to a meeting and needs no administrator, while reading the transcript collection needs one.
+A tenant can grant the first and withhold the second, and the tool's 403 then names the one its own
+request was made under.
 
 `ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
 enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never

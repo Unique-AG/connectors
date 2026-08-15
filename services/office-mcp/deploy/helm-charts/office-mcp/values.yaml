@@ -49,11 +49,18 @@ env:
   # requires one of the two, so a missing selection fails `helm install` instead of crash-looping the
   # pod, and TOOLS_PRESET carries the valid names as an enum so a typo fails there too.
   #   TOOLS_PRESET: teams              # every tool there is
-  #   TOOLS_ENABLED: get_me            # or name them; get_me is always on
-  # GET /manifest and the startup log print the resolved tools, the exact permissions and which of
-  # them need admin consent. That list is what an Entra administrator has to grant, and it is the
-  # only place it is written down: a scope the app registration does not carry fails at the authorize
-  # hop, for every user, with nothing in this service's logs.
+  #   TOOLS_ENABLED: get_me,list_chats # or name them; get_me is always on
+  #
+  # Those, the tool surface and the two secrets below are the whole of this service's configuration.
+  # What the tools add is tenant-side onboarding, which no value here can carry (see README, "Auth"):
+  #   - the delegated Graph permissions the selected tools ask for, on that app registration. Some
+  #     need admin consent, OnlineMeetingTranscript.Read.All among them. GET /manifest and the
+  #     startup log print the exact list this deployment asks for and which of it needs an
+  #     administrator — the only place it is written down, because a scope the registration does not
+  #     carry fails at the authorize hop, for every user, with nothing in this service's logs;
+  #   - Graph access to Teams meeting transcripts, a tenant-wide Teams setting that is OFF by
+  #     default and that only a Teams administrator can turn on. Until they do,
+  #     list_meeting_transcripts answers 403 with that remedy and every other tool is unaffected.
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
