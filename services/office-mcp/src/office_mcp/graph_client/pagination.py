@@ -1,20 +1,17 @@
-"""Following `@odata.nextLink`, with the caps `services/teams-mcp` learned it needed.
+"""Paging via @odata.nextLink, with the guards teams-mcp learned it needed.
 
-Graph pages every list endpoint, and the whole `@odata.nextLink` URL is the cursor: it is
-replayed verbatim, never decomposed (https://learn.microsoft.com/en-us/graph/paging). The SDK's
-`PageIterator` does that walk, so this module is only the two lessons teams-mcp paid for in
-`src/msgraph/graph-pagination.ts`:
+Graph pages every list endpoint using opaque @odata.nextLink URLs that must be replayed
+verbatim. The SDK's PageIterator does the walk. This module adds two lessons from teams-mcp:
 
-* a scan cap as well as an item cap. Where a collection is filtered after the fact — channel
-  messages are mostly system messages about members joining — "give me 20" can otherwise walk
-  the entire history of a busy channel one page at a time, at 1 request per second per chat per
-  tenant for the whole app (https://learn.microsoft.com/en-us/graph/throttling-limits).
-* saying so. A truncated answer that looks complete is the failure mode, because the caller
-  above is a language model that will summarise 20 of 4000 messages as "the discussion".
+1. A scan cap as well as item cap. Filtered collections (channel messages are mostly system
+   messages) can walk long histories for few kept items. A 20-item limit can scan thousands of
+   messages at 1 request per second per chat per tenant.
 
-Search paging is deliberately not here. `POST /search/query` takes `from`/`size` offsets instead
-of an opaque cursor, so a stateless MCP tool resumes a search by re-issuing it with a larger
-`from` — no cursor to carry across calls, and nothing for this module to do.
+2. Truncation signalling. A partial answer that looks complete misleads callers (models will
+   summarize 20 of 4000 messages as "the discussion").
+
+Search paging is not handled here. POST /search/query takes from/size offsets instead of a
+cursor, so stateless tools resume by re-issuing with a larger from value.
 """
 
 from collections.abc import Callable
@@ -28,12 +25,12 @@ from msgraph_core.tasks import PageIterator
 
 
 class GraphCollection[T](Protocol):
-    """The two members of a Graph collection response that paging needs.
+    """Structural type for Graph collection response fields paging needs.
 
-    Structural rather than nominal so that the element type comes from the caller's own
-    response: `await client.me.chats.get()` is a `ChatCollectionResponse`, and matching it
-    against this is what makes `collect_pages` return `Chat`s. The generated collection
-    responses all inherit these from `BaseCollectionPaginationCountResponse`.
+    Structural typing extracts the element type from the caller's own response. `await
+    client.me.chats.get()` returns ChatCollectionResponse, and matching it against this
+    protocol makes `collect_pages` return Chat items. The SDK's generated collection responses
+    inherit these fields from BaseCollectionPaginationCountResponse.
     """
 
     @property
@@ -43,19 +40,18 @@ class GraphCollection[T](Protocol):
     def odata_next_link(self) -> str | None: ...
 
 
-# How many items may be looked at to satisfy one request, however few of them are kept. A
-# safety valve on request count, not a tuning knob: a caller that needs more than this from a
-# filtered collection is asking the wrong endpoint (use search).
+# Safety valve on items examined, not a tuning knob. Callers needing more from a filtered
+# collection should use the search endpoint instead.
 MAX_SCANNED_ITEMS = 1000
 
 
 @dataclass(frozen=True, slots=True)
 class CollectedItems[T]:
-    """Up to `limit` items, and whether Graph might still have had more.
+    """Items collected and truncation flag.
 
-    `truncated` is a "may be incomplete", not a "was incomplete": it is true when a cap stopped
-    the walk while a `@odata.nextLink` remained, and Graph's paging gives no way to know whether
-    that next page holds anything the filter would have kept.
+    `truncated` is "may be incomplete", not "was incomplete". It is true when a cap stopped the
+    walk while @odata.nextLink remained. Graph's paging gives no way to know whether the next
+    page holds anything the filter would have kept.
     """
 
     items: list[T]
@@ -70,14 +66,12 @@ async def collect_pages[T](
     matches: Callable[[T], bool] | None = None,
     max_scanned: int = MAX_SCANNED_ITEMS,
 ) -> CollectedItems[T]:
-    """Walk `first_page` and its successors, keeping matching items up to `limit`.
+    """Walk first_page and successors, keeping matching items up to limit.
 
-    `first_page` is a collection response the caller already awaited (`await
-    client.me.chats.get()`), and `client` is what fetched it — its request adapter is what
-    fetches every page after the first. The cast is where the element type comes back: the SDK's
-    page walker hands items over as `Parsable`, having deserialized each page with
-    `type(first_page)`, so what comes out of a page is what the caller's own collection response
-    declared it holds.
+    first_page is an already-awaited collection response; client is what fetched it and will
+    fetch successive pages via its request adapter. The cast recovers the element type: the
+    SDK's page walker hands items over as Parsable, deserialized with type(first_page), so the
+    output type matches the caller's collection response declaration.
     """
     items: list[T] = []
     scanned = 0
@@ -90,9 +84,8 @@ async def collect_pages[T](
             items.append(candidate)
         return len(items) < limit and scanned < max_scanned
 
-    # The SDK leaves `RequestAdapter`'s own type parameter unbound and `iterate`'s callback
-    # untyped, so both reads are unknown-typed everywhere. Taking the client rather than its
-    # adapter is what keeps that confined to these two lines instead of every call site.
+    # TRAP: SDK leaves RequestAdapter type parameter and iterate callback untyped. Taking client
+    # instead of adapter keeps the unknowns to these two lines, not every call site.
     iterator = PageIterator(
         first_page,
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
@@ -103,12 +96,11 @@ async def collect_pages[T](
 
 
 def _stopped_short(iterator: PageIterator) -> bool:
-    """Whether the walk ended with items still on offer.
+    """Whether the walk stopped with items still on offer.
 
-    Two ways it can: a page was left part-read because a cap was hit mid-page (`pause_index`
-    lands between the first and last item), or the last page read still advertised a next link.
-    The second case also covers an empty page carrying a next link — Graph does return those,
-    and the iterator treats an empty page as the end.
+    Two scenarios: a page was left part-read (pause_index between first and last item), or the
+    last page read carried an @odata.nextLink. An empty page with a next link also counts;
+    Graph returns those, and the iterator treats empty pages as the end.
     """
     page = iterator.current_page
     part_read = 0 < iterator.pause_index < len(page.value or [])
