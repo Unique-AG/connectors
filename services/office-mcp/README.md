@@ -2,15 +2,16 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes nine MCP
+Users sign in with their own Microsoft account and the server acts as them. It exposes ten MCP
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
 `search_messages`, full-text search across every Teams message they can see; `read_message`,
 one of those messages in full; `list_meeting_transcripts`, whether a Teams meeting was
-transcribed and a handle for each transcript; and `read_transcript`, what was said in one of those
-meetings as speaker-attributed, timestamped turns — each one a file of its own, and more land in
-later PRs, stacked on top of this one, one tool per PR.
+transcribed and a handle for each transcript; `read_transcript`, what was said in one of those
+meetings as speaker-attributed, timestamped turns; and `list_meeting_recordings`, whether a meeting
+was recorded, how long each recording runs and who may download it — each one a file of its own,
+and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
 user to consent to are exactly the union of what those tools need — see **Tool surface** below.
@@ -120,8 +121,9 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
-| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts` (resolving a join URL to a meeting) |
+| `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts`, `list_meeting_recordings` (resolving a join URL to a meeting) |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts`, `read_transcript` |
+| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `list_meeting_recordings` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -154,6 +156,33 @@ Microsoft scopes the setting to transcript resources, so nothing else here is af
 neighbouring `-EnableAttributedTranscripts` setting is *not* a prerequisite: when it is off,
 `read_transcript` degrades to Microsoft's unattributed format and reports `speaker_attribution:
 false` rather than failing.
+
+**That setting does not cover recordings, and the asymmetry is why they are a separate tool.**
+Microsoft scopes it to transcript resources only — the change-notification reference says so in as
+many words — and neither recordings reference page publishes a tenant control or an inner error code
+of its own. So in a default tenant (the switch off, admin consent granted) `list_meeting_transcripts`
+answers `403` while `list_meeting_recordings` answers normally, which one combined artifact tool
+could not do without either failing the whole call or growing a status per artifact — and the
+per-artifact status is exactly what makes the "read `status` first" shape unreadable.
+`OnlineMeetingRecording.Read.All` needs admin consent in its own right and separately from the
+transcript permission, so a tenant can grant either without the other and each tool's 403 names only
+the one its own request was made under.
+
+**A recording is answered as metadata and availability; its bytes are never returned, by anything
+here.** Graph streams an MP4 inline with no ranged contract on that path, a Teams meeting can run
+thirty hours, and a model cannot watch video — so a tool that returned one would be a defect wearing
+a feature's clothes. `recordingContentUrl` is no better: it opens only with this connector's own
+bearer token, so passing it on is either useless or a token leak. What `list_meeting_recordings`
+answers is "there is a 47-minute recording from Tuesday, only the organiser can download it, and
+here is the transcript instead" — existence, start and end, a derived `duration_seconds` (Microsoft
+publishes no duration property at all), and `content_correlation_id`, which is Microsoft's own link
+to the transcript of the same call. Layering rule 7 forbids any module from addressing a single
+recording, because that is the only door to those bytes and the change that opens it looks like a
+convenience. The organiser-only rule is reported rather than recited: Microsoft permits only the
+meeting organiser to download a recording under delegated access, the *metadata* is not so
+restricted, and answering "there is no recording" for a participant would be a wrong answer nobody
+could detect — so an unreachable recording is always listed, with `content_access` saying which side
+of the rule this user is on.
 
 The two meeting permissions are separate scopes and are granted independently, which is the point of
 asking for both: `OnlineMeetings.Read` is the least privilege Microsoft documents for resolving a
