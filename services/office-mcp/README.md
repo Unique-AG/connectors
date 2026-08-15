@@ -2,12 +2,12 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes five MCP
+Users sign in with their own Microsoft account and the server acts as them. It exposes six MCP
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
-most recently active first; `list_teams`, the teams they are a member of; `search_messages`,
-full-text search across every Teams message they can see; and `read_message`, one of those messages
-in full — each one a file of its own, and more land in later PRs, stacked on top of this one, one
-tool per PR.
+most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
+channels of one of those teams; `search_messages`, full-text search across every Teams message they
+can see; and `read_message`, one of those messages in full — each one a file of its own, and more
+land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
 user to consent to are exactly the union of what those tools need — see **Tool surface** below.
@@ -113,6 +113,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `User.Read` | Delegated | No | `get_me` |
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
+| `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
@@ -149,6 +150,17 @@ which is why its 403 names one. `shared/seam.py` writes the same names out once 
 those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
 an authorize request carrying a scope it does not know, which fails every sign-in for every user.
 Adding a name there is the deliberate act this table records.
+
+`ChannelMessage.Read.All` requested deliberately. `Chat.Read` alone lets Graph *accept* searches
+but Microsoft docs say searches never return more than GET would. All channel GET needs
+`ChannelMessage.Read.All`. Without it, searches silently cover chats only. Asking at sign-in makes
+tenants that withhold it fail visibly at consent, not serve incomplete results.
+
+The channel inventory is two permissions, and they are separate scopes on purpose:
+`Channel.ReadBasic.All` lists a team's channels, `ChannelMessage.Read.All` reads what was posted in
+one. Each is the least-privileged permission Microsoft documents for its collection. A tenant
+refusing the message permission still lists teams and channels, and each tool's 403 names only the
+permission its own request needed.
 
 **State.** Every token is a reference token re-validated on each request. State location decides
 whether a restart or second replica causes loss. FastMCP defaults to an encrypted file tree in
