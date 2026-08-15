@@ -5,23 +5,22 @@ shape must exist. Two modules spelling `teams:///meetings/…` would silently di
 lives here, not in tool files. This is the only module that spells or parses these URIs (enforced
 by tests/test_layering.py).
 
-## The three shapes, and why they are three
+## The four shapes, and why they are four
 
-Two of them are Graph's ways of addressing a Teams message
+Three of them are Graph's three ways to address a Teams message
 (https://learn.microsoft.com/en-us/graph/api/chatmessage-get):
 
     teams:///chats/{chatId}/messages/{messageId}
     teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}
+    teams:///teams/{teamId}/channels/{channelId}/messages/{rootId}/replies/{replyId}
 
-Graph has a third — a reply in a channel thread is addressed *under* the post it answers,
-`…/messages/{rootId}/replies/{replyId}` — and it is deliberately not written yet. The search
-projection carries no `replyToId`, so nothing this connector has can tell a reply from a root post;
-a shape no tool can mint is a shape nothing has checked the spelling of, and it belongs with the
-tool that walks a channel post by post and therefore knows each reply's parent. Which is also why a
-channel hit that is really a reply gets the root-post shape above: it is the only true thing a
-search can say about where that message lives.
+The third is the one a search cannot mint. Graph addresses a reply in a channel thread *under* its
+parent post, and the search projection carries no `replyToId` — so a channel hit that is really a
+reply becomes the second shape, which Graph answers 404 to. `browse_channel` walks a channel post
+by post and therefore knows each reply's parent, which is why it is what mints this shape and why
+the shape lives here rather than there.
 
-The third shape: `teams:///meetings/{joinWebUrl}`. A meeting is addressed by join URL because that
+The fourth shape: `teams:///meetings/{joinWebUrl}`. A meeting is addressed by join URL because that
 is the only route Microsoft Graph gives a delegated caller from chat to meeting. The chat
 collection's default projection carries `onlineMeetingInfo.joinWebUrl` and Graph's onlineMeetings
 lookup matches it byte-for-byte. Nothing else—no chat id, topic, or date—turns into one.
@@ -69,6 +68,7 @@ class MessageHandle:
     chat_id: str | None = None
     team_id: str | None = None
     channel_id: str | None = None
+    reply_to_id: str | None = None
 
     @property
     def permission(self) -> str:
@@ -84,6 +84,11 @@ class MessageHandle:
             "a handle addresses either a chat or a team channel"
         )
         channel = f"teams:///teams/{_segment(self.team_id)}/channels/{_segment(self.channel_id)}"
+        if self.reply_to_id is not None:
+            return (
+                f"{channel}/messages/{_segment(self.reply_to_id)}"
+                + f"/replies/{_segment(self.message_id)}"
+            )
         return f"{channel}/messages/{_segment(self.message_id)}"
 
 
@@ -102,11 +107,14 @@ class MeetingHandle:
 # above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
+_REPLY_HANDLE = re.compile(
+    r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)/replies/([^/]+)\Z"
+)
 _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
-    """`uri` as a message handle, or None if it is not one this connector can address.
+    """`uri` as a message handle, or None if it is not one this connector can read.
 
     None rather than an exception carrying advice: what to tell a caller about a malformed handle
     is the tool boundary's business, and each reader's advice names its own shapes and its own
@@ -116,6 +124,17 @@ def message_handle(uri: str) -> MessageHandle | None:
     if chat is not None:
         chat_id, message_id = (unquote(part) for part in chat.groups())
         return _message_handle(MessageHandle(message_id=message_id, chat_id=chat_id))
+    reply = _REPLY_HANDLE.match(uri)
+    if reply is not None:
+        team_id, channel_id, root_id, message_id = (unquote(part) for part in reply.groups())
+        return _message_handle(
+            MessageHandle(
+                message_id=message_id,
+                team_id=team_id,
+                channel_id=channel_id,
+                reply_to_id=root_id,
+            )
+        )
     channel = _CHANNEL_HANDLE.match(uri)
     if channel is not None:
         team_id, channel_id, message_id = (unquote(part) for part in channel.groups())
@@ -151,7 +170,13 @@ def meeting_uri_for(join_web_url: str | None) -> str | None:
 
 def _message_handle(handle: MessageHandle) -> MessageHandle | None:
     """The handle, unless a segment decoded to nothing — `%20` is not an id."""
-    ids = (handle.message_id, handle.chat_id, handle.team_id, handle.channel_id)
+    ids = (
+        handle.message_id,
+        handle.chat_id,
+        handle.team_id,
+        handle.channel_id,
+        handle.reply_to_id,
+    )
     if any(value is not None and not value.strip() for value in ids):
         return None
     return handle

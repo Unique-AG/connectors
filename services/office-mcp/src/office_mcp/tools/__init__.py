@@ -27,6 +27,7 @@ from fastmcp import FastMCP
 
 from office_mcp.shared.seam import ToolAdvice, graph_scope
 from office_mcp.tools import (
+    browse_channel,
     get_me,
     list_channels,
     list_chats,
@@ -93,6 +94,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     list_chats,
     list_teams,
     list_channels,
+    browse_channel,
     search_messages,
     read_message,
 )

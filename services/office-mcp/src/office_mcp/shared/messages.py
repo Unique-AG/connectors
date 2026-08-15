@@ -1,11 +1,11 @@
 """What a Teams message is: the shape it is answered in, and the HTML it is unwound from.
 
-Two tools answer with a message or part of one — a search hit and a single read — and Graph hands
-each of them a different projection of the same thing. A message therefore has to mean the same
-thing whichever tool produced it, and that is a property of there being one definition rather than
-of two agreeing: a message a search found and the same message read by handle are the same type,
-normalised by the same function, with the same sender shape and the same test for "did a person
-write this".
+Three tools answer with a message or part of one — a search hit, a channel post and its replies, a
+single read — and Graph hands each of them a different projection of the same thing. A message
+therefore has to mean the same thing whichever tool produced it, and that is a property of there
+being one definition rather than of three agreeing: a post browsed in a channel and a message read
+by handle are the same type, normalised by the same function, with the same sender shape and the
+same test for "did a person write this".
 
 What the normalisation has to survive, all of it documented and none of it optional:
 
@@ -42,7 +42,9 @@ What the normalisation has to survive, all of it documented and none of it optio
   are not in its projection, which leaves the missing sender as the only thing that says so — and
   a read that lands on one has to say what the event *was*, from `eventDetail`. Two behaviours
   over one question, which is why `event_of` is the one place that answers it rather than each
-  tool having its own opinion about what counts as a message somebody wrote.
+  tool having its own opinion about what counts as a message somebody wrote. A channel listing
+  filters by the same call: Graph offers no server-side `messageType` filter on that collection,
+  so the filtering is client-side, and it has to ask the same question a read does.
 * **Deleted and edited messages exist.** `deletedDateTime` and `lastEditedDateTime` are read-only
   properties of `chatMessage`; a tombstone must not be presented as live content.
 * **`mentions[]` and `attachments[]` are the key to the body.** The body carries `<at id="0">` and
@@ -50,6 +52,10 @@ What the normalisation has to survive, all of it documented and none of it optio
   resolved. A *card* is one of those attachments and nothing else: Graph marks it by the
   attachment's `contentType`, so that — never the shape of the body text — is what says a message
   is a card here.
+
+One number lives here for the same reason the shape does: `MAX_REPLIES_PER_POST`, how far back into
+a channel thread a reply is reachable at all. One tool applies it and two others *describe* it —
+which is exactly the shape of a fact that must not be spelled twice.
 """
 
 import html
@@ -68,6 +74,30 @@ from msgraph.generated.models.identity import Identity
 from pydantic import BaseModel, Field
 
 from office_mcp.shared.handles import MessageHandle
+
+# How many of a post's replies a channel browse returns, and so how far back a reply is reachable in
+# this connector at all. Shared vocabulary rather than the browser's own, because two tools that
+# never apply it have to *describe* it: a search hit that is really a channel reply carries a handle
+# Graph answers 404 to, and the reader's explanation of that 404 names this window as the only place
+# a reply's own handle can be minted from. A second spelling of the number is a refusal telling a
+# caller to look somewhere the browser does not reach.
+#
+# `$expand=replies` brings back up to 200 replies per post, and 50 posts of 200 replies is a
+# response no caller has a budget for — so the newest of each thread are kept, and a thread that
+# came back full to this window is one that may have older replies, exactly as a full page is
+# elsewhere here.
+#
+# This window is the end of the line rather than a first page. Graph puts its own cursor on a post
+# whose expanded replies were themselves paged, and following it is a request per post against a
+# channel that allows the whole app one a second — the same reason a channel's own pages are not
+# walked. That cursor needs no separate reporting: Graph expands up to 200 replies before it pages
+# them, so a thread it paged has far more than this window holds and the window comes back full. So
+# a reply older than this window has no route to its full text here: a search can find it and report
+# Microsoft's snippet, but Graph addresses a reply under the post it answers and the search index
+# does not name that post, so such a hit cannot be read. Browsing again returns the same newest
+# replies, which is why every surface that mentions this says so rather than sending a caller back
+# round.
+MAX_REPLIES_PER_POST = 10
 
 
 class MessageSender(BaseModel):
@@ -307,7 +337,9 @@ def message_of(message: ChatMessage, *, handle: MessageHandle) -> TeamsMessage:
         created_at=message.created_date_time,
         last_edited_at=message.last_edited_date_time,
         deleted_at=message.deleted_date_time,
-        reply_to_id=message.reply_to_id,
+        # The handle is the fallback rather than the source: it names a parent only for a reply,
+        # while Graph sets `replyToId` on every message in a channel thread.
+        reply_to_id=message.reply_to_id or handle.reply_to_id,
         subject=message.subject,
         # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
         importance=message.importance,
