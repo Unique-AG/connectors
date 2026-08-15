@@ -1,8 +1,9 @@
 """The `teams:///` grammar: what round-trips, and what is not a handle of a given family.
 
 The families are separate because the tools and the permissions behind them are, so the assertions
-that matter most here are the negative ones — a message handle must not parse as a meeting's, and a
-meeting's must not parse as a message's. Every id below is invented.
+that matter most here are the negative ones — a message handle must not parse as a meeting's, a
+meeting's must not parse as a message's, and a meeting's must not parse as a transcript's. Every id
+below is invented.
 """
 
 import pytest
@@ -17,6 +18,10 @@ JOIN_WEB_URL = (
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
     + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
 )
+
+MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+
+_TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0001"
 
 _CHAT_ID = "19:release@thread.v2"
 _MESSAGE_ID = "1770000000000"
@@ -140,12 +145,24 @@ class TestTheHandleGrammar:
             "the join URL is one path segment; an unencoded slash would make it several"
         )
 
+    def test_a_transcript_handle_round_trips_both_ids(self) -> None:
+        handle = handles.TranscriptHandle("MSo1N2Y5:ZGFjYw==", "MSMjMCMj/0001")
+
+        parsed = handles.transcript_handle(handle.uri)
+
+        assert parsed is not None
+        assert (parsed.meeting_id, parsed.transcript_id) == (
+            "MSo1N2Y5:ZGFjYw==",
+            "MSMjMCMj/0001",
+        )
+
     @pytest.mark.parametrize(
         "uri",
         [
             # Another family's shape, which is the negative that matters: the first segment is what
             # tells the families apart, and a parser that ignored it would answer for all of them.
             "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
+            f"teams:///transcripts/{MEETING_ID}/{_TRANSCRIPT_ID}",
             "teams:///meetings/",
             "teams:///meetings/%20",
             "teams:///meetings/a/b",
@@ -163,6 +180,22 @@ class TestTheHandleGrammar:
     )
     def test_what_is_not_a_meeting_handle(self, uri: str) -> None:
         assert handles.meeting_handle(uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The family a transcript is reached *from*, which is the negative that matters most
+            # here: one of these two is what a lister takes and the other is what it mints.
+            handles.MeetingHandle(JOIN_WEB_URL).uri,
+            "teams:///transcripts/only-one-id",
+            "teams:///transcripts//a",
+            "teams:///transcripts/a/%20",
+            "teams:///transcripts/a/b/c",
+            "",
+        ],
+    )
+    def test_what_is_not_a_transcript_handle(self, uri: str) -> None:
+        assert handles.transcript_handle(uri) is None
 
     @pytest.mark.parametrize("join_web_url", [None, "", "   "])
     def test_no_join_url_means_no_handle_rather_than_an_empty_one(
