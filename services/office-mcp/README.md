@@ -2,11 +2,12 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes four MCP
+Users sign in with their own Microsoft account and the server acts as them. It exposes five MCP
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
-most recently active first; `search_messages`, full-text search across every Teams message they can
-see; and `read_message`, one of those messages in full — each one a file of its own, and more land
-in later PRs, stacked on top of this one, one tool per PR.
+most recently active first; `list_teams`, the teams they are a member of; `search_messages`,
+full-text search across every Teams message they can see; and `read_message`, one of those messages
+in full — each one a file of its own, and more land in later PRs, stacked on top of this one, one
+tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
 user to consent to are exactly the union of what those tools need — see **Tool surface** below.
@@ -111,7 +112,14 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me` |
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
+| `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
+
+`Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
+is a separate scope from the broad message permission below on purpose: a tenant that refuses
+`ChannelMessage.Read.All` can still list its teams, and `list_teams`' own 403 names only the
+permission its own request needed rather than sending an administrator after one that was never
+missing.
 
 `Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
 `$expand=lastMessagePreview`, and a message preview is a message — which "read the names and members
