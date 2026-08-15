@@ -112,6 +112,7 @@ MEETING_PERMISSION = "OnlineMeetings.Read"
 # constants. Tool's GRAPH_PERMISSIONS tuple names its request permissions; gets name from here.
 # Typo in one is Entra scope rejection, sign-in fails for everybody.
 TRANSCRIPT_PERMISSION = "OnlineMeetingTranscript.Read.All"
+RECORDING_PERMISSION = "OnlineMeetingRecording.Read.All"
 
 # Artifacts one listing may scan. This is "newest first" cost: no orderby, only looking at the
 # collection reveals newest. Bound on artifacts not requests (what collect_pages can bound). Graph
