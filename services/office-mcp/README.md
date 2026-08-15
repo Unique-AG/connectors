@@ -2,10 +2,11 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes two MCP tools
-so far — `get_me`, the signed-in user's own profile, and `list_chats`, their Microsoft Teams chats
-most recently active first — each one a file of its own, and more land in later PRs, stacked on top
-of this one, one tool per PR.
+Users sign in with their own Microsoft account and the server acts as them. It exposes three MCP
+tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
+most recently active first; and `search_messages`, full-text search across every Teams message they
+can see — each one a file of its own, and more land in later PRs, stacked on top of this one, one
+tool per PR.
 
 ## Layout
 
@@ -36,10 +37,13 @@ verifies this.
 **`shared/` is what a file-per-tool costs.** Two files are free to disagree, and this package is the
 list of things they must not: `handles.py` (the `teams:///` grammar — every shape this connector
 mints, its parser and its speller, and the permission each Teams surface is read under),
-`identity.py` (who the signed-in user is — `get_me` reports it, and it is the fact every other
-answer gets correlated against, so a second tool asking with a `GET /me` of its own would be a
-second answer to one question) and `seam.py` (the per-tool On-Behalf-Of token and the
-Graph-failure-to-advice mapping, because a model reads every refusal on this server as one voice). A
+`messages.py` (what a Teams message is — today the sender, normalised out of the two identity
+shapes Graph answers with, so that the same message found by one tool and read by another is not
+reported with two different authors), `identity.py` (who the signed-in user is — `get_me` reports
+it, and it is the fact every other answer gets correlated against, so a second tool asking with a
+`GET /me` of its own would be a second answer to one question) and `seam.py` (the per-tool
+On-Behalf-Of token and the Graph-failure-to-advice mapping, because a model reads every refusal on
+this server as one voice). A
 thing belongs there when two tools would otherwise each need a copy *and* a difference between the
 copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
@@ -94,13 +98,25 @@ requested at sign-in cannot be consented to.
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me` |
-| `Chat.Read` | Delegated | No | `list_chats` |
+| `Chat.Read` | Delegated | No | `list_chats`, `search_messages` |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages` |
 
 `Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
 `$expand=lastMessagePreview`, and a message preview is a message — which "read the names and members
 of chats" does not cover. It is spelled in `shared/handles.py` rather than in the tool file, because
 which Teams surface a permission covers is the handle grammar's knowledge; the tool still declares
-its own tuple, which is what its 403 is worded from. `shared/seam.py` writes the same names out once more, by hand, as
+its own tuple, which is what its 403 is worded from.
+
+`ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
+enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
+returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
+`ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
+missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
+than serve half an answer per query. It is also the first permission here that needs an
+administrator, and the first row where one tool needs two: neither Graph's 403 nor Entra's
+AADSTS65001 says which of the two was missing, so `search_messages` names both in every refusal —
+handed one name, an administrator may grant the permission that was never missing and watch the
+identical failure. `shared/seam.py` writes the same names out once more, by hand, as
 `REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
 those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
 an authorize request carrying a scope it does not know, which fails every sign-in for every user.

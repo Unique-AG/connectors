@@ -56,7 +56,9 @@ _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
-REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset({"User.Read", "Chat.Read"})
+REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
+    {"User.Read", "Chat.Read", "ChannelMessage.Read.All"}
+)
 
 
 def graph_scope(permission: str) -> str:
