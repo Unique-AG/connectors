@@ -10,14 +10,7 @@ _provider: MeterProvider | None = None
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
-    """Install the OTel→Prometheus reader so domain instruments land where `/metrics` reads from.
-
-    HTTP `/metrics` itself is served by `unique_mcp.monitoring.setup_ops` (via
-    `unique_toolkit.monitoring.get_metrics`), which reads `unique_toolkit.monitoring.REGISTRY` —
-    a `CollectorRegistry` distinct from `prometheus_client`'s module-level default. The reader
-    is pointed at that same registry explicitly; otherwise its metrics land in the default
-    registry and never appear in a scrape.
-    """
+    """Install OTel→Prometheus reader to route domain instruments to the toolkit registry."""
     global _provider
     if _provider is not None:
         return _provider
@@ -29,8 +22,6 @@ def configure_metrics(config: AppConfig) -> MeterProvider:
     return provider
 
 
-# Domain instruments are declared here, at import time, against the OTel API rather than the SDK.
-# Before `configure_metrics` runs, `get_meter` hands back a proxy that buffers instrument creation
-# and rebinds to the real provider once one is set — so import order doesn't matter and nothing
-# needs a lazy accessor. There are none yet: the first ones land with the Microsoft Graph client.
+# Domain instruments declared here at import time. OTel proxy buffers creation
+# until configure_metrics runs.
 _meter = metrics.get_meter("office_mcp")
