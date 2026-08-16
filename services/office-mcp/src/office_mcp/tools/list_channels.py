@@ -1,26 +1,19 @@
-"""`list_channels` — the channels of one team the signed-in user can see.
+"""`list_channels` — channels of one team the signed-in user can access.
 
-The middle step of the channel path: `list_teams` names a team and this names a channel inside it.
-The pair is always needed, because a channel name is unique only inside its own team — every team
-has a `General` — and a channel id alone addresses nothing in Graph, which is why the handle
-`read_message` takes for a channel message carries both.
+`list_teams` names a team; this names a channel inside it. Channel names are unique only inside
+their own team — every team has a `General` — so channel identification needs both ids.
 
-**`$select` here is a requirement rather than an optimisation.** Graph documents populating a
-channel's `email` as "an expensive operation that results in slow performance"
-(https://learn.microsoft.com/en-us/graph/api/channel-list), and selecting around it is the only way
-not to pay for it. The same reference gives this collection `$select` and `$filter` and nothing
-else — no `$top`, which `services/teams-mcp` shipped and had to take back out — so the window is
-applied while walking the pages Graph chose, exactly as `list_teams` does.
+**`$select` is a requirement: the connector must exclude the expensive `email` property.** Graph \
+documents email as "an expensive operation that results in slow performance". Without `$select`, \
+every channel listing pays that cost. The collection accepts no `$top` (Graph returns 400); \
+the window is this connector's own, applied while walking pages.
 
-The collection is already access-trimmed: "Teams members can't see private or shared channels that
-they aren't members of in the response for this API". That is why an absent channel is not evidence
-that the team has no such channel, and why the description says so rather than leaving a model to
-conclude it.
+Graph filters membership-based channels: private and shared channels the user is not a member of \
+do not appear. An absent channel does not mean the team lacks it — only that the user cannot \
+access it.
 
-What this file does not own is the token and the refusal wording (`shared/seam.py`, so this tool's
-403 sounds like every other tool's). Everything else — the name, the description, the permission,
-the fields asked for, the window, the answer shape and the request — is here.
-"""
+Token exchange and error wording belong to `shared/seam.py`; the tool owns the request, window,
+answer shape, fields, permission, and description."""
 
 from datetime import datetime
 from typing import Annotated
@@ -38,61 +31,48 @@ from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "list_channels"
 
-# The delegated Graph permission this tool's one request needs — the cheap "basic" scope over a
-# channel's identity, which is all this collection returns. Reading what was *posted* in a channel
-# is the broad `ChannelMessage.Read.All`, which the tools that read messages declare; a tenant
-# commonly grants this one and withholds that one, which is why the two are named separately.
+# The cheap "basic" scope for channel identity. Reading messages needs `ChannelMessage.Read.All`;
+# a tenant often grants this one and withholds the broad one, so the two are named separately.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 
-# Built once at import: a call inside a parameter default rebuilds the descriptor on every
-# registration and is a lint error in both of this repo's checkers.
+# Built at import, not in the parameter default: rebuilding the descriptor on every registration
+# is a lint error.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
-# How many channels one call returns, and the ceiling on `limit`. Graph takes no `$top` on this
-# collection either, so this window is this connector's own and so is its bound: it caps the number
-# of Graph requests one call can make while walking the pages.
+# Window size and limit cap. Graph accepts no `$top` here; this bounds requests per call.
 MAX_CHANNELS = 200
 
-# What a channel listing asks for, which is everything Graph populates that identifies a channel.
-# `email` is excluded deliberately (see the module docstring), and so is `isArchived`: Graph
-# documents `layoutType` as coming back null on this collection and archived channels are a Teams
-# preview concept, so neither is claimed here.
+# Excludes `email` (expensive) and `isArchived` (archived channels are in preview).
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = f"""\
-List the channels of one Microsoft Teams team, identified by the `team_id` list_teams returned: \
-each channel's id, name, description, membership type and creation date.
+List channels of a Microsoft Teams team. Pass the `team_id` from list_teams.
 
-Call this to see what channels a team has, and to put a name to the `channel_id` search_messages \
-reports on a channel message — a channel id alone addresses nothing. Channel names are unique only \
-inside their own team (every team has a `General`), which is why the pair is always needed. No \
-message content is returned here.
+Each channel's id, name, description, membership type, and creation date are returned. \
+Channel names are unique only inside their own team (every team has a `General`), so use both \
+ids to address a channel. `membership_type` is `standard`, `private`, or `shared`.
 
-The list is already trimmed to what the signed-in user may see: Microsoft omits private and shared \
-channels they are not a member of, so an absent channel is not evidence that the team has no such \
-channel. `membership_type` says which kind each one is — `standard`, `private` or `shared`.
+The list shows only channels the signed-in user can access. An absent channel means the user \
+cannot access it, not that the team lacks it.
 
-There is no pagination and no ordering, for the same reason as list_teams: Microsoft accepts no \
-page size on this collection either. As many channels as `limit` means the team may have more; \
-fewer than `limit` is all of them this user can see. Widen `limit` (up to {MAX_CHANNELS}).\
+Microsoft Graph applies no page size to this collection. As many channels as `limit` means more \
+may exist; fewer than `limit` is all of them the user can see. Raise `limit` (up to \
+{MAX_CHANNELS}).\
 """
 
 
 class ChannelSummary(BaseModel):
     channel_id: str = Field(
         description=(
-            "The channel's Graph id, e.g. `19:...@thread.tacv2`. It is the id search_messages "
-            + "reports as `channel_id` on a channel message, and it addresses a channel only "
-            + "together with its `team_id`. Opaque — copy it rather than constructing one from a "
-            + "name."
+            "The channel's Graph id, e.g. `19:...@thread.tacv2`. Use it with `team_id` to "
+            + "address a channel. Opaque — copy it from responses rather than constructing it."
         )
     )
     display_name: str | None = Field(
         description=(
-            "The channel's name as Teams shows it, e.g. `General`. Every team has a `General` "
-            + "channel, so a name is only unique within its own team."
+            "The channel name, e.g. `General`. Names are unique only inside their own team."
         )
     )
     description: str | None = Field(
@@ -100,10 +80,9 @@ class ChannelSummary(BaseModel):
     )
     membership_type: str | None = Field(
         description=(
-            "`standard` for a channel every team member is in, `private` for one with its own "
-            + "member list, or `shared` for one shared with other teams. Null when Microsoft Graph "
-            + "reported a type this connector predates. Private and shared channels the signed-in "
-            + "user is not a member of are not in this list at all."
+            "`standard` for all team members, `private` for a member-list channel, or `shared` "
+            + "for a channel shared with other teams. Null if the type predates this code. "
+            + "Channels the user is not a member of do not appear."
         )
     )
     created_at: datetime | None = Field(
@@ -114,10 +93,9 @@ class ChannelSummary(BaseModel):
 class ChannelList(BaseModel):
     channels: list[ChannelSummary] = Field(
         description=(
-            "The channels of this team that the signed-in user can see. As many as `limit` means "
-            + "there may be more; fewer than `limit` is all of them the user can see. There is no "
-            + f"cursor: raise `limit` (up to {MAX_CHANNELS}). Microsoft Graph applies no order to "
-            + "this collection either."
+            "Channels the user can access. As many as `limit` means more may exist; fewer is all "
+            + "of them. No cursor; raise `limit` (up to "
+            + f"{MAX_CHANNELS}). Microsoft Graph does not order this collection."
         )
     )
 
@@ -143,8 +121,7 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
 
 def _channel(channel: Channel) -> ChannelSummary:
     assert channel.id is not None, "Graph returned a channel with no id"
-    # `ChannelMembershipType` subclasses `str`, so the member is its own wire value ("standard");
-    # a value the generated enum has no member for deserializes to None rather than raising.
+    # Unknown membership types deserialize to None rather than raising (Graph SDK behavior).
     return ChannelSummary(
         channel_id=channel.id,
         display_name=channel.display_name,
@@ -155,11 +132,8 @@ def _channel(channel: Channel) -> ChannelSummary:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Declare this tool against the shared Graph transport.
-
-    `transport` is the long-lived `httpx.AsyncClient` from `create_graph_transport`; the tool
-    borrows it per call and never owns it. `create_app` closes it on shutdown.
-    """
+    """Register this tool. The tool owns the request, window, answer shape, fields, permission, \
+and description. Token exchange and error wording stay in `shared/seam.py`."""
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -173,9 +147,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The team whose channels to list, exactly as list_teams reported its "
-                    + "`team_id`. Opaque — a team's name is not one, and one cannot be "
-                    + "constructed."
+                    "The team whose channels to list, exactly as list_teams reported it. "
+                    + "Opaque — copy it rather than constructing it. A team name is not one; "
+                    + "names can repeat within a tenant, but team_ids do not."
                 ),
             ),
         ],
@@ -186,8 +160,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_CHANNELS,
                 description=(
                     "How many channels to return. Default 50, maximum "
-                    + f"{MAX_CHANNELS} — as with list_teams, Microsoft Graph applies no "
-                    + "page size here and this is the window applied while paging."
+                    + f"{MAX_CHANNELS}. Microsoft Graph applies no page size; this is the "
+                    + "window applied while paging."
                 ),
             ),
         ] = 50,

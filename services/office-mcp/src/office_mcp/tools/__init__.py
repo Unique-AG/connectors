@@ -1,14 +1,13 @@
-"""The registry: every tool module and their shared permissions.
+"""The registry of all tools and their permissions.
 
-A tool is one file. It publishes `GRAPH_PERMISSIONS` (tuple) and `register` (function). Adding a
-tool: one file plus one line here.
+Each tool is one file that publishes `GRAPH_PERMISSIONS` and `register`. Add a tool: one file
+plus one line here.
 
-TRAP: `GRAPH_SCOPES` must be derived from modules, never hand-written. At startup, `create_app`
-passes all permissions to the auth provider. A forgotten permission means sign-in fails with
-AADSTS65001. Deriving it here guarantees every registered tool has consent.
+TRAP: Derive `GRAPH_SCOPES` from modules, never hand-write it. `create_app` passes all permissions
+to the auth provider at startup. A missing permission causes sign-in to fail with AADSTS65001.
+Deriving here guarantees every tool has consent.
 
-Order is stable (via `dict.fromkeys`, not `set`) so token keys don't change on each restart.
-"""
+Order is stable (via `dict.fromkeys`, not `set`)."""
 
 from typing import Protocol
 
@@ -29,8 +28,7 @@ __all__ = ["GRAPH_SCOPES", "register_tools"]
 
 
 class ToolModule(Protocol):
-    """Contract a tool file must satisfy. Checked structurally: missing `GRAPH_PERMISSIONS` or
-    `register` is a type error, not a runtime surprise."""
+    """Contract a tool must satisfy. Type-checked structurally at import."""
 
     GRAPH_PERMISSIONS: tuple[str, ...]
 
