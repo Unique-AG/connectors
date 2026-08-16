@@ -1,13 +1,16 @@
 """`list_meeting_transcripts` — whether a Teams meeting was transcribed, and a handle for each.
 
-Reports what exists and none of what was said. A recurring series is one meeting to Graph, so
-every occurrence's transcript lands in one collection. Distinguish occurrences with
-`started_after`/`started_before`.
+Reports what exists and none of what was said. A transcript is large, so this tool answers as a
+separate step, not as a field on the meeting. A recurring series is one meeting to Graph, so every
+occurrence's transcript lands in one collection. No default occurrence exists. Distinguish
+occurrences with `started_after`/`started_before`.
 
 Shared code in `shared/meetings.py` and `shared/handles.py` documents how meetings are reached,
-how the join URL encodes, what an occurrence window is, and how "newest first" is bounded. This
-file owns the answer's vocabulary: "was not transcribed" is a fact about one artifact, never about
-the meeting.
+how the join URL encodes, what an occurrence window is, and how "newest first" is bounded. These
+are facts about the meeting, not about transcripts, so they live outside this file. Handle grammar
+lives there too, for the same reason. A second spelling of a handle would work in the tool that
+mints it and fail in the tool that reads it. This file owns the answer's vocabulary: "was not
+transcribed" is a fact about one artifact, never about the meeting.
 
 ## Five answers that need different action
 
@@ -71,8 +74,14 @@ from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "list_meeting_transcripts"
 
-# Both permissions come from `shared/meetings.py` rather than being typed here. The resolve and
-# list are redeemed together under one token, or not at all.
+# Both permissions come from `shared/meetings.py`, not typed here. A permission belongs to its
+# resource. No sibling module may import this file to learn its spelling (see
+# tests/test_layering.py, rule 4).
+#
+# The resolve and list are redeemed together, under one token, or not at all. The transcript
+# handle minted below already carries the resolved meeting id. A future tool that reads
+# transcript content needs only TRANSCRIPT_PERMISSION. Withholding OnlineMeetings.Read would not
+# block that.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 # Built at import: a call inside a parameter default rebuilds it on every registration.
@@ -120,7 +129,8 @@ separately: a tenant can grant one and withhold the other.\
 """
 
 # Error message for invalid meeting_uri. Unique to this tool to prevent a caller being sent to
-# the wrong tool.
+# the wrong tool. A shared message would rebuild a shared tools module one import at a time (see
+# tests/test_layering.py, rule 4).
 _NOT_A_MEETING_HANDLE = (
     "list_meeting_transcripts takes the `meeting_uri` that list_chats reports on a meeting chat, "
     + "and this is not one. A meeting handle has exactly one shape:\n"
@@ -249,12 +259,15 @@ async def list_meeting_transcripts(
     """Transcripts of the meeting `handle` addresses, and what a caller should do about them.
 
     Makes at most two Graph requests: resolve the join URL, then list transcripts. Lists all
-    transcripts without filtering (Graph documents no date filter on transcripts), then applies the
-    window while paging. The window bounds are instants (naive ones read as UTC). The same window
+    transcripts without filtering. Graph documents no date filter on this collection, and an
+    unsupported filter can still answer `200 OK` with an empty list, not an error. A caller could
+    not tell a bad filter from a true absence, so no filter is sent. The window is applied while
+    paging instead. The window bounds are instants (naive ones read as UTC). The same window
     decides which transcripts are kept and what an empty answer means.
 
     `include_scan_completeness` only changes whether `scan_incomplete` is reported, not what is
-    read.
+    read. It defaults to false. The field matters for one rare meeting shape only, and a field
+    that is null everywhere else is one a model can ignore.
     """
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -320,7 +333,11 @@ def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Declare this tool against the shared Graph transport."""
+    """Declare this tool against the shared Graph transport.
+
+    `transport` is a shared, long-lived client. This tool borrows it per call and does not own
+    it. `create_app` closes it on shutdown.
+    """
 
     @mcp.tool(
         name=TOOL_NAME,
