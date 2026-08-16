@@ -1,7 +1,8 @@
 """`list_channels` — channels of one team the signed-in user can access.
 
-`list_teams` names a team; this names a channel inside it. Channel names are unique only inside
-their own team — every team has a `General` — so channel identification needs both ids.
+`list_teams` names a team; this names a channel inside it. A channel id alone identifies nothing
+in Graph. Channel names are unique only inside their own team — every team has a `General`.
+Channel identification needs both ids.
 
 **`$select` is a requirement: the connector must exclude the expensive `email` property.** Graph \
 documents email as "an expensive operation that results in slow performance". Without `$select`, \
@@ -42,7 +43,8 @@ _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 # Window size and limit cap. Graph accepts no `$top` here; this bounds requests per call.
 MAX_CHANNELS = 200
 
-# Excludes `email` (expensive) and `isArchived` (archived channels are in preview).
+# Excludes `email` (expensive). Excludes `isArchived`: archived channels are a Teams preview
+# feature. Excludes `layoutType`: Graph documents it as always null on this collection.
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
@@ -121,7 +123,8 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
 
 def _channel(channel: Channel) -> ChannelSummary:
     assert channel.id is not None, "Graph returned a channel with no id"
-    # Unknown membership types deserialize to None rather than raising (Graph SDK behavior).
+    # `ChannelMembershipType` subclasses `str`; each member equals its own wire value. Unknown
+    # membership types deserialize to None rather than raising (Graph SDK behavior).
     return ChannelSummary(
         channel_id=channel.id,
         display_name=channel.display_name,
@@ -132,8 +135,11 @@ def _channel(channel: Channel) -> ChannelSummary:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool owns the request, window, answer shape, fields, permission, \
-and description. Token exchange and error wording stay in `shared/seam.py`."""
+    """Register this tool with the shared Graph transport.
+
+    The tool borrows `transport` per call and does not own it. `create_app` closes it on
+    shutdown.
+    """
 
     @mcp.tool(
         name=TOOL_NAME,

@@ -7,7 +7,7 @@ TRAP: Derive `GRAPH_SCOPES` from modules, never hand-write it. `create_app` pass
 to the auth provider at startup. A missing permission causes sign-in to fail with AADSTS65001.
 Deriving here guarantees every tool has consent.
 
-Order is stable (via `dict.fromkeys`, not `set`)."""
+Order is stable (via `dict.fromkeys`, not `set`). This keeps token keys the same across restarts."""
 
 from typing import Protocol
 
