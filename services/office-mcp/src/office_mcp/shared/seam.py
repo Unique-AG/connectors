@@ -1,58 +1,36 @@
-"""How a tool is attached to the outside: the token it calls under, and what a refusal becomes.
+"""How a tool talks to the outside world: the token and error messages.
 
-Everything else a tool needs is its own — its name, its arguments, its answer, its Graph request.
-These two things are not, and both for the same reason: a model on the other end reads this server
-as one thing. A token exchange refused for one tool has to be explained the way it is explained for
-every other, and a Graph 403 has to name a permission in the same sentence shape wherever it came
-from, or the surface stops sounding like one server and starts sounding like ten. This module is
-therefore the seam — and it is the one file under `shared/` that imports FastMCP, which is what
-keeps the framework out of the rest of the shared vocabulary (`tests/test_layering.py` rule 1).
+A model reads this server as one thing. Token refusals must be explained consistently and 403 errors
+must name the permission wherever they come from—or the surface sounds like ten servers. This module
+is the seam (the only file in `shared/` that imports FastMCP—keeps the framework away from shared
+vocabulary, enforced by tests/test_layering.py).
 
-## The token
+Token Exchange
 
-`EntraOBOToken` is FastMCP's own On-Behalf-Of dependency: it takes the Entra token the caller
-presented (audience `api://{client_id}`, useless against Graph) and exchanges it for a Graph one in
-the scopes asked for. It is a dependency default, so it never appears in a tool's input schema —
-the model cannot see it and cannot supply it.
+`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. It takes Entra's token (audience `api://{client_id}`,
+useless against Graph) and exchanges it for a Graph token in the requested scopes. It is a dependency
+default—models never see it.
 
-`GraphToken` wraps it for one reason: a dependency is resolved *outside* the tool body, so an
-exchange Entra refuses never enters the body and never reaches the `graph_tool_errors` block inside
-it. FastMCP reports it as "Failed to resolve dependency 'graph_token' for get_me", which tells
-a model nothing it can act on. The one thing it does pass through untouched is a `FastMCPError` —
-so raising `ToolError` here, from the permissions this instance was built for, is what makes an
-unconsented permission as fixable before the Graph call as a 403 is after it.
+`GraphToken` wraps it: dependency resolution happens outside the tool body, so an Entra refusal
+never reaches the `graph_tool_errors` block inside. FastMCP reports "Failed to resolve dependency"
+(unhelpful to models). Raising `ToolError` here makes an unconsented permission as fixable as a 403
+after the Graph call. One instance covers one exchange, however many permissions, because Entra
+redeems them together. The refusal does not say which permission was missing, so all are named.
 
-One instance covers one exchange, however many permissions that exchange asks for, because Entra
-redeems them together and refuses them together: a tool needing two gets one token or none. Naming
-all of them is therefore the same requirement as it is for a 403 — the refusal does not say which
-one was missing.
+Error Messages
 
-## The advice
+Models' only options are: retry, retry later, sign in, ask administrator, or stop. Every message
+names one. `Microsoft 365` comes first (not "Graph"—models don't call Graph). Then remedy and
+whether retrying helps. Then operator evidence in parentheses. Graph details only where they explain
+(404 means three things) or operators need their own label (`Graph request id` for support).
 
-`graph_client` classifies what Graph said; this decides what to tell the caller to do about it,
-because the caller is a language model and its only options are: retry, retry later, ask the user
-to sign in, ask an administrator for a permission, or stop. A message that does not name one of
-those is a message it will answer by calling the same tool again.
+TRAP: `GraphForbidden` covers 401 and 403. Only status separates them: 401 means sign in again,
+403 means ask administrator. 403 is only actionable if it names the permission. Graph never does.
+The tool does—every mapping here is scoped to the permissions the failing call used.
 
-Every message here is written to one shape. The thing that refused comes first and is always
-"Microsoft 365" — not "Microsoft Graph", which is the name of an API the caller is not calling.
-Then the remedy, and whether retrying could possibly help. Then, in a parenthesis at the end rather
-than woven through the advice, the evidence an operator needs. Graph is named after that opening
-only where it is the explanation (one 404 meaning three different things, a 500 that recurs) or
-where an operator needs its own label — `Graph request id` is what Microsoft support asks for, by
-that name.
-
-Two failures are only distinguishable with information Graph does not send. `GraphForbidden`
-covers both 401 and 403 and carries `status` for exactly this reason: 401 means the token was
-rejected (sign in again), 403 means the token was fine and the permission is missing (ask an
-administrator) — opposite remedies behind one exception class. And a 403 is only actionable if
-the message says *which* permission, which Graph never does; the tool does, so every mapping
-here is scoped to the permissions the failing call was made under.
-
-The same missing permission also has an earlier, uglier shape: if it was never consented to,
-Entra refuses the On-Behalf-Of exchange (AADSTS65001) and Graph is never reached at all. That
-failure is `entra_token_errors`, and it says the same thing as the 403 above — because from the
-caller's side it *is* the same thing, and the remedy is identical.
+The same missing permission appears earlier as Entra refusal (AADSTS65001) if never consented.
+Graph is never reached. `entra_token_errors` reports the same remedy: ask administrator to grant
+the permission and consent for the organization.
 """
 
 import re
@@ -74,55 +52,24 @@ from office_mcp.graph_client import (
     GraphUnavailable,
 )
 
-# A Graph delegated permission, as a scope the On-Behalf-Of exchange can ask for. Graph accepts a
-# bare permission name at the authorize endpoint too, but only because it is the default resource;
-# the full form is unambiguous and is what FastMCP's own examples use.
 _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 
-# What every tool here declares about itself, because every tool here is one of these: it reads,
-# and what it reads is a live Microsoft 365 tenant rather than a closed world. One dict rather than
-# one per tool file — a tool that differed would be saying something, and none of them does.
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
-
-# Every delegated permission this connector may ask Entra for, written out once. A tool declares
-# its own `GRAPH_PERMISSIONS` and the registry unions them, so nothing here is *derived* from this
-# list — what it is, is the list of names that are allowed to appear in one, and `tests/test_app.py`
-# holds every tool file to it.
-#
-# It exists because a misspelling is otherwise invisible in both directions. `Chat.Raed` reaches
-# `additional_authorize_scopes` unchallenged — every test comparing tool files against the registry
-# compares the typo with itself — and Entra rejects an authorize request carrying a scope it does
-# not know, so every sign-in fails for every user, for a permission nobody asked for.
-#
-# Adding a name here is therefore a deliberate act and not bookkeeping: it widens what sign-in asks
-# every user of this connector to consent to, and some of the ones still to come need an
-# administrator. Adding one means a tool genuinely needs it, spelled as Microsoft spells it, and the
-# README's permission table says which tool and why — which is also why this is what the connector
-# asks for today rather than what it might ask for one day: a name no tool declares is a name
-# nothing has checked the spelling of, and it weakens the check above by exactly the permissions it
-# would wave through.
 REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset({"User.Read", "Chat.Read"})
 
 
 def graph_scope(permission: str) -> str:
-    """A delegated Graph permission as the scope sign-in and the exchange ask for it by."""
+    """Permission as scope for sign-in and exchange."""
     return f"{_GRAPH_SCOPE_PREFIX}{permission}"
 
 
 class GraphToken(Dependency[str]):
-    """`EntraOBOToken` for a tool's permissions, with the refusal explained in terms of them.
-
-    The exchange itself is untouched: `__aenter__` delegates to FastMCP's dependency, which owns
-    the credential cache, and `__aexit__` delegates so any cleanup it grows is not dropped.
-    """
+    """Wrap EntraOBOToken: explain the refusal in terms of permissions."""
 
     def __init__(self, *permissions: str) -> None:
         assert permissions, "a token is exchanged for at least one permission"
         self._permissions: tuple[str, ...] = permissions
-        # `EntraOBOToken` is annotated `-> str` (a lie for the type checker's benefit, so a tool
-        # can annotate the token as the string it receives); the value is the dependency object.
-        # Casting back to what it is has to go through `object` — the two types do not overlap.
         self._exchange: Dependency[str] = cast(
             "Dependency[str]",
             cast("object", EntraOBOToken([graph_scope(permission) for permission in permissions])),
@@ -144,36 +91,13 @@ class GraphToken(Dependency[str]):
 
 
 def graph_token(*permissions: str) -> str:
-    """A `GraphToken` typed as the token FastMCP will inject in its place.
-
-    The same annotation `EntraOBOToken` uses, for the same reason: the tool body is handed a
-    string and should say so, and the dependency object it never sees would otherwise have to be
-    cast at every declaration site. The cast goes through `object` for the same reason it does
-    above — a dependency is not a string, which is precisely why FastMCP replaces it with one.
-
-    Build one per tool module, at module level: a call inside a parameter default rebuilds the
-    descriptor on every registration and is a lint error in both of this repo's checkers. Sharing
-    one instance across calls is safe — FastMCP enters it per call and it holds nothing but its
-    permissions.
-    """
+    """GraphToken typed as string for tool injection. Build once at module level."""
     return cast("str", cast("object", GraphToken(*permissions)))
 
 
 @contextmanager
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
-    """Map any Graph failure raised in this block onto an actionable MCP tool error.
-
-    `permissions` are the delegated Graph permissions the enclosed calls were made with, e.g.
-    `Chat.Read` — they are what make a 403 fixable rather than merely reported. Where a call needs
-    more than one, name them all: Graph never says which of them it refused, so an administrator
-    given only one name may grant the wrong permission and see the same failure.
-
-    `not_found` replaces the advice for a 404. The default tells the caller to check that the id it
-    sent came from a tool response verbatim, which is the likeliest cause when a tool takes an id —
-    and is misleading advice for one that takes a handle another tool just produced, where the
-    remaining causes are deletion and lost access. Pass the sentence that is true of this call; the
-    diagnostics Graph sent are appended either way.
-    """
+    """Map Graph failures onto actionable tool errors. Name all permissions—Graph doesn't."""
     assert permissions, "a Graph call is made under at least one permission"
     try:
         yield
@@ -183,20 +107,7 @@ def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Genera
 
 @contextmanager
 def entra_token_errors(*permissions: str) -> Generator[None]:
-    """Map a failed On-Behalf-Of exchange in this block onto an actionable MCP tool error.
-
-    Wrap the *acquisition* of a Graph token, not the Graph call: this is the failure that happens
-    before any request is made, and the one FastMCP would otherwise report as "Failed to resolve
-    dependency 'graph_token'" — a message that names neither the missing permission nor the
-    remedy, because FastMCP's dependency resolver knows neither. It re-raises `ToolError`
-    untouched (`fastmcp.server.dependencies` lets `FastMCPError` subclasses out of dependency
-    resolution unwrapped, which is what makes this interception point work at all).
-
-    `permissions` are the delegated Graph permissions the exchange asked for, and where it asked
-    for more than one, all of them are named: an exchange is refused as a whole, so an
-    administrator given only one name may grant the wrong permission and see the same failure —
-    the same reason `graph_tool_errors` names them all for a 403.
-    """
+    """Map token acquisition failures onto actionable tool errors. Name all permissions."""
     assert permissions, "a token exchange asks for at least one permission"
     try:
         yield
@@ -204,9 +115,6 @@ def entra_token_errors(*permissions: str) -> Generator[None]:
         raise ToolError(_token_advice(failure, permissions)) from failure
 
 
-# Entra puts a machine-readable code in every token-endpoint failure (`AADSTS65001` is "the user
-# or administrator has not consented"). It is the one part of a multi-line azure-identity error
-# worth repeating to the caller, and what an operator searches for.
 _ENTRA_CODE = re.compile(r"AADSTS\d+")
 
 
