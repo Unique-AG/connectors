@@ -1,14 +1,4 @@
-"""Microsoft Entra auth via FastMCP's AzureProvider with durable state.
-
-This module holds no OAuth code — AzureProvider is a full OAuth 2.1 proxy that owns the authorize
-endpoint, PKCE on both hops, redirect callback, token refresh, and On-Behalf-Of exchange. This
-service only decides which app registration and state store to use.
-
-The state store is critical. Every token is a reference token re-validated on each request. The
-default store is an encrypted file tree in the process's home directory, which logs users out on
-each pod restart and breaks at the second replica. Postgres, which this service already runs, makes
-the deployment horizontally scalable.
-"""
+"""Microsoft Entra auth via FastMCP's AzureProvider with durable Postgres storage."""
 
 from collections.abc import Sequence
 
@@ -19,27 +9,25 @@ from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 
 from office_mcp.config import DatabaseConfig, EntraConfig
 
-# Trap: created by the store on first use; database user needs CREATE on schema. No migration
-# because columns are the store library's to define and keep in sync.
 _OAUTH_TABLE_NAME = "oauth_kv"
 
-# Trap: AzureProvider requires a non-OIDC scope. Entra omits OIDC scopes from `scp` claim, so
-# they cannot be enforced. Graph permissions (requested per tool via On-Behalf-Of) are separate.
+# Trap: oauth_kv is created by the store on first use. Database user needs CREATE on schema.
+# No migration file exists; this is intentional.
+
+# Trap: AzureProvider needs a non-OIDC scope. Entra omits OIDC scopes from scp claim.
 _REQUIRED_SCOPES = ("access_as_user",)
 
 _ENCRYPTION_SALT = "office-mcp-oauth-storage"
 
 
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
-    """Durable encrypted OAuth state storage for Entra tokens.
+    """Create encrypted OAuth storage in Postgres. The client secret is the encryption key.
 
-    Encryption is mandatory, not optional. FastMCP's default store encrypts. Handing a bare table
-    would disable at-rest encryption silently while looking like configuration.
-
-    The client secret is the key material (derived via PBKDF2). No second secret is needed. Rotating
-    the secret makes existing rows unreadable. Decryption errors are treated as cache misses, so
-    users re-authenticate once instead of the server failing. This trade-off avoids a separate
-    secret provisioning path.
+    Encryption is mandatory, not optional. A bare table would disable at-rest encryption
+    silently while still looking like configuration. The key is derived from the client secret,
+    so no second secret is needed. Rotating the secret makes existing rows unreadable: a
+    decryption error is treated as a cache miss, so each user signs in once more instead of the
+    server failing.
     """
     return FernetEncryptionWrapper(
         key_value=PostgreSQLStore(
@@ -59,24 +47,12 @@ def build_auth(
     client_storage: AsyncKeyValue,
     graph_scopes: Sequence[str],
 ) -> AzureProvider:
-    """Build the auth provider.
+    """Create the auth provider. base_url must be the externally-reachable service URL.
 
-    `base_url` must be the externally-reachable URL of this service. OAuth metadata and the
-    redirect URI Entra sends browsers to are derived from it. The redirect path is the provider's
-    default `/auth/callback`. The app registration must list `{base_url}/auth/callback` as a Web
-    redirect URI.
-
-    `client_storage` is passed rather than built here so the readiness probe uses the same object,
-    proving the provider's connection to Postgres works. A separate readiness connection would pass
-    while the provider's connection fails, masking sign-in outages.
-
-    `graph_scopes` are the Microsoft Graph permissions the tools need, which is why they arrive
-    from outside rather than being listed here — the tools decide them. They ride the authorize
-    request only: Entra issues one token per resource (AADSTS28000), so the code exchange asks
-    only for this API's own scope, and the Graph ones are redeemed later, per tool call, by the
-    On-Behalf-Of exchange. Sending them at authorize time is what makes that possible at all —
-    OBO can only redeem a permission the user or an administrator has already consented to, and
-    a permission that is never requested is never consented to.
+    Trap: graph_scopes must include every permission any tool will need. Entra issues one token
+    per resource, so the code exchange asks only for this service's scope. Graph permissions are
+    redeemed per tool call via On-Behalf-Of. A permission never requested at authorize time cannot
+    be consented to, so the exchange later fails.
     """
     return AzureProvider(
         client_id=entra.client_id,
