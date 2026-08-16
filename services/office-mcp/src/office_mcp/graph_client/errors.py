@@ -1,15 +1,14 @@
-"""Graph failures categorized by remedy, not just status code.
+"""Graph failures sorted by remedy.
 
-The SDK reports all failures as APIError, carrying status as data. Without categorizing, each
-caller must re-derive remedies from the status code. This module draws distinctions once:
+The SDK reports all failures as APIError with a status code. This module categorizes them once so
+each caller does not re-derive remedies:
 
-- GraphThrottled (429): retriable, Graph supplies Retry-After.
-- GraphForbidden (401/403): token lacks permission.
-- GraphNotFound (404): resource not found.
-- GraphUnavailable (5xx or no response): service down or unreachable.
+- GraphThrottled (429): Retriable. Graph supplies Retry-After.
+- GraphForbidden (401/403): Token lacks permission.
+- GraphNotFound (404): Resource not found or not visible.
+- GraphUnavailable (5xx or no response): Service down or unreachable.
 
-Anything else (400, 409) raises base GraphFailure. Inventing categories per status code would
-guess at remedies that do not exist.
+Anything else (400, 409) raises GraphFailure. Other status codes do not suggest remedies.
 
 One of them is not a failed request at all. `GraphPagingUnending` is Graph answering 200 after 200
 with nothing in them while still advertising more of a collection, which no status code describes
@@ -41,12 +40,7 @@ from office_mcp.graph_client.observability import (
 
 
 class GraphFailure(Exception):
-    """Microsoft Graph request failure with status, code, and request ID.
-
-    The subclass indicates the remedy; status/code/request_id provide evidence. 401 and 403 are
-    both GraphForbidden, but only 401 is fixed by signing in again. Microsoft support needs
-    request_id.
-    """
+    """Graph request failure. Subclass indicates remedy. Support needs request_id."""
 
     def __init__(
         self,
@@ -63,15 +57,8 @@ class GraphFailure(Exception):
 
 
 class GraphThrottled(GraphFailure):
-    """Rate limit from Graph; SDK retries did not outlast it.
-
-    `retry_after_seconds` is Graph's Retry-After header. Graph documents that obeying it is the
-    fastest recovery path. Usage accrues while throttled, so eager retries make recovery worse.
-    None means Graph sent no header; the caller must choose its own backoff.
-
-    Reaching this means the request was retried GraphSettings.max_retries times or Retry-After
-    exceeded the SDK's 180 s ceiling and the SDK declined to wait.
-    """
+    """Rate limit from Graph. SDK retries did not outlast it. Obey Retry-After header for fastest
+    recovery. None means Graph sent no header—choose your own backoff."""
 
     def __init__(
         self,
@@ -87,42 +74,31 @@ class GraphThrottled(GraphFailure):
 
 
 class GraphForbidden(GraphFailure):
-    """Graph refused the caller, not the request.
-
-    Covers 403 (token valid but no scope for this resource; usually missing admin consent) and
-    401 (token rejected). Both are non-retriable and cannot be worked around by asking
-    differently. Status separates them: tell user to sign in again (401) or ask an administrator
-    (403).
-    """
+    """Graph refused the caller, not the request. TRAP: 401 (token rejected) and 403 (no scope)
+    are both forbidden. Status tells them apart. 401 means sign in again. 403 means ask administrator."""
 
 
 class GraphNotFound(GraphFailure):
-    """Resource not found or not visible to caller.
-
-    TRAP: Graph returns 404 for both. This cannot prove absence.
-    """
+    """TRAP: Graph returns 404 for both not-found and not-visible. Cannot prove absence."""
 
 
 class GraphUnavailable(GraphFailure):
-    """Graph returned 5xx, timeout, or connection failure.
-
-    Usually transient. TRAP: teams-mcp found recurring 500s on every attempt when a chat contains
-    Loop components or certain cards that Graph cannot serialize. Callers that retry forever spin.
-    """
+    """Graph returned 5xx, timeout, or connection failure. Usually transient. TRAP: Some 500s are
+    permanent for certain content (Loop components, certain cards). Endless retries spin."""
 
 
 class GraphPagingUnending(GraphFailure):
     """Graph would not end a collection: a run of empty pages, every one advertising more.
 
-    Not a failed request — each of those pages was a 200 — so it carries no status, no code and no
+    Not a failed request—each of those pages was a 200—so it carries no status, no code and no
     request id, and `_classify` never produces it. `pagination.collect_pages` raises it directly
     when the run exceeds `pagination.MAX_EMPTY_PAGES`, and `empty_pages` is how long that run was.
 
-    A raise rather than an `assert`, for two reasons that are both about the bound being real.
-    `python -O` strips asserts, and the bound is the only thing between a collection that answers
-    nothing but empty pages and a walk that follows them until throttling or a timeout ends it —
-    the thousand-page walk `MAX_EMPTY_PAGES` exists to prevent. And Graph misbehaving is the
-    boundary this module exists to describe, not an invariant of this connector's own code.
+    A raise rather than the `assert` this used to be, for two reasons that are both about the bound
+    being real. `python -O` strips asserts, and the bound is the only thing between a collection
+    that answers nothing but empty pages and a walk that follows them until throttling or a timeout
+    ends it—the thousand-page walk `MAX_EMPTY_PAGES` exists to prevent. And Graph misbehaving is
+    the boundary this module exists to describe, not an invariant of this connector's own code.
     """
 
     def __init__(self, message: str, *, empty_pages: int) -> None:
@@ -236,21 +212,12 @@ def _classify(error: APIError) -> GraphFailure:
 
 
 def _lowercase_headers(error: APIError) -> dict[str, str]:
-    """Convert APIError.response_headers to a plain dict with lowercased keys.
-
-    The attribute type is dict[str, str], but the request adapter may assign httpx.Headers
-    (case-insensitive). Lowercase keys work for both.
-    """
+    """Convert response_headers to dict with lowercased keys."""
     return {name.lower(): value for name, value in (error.response_headers or {}).items()}
 
 
 def _retry_after_seconds(headers: dict[str, str]) -> float | None:
-    """Parse Retry-After header as delay-seconds if Graph sent a number.
-
-    Graph documents the header as delay-seconds. The HTTP-date form is legal but never observed
-    here. Guessing wrong about the caller's clock is worse than reporting nothing. None already
-    means "no advice from Graph".
-    """
+    """Parse Retry-After header as delay-seconds or None."""
     value = headers.get("retry-after")
     if value is None:
         return None

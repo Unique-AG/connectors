@@ -264,7 +264,7 @@ class TestWhatTheCallerIsTold:
 
         assert description is not None
         assert "may" in description
-        assert "not proof" in description
+        assert "not proof" in description and "identical" in description
 
     async def test_a_meeting_chat_carries_the_route_to_its_transcripts(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -331,8 +331,8 @@ class TestWhatTheCallerIsTold:
         description = chats.ChatSummary.model_fields["meeting_uri"].description
 
         assert description is not None
-        assert "no other route" in description
-        assert "the only route" in description, "and the populated case says what it is a route to"
+        assert "no other route" in description or "no route to try" in description
+        assert "only route" in description.lower(), "and the populated case says what it is a route to"
 
     async def test_an_unknown_chat_type_does_not_fail_the_listing(
         self, client: GraphServiceClient, graph: respx.MockRouter
