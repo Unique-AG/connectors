@@ -376,9 +376,16 @@ class TestTheHandleItMints:
         described = search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
-        assert "no tool on this server takes it as an argument" in described
-        assert "no route from here to the message body" in described
+        assert "No tool here accepts it as an argument" in described
+        assert "no route to the body" in described
         assert "`summary` is the whole of the text" in described
+
+    def test_the_summary_warns_against_inference_from_truncation(self) -> None:
+        """Summary is an excerpt, not the message. Users must not treat it as complete."""
+        described = search_messages.MessageHit.model_fields["summary"].description
+        assert described is not None
+
+        assert "or infer from its absence" in described
 
 
 class TestWhatTheCallerIsTold:

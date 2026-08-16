@@ -32,9 +32,10 @@ the one request that was being made anyway. This tool is one Graph request, alwa
 criterion" is advertised in the input schema as an `anyOf` — the JSON Schema spelling of it, and the
 only form a client can check — *and* re-checked in the tool body, because FastMCP validates
 arguments against the function signature rather than against the schema it advertises, so a client
-that ignores the `anyOf` would otherwise reach Graph with a search for everything. And whether the
-criteria are empty is measured on the query string rather than on which arguments were passed, so a
-`query` of nothing but punctuation is refused rather than sent.
+that ignores the `anyOf` would otherwise reach Graph with a search for everything. Emptiness is
+measured on the query string, not on which arguments were passed, so `query` text with no actual
+words (whitespace, punctuation only) contributes nothing and may cause a refusal if no other
+criterion is set.
 
 What this file does not own is the handle grammar (`shared/handles.py`, so the handle minted here is
 the handle a reader of one will parse — two spellers would look like a search result that cannot be
@@ -81,56 +82,40 @@ TOOL_NAME = "search_messages"
 # a handle addresses; a search is made under both, having no handle yet.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
-# Built once at import: a call inside a parameter default rebuilds the descriptor on every
-# registration and is a lint error in both of this repo's checkers.
+# Built once at import. A call inside a parameter default rebuilds the descriptor on every
+# registration, and both of this repo's checkers report that as an error.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
-# Graph documents `size` as defaulting to 25 with a maximum of 1000, but the paragraph that caps a
-# page at 25 names only the `message` and `event` entities, and no chatMessage-specific ceiling is
-# published. 50 is the largest page this connector will claim on undocumented ground.
+# No chatMessage-specific ceiling is published; Graph caps `message` and `event` at 25. This tool
+# uses 50 on undocumented ground as a safe intermediate.
 MAX_RESULTS = 50
 
 _DESCRIPTION = f"""\
-Search the Microsoft Teams messages the signed-in user can see — every one-to-one chat, group \
-chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
-and read state. Messages from ANY participant match, not only the user's own; call get_me if you \
-need to know who the user is. It is the only tool here that searches.
+Search Teams messages the user can see across all chats and channels — by keywords, sender, \
+mentions, date, attachments and read state. Matches include messages from any participant, not \
+only the user.
 
-A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
-view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
-truncated with `...` where it was cut — is the only text here. Every hit carries a `uri` handle \
-naming that exact message, and no tool on this server takes one as an argument yet: it identifies \
-a message rather than opening one, and there is no route from here to the full text. Never present \
-`summary` as the whole message, and never conclude from it that the message does not say more.
+Results are metadata and a snippet only. The search index returns no message body; `summary` is \
+the only text. Each hit carries a `uri` handle naming that message. No tool here reads it yet: \
+there is no route to the full body. Do not quote `summary` as the whole message.
 
-There is no result total, and this is not an omission: Microsoft Graph reports a per-page count \
-rather than a match count for Teams messages, so a total would be a fabrication. `next_offset` is \
-the whole of the paging contract and the whole completeness signal: a value there means the index \
-holds more matches, and null means this page is the last. Pass it back as `offset` to continue. A \
-page can hold fewer than `size` messages: offsets index Graph's own results, and system messages \
-("Ada joined the chat") are dropped from ours because Graph gives them neither an author nor any \
-text.
+There is no result total — Graph gives a per-page count, not a match count. Use `next_offset` to \
+page: a value means more matches, null means there is no page to advance to. Pass it back as \
+`offset` to advance. System messages ("Ada joined") are dropped: Graph gives them no author.
 
-The search covers every chat and channel the user belongs to and cannot be narrowed to one of \
-them — Microsoft's index offers no such scope, so there is no chat or channel parameter and a \
-`chat_id` from list_chats is not one. Narrow with `sender`, dates or more words instead, and read \
-`chat_id` (or `team_id`/`channel_id`) on each hit to see where it came from.
+Search covers all user chats and channels; you cannot narrow to one. Use `sender`, dates or more \
+words to filter. Read `chat_id` or `channel_id` on each hit to see where it came from.
 
-Results cannot be sorted: Graph refuses sort options on a message search. Its documented default \
-for message results is newest first and relevance can be mixed in, so compare `created_at` \
-whenever order matters to the answer.
+Results are not sorted: Graph refuses sort options on message search. The default is newest first \
+with possible relevance mixing. Compare `created_at` when order matters.
 
-At least one criterion is required and all criteria given are ANDed. `query` is matched as plain \
-words and every word must appear, anywhere in the message and in any order — the words do not have \
-to be next to each other. To require that they are, quote them yourself: `"release notes"` matches \
-only where those two words are adjacent. Search operators typed into `query` are searched for \
-literally, so put a sender in `sender`, a date in `sent_after`/`sent_before`, and so on. Those two \
-dates are inclusive whole days and are \
-applied by the index itself, so a date-bounded search still costs one request and still covers \
-channels. `recipient` is honoured by Microsoft only for one-to-one chats and will hide group and \
-channel matches, so prefer `sender`. Channel matches need the delegated \
-{CHANNEL_PERMISSION} permission, which this connector requires at sign-in rather \
-than degrading to chats-only search without saying so.\
+At least one criterion is required; all criteria are ANDed. `query` matches as plain words: every \
+word must appear anywhere, in any order. Quote to require adjacency: `"release notes"` matches \
+only side by side. Search operators in `query` are treated as text, not operators. Put operators \
+in their own parameters. Dates are inclusive whole days, applied by the index at no extra cost, \
+and cover both chats and channels. `recipient` works only for one-to-one chats; prefer `sender`. \
+Channel search requires the delegated {CHANNEL_PERMISSION} permission, which this connector \
+requires at sign-in.\
 """
 
 
@@ -139,29 +124,23 @@ class MessageHit(BaseModel):
 
     uri: str | None = Field(
         description=(
-            "A handle for this exact message, e.g. "
-            + "`teams:///chats/{chatId}/messages/{messageId}` or "
-            + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
-            + "percent-encoded. It names the message so that the same one can be recognised across "
-            + "answers; no tool on this server takes it as an argument, so there is no route from "
-            + "here to the message body and `summary` is the whole of the text. Null in the rare "
-            + "case where Graph returned a hit with neither a chat nor a channel identity, which "
-            + "cannot be addressed at all."
+            "Handle naming this message. Format: `teams:///chats/{chatId}/messages/{messageId}` "
+            + "or `teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each "
+            + "id percent-encoded. No tool here accepts it as an argument; no route to the body. "
+            + "`summary` is the whole of the text this tool returns. "
+            + "Null if Graph returned a hit with no chat or channel identity."
         )
     )
     message_id: str = Field(
         description=(
-            "The message's Graph `id`. Unique only within its own chat, channel or reply thread — "
-            + "Microsoft documents that the same id may recur elsewhere — so identify a message by "
-            + "`uri`, never by this alone."
+            "Graph message `id`. Unique within its chat or channel only; use `uri` to identify "
+            + "a message globally."
         )
     )
     chat_id: str | None = Field(
         description=(
-            "The chat this message is in, unencoded, e.g. `19:...@thread.v2`. It is the same id "
-            + "list_chats reports as `chat_id`, which is how to put a topic and members to the "
-            + "chat a hit came from. Null for a channel message; `team_id` and `channel_id` are "
-            + "set instead."
+            "Chat this message is in, unencoded, e.g. `19:...@thread.v2`. Same as list_chats "
+            + "reports. Null for channel messages."
         )
     )
     team_id: str | None = Field(
@@ -171,54 +150,43 @@ class MessageHit(BaseModel):
         description="The channel a channel message was posted in. Null for a chat message."
     )
     subject: str | None = Field(
-        description=(
-            "The message subject. Usually null or empty: Teams only sets one on some channel root "
-            + "posts, never on ordinary chat messages."
-        )
+        description="Message subject. Usually null: Teams sets it only on some channel root posts."
     )
     summary: str | None = Field(
         description=(
-            "Microsoft's own snippet of the matching text, truncated with `...` where it was cut. "
-            + "This is the ONLY message content this search returns — Graph's search projection "
-            + "has no body — so do not quote it as the whole message or infer from its absence."
+            "Graph's excerpt from the match, truncated with `...`. This is the only message body "
+            + "text this search returns. Do not quote it as the whole message or infer from its "
+            + "absence."
         )
     )
     sender: MessageSender = Field(description="Who sent the message.")
     created_at: datetime | None = Field(
         description=(
-            "When the message was sent. Compare this when order matters: Graph refuses to sort a "
-            + "message search, so the sequence results arrive in is not a contract."
+            "When sent. Compare this to order results: Graph does not sort message search."
         )
     )
     last_modified_at: datetime | None = Field(
         description=(
-            "When the message was last modified. Microsoft counts adding or removing a reaction "
-            + "as a modification, so a difference from `created_at` is not evidence of an edit — "
-            + "the property behind Teams' own 'Edited' flag is a different one, and Microsoft's "
-            + "search index does not return it."
+            "Last modification time. Includes reactions added or removed; not the 'Edited' flag."
         )
     )
     importance: str | None = Field(
         description="`normal`, `high` or `urgent`, as the sender marked the message."
     )
     web_url: str | None = Field(
-        description=(
-            "A link that opens the message in Microsoft Teams. Populated for channel messages and "
-            + "null for chat messages, which Graph gives no such link."
-        )
+        description="Link to open the message in Teams. Set for channel messages, null for chats."
     )
 
 
 class MessageSearchResults(BaseModel):
-    messages: list[MessageHit] = Field(description="The matching messages on this page of results.")
+    messages: list[MessageHit] = Field(description="Matching messages on this page.")
     next_offset: int | None = Field(
         description=(
-            "The `offset` that reaches the next page of matches, or null when this page is the "
-            + "last. It is both how to page on and the whole completeness signal: a value here "
-            + "means Microsoft's index holds more matches than this page, and null means it does "
-            + "not. Graph reports no match total for Teams messages, so there is no other. It "
-            + "counts the hits Graph returned rather than the messages listed here, because "
-            + "offsets index Graph's own unfiltered results."
+            "The offset that reaches the next page of results, or null when the page cannot "
+            + "advance further. Null means either no more results exist, or the page held no hits "
+            + "to advance past even though Graph said more may exist — in both cases, do not use "
+            + "this offset again. It counts Graph's hits, not the messages this tool returned, "
+            + "because offsets index Graph's unfiltered results."
         )
     )
 
@@ -248,15 +216,12 @@ class SearchCriteria:
         return not _query_string(self)
 
 
-# The criteria a caller may set, in declaration order. The tool advertises this as a JSON Schema
-# `anyOf` of one-element `required` lists, which is how "at least one of these" becomes something
-# a client can check rather than a sentence in a description it may not read.
 CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria))
 
-# What the tool says when it is called with nothing to look for. Graph would answer such a request
-# with an arbitrary slice of everything the user can read, which reads like a real result set and
-# is the one failure mode a model cannot detect from the response. Built from `CRITERIA` rather
-# than written out, so a criterion added above appears here without anybody remembering to add it.
+# Graph would answer a criteria-free search with an arbitrary slice of everything the user can
+# read. That reads like a real result set, so it is the one failure mode a model cannot detect
+# from the response. Built from `CRITERIA` rather than written out, so a criterion added above
+# appears here without anybody remembering to add it.
 _NO_CRITERIA = (
     "search_messages needs at least one of "
     + ", ".join(CRITERIA)
@@ -380,7 +345,7 @@ def _query_string(criteria: SearchCriteria) -> str:
         terms.append(f"to:{_quoted(criteria.recipient)}")
     if criteria.mentions is not None:
         # Microsoft's example is a user id "without '-'", which is exactly `UUID.hex`. Typing the
-        # parameter as a UUID is also what makes this the one term needing no quoting.
+        # parameter as a UUID is also what makes this the one term that needs no quoting.
         terms.append(f"mentions:{criteria.mentions.hex}")
     if criteria.sent_after is not None:
         terms.append(f"sent>={criteria.sent_after.isoformat()}")
@@ -438,7 +403,7 @@ async def search_messages(
 
 
 def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
-    """The one container this request can produce.
+    """The one container this request produces.
 
     Graph "currently supports only a single searchRequest at a time" and one entity type, so the
     nesting — a response per request, a container per entity type — only ever holds one of each.
@@ -507,7 +472,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     """
 
     # Declared and registered in two steps rather than with `@mcp.tool`, which does both and hands
-    # back the function: `add_tool` returns the registered tool, which is the only way to reach the
+    # back the function. `add_tool` returns the registered tool, which is the only way to reach the
     # schema `_require_a_criterion` has to add to. Same registration, same metadata.
     @tool_metadata(
         name=TOOL_NAME,
@@ -521,12 +486,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Keywords to find in the message text or in an attachment's contents. Every "
-                    + "word must appear, anywhere in the message and in any order; they are not "
-                    + "matched as a phrase unless you quote them, so `release notes` finds "
-                    + 'messages containing both words and `"release notes"` only messages where '
-                    + "they are adjacent. Never a query language — a search operator written here "
-                    + "is searched for as literal text, so use the other parameters for filters."
+                    "Keywords to find. Every word must appear anywhere in any order; they are not "
+                    + 'matched as phrases unless quoted. Quote terms for adjacency: `"release '
+                    + 'notes"` matches only side by side, `release notes` matches anywhere. '
+                    + "Search operators are searched as text, not interpreted. Use the other "
+                    + "parameters for filtering."
                 ),
             ),
         ] = None,
@@ -535,9 +499,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only messages from this person, by name, alias or email address. Prefer this "
-                    + "over naming the person in `query`, which would match messages that merely "
-                    + "mention them."
+                    "Only messages from this person, by name, alias or email. Prefer this over "
+                    + "naming the person in `query`, which matches mentions too."
                 ),
             ),
         ] = None,
@@ -546,9 +509,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only messages addressed to this person. Microsoft supports this only "
-                    + "partially, for one-to-one chats, so it hides group-chat and channel "
-                    + "matches: an empty result here is not evidence that no such message exists."
+                    "Only messages addressed to this person. Works only for one-to-one chats; "
+                    + "hides group and channel matches."
                 ),
             ),
         ] = None,
@@ -556,9 +518,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             UUID | None,
             Field(
                 description=(
-                    "Only messages that @-mention this user, by Microsoft Entra object id (the "
-                    + "`user_id` of a sender here, or from get_me). A name will not work: "
-                    + "Microsoft matches this term on the id alone."
+                    "Only messages that @-mention this user, by Entra object id (the `user_id` "
+                    + "of a sender or from get_me). Names do not work: Microsoft matches on the "
+                    + "id alone."
                 )
             ),
         ] = None,
@@ -566,9 +528,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | None,
             Field(
                 description=(
-                    "Only messages sent on or after this date (YYYY-MM-DD), inclusive. Applied by "
-                    + "Microsoft's index, so it costs nothing extra and narrows chats and "
-                    + "channels alike."
+                    "Only messages sent on or after this date (YYYY-MM-DD), inclusive. Applied "
+                    + "by the index at no extra cost."
                 )
             ),
         ] = None,
@@ -580,37 +541,25 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool | None,
             Field(
                 description=(
-                    "True for only messages carrying an attachment, false for only messages "
-                    + "without one. Omit to search both."
+                    "True: messages with attachments. False: messages without. Omit to search both."
                 )
             ),
         ] = None,
         is_read: Annotated[
             bool | None,
-            Field(
-                description=(
-                    "True for only messages the signed-in user has read, false for only unread "
-                    + "ones. Omit to search both."
-                )
-            ),
+            Field(description=("True: read by the user. False: unread. Omit to search both.")),
         ] = None,
         mentions_me: Annotated[
             bool | None,
-            Field(
-                description=(
-                    "True for only messages that @-mention the signed-in user, false for only "
-                    + "messages that do not. Omit to search both."
-                )
-            ),
+            Field(description=("True: @-mentions the user. False: does not. Omit to search both.")),
         ] = None,
         offset: Annotated[
             int,
             Field(
                 ge=0,
                 description=(
-                    "How many results to skip. Start at 0 and pass the previous response's "
-                    + "`next_offset` to advance; it is an index into Microsoft's results, not "
-                    + "into the messages this tool returned."
+                    "How many results to skip. Start at 0; pass the previous response's "
+                    + "`next_offset` to advance."
                 ),
             ),
         ] = 0,
@@ -619,11 +568,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=1,
                 le=MAX_RESULTS,
-                description=(
-                    "How many results to ask Microsoft for. Default 25, maximum "
-                    + f"{MAX_RESULTS} — Microsoft documents no page size above "
-                    + "that for message search."
-                ),
+                description=("Results per page. Default 25, maximum " + f"{MAX_RESULTS}."),
             ),
         ] = 25,
         graph_token: str = _TOKEN,
