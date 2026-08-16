@@ -3,14 +3,20 @@
 TRAP: No video is returned or reachable anywhere in this connector. A Teams meeting runs 30 hours
 max (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams). Graph serves a
 recording as one MP4 byte stream. A model cannot watch video: an MP4 in text form is hundreds of
-megabytes and answers nothing. This tool returns metadata and access rules only.
+megabytes and answers nothing. This tool returns metadata and access rules only. It never returns
+`recordingContentUrl` either: that link only opens with this connector's own token, so passing it
+on leaks a credential or does nothing.
+
+`tests/test_layering.py` rule 7 blocks every module from addressing one recording. That is the only
+way to reach its bytes, so this file must stay inside the rule too.
 
 The two artifacts (recordings and transcripts) need separate tools because Graph gates them
 independently with separate permissions (OnlineMeetingRecording.Read.All vs
 OnlineMeetingTranscript.Read.All). In a default tenant the transcript gate is shut. Combining both
 in one tool would force the choice between failing a reachable recording or holding two incompatible
-statuses. The bridge between artifacts is `content_correlation_id` — Microsoft's own identifier for
-"these two are the same call", present on both.
+statuses. Each tool's refusal also names only its own missing permission, so an admin grants the
+right one. The bridge between artifacts is `content_correlation_id` — Microsoft's own identifier
+for "these two are the same call", present on both.
 
 Newest first: Graph has no `$orderby` on this collection. Read up to MAX_ARTIFACT_SCAN, sort,
 cut to `limit`. Stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
@@ -19,7 +25,8 @@ Past the cap the first entry is the newest of what was READ; `scan_incomplete` s
 The five statuses: `available` (newest first, with access rules), `not_ready` (nothing yet; window
 or meeting recent), `not_recorded` (window is past; nothing there), `scan_incomplete` (more
 recordings than one call reads; none in window; stop, no remedy), `meeting_not_found` (URL matched
-no meeting this user sees).
+no meeting this user sees; not proof of deletion — a meeting made outside a calendar, or one this
+user was never invited to, answers the same way).
 
 Duration is derived: Graph sends no duration field. It is `endDateTime - createdDateTime` from the
 recording itself (not the meeting), null if either timestamp is missing. A recording started late
@@ -27,9 +34,11 @@ and stopped early is shorter than the meeting, and that is the honest answer.
 
 TRAP: Organiser-only download. Microsoft: "Meeting participants don't have permission to download
 meeting recordings" unless tenant admin unblocks them. Never report an unreachable recording as
-missing — the existence and reachability are separate fields. `content_access` says which side the
-signed-in user is on (you_are_the_organizer / organizer_only / unknown). An admin can still block
-downloads tenant-wide from SharePoint and OneDrive.
+missing — the existence and reachability are separate fields. Metadata access is wider than
+download access: Microsoft gives recording metadata to every invited participant, but download
+stays organiser-only. `content_access` says which side the signed-in user is on
+(you_are_the_organizer / organizer_only / unknown). An admin can still block downloads tenant-wide
+from SharePoint and OneDrive.
 """
 
 from datetime import date, datetime
@@ -72,6 +81,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Max recordings per call. A one-off meeting has 1–2; a series has 1 per recorded occurrence.
+# Graph sets no ceiling on `$top`; this limit is ours.
 MAX_RECORDINGS = 50
 
 _DESCRIPTION = f"""\
@@ -122,6 +132,8 @@ succeed where list_meeting_transcripts is refused outright. Recordings need thei
 admin-consented permission ({RECORDING_PERMISSION}); refusal names it.\
 """
 
+# `tests/test_layering.py` rule 4 forbids one tool file from importing another, so this text
+# stays local rather than being shared with list_meeting_transcripts's own refusal.
 _NOT_A_MEETING_HANDLE = (
     "list_meeting_recordings takes the `meeting_uri` from list_chats: "
     "teams:///meetings/{join_web_url}. This is not one. Call list_chats, find the meeting chat, "
@@ -295,6 +307,7 @@ async def list_meeting_recordings(
         found = collected.items
         # Asked for last and only when it changes an answer: with nothing to report there is no
         # organiser to compare anybody with, and the request would be spent on every empty listing.
+        # Reused from shared/identity.py rather than a second GET /me under a different projection.
         caller = (await identity.signed_in_user(client)).id if found else None
 
     return MeetingRecordings(
@@ -378,7 +391,11 @@ def _duration_seconds(recording: CallRecording) -> float | None:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool against the shared Graph transport."""
+    """Register this tool with the shared Graph transport.
+
+    The tool borrows `transport` per call and does not own it. `create_app` closes it on
+    shutdown.
+    """
 
     @mcp.tool(
         name=TOOL_NAME,

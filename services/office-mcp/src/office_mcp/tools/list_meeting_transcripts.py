@@ -22,7 +22,17 @@ collection — the only filterable property shown by example is `contentCorrelat
 (https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example 11), never a date. So the
 request is bare and the same MAX_ARTIFACT_SCAN artifacts are read for any window. Narrowing and
 retrying reads the same artifacts and returns the same answer — advice a model could follow forever.
-The fix: state plainly that there is nothing to try.
+The channel browser tool already shipped that same mistake, as circular retry advice. The fix here:
+state plainly that there is nothing to try.
+
+TRAP: Graph can return an empty page that still carries a next link — the page is empty, but not
+the end of the collection. `graph_client/pagination.py` follows that link instead of stopping.
+Without this, a meeting Graph pages as `[3, nothing, 1]` would look like it held only 3 transcripts.
+Tests page a meeting that exact way and assert every transcript still comes back.
+
+`include_scan_completeness` is opt-in. A short list already shows the window holds no more than
+`limit` transcripts. It cannot show whether the read itself stopped early. One merged flag would
+blur two different fixes: raise `limit`, or accept that nothing more can be known.
 """
 
 from datetime import date, datetime
@@ -50,7 +60,8 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 TOOL_NAME = "list_meeting_transcripts"
 
 # Two permissions: meeting resolve and transcript read, redeemed under one token by Entra.
-# Transcript permission shared with read_transcript, named in shared/meetings.py.
+# Transcript permission is shared with read_transcript. It lives in shared/meetings.py because
+# tests/test_layering.py rule 4 forbids one tool file from importing another.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 # Maximum transcripts to return. Graph documents `$top` but publishes no ceiling, so this is ours.
@@ -185,7 +196,7 @@ async def list_meeting_transcripts(
 ) -> MeetingTranscripts:
     """Transcripts of the meeting and what to do about them.
 
-    Two Graph requests: resolve URL, then list.
+    At most two Graph requests: resolve URL, then list.
     """
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
