@@ -1,44 +1,21 @@
-"""The registry: every tool module, and the one thing that has to be assembled from all of them.
+"""The registry: every tool module, the selection an operator makes, and what it asks for.
 
-A tool is a file. It owns its name, the prose that teaches a model when to reach for it, the Graph
-delegated permissions it calls under, its arguments and their descriptions, the shape it answers
-with, the Graph request it makes and the wording of every refusal only it can explain. Adding the
-sixth tool is adding one file and one line to `_TOOL_MODULES`; reading the fifth is reading one
-file. Nothing here is a base class and nothing is a decorator of our own — a tool module publishes
-three names (`TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`) and that is the whole of the contract,
-which is what `ToolModule` says in the only place it could be checked. All three were already on
-every tool file before an operator could select between them; nothing had to be added to one.
+A tool is one file. It publishes `TOOL_NAME` (str), `GRAPH_PERMISSIONS` (tuple) and `register`
+(function). Adding a tool: one file plus one line here.
 
-**This is the one piece of central machinery, and the scope list is why it exists.** `create_app`
-has to hand the auth provider every Graph permission any registered tool might redeem, at startup,
-before any tool has been called: a permission the user (or an administrator) never consented to
-cannot be obtained later — the On-Behalf-Of exchange fails with AADSTS65001 before the tool body
-runs. So the union is assembled here, *from the modules*, and never written by hand. A hand-written
-list is a list somebody forgets: the sixth tool file would be added, registered, called, and
-refused at sign-in for a permission nobody asked for. Deriving it means a tool that is registered
-has its permissions consented to by construction.
+TRAP: the scope list must be derived from the modules, never hand-written. At startup, `create_app`
+passes the selected tools' permissions to the auth provider. A forgotten permission means sign-in
+fails with AADSTS65001. Deriving it here guarantees every registered tool has consent.
 
-**An operator chooses which of these tools a deployment runs**, and `resolve` is where that choice
-becomes both halves of the answer at once: the modules to register and the permissions to ask for.
-The two are one object because they must not be able to disagree — a tool registered whose
-permission was not requested fails at its first call, and a permission requested for a tool nobody
-registered widens every user's consent screen for nothing. So the filter happens *here*, before the
-union is taken. Hiding a tool afterwards would not do: FastMCP's `enable`/`disable` transforms leave
-the module registered and the scopes already computed, so they shorten `tools/list` and change
-nothing whatever about what the tenant is asked to grant.
+An operator chooses which of these tools run. `resolve` answers with both halves at once: the
+modules to register, and the permissions to ask for. They are one object so they cannot disagree.
+The filter runs here, before the union. FastMCP's `enable`/`disable` transforms would not do: they
+hide a registered tool and leave its scopes computed, so they shorten `tools/list` and change
+nothing the tenant is asked to grant.
 
-The order is the registry's own and never the operator's, and that is load-bearing rather than tidy:
-`dict.fromkeys` over the modules in declaration order rather than a `set`, and the selection
-filtered over that same order, because `TOOLS_ENABLED=a,b` and `b,a` must not make the scope list a
-different string — the consent screen and every cached On-Behalf-Of token key are keyed by it.
-
-Two tools naming the same permission is normal and is not duplication to remove: `list_chats`,
-`search_messages` and `read_message` all spend `Chat.Read`, because a chat's messages are read under
-it whether they are being listed, searched or read one at a time, and the last two both spend
-`ChannelMessage.Read.All` for the channel side of the same question. Each has to declare what its
-own request is made under, because that tuple is also what its 403 and its AADSTS65001 are worded
-from. Deduplication is this module's job, not theirs, and doing it here is what lets a tool arrive
-without knowing which others exist.
+Order is the registry's, never the operator's: `dict.fromkeys` over the modules in declaration
+order, and the selection filtered over that same order. `TOOLS_ENABLED=a,b` and `b,a` must produce
+one scope list, because the consent screen and every cached On-Behalf-Of token key are keyed by it.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -72,20 +49,12 @@ __all__ = [
 
 
 class ToolModule(Protocol):
-    """What a tool file has to publish to be registered, and nothing more.
+    """Contract a tool file must satisfy. Checked structurally: a missing `TOOL_NAME`,
+    `GRAPH_PERMISSIONS` or `register` is a type error, not a runtime surprise.
 
-    A `Protocol` rather than a convention in a docstring because modules are checked against it
-    structurally: a file added to `_TOOL_MODULES` without a `TOOL_NAME`, a `GRAPH_PERMISSIONS` or a
-    `register` is a type error at the line that lists it, rather than an `AttributeError` at
-    startup or — worse — a permission missing from the consent screen.
-
-    `TOOL_NAME` is read as well as the permissions because a selection is written in tool names.
-    Every tool file already published it, to name itself to FastMCP; nothing had to be added to one.
-    It is declared read-only — a property rather than an attribute — because a tool file writes
-    `TOOL_NAME = "get_me"` without an annotation, so its type is the literal string and a *mutable*
-    protocol attribute would demand exactly `str`. Nothing here writes it, and requiring an
-    annotation on every tool file to satisfy a type checker would be the tool files serving this
-    module rather than the other way round.
+    TRAP: `TOOL_NAME` is read-only here. A tool file writes it without an annotation, so its type is
+    a literal string, and a mutable protocol attribute would demand exactly `str` — which would put
+    an annotation on every tool file only to satisfy a type checker.
     """
 
     @property
