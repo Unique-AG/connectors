@@ -1,5 +1,9 @@
 """`get_me` — return the signed-in user's own profile.
 
+The name is `get_me`, not the shell idiom `whoami`, to keep the verb_noun pattern every tool
+name follows. A tool name cannot change later: every caller that learned it must learn it
+again. Microsoft's own M365 connector uses the same name.
+
 **Trap:** `email`, `user_principal_name`, and `user_id` are not interchangeable. Use email to match
 sender and recipient addresses. Use user_principal_name only when email is null (guest or unlicensed
 accounts). Compare user_id only against another user_id—it is the immutable Entra object id.
@@ -19,6 +23,8 @@ TOOL_NAME = "get_me"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 
+# Built once, at import, not inside a parameter default. A default rebuilds it on every
+# registration. Both of this repo's linters reject that.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 _DESCRIPTION = """\

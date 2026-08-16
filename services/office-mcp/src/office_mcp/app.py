@@ -58,7 +58,8 @@ def create_app(
         graph_scopes=GRAPH_SCOPES,
     )
     # Architectural rationale: GraphSettings() is built in the composition root, not inside
-    # graph_client, because it is a stable value that must be held for the app lifetime.
+    # graph_client. The composition root is the place to map a knob from AppConfig. An
+    # operator may need a different value some day.
     graph_transport = create_graph_transport(GraphSettings())
 
     # Architectural constraint: Nothing downstream re-reads the environment. Configuration is
@@ -71,6 +72,9 @@ def create_app(
         finally:
             await graph_transport.aclose()
             await auth.close_obo_credentials()
+            # This does not close oauth_storage. Reaching through its encryption wrapper is
+            # not worth it when the process ends anyway. Its connection pool ends with the
+            # process.
 
     mcp = FastMCP(
         "Office MCP",
