@@ -13,169 +13,112 @@ tool per PR.
 
 ```
 src/office_mcp/
-  app.py                 Compose the app.
-  config.py              Config classes.
-  auth.py                Entra auth setup.
-  logging.py metrics.py  Cross-cutting utilities.
-  graph_client/          Microsoft Graph transport (official SDK).
-  shared/                Code that two or more tools must share.
-  tools/                 One file per tool, plus permissions registry.
-  server/                /ready endpoint (not a tool).
+  app.py                 Build the app.
+  config.py              Configuration.
+  auth.py                Entra authentication.
+  logging.py metrics.py  Utilities.
+  graph_client/          Graph transport (official SDK).
+  shared/                Code two or more tools share.
+  tools/                 One file per tool. Plus registry.
+  server/                Health endpoints.
 ```
 
-This service owns no database schema or migrations. Its only table (oauth_kv) is created by the OAuth store.
+One table: `oauth_kv` (created by the OAuth store). No migrations owned.
 
-**A tool is a file.** `tools/get_me.py` owns the tool name, description, Graph permissions, arguments,
-output shape, Graph request, and error messages. A new tool is one file plus one line in the registry.
-No base class, no decorator. A tool module publishes `GRAPH_PERMISSIONS` and `register`.
+**A tool is one file.** The file owns its name, description, permissions, parameters, output shape,
+Graph request, and error messages. One file plus one line in the registry adds a tool.
+`tools/__init__.py` assembles `GRAPH_SCOPES` from modules (never by hand). All permissions reach
+Entra at startup. A forgotten permission means sign-in fails. `tests/test_app.py` verifies this.
 
-`tools/__init__.py` is the central registry. It assembles `GRAPH_SCOPES`—the union of every tool's
-`GRAPH_PERMISSIONS`—derived from the tool modules themselves, never by hand. Entra must receive all
-Graph permissions at startup. A forgotten permission cannot be obtained later. The registry reads the
-tool *files* from disk to ensure every registered tool declares its permissions, and `tests/test_app.py`
-verifies this.
+**`shared/` is the cost of file-per-tool architecture.** It holds the things two files must agree on:
+`handles.py` (the `teams:///` grammar), `messages.py` (Teams message shape, sender normalization,
+HTML unwinding), `identity.py` (signed-in user profile), `seam.py` (token exchange, error advice).
+Use `shared/` when two tools would otherwise need identical copies and differing copies would be
+visible bugs: handles one tool mints and another rejects; two answers to "who am I"; refusals that
+sound inconsistent. Don't put tool-specific things there: descriptions, parameters, output, requests.
 
-**`shared/` is what a file-per-tool costs.** Two files are free to disagree, and this package is the
-list of things they must not: `handles.py` (the `teams:///` grammar — every shape this connector
-mints, its parser and its speller, and the permission each Teams surface is read under),
-`messages.py` (what a Teams message is — the shape it is answered in, the sender normalised out of
-the two identity shapes Graph answers with, the Teams HTML a body is unwound from, and the test for
-"did a person write this", so that the same message found by one tool and read by another is one
-type normalised by one function rather than two that agree), `identity.py` (who the signed-in user
-is — `get_me` reports
-it, and it is the fact every other answer gets correlated against, so a second tool asking with a
-`GET /me` of its own would be a second answer to one question) and `seam.py` (the per-tool
-On-Behalf-Of token and the Graph-failure-to-advice mapping, because a model reads every refusal on
-this server as one voice). A
-thing belongs there when two tools would otherwise each need a copy *and* a difference between the
-copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
-answers to "who am I", a refusal that sounds like a different server. What does not belong there is
-anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
+Layering rules:
+- `shared/` imports no tool; only `seam.py` imports FastMCP.
+- `graph_client/` imports nothing of this app.
+- `tools/` imports `shared/`, `graph_client/`, FastMCP only.
+- No tool imports another tool.
+- Only `create_app` constructs configuration.
+- Only `handles.py` builds or parses `teams:///` URIs.
+- Packages entered through `__init__` (`graph_client/`, `server/`, `tools/` publish `__all__`; `shared/` does not).
 
-The layering rules are that **`shared/` imports no tool module, and only `shared/seam.py` imports
-FastMCP** — the seam is where the framework is spoken, which is what keeps it out of the handle
-grammar and the rest of the vocabulary; that **`graph_client/` imports nothing of this application
-at all**, taking its own frozen `GraphSettings` instead of reading config; that **`tools/` imports
-`shared/`, `graph_client/` and FastMCP and nothing else of this package** — not `server/`, or the
-tool file is one in name only; that **no tool module imports another tool module**, which is what
-independent means and is the rule the whole layout exists for; that **only `create_app` constructs a
-config**, so nothing downstream can quietly re-read the environment and disagree with the app it
-runs in; that **`shared/handles.py` is the only module that builds or parses a `teams:///` URI**
-(showing the shape to a model in a description, an `examples=` or a refusal is prose and is not
-that); and that **a package is entered through its `__init__`** — `graph_client/`, `server/` and
-`tools/` each publish an `__all__`, and `shared/` deliberately does not, being a grouping whose
-modules are the units and whose consumers say which one they depend on at the import line.
-
-`tests/test_layering.py` enforces them, and each rule is paired with a guard that fails if the rule
-has gone vacuous — an empty tree to walk, a missing file to forbid reaching past, a framework
-nothing imports any more, a second tool module that stopped existing so that "another tool module"
-named nothing, a package with no `__all__` to insist on. One rule of the finished set is still
-absent for exactly that reason and is named in that module: nothing may address a single meeting
-recording, which needs a recordings listing to be the surface it protects. It arrives with the tool
-that lists them, and the numbering is the finished one so that arriving costs a class.
+`tests/test_layering.py` enforces each rule with a guard that fails if the rule is vacuous.
 
 ## Auth
 
-Entra via FastMCP's AzureProvider. FastMCP handles OAuth 2.1: /authorize, PKCE, callback, refresh, and
-On-Behalf-Of exchange. This service chooses the app registration and state store only.
+FastMCP AzureProvider handles OAuth 2.1 (authorization, PKCE, refresh, On-Behalf-Of). This service
+picks the app registration and state store.
 
-The provider mounts these endpoints (must be reachable unauthenticated, not behind an ingress prefix):
+FastMCP mounts these endpoints (must be unauthenticated, not behind ingress prefix):
 ```
 /authorize  /token  /register  /auth/callback  /consent
 /.well-known/oauth-authorization-server
 /.well-known/oauth-protected-resource/mcp
 ```
 
-**App registration requirements:**
-- Web redirect URI: `$PUBLIC_BASE_URL/auth/callback`
-- Application ID URI: `api://$ENTRA_CLIENT_ID` with scope `access_as_user`
+**App registration:**
+- Redirect URI: `$PUBLIC_BASE_URL/auth/callback`
+- App ID URI: `api://$ENTRA_CLIENT_ID` scope `access_as_user`
 - Manifest: `"requestedAccessTokenVersion": 2`
-- Client secret (required for On-Behalf-Of)
-- Single tenant ID (multi-tenant values are rejected)
+- Client secret (for On-Behalf-Of)
+- Single tenant (multi-tenant rejected)
 
-**Graph permissions.** Tools declare what they need. `create_app` passes the union to the provider as
-`additional_authorize_scopes`. Entra issues one token per resource. The code exchange asks for this
-service's scope only. Tools redeem Graph permissions per call via On-Behalf-Of. A permission never
-requested at sign-in cannot be consented to.
+**Graph permissions:** Tools declare what they need. `create_app` passes the union to the provider.
+Tools redeem permissions per call via On-Behalf-Of. No permission = no consent = sign-in fails.
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me` |
-| `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
+| `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `search_messages`, `read_message` (channels) |
+| `ChannelMessage.Read.All` | Delegated | Usually | `search_messages`, `read_message` (channels) |
 
-`Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
-is a separate scope from the broad message permission below on purpose: a tenant that refuses
-`ChannelMessage.Read.All` can still list its teams, and `list_teams`' own 403 names only the
-permission its own request needed rather than sending an administrator after one that was never
-missing.
+`Team.ReadBasic.All` is least-privileged for `/me/joinedTeams` (Microsoft's docs). Separate from
+the broad channel permission: a tenant refusing `ChannelMessage.Read.All` still lists teams.
+`list_teams` 403 names only its own permission.
 
-`Chat.Read` rather than the least-privileged `Chat.ReadBasic` because listing chats by recency needs
-`$expand=lastMessagePreview`, and a message preview is a message — which "read the names and members
-of chats" does not cover. It is spelled in `shared/handles.py` rather than in the tool file, because
-which Teams surface a permission covers is the handle grammar's knowledge; the tool still declares
-its own tuple, which is what its 403 is worded from.
+`Chat.Read` not `Chat.ReadBasic`: listing chats by recency needs `$expand=lastMessagePreview`.
+A preview is a message; "read chat names" doesn't cover it.
 
-The two rows a tool appears in *parenthesised* are the per-surface case, and it is the reason
-`MessageHandle.permission` exists. Graph's permissions for a message read are per surface, so
-`read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
-its 403 names only the one the read was actually made under. Naming both there would be the same
-defect as naming none: an administrator handed two names may grant the one that was never missing.
+Per-surface permissions: `read_message` redeems both (exchange before tool sees argument), but 403
+names only the surface used. Search can't know the surface beforehand, so it names both.
+`shared/seam.py` lists both in `REQUESTABLE_PERMISSIONS`: misspelling is on both sides.
 
-`ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
-enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
-returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
-`ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
-missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
-than serve half an answer per query. It is also what `read_message` needs for a channel message. It
-is the first permission here that needs an administrator, and the first row where one tool needs
-two: neither Graph's 403 nor Entra's AADSTS65001 says which of the two was missing, so
-`search_messages` names both in every refusal — handed one name, an administrator may grant the
-permission that was never missing and watch the identical failure. A search has no choice about
-that, because a search happens before anything knows which surface a hit will be on; a *read* does,
-which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
-`REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
-those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
-an authorize request carrying a scope it does not know, which fails every sign-in for every user.
-Adding a name there is the deliberate act this table records.
+`ChannelMessage.Read.All` requested deliberately. `Chat.Read` alone lets Graph *accept* searches
+but Microsoft docs say searches never return more than GET would. All channel GET needs
+`ChannelMessage.Read.All`. Without it, searches silently cover chats only. Asking at sign-in makes
+tenants that withhold it fail visibly at consent, not serve incomplete results.
 
-**State.** Every token is re-validated on each request. FastMCP defaults to an encrypted file tree (resets
-on restart, breaks at replicas). This service uses Postgres. The store creates table `oauth_kv` on first
-use. The database user needs CREATE on its schema. Rows are encrypted with a key derived from the client
-secret. Rotating the secret requires each user to re-login once.
+**State:** Tokens revalidated per request. This service uses Postgres (default: encrypted file tree,
+resets on restart). Store creates `oauth_kv` on first use. Rows encrypted with key from client secret.
+Rotating the secret requires each user to re-login once.
 
 ## Microsoft Graph
 
-`graph_client/` wraps the official msgraph-sdk. It does not acquire tokens. FastMCP's On-Behalf-Of
-exchange hands the caller's Graph token as a string; this package sends it.
+`graph_client/` wraps the official msgraph-sdk (no token acquisition; FastMCP provides token).
 
-- **One transport, many callers.** `create_graph_transport(settings)` builds the `httpx.AsyncClient`
-  (connection pool + SDK middleware) once. `graph_client_for(transport, token)` wraps it per call.
-  Per-call clients cause TLS handshakes and leak pools.
+- **One transport, many callers:** `create_graph_transport` builds the `httpx.AsyncClient` once.
+  `graph_client_for(transport, token)` wraps it per call. Per-call clients leak TLS and pools.
 
-- **Throttling is built-in.** The SDK retries on 429/503/504 with Retry-After three times. On timeout,
-  callers get `GraphThrottled` with `retry_after_seconds`.
+- **Throttling built-in:** SDK retries 429/503/504 three times. Timeouts return `GraphThrottled`.
 
-- **Errors are four types (four remedies):** `GraphThrottled` (429), `GraphForbidden` (401/403),
-  `GraphNotFound` (404), `GraphUnavailable` (5xx or unreachable). Wrap Graph work with
-  `with graph_errors():`.
+- **Four error types:** `GraphThrottled` (429), `GraphForbidden` (401/403), `GraphNotFound` (404),
+  `GraphUnavailable` (5xx/unreachable). Wrap Graph work with `with graph_errors():`.
 
-- **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. Search uses
-  from/size offsets.
+- **Paging:** Follows `@odata.nextLink` via `collect_pages` (item/scan caps). Search uses offsets.
 
-- **An empty page carrying a next link means keep going, and the walk is ours because of it.** The
-  SDK's `PageIterator.enumerate` returns `False` for a page whose `value` is empty and its `iterate`
-  reads that as the end of the collection — so a collection Graph answers `[1 item + nextLink]`,
-  `[nothing + nextLink]`, `[3 more]` came back as one item. Every list-shaped tool here says "that
-  is all of it" by coming back short of `limit`, so believing an empty page does not merely lose
-  items: it turns a window with more behind it into a claim that there is not. `collect_pages` walks
-  through them, bounds a *run* of them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap:
-  an empty page spends no scan budget, so a shared budget is no bound on empty pages at all), and
-  raises `GraphPagingUnending` rather than answering short — because a short answer means a cap.
+- **TRAP: Empty pages with `@odata.nextLink` mean keep going.** SDK's `PageIterator` treats empty
+  pages as end-of-collection. A collection like `[1 item+link]`, `[empty+link]`, `[3 more]`
+  becomes one item. List tools here claim "end" only by returning short of `limit`.
+  `collect_pages` follows empties (bounded by `MAX_EMPTY_PAGES`, not scan budget) or raises
+  `GraphPagingUnending`—short answers mean the limit applied.
 
-- **Trap:** The SDK bearer provider does not validate allowed-hosts. Redirects to off-Graph URLs send
-  the caller's delegated credential. Restrict to `graph.microsoft.com` only.
+- **TRAP:** SDK bearer provider doesn't validate allowed hosts. Redirects to non-Graph URLs send
+  delegated credentials. Restrict to `graph.microsoft.com`.
 
 ## Run locally
 

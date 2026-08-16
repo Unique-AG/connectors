@@ -1,36 +1,21 @@
 """How a tool talks to the outside world: the token and error messages.
 
-A model reads this server as one thing. Token refusals must be explained consistently and 403 errors
-must name the permission wherever they come from—or the surface sounds like ten servers. This module
-is the seam (the only file in `shared/` that imports FastMCP—keeps the framework away from shared
-vocabulary, enforced by tests/test_layering.py).
+A model reads this server as one voice. 403 errors must name the permission wherever they come from.
 
 Token Exchange
 
-`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. It takes Entra's token (audience
-`api://{client_id}`, useless against Graph) and exchanges it for a Graph token in the requested
-scopes. It is a dependency default—models never see it.
-
-`GraphToken` wraps it: dependency resolution happens outside the tool body, so an Entra refusal
-never reaches the `graph_tool_errors` block inside. FastMCP reports "Failed to resolve dependency"
-(unhelpful to models). Raising `ToolError` here makes an unconsented permission as fixable as a 403
-after the Graph call. One instance covers one exchange, however many permissions, because Entra
-redeems them together. The refusal does not say which permission was missing, so all are named.
+`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. `GraphToken` wraps it: dependency resolution
+happens outside the tool body, so Entra refusals don't hit `graph_tool_errors` inside. FastMCP
+would report "Failed to resolve dependency" (unhelpful). Wrapping makes unconsented permissions as
+actionable as Graph 403s.
 
 Error Messages
 
-Models' only options are: retry, retry later, sign in, ask administrator, or stop. Every message
-names one. `Microsoft 365` comes first (not "Graph"—models don't call Graph). Then remedy and
-whether retrying helps. Then operator evidence in parentheses. Graph details only where they explain
-(404 means three things) or operators need their own label (`Graph request id` for support).
+Models' only remedies are retry, retry later, sign in, ask administrator, or stop. Every message
+names one. TRAP: `GraphForbidden` covers 401 and 403 (401 = sign in; 403 = ask administrator).
+Graph never names the permission on 403. The tool does, scoped to the permissions used.
 
-TRAP: `GraphForbidden` covers 401 and 403. Only status separates them: 401 means sign in again,
-403 means ask administrator. 403 is only actionable if it names the permission. Graph never does.
-The tool does—every mapping here is scoped to the permissions the failing call used.
-
-The same missing permission appears earlier as Entra refusal (AADSTS65001) if never consented.
-Graph is never reached. `entra_token_errors` reports the same remedy: ask administrator to grant
-the permission and consent for the organization.
+The same missing permission appears first as Entra refusal (AADSTS65001) if never consented.
 """
 
 import re
@@ -62,12 +47,12 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
 
 
 def graph_scope(permission: str) -> str:
-    """Permission as scope for sign-in and exchange."""
+    """Turn permission into scope format."""
     return f"{_GRAPH_SCOPE_PREFIX}{permission}"
 
 
 class GraphToken(Dependency[str]):
-    """Wrap EntraOBOToken: explain the refusal in terms of permissions."""
+    """Wrap EntraOBOToken to explain refusals as permission problems."""
 
     def __init__(self, *permissions: str) -> None:
         assert permissions, "a token is exchanged for at least one permission"
@@ -93,14 +78,14 @@ class GraphToken(Dependency[str]):
 
 
 def graph_token(*permissions: str) -> str:
-    """GraphToken typed as string for tool injection. Build once at module level."""
+    """Build GraphToken for tool injection."""
     return cast("str", cast("object", GraphToken(*permissions)))
 
 
 @contextmanager
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
-    """Map Graph failures onto actionable tool errors. Name all permissions—Graph doesn't."""
-    assert permissions, "a Graph call is made under at least one permission"
+    """Map Graph failures to actionable errors. Name the permissions."""
+    assert permissions
     try:
         yield
     except GraphFailure as failure:
@@ -109,8 +94,8 @@ def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Genera
 
 @contextmanager
 def entra_token_errors(*permissions: str) -> Generator[None]:
-    """Map token acquisition failures onto actionable tool errors. Name all permissions."""
-    assert permissions, "a token exchange asks for at least one permission"
+    """Map token failures to actionable errors. Name the permissions."""
+    assert permissions
     try:
         yield
     except Exception as failure:
@@ -121,13 +106,10 @@ _ENTRA_CODE = re.compile(r"AADSTS\d+")
 
 
 def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
-    """What to do about an On-Behalf-Of exchange that did not produce a token.
+    """Map On-Behalf-Of failures to actionable advice.
 
-    One message for every cause, because the two the exchange can actually fail for share the
-    first remedy: a permission was never consented to (AADSTS65001, overwhelmingly the common
-    one), or this connector's own Entra credentials are wrong. Splitting them would mean
-    classifying Entra error codes this connector has never observed, and the cost of guessing
-    wrong is advice that sends the caller after the wrong fix.
+    Both causes (missing consent, wrong Entra config) share the first remedy: ask the administrator.
+    Splitting would mean classifying Entra codes we may never see.
     """
     code = _ENTRA_CODE.search(str(failure))
     diagnostics = code.group() if code is not None else type(failure).__name__
@@ -214,18 +196,14 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
 
 
 def _named(permissions: tuple[str, ...]) -> str:
-    """The permissions as a phrase, so the message reads as a sentence rather than a list."""
+    """Format permissions as a readable phrase."""
     if len(permissions) == 1:
         return permissions[0]
     return " and ".join((", ".join(permissions[:-1]), permissions[-1]))
 
 
 def _diagnostics(failure: GraphFailure) -> str:
-    """The evidence an operator needs, appended once rather than woven into every message.
-
-    `request_id` is what Microsoft support asks for first, and it is only ever in this response —
-    losing it means the failure cannot be traced afterwards.
-    """
+    """Add operator details: request_id is what Microsoft support asks for first."""
     parts = [
         f"{label} {value}"
         for label, value in (
