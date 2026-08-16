@@ -86,8 +86,9 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 # registration, and both of this repo's checkers report that as an error.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
-# No chatMessage-specific ceiling is published; Graph caps `message` and `event` at 25. This tool
-# uses 50 on undocumented ground as a safe intermediate.
+# Graph documents a general `size` maximum of 1000. No chatMessage-specific ceiling is published;
+# Graph caps the `message` and `event` entities at 25. This tool uses 50 on undocumented ground,
+# as a safe value between the two.
 MAX_RESULTS = 50
 
 _DESCRIPTION = f"""\
