@@ -41,9 +41,10 @@ class _CallerTokenProvider(AccessTokenProvider):
     """Kiota token provider holding a single delegated token.
 
     TRAP: Do not pass an `azure-identity` credential to `GraphServiceClient`. The SDK calls
-    `await credentials.close()` after every token acquisition, which closes FastMCP's cached
-    `OnBehalfOfCredential` transport, breaking users at the next cache miss. That same path also
-    returns an empty bearer token for anything that isn't exactly an
+    `await credentials.close()` after every token acquisition. This closes FastMCP's cached
+    `OnBehalfOfCredential` transport. The closed transport breaks the user permanently, at the
+    next cache miss, about an hour later. The user must sign in again to recover. That same
+    path also returns an empty bearer token for anything that isn't exactly an
     `azure.core.credentials.AccessToken`, which surfaces as an unexplained 401. This provider is
     two methods and has neither hazard.
     """
@@ -80,8 +81,10 @@ def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:
     """Shared HTTP transport for all Graph calls. Close on shutdown.
 
     Built via `GraphClientFactory` to preserve the SDK's middleware pipeline: redirects, retries
-    (honouring Retry-After on 429/503/504), parameter decoding, `/me` URL rewrite, and telemetry.
-    Only the two things GraphSettings controls are overridden.
+    (honouring Retry-After on 429/503/504, on asyncio.sleep, so a wait never blocks the event
+    loop), parameter decoding, `/me` URL rewrite, and telemetry. Only the two things
+    GraphSettings controls are overridden. The factory does not set base_url when given a
+    client, so base_url above is ours to set too.
 
     `sdk_middleware_options` carries the `/users/me-token-to-replace` → `/me` rewrite that
     `client.me` calls depend on, plus the telemetry handler's SDK version. Carry it over rather
@@ -110,8 +113,9 @@ def graph_client_for(transport: httpx.AsyncClient, access_token: str) -> GraphSe
         auth_provider=BaseBearerTokenAuthenticationProvider(_CallerTokenProvider(access_token)),
         client=transport,
     )
-    # TRAP: httpx normalises base_url to end with a slash. The SDK's URL templates then join
-    # onto it, causing `/v1.0//users/...`. Graph tolerates the empty path segment; nothing else
-    # on the way there is promised to.
+    # TRAP: without this line, the adapter takes base_url from the transport instead. httpx
+    # normalises base_url to end with a slash. The SDK's URL templates then join onto it,
+    # causing `/v1.0//users/...`. Graph tolerates the empty path segment; nothing else on the
+    # way there is promised to.
     adapter.base_url = _GRAPH_BASE_URL
     return GraphServiceClient(request_adapter=adapter)

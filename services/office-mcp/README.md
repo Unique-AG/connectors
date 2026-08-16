@@ -61,8 +61,8 @@ process home. This service uses Postgres. The store creates table oauth_kv on fi
 database user needs CREATE on its schema. No migration exists because the columns are the store
 library's to define and keep in sync — a revision duplicating them would be ours to keep in sync,
 which breaks when the library changes its schema. Rows are encrypted with a key derived from the
-client secret. Rotating the secret requires each signed-in user to re-login once (decryption
-failure is treated as a cache miss).
+client secret. Rotating the secret requires each signed-in user to re-login once. A decryption
+failure is a cache miss, not an error.
 
 ## Microsoft Graph
 
@@ -75,9 +75,10 @@ On-Behalf-Of exchange hands tools the caller's Graph token as a string; this pac
   call and a leaked pool.
 
 - **Throttling is the SDK's.** Its retry middleware waits out Retry-After on 429/503/504 three
-  times, which is Graph's documented contract. Nothing here re-implements it. What is added is
-  the typed outcome: when retries are outlasted, callers get GraphThrottled with
-  retry_after_seconds, not a status code to re-interpret.
+  times, on asyncio.sleep, so a wait never blocks the event loop. This is Graph's documented
+  contract. Nothing here re-implements it. There is no rate limiter. What is added is the typed
+  outcome: when retries are outlasted, callers get GraphThrottled with retry_after_seconds, not
+  a status code to re-interpret.
 
 - **Errors are four categories**, because those are the four remedies: GraphThrottled (429),
   GraphForbidden (401/403), GraphNotFound (404), GraphUnavailable (5xx or unreachable). Wrap
