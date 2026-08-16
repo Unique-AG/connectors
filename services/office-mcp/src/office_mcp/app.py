@@ -59,9 +59,8 @@ def create_app(
             yield
         finally:
             # Close per-user OBO credentials and their open HTTP transports. Don't close the
-            # OAuth store: reaching through the encryption wrapper for a store the process is
-            # about to drop anyway is not worth the complexity. Its asyncpg pool dies with the
-            # process.
+            # OAuth store: its wrapper chain exposes only get, put, and delete, with no close
+            # method. Its asyncpg pool dies with the process anyway.
             await auth.close_obo_credentials()
 
     mcp = FastMCP(

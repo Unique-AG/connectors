@@ -39,9 +39,10 @@ authentication) and not hidden behind an ingress path prefix:
 /.well-known/oauth-protected-resource/mcp
 ```
 
-**App registration requirements** (the provider refuses to start if any are missing):
+**App registration requirements.** Missing values here do not always stop the provider from
+starting. Some only make every login fail, with no startup error:
 
-- A **Web** redirect URI of exactly `$PUBLIC_BASE_URL/auth/callback`
+- A **Web platform** redirect URI of exactly `$PUBLIC_BASE_URL/auth/callback`
 - An Application ID URI (defaults to `api://$ENTRA_CLIENT_ID`) exposing the scope **access_as_user**
   (Entra omits OIDC scopes from the scp claim, so a custom scope is the only gate)
 - `"requestedAccessTokenVersion": 2` in the manifest
@@ -77,7 +78,7 @@ OAuth store creates its table on first use.
 - Health: `GET /health` (liveness via unique_mcp.monitoring.setup_ops)
 - Probe: `GET /probe` (process-up via setup_ops)
 - Ready: `GET /ready` (503 when Postgres unreachable; asks the OAuth store, the only connection
-  a sign-in depends on)
+  a sign-in depends on. A different connection could report ready while sign-in still fails.)
 - Metrics: `GET /metrics` (Prometheus via setup_ops)
 - Traces: off unless an `OTEL_*` variable says where to send them. `OTEL_TRACES_EXPORTER=console`
   prints spans to stderr; an `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends them to a collector and

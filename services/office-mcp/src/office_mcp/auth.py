@@ -32,8 +32,10 @@ _ENCRYPTION_SALT = "office-mcp-oauth-storage"
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
     """Durable encrypted OAuth state storage for Entra tokens.
 
-    Encryption is mandatory, not optional. FastMCP's default store encrypts. Handing a bare table
-    would disable at-rest encryption silently while looking like configuration.
+    This store holds users' Entra access tokens and refresh tokens. It stays encrypted even
+    though the rows never leave our own database. Encryption is mandatory, not optional. FastMCP's
+    default store encrypts. Handing a bare table would disable at-rest encryption silently while
+    looking like configuration.
 
     The client secret is the key material (derived via PBKDF2). No second secret is needed. Rotating
     the secret makes existing rows unreadable. Decryption errors are treated as cache misses, so
@@ -57,8 +59,8 @@ def build_auth(entra: EntraConfig, base_url: str, client_storage: AsyncKeyValue)
 
     `base_url` must be the externally-reachable URL of this service. OAuth metadata and the
     redirect URI Entra sends browsers to are derived from it. The redirect path is the provider's
-    default `/auth/callback`. The app registration must list `{base_url}/auth/callback` as a Web
-    redirect URI.
+    default `/auth/callback`. The app registration must list `{base_url}/auth/callback` exactly,
+    as a Web platform redirect URI.
 
     `client_storage` is passed rather than built here so the readiness probe uses the same object,
     proving the provider's connection to Postgres works. A separate readiness connection would pass
