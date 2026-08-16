@@ -48,6 +48,9 @@ Layering rules:
 
 `tests/test_layering.py` enforces each rule with a guard that fails if the rule is vacuous.
 
+One planned rule is still missing. Only one module may address a single meeting recording. It
+waits for a recordings-list tool to give it a surface to protect. It arrives with that tool.
+
 ## Auth
 
 FastMCP AzureProvider handles OAuth 2.1 (authorization, PKCE, refresh, On-Behalf-Of). This service
@@ -77,6 +80,10 @@ Tools redeem permissions per call via On-Behalf-Of. No permission = no consent =
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `ChannelMessage.Read.All` | Delegated | Usually | `search_messages`, `read_message` (channels) |
 
+Multiple tools naming the same permission is normal. It is not duplication to remove. Each tool
+declares its own tuple because that tuple words its own 403 and AADSTS65001 messages.
+`tools/__init__.py` removes the duplicates when it builds `GRAPH_SCOPES`.
+
 `Team.ReadBasic.All` is least-privileged for `/me/joinedTeams` (Microsoft's docs). Separate from
 the broad channel permission: a tenant refusing `ChannelMessage.Read.All` still lists teams.
 `list_teams` 403 names only its own permission.
@@ -85,17 +92,20 @@ the broad channel permission: a tenant refusing `ChannelMessage.Read.All` still 
 A preview is a message; "read chat names" doesn't cover it.
 
 Per-surface permissions: `read_message` redeems both (exchange before tool sees argument), but 403
-names only the surface used. Search can't know the surface beforehand, so it names both.
-`shared/seam.py` lists both in `REQUESTABLE_PERMISSIONS`: misspelling is on both sides.
+names only the surface used. Naming both there would be as unhelpful as naming none. An
+administrator handed two names may grant the one that was never missing. Search can't know the
+surface beforehand, so it names both. `shared/seam.py` lists both in `REQUESTABLE_PERMISSIONS`:
+misspelling is on both sides.
 
 `ChannelMessage.Read.All` requested deliberately. `Chat.Read` alone lets Graph *accept* searches
 but Microsoft docs say searches never return more than GET would. All channel GET needs
 `ChannelMessage.Read.All`. Without it, searches silently cover chats only. Asking at sign-in makes
 tenants that withhold it fail visibly at consent, not serve incomplete results.
 
-**State:** Tokens revalidated per request. This service uses Postgres (default: encrypted file tree,
-resets on restart). Store creates `oauth_kv` on first use. Rows encrypted with key from client secret.
-Rotating the secret requires each user to re-login once.
+**State:** Tokens revalidated per request. FastMCP's default store is an encrypted file tree. It
+resets on restart. It breaks at replicas: each replica writes its own file, invisible to the
+others. This service uses Postgres instead. Store creates `oauth_kv` on first use. Rows encrypted
+with key from client secret. Rotating the secret requires each user to re-login once.
 
 ## Microsoft Graph
 

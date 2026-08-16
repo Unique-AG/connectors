@@ -4,16 +4,27 @@ A model reads this server as one voice. 403 errors must name the permission wher
 
 Token Exchange
 
-`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. `GraphToken` wraps it: dependency resolution
-happens outside the tool body, so Entra refusals don't hit `graph_tool_errors` inside. FastMCP
-would report "Failed to resolve dependency" (unhelpful). Wrapping makes unconsented permissions as
-actionable as Graph 403s.
+`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. Entra's own token has audience
+`api://{client_id}`. Graph rejects that audience. The exchange trades it for a token Graph
+accepts, in the requested scopes.
+
+`GraphToken` wraps it: dependency resolution happens outside the tool body, so Entra refusals
+don't hit `graph_tool_errors` inside. FastMCP would report "Failed to resolve dependency"
+(unhelpful). Wrapping makes unconsented permissions as actionable as Graph 403s. One exchange
+covers every permission at once. Entra's refusal does not name the missing permission, so this
+message names them all.
 
 Error Messages
 
 Models' only remedies are retry, retry later, sign in, ask administrator, or stop. Every message
-names one. TRAP: `GraphForbidden` covers 401 and 403 (401 = sign in; 403 = ask administrator).
-Graph never names the permission on 403. The tool does, scoped to the permissions used.
+names one. Each message opens with `Microsoft 365`, not `Graph`. Models never call Graph directly.
+
+Each message states the remedy first. Operator evidence follows, in parentheses. Graph details
+appear only to resolve an ambiguity, such as a 404. Graph details also appear when an operator
+needs a support label, such as a request id.
+
+TRAP: `GraphForbidden` covers 401 and 403 (401 = sign in; 403 = ask administrator). Graph never
+names the permission on 403. The tool does, scoped to the permissions used.
 
 The same missing permission appears first as Entra refusal (AADSTS65001) if never consented.
 """
