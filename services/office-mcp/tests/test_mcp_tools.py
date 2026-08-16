@@ -785,13 +785,15 @@ class TestTheToolsThisServerAdvertises:
         limit = _object(_properties(tools["browse_channel"].inputSchema)["limit"])
         assert description is not None
 
-        assert "exactly one request" in description
-        assert "never pages deeper" in description
+        assert "makes one request" in description
+        assert "raise `limit` rather than calling again" in description, (
+            "where it stops: the window widens, it never pages deeper"
+        )
         assert "one request against the channel" in str(limit["description"])
-        assert "browsing again returns the same newest replies" in description, (
+        assert "browsing again returns the same newest" in description, (
             "the reply window is a dead end, not a first page"
         )
-        assert "do not browse again for it" in description
+        assert "stop looking" in description
 
     async def test_no_description_names_a_tool_this_server_does_not_advertise(
         self, mcp_client: Client[FastMCPTransport]
