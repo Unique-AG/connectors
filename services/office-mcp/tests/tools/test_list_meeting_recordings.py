@@ -601,7 +601,7 @@ class TestScopingToOneOccurrence:
 
         assert "There is nothing to try" in described
         assert "Stop, and report" in described
-        assert "do not ask again" in described
+        assert "returns this same status" in described
         assert "Narrow `started_after`/`started_before` to the occurrence you mean" not in described
 
     async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
@@ -657,7 +657,7 @@ class TestScopingToOneOccurrence:
             "window — the claim a caller would otherwise read off its length"
         )
         described = str(lister.MeetingRecordings.model_fields["recordings"].description)
-        assert "the whole window OF WHAT WAS READ" in described
+        assert "the window holds no more than was read" in described
         assert "these are the whole window." not in described, (
             "the unqualified claim, which this meeting is the counter-example to"
         )
