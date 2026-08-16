@@ -6,15 +6,18 @@ across every chat and channel, not one. `read_message` reads a message by handle
 Four design decisions:
 
 **Order is thread activity, not post date.** Graph sorts by reply-chain last modified, so a
-two-year-old post moves to the first page when someone replies to it. This order is preserved.
-Read `created_at` to know when a post was written, not its position here.
+two-year-old post moves to the first page when someone replies to it. This order is kept, not
+corrected — re-sorting would invent an order Graph never gave. Read `created_at` to know when a
+post was written, not its position here. The same order rules out paging by date: a walk could
+never tell when it had gone back far enough.
 
 **One request only.** Graph rate-limits channel reads to one request per second for this app
 across the tenant. This tool makes one request: `$top` is the window, the single page Graph
 answers with is the result.
 
 **No date filter.** This collection accepts only `$top` and `$expand=replies`, no `$filter`.
-Use `search_messages` with `sent_after`/`sent_before` to search by date.
+Graph documents no `$orderby` for it either. Use `search_messages` with
+`sent_after`/`sent_before` to search by date.
 
 **Cannot tell if a page is the whole channel.** System messages are dropped after Graph counts them,
 so a short page is not proof the channel is empty. Graph's `@odata.nextLink` on the page says if
@@ -56,7 +59,8 @@ TOOL_NAME = "browse_channel"
 # Several tools declare one permission; deduplication is the registry's job.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
 
-# Built at import time. A parameter default call rebuilds the descriptor on every registration.
+# Built at import time. A parameter default call rebuilds the descriptor on every registration,
+# which trips a lint error in both of this repo's checkers.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Graph's documented ceiling on `$top` for a channel's messages — the whole of one request.
@@ -182,7 +186,8 @@ async def browse_channel(
         )
         assert page is not None, "Graph answered a channel message listing with no collection"
 
-    # The window is this tool's promise, not Graph's, so apply it rather than trust it.
+    # `$top` is `limit`, so Graph should never send back more than that — but the window is
+    # this tool's promise, not Graph's, so apply it rather than trust it.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
     kept = posts[:limit]
 
