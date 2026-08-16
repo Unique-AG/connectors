@@ -1,11 +1,15 @@
 """`read_transcript` — speaker-attributed, timestamped turns from a Teams meeting transcript.
 
-The handle holds both the meeting id and transcript id, so one call reaches `/content`. The reader
-does not resolve the join URL again; `list_meeting_transcripts` already did that. Speaker
-attribution degrades rather than fails: a tenant can forbid speaker names and the call asks for the
-unattributed format as Microsoft documents. Filtering (seconds, speaker) is applied after the
-whole transcript arrives and is parsed, then paged — no call cheaper. Two reject-at-call
-conditions prevent empty pages: inverted time bounds and blank speaker filter.
+The handle holds both the meeting id and transcript id, so one call reaches `/content`. The
+reader does not resolve the join URL again. `list_meeting_transcripts` already did that. A reader
+that took the meeting's `meeting_uri` instead would repeat the resolve. It would spend a second
+permission. Its 403 could point to either failure. This tool declares only
+`OnlineMeetingTranscript.Read.All`. A tenant can withhold `OnlineMeetings.Read` and this tool still
+answers. Speaker attribution degrades rather than fails: a tenant can forbid speaker names and the
+call asks for the unattributed format as Microsoft documents. `services/teams-mcp` still has this
+gap — it hardcodes `Accept: text/vtt`. Filtering (seconds, speaker) is applied after the whole
+transcript arrives and is parsed, then paged — no call cheaper. Two reject-at-call conditions
+prevent empty pages: inverted time bounds and blank speaker filter.
 """
 
 import html
@@ -206,7 +210,13 @@ _UNATTRIBUTED_FORMAT = "application/vnd.microsoft.graph.transcript+text"
 async def _content(client: GraphServiceClient, handle: TranscriptHandle) -> tuple[bytes, bool]:
     """Transcript bytes and whether they carry speaker names.
 
-    Retries on speaker-attribution refusal only.
+    Retries once, only for the `SpeakerAttributionNotAllowed` inner code. The tenant-wide switch
+    that blocks transcripts answers with the same `403`. It has no retry that fixes it. Retrying
+    that case would waste a call and report the wrong remedy.
+
+    Each attempt uses its own `graph_errors()` block. The raw SDK error carries no inner code
+    before translation. One block around both attempts would let the first failure pass the
+    `except` clause untranslated.
     """
     endpoint = (
         client.me.online_meetings.by_online_meeting_id(handle.meeting_id)
