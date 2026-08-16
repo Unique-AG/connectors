@@ -566,7 +566,7 @@ class TestTheToolsThisServerAdvertises:
             description = " ".join(written.split())
             assert "emailAddress" in description, name
             assert "teamworkUserIdentity" in description, name
-            assert "a null is not evidence that the sender has no name or no address" in (
+            assert "A null is not evidence that the sender has no name or no address" in (
                 description
             ), name
         fields = [_properties(taught[name]) for name in _MESSAGE_TOOLS]

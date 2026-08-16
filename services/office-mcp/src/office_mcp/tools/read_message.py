@@ -1,41 +1,20 @@
-"""`read_message` — one Microsoft Teams message in full, from the handle another tool minted.
+"""`read_message` — one Microsoft Teams message in full, from a handle another tool creates.
 
-`search_messages` cannot answer "what did they actually say". Graph's search index returns a
-reduced `chatMessage` projection with **no `body`** — "The search Teams API doesn't return all
-properties defined in chatMessage. You can use the Teams API to retrieve more details about any
-single message" (https://learn.microsoft.com/en-us/graph/search-concept-chat-messages) — so a hit
-is metadata plus a handle, and this is the tool that turns the handle back into a message.
+Search cannot answer "what did they actually say". Graph's search index has no message body at all
+— only Microsoft's `summary` snippet. This tool resolves a handle from a search result into the
+full message.
 
-Three things make this tool what it is, and each of them is a decision rather than a detail.
+The handle decides which surface to read. Graph puts a Teams message in a chat or a channel, each
+with a different endpoint and permission. The handle shape names which surface it addresses.
 
-**It reads one of two surfaces, and the handle is what says which.** Graph addresses a Teams
-message under a chat and under a team's channel, with a different endpoint and a different
-delegated permission for each. Nothing in the argument a model passes says which of them it is
-except the handle's own shape, which is why the handle is what decides both.
+Three failures are kept apart. A malformed handle is ours to explain. Graph's 403 is about that
+one surface's permission only (naming the other would send an admin after a missing one). Graph's
+404 means deleted, never-existed, or invisible — it does not say which, so the tool must not claim
+the message never existed. The generic advice to check the id is wrong here: it came from a tool.
 
-**Three failures are kept distinct, and only one of them is ours.** A malformed handle is ours to
-explain, so its refusal shows the two shapes and names the tool that produces them. Graph's 403 is
-a missing permission and names *one* — `MessageHandle.permission`, the one the surface being read is
-read under — because naming the other would send an administrator after a permission that was never
-missing. Graph's 404 is the one that must not be reported as "the message never existed": Graph
-answers deleted, never-existed and invisible-to-this-user identically and never says which of them
-it meant. That 404 also suppresses the generic advice — "check the id came from a tool response
-verbatim" — because the handle *did* come from a tool response, and telling a caller to check it is
-telling them to retry a call that cannot succeed.
-
-**Two messages have no text and neither is an empty one.** A deleted message carries a tombstone
-whose body must not be presented as content, and a system event message has no author and no text
-anywhere in Graph, because the sentence Teams shows ("Ada joined the chat") is written by the Teams
-client and never sent. `deleted_at` and `event` are what say which, and the description says to
-report the reason rather than the emptiness.
-
-What this file does not own is the handle grammar (`shared/handles.py`, so the handle
-`search_messages` minted is read by the one parser that wrote it, and so that which permission a
-surface is read under is decided once), the message shape and its normalisation out of Teams HTML
-(`shared/messages.py`, so a message a search found and the same message read here are the same type
-normalised by the same function), and the token and refusal wording (`shared/seam.py`, so this
-tool's 403 sounds like every other tool's). Everything else — the name, the description, the
-argument, the request and every refusal below — is here.
+Two messages have no text. A deleted message carries a tombstone, which must not read as content.
+A system event ("Ada joined") has no author and no text in Graph — Teams writes the sentence itself.
+Report the event, not the emptiness.
 """
 
 from typing import Annotated
@@ -67,79 +46,58 @@ from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "read_message"
 
-# What the token exchange has to ask for: both, because the exchange happens before the tool sees
-# its argument and so before anything knows which surface this call will read. Reading a message is
-# `Chat.Read` in a chat and `ChannelMessage.Read.All` in a channel — the permissions are per surface
-# (https://learn.microsoft.com/en-us/graph/api/chatmessage-get) — and `MessageHandle.permission` is
-# what names the one a given read was actually made under, which is what a 403 is worded from.
+# Token exchange requests both because the handle is parsed after the exchange happens.
+# Read uses `Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
-# Built once at import: a call inside a parameter default rebuilds the descriptor on every
-# registration and is a lint error in both of this repo's checkers.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 _DESCRIPTION = """\
-Read one Microsoft Teams message in full, from the `uri` handle a search_messages result carries: \
-the whole message text, who sent it, who was @-mentioned, what was attached, and whether it has \
-been edited or deleted.
+Read one Microsoft Teams message in full, from the `uri` handle search_messages produces: the \
+whole text, sender, @-mentions, attachments, and edit/delete status.
 
-This is the other half of search_messages, and the only route to the text of a message a search \
-found. Microsoft's search index answers with a reduced view of a message that contains no body at \
-all, so a search result carries only Microsoft's `summary` snippet. Read the message here whenever \
-the answer depends on what somebody actually said rather than on the fact that a matching message \
-exists — and never present a snippet as the message.
+This is the other half of search_messages. Graph's search index has no message body, so a search \
+result carries only Microsoft's `summary` snippet. Read the message here to get the full text. \
+Never present a snippet as the message.
 
-`uri` takes a handle this connector produced, in one of exactly two shapes:
+`uri` takes a handle this connector produced, exactly one of these shapes:
   teams:///chats/{chat_id}/messages/{message_id}
   teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
-Nothing else is readable here. No handle of this connector's names mail, a calendar event, a file \
-or a SharePoint page, and nothing turns a person's name or a chat topic into one — pass the `uri` \
-from a tool result verbatim.
+Nothing else is readable. This connector does not address mail, calendar events, files or sites. \
+Pass the `uri` from a tool result verbatim — do not assemble one.
 
-`text` is plain text, normalised from Teams' own HTML: a mention reads as `@Name`, a list item as \
-`- `, an attachment as `[attachment: name]`, an inline image as `[image]` and a card as `[card]`. \
-`mentions` and `attachments` say who and what those refer to. Nothing else is summarised or \
-abridged — a message that happens to contain JSON, a config fragment or code is somebody's own \
-words and comes back verbatim, and `[card]` appears only where `attachments` names a card.
+`text` is plain text normalised from Teams HTML: mentions read as `@Name`, list items as `- `, \
+attachments as `[attachment: name]`, inline images as `[image]`, cards as `[card]`. The `mentions` \
+and `attachments` fields name what those placeholders refer to. A message with JSON or code is \
+somebody's words and is returned in full. `[card]` appears only where `attachments` names a card.
 
-Two messages have no text and must not be reported as empty ones. A deleted message returns \
-`deleted_at` and no text: say it was deleted. A system event message — somebody joining, a call \
-ending, a chat being renamed — has no author and no text anywhere in Microsoft Graph, because the \
-sentence Teams displays is written by the Teams client and never sent. For those, `event` names \
-what happened, and inventing the wording of one is a fabrication.\
+Two messages have no text. A deleted message returns `deleted_at` and null `text` — report the \
+deletion. A system event — somebody joining, a call ending, a chat renamed — has no author and no \
+text in Graph (Teams writes the displayed sentence itself). For those, `event` names what \
+happened. Do not invent the wording.\
 """
 
-# What the tool says when `uri` is not a handle at all. This is the failure that is *our* fault to
-# explain — the two below are Microsoft's answers — so it is the one that shows the shapes.
 _BAD_HANDLE = (
-    "read_message takes a `uri` handle that search_messages produced, and this is not one. A "
-    + "readable handle has one of exactly two shapes:\n"
+    "read_message takes a `uri` handle search_messages produced. This is not one. A readable "
+    + "handle has one of exactly two shapes:\n"
     + "  teams:///chats/{chat_id}/messages/{message_id}\n"
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
-    + "with the ids percent-encoded, e.g. "
-    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool "
-    + "result rather than assembling one. This reader serves Teams messages only: no mail, files "
-    + "or sites are addressable in this connector at all. Retrying this value will fail "
-    + "identically."
+    + "with ids percent-encoded, e.g. "
+    + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. "
+    + "Copy the `uri` from a tool result — do not assemble one. "
+    + "This reader serves Teams messages only: "
+    + "no mail, files or sites. Retrying this value will fail identically."
 )
 
-# Graph's 404 on a well-formed handle, which is a different failure from a malformed one and must
-# not be reported as the message never having existed.
 _UNREADABLE = (
-    "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
-    + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
-    + "'never existed' and 'the signed-in user may not see it' with the same 404, and does not say "
-    + "which of them it meant. Report that the message could not be read, never that it was never "
-    + "written. Retrying will not help and this connector has no other route to the text. Report "
-    + "the search snippet with its sender and date, say the full text could not be retrieved, and "
-    + "stop looking."
+    "Microsoft 365 would not return this message. The handle is well formed, so this is not a "
+    + "bad argument. This is not evidence that the message does not exist: Graph answers "
+    + "deleted, never existed, and invisible-to-user identically and does not say which. "
+    + "Report that the message could not be read. Retrying will not help. Report the search "
+    + "snippet with sender and date, say full text could not be retrieved, and stop looking."
 )
 
-# `messageType` is an evolvable enum: without this header Graph answers `systemEventMessage` as
-# `unknownFutureValue` (https://learn.microsoft.com/en-us/graph/api/resources/chatmessage). Nothing
-# below *depends* on the type — a null `from` and a populated `eventDetail` identify a system
-# message either way — but `chatEvent` and `typing` carry neither, and the type is the only thing
-# that names them.
+# Without this header, Graph answers systemEventMessage as unknownFutureValue.
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
@@ -149,11 +107,7 @@ type _ChannelMessageQuery = (
 
 
 async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
-    """The message `handle` addresses. One Graph request, whichever surface it lives on.
-
-    `chatmessage-get` "doesn't support the OData query parameters", so there is no `$select` to
-    narrow it with and no `$expand` to widen it: mentions and attachments arrive with the message.
-    """
+    """The message `handle` addresses. One Graph request, whichever surface it lives on."""
     with graph_errors():
         message = await _get(client, handle)
 
@@ -180,11 +134,10 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
 
 
 def _headers() -> HeadersCollection:
-    """A `HeadersCollection` of our own, carrying the `Prefer` header.
+    """A `HeadersCollection` with the `Prefer` header.
 
-    Built per request on purpose: `RequestConfiguration.headers` defaults to a single
-    `HeadersCollection` instance shared by every configuration in the process, so adding a header
-    to the default would add it to every other Graph request this connector makes.
+    Built per request: the default is shared by all configurations, so adding to it would affect
+    every Graph request this connector makes.
     """
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
@@ -192,11 +145,7 @@ def _headers() -> HeadersCollection:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Declare this tool against the shared Graph transport.
-
-    `transport` is the long-lived `httpx.AsyncClient` from `create_graph_transport`; the tool
-    borrows it per call and never owns it. `create_app` closes it on shutdown.
-    """
+    """Register this tool against the shared Graph transport."""
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -210,25 +159,20 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle of the message to read, exactly as a search_messages result gave "
-                    + "it: `teams:///chats/{chat_id}/messages/{message_id}` or "
-                    + "`teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}`. No "
-                    + "other scheme or shape is readable, and nothing else identifies a Teams "
-                    + "message — a chat topic, a person's name or a Teams web link cannot be "
-                    + "turned into one."
+                    "The handle search_messages produced, exactly: "
+                    + "`teams:///chats/{chat_id}/messages/{message_id}` or "
+                    + "`teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}`. "
+                    + "No other shape is readable. Chat topics, person names and Teams web links "
+                    + "cannot be turned into handles."
                 ),
             ),
         ],
         graph_token: str = _TOKEN,
     ) -> TeamsMessage:
-        # The parser is `shared/handles.py`'s, not this file's: search is what mints a handle and
-        # this is what reads one back, and one definition of the shape is what makes a search
-        # result readable at all.
         handle = message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        # One permission, not both: the handle says which surface is being read, and Graph's 403
-        # there can only be about that one. The token was exchanged for both because a dependency
-        # is resolved before the tool sees its argument.
+        # Use only the permission for this surface. The token was exchanged for both because
+        # the handle is parsed after the exchange happens.
         with graph_tool_errors(handle.permission, not_found=_UNREADABLE):
             return await read_message(graph_client_for(transport, graph_token), handle=handle)

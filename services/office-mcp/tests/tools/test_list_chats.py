@@ -263,8 +263,11 @@ class TestWhatTheCallerIsTold:
         description = chats.ChatSummary.model_fields["members_may_be_incomplete"].description
 
         assert description is not None
-        assert "may" in description
-        assert "Not proof" in description and "identical" in description
+        assert f"reached Graph's cap of {chats.MEMBERS_PER_CHAT}" in description
+        assert (
+            f"exactly {chats.MEMBERS_PER_CHAT} members is indistinguishable from one with more"
+            in description
+        ), "reaching the cap is not proof that members are missing, and the flag must say so"
 
     async def test_a_meeting_chat_carries_the_route_to_its_transcripts(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -331,9 +334,10 @@ class TestWhatTheCallerIsTold:
         description = chats.ChatSummary.model_fields["meeting_uri"].description
 
         assert description is not None
-        assert "no other route" in description or "no route to try" in description
-        assert "only route" in description.lower(), (
-            "and the populated case says what it is a route to"
+        assert "Null when no join URL exists" in description
+        assert "The only route from conversation to meeting" in description, (
+            "the populated case says what it is a route to, and its being the only one is what "
+            + "makes a null a dead end rather than an invitation to try something else"
         )
 
     async def test_an_unknown_chat_type_does_not_fail_the_listing(
