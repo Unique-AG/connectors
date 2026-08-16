@@ -19,11 +19,9 @@ from office_mcp.metrics import configure_metrics
 from office_mcp.server import ready_response
 from office_mcp.tools import GRAPH_SCOPES, register_tools
 
-# Every Graph permission any tool might redeem, which the auth provider has to have at startup: one
-# never consented to cannot be obtained later, and the On-Behalf-Of exchange fails with AADSTS65001
-# before the tool body runs. One source, re-exported rather than re-derived — `tools/__init__.py`
-# assembles it from the tool modules themselves, in a stable order, and this name is here so that
-# `create_app` and its test have one thing to read.
+# Intent: GRAPH_SCOPES is re-exported because tools derive it from their own GRAPH_PERMISSIONS.
+# If a permission was not consented at authorization time, the later token exchange fails with
+# AADSTS65001. All tools must declare their permissions; build_auth requests all of them at sign-in.
 __all__ = ["GRAPH_SCOPES", "create_app"]
 
 
@@ -32,17 +30,9 @@ def create_app(
     database_config: DatabaseConfig | None = None,
     entra_config: EntraConfig | None = None,
 ) -> Starlette:
-    """Composition root.
-
-    Every config object and long-lived collaborator is built exactly once and injected. Nothing
-    downstream re-reads the environment: `graph_client` in particular is handed its own frozen
-    `GraphSettings` rather than being allowed to read config, and the tools are handed the one
-    HTTP transport built from it.
-    """
+    """Compose the app. Every long-lived object is built once and injected."""
     config = config or AppConfig()
     database_config = database_config or DatabaseConfig()
-    # EntraConfig fields are required; pydantic-settings fills them from the environment.
-    # No placeholder defaults: a missing app registration fails at startup by name.
     entra_config = entra_config or EntraConfig()  # pyright: ignore[reportCallIssue]
 
     configure_logging(config)
@@ -58,8 +48,8 @@ def create_app(
     # Self-disabling when no OTEL_* variable is set, so a test process stays untraced.
     configure_tracing(service_name="office-mcp", service_version=config.version)
 
-    # OAuth store is the only Postgres connection. Built here (not in build_auth) so one
-    # object serves both the auth provider and the readiness probe.
+    # Design decision: oauth_storage is built in the composition root because it serves both the
+    # auth provider and the readiness probe.
     oauth_storage = build_oauth_storage(entra_config, database_config)
     auth = build_auth(
         entra_config,
@@ -67,21 +57,18 @@ def create_app(
         client_storage=oauth_storage,
         graph_scopes=GRAPH_SCOPES,
     )
-    # `GraphSettings`' defaults are what this service wants (see its docstring: interactive-call
-    # timeouts, the SDK's own retry count). It is still built here rather than inside
-    # `graph_client`, because the composition root is where a knob would have to be mapped from
-    # `AppConfig` the day an operator needs a different value.
+    # Architectural rationale: GraphSettings() is built in the composition root, not inside
+    # graph_client, because it is a stable value that must be held for the app lifetime.
     graph_transport = create_graph_transport(GraphSettings())
+
+    # Architectural constraint: Nothing downstream re-reads the environment. Configuration is
+    # captured at startup and injected. This makes behavior deterministic and testable.
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
         try:
             yield
         finally:
-            # Close the shared Graph transport pool, then the per-user OBO credentials and their
-            # open HTTP transports. Don't close the OAuth store: reaching through the encryption
-            # wrapper for a store the process is about to drop anyway is not worth the
-            # complexity. Its asyncpg pool dies with the process.
             await graph_transport.aclose()
             await auth.close_obo_credentials()
 
@@ -94,16 +81,11 @@ def create_app(
     )
     register_tools(mcp, graph_transport)
 
-    # Mounts /probe, /health, /metrics and returns HTTP request-metrics middleware.
     ops_middleware = setup_ops(mcp)
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:
-        """Postgres readiness. `setup_ops` `/probe` is process-up only.
-
-        Ask the OAuth store (the connection every sign-in uses). See `server/readiness.py`
-        for why not a separate connection.
-        """
+        """Check Postgres readiness by asking the OAuth store."""
         return await ready_response(oauth_storage)
 
     return mcp.http_app(
