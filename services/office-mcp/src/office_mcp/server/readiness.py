@@ -4,9 +4,10 @@ The OAuth state store owns this connection. Every token is a reference token re-
 against the store on each request, so an unreachable database means no one can sign in.
 
 The store builds its own asyncpg pool from driver_dsn with no connect args; TLS settings ride
-the DSN. A separate connection would negotiate TLS differently and could report ready while
-every sign-in fails—the exact failure a readiness probe prevents. So the probe asks the store
-itself through the same wrapper chain.
+the DSN. An earlier version of this probe opened its own connection instead. That connection
+negotiated TLS differently and could report ready while every sign-in failed—the exact failure
+a readiness probe exists to prevent. So the probe now asks the store itself through the same
+wrapper chain.
 """
 
 import logging

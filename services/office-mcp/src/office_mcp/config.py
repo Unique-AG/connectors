@@ -142,9 +142,10 @@ class AppConfig(BaseSettings):
         return str(self.public_base_url).rstrip("/")
 
 
-# Trap: AzureProvider derives one expected issuer from tenant_id with no way to turn the check
-# off. A real token's iss names the caller's tenant, so these fail all tokens identically with
-# nothing in logs pointing at the tenant_id.
+# Trap: these are Entra authority aliases that let any tenant sign in. AzureProvider derives one
+# expected issuer from tenant_id (https://{authority}/{tenant_id}/v2.0) with no way to turn the
+# check off. A real token's iss names the caller's tenant, so these fail all tokens identically
+# with nothing in logs pointing at the tenant_id.
 _MULTI_TENANT_AUTHORITIES = frozenset({"common", "organizations", "consumers"})
 
 
