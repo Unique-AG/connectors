@@ -988,7 +988,8 @@ class TestTheToolsThisServerAdvertises:
         assert description is not None
 
         assert "nothing to try" in description and "Stop here" in description
-        assert "There is nothing to try" in status and "do not ask again" in status
+        assert "There is nothing to try" in status
+        assert "This status is final and cannot be retried" in status
         assert "reads the same transcripts and returns this same answer" in description, (
             "a narrower window is named only as the thing that does NOT help"
         )
