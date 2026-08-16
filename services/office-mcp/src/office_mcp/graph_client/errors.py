@@ -75,7 +75,8 @@ class GraphThrottled(GraphFailure):
 
 class GraphForbidden(GraphFailure):
     """Graph refused the caller, not the request. TRAP: 401 (token rejected) and 403 (no scope)
-    are both forbidden. Status tells them apart. 401 means sign in again. 403 means ask administrator."""
+    are both forbidden. Status tells them apart. 401 means sign in again. 403 means ask an
+    administrator."""
 
 
 class GraphNotFound(GraphFailure):
