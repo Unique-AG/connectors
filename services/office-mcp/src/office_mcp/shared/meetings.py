@@ -17,10 +17,14 @@ Graph documents exactly three delegated ways to reach an `onlineMeeting`
 (https://learn.microsoft.com/en-us/graph/api/onlinemeeting-get): by its own `id`, by `joinWebUrl`,
 or by `joinMeetingIdSettings/joinMeetingId`. Only the join URL path works from Teams' conversation
 side. Only place delegated callers get one: `chat.onlineMeetingInfo.joinWebUrl` in default
-`GET /me/chats`. Chat id is not a route; neither is chat `webUrl`.
+`GET /me/chats`. That collection supports `$expand`, `$top`, `$filter`, and `$orderby` only. It has
+no `$select`, so the field could not be requested even if it were absent. Chat id is not a route;
+neither is chat `webUrl`.
 
-Verified: meeting chats are enumerable with `topic` and recency. **Not verified**: `joinWebUrl` is
-populated, especially for non-organisers. Null join URL is first-class outcome, not impossible.
+Verified: meeting chats are enumerable with `topic` and recency. Graph documents `joinWebUrl` as
+empty when the chat is not a meeting's chat at all. **Not verified**: `joinWebUrl` is populated
+when the chat is a meeting's chat, especially for non-organisers. Null join URL is first-class
+outcome, not impossible.
 No fallback or second route documented. `onlineMeeting.chatInfo.threadId` is filterable in code but
 not in Graph docs, so we skip that invented path.
 
@@ -32,9 +36,11 @@ policy roughly 60 days after a one-off
 ## The `$filter` on the join URL, and the bug class around it
 
 Graph: "joinWebUrl must be URL encoded". A `%3a` in the stored URL arrives as `%253a` (% is
-escaped). Wrong code doubles quotes then hands raw URL to concatenation without encoding, making
-`&` or `#` in the URL parse as truncated filter — Graph answers `200 OK` with empty `value`,
-indistinguishable from "no such meeting" (silent failure).
+escaped). `services/teams-mcp` has this defect today, in
+`src/transcript/tools/ingest-meeting.tool.ts`. It doubles the quote. Then it hands the raw URL to a
+JavaScript SDK that does not encode query parameters. A join URL with `&` or `#` then parses as a
+truncated filter. Graph answers `200 OK` with an empty `value`, indistinguishable from "no such
+meeting" (silent failure).
 
 Two transforms, only the first ours:
 1. OData literal escape: double single quotes inside string literals. Required for correctness and
@@ -221,7 +227,8 @@ async def newest_in_window[T: MeetingArtifact](
     """Limit newest artifacts of meeting in window, newest first.
 
     Read everything window holds, sort, cut to limit — Graph has no orderby. Stop-at-limit-before-
-    sort is undetectable wrong answer. Capped: read stopped at MAX_ARTIFACT_SCAN; nothing else.
+    sort is undetectable wrong answer. `capped` means only that the scan hit `MAX_ARTIFACT_SCAN`.
+    It does not mean the window held more than `limit` artifacts. Read the returned count for that.
 
     Where promise stops being "newest of this meeting" and starts being "newest of read ones". With
     no orderby, only reading everything makes newest exact. Cap prevents unbounded walk on
