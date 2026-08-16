@@ -53,11 +53,17 @@ class MeetingHandle:
         return f"teams:///meetings/{_segment(self.join_web_url)}"
 
 
+# The id is matched as "anything but a separator" because `_segment` above always
+# percent-encodes it: a raw "/" cannot reach this position.
 _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
 
 
 def meeting_handle(uri: str) -> MeetingHandle | None:
-    """Parse `uri` as a meeting handle or return None. None means malformed."""
+    """Parse `uri` as a meeting handle or return None. None means malformed.
+
+    Not an exception carrying advice: what to tell a caller about a malformed handle is the tool
+    boundary's business, not this module's.
+    """
     match = _MEETING_HANDLE.match(uri)
     if match is None:
         return None
@@ -66,7 +72,11 @@ def meeting_handle(uri: str) -> MeetingHandle | None:
 
 
 def meeting_uri_for(join_web_url: str | None) -> str | None:
-    """Meeting handle for `join_web_url` or None when Graph gave none."""
+    """Meeting handle for `join_web_url` or None when Graph gave none.
+
+    None is not a gap here—Graph giving a meeting chat no join URL is an outcome this module
+    already knows how to have, so callers do not each decide it for themselves.
+    """
     if join_web_url is None or not join_web_url.strip():
         return None
     return MeetingHandle(join_web_url).uri
