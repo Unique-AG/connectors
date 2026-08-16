@@ -1,16 +1,6 @@
-"""The whole loop, over the real MCP protocol: client → tool → OBO token → Microsoft Graph.
+"""Test the MCP protocol: client → tool → On-Behalf-Of token → Microsoft Graph.
 
-This drives the app `create_app` actually builds — same FastMCP server, same Entra auth provider,
-same registered tools, same shared Graph transport — through fastmcp's own in-process client. Only
-the two external systems are stood in for, at exactly the boundary each one owns:
-
-* **Entra's token endpoint.** The signed-in user's token and the On-Behalf-Of exchange are
-  replaced, because the exchange is a network call to login.microsoftonline.com. What is *not*
-  replaced is `EntraOBOToken` itself: the dependency still runs, still finds the app's
-  `AzureProvider`, and the token it produces is the one the tool must put on the wire.
-* **Microsoft Graph**, via respx.
-
-Every payload is synthesised: fake ids, `.invalid` domains, public-domain names.
+Test app from create_app with Entra and Graph stubbed at their boundaries.
 """
 
 import re
@@ -36,10 +26,7 @@ from office_mcp.graph_client import GraphSettings, create_graph_transport
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
-# The token the (stubbed) On-Behalf-Of exchange hands back. Asserting on it is what proves the
-# caller's delegated token — and not the connector's own — is what called Graph.
 OBO_TOKEN = "synthetic-obo-graph-token"
-
 _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 
 _ME = {
@@ -52,11 +39,9 @@ _ME = {
 
 
 class _StubOboCredential:
-    """Stands in for `azure.identity.aio.OnBehalfOfCredential`, which would call Entra.
+    """Stub for azure.identity.aio.OnBehalfOfCredential.
 
-    Records the scopes it was asked for: those are what the tool declared it needs, and getting
-    them wrong is invisible until a real tenant refuses the exchange. Set `refusal` to be that
-    tenant — an exchange Entra declines is the failure that happens before Graph.
+    Records scopes requested and can simulate failure.
     """
 
     def __init__(self) -> None:
@@ -72,18 +57,16 @@ class _StubOboCredential:
 
 @pytest.fixture
 def obo(monkeypatch: pytest.MonkeyPatch) -> _StubOboCredential:
-    """Authenticate the in-process caller and stub only the Entra round trip."""
+    """Stub Entra on-behalf-of exchange. Authenticate the in-process client."""
     credential = _StubOboCredential()
 
     async def get_obo_credential(
         _self: AzureProvider, *, user_assertion: str
     ) -> _StubOboCredential:
-        assert user_assertion == _CLIENT_TOKEN, "the caller's own token is what gets exchanged"
+        assert user_assertion == _CLIENT_TOKEN
         return credential
 
     monkeypatch.setattr(AzureProvider, "get_obo_credential", get_obo_credential)
-    # `EntraOBOToken` reads the caller's token through this function; there is no HTTP request
-    # behind an in-process client, so there is nothing for it to read it from.
     monkeypatch.setattr(
         "fastmcp.server.dependencies.get_access_token",
         lambda: AccessToken(
@@ -104,8 +87,6 @@ def graph() -> Iterator[respx.MockRouter]:
 def _build_app() -> Starlette:
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-mcp.example"}),
-        # Nothing in these tests reaches Postgres: the engine is lazy and the OAuth state store is
-        # only touched by the HTTP auth path, which an in-process client does not go through.
         database_config=DatabaseConfig.model_validate(
             {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
         ),
@@ -125,13 +106,13 @@ def app() -> Starlette:
 
 
 def _server_of(app: Starlette) -> FastMCP[None]:
-    """The FastMCP server `create_app` mounted, which is what the MCP protocol talks to."""
+    """Get the FastMCP server from the app."""
     return cast("FastMCP[None]", app.state.fastmcp_server)
 
 
 @pytest.fixture
 async def mcp_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
-    """A real MCP client speaking to that server, lifespan and all."""
+    """Create an MCP client connected to the server."""
     async with Client(FastMCPTransport(_server_of(app))) as client:
         yield client
 
@@ -163,8 +144,7 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_tool_is_listed_and_none_asks_for_a_token(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The Graph token is a dependency, not a parameter: if it ever leaked into the input
-        schema, a model would try to invent one."""
+        """Graph token is a dependency, not a parameter."""
         tools = _named(await mcp_client.list_tools())
 
         assert set(tools) == {"get_me"}
@@ -180,9 +160,7 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_tool_declares_its_result_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The oracle connector returns an unschematised stream of objects whose last element may
-        be pagination metadata. A declared output schema is how a `next_offset` or a
-        `members_may_be_incomplete` stops being prose."""
+        """Every tool declares its output schema."""
         tools = _named(await mcp_client.list_tools())
 
         assert set(_properties(tools["get_me"].outputSchema)) == {
@@ -196,17 +174,7 @@ class TestTheToolsThisServerAdvertises:
     async def test_the_whole_surface_speaks_one_language(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """These tools arrive one at a time and are read all at once, by a model choosing between
-        them. So the conventions are asserted from the first one rather than merely written down: a
-        name is verb_noun (which is why this tool is `get_me` and not the shell idiom `whoami`), a
-        result field is snake_case, and no answer carries a "there is more" flag of its own.
-
-        That last one is a convention a single-object answer cannot break, and it is asserted here
-        anyway, because the tool that breaks it is the first list-shaped one and by then the word is
-        already on the surface. A window filled to `limit` says there may be more and a short one
-        says there is not; `next_offset` says it outright where paging exists; and `truncated` on
-        top of either means "raise `limit`" or "nothing will help" with no way to tell which.
-        """
+        """Tool names are verb_noun, fields are snake_case, no truncated flag."""
         tools = _named(await mcp_client.list_tools())
 
         for name in tools:
@@ -248,11 +216,7 @@ class TestCallingThem:
         graph: respx.MockRouter,
         obo: _StubOboCredential,
     ) -> None:
-        """A misremembered parameter — `user_id`, say, which this tool deliberately does not take,
-        because the whole of what it answers is who the caller already is — must fail rather than
-        be ignored, or the model believes it asked about somebody else and reads the answer as
-        being about them.
-        """
+        """Tool rejects arguments it does not expect."""
         route = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         result = await mcp_client.call_tool(
@@ -261,15 +225,14 @@ class TestCallingThem:
 
         assert result.is_error
         assert not route.called
-        assert not obo.requested_scopes, "no token is exchanged for a call that cannot run"
+        assert not obo.requested_scopes
 
 
 class TestTheTransportTheToolsShare:
     async def test_it_is_closed_when_the_server_shuts_down(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """One connection pool serves every tool call, so nothing else in the process would ever
-        notice it being leaked — until a pod's sockets ran out."""
+        """Transport closes when the server shuts down."""
         built: list[httpx.AsyncClient] = []
 
         def record(settings: GraphSettings) -> httpx.AsyncClient:
@@ -292,8 +255,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         graph: respx.MockRouter,
         obo: _StubOboCredential,
     ) -> None:
-        """End to end, the case the oracle connector handles worst: a 403 that says only that
-        something was forbidden leaves a model with nothing to do but retry."""
+        """403 response names the missing permission."""
         graph.get("/me").mock(
             return_value=httpx.Response(
                 403,
@@ -309,7 +271,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "User.Read" in message
         assert "administrator" in message
         assert "synthetic-request-id" in message
-        assert obo.requested_scopes, "the failure came from Graph, not from the token exchange"
+        assert obo.requested_scopes
 
     async def test_a_permission_nobody_consented_to_names_it_too(
         self,
@@ -317,15 +279,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         graph: respx.MockRouter,
         obo: _StubOboCredential,
     ) -> None:
-        """The same missing permission, one step earlier: Entra refuses the On-Behalf-Of exchange
-        (AADSTS65001) and Graph is never called.
-
-        This runs inside FastMCP's dependency resolution rather than inside the tool body, so it
-        bypasses the tool's own error handling entirely — the report a model gets by default is
-        "Failed to resolve dependency 'graph_token' for get_me", which names neither the permission
-        nor anyone who could grant it. Whatever else changes, this end of the wire has to stay as
-        actionable as the 403 above.
-        """
+        """Entra refusal (AADSTS65001) for unconsented permission names the permission."""
         route = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
         obo.refusal = ClientAuthenticationError(
             message=(
@@ -342,4 +296,4 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert "administrator" in message
         assert "AADSTS65001" in message
         assert "resolve dependency" not in message
-        assert not route.called, "no token means no Graph request was ever made"
+        assert not route.called

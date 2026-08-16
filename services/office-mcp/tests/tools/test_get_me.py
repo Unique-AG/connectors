@@ -1,4 +1,4 @@
-"""`get_me`: what `GET /me` is asked for, and what the caller is told."""
+"""Test get_me tool."""
 
 import httpx
 import pytest
@@ -23,7 +23,7 @@ class TestTheProfileItReturns:
     async def test_it_asks_graph_only_for_the_properties_it_promises(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`/me`'s default projection is ~20 properties; the tool documents five."""
+        """Tool requests only the five promised properties."""
         route = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         _ = await get_me.get_signed_in_user(client)
@@ -34,13 +34,7 @@ class TestTheProfileItReturns:
     async def test_it_reports_the_email_and_the_upn_separately(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The fixture's `mail` and `userPrincipalName` are on different domains on purpose —
-        that is the live-tenant shape, and collapsing the two is how "my messages" mis-filters.
-
-        Graph's `mail` and `id` are reported as `email` and `user_id`: an address is `email` and a
-        person's Entra id is `user_id` everywhere on this server's surface, and this profile is the
-        one payload a model correlates the rest against.
-        """
+        """Tool returns email and user_principal_name as separate fields."""
         graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         user = await get_me.get_signed_in_user(client)
@@ -54,8 +48,7 @@ class TestTheProfileItReturns:
     async def test_a_guest_account_without_a_mailbox_still_answers(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A guest or unlicensed account has no `mail`. The tool's contract is that
-        `user_principal_name` carries the identity then, so a null must not be an error."""
+        """Tool accepts null email (guest or unlicensed account)."""
         graph.get("/me").mock(
             return_value=httpx.Response(
                 200,
@@ -77,6 +70,7 @@ class TestTheProfileItReturns:
     async def test_it_calls_as_the_caller(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        """Tool uses the caller's token."""
         route = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         _ = await get_me.get_signed_in_user(client)
@@ -88,8 +82,7 @@ class TestGraphFailures:
     async def test_a_refusal_arrives_classified(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The Graph call wraps itself in `graph_errors`, so the tool has a typed failure to map
-        onto advice rather than a bare `APIError`."""
+        """Graph refusal is classified to typed exception."""
         graph.get("/me").mock(
             return_value=httpx.Response(
                 403,
