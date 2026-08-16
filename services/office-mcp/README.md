@@ -2,12 +2,10 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes six MCP
-tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
-most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
-channels of one of those teams; `search_messages`, full-text search across every Teams message they
-can see; and `read_message`, one of those messages in full — each one a file of its own, and more
-land in later PRs, stacked on top of this one, one tool per PR.
+Users sign in with their own Microsoft account; the server acts as them. Six MCP tools are available:
+`get_me` (profile), `list_chats` (chats by recency), `list_teams` (teams the user is in), `list_channels`
+(channels in one team), `search_messages` (full-text search), and `read_message` (one message in full).
+Each tool is one file; more land in later PRs, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
 user to consent to are exactly the union of what those tools need — see **Tool surface** below.
