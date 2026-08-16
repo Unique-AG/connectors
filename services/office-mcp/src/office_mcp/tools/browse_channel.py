@@ -1,50 +1,30 @@
-"""`browse_channel` — one Teams channel's posts, each followed by the replies to it.
+"""`browse_channel` — one Teams channel's posts with their newest replies.
 
-The one thing the other message tools cannot do: walk a single channel. `search_messages` finds
-messages by keyword across every chat and channel at once and cannot be scoped to one of them;
-`read_message` reads a message somebody already has a handle for. This is the tool for "what is
-going on in this channel".
+Walk one channel — the only message tool that can. `search_messages` finds messages by keyword
+across every chat and channel, not one. `read_message` reads a message by handle.
 
-Four things make it what it is, and each of them is a decision rather than a detail.
+Four design decisions:
 
-**The order is thread activity, not post recency.** Graph sorts this collection "by the last
-modified date of the entire reply chain, including both the root channel message and its replies"
-(https://learn.microsoft.com/en-us/graph/api/channel-list-messages), so a two-year-old post returns
-to the first page the moment somebody replies to it. That order is preserved rather than corrected —
-reordering it would be inventing an order Graph did not give — and `created_at` is what tells the
-truth about age. It also makes "stop paging once a page is older than X" an unsound stop condition:
-a walk down this collection could not know when it had gone back far enough, which is one of the two
-reasons there is no walk.
+**Order is thread activity, not post date.** Graph sorts by reply-chain last modified, so a
+two-year-old post moves to the first page when someone replies to it. This order is preserved.
+Read `created_at` to know when a post was written, not its position here.
 
-**There is no sweep, and that is the other reason.** Graph caps reads at "one request per second per
-app per tenant … on a given channel" (https://learn.microsoft.com/en-us/graph/throttling-limits),
-and that budget is per *app* — so walking every channel of a team degrades every other user in the
-tenant, and following `@odata.nextLink` down one channel spends the tenant's whole budget for that
-channel on one caller. This tool therefore issues exactly one request: `$top` is the window and the
-single page Graph answers with is the answer. A caller who needs a wider window raises `limit`;
-searching across channels is `search_messages`'s job.
+**One request only.** Graph rate-limits channel reads to one request per second for this app
+across the tenant. This tool makes one request: `$top` is the window, the single page Graph
+answers with is the result.
 
-**It cannot be date-bounded at all.** `$top` and `$expand=replies` are the only parameters this
-collection takes — "The other OData query parameters aren't currently supported" — so there is no
-`$filter` and no `$orderby`, and no date parameter is offered rather than one being faked.
-`search_messages` puts a date into the search index instead, for the price of the one request it was
-making anyway.
+**No date filter.** This collection accepts only `$top` and `$expand=replies`, no `$filter`.
+Use `search_messages` with `sent_after`/`sent_before` to search by date.
 
-**That one page is the one place here where "was that everything?" is not derivable.** Everywhere
-else a page short of `limit` is the end of the collection, because the walk underneath followed
-Graph's paging to it; here nothing is followed, and system messages are dropped out of the page
-after Graph counted them into it, so a short answer says nothing either way. What does say something
-is Graph's own `@odata.nextLink` on that page — an accurate read, and the only one available — so it
-is reported, opt-in, as `ChannelPosts` explains.
+**Cannot tell if a page is the whole channel.** System messages are dropped after Graph counts them,
+so a short page is not proof the channel is empty. Graph's `@odata.nextLink` on the page says if
+more exists — reported via `include_window_completeness`.
 
-What this file does not own is the handle grammar (`shared/handles.py`, so that the reply handle
-this mints is the one `read_message` resolves — and this is the only tool that can mint it, because
-Graph addresses a reply under the post it answers and a search projection carries no `replyToId`),
-the message shape and its Teams-HTML normaliser, which also holds the reply window
-(`shared/messages.py`, so that a post browsed here and a message read by handle are the same thing
-rather than two that agree, and so that `read_message`'s 404 advice names the same number this
-window is), and the token and refusal wording (`shared/seam.py`). Everything else — the name, the
-description, the permission, the arguments, the answer shape and the request — is here.
+This file owns the name, description, permission, arguments, answer shape and request. The handle
+grammar lives in `shared/handles.py` (so the reply handle this tool mints is what `read_message`
+resolves and this is the only tool that can mint it). The message shape and Teams HTML normaliser
+live in `shared/messages.py` (so a post browsed and a message read are the same type). Token and
+error text live in `shared/seam.py`.
 """
 
 from datetime import UTC, datetime
@@ -72,125 +52,85 @@ from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
 TOOL_NAME = "browse_channel"
 
-# The one delegated permission this tool's one request needs: the broad message permission, which is
-# also what buys `search_messages` its channel coverage. It is imported rather than respelled —
-# which surface a Teams message is read under is handle vocabulary, and a second spelling of
-# `ChannelMessage.Read.All` is a second thing to keep true. Several tools declaring one permission
-# is what the registry's deduplication is for, and none of them may leave it out.
+# Import CHANNEL_PERMISSION to avoid misspelling — handle vocabulary owns surface permissions.
+# Several tools declare one permission; deduplication is the registry's job.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
 
-# Built once at import: a call inside a parameter default rebuilds the descriptor on every
-# registration and is a lint error in both of this repo's checkers.
+# Built at import time. A parameter default call rebuilds the descriptor on every registration.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
-# Graph's documented ceiling on `$top` for a channel's messages, and so the widest window one call
-# can answer with: the call is one request and `$top` is the whole of it.
+# Graph's documented ceiling on `$top` for a channel's messages — the whole of one request.
 MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = f"""\
-Read what was posted in one Microsoft Teams channel: its posts with their full text, each followed \
-by the replies to it. Takes the `team_id` and `channel_id` list_teams and list_channels returned.
+Read a Teams channel's posts with their replies. Take `team_id` and `channel_id` from list_teams \
+and list_channels.
 
-This is the one thing the other message tools cannot do — walk a single channel in order. \
-search_messages finds messages by keyword across every chat and channel at once but cannot be \
-scoped to one channel, and read_message reads a single message you already have a handle for. \
-Reach for this when the question is "what is going on in this channel" rather than "where was this \
-mentioned". Do not call it for channel after channel: Microsoft rate-limits reads of a given \
-channel to about one request a second for this whole connector across the tenant, so a sweep is \
-slow for you and harmful to everyone else on it — search_messages covers every channel in one \
-request. This call spends exactly one request of that budget: it reads the single page Microsoft \
-answers with and never pages deeper, so `limit` is the whole window and widening `limit` — not \
-calling again — is how to see more.
+This is the only message tool that walks one channel. `search_messages` finds messages by keyword \
+across channels and chats (not scoped to one). `read_message` reads a single message by handle. \
+Use this when you need to know "what is in this channel".
 
-**The order is not what it looks like.** Microsoft sorts this collection by the last modified time \
-of the entire reply chain, so a two-year-old post returns to the front the moment somebody replies \
-to it. The first message here is the most recently *active* thread, not the most recent post. Read \
-`created_at` before saying when anything was written, never the position in this list, and do not \
-report the top of the list as "the latest news in the channel".
+**Do not sweep channels.** Microsoft rate-limits a given channel to about one request per second \
+for this app across the tenant. This tool makes one request: `$top` is the window. To see more, \
+raise `limit` rather than calling again. `search_messages` covers all channels in one request.
 
-It cannot be date-filtered, and this is Microsoft's limit rather than a missing parameter: this \
-collection accepts no filter and no sort at all. To bound by date use search_messages with \
-`sent_after`/`sent_before`, which the search index applies and which covers channels. For the same \
-reason, paging deeper is not a way to reach older posts — there is no cursor, and a wider `limit` \
-(up to {MAX_POSTS}, Microsoft's own maximum) or a search is the only way to see more.
+**The order is thread activity, not post date.** Microsoft sorts by the last-modified time of the \
+entire reply chain. A two-year-old post moves to the first page when someone replies to it. Read \
+`created_at` to know when a post was written — not its position here or the top of the list.
 
-**Never report this as the whole of a channel unless you asked and were told.** A page holding \
-fewer than `limit` posts is not evidence that the channel has no more — Microsoft counts the \
-system messages into that page before they are dropped here — so, unlike every other list here, \
-what comes back cannot tell you whether it was everything. Microsoft's page does say, and \
-`include_window_completeness` is how to have it reported: `more_posts_in_channel` is Microsoft's \
-own "there is more of this channel", which no `limit` here reaches — the older posts of a busy \
-channel are reached by searching, not by asking again — and `posts_cut_to_limit` is the separate \
-case of this window closing over posts Microsoft did send, which a wider `limit` does fix. Both \
-are null unless you set it.
+**Cannot filter by date.** This collection accepts only `$top` and `$expand=replies`. Use \
+`search_messages` with `sent_after`/`sent_before` for date bounds.
 
-Replies come with their posts: up to {MAX_REPLIES_PER_POST} of the newest per post, \
-oldest first, each carrying the post it answers in `reply_to_id`. A post carrying that many \
-replies may have older ones, and those are out of reach rather than one call \
-away — Microsoft's cursor into a thread is a request per post against the same one-a-second \
-budget, so it is not followed and browsing again returns the same newest replies. Every message is \
-complete — the same fields, and the same plain text normalised out of Teams' HTML, that \
-read_message returns — so a message here needs no second call to read it. Its `uri` is a handle \
-for quoting or re-reading it, and for a reply it is the only handle that exists: Microsoft \
-addresses a reply under its parent post, which a search result cannot express. That is also the \
-limit of what this tool can rescue: when a search hit is a reply older than the window above, \
-there is no route to its full text anywhere in this connector — report the search snippet, say so, \
-and do not browse again for it.
+**Cannot tell if a page is the whole channel.** Microsoft drops system messages after counting \
+them, so a short page is not proof the channel is empty. Set `include_window_completeness` to see \
+Microsoft's cursor on the page (`more_posts_in_channel`) — the only accurate answer.
 
-System messages are dropped — somebody joining, a call ending, a channel being renamed — because \
-Microsoft gives them no author and no text. That is why a page can hold fewer posts than `limit`, \
-and it is not evidence that the channel is quiet.\
+Replies come with posts: up to {MAX_REPLIES_PER_POST} newest per post, oldest first. Each reply \
+carries `reply_to_id` with its parent. Older replies on a post are unreachable — browsing again \
+returns the same newest ones. Every message is complete (same shape and text as `read_message` \
+returns). A reply's `uri` is its only handle, because Microsoft addresses it under its parent — \
+search cannot express this. When a search hit is a reply older than this window, there is no \
+route to its full text anywhere in this connector — report the search snippet and stop looking.
+
+System messages (joins, call ends, renames) are dropped — Microsoft gives them no author or text. \
+That is why pages may be shorter than `limit` and is not evidence the channel is quiet.\
 """
 
 
 class ChannelPosts(BaseModel):
     messages: list[TeamsMessage] = Field(
         description=(
-            "The channel's posts and their replies, in thread order: each root post is followed by "
-            + "the replies to it, oldest first, and a reply carries the post it answers in "
-            + "`reply_to_id`. Every message is complete — the same shape and the same normalised "
-            + "text read_message answers with — so nothing here needs a second read.\n"
-            + "This is one window on the channel and never the whole of it, whatever comes back. "
-            + f"Up to `limit` posts are returned (raise it, up to {MAX_POSTS}) and up to "
-            + f"{MAX_REPLIES_PER_POST} of the newest replies per post, so a post carrying that "
-            + "many replies may have older ones — and those are a dead end rather than a next "
-            + "page, because browsing again returns the same newest ones. FEWER posts than "
-            + "`limit` is NOT evidence that the channel holds no more: Microsoft counts system "
-            + "messages into the page it answers with and they are dropped from this list, and "
-            + "the same is true of a thread's replies. Whether the channel does hold more is the "
-            + "one thing here you cannot read off this list, and Microsoft's own answer to it is "
-            + "reported when you ask: set `include_window_completeness` for "
-            + "`more_posts_in_channel`. There is no cursor and paging deeper is not a route to "
-            + "older posts: Microsoft orders this collection by reply-chain activity rather than "
-            + "by date, so reaching back in time is search_messages with `sent_before`."
+            "Posts and their replies, in thread order. Each root post is followed by its replies, "
+            + "oldest first. Replies carry `reply_to_id` with their parent post. Each message is "
+            + "complete — same shape and text as `read_message` returns — no second read needed.\n"
+            + "Up to `limit` posts returned (raise it, up to "
+            + f"{MAX_POSTS}). Up to {MAX_REPLIES_PER_POST} newest replies per post (older ones "
+            + "unreachable, browsing returns the same newest). Fewer posts than `limit` is NOT "
+            + "proof the channel holds no more — Microsoft drops system messages after counting "
+            + "them. Set `include_window_completeness` for `more_posts_in_channel` (the only way "
+            + "to know if more exists). Microsoft orders by reply-chain last modified, not date; "
+            + "use `search_messages` with `sent_before` to reach back in time."
         )
     )
     more_posts_in_channel: bool | None = Field(
         description=(
-            "Whether Microsoft said this channel holds posts beyond the page it answered with — "
-            + "its `@odata.nextLink` on that page, reported as it came — or null when "
-            + "`include_window_completeness` was not set, which is the default.\n"
-            + "True means there ARE more posts and this window is not the channel. It is not a "
-            + "cursor and there is nothing here to page with: this tool spends one request against "
-            + "a channel Microsoft rate-limits to about one a second for the whole connector, so "
-            + "the remedy is a wider `limit` for a little more, and search_messages with "
-            + "`sent_before` to reach back in time. False means Microsoft offered no continuation "
-            + f"of the collection, so — subject to `limit` and to {MAX_REPLIES_PER_POST} replies a "
-            + "post — this window was the whole channel. This is the only thing that says either "
-            + "way: a short list does NOT mean the channel ran out."
+            "Microsoft's cursor on the page (`@odata.nextLink`), or null if "
+            + "`include_window_completeness` was not set (the default). True: more posts "
+            + "exist beyond this page; a wider `limit` gets a little more, `search_messages` "
+            + "with `sent_before` reaches older posts. False: this window was the whole "
+            + "channel (subject to `limit` and reply limits). Null means this field was not "
+            + "requested. A short page alone does NOT mean the channel ran out."
         )
     )
     posts_cut_to_limit: bool | None = Field(
         description=(
-            "Whether Microsoft's page held more posts than `limit` and this answer was cut to it, "
-            + "or null when `include_window_completeness` was not set. A different fact from "
-            + f"`more_posts_in_channel` with a different remedy: raise `limit` (up to {MAX_POSTS}) "
-            + "and the cut posts are in the next answer, where more of the channel is not "
-            + "reachable at all. Normally false whatever the channel holds — `$top` is set to "
-            + "`limit`, so Microsoft answers with no more than that — and reported rather than "
-            + "assumed because the window is this tool's promise rather than Microsoft's."
+            "Whether Microsoft's page held more posts than `limit` and this answer was cut "
+            + "to it, or null if `include_window_completeness` was not set. Different from "
+            + f"`more_posts_in_channel`: raise `limit` (up to {MAX_POSTS}) to get the cut "
+            + "posts; they are in the next answer. Normally false because `$top` is set to "
+            + "`limit`. Reported, not assumed, because the window is this tool's promise."
         )
     )
 
@@ -203,36 +143,29 @@ async def browse_channel(
     limit: int,
     include_window_completeness: bool,
 ) -> ChannelPosts:
-    """Up to `limit` posts from one channel's first page, each with the newest of its replies.
+    """Return up to `limit` posts from a channel's first page, each with its newest replies.
 
-    One Graph request against the channel, always. Graph's per-channel budget is a single request a
-    second for the whole app in the tenant, so neither cursor Graph offers here is followed: not the
-    collection's `@odata.nextLink` and not a post's own `replies@odata.nextLink`. `$top` is the
-    window and `$expand=replies` makes a thread part of that one request rather than a round trip
-    per post; a caller who needs more raises `limit` (up to `MAX_POSTS`, Graph's own ceiling)
-    instead of the tool spending the tenant's budget on their behalf.
+    One Graph request, always. Graph rate-limits a given channel to one request per second for this
+    app across the tenant. Neither cursor is followed: not `@odata.nextLink` on the collection or
+    `replies@odata.nextLink` on a post. `$top=limit` is the window; `$expand=replies` brings
+    threads into one request instead of one per post. A caller who needs more raises `limit`
+    instead of this tool spending the tenant's budget.
 
-    The system messages — somebody joining, a call ending, a channel being renamed — are dropped,
-    and Graph offers no `$filter` to drop them at the source, so they are filtered out of the page
-    Graph counted them into: a page can hold fewer posts than `limit` without the channel having run
-    out of them. That is what makes this the one tool here whose answer cannot say whether it was
-    everything, and the reason `include_window_completeness` exists at all. Elsewhere a short
-    answer is the end of the collection — `collect_pages` followed Graph's paging to it — so "there
-    is more" is derivable and is not reported; here nothing was followed and a short answer says
-    nothing.
+    System messages (joins, call ends, renames) are dropped. Graph has no `$filter` to drop them
+    at the source, so they are filtered out of the page Graph counted them into. This means a page
+    can be shorter than `limit` without the channel being empty. This is the one tool whose answer
+    cannot say if it is everything — that is why `include_window_completeness` exists. Elsewhere
+    a short answer means the end of the collection (paging reached it); here nothing was followed,
+    so a short answer says nothing.
 
-    Two facts are reported for it, separately, because their remedies are opposite ones and one
-    boolean over both is the ambiguous "there is more" flag no answer here carries — it would mean
-    "raise `limit`" or "nothing will help" with no way to tell which. `more_posts_in_channel` is
-    Graph's own `@odata.nextLink` on the page, read as it came: the channel holds more, and nothing
-    here reaches it — a wider `limit` buys a little more of the same page and `search_messages` is
-    the route back in time. `posts_cut_to_limit` is this function's own window closing over posts
-    Graph did send, which a wider `limit` does fix. Both are null unless asked for: a field that is
-    null for almost every answer is one a model need not reason about, and only a caller whose
-    question turns on it pays that price.
+    Two facts are reported separately because their remedies differ and one boolean over both would
+    be ambiguous. `more_posts_in_channel`: Graph's `@odata.nextLink` as-is. The channel holds more,
+    and nothing here reaches it — raise `limit` for more of the same page, `search_messages` for
+    older posts. `posts_cut_to_limit`: this function's window closing over posts Graph did send;
+    raise `limit` to get them. Both are null unless asked for.
 
-    The reply window is deliberately not a third fact here. A thread's older replies are out of
-    reach whether or not Graph paged them, so nothing acts on it — see `_replies`.
+    Reply window is deliberately not a third fact. Older replies on a post are unreachable either
+    way, so nothing acts on it — see `_replies` function.
     """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
@@ -249,8 +182,7 @@ async def browse_channel(
         )
         assert page is not None, "Graph answered a channel message listing with no collection"
 
-    # `$top` is `limit`, so Graph returning more posts than were asked for should not happen — but
-    # the window is this tool's promise rather than Graph's, so it is applied rather than trusted.
+    # The window is this tool's promise, not Graph's, so apply it rather than trust it.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
     kept = posts[:limit]
 
@@ -283,16 +215,15 @@ def _is_a_post(message: ChatMessage) -> bool:
 
 
 def _replies(post: ChatMessage) -> list[ChatMessage]:
-    """The newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
+    """Newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
 
-    Sorted here because Graph publishes no order for replies — the reply collection documents
-    `$top` and nothing else — so the order they arrive in is not a contract to preserve. The newest
-    are the ones kept: a thread's recent turns are what a question about it is usually about.
-
-    Whether older ones were left behind is not reported, because a full window says it: Graph
-    expands up to 200 replies per post, so a thread it paged had more than 200 of them and the
-    window returned is full either way. That leaves the same reading as everywhere else here — this
-    many replies means there may be more, fewer means that was the thread.
+    Sorted here because Graph does not order replies — the reply collection documents `$top`
+    only, so the arrival order is not a contract to preserve. Keep the newest: a thread's recent
+    turns are usually what a question needs. Whether older replies were left behind is not
+    reported, because a full window already says it: Graph expands up to 200 replies per post, so
+    a thread it paged had more than 200 and the window is full either way. That leaves the same
+    reading as everywhere here: this many replies means there may be more, fewer means that was
+    the thread.
     """
     replies = sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
     return replies[-MAX_REPLIES_PER_POST:]
@@ -327,8 +258,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The team the channel belongs to, exactly as list_teams reported its "
-                    + "`team_id`. A channel id alone does not address a channel."
+                    "The team the channel is in, exactly as `list_teams` reported. A channel id "
+                    + "alone does not address a channel."
                 ),
             ),
         ],
@@ -337,9 +268,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The channel to read, exactly as list_channels reported its `channel_id` (or "
-                    + "as search_messages reported `channel_id` on a channel message). Opaque — a "
-                    + "channel's name is not one."
+                    "The channel to read, exactly as `list_channels` or `search_messages` reported "
+                    + "it. Opaque — copy it, do not build it from a channel name."
                 ),
             ),
         ],
@@ -349,11 +279,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_POSTS,
                 description=(
-                    "How many posts to return, each with its replies. Default 20 and maximum "
-                    + f"{MAX_POSTS} — both Microsoft Graph's own, for this collection. "
-                    + "One call is one request against the channel and this is the whole of its "
-                    + "window: widen it to see more rather than calling again. System messages are "
-                    + "dropped after Graph counts them, so a page can hold fewer posts than this."
+                    "How many posts to return, each with its replies. Default 20, maximum "
+                    + f"{MAX_POSTS} (both Graph's own for this collection). One call is one "
+                    + "request against the channel and is the whole of its window: raise "
+                    + "`limit` to see more rather than calling again. Microsoft drops system "
+                    + "messages after counting them, so a page can hold fewer posts than "
+                    + "`limit`."
                 ),
             ),
         ] = 20,
@@ -361,15 +292,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Report whether this window was the whole channel, as `more_posts_in_channel` "
-                    + "and `posts_cut_to_limit` in the answer. Off by default; set it when the "
-                    + "answer turns on completeness, because this is the one tool here where a "
-                    + "short answer tells you nothing — it reads a single page, and Microsoft "
-                    + "counts system messages into that page before they are dropped. "
-                    + "`more_posts_in_channel` is Microsoft's own cursor on that page: the channel "
-                    + "holds more, and nothing here pages to it. `posts_cut_to_limit` is the "
-                    + "separate, ordinary case of more posts on the page than `limit`, which a "
-                    + "wider `limit` fixes. Both are null when this is not set."
+                    "Report whether this window was the whole channel as `more_posts_in_channel` "
+                    + "and `posts_cut_to_limit`. Off by default. Set it when the answer turns on "
+                    + "completeness — this is the one tool where a short page tells you nothing. "
+                    + "Microsoft counts system messages into the page before they are dropped. "
+                    + "`more_posts_in_channel` is Microsoft's cursor: the channel holds more and "
+                    + "nothing here reaches it. `posts_cut_to_limit` is the ordinary case of "
+                    + "more posts on the page than `limit`, fixed by raising `limit`. Both "
+                    + "are null when not requested."
                 )
             ),
         ] = False,
