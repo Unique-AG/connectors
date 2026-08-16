@@ -7,9 +7,9 @@ vocabulary, enforced by tests/test_layering.py).
 
 Token Exchange
 
-`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. It takes Entra's token (audience `api://{client_id}`,
-useless against Graph) and exchanges it for a Graph token in the requested scopes. It is a dependency
-default—models never see it.
+`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. It takes Entra's token (audience
+`api://{client_id}`, useless against Graph) and exchanges it for a Graph token in the requested
+scopes. It is a dependency default—models never see it.
 
 `GraphToken` wraps it: dependency resolution happens outside the tool body, so an Entra refusal
 never reaches the `graph_tool_errors` block inside. FastMCP reports "Failed to resolve dependency"

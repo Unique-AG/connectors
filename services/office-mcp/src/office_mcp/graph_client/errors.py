@@ -12,8 +12,8 @@ Anything else (400, 409) raises GraphFailure. Other status codes do not suggest 
 
 GraphPagingUnending is not a failed request—it is Graph answering 200 with empty pages while
 advertising more. No status code describes it. Only the pagination walk sees it. It belongs here
-because it is what Graph did wrong and because being a GraphFailure carries it through `shared/seam.py`
-as advice rather than crash.
+because it is what Graph did wrong, and because being a GraphFailure carries it through
+`shared/seam.py` as advice rather than crash.
 """
 
 from collections.abc import Generator
@@ -60,7 +60,8 @@ class GraphThrottled(GraphFailure):
 
 class GraphForbidden(GraphFailure):
     """Graph refused the caller, not the request. TRAP: 401 (token rejected) and 403 (no scope)
-    are both forbidden. Status tells them apart. 401 means sign in again. 403 means ask administrator."""
+    are both forbidden. Status tells them apart. 401 means sign in again. 403 means ask an
+    administrator."""
 
 
 class GraphNotFound(GraphFailure):
