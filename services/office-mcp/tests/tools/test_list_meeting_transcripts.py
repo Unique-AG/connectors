@@ -523,8 +523,8 @@ class TestScopingToOneOccurrence:
         described = str(lister.MeetingTranscripts.model_fields["status"].description)
 
         assert "There is nothing to try" in described
-        assert "Stop, and report" in described
-        assert "do not ask again" in described
+        assert "Stop and report" in described
+        assert "This status is final and cannot be retried" in described
         assert "Narrow `started_after`/`started_before` to the occurrence you mean" not in described
 
     async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
@@ -669,7 +669,8 @@ class TestScopingToOneOccurrence:
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in described
-        assert "the latest of what was READ" in described
+        assert "Ordered over every transcript read" in described
+        assert "not over one page of Microsoft's answer" in described
         assert "The order is over the whole collection" not in described
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
