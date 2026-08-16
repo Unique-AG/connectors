@@ -1,5 +1,8 @@
 """`list_teams` — the teams the signed-in user is a member of.
 
+This tool complements `list_chats`. A chat is joined. A channel is browsed inside a team. No
+tool reaches a channel without a team id first.
+
 TRAP: Graph accepts no OData query on this collection. `$top`, `$select`, and `$filter` all
 return 400. services/teams-mcp shipped `$top` and had to remove it. This tool sends no request
 configuration.
@@ -22,8 +25,12 @@ TOOL_NAME = "list_teams"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)
 
+# Build at import time. A call inside the parameter default would rebuild it on every
+# registration. Both of this repo's lint checkers reject that.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
+# A safety valve on Graph request count, not a Graph-imposed page size. Graph accepts no page
+# size on this collection.
 MAX_TEAMS = 200
 
 _DESCRIPTION = """\
