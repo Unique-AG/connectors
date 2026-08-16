@@ -509,7 +509,9 @@ def _from_html(
 def _mention_text(tag: re.Match[str], mention_texts: dict[int, str | None]) -> str:
     """`<at id="0">Ada Lovelace</at>` → `@Ada Lovelace`.
 
-    The tag's `id` indexes `mentions[]`. That is the authority; the element's text is fallback.
+    The tag's `id` indexes `mentions[]`. That is the authority. The element's own text is
+    fallback, because it is sometimes empty. When neither names anybody, the mention still shows
+    as `[mention]`. It never disappears and never leaves a bare tag.
     """
     index = _MENTION_INDEX.search(tag.group(1))
     resolved = mention_texts.get(int(index.group(1))) if index is not None else None
@@ -537,9 +539,10 @@ def _is_card_payload(text: str, attachments: list[ChatMessageAttachment]) -> boo
     """Whether `text` is nothing but the payload of a card this message already carries.
 
     Teams sometimes leaves card JSON in `body.content` instead of `<attachment id="…">`. A body is
-    only dropped when the message carries a card attachment whose `content` is that payload,
-    compared parsed. Looking like JSON is not evidence enough—a developer pasting config or an
-    API response writes brace-and-type too. Everything else is what somebody wrote.
+    only dropped when the message carries a card attachment whose `content` is that payload. The
+    comparison uses parsed JSON, not raw text. Different spacing or escaping does not change the
+    result. Looking like JSON is not evidence enough—a developer pasting config or an API response
+    writes brace-and-type too. Everything else is what somebody wrote.
     """
     payload = _json(text)
     if payload is None:
