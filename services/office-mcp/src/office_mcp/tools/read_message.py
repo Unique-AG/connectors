@@ -50,6 +50,8 @@ TOOL_NAME = "read_message"
 # Read uses `Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
+# Built once at import. A call inside a parameter default rebuilds this on every registration.
+# That is a lint error in both of this repo's checkers.
 _TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 _DESCRIPTION = """\
@@ -98,6 +100,9 @@ _UNREADABLE = (
 )
 
 # Without this header, Graph answers systemEventMessage as unknownFutureValue.
+# Most system events are visible without this header: a null `from` or a populated `eventDetail`
+# already marks them. `chatEvent` and `typing` messages show neither signal. `messageType` is the
+# only way to name them, and this header keeps it legible.
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
@@ -107,7 +112,11 @@ type _ChannelMessageQuery = (
 
 
 async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
-    """The message `handle` addresses. One Graph request, whichever surface it lives on."""
+    """The message `handle` addresses. One Graph request, whichever surface it lives on.
+
+    This endpoint does not support `$select` or `$expand`. Mentions and attachments always arrive
+    with the message.
+    """
     with graph_errors():
         message = await _get(client, handle)
 
@@ -145,7 +154,11 @@ def _headers() -> HeadersCollection:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool against the shared Graph transport."""
+    """Register this tool against the shared Graph transport.
+
+    `transport` is the long-lived client from `create_graph_transport`. This tool borrows it per
+    call and does not own it; `create_app` closes it on shutdown.
+    """
 
     @mcp.tool(
         name=TOOL_NAME,

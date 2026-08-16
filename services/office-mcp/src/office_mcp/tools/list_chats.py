@@ -4,6 +4,9 @@ Lists one-to-one, group, and meeting chats with id, type, topic, last message ti
 (for unnamed chats). No message text. This tool names conversations for other tools and shows which
 chats are live and when last posted in.
 
+Graph's `lastUpdatedDateTime` changes on a rename or a member change. It is not recency. Only the
+last message sent decides `last_message_at` and the sort order.
+
 `limit` is a window, not a cursor. A full window may have more. A short one is all. The walk
 follows Graph's paging to completion rather than trusting a short page.
 
