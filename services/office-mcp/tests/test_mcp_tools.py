@@ -1131,15 +1131,23 @@ class TestTheToolsThisServerAdvertises:
         assert "not known" in description, "the fifth answer claims nothing, and has to say so"
 
     @pytest.mark.parametrize(
-        ("tool", "artifact"),
+        ("tool", "artifact", "finality"),
         [
-            ("list_meeting_transcripts", "transcripts"),
-            ("list_meeting_recordings", "recordings"),
+            (
+                "list_meeting_transcripts",
+                "transcripts",
+                "This status is final and cannot be retried",
+            ),
+            (
+                "list_meeting_recordings",
+                "recordings",
+                "reads the same recordings and returns this same status",
+            ),
         ],
         ids=["transcripts", "recordings"],
     )
     async def test_neither_lister_offers_a_remedy_its_mechanism_cannot_keep(
-        self, mcp_client: Client[FastMCPTransport], tool: str, artifact: str
+        self, mcp_client: Client[FastMCPTransport], tool: str, artifact: str, finality: str
     ) -> None:
         """Four of the five statuses tell a caller what to do next; `scan_incomplete` cannot,
         because the window is applied after Microsoft has answered and so no argument sends the
@@ -1148,7 +1156,9 @@ class TestTheToolsThisServerAdvertises:
         so both the tool and the field say to stop.
 
         Asserted per tool rather than once over both: the two listers share this mechanism and
-        therefore this dead end, and identical prose drifts by being edited on one side.
+        therefore this dead end, and identical prose drifts by being edited on one side. Each says
+        the dead end is final in its own words — one names the finality, one names the mechanism
+        that causes it — so the sentence is pinned per tool rather than assumed shared.
         """
         tools = _named(await mcp_client.list_tools())
         description = tools[tool].description
@@ -1157,7 +1167,7 @@ class TestTheToolsThisServerAdvertises:
 
         assert "nothing to try" in description and "Stop here" in description
         assert "There is nothing to try" in status
-        assert "This status is final and cannot be retried" in status
+        assert finality in status
         assert f"reads the same {artifact} and returns this same answer" in description, (
             "a narrower window is named only as the thing that does NOT help"
         )
@@ -1409,7 +1419,7 @@ class TestTheToolsThisServerAdvertises:
         rendered = str(limit.get("description")) + str(listed.get("description"))
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in rendered, "the cap is named where it binds"
-        assert "the 3 newest OF THE ONES READ" in str(limit.get("description"))
+        assert "the newest OF THE ONES READ" in str(limit.get("description"))
         assert "the latest of what was READ" in str(listed.get("description"))
         assert "so asking for 3 gives the 3 latest" not in rendered, (
             "the overstatement: past the cap those 3 are the newest of what was read"
@@ -2689,12 +2699,11 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         [
             (
                 "list_meeting_transcripts",
-                "that last one is read_transcript's, and this tool is what produces it",
+                "handle is read_transcript's; this tool is what produces it",
             ),
             (
                 "list_meeting_recordings",
-                "No recording is addressable at all: nothing here returns recording video, so "
-                + "there is no handle for one",
+                "No recording is addressable here",
             ),
         ],
         ids=["transcripts", "recordings"],

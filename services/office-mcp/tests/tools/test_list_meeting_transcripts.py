@@ -693,7 +693,7 @@ class TestScopingToOneOccurrence:
             "window — the claim a caller would otherwise read off its length"
         )
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
-        assert "the whole window OF WHAT WAS READ" in described
+        assert "the window holds no more than was read" in described
         assert "these are the whole window." not in described, (
             "the unqualified claim, which this meeting is the counter-example to"
         )
@@ -705,8 +705,8 @@ class TestScopingToOneOccurrence:
         described = str(lister.MeetingTranscripts.model_fields["transcripts"].description)
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in described
-        assert "Ordered over those read" in described
-        assert "not a Microsoft page" in described
+        assert "The order is over every transcript this call read" in described
+        assert "not over one page of Microsoft's answer" in described
         assert "The order is over the whole collection" not in described
 
     async def test_a_limit_above_the_ceiling_is_a_programming_error(
