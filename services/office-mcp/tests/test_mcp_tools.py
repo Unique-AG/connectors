@@ -405,7 +405,7 @@ class TestTheToolsThisServerAdvertises:
 
         assert "Every word must appear" in description
         assert "any order" in description
-        assert "not matched as a phrase unless you quote them" in description
+        assert "not matched as phrases unless quoted" in description
         assert '"release notes"' in description, "the phrase syntax needs an example to be usable"
 
     async def test_search_messages_bounds_its_page_where_microsoft_documents_it(
