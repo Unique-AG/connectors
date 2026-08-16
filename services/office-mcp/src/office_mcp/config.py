@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PKG_VERSION = pkg_version("office-mcp")
 
 # libpq `sslmode` values asyncpg accepts. Only `verify` (libpq's alias for
-# `verify-full`) is rewritten.
+# `verify-full`) is rewritten, because asyncpg does not accept the short spelling.
 # Trap: verify-ca is a genuinely weaker mode. Never widen it to verify-full—that
 # silently changes what the connection checks.
 _ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
@@ -29,8 +29,10 @@ _UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 def asyncpg_dsn(url: str) -> str:
     """Convert a libpq PostgreSQL URL to asyncpg DSN format. Rewrites scheme and sslmode values.
 
-    Trap: Use urllib.parse to preserve encoding and IPv6. There is no second connection
-    shape that can negotiate TLS differently from the first.
+    Trap: `urlsplit` keeps `netloc` intact, so a percent-encoded password, a bracketed IPv6
+    host, and a missing port all survive unchanged. A library that decodes and reassembles
+    the parts would corrupt them. Only the scheme and the query change.
+    There is no second connection shape that can negotiate TLS differently from the first.
     """
     parts = urlsplit(url)
     scheme = parts.scheme
@@ -67,6 +69,7 @@ class AppEnv(StrEnum):
 
 
 # Hosts not reachable externally. `0.0.0.0` and `[::]` are bind addresses, not destinations.
+# IPv6 entries keep their brackets because pydantic's `HttpUrl.host` keeps them too.
 _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "[::]"})
 
 
@@ -95,7 +98,11 @@ class AppConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def _lowercase_log_level_and_app_env(cls, data: object) -> object:
-        """Accept uppercase `LOG_LEVEL=INFO` and `APP_ENV=PRODUCTION` from operators."""
+        """Accept uppercase `LOG_LEVEL=INFO` and `APP_ENV=PRODUCTION` from operators.
+
+        Trap: pydantic's `StrEnum` coercion is case-sensitive. Without this step, an
+        uppercase value aborts startup instead.
+        """
         if not isinstance(data, dict):
             return data
         values = cast(dict[str, object], data)
@@ -107,7 +114,11 @@ class AppConfig(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
-        """Reject loopback URLs in production. Clients cannot reach localhost or 127.0.0.1."""
+        """Reject loopback URLs in production. Clients cannot reach localhost or 127.0.0.1.
+
+        Trap: without this check, the server logs no error here. Clients simply fail to
+        connect, with no signal anywhere that explains why.
+        """
         if self.app_env != AppEnv.PRODUCTION:
             return self
         host = self.public_base_url.host
@@ -122,7 +133,12 @@ class AppConfig(BaseSettings):
 
     @property
     def issuer(self) -> str:
-        """Return `public_base_url` as a string without trailing slash for path joins."""
+        """Return `public_base_url` as a string without trailing slash for path joins.
+
+        Trap: `HttpUrl` renders with a trailing slash, so joining a path onto it gives
+        `https://host//authorize`. The OAuth discovery document re-parses the issuer on its
+        own and restores the slash there.
+        """
         return str(self.public_base_url).rstrip("/")
 
 
@@ -148,7 +164,8 @@ class DatabaseConfig(BaseSettings):
     def accept_database_url(cls, data: object) -> object:
         """Accept DATABASE_URL (Helm alias) if neither `url` nor discrete fields are set.
 
-        Explicit args win.
+        Explicit args win. Trap: without this guard, an explicit `DatabaseConfig(host=...)`
+        call would silently lose its arguments to the ambient environment instead.
         """
         if not isinstance(data, dict):
             return data
@@ -186,8 +203,10 @@ class DatabaseConfig(BaseSettings):
         )
 
         # Escape all reserved characters in user and password; unescaped delimiters reparse the DSN.
+        # `quote`'s default leaves `/` unescaped, so `safe=""` forces full escaping here.
         userinfo = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}"
         database = quote(self.name, safe="")
+        # The host is written as given, so a bracketed IPv6 literal keeps its brackets.
         self._driver_dsn = f"postgresql://{userinfo}@{self.host}:{self.port}/{database}"
         return self
 

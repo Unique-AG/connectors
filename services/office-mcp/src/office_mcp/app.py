@@ -35,6 +35,7 @@ def create_app(
     """Build the app.
 
     All config objects and long-lived collaborators are built here once, then injected.
+    Nothing downstream re-reads the environment.
     Scaffolding only: no OAuth, no Graph client, no tools yet.
     """
     config = config or AppConfig()
