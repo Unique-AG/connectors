@@ -111,7 +111,12 @@ async def collect_pages[T](
     matches: Callable[[T], bool] | None = None,
     max_scanned: int = MAX_SCANNED_ITEMS,
 ) -> CollectedItems[T]:
-    """Walk first_page and successors, keeping matching items up to limit."""
+    """Walk first_page and successors, keeping matching items up to limit.
+
+    The SDK deserializes every page with `type(first_page)`, so the item a page hands back is
+    always what the caller's own collection response declared it holds. The cast to `T` only
+    names that guarantee; it does not create it.
+    """
     items: list[T] = []
     scanned = 0
     capped = False
@@ -125,6 +130,9 @@ async def collect_pages[T](
         capped = len(items) >= limit or scanned >= max_scanned
         return not capped
 
+    # The SDK leaves `RequestAdapter`'s own type parameter unbound, so `client.request_adapter`
+    # reads as unknown-typed. Taking `client` here confines that to this one line instead of
+    # every call site.
     iterator = PageIterator(
         first_page,
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
@@ -133,6 +141,8 @@ async def collect_pages[T](
     empty_pages_in_a_row = 0
     while True:
         looked_at_before = scanned
+        # `enumerate`'s return value conflates two different stops: the page ran out, or `visit`
+        # asked to stop. `capped` is `visit`'s own answer, so it is read instead.
         _ = iterator.enumerate(visit)  # pyright: ignore[reportUnknownMemberType]
         if capped or not iterator.current_page.odata_next_link:
             return CollectedItems(items=items, capped=capped and _more_was_on_offer(iterator))

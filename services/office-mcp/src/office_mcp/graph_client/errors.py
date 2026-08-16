@@ -58,7 +58,10 @@ class GraphFailure(Exception):
 
 class GraphThrottled(GraphFailure):
     """Rate limit from Graph. SDK retries did not outlast it. Obey Retry-After header for fastest
-    recovery. None means Graph sent no header—choose your own backoff."""
+    recovery: usage keeps accruing while throttled, so an early retry only extends the wait. This
+    means the SDK already retried `GraphSettings.max_retries` times, or Retry-After asked for more
+    than the SDK's 180 s wait ceiling and it gave up. None means Graph sent no header—choose your
+    own backoff."""
 
     def __init__(
         self,
@@ -213,12 +216,21 @@ def _classify(error: APIError) -> GraphFailure:
 
 
 def _lowercase_headers(error: APIError) -> dict[str, str]:
-    """Convert response_headers to dict with lowercased keys."""
+    """Convert response_headers to dict with lowercased keys.
+
+    The declared type is dict[str, str], but the request adapter may assign httpx.Headers
+    instead. httpx.Headers is case-insensitive; lowercasing the keys makes both forms behave alike.
+    """
     return {name.lower(): value for name, value in (error.response_headers or {}).items()}
 
 
 def _retry_after_seconds(headers: dict[str, str]) -> float | None:
-    """Parse Retry-After header as delay-seconds or None."""
+    """Parse Retry-After header as delay-seconds or None.
+
+    Graph documents this header as delay-seconds and never sends the legal HTTP-date form here.
+    This parser does not guess at that form: a wrong guess about the caller's clock is worse than
+    reporting no advice.
+    """
     value = headers.get("retry-after")
     if value is None:
         return None

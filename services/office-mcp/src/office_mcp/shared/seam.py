@@ -119,6 +119,11 @@ _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
+# Every permission this connector may request, listed once. A tool file names its own
+# permissions. Every check compares a tool file against this list. A misspelled permission, like
+# `Chat.Raed`, passes every check. Each check compares the typo against itself, never against the
+# correct name. Entra rejects an unknown scope at the authorize endpoint. One typo here stops
+# sign-in for every user of this connector.
 REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset({"User.Read", "Chat.Read"})
 
 
@@ -156,6 +161,10 @@ class GraphToken(Dependency[str]):
     def __init__(self, *permissions: str) -> None:
         assert permissions, "a token is exchanged for at least one permission"
         self._permissions: tuple[str, ...] = permissions
+        # `EntraOBOToken` is annotated `-> str`. This is a lie for the type checker's benefit.
+        # The lie lets a tool body treat the injected value as a string. The real value here
+        # is the dependency object, not a string. The two types do not overlap. So the cast
+        # goes through `object`.
         self._exchange: Dependency[str] = cast(
             "Dependency[str]",
             cast("object", EntraOBOToken([graph_scope(permission) for permission in permissions])),
@@ -305,7 +314,13 @@ def _causes(error: BaseException) -> Iterator[BaseException]:
 
 @contextmanager
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
-    """Map Graph failures onto actionable tool errors. Name all permissions—Graph doesn't."""
+    """Map Graph failures onto actionable tool errors. Name all permissions—Graph doesn't.
+
+    `not_found` replaces the default advice for a 404. The default advice assumes the id comes
+    verbatim from a tool response. That assumption is wrong for a handle that another tool
+    creates. For a handle, the remaining causes are deletion and lost access. Override
+    `not_found` with the sentence true of this call.
+    """
     assert permissions, "a Graph call is made under at least one permission"
     try:
         yield
