@@ -71,95 +71,92 @@ from office_mcp.shared.handles import MessageHandle
 
 
 class MessageSender(BaseModel):
-    """Who sent a message, from whichever identity shape Graph used.
+    """Who sent a message, in whichever identity shape Graph used.
 
-    Three shapes. Teams messages are indexed out of the substrate mailbox, so a search hit carries
-    an Exchange-style `emailAddress` (a name and an address), while every Teams read API returns a
-    `teamworkUserIdentity` (an id and an optional display name, and no email at all); a bot, a
-    connector or an outgoing webhook is an application identity (an id and an optional display
-    name). Which fields are populated therefore says which shape Graph answered with, and a null is
-    not evidence that the sender has no name, no address or no id.
+    Three shapes: search hits carry Exchange-style `emailAddress` (name and address), Teams reads
+    return `teamworkUserIdentity` (id and optional name, no email), and a bot, connector or
+    outgoing webhook is an application identity (id and optional name). Which fields are filled
+    says which shape Graph answered with. A null is not evidence that the sender has no name, no
+    address or no id.
     """
 
     display_name: str | None = Field(
         description=(
-            "The sender's name as Teams shows it. Microsoft documents this as optional and it is "
-            + "genuinely absent on some messages, including messages from external and federated "
-            + "users — a null is not an anonymous sender."
+            "The sender's name as Teams shows it. Genuinely absent on some messages from external "
+            + "and federated users. A null is not an anonymous sender."
         )
     )
     email: str | None = Field(
         description=(
             "The sender's email address. Present when Graph answered with the mailbox-shaped "
-            + "identity that search hits normally carry, and null otherwise; the Teams identity "
-            + "has no email property at all, so compare `user_id` when this is null."
+            + "identity (search hits). Null for the Teams identity, which has no email property. "
+            + "Compare `user_id` when this is null."
         )
     )
     user_id: str | None = Field(
         description=(
-            "The sender's Microsoft Entra object id, when Graph answered with the Teams-shaped "
-            + "identity. This is the value the `mentions` search parameter takes, and the only "
-            + "sender field safe to compare against ids from other tools. Null for a message sent "
-            + "by an application (a bot or a connector), and null when Graph gave an email "
-            + "address instead."
+            "The sender's Microsoft Entra object id from the Teams-shaped identity. This is what "
+            + "the `mentions` search parameter takes. The only sender field safe to compare "
+            + "against ids from other tools in chats and channels. Null for applications and when "
+            + "Graph gave an email address."
         )
     )
     application_id: str | None = Field(
         description=(
             "The id of the application that sent the message — a bot, a connector or an outgoing "
-            + "webhook. Microsoft documents this id as always present on an application identity, "
-            + "where the display name is optional, so it is the one field that names such a sender "
-            + "in every case. Null for a message a person sent. It is not interchangeable with "
-            + "`user_id`, and the `mentions` search parameter does not accept it: that parameter "
-            + "matches on user ids alone."
+            + "webhook. Null for a message a person sent. Not interchangeable with `user_id`, and "
+            + "the `mentions` search parameter does not accept it."
         )
     )
 
 
 class MessageMention(BaseModel):
-    """One @-mention, resolved: the body only carries an `<at id="N">` placeholder."""
+    """One @-mention.
+
+    The body carries an `<at id="N">` placeholder; this is the resolved mention.
+    """
 
     text: str | None = Field(
         description=(
-            "How the mention reads in the message, e.g. a person's display name or a team's name. "
-            + "This is Microsoft's `mentionText`, and it is what the `@…` in `text` was rendered "
-            + "from."
+            "How the mention reads in the message, e.g. a person's name or a team's name. "
+            + "Microsoft's `mentionText`. This is what the `@…` in `text` was rendered from."
         )
     )
     user_id: str | None = Field(
         description=(
-            "The mentioned person's Microsoft Entra object id, comparable against `user_id` from "
-            + "get_me and the `mentions` parameter of search_messages. Null when the mention was "
-            + "not a person — Teams also mentions teams, channels, chats, tags and everyone at "
-            + "once — so a null here is not a failure to resolve a user."
+            "The mentioned person's Entra object id. Comparable against `user_id` from get_me and "
+            + "the `mentions` search parameter. Null when not a person (Teams also mentions teams, "
+            + "channels, tags, etc)."
         )
     )
 
 
 class MessageAttachment(BaseModel):
-    """One attachment. The body only carries an `<attachment id="…">` placeholder."""
+    """One attachment.
+
+    The body carries an `<attachment id="…">` placeholder; this is the resolved attachment.
+    """
 
     name: str | None = Field(
         description=(
-            "The attachment's name, which is what `[attachment: …]` in `text` shows. Null for "
-            + "attachments Teams gives no name, such as an adaptive card or a forwarded message."
+            "The attachment's name, shown as `[attachment: …]` in `text`. Null for attachments "
+            + "without names, like cards or forwarded messages."
         )
     )
     content_type: str | None = Field(
         description=(
-            "Microsoft's `contentType`: `reference` for a link to a file, "
-            + "`forwardedMessageReference` for a forwarded message, or a card type such as "
-            + "`application/vnd.microsoft.card.adaptive` for an adaptive card and "
-            + "`application/vnd.microsoft.card.codesnippet` for a code snippet. It says what the "
-            + "attachment is, not what format the file is in — and it is the only thing that says "
-            + "a message carries a card, which is why `[card]` in `text` comes from here."
+            "Microsoft's `contentType`: `reference` for file links, `forwardedMessageReference` "
+            + "for forwarded messages, or card types like "
+            + "`application/vnd.microsoft.card.adaptive`. It says what the attachment is, not the "
+            + "file format. It is the only signal that a message carries a card, so `[card]` in "
+            + "`text` comes from here."
         )
     )
     url: str | None = Field(
         description=(
-            "Where the attachment's content lives, when Microsoft gave a URL. This connector does "
-            + "not download attachments, and the URL may need Microsoft 365 credentials to open, "
-            + "so treat it as a reference to show a person rather than something to fetch."
+            "Where the attachment's content lives when Microsoft provides a URL. This connector "
+            + "does not download. The URL may need Microsoft 365 credentials to open, so treat it "
+            + "as a reference to show."
         )
     )
 
@@ -169,114 +166,104 @@ class TeamsMessage(BaseModel):
 
     uri: str = Field(
         description=(
-            "The handle this message was read from, in the canonical form search_messages emits. "
-            + "Echoed so a message can be quoted, cached or re-read without reassembling it."
+            "The handle this message was read from, in the form search_messages emits. Echoed so "
+            + "messages can be quoted, cached or re-read without reassembling."
         )
     )
     message_id: str = Field(
         description=(
-            "The message's Graph `id`. Unique only within its own chat, channel or reply thread, "
-            + "so identify a message by `uri` rather than by this."
+            "The message's Graph `id`. Unique only within its chat, channel or reply thread. Use "
+            + "`uri` to identify globally."
         )
     )
     chat_id: str | None = Field(
-        description="The chat this message is in. Null for a channel message."
+        description="The chat this message is in. Null for channel messages."
     )
-    team_id: str | None = Field(description="The team, for a channel message. Null in a chat.")
-    channel_id: str | None = Field(
-        description="The channel, for a channel message. Null in a chat."
-    )
+    team_id: str | None = Field(description="The team, for channel messages. Null for chats.")
+    channel_id: str | None = Field(description="The channel, for channel messages. Null for chats.")
     sender: MessageSender | None = Field(
         description=(
             "Who wrote the message, in the same shape search_messages reports. Null only when "
-            + "nobody wrote it: Microsoft Graph sends no author for a system event message, which "
-            + "`event` then describes. A read identifies a sender by Entra object id rather than "
-            + "by email — the Teams identity Graph answers a read with carries no email address at "
-            + "all — so `email` is normally null here even though search fills it in."
+            + "nobody wrote it: Graph sends no author for system event messages, which `event` "
+            + "then describes. Reads identify senders by Entra id rather than email—the Teams "
+            + "identity has no email address at all—so `email` is normally null here."
         )
     )
     text: str | None = Field(
         description=(
-            "The message, as plain text. Teams HTML is normalised: mentions read as `@Name`, list "
-            + "items as `- `, emoji as themselves, an inline image as `[image]`, an attachment as "
-            + "`[attachment: name]` and a card as `[card]`, with every remaining tag removed and "
-            + "every HTML entity decoded. Null when the message has no text of its own — a system "
-            + "event, a deleted message, or a post that was only an image or a card. This is the "
-            + "whole message, never abridged: text that happens to look like JSON or code is a "
-            + "person's own words and is reported verbatim, and `[card]` appears only where "
-            + "`attachments` names a card. This is the full body, not search's `summary` snippet."
+            "The message as plain text. Teams HTML is normalised: mentions as `@Name`, list items "
+            + "as `- `, emoji as themselves, inline images as `[image]`, attachments as "
+            + "`[attachment: name]`, cards as `[card]`, all tags removed, HTML entities decoded. "
+            + "Null when no text of its own—system events, deleted messages, posts that were only "
+            + "images or cards. This is the whole message, never abridged. Text that looks like "
+            + "JSON or code is a person's words and is reported in full. `[card]` appears only "
+            + "where `attachments` names a card."
         )
     )
     event: str | None = Field(
         description=(
-            "What happened, when this is a system event message rather than something a person "
-            + "wrote: `members joined`, `chat renamed`, `call ended` and so on, from Microsoft's "
-            + "`eventDetail` type. Null for an ordinary message. Microsoft Graph does not send the "
-            + "sentence Teams displays for these ('Ada joined the chat') — the Teams client writes "
-            + "it — so this naming of the event is all there is, and there is no text to quote. "
-            + "Who took part in the event is not returned by this connector."
+            "What happened when this is a system event message: `members joined`, `chat renamed`, "
+            + "`call ended`, etc., from Microsoft's `eventDetail` type. Null for ordinary "
+            + "messages. Graph does not send the sentence Teams displays—the client writes it—so "
+            + "this naming is all there is. Participant details are not returned."
         )
     )
     created_at: datetime | None = Field(description="When the message was sent.")
     last_edited_at: datetime | None = Field(
         description=(
-            "When the message was last edited by its author, or null if it never was — this is "
-            + "Microsoft's `lastEditedDateTime`, the property behind the 'Edited' flag in Teams. "
-            + "Unlike `lastModifiedDateTime` it does not move when somebody adds a reaction."
+            "When last edited by the author, or null if never. Microsoft's `lastEditedDateTime`, "
+            + "the property behind Teams' 'Edited' flag. Unlike `lastModifiedDateTime`, it does "
+            + "not change when reactions are added."
         )
     )
     deleted_at: datetime | None = Field(
         description=(
-            "When the message was deleted, or null if it is still live. When this is set, `text` "
-            + "is null and the message's content is gone: say the message was deleted rather than "
-            + "reporting it as empty."
+            "When deleted, or null if live. When set, `text` is null and content is gone. Do not "
+            + "return the tombstone body as live content. Say the message was deleted, do not "
+            + "report it as empty."
         )
     )
     reply_to_id: str | None = Field(
         description=(
-            "The id of the channel post this message replies to, for a reply in a channel thread; "
-            + "null for a root post and for every chat message, which Teams does not thread."
+            "The id of the channel post this message replies to, for replies in channel threads. "
+            + "Null for root posts and all chat messages (Teams does not thread chats)."
         )
     )
     subject: str | None = Field(
-        description="The message subject. Usually null: Teams sets one only on some channel posts."
+        description="The message subject. Usually null: Teams sets it only on some channel posts."
     )
     importance: str | None = Field(
-        description="`normal`, `high` or `urgent`, as the sender marked the message."
+        description="`normal`, `high` or `urgent`, as marked by the sender."
     )
     web_url: str | None = Field(
         description=(
-            "A link that opens the message in Microsoft Teams. Populated for channel messages; "
-            + "Graph gives chat messages no such link, so it is null there."
+            "A link to open the message in Microsoft Teams. Set for channel messages. Null for "
+            + "chats."
         )
     )
     mentions: list[MessageMention] = Field(
         description=(
-            "Everyone and everything this message @-mentions, in the order Microsoft lists them. "
-            + "Empty when it mentions nobody."
+            "Everyone and everything this message @-mentions, in Microsoft's order. Empty when "
+            + "none."
         )
     )
     attachments: list[MessageAttachment] = Field(
         description=(
             "What was attached: files, cards, code snippets, forwarded messages. Empty when "
-            + "nothing was. The contents are not downloaded and a forwarded message's own body is "
-            + "not unpacked."
+            + "nothing. Contents are not downloaded. Forwarded messages are not unpacked."
         )
     )
 
 
 def sender_of(identity: ChatMessageFromIdentitySet | None) -> MessageSender | None:
-    """The sender, or None when Graph named no sender at all.
+    """The sender, or None when Graph named nobody.
 
-    One function over all three identity shapes, because a search hit and a read of the same
-    message must report the same sender.
-
-    The decision is made on the identity Graph named rather than on the fields below, because every
-    one of those is optional: an identity carrying an id or a name is a sender, whatever else it
-    left blank. What the presence of the identity *object* says is nothing — Graph sends an empty
-    one — so a sender is only as real as what is inside it. A null `from`, and an identity set
-    naming nobody, is how Graph sends a deleted message and a Teams internal system message, so
-    None is also the signal a search filters those hits out by.
+    One function for all three identity shapes so a search hit and a read of the same message
+    report the same sender. The decision is made on the identity Graph named, not on the fields
+    below: every one of those is optional, so an identity carrying an id or a name is a sender
+    whatever else it left blank. The identity object being present says nothing — Graph sends an
+    empty one. A null `from`, and an identity set naming nobody, is how Graph sends a deleted
+    message and a Teams internal system message.
     """
     if identity is None:
         return None
@@ -301,12 +288,10 @@ def sender_of(identity: ChatMessageFromIdentitySet | None) -> MessageSender | No
 
 
 def message_of(message: ChatMessage, *, handle: MessageHandle) -> TeamsMessage:
-    """`message` as this connector reports a Teams message, addressed by `handle`.
+    """`message` as this connector reports, addressed by `handle`.
 
-    One function rather than one per Graph projection: a `chatMessage` carries the same fields
-    whichever collection it came out of, so every tool that answers with a whole message answers
-    with the same shape, normalised the same way, because it is the same function rather than two
-    that agree.
+    One function for all Graph projections. A `chatMessage` carries the same fields whichever
+    collection it came from, so every tool answers with the same shape normalised the same way.
     """
     mentions = message.mentions or []
     attachments = message.attachments or []
@@ -332,11 +317,9 @@ def message_of(message: ChatMessage, *, handle: MessageHandle) -> TeamsMessage:
     )
 
 
-# Every `eventMessageDetail` subtype is named `<what happened>EventMessageDetail`, and Microsoft
-# lists all 31 (https://learn.microsoft.com/en-us/graph/system-messages) — so the `@odata.type` of
-# the one Graph sent *is* the event. Reading the name is what makes this cover the subtypes
-# Microsoft adds next as well as the ones that exist today; a table of the 31 would answer
-# "unknown event" for the 32nd.
+# Every eventMessageDetail subtype is named <what happened>EventMessageDetail. Reading the name
+# covers subtypes Microsoft adds next. A table of the 31 current types would answer "unknown" for
+# the 32nd.
 _EVENT_TYPE = re.compile(r"\A#?microsoft\.graph\.(.+?)EventMessageDetail\Z")
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
@@ -346,15 +329,13 @@ _UNDESCRIBED_EVENT = "a system event Microsoft Graph sent no detail for"
 
 
 def event_of(message: ChatMessage) -> str | None:
-    """What this message is an event *of*, or None if a person wrote it.
+    """What this message is an event of, or None if a person wrote it.
 
-    Three independent signals, because no one of them is reliable alone: `eventDetail` is only
-    populated for `systemEventMessage`, `messageType` needs a `Prefer` header on the request to be
-    legible at all, and a null `from` is what Graph actually sends for every one of them.
-
-    This is also the test for "is this a message somebody wrote", which is the question every tool
-    that filters system messages out of a collection has to ask the same way a read does — or the
-    two disagree about what a message is.
+    Three independent signals guide the decision: `eventDetail`, `messageType`, and `from`. None
+    is reliable alone. `eventDetail` names the event when present. `messageType` other than
+    `Message` signals a non-authored event. `from` null marks system events. All three are needed
+    because Graph omits eventDetail on some events and sends `from: null` on others. Checking
+    only one would miss events or misidentify messages.
     """
     detail = message.event_detail
     if detail is not None:
@@ -483,11 +464,7 @@ def _text(
     mentions: list[ChatMessageMention],
     attachments: list[ChatMessageAttachment],
 ) -> str | None:
-    """The message as plain text, or None when it has none.
-
-    A deleted message has no content to normalise whatever `body` says, and returning what Graph
-    happens to leave in a tombstone would present a deleted message as live text.
-    """
+    """The message as plain text, or None when it has none. Deleted messages have no content."""
     if message.deleted_date_time is not None:
         return None
     body = message.body
@@ -532,10 +509,7 @@ def _from_html(
 def _mention_text(tag: re.Match[str], mention_texts: dict[int, str | None]) -> str:
     """`<at id="0">Ada Lovelace</at>` → `@Ada Lovelace`.
 
-    The tag's `id` indexes `mentions[]` — Microsoft documents the correspondence — and that is the
-    authority, because the element's own text is sometimes empty. Its text is the fallback, and if
-    neither names anybody the mention is still marked: an `<at>` that vanished would read as the
-    author addressing nobody, and a bare `<at id="0">` left in the text would be a key to nothing.
+    The tag's `id` indexes `mentions[]`. That is the authority; the element's text is fallback.
     """
     index = _MENTION_INDEX.search(tag.group(1))
     resolved = mention_texts.get(int(index.group(1))) if index is not None else None
@@ -546,8 +520,8 @@ def _mention_text(tag: re.Match[str], mention_texts: dict[int, str | None]) -> s
 def _attachment_marker(attachment: ChatMessageAttachment) -> str:
     """How one attachment reads where the body's `<attachment id="…">` placeholder sat.
 
-    Teams gives a card no `name`, so a card would otherwise read as an anonymous `[attachment]`.
-    Its `contentType` is what says it is a card, and that is where `[card]` comes from.
+    Teams gives cards no `name`. The `contentType` says it is a card and that is where `[card]`
+    comes from.
     """
     if attachment.name:
         return f"[attachment: {attachment.name}]"
@@ -562,14 +536,10 @@ def _is_card(attachment: ChatMessageAttachment) -> bool:
 def _is_card_payload(text: str, attachments: list[ChatMessageAttachment]) -> bool:
     """Whether `text` is nothing but the payload of a card this message already carries.
 
-    Teams sometimes leaves a card's own JSON in `body.content` instead of the
-    `<attachment id="…">` placeholder, and handing a model a screenful of layout JSON spends its
-    context on nothing. But *looking* like JSON is not evidence of a card — a developer pasting a
-    config fragment or an API response into Teams writes a brace-and-`"type"` object too, and a
-    guard that went by the shape of the text silently threw those messages away, in the one tool
-    that is the only route to a message's text. So a body is only dropped when the message carries
-    a card attachment whose `content` *is* that payload, compared parsed so that indentation and
-    escaping do not decide it. Everything else is what somebody wrote, and is returned in full.
+    Teams sometimes leaves card JSON in `body.content` instead of `<attachment id="…">`. A body is
+    only dropped when the message carries a card attachment whose `content` is that payload,
+    compared parsed. Looking like JSON is not evidence enough—a developer pasting config or an
+    API response writes brace-and-type too. Everything else is what somebody wrote.
     """
     payload = _json(text)
     if payload is None:
@@ -579,7 +549,7 @@ def _is_card_payload(text: str, attachments: list[ChatMessageAttachment]) -> boo
 
 
 def _json(value: str | None) -> object | None:
-    """`value` parsed, or None when it is not a JSON object or array to begin with."""
+    """`value` parsed, or None when not a JSON object or array."""
     if value is None or not value.lstrip().startswith(("{", "[")):
         return None
     try:
