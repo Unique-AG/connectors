@@ -1,23 +1,21 @@
-"""The registry: every tool module, the selection an operator makes, and what it asks for.
+"""The registry of all tools, the selection an operator makes, and the permissions it implies.
 
-A tool is one file. It publishes `TOOL_NAME` (str), `GRAPH_PERMISSIONS` (tuple) and `register`
-(function). Adding a tool: one file plus one line here.
+Each tool is one file that publishes `TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`. Add a tool:
+one file plus one line here.
 
-TRAP: the scope list must be derived from the modules, never hand-written. At startup,
-`create_app` passes the selected tools' permissions to the auth provider. A permission not
-consented at authorization time cannot be obtained later: the On-Behalf-Of exchange fails with
-AADSTS65001 per tool call, before the tool body runs. Deriving it here guarantees every
-registered tool has consent.
+TRAP: Derive the scope list from the modules, never hand-write it. `create_app` passes the selected
+tools' permissions to the auth provider at startup. A permission not consented at sign-in cannot be
+obtained later: the On-Behalf-Of exchange fails with AADSTS65001 per tool call, before the tool body
+runs. Deriving here guarantees every registered tool has consent.
 
-An operator chooses which of these tools run. `resolve` answers with both halves at once: the
-modules to register, and the permissions to ask for. They are one object so they cannot disagree.
-The filter runs here, before the union. FastMCP's `enable`/`disable` transforms would not do: they
-hide a registered tool and leave its scopes computed, so they shorten `tools/list` and change
-nothing the tenant is asked to grant.
+`resolve` answers a selection with both halves at once: the modules to register, and the permissions
+to ask for. One object, so they cannot disagree. The filter runs here, before the union — FastMCP's
+`enable`/`disable` transforms hide a registered tool and leave its scopes computed, so they shorten
+`tools/list` and change nothing the tenant is asked to grant.
 
-Order is the registry's, never the operator's: `dict.fromkeys` over the modules in declaration
-order, and the selection filtered over that same order. `TOOLS_ENABLED=a,b` and `b,a` must produce
-one scope list, because the consent screen and every cached On-Behalf-Of token key are keyed by it.
+Order is stable (via `dict.fromkeys`, not `set`) and is the registry's, never the operator's:
+`TOOLS_ENABLED=a,b` and `b,a` produce one scope list, which the consent screen and every cached
+On-Behalf-Of token key are keyed by.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -58,12 +56,11 @@ __all__ = [
 
 
 class ToolModule(Protocol):
-    """Contract a tool file must satisfy. Checked structurally: a missing `TOOL_NAME`,
-    `GRAPH_PERMISSIONS` or `register` is a type error, not a runtime surprise.
+    """Contract a tool must satisfy. Type-checked structurally at import.
 
     TRAP: `TOOL_NAME` is read-only here. A tool file writes it without an annotation, so its type is
-    a literal string, and a mutable protocol attribute would demand exactly `str` — which would put
-    an annotation on every tool file only to satisfy a type checker.
+    a literal string, and a mutable protocol attribute would demand exactly `str` — an annotation on
+    every tool file only to satisfy a type checker.
     """
 
     @property
