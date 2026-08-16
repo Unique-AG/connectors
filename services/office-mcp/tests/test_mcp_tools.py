@@ -576,10 +576,11 @@ class TestTheToolsThisServerAdvertises:
         does not override it — and losing it is invisible: the fields are all still there, the
         schema still validates, and every tool still answers. What goes missing is the sentence
         that stops a model reading a null as a fact about the person: a search hit carries an
-        Exchange-style `emailAddress` while a Teams read answers with a `teamworkUserIdentity`
-        that has no email property at all, so which fields are filled in says which shape Graph
-        used rather than saying the sender has no name or no address. `read_message` is where that
-        matters, because its senders normally arrive with `email` null.
+        Exchange-style `emailAddress`, a Teams read answers with a `teamworkUserIdentity` that has
+        no email property at all, and a bot arrives as an application identity, so which fields are
+        filled in says which shape Graph used rather than saying the sender has no name, no address
+        or no id. `read_message` is where that matters, because its senders normally arrive with
+        `email` null.
 
         `search_messages` is deliberately not in that list: it overrides at field level, so its
         own words are what a model reads there. The per-field descriptions are shared by both
@@ -597,7 +598,7 @@ class TestTheToolsThisServerAdvertises:
             description = " ".join(written.split())
             assert "emailAddress" in description, name
             assert "teamworkUserIdentity" in description, name
-            assert "a null is not evidence that the sender has no name or no address" in (
+            assert "A null is not evidence that the sender has no name, no address or no id" in (
                 description
             ), name
         fields = [_properties(taught[name]) for name in _MESSAGE_TOOLS]

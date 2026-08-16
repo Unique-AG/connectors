@@ -427,7 +427,7 @@ class TestTheHandleItMints:
         assert described is not None
 
         assert "read_message" in described
-        assert "only route to the full text" in described
+        assert "only route to full text, attachments and mentions" in described
         assert "no tool on this server takes it as an argument" not in described
         assert "no route from here to the message body" not in described
 
