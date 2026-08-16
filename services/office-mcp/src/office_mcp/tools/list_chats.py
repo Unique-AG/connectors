@@ -63,15 +63,15 @@ first. Returns each chat's id, type, topic, last-message time, and members (for 
 Use this to see which conversations are live, who is in them, and when each was last posted in. Do \
 not use for message content—no tool on this server reads messages. Also use to name a chat: \
 `chat_id` is the id Microsoft puts on every message in that chat, so this is how to get a topic \
-and participant list for a message found elsewhere. No tool takes a chat id as an argument. Returns \
-chats only—Teams channels are inside teams and are a separate surface not listed here.
+and participant list for a message found elsewhere. No tool takes a chat id as an argument. \
+Returns chats only—Teams channels are inside teams and are a separate surface not listed here.
 
 Meeting discovery: A `meeting` chat is the conversation attached to a Teams meeting. Its `topic` \
 is the meeting subject and it carries `meeting_uri`—a handle for the meeting. There is no separate \
 meeting tool because this list finds meetings by topic and recency. No calendar permission needed. \
-No tool takes `meeting_uri` as an argument yet, so it identifies meetings rather than opening them. \
-`meeting_uri` is null for non-meeting chats and for meeting chats where Microsoft returned no join \
-URL—nothing else here addresses that meeting, so there is no other route to try.
+No tool takes `meeting_uri` as an argument yet, so it identifies meetings rather than opening \
+them. `meeting_uri` is null for non-meeting chats and for meeting chats where Microsoft returned \
+no join URL—nothing else here addresses that meeting, so there is no other route to try.
 
 Order and `last_message_at` come from the last message sent in the chat—the only recency order \
 Graph applies. Graph's `lastUpdatedDateTime` (rename or member change) is not returned on purpose: \
@@ -109,8 +109,9 @@ class ChatSummary(BaseModel):
     chat_id: str = Field(
         description=(
             "Graph id for this chat (e.g. `19:...@thread.v2`). Microsoft puts this id on every "
-            + "message in this chat. Use this to identify which chat a message found elsewhere came "
-            + "from. Not a tool argument. Not a `teams:///` handle and cannot be assembled into one."
+            + "message in this chat. Use this to identify which chat a message found elsewhere "
+            + "came from. Not a tool argument. Not a `teams:///` handle and cannot be assembled "
+            + "into one."
         )
     )
     chat_type: str = Field(
@@ -135,8 +136,8 @@ class ChatSummary(BaseModel):
     )
     last_message_at: datetime | None = Field(
         description=(
-            "When the last message was sent in this chat. The sort order is by this field. The only "
-            + "recency Microsoft Graph exposes for a chat. Null if no one has posted yet."
+            "When the last message was sent in this chat. The sort order is by this field. The "
+            + "only recency Microsoft Graph exposes for a chat. Null if no one has posted yet."
         )
     )
     created_at: datetime | None = Field(
@@ -151,7 +152,7 @@ class ChatSummary(BaseModel):
     members_may_be_incomplete: bool = Field(
         description=(
             f"True when `members` reached Microsoft Graph's cap of {MEMBERS_PER_CHAT} per chat, so "
-            + f"the chat may have more members. Not proof that it does: a chat with exactly "
+            + "the chat may have more members. Not proof that it does: a chat with exactly "
             + f"{MEMBERS_PER_CHAT} members is identical to one with 200. Do not use this list to "
             + "answer 'who is in this chat' when this is true. Always false when `members` is null."
         )
@@ -238,7 +239,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_CHATS,
                 description=(
                     "How many chats to return, most recent first. Default 25. Microsoft Graph "
-                    + f"refuses larger pages on this collection."
+                    + "refuses larger pages on this collection."
                 ),
             ),
         ] = 25,

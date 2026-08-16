@@ -7,10 +7,10 @@ item cap), empty page handling, and empty page run bounds.
 Scan cap: If filtered after fetch (e.g., messages are mostly joins), "give me 20 items" can walk
 entire channel history one page at a time. Cap must bound what was looked at, not only what kept.
 
-Empty pages: `PageIterator.iterate` stops at empty pages, but Graph sends them with `@odata.nextLink`
-still set. The SDK stops early, losing items. A short window comes back as "that's all" instead of
-truthfully saying "window stopped at cap". This module's loop handles empty pages: if it carries
-nextLink, keep going.
+Empty pages: `PageIterator.iterate` stops at empty pages, but Graph sends them with
+`@odata.nextLink` still set. The SDK stops early, losing items. A short window comes back as
+"that's all" instead of truthfully saying "window stopped at cap". This module's loop handles
+empty pages: if it carries nextLink, keep going.
 
 Empty run bound: Following empty pages needs its own bound separate from item cap. `MAX_EMPTY_PAGES`
 is that bound, counted per run on its own—never pooled with item budget.
@@ -31,7 +31,8 @@ from office_mcp.graph_client.errors import GraphPagingUnending
 
 
 class GraphCollection[T](Protocol):
-    """Structural type for Graph collection responses. Extracts element type from caller's response."""
+    """Structural type for Graph collection responses. Extracts element type from the caller's
+    response."""
 
     @property
     def value(self) -> list[T] | None: ...
