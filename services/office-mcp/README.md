@@ -20,6 +20,7 @@ Database surface: one string `DatabaseConfig.driver_dsn` passed to `asyncpg.conn
 Deliberately no engine, pool or session layer. Two shapes are two places TLS can be negotiated differently.
 
 Layering rule: **`features/` must not import `server/`**. Server wires features; the reverse is a violation.
+`tests/test_layering.py` enforces this rule. The test grows as each new package arrives.
 
 ## Run locally
 
@@ -39,7 +40,8 @@ Endpoints:
 
 ## Tests
 
-Integration tests start a Postgres container via Docker.
+Integration tests start a Postgres container via Docker. The service owns no schema, so the
+tests create nothing in it.
 
 ```bash
 uv run pytest

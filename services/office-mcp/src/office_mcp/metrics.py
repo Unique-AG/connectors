@@ -10,7 +10,11 @@ _provider: MeterProvider | None = None
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
-    """Install OTel→Prometheus reader to route domain instruments to the toolkit registry."""
+    """Install OTel→Prometheus reader to route domain instruments to the toolkit registry.
+
+    Trap: `/metrics` reads `unique_toolkit.monitoring.REGISTRY`, not `prometheus_client`'s
+    default registry. Point the reader at it explicitly, or metrics never appear in a scrape.
+    """
     global _provider
     if _provider is not None:
         return _provider
@@ -23,5 +27,5 @@ def configure_metrics(config: AppConfig) -> MeterProvider:
 
 
 # Domain instruments declared here at import time. OTel proxy buffers creation
-# until configure_metrics runs.
+# until configure_metrics runs, so import order does not matter here.
 _meter = metrics.get_meter("office_mcp")
