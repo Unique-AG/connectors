@@ -195,7 +195,10 @@ async def list_recent_chats(
 def _summarise(chat: Chat, include_member_emails: bool) -> ChatSummary:
     assert chat.id is not None, "Graph returned a chat with no id"
     preview = chat.last_message_preview
-    members = _members(chat, include_member_emails) if chat.topic is None else None
+    # Graph documents `topic` as absent on an unnamed chat, but a blank one survives the SDK as `""`
+    # and is not a name either. Normalised once, here, so a caller never has to tell the two apart.
+    topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
+    members = _members(chat, include_member_emails) if topic is None else None
     # `chat_type` is passed as-is, not as `chat.chat_type.value`. `ChatType` subclasses `str`, so
     # the member already is its wire value ("group"). `.value` looks like the right way to read
     # it but is typed as a one-tuple, because the generated members carry a trailing comma
@@ -204,7 +207,7 @@ def _summarise(chat: Chat, include_member_emails: bool) -> ChatSummary:
     return ChatSummary(
         chat_id=chat.id,
         chat_type=chat.chat_type if chat.chat_type is not None else "unknown",
-        topic=chat.topic,
+        topic=topic,
         # Asked of the one module that spells this scheme, never assembled here: a null join URL is
         # an outcome that speller already knows, and a second speller is free to disagree with it.
         meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
