@@ -1,11 +1,7 @@
 # Changelog
 
-## [0.2.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.1.0...backstop-mcp@0.2.0) (2026-08-17)
+## 0.0.1 (2026-08-17)
 
-
-### ⚠ BREAKING CHANGES
-
-* **sharepoint-connector,outlook-mcp,factset-mcp:** all git tags no longer include the version 'v'. In a future version, all releases will also not include the v anymore.
 
 ### Features
 
@@ -16,4 +12,3 @@
 * **backstop-mcp:** add custom-field schema discovery library ([#750](https://github.com/Unique-AG/connectors/issues/750)) ([a2dbafb](https://github.com/Unique-AG/connectors/commit/a2dbafb89c9e6e6339014fbd30fa8b9320b25bc5))
 * **backstop-mcp:** add data hygiene and MCP tool surface ([#793](https://github.com/Unique-AG/connectors/issues/793)) ([21734c3](https://github.com/Unique-AG/connectors/commit/21734c348aabe2919132be14c0ff0b4068ebd53b))
 * **backstop-mcp:** add party ID resolver library ([#749](https://github.com/Unique-AG/connectors/issues/749)) ([3bcb9b6](https://github.com/Unique-AG/connectors/commit/3bcb9b648e68aa47240f417ff80c85208da11119))
-* **sharepoint-connector,outlook-mcp,factset-mcp:** remove v in tags ([#168](https://github.com/Unique-AG/connectors/issues/168)) ([2f56700](https://github.com/Unique-AG/connectors/commit/2f5670000c968d8bf0e0051eeb47766f586c84cc))

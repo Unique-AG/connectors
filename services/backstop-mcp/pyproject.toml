@@ -1,6 +1,6 @@
 [project]
 name = "backstop-mcp"
-version = "0.2.0"
+version = "0.0.1"
 description = "Backstop CRM FastMCP server with OAuth credential bridging"
 requires-python = ">=3.12"
 dependencies = [
