@@ -1,46 +1,52 @@
 """Every field a tool returns to the model has a description FastMCP can publish."""
 
 from types import UnionType
-from typing import Annotated, TypeAliasType, Union, get_args, get_origin, get_type_hints
+from typing import Annotated, TypeAliasType, cast, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
 from backstop_mcp.server.tools.registry import TOOLS
 
 
-def _is_model(annotation: object) -> bool:
+def _is_model(annotation: object) -> type[BaseModel] | None:
     if not isinstance(annotation, type):
-        return False
+        return None
     try:
-        return issubclass(annotation, BaseModel)
+        return annotation if issubclass(annotation, BaseModel) else None
     except TypeError:
-        return False
+        return None
+
+
+def _args(annotation: object) -> tuple[object, ...]:
+    return cast(tuple[object, ...], get_args(annotation))
 
 
 def _collect_models(annotation: object, seen: set[type[BaseModel]]) -> None:
     if annotation is None:
         return
     if isinstance(annotation, TypeAliasType):
-        _collect_models(annotation.__value__, seen)
+        _collect_models(cast(object, annotation.__value__), seen)
         return
-    origin = get_origin(annotation)
-    if origin is UnionType or origin is Union:
-        for arg in get_args(annotation):
+    origin: object = get_origin(annotation)
+    if origin is UnionType or getattr(origin, "__name__", "") == "Union":
+        for arg in _args(annotation):
             _collect_models(arg, seen)
         return
     if origin is Annotated:
-        args = get_args(annotation)
-        if args:
-            _collect_models(args[0], seen)
+        inner = _args(annotation)
+        if inner:
+            _collect_models(inner[0], seen)
         return
     if origin is not None:
-        if _is_model(origin):
-            _add_model(origin, seen)
-        for arg in get_args(annotation):
+        model = _is_model(origin)
+        if model is not None:
+            _add_model(model, seen)
+        for arg in _args(annotation):
             _collect_models(arg, seen)
         return
-    if _is_model(annotation):
-        _add_model(annotation, seen)
+    model = _is_model(annotation)
+    if model is not None:
+        _add_model(model, seen)
 
 
 def _add_model(model: type[BaseModel], seen: set[type[BaseModel]]) -> None:
@@ -54,7 +60,8 @@ def _add_model(model: type[BaseModel], seen: set[type[BaseModel]]) -> None:
 def _tool_return_models() -> set[type[BaseModel]]:
     seen: set[type[BaseModel]] = set()
     for fn in TOOLS:
-        _collect_models(get_type_hints(fn)["return"], seen)
+        return_type: object = get_type_hints(fn)["return"]  # pyright: ignore[reportAny]
+        _collect_models(return_type, seen)
     return seen
 
 
