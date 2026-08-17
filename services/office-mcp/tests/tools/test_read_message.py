@@ -624,6 +624,102 @@ class TestWhatCountsAsACard:
 
         assert message.text == "[card]"
 
+    async def test_a_payload_carrying_a_non_breaking_space_is_still_the_card_it_came_from(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The normalisation turns Teams' non-breaking spaces into plain ones for a reader. A card's
+        own layout text carries them too, so a comparison against the rewritten text sees a payload
+        that no longer matches the attachment it is a copy of — and answers with the layout JSON."""
+        payload = (
+            '{"type":"AdaptiveCard","version":"1.4",'
+            + '"body":[{"type":"TextBlock","text":"Deploy\xa0build #7?"}]}'
+        )
+        _reads(
+            graph,
+            message_payload(
+                content=payload, attachments=[{**_CARD_ATTACHMENT, "content": payload}]
+            ),
+        )
+
+        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.text == "[card]"
+
+    async def test_a_payload_carrying_markup_is_still_the_card_it_came_from(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The same asymmetry from the other lossy rewrite: the tag strip that makes Teams HTML
+        readable deletes `<b>` from a card's own text, and `attachment.content` still holds it."""
+        payload = (
+            '{"type":"AdaptiveCard","version":"1.4",'
+            + '"body":[{"type":"TextBlock","text":"<b>Deploy</b> build #7?"}]}'
+        )
+        _reads(
+            graph,
+            message_payload(
+                content=payload, attachments=[{**_CARD_ATTACHMENT, "content": payload}]
+            ),
+        )
+
+        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.text == "[card]"
+
+    async def test_a_payload_graph_escaped_on_its_way_into_the_body_is_still_that_card(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The encoding difference Graph itself makes, and one reason the body is compared in more
+        than one form: it HTML-escapes a body and never escapes `attachment.content`."""
+        payload = (
+            '{"type":"AdaptiveCard","version":"1.4",'
+            + '"body":[{"type":"TextBlock","text":"Ship & tell <b>everyone</b>"}]}'
+        )
+        escaped = (
+            '{"type":"AdaptiveCard","version":"1.4",'
+            + '"body":[{"type":"TextBlock","text":"Ship &amp; tell &lt;b&gt;everyone&lt;/b&gt;"}]}'
+        )
+        _reads(
+            graph,
+            message_payload(
+                content=escaped, attachments=[{**_CARD_ATTACHMENT, "content": payload}]
+            ),
+        )
+
+        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.text == "[card]"
+
+    @pytest.mark.parametrize(
+        "wrapper",
+        [
+            "<div>{payload}</div>",
+            "<p>{payload}</p>",
+            "<div><p>{payload}</p></div>",
+            "{payload}<br>",
+        ],
+    )
+    async def test_a_payload_teams_wrapped_in_markup_is_still_the_card_it_came_from(
+        self, client: GraphServiceClient, graph: respx.MockRouter, wrapper: str
+    ) -> None:
+        """The other direction of the same asymmetry, and why the rewritten body is compared too. A
+        body is only reached here when Graph typed it `html`, so a wrapped payload is the likelier
+        shape of the two: deleting the tags is what uncovers the JSON to compare."""
+        payload = (
+            '{"type":"AdaptiveCard","version":"1.4",'
+            + '"body":[{"type":"TextBlock","text":"Deploy build #7?"}]}'
+        )
+        _reads(
+            graph,
+            message_payload(
+                content=wrapper.format(payload=payload),
+                attachments=[{**_CARD_ATTACHMENT, "content": payload}],
+            ),
+        )
+
+        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.text == "[card]"
+
     async def test_a_card_attachment_does_not_license_discarding_unrelated_text(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
