@@ -120,10 +120,29 @@ ALWAYS_ON: str = get_me.TOOL_NAME
 # misspelling is a startup error listing the valid ones; the contents are here, because this is the
 # only module that knows which tools exist. One test asserts the two sides agree in both directions,
 # which is what keeps the names in config from becoming a second copy of the tool list.
+#
+# Each curated preset is one use case: the tools it needs and no others, so the permissions it
+# implies are the smallest set that use case can run on. None lists `ALWAYS_ON`, which joins every
+# selection anyway. Two things are checked elsewhere rather than here: `resolve` refuses a preset
+# naming a tool this server lacks, and one test per preset asserts every tool in it can obtain its
+# arguments from another member — permissions do not encode that at all: `teams-messages` without
+# `search_messages` asks for the identical three permissions and exposes a `read_message` nothing in
+# it can address.
 PRESETS: Mapping[str, tuple[str, ...]] = {
     # Derived — "every tool there is" — so it needs no maintenance as tools land, and so the
     # widest surface stays a value an operator chose rather than one they inherited.
     "teams": TOOL_NAMES,
+    "teams-chat": ("list_chats",),
+    "teams-messages": ("list_chats", "search_messages", "read_message"),
+    "teams-channels": ("list_teams", "list_channels", "browse_channel"),
+    "teams-transcripts": ("list_chats", "list_meeting_transcripts", "read_transcript"),
+    "teams-recordings": ("list_chats", "list_meeting_recordings"),
+    "teams-meetings": (
+        "list_chats",
+        "list_meeting_transcripts",
+        "read_transcript",
+        "list_meeting_recordings",
+    ),
 }
 
 

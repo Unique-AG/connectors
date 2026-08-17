@@ -257,9 +257,41 @@ Both set is a startup error naming which to remove. Neither set is a startup err
 **no default**, because a default of "every tool" would make the widest consent screen what a
 deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-word but chosen value.
 
-| preset | tools |
-| --- | --- |
-| `teams` | every tool there is |
+| preset | what it can do | tools besides `get_me` | permissions | admin consents |
+| --- | --- | --- | --- | :-: |
+| `teams-chat` | name the live conversations — not read them | `list_chats` | `User.Read`, `Chat.Read` | 0 |
+| `teams-messages` | find a message anywhere and read it in full | `list_chats`, `search_messages`, `read_message` | + `ChannelMessage.Read.All` | 1 |
+| `teams-channels` | walk a team's channels and read what was posted | `list_teams`, `list_channels`, `browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
+| `teams-transcripts` | find a meeting and read what was said | `list_chats`, `list_meeting_transcripts`, `read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
+| `teams-recordings` | say whether a meeting was recorded and who may get at it | `list_chats`, `list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
+| `teams-meetings` | both of the above for one meeting | `list_chats`, `list_meeting_transcripts`, `read_transcript`, `list_meeting_recordings` | + both meeting permissions | 2 |
+| `teams` | everything | every tool there is | all eight | 3 |
+
+`get_me` is always on, which is why no *curated* preset lists it — each of those six rows is one
+tool wider than its third column. (`teams` is the registry itself, `get_me` included.) Read the second column before choosing: `teams-chat` is the narrowest surface there
+is and the only one that asks for **no** administrator, and the reason it costs nothing is exactly
+that it cannot read a *chat* message — the two tools that can (`search_messages`, `read_message`)
+both declare `ChannelMessage.Read.All`, which an administrator has to grant even though the message
+is a chat. Reading chat messages is `teams-messages`.
+
+`teams` is *derived* — every tool in the registry — so it needs no maintenance as tools land. The rest
+are named sets, each with a test asserting what it costs a tenant and that every *argument* its tools
+require can be minted by another member of the same preset. The names carry a product axis from the
+start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
+
+The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs
+**one** admin consent and does not drag in `ChannelMessage.Read.All`, the permission to read every
+channel message in the tenant. It does need one thing no permission can carry — Graph access to Teams
+transcripts is a tenant-wide Teams setting, off by default, that only a Teams administrator can turn
+on (Teams admin centre → Meetings → Meeting settings → Transcript API access). `list_meeting_recordings`
+is **not** behind that switch, which is why the two are separately selectable.
+
+Nothing stops a hand-written `TOOLS_ENABLED` from enabling a tool whose arguments nothing in the
+selection can mint — `read_transcript` without `list_meeting_transcripts`, say. That is deliberate:
+a tool that takes a `teams:///` handle names the tool that mints it in its own refusal, on first use,
+and the alternative is a declaration on every tool file plus a validator to read it. (A tool that
+takes a plain Graph id, like `list_channels`, answers a fabricated one with the generic "check the id
+came from a tool response verbatim".) The presets we ship are checked, per argument.
 
 `get_me` is **always on**, whatever the selection. It is how the server resolves "me"—the identity
 every other answer is correlated against—and `User.Read` is the least-privileged delegated permission

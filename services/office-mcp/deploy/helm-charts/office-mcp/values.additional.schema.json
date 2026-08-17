@@ -10,8 +10,8 @@
       "properties": {
         "TOOLS_PRESET": {
           "type": "string",
-          "enum": ["teams"],
-          "description": "Which tools this deployment runs, as a named surface. The tools enabled decide which delegated Microsoft Graph permissions every user is asked to consent to at sign-in, so there is deliberately no default: 'every tool' has to be a choice rather than what a deployment gets by not making one. 'teams' is every tool there is. Set this or TOOLS_ENABLED, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
+          "enum": ["teams", "teams-chat", "teams-messages", "teams-channels", "teams-transcripts", "teams-recordings", "teams-meetings"],
+          "description": "Which tools this deployment runs, as a named surface. The tools enabled decide which delegated Microsoft Graph permissions every user is asked to consent to at sign-in, so there is deliberately no default: 'every tool' has to be a choice rather than what a deployment gets by not making one. 'teams' is every tool there is; the rest are one use case each, and README's preset table says what each costs a tenant in permissions and admin consents. Set this or TOOLS_ENABLED, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
         },
         "TOOLS_ENABLED": {
           "type": "string",
