@@ -8,6 +8,7 @@ from typing import Annotated, ClassVar
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.models import OmitNoneModel
 
 
 def _clean_or_none(value: object) -> object:
@@ -84,7 +85,7 @@ class ProvenanceFields(BaseModel):
     """Shared `modifiedTimestamp` / `modifiedBy` attributes for as-of provenance."""
 
     # `populate_by_name` so camelCase wire payloads and snake_case tool dumps both bind;
-    # without it, `tool_result`'s `by_alias=False` JSON leaves these fields at None and
+    # without it, a dump that does not serialize by alias leaves these fields at None and
     # parks the keys in `extra` when a subclass uses `extra="allow"`.
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
@@ -92,7 +93,7 @@ class ProvenanceFields(BaseModel):
     modified_by: object | None = Field(default=None, alias="modifiedBy")
 
 
-class AsOf(BaseModel):
+class AsOf(OmitNoneModel):
     """Plain provenance from a Backstop record. No staleness verdict attached."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)

@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 from fastmcp import Context
 from fastmcp.tools import tool
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.activity_history import (
@@ -27,18 +27,20 @@ from backstop_mcp.features.activity_history import (
     ActivityPage,
     ActivityType,
     EmailPage,
+    GetActivityHistoryResponse,
     TimelineRecord,
     fetch_activities_page_by_type,
     group_page,
     resolved_party_as_of_response,
     to_timeline_record,
 )
+from backstop_mcp.models import published_output_schema
 from backstop_mcp.server.runtime import get_activity_history_settings, get_backstop_client
-from backstop_mcp.server.tools.results import tool_result
 from backstop_mcp.server.tools.utils.get_activity_history_utils import (
     ActivityHistoryFirstPageInput,
     ActivityHistoryNextPageInput,
     ActivityHistoryPageInput,
+    FetchArgs,
     PartyAttributes,
     extract_fetch_activity_history_args,
 )
@@ -60,11 +62,12 @@ __all__ = [
         idempotentHint=True,
         openWorldHint=False,
     ),
+    output_schema=published_output_schema(GetActivityHistoryResponse),
 )
 async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
-) -> CallToolResult:
+) -> GetActivityHistoryResponse:
     """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
 
     Pass `request.type="first"` with `party_type` plus a trusted `party_id` (from a prior resolve
@@ -92,7 +95,7 @@ async def get_activity_history(
     """
     client = await get_backstop_client()
     args = await extract_fetch_activity_history_args(ctx, client, request)
-    if isinstance(args, CallToolResult):
+    if not isinstance(args, FetchArgs):
         return args
 
     logger.info(
@@ -162,10 +165,7 @@ async def get_activity_history(
             "open_streams": open_streams,
         },
     )
-    return tool_result(
-        ActivityHistoryResolvedResponse(
-            resolved=resolved_party_as_of_response(args.party, attributes),
-            groups=groups,
-        ),
-        exclude_none=True,
+    return ActivityHistoryResolvedResponse(
+        resolved=resolved_party_as_of_response(args.party, attributes),
+        groups=groups,
     )

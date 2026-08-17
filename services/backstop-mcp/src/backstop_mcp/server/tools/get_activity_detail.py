@@ -24,19 +24,20 @@ from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.tools import tool
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.activity_history import (
     ActivityDetail,
+    ActivityDetailResponse,
     Attendee,
     fetch_activity_detail,
     fetch_attendees,
     is_meeting_or_call,
     to_activity_detail_response,
 )
+from backstop_mcp.models import published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
-from backstop_mcp.server.tools.results import tool_result
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ logger = logging.getLogger(__name__)
         idempotentHint=True,
         openWorldHint=False,
     ),
+    output_schema=published_output_schema(ActivityDetailResponse),
 )
 async def get_activity_detail(
     ctx: Context,
@@ -61,7 +63,7 @@ async def get_activity_detail(
             ),
         ),
     ],
-) -> CallToolResult:
+) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, and attendees by `activity_id`.
 
     `activity_id` must come from a prior `get_activity_history` response — never invent or
@@ -101,4 +103,4 @@ async def get_activity_detail(
             "has_body": detail.description is not None,
         },
     )
-    return tool_result(to_activity_detail_response(detail, attendees), exclude_none=True)
+    return to_activity_detail_response(detail, attendees)

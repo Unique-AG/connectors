@@ -36,13 +36,14 @@ typed page schema would deserialize the whole page in one pass, so one malformed
 Here it is warned about and dropped on its own.
 """
 
+import asyncio
 import logging
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Iterable, Mapping, Sequence
 from datetime import date
 from typing import ClassVar, Literal
 from urllib.parse import quote
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import ConfigDict, Field, TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
@@ -60,6 +61,7 @@ from backstop_mcp.features.opportunities.stages import (
     OpportunityStage,
     OpportunityStageAttributes,
 )
+from backstop_mcp.models import OmitNoneModel
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,7 @@ def stage_ref_id(value: object) -> str | None:
         return None
 
 
-class OpportunityFetchResult(BaseModel):
+class OpportunityFetchResult(OmitNoneModel):
     """One party's opportunities after filtering and ordering, plus what the whole set says.
 
     `total` and the two counts are over everything fetched — the party's complete set, since the
@@ -320,34 +322,56 @@ def project_opportunities(
     return tuple(projected)
 
 
+async def _resolved_vocabulary(
+    vocabulary: Mapping[str, OpportunityStage] | Awaitable[Mapping[str, OpportunityStage]],
+) -> dict[str, OpportunityStage]:
+    """The vocabulary mapping, whether the caller already had it or is still fetching it.
+
+    A Mapping is returned as a new dict; an awaitable is awaited. `fetch_opportunities` gathers
+    this with the sub-collection page so the tool can pass `stages_service.get(client)` and the
+    two HTTP calls run together.
+    """
+    if isinstance(vocabulary, Mapping):
+        return dict(vocabulary)
+    return dict(await vocabulary)
+
+
 async def fetch_opportunities(
     client: BackstopClient,
     *,
     segment: SearchType,
     entity_id: str,
     status: OpportunityStatus = "all",
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStage] | Awaitable[Mapping[str, OpportunityStage]],
 ) -> OpportunityFetchResult:
     """Every opportunity for one party, `status`-filtered and newest stage move first.
 
     Walks the party's whole sub-collection: both the filter and the ordering are over the
     complete set, so a partial fetch would answer the wrong question.
 
-    Takes the stage vocabulary already resolved rather than reaching for the service itself, so
-    this stays a function of its arguments and the caller decides when that fetch happens.
+    Takes the stage vocabulary as a mapping or as an awaitable that produces one, so the caller
+    decides when that fetch happens — and can overlap it with this page walk by passing the
+    in-flight coroutine. Either failure fails the call: a pipeline that silently omits stages
+    is worse than an error.
     """
-    page = await client.paginate(
-        f"/{segment}/{quote(entity_id, safe='')}/opportunities",
-        # Attributes left as a plain dict so each record is validated on its own — see the module
-        # docstring: a typed page schema fails every opportunity over one malformed record.
-        schema=BackstopApiResource[dict[str, object]],
-        params={"include": _INCLUDE},
-        # Explicitly unbounded: `paginate` caps at 10_000 records by default, so passing nothing
-        # would reintroduce a cap that never announces itself.
-        max_records=None,
-        page_size=_PAGE_SIZE,
+    page, resolved_vocabulary = await asyncio.gather(
+        client.paginate(
+            f"/{segment}/{quote(entity_id, safe='')}/opportunities",
+            # Attributes left as a plain dict so each record is validated on its own — see the
+            # module docstring: a typed page schema fails every opportunity over one malformed
+            # record.
+            schema=BackstopApiResource[dict[str, object]],
+            params={"include": _INCLUDE},
+            # Explicitly unbounded: `paginate` caps at 10_000 records by default, so passing
+            # nothing would reintroduce a cap that never announces itself.
+            max_records=None,
+            page_size=_PAGE_SIZE,
+        ),
+        _resolved_vocabulary(vocabulary),
     )
-    fetched = project_opportunities(page.items, included=page.included, vocabulary=vocabulary)
+    fetched = project_opportunities(
+        page.items, included=page.included, vocabulary=resolved_vocabulary
+    )
     selected = order_by_date_entered(
         opportunity for opportunity in fetched if matches_status(opportunity, status)
     )

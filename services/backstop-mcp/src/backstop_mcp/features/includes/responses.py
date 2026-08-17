@@ -27,9 +27,10 @@ looking for an address, so it is exposed as `email_addresses`.
 
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.features.includes.types import Include
+from backstop_mcp.models import OmitNoneModel
 
 
 def _blank_to_none(value: object) -> object:
@@ -45,7 +46,7 @@ _CleanStr = Annotated[str | None, BeforeValidator(_blank_to_none)]
 _PROJECTION_CONFIG = ConfigDict(extra="ignore", populate_by_name=True)
 
 
-class ContactLocationResponse(BaseModel):
+class ContactLocationResponse(OmitNoneModel):
     """A postal address on file for a person or organization.
 
     One entry per address Backstop holds, labelled by `location_title` ("Business", "Home"), with
@@ -88,7 +89,7 @@ class ContactLocationResponse(BaseModel):
     )
 
 
-class ContactEmailResponse(BaseModel):
+class ContactEmailResponse(OmitNoneModel):
     """One email address from a contact's address book.
 
     Not an email *message*: Backstop's `emails` relationship holds correspondence (hundreds of
@@ -112,7 +113,7 @@ class ContactEmailResponse(BaseModel):
     )
 
 
-class ContactCardResponse(BaseModel):
+class ContactCardResponse(OmitNoneModel):
     """Who a person is, in the few fields needed to recognise and reach them.
 
     A summary attached to another record (an organization's primary contact), not the full
@@ -143,7 +144,7 @@ class ContactCardResponse(BaseModel):
     )
 
 
-class CompanyRefResponse(BaseModel):
+class CompanyRefResponse(OmitNoneModel):
     """The organization a person works at, in the few fields needed to identify it.
 
     A summary attached to a person record, not the full organization — call `get_organization`
@@ -164,7 +165,7 @@ class CompanyRefResponse(BaseModel):
     country: _CleanStr = Field(default=None, description="Country, spelled out.")
 
 
-class InternalOwnerResponse(BaseModel):
+class InternalOwnerResponse(OmitNoneModel):
     """The colleague at *our* firm who owns this relationship.
 
     A Backstop `system-users` record — one of our own staff, not the investor. Every field here
@@ -192,7 +193,7 @@ type OrganizationInclude = Literal[
 ]
 
 
-class OrganizationIncludesResponse(BaseModel):
+class OrganizationIncludesResponse(OmitNoneModel):
     """The related records side-loaded with an organization, one field per `include` value.
 
     Every field distinguishes three answers, and none of them is `null` — a field with no value
@@ -250,7 +251,7 @@ class OrganizationIncludesResponse(BaseModel):
 type PersonInclude = Literal["locations", "email_addresses", "company", "representative"]
 
 
-class PersonIncludesResponse(BaseModel):
+class PersonIncludesResponse(OmitNoneModel):
     """The related records side-loaded with a person, one field per `include` value.
 
     Every field distinguishes three answers, and none of them is `null` — a field with no value

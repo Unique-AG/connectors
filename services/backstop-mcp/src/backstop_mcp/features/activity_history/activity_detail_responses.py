@@ -13,10 +13,11 @@ are spelled out explicitly.
 from datetime import datetime
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from backstop_mcp.features.activity_history.fetch_activity_detail import ActivityDetail, Attendee
 from backstop_mcp.features.activity_history.gist_from_html import to_gist
+from backstop_mcp.models import OmitNoneModel
 
 __all__ = ["ActivityDetailResponse", "AttendeeResponse", "to_activity_detail_response"]
 
@@ -28,7 +29,7 @@ __all__ = ["ActivityDetailResponse", "AttendeeResponse", "to_activity_detail_res
 _FULL_BODY_MAX_CHARS = 10_000_000
 
 
-class AttendeeResponse(BaseModel):
+class AttendeeResponse(OmitNoneModel):
     """One trimmed attendee: a single display name (see `Attendee.name`'s fallback)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
@@ -36,7 +37,7 @@ class AttendeeResponse(BaseModel):
     name: str | None = None
 
 
-class ActivityDetailResponse(BaseModel):
+class ActivityDetailResponse(OmitNoneModel):
     """`get_activity_detail`'s payload: full body plus meeting specifics and attendees.
 
     `type`/`start`/`stop`/`location`/`time_zone` and `attendees` are populated only when

@@ -4,8 +4,8 @@ from urllib.parse import quote
 
 from fastmcp import Context
 from fastmcp.tools import tool
-from mcp.types import CallToolResult, ToolAnnotations
-from pydantic import BaseModel, ConfigDict, Field
+from mcp.types import ToolAnnotations
+from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
@@ -27,11 +27,11 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
-from backstop_mcp.server.tools.results import tool_result
 
 
-class OrganizationAttributes(ProvenanceFields):
+class OrganizationAttributes(OmitNoneModel, ProvenanceFields):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
     `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
@@ -43,7 +43,7 @@ class OrganizationAttributes(ProvenanceFields):
     name: str | None = None
 
 
-class OrganizationResolvedResponse(BaseModel):
+class OrganizationResolvedResponse(OmitNoneModel):
     """`get_organization`'s response once the organization was found and fetched.
 
     `organization` holds the record's own fields (the JSON:API resource's `attributes`) — not
@@ -77,6 +77,7 @@ type GetOrganizationResponse = (
         idempotentHint=True,
         openWorldHint=False,
     ),
+    output_schema=published_output_schema(GetOrganizationResponse),
 )
 async def get_organization(
     ctx: Context,
@@ -113,7 +114,7 @@ async def get_organization(
             ),
         ),
     ] = (),
-) -> CallToolResult:
+) -> GetOrganizationResponse:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
@@ -142,7 +143,7 @@ async def get_organization(
         search=search,
     )
     if not isinstance(result, Resolved):
-        return tool_result(unresolved_party_response(result))
+        return unresolved_party_response(result)
 
     party = result.value
     path = f"/organizations/{quote(party.id, safe='')}"
@@ -153,20 +154,11 @@ async def get_organization(
         schema=BackstopApiResourceDocument[OrganizationAttributes],
     )
     attributes = document.data.attributes
-    return tool_result(
-        OrganizationResolvedResponse(
-            organization=attributes,
-            resolved=party_response(
-                party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
-            ),
-            as_of=as_of_response(extract_as_of(attributes)),
-            included=plan.project(document=document) if plan.planned else None,
+    return OrganizationResolvedResponse(
+        organization=attributes,
+        resolved=party_response(
+            party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        # `exclude_none=True` drops every null from the whole payload, not just `included`: an
-        # absent key means "no value on the record", never "we did not look". `organization`
-        # sheds most of the nulls Backstop ships; `regularCustomFieldValues` is a plain dict and
-        # survives untouched, so custom-field write-back still round-trips.
-        # Keep this when typed returns land: an `OmitNoneModel` base is opt-in per model and does
-        # not recurse into nested models, so swapping it in here would restore those nulls.
-        exclude_none=True,
+        as_of=as_of_response(extract_as_of(attributes)),
+        included=plan.project(document=document) if plan.planned else None,
     )

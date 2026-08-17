@@ -254,7 +254,6 @@ class TestCompanyRef:
 
         assert company.model_dump() == {
             "name": "Koch Industries Employees' Pension Plan",
-            "legal_name": None,
             "website": "www.kbslp.com",
             "city": "Scottsdale",
             "state": "AZ",
@@ -333,13 +332,21 @@ class TestTheIncludesModelsAreTheAllowlist:
         assert includes["email_addresses"].relationship == "contactEmails"
 
     def test_every_field_defaults_to_not_looked(self) -> None:
-        """`None` by default is what makes "not requested" distinguishable from "none found"."""
-        assert OrganizationIncludesResponse().model_dump() == dict.fromkeys(
-            OrganizationIncludesResponse.model_fields
+        """`None` by default is what makes "not requested" distinguishable from "none found".
+
+        Serialization drops those Nones (`OmitNoneModel`), so "not requested" is an omitted
+        key on the wire — asserted separately from the in-memory default.
+        """
+        empty_org = OrganizationIncludesResponse()
+        empty_person = PersonIncludesResponse()
+        assert all(
+            getattr(empty_org, name) is None for name in OrganizationIncludesResponse.model_fields
         )
-        assert PersonIncludesResponse().model_dump() == dict.fromkeys(
-            PersonIncludesResponse.model_fields
+        assert all(
+            getattr(empty_person, name) is None for name in PersonIncludesResponse.model_fields
         )
+        assert empty_org.model_dump() == {}
+        assert empty_person.model_dump() == {}
 
     def test_every_field_is_documented_for_the_output_schema(self) -> None:
         fields = list(OrganizationIncludesResponse.model_fields.values()) + list(
