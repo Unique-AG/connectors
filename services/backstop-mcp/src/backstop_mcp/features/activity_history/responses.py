@@ -20,7 +20,7 @@ import logging
 from datetime import date, datetime
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, ConfigDict, Field
 
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityItem,
@@ -43,6 +43,7 @@ from backstop_mcp.features.party_resolver import (
     party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.models import OmitNoneModel
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ __all__ = [
 _MAX_RECIPIENTS = 3
 
 
-class ActivityRecordResponse(BaseModel):
+class ActivityRecordResponse(OmitNoneModel):
     """One meeting/call/note/document record on the timeline."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True, extra="ignore")
@@ -78,7 +79,7 @@ class ActivityRecordResponse(BaseModel):
     description_length: int | None = None
 
 
-class EmailRecordResponse(BaseModel):
+class EmailRecordResponse(OmitNoneModel):
     """One email record on the timeline. No gist: emails carry no HTML body to convert."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True, extra="ignore")
@@ -140,7 +141,7 @@ def to_timeline_record(item: ActivityItem | EmailItem, *, gist_max_chars: int) -
     )
 
 
-class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
+class ResolvedPartyAsOfResponse(OmitNoneModel, ResolvedPartyResponse):
     """Resolved party identity plus `as_of` provenance from the same record."""
 
     as_of: AsOf | None = None
@@ -161,7 +162,7 @@ def resolved_party_as_of_response(
     )
 
 
-class ActivityHistoryResolvedResponse(BaseModel):
+class ActivityHistoryResolvedResponse(OmitNoneModel):
     """`get_activity_history` once the party was resolved and its timeline fetched."""
 
     status: Literal["resolved"] = "resolved"

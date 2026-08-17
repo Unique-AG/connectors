@@ -4,8 +4,8 @@ from urllib.parse import quote
 
 from fastmcp import Context
 from fastmcp.tools import tool
-from mcp.types import CallToolResult, ToolAnnotations
-from pydantic import BaseModel, ConfigDict, Field
+from mcp.types import ToolAnnotations
+from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
@@ -30,11 +30,11 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
+from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
-from backstop_mcp.server.tools.results import tool_result
 
 
-class PersonAttributes(ProvenanceFields):
+class PersonAttributes(OmitNoneModel, ProvenanceFields):
     """Person resource attributes; extras preserved for the tool payload."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
@@ -42,7 +42,7 @@ class PersonAttributes(ProvenanceFields):
     name: str | None = None
 
 
-class PersonResolvedResponse(BaseModel):
+class PersonResolvedResponse(OmitNoneModel):
     """`get_person` once the person was found and fetched.
 
     Always returns the person when resolved. `employments` lists every current and former
@@ -75,6 +75,7 @@ type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResol
         idempotentHint=True,
         openWorldHint=False,
     ),
+    output_schema=published_output_schema(GetPersonResponse),
 )
 async def get_person(
     ctx: Context,
@@ -121,7 +122,7 @@ async def get_person(
             ),
         ),
     ] = (),
-) -> CallToolResult:
+) -> GetPersonResponse:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
@@ -156,7 +157,7 @@ async def get_person(
         search=search,
     )
     if not isinstance(result, Resolved):
-        return tool_result(unresolved_party_response(result))
+        return unresolved_party_response(result)
 
     party = result.value
     # Quick-search for people uses the shared PERSON_* types, so a hit may be a
@@ -175,22 +176,12 @@ async def get_person(
     attributes = document.data.attributes
     index = get_employment_index_factory().index(**entity_relationships(document))
 
-    return tool_result(
-        PersonResolvedResponse(
-            person=attributes,
-            resolved=party_response(
-                party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
-            ),
-            as_of=as_of_response(extract_as_of(attributes)),
-            employments=index.links(),
-            included=plan.project(document=document) if plan.planned else None,
+    return PersonResolvedResponse(
+        person=attributes,
+        resolved=party_response(
+            party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        # `exclude_none=True` drops every null from the whole payload, not just `included`: an
-        # absent key means "no value on the record", never "we did not look". `person` sheds most
-        # of the 31 attributes Backstop ships, and each `employments` entry sheds its unset
-        # fields; `regularCustomFieldValues` is a plain dict and survives untouched, so
-        # custom-field write-back still round-trips.
-        # Keep this when typed returns land: an `OmitNoneModel` base is opt-in per model and does
-        # not recurse into nested models, so swapping it in here would restore those nulls.
-        exclude_none=True,
+        as_of=as_of_response(extract_as_of(attributes)),
+        employments=index.links(),
+        included=plan.project(document=document) if plan.planned else None,
     )

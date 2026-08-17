@@ -7,7 +7,6 @@ from datetime import date
 from typing import Annotated, ClassVar, Literal, Self
 
 from fastmcp import Context
-from mcp.types import CallToolResult
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -27,13 +26,13 @@ from backstop_mcp.features.activity_history import (
 from backstop_mcp.features.data_hygiene import ProvenanceFields
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
+    PartyAmbiguousResponse,
     ResolvedParty,
     resolve_party,
     unresolved_party_response,
 )
-from backstop_mcp.features.resolution import Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.server.runtime import get_activity_history_settings
-from backstop_mcp.server.tools.results import tool_result
 
 logger = logging.getLogger(__name__)
 
@@ -255,8 +254,8 @@ async def extract_fetch_activity_history_args(
     ctx: Context,
     client: BackstopClient,
     request: ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
-) -> FetchArgs | CallToolResult:
-    """Turn a first/next page input into shared fetch inputs, or an early tool result/error.
+) -> FetchArgs | PartyAmbiguousResponse | NotFoundResponse:
+    """Turn a first/next page input into shared fetch inputs, or an unresolved party response.
 
     Pydantic already validates/discriminates the wire shape (`ActivityHistoryPageInput`). This
     step is separate because it does async I/O: party resolve on `first`. `next` copies
@@ -308,7 +307,7 @@ async def extract_fetch_activity_history_args(
                         "status": result.status,
                     },
                 )
-                return tool_result(unresolved_party_response(result))
+                return unresolved_party_response(result)
             party = result.value
             effective_types = effective_activity_types(activity_types)
             page_size = limit if limit is not None else get_activity_history_settings().page_size

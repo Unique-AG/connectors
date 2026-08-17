@@ -104,14 +104,15 @@ class TestEmploymentIndexLinks:
             ]
         )
 
-        assert index.links()[0].model_dump() == {
+        link = index.links()[0]
+        assert link.signal is None
+        assert link.end_date is None
+        assert link.model_dump() == {
             "status": "current",
             "person_id": "p1",
             "person_type": "people",
             "organization_id": "o1",
             "organization_type": "organizations",
-            "signal": None,
-            "end_date": None,
             "relationship_type_id": "456439",
             "relationship_type_name": "is employee of",
         }

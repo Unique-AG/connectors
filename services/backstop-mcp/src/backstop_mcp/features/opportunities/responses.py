@@ -24,9 +24,10 @@ still a fact even when the vocabulary has moved on.
 
 from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import BeforeValidator, ConfigDict, Field, StringConstraints
 
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.models import OmitNoneModel
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
@@ -41,7 +42,7 @@ def _custom_field_values(value: object) -> object:
     return () if value is None else value
 
 
-class StageChangeResponse(BaseModel):
+class StageChangeResponse(OmitNoneModel):
     """One move in a deal's stage history: which stage it entered, and when.
 
     Validated from a side-loaded `opportunity-stage-history` entry's `attributes`. That entry
@@ -72,7 +73,7 @@ class StageChangeResponse(BaseModel):
     )
 
 
-class OpportunityResponse(BaseModel):
+class OpportunityResponse(OmitNoneModel):
     """One deal in the pipeline for a person or organization.
 
     Amounts are in `currency`; `probability` is a fraction, not a percentage. The stage timings

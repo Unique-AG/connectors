@@ -6,6 +6,7 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
+from backstop_mcp.models import OmitNoneModel
 
 type EmploymentLinkStatus = Literal["current", "former"]
 
@@ -32,7 +33,7 @@ class DepartedContactResponse(BaseModel):
     relationship_type_name: str | None = None
 
 
-class EmploymentLinkResponse(BaseModel):
+class EmploymentLinkResponse(OmitNoneModel):
     """One resolved person↔organization employment pair for tool payloads.
 
     Always carries both sides. `status` is `current` or `former`; unknown pairs are omitted

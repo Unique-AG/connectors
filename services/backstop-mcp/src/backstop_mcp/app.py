@@ -39,6 +39,7 @@ from backstop_mcp.features.data_hygiene import create_employment_index_factory
 from backstop_mcp.features.opportunities import create_opportunity_stages_service
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
+from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.runtime import Services, configure_services, reset_services
 from backstop_mcp.server.tools import TOOLS
 
@@ -142,6 +143,7 @@ def create_app(
         version=config.version,
         auth=auth_provider,
         lifespan=lifespan,
+        instructions=INSTRUCTIONS,
     )
     for fn in TOOLS:
         mcp.add_tool(fn)
