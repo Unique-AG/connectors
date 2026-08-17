@@ -195,9 +195,11 @@ type OrganizationInclude = Literal[
 class OrganizationIncludesResponse(BaseModel):
     """The related records side-loaded with an organization, one field per `include` value.
 
-    Every field distinguishes three answers: `null` means the include was not requested — we did
-    not look; `[]` means it was requested and there is nothing on file — we looked, there are
-    none; anything else is what was requested and found.
+    Every field distinguishes three answers, and none of them is `null` — a field with no value
+    is left out of the payload entirely. An **omitted** key means the include was not requested —
+    we did not look, or, for a single record, there is nothing on file. `[]` means a list include
+    was requested and there is nothing on file — we looked, there are none. A value is what was
+    requested and found.
     """
 
     locations: Annotated[
@@ -206,8 +208,8 @@ class OrganizationIncludesResponse(BaseModel):
     ] = Field(
         default=None,
         description=(
-            "Postal addresses on file for the organization, from `include=locations`. Null when "
-            + "that include was not asked for; `[]` when it was and there are no addresses."
+            "Postal addresses on file for the organization, from `include=locations`. Omitted "
+            + "when that include was not asked for; `[]` when it was and there are no addresses."
         ),
     )
     email_addresses: Annotated[
@@ -217,7 +219,7 @@ class OrganizationIncludesResponse(BaseModel):
         default=None,
         description=(
             "The organization's email address book, from `include=email_addresses` — addresses, "
-            + "not correspondence. Null when that include was not asked for; `[]` when it was "
+            + "not correspondence. Omitted when that include was not asked for; `[]` when it was "
             + "and there are no addresses."
         ),
     )
@@ -228,8 +230,8 @@ class OrganizationIncludesResponse(BaseModel):
         default=None,
         description=(
             "The person Backstop names as the organization's main point of contact, from "
-            + "`include=primary_contact`. Null when that include was not asked for and equally "
-            + "when it was and no primary contact is set."
+            + "`include=primary_contact`. Omitted when that include was not asked for and "
+            + "equally when it was and no primary contact is set."
         ),
     )
     representative: Annotated[
@@ -239,8 +241,8 @@ class OrganizationIncludesResponse(BaseModel):
         default=None,
         description=(
             "The colleague at our own firm who owns this relationship, from "
-            + "`include=representative` — not a way to contact the organization. Null when that "
-            + "include was not asked for and equally when it was and nobody is assigned."
+            + "`include=representative` — not a way to contact the organization. Omitted when "
+            + "that include was not asked for and equally when it was and nobody is assigned."
         ),
     )
 
@@ -251,9 +253,11 @@ type PersonInclude = Literal["locations", "email_addresses", "company", "represe
 class PersonIncludesResponse(BaseModel):
     """The related records side-loaded with a person, one field per `include` value.
 
-    Every field distinguishes three answers: `null` means the include was not requested — we did
-    not look; `[]` means it was requested and there is nothing on file — we looked, there are
-    none; anything else is what was requested and found.
+    Every field distinguishes three answers, and none of them is `null` — a field with no value
+    is left out of the payload entirely. An **omitted** key means the include was not requested —
+    we did not look, or, for a single record, there is nothing on file. `[]` means a list include
+    was requested and there is nothing on file — we looked, there are none. A value is what was
+    requested and found.
     """
 
     locations: Annotated[
@@ -262,8 +266,8 @@ class PersonIncludesResponse(BaseModel):
     ] = Field(
         default=None,
         description=(
-            "Postal addresses on file for the person, from `include=locations`. Null when that "
-            + "include was not asked for; `[]` when it was and there are no addresses."
+            "Postal addresses on file for the person, from `include=locations`. Omitted when "
+            + "that include was not asked for; `[]` when it was and there are no addresses."
         ),
     )
     email_addresses: Annotated[
@@ -273,8 +277,8 @@ class PersonIncludesResponse(BaseModel):
         default=None,
         description=(
             "The person's email address book, from `include=email_addresses` — addresses, not "
-            + "correspondence, and retired addresses are flagged rather than hidden. Null when "
-            + "that include was not asked for; `[]` when it was and there are no addresses."
+            + "correspondence, and retired addresses are flagged rather than hidden. Omitted "
+            + "when that include was not asked for; `[]` when it was and there are no addresses."
         ),
     )
     company: Annotated[
@@ -283,7 +287,7 @@ class PersonIncludesResponse(BaseModel):
     ] = Field(
         default=None,
         description=(
-            "The organization the person works at, from `include=company`. Null when that "
+            "The organization the person works at, from `include=company`. Omitted when that "
             + "include was not asked for and equally when it was and no organization is linked."
         ),
     )
@@ -294,7 +298,7 @@ class PersonIncludesResponse(BaseModel):
         default=None,
         description=(
             "The colleague at our own firm who owns this relationship, from "
-            + "`include=representative` — not a way to contact the person. Null when that "
+            + "`include=representative` — not a way to contact the person. Omitted when that "
             + "include was not asked for and equally when it was and nobody is assigned."
         ),
     )
