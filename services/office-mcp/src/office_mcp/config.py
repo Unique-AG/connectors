@@ -131,6 +131,23 @@ class AppConfig(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _reject_cleartext_base_url_in_production(self) -> Self:
+        """Reject http URLs in production. The OAuth endpoints are published under this URL.
+
+        Trap: nothing downstream fails closed. The auth provider reads the scheme, logs a
+        warning for http, and then drops `Secure` from its OAuth consent cookies.
+        """
+        if self.app_env != AppEnv.PRODUCTION:
+            return self
+        if self.public_base_url.scheme != "https":
+            raise ValueError(
+                "PUBLIC_BASE_URL must use https in "
+                + f"{AppEnv.PRODUCTION} (got {self.public_base_url}); the OAuth discovery, "
+                + "authorize and token endpoints are published under it"
+            )
+        return self
+
     @property
     def issuer(self) -> str:
         """Return `public_base_url` as a string without trailing slash for path joins.

@@ -37,7 +37,7 @@ env:
   OTEL_RESOURCE_ATTRIBUTES:
     if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
     value: 'deployment.environment={{ .Values.env.APP_ENV }}'
-  # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
+  # PUBLIC_BASE_URL must be the externally-reachable https OAuth issuer URL (set in overlay).
   # ENTRA_TENANT_ID and ENTRA_CLIENT_ID identify the app registration users sign in through;
   # both are required and set in the overlay (not secrets). ENTRA_TENANT_ID must be a single
   # tenant's ID — a multi-tenant authority is rejected at startup.
