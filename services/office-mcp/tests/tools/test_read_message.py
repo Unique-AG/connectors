@@ -143,7 +143,7 @@ class TestWhatItReportsAboutTheMessage:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """A read gives `teamworkUserIdentity`, which has no email property at all — so the field
-        search fills in is null here, and the id is what the two shapes have in common."""
+        search fills in is null here, and `user_id` is what carries the sender instead."""
         _reads(graph, message_payload())
 
         message = await read_message.read_message(client, handle=_CHAT_HANDLE)
@@ -181,6 +181,9 @@ class TestWhatItReportsAboutTheMessage:
     async def test_a_bot_is_named_by_its_application(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        """The read path is where the application shape actually arrives, so it is where
+        `application_id` has to be carried: a bot's id is reported, and never as `user_id`, which
+        the `mentions` parameter takes and which only a person has."""
         _reads(
             graph,
             message_payload(
@@ -198,6 +201,7 @@ class TestWhatItReportsAboutTheMessage:
 
         assert message.sender is not None
         assert (message.sender.display_name, message.sender.user_id) == ("Release Bot", None)
+        assert message.sender.application_id == "0dbc0b2f-e0d6-4a1f-b2f4-8f2b3f3f0e8c"
 
     async def test_edits_and_reactions_are_not_confused_for_each_other(
         self, client: GraphServiceClient, graph: respx.MockRouter
