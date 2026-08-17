@@ -189,15 +189,25 @@ class TestConfigAndTheRegistryAgreeAboutPresetNames:
             + "TOOLS_PRESET value reaches it"
         )
 
-    def test_each_one_resolves_to_tools_this_server_actually_has(self) -> None:
+    def test_each_one_names_only_tools_this_server_actually_has(self) -> None:
         """The check the two above cannot make: they compare names, and a mapping is only as good as
-        the tools it names."""
-        for preset in ToolsPreset:
-            selection = resolve(preset=preset, enabled=None)
-            unknown = sorted(set(selection.tools) - set(TOOL_NAMES))
+        the tools it names.
 
-            assert selection.tools, f"{preset} resolves to no tools"
-            assert not unknown, f"{preset} names tools this server does not have: {unknown}"
+        Asserted against the registry and never against what `resolve` returned, which is the trap
+        here: a selection's own `tools` are built by *filtering* the registry, so
+        `resolve(...).tools - TOOL_NAMES` is empty whatever the mapping says, and a preset member
+        one character wrong would resolve one tool short with a test like that still green. `teams`
+        is derived from the registry and so passes trivially; the hand-written presets are what this
+        is for, and they arrive with the tools they name.
+        """
+        for preset, members in PRESETS.items():
+            unknown = sorted(set(members) - set(TOOL_NAMES))
+
+            assert members, f"{preset} maps to no tools, so nobody can usefully ask for it"
+            assert not unknown, (
+                f"{preset} names {unknown}, which this server has no tool for — it would resolve "
+                + "that many tools short, and ask for that many permissions fewer"
+            )
 
 
 class TestGetMeIsAlwaysOn:
@@ -280,6 +290,22 @@ class TestANarrowedSelectionAsksForLess:
         assert registry.registered() == [ALWAYS_ON, _SECOND]
         assert _OWN[1] not in selection.permissions
         assert graph_scope(_OWN[1]) not in selection.graph_scopes
+
+    @pytest.mark.usefixtures("registry")
+    def test_a_preset_naming_a_tool_this_server_lacks_is_not_quietly_shortened(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The runtime half of the guard above, and the reason it is an assertion rather than an
+        exception: a preset that lists a tool this server does not have is a defect in the registry,
+        not something an operator typed. Silence is the one answer it must not give — the tool would
+        simply not register, and its permission would simply not be asked for.
+        """
+        monkeypatch.setattr(tools_module, "PRESETS", {ToolsPreset.TEAMS: (_SECOND, "secnod_tool")})
+
+        with pytest.raises(AssertionError, match="no tool for") as refusal:
+            resolve(preset=ToolsPreset.TEAMS, enabled=None)
+
+        assert "secnod_tool" in str(refusal.value)
 
     @pytest.mark.usefixtures("registry")
     def test_a_name_this_server_has_no_tool_for_aborts_and_lists_the_ones_it_has(self) -> None:

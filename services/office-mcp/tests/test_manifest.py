@@ -235,6 +235,21 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
         assert "does not expose" not in _flat(manifest)
 
     @pytest.mark.usefixtures("registry_of_three")
+    async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
+        """A tool name is one word, here as to a reader. `read_message` is not mentioned by prose
+        saying `read_messages`, and a note about it would send an operator looking for a reference
+        nobody wrote — in a report whose whole value is that every line of it is true."""
+        selection = Selection(
+            preset=None, tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
+        )
+
+        manifest = await _manifest_of(
+            selection, tools={_SECOND: f"Nothing to do with {_THIRD}s, plural."}
+        )
+
+        assert "does not expose" not in _flat(manifest)
+
+    @pytest.mark.usefixtures("registry_of_three")
     async def test_a_reference_to_the_always_on_tool_is_never_a_warning(self) -> None:
         """Because it is registered whatever the selection, which is what lets every tool that sends
         a model to it go on saying so in every deployment."""
