@@ -68,9 +68,7 @@ class DataModelEntity(BaseModel):
     purpose: str = Field(
         description="What this entity is, taken from the payload model's docstring."
     )
-    fields: tuple[DataModelField, ...] = Field(
-        description="Documented fields of this entity."
-    )
+    fields: tuple[DataModelField, ...] = Field(description="Documented fields of this entity.")
     produced_by: tuple[str, ...] = Field(
         description=(
             "Which tool, and which `include` when relevant, returns this entity. "

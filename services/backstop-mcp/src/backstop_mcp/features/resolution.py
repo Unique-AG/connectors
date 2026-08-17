@@ -274,9 +274,7 @@ class CandidateResponse(BaseModel):
             "— it is not a Backstop party id."
         )
     )
-    label: str = Field(
-        description="What to show the user when asking which record they meant."
-    )
+    label: str = Field(description="What to show the user when asking which record they meant.")
 
 
 # Generic rather than "subclass and narrow `candidates`": a mutable `list[...]` field is
@@ -292,9 +290,7 @@ class AmbiguousResponse[CandidateT: CandidateResponse](BaseModel):
     )
     query: str = Field(description="The search text that produced these candidates.")
     scope: str = Field(
-        description=(
-            "Collection the query was resolved against, e.g. 'organizations' or 'people'."
-        )
+        description=("Collection the query was resolved against, e.g. 'organizations' or 'people'.")
     )
     candidates: list[CandidateT] = Field(
         default_factory=list,
@@ -314,9 +310,7 @@ class NotFoundResponse(BaseModel):
     )
     query: str = Field(description="The search text that matched nothing.")
     scope: str = Field(
-        description=(
-            "Collection the query was resolved against, e.g. 'organizations' or 'people'."
-        )
+        description=("Collection the query was resolved against, e.g. 'organizations' or 'people'.")
     )
 
 

@@ -244,9 +244,7 @@ def _candidate_from_resource(
     # search_type so `enhance_search_types` hits that share an id stay distinct options.
     return Candidate(
         key=f"{resolved_search_type}:{party_id}",
-        label=_candidate_label(
-            name=name, search_type=resolved_search_type, party_id=party_id
-        ),
+        label=_candidate_label(name=name, search_type=resolved_search_type, party_id=party_id),
         value=ResolvedParty(id=party_id, search_type=resolved_search_type, name=name),
     )
 

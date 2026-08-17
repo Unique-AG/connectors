@@ -136,8 +136,7 @@ class EmailRecordResponse(OmitNoneModel):
     to_emails: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Up to three To: addresses. When more were on the wire, `to_emails_count` is "
-            "the total."
+            "Up to three To: addresses. When more were on the wire, `to_emails_count` is the total."
         ),
     )
     to_emails_count: int | None = Field(
@@ -147,8 +146,7 @@ class EmailRecordResponse(OmitNoneModel):
     cc_emails: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Up to three Cc: addresses. When more were on the wire, `cc_emails_count` is "
-            "the total."
+            "Up to three Cc: addresses. When more were on the wire, `cc_emails_count` is the total."
         ),
     )
     cc_emails_count: int | None = Field(

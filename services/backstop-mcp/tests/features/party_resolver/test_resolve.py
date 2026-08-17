@@ -424,9 +424,7 @@ class TestCandidateLabel:
     @respx.mock
     async def test_a_hit_without_a_name_still_names_the_kind(self, client: BackstopClient) -> None:
         respx.get(f"{BASE_URL}/quick-search").mock(
-            return_value=httpx.Response(
-                200, json=collection(resource("o42", "organizations"))
-            )
+            return_value=httpx.Response(200, json=collection(resource("o42", "organizations")))
         )
 
         result = await quick_search(client, search_type="organizations", search="unknown")
