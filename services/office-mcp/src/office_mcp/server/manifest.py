@@ -24,6 +24,7 @@ nothing but `list_chats`, which is the opposite of what this feature is for. Wha
 is that nobody is surprised a model was told about a tool it cannot call.
 """
 
+import re
 import textwrap
 from collections.abc import Mapping, Sequence
 from typing import cast
@@ -129,13 +130,23 @@ def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
     notes: list[str] = []
     for tool in tools:
         prose = _prose_of(tool)
-        named = [name for name in absent if name in prose]
+        named = [name for name in absent if _mentions(prose, name)]
         if named:
             notes.append(
                 f"{tool.name}'s description mentions {', '.join(named)}, which this deployment "
                 + "does not expose"
             )
     return notes
+
+
+def _mentions(prose: str, name: str) -> bool:
+    """Whether `prose` names the tool `name`, as a whole word rather than as a substring.
+
+    A tool name is one word to a reader and to this check: `read_message` is not mentioned by prose
+    saying `read_messages`, and reporting it would be a note about a tool nobody referred to. Tool
+    names are `[a-z_]`, so a word boundary lands where the eye does.
+    """
+    return re.search(rf"\b{re.escape(name)}\b", prose) is not None
 
 
 def _prose_of(tool: Tool) -> str:

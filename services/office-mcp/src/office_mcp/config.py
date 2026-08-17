@@ -92,6 +92,11 @@ class ToolsPreset(StrEnum):
     Helm chart's schema can carry the same `enum` and fail a `helm install` at validation instead of
     crash-looping a pod.
 
+    Unlike `AppEnv` and `LogLevel`, an uppercase spelling is *not* accepted here, and the shared
+    `enum` is why: the chart's schema matches these values exactly and JSON Schema has no
+    case-insensitive enum, so a server taking `TOOLS_PRESET=TEAMS` would accept a value `helm
+    install` rejects. Failing identically in both places beats absorbing the shift key.
+
     What each name expands to belongs to `tools/__init__.py`, the one module that knows which tools
     exist. Config is upstream of everything, so a config that knew the tool set would invert that
     dependency and be a second place the tool list lives — which is the duplication this whole

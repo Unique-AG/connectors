@@ -40,7 +40,7 @@ does. Each has to declare what its own request is made under, because that tuple
 it here is what lets the second tool arrive without knowing the first exists.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -141,6 +141,13 @@ def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
     this asserts it rather than re-explaining it. `ALWAYS_ON` joins whatever was asked for, and
     naming it as well is accepted rather than an error: an operator who copies the manifest's tool
     list back into `TOOLS_ENABLED` will name it.
+
+    **Both routes in are checked against the registry**, because a name this server has no tool for
+    would otherwise be filtered out in silence — one tool fewer registered and one permission fewer
+    on the consent screen than whoever wrote it believes. They differ only in whose mistake it is:
+    a name in `TOOLS_ENABLED` is the operator's and gets an exception naming the tools that exist,
+    while a name in a preset is ours and gets an assertion, because a mapping listing a tool this
+    server does not have is a defect in this file rather than a deployment anyone asked for.
     """
     assert (preset is None) != (enabled is None), (
         "exactly one of preset and enabled is a selection, which SurfaceConfig guarantees "
@@ -152,6 +159,11 @@ def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
             + f"drifted apart (mapped: {sorted(PRESETS)})"
         )
         asked_for = PRESETS[preset]
+        assert not _unknown(asked_for), (
+            f"preset {preset!r} names {', '.join(_unknown(asked_for))}, which this server has no "
+            + "tool for, so it would resolve that many tools short. The tools it has are: "
+            + f"{', '.join(TOOL_NAMES)}"
+        )
     else:
         assert enabled is not None, "the assertion above leaves enabled set when preset is not"
         asked_for = _every_name_known(enabled)
@@ -169,6 +181,11 @@ def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
     )
 
 
+def _unknown(names: Iterable[str]) -> list[str]:
+    """The names in `names` this server has no tool for, in the order they were written."""
+    return [name for name in names if name not in TOOL_NAMES]
+
+
 def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
     """`enabled` unchanged, once every name in it is one this server actually has a tool for.
 
@@ -177,7 +194,7 @@ def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
     of it would be a model that cannot find a tool the deployment is supposed to expose — long after
     the consent screen everyone already agreed to.
     """
-    unknown = [name for name in enabled if name not in TOOL_NAMES]
+    unknown = _unknown(enabled)
     if unknown:
         raise ValueError(
             f"TOOLS_ENABLED names {', '.join(unknown)}, which this server has no tool for. "
