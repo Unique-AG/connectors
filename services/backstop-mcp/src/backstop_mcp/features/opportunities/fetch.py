@@ -28,33 +28,30 @@ are read as the raw dicts they arrive as.
 distinct stage ids while only 3 arrived in `included`. Every stage id is therefore resolved
 against this response first and the cached vocabulary second; one in neither keeps its id and
 reports a null name, rather than being dropped or guessed at.
+
+**Records are validated one at a time.** The fetch pages with the attributes left as a plain
+dict, and `OpportunityResponse` then reads each record's own attributes through its aliases. A
+typed page schema would deserialize the whole page in one pass, so one malformed record — a
+`regularCustomFieldValues` that is not a list, say — would fail every opportunity the party has.
+Here it is warned about and dropped on its own.
 """
 
 import logging
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
-from typing import Annotated, ClassVar, Literal
+from typing import ClassVar, Literal
 from urllib.parse import quote
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    ValidationError,
-)
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import (
-    BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopClient,
+    ResourceRef,
     follow_included,
     included_by_type,
 )
-from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.includes import ResourceRef
 from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
     StageChangeResponse,
@@ -72,70 +69,24 @@ _STAGE = "stage"
 _STAGE_HISTORY = "stageHistory"
 _STAGE_TYPE = "opportunity-stages"
 
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
+_RawAttributes: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
 
 type OpportunityStatus = Literal["open", "closed", "all"]
+type OpportunityResource = BackstopApiResource[dict[str, object]]
 
 
-class OpportunityAttributes(BaseModel):
-    """Wire shape for `opportunities` attributes — the subset a pipeline question needs.
-
-    Every field is optional for the same reason `OpportunityStageAttributes`' are: a page is
-    deserialized in one pass, so a required field would fail a party's whole pipeline over one
-    malformed record. `isOpen`, `dateEnteredCurrentStage` and `daysInCurrentStage` were in fact
-    never null across all 1206 opportunities in the instance this was built against;
-    `regularCustomFieldValues` was not measured that way, so an explicit null there reads as no
-    custom fields rather than as a bad record.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    name: _StrippedStr | None = None
-    previous_stage: _StrippedStr | None = Field(default=None, alias="previousStage")
-    is_open: bool | None = Field(default=None, alias="isOpen")
-    probability: float | None = None
-    requested_amount: float | None = Field(default=None, alias="requestedAmount")
-    allocated_amount: float | None = Field(default=None, alias="allocatedAmount")
-    currency: _StrippedStr | None = Field(default=None, alias="currencyCode")
-    expected_investment_date: LenientDate = Field(default=None, alias="expectedInvestmentDate")
-    closed_date: LenientDate = Field(default=None, alias="closedDate")
-    days_open: int | None = Field(default=None, alias="daysOpen")
-    days_in_current_stage: int | None = Field(default=None, alias="daysInCurrentStage")
-    date_entered_current_stage: LenientDate = Field(default=None, alias="dateEnteredCurrentStage")
-    custom_field_values: list[dict[str, object]] | None = Field(
-        default=None, alias="regularCustomFieldValues"
-    )
-
-
-def parse_stage_ref(value: object) -> ResourceRef | None:
-    """Read a history entry's inline stage pointer, or None when it carries no usable id.
+def stage_ref_id(value: object) -> str | None:
+    """The stage id a history entry's inline pointer carries, or None when it carries none.
 
     `ResourceRef.resource_id` is required, correctly — a reference nobody can resolve is not a
-    reference — but validating the field would discard the whole history entry, its
-    `effective_date` with it. A stage this response cannot identify is reported as a null name
-    beside the move that happened, exactly as one the vocabulary can no longer name is.
+    reference — but failing on it would discard the whole history entry, its `effectiveDate` with
+    it. A stage this response cannot identify is reported as a null name beside the move that
+    happened, exactly as one the vocabulary can no longer name is.
     """
     try:
-        return ResourceRef.model_validate(value)
+        return ResourceRef.model_validate(value).resource_id
     except ValidationError:
         return None
-
-
-class StageHistoryAttributes(BaseModel):
-    """Wire shape for one side-loaded `opportunity-stage-history` entry's attributes.
-
-    `stage` is an inline `ResourceRef`, not JSON:API linkage — see the module docstring. The
-    entry's `relationships` is never read, which is what keeps its literal `null` harmless.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    stage: Annotated[ResourceRef | None, BeforeValidator(parse_stage_ref)] = None
-    effective_date: LenientDate = Field(default=None, alias="effectiveDate")
-
-
-type OpportunityResource = BackstopApiResource[OpportunityAttributes]
-type OpportunityDocument = BackstopApiCollectionDocument[OpportunityAttributes]
 
 
 class OpportunityFetchResult(BaseModel):
@@ -172,7 +123,7 @@ class OpportunityFetchResult(BaseModel):
     )
 
 
-def stage_names_from_included(document: OpportunityDocument) -> dict[str, str]:
+def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
     """Stage id to name for every `opportunity-stages` resource side-loaded with the response.
 
     Selected by JSON:API `type` rather than followed from linkage, because the stages a history
@@ -181,7 +132,7 @@ def stage_names_from_included(document: OpportunityDocument) -> dict[str, str]:
     this index is for.
     """
     names: dict[str, str] = {}
-    for raw in included_by_type(document, _STAGE_TYPE):
+    for raw in included_by_type(included, _STAGE_TYPE):
         stage_id = raw.get("id")
         if not isinstance(stage_id, str) or not stage_id.strip():
             continue
@@ -270,21 +221,23 @@ def order_by_date_entered(
 def stage_history(
     resource: OpportunityResource,
     *,
-    document: OpportunityDocument,
+    included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
     vocabulary: Mapping[str, OpportunityStage],
 ) -> tuple[StageChangeResponse, ...]:
     """One deal's stage moves, in the order Backstop links them.
 
-    The entries come back as raw dicts and only their `attributes` are validated: an
+    The entries come back as raw dicts and only their `attributes` are read: an
     `opportunity-stage-history` resource carries `"relationships": null`, which
-    `BackstopApiResource` rejects as "input should be a valid dictionary". An entry whose
-    attributes are unreadable is dropped on its own so one bad row does not cost the trail.
+    `BackstopApiResource` rejects as "input should be a valid dictionary". `StageChangeResponse`
+    reads `effectiveDate` off those attributes itself, with the entry's inline stage pointer
+    replaced by the name and id resolved from it. An entry whose attributes are unreadable is
+    dropped on its own so one bad row does not cost the trail.
     """
     changes: list[StageChangeResponse] = []
-    for raw in follow_included(document, resource, _STAGE_HISTORY):
+    for raw in follow_included(included, resource, _STAGE_HISTORY):
         try:
-            attributes = StageHistoryAttributes.model_validate(raw.get("attributes"))
+            attributes = _RawAttributes.validate_python(raw.get("attributes"))
         except ValidationError as exc:
             logger.warning(
                 "opportunities.stage_history.unreadable",
@@ -292,12 +245,16 @@ def stage_history(
                 exc_info=exc,
             )
             continue
-        stage_id = attributes.stage.resource_id if attributes.stage is not None else None
+        stage_id = stage_ref_id(attributes.get(_STAGE))
         changes.append(
-            StageChangeResponse(
-                stage=resolve_stage_name(stage_id, side_loaded=side_loaded, vocabulary=vocabulary),
-                stage_id=stage_id,
-                effective_date=attributes.effective_date,
+            StageChangeResponse.model_validate(
+                {
+                    **attributes,
+                    "stage": resolve_stage_name(
+                        stage_id, side_loaded=side_loaded, vocabulary=vocabulary
+                    ),
+                    "stage_id": stage_id,
+                }
             )
         )
     return tuple(changes)
@@ -306,54 +263,61 @@ def stage_history(
 def to_opportunity_response(
     resource: OpportunityResource,
     *,
-    document: OpportunityDocument,
+    included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
     vocabulary: Mapping[str, OpportunityStage],
 ) -> OpportunityResponse:
-    """Project one `opportunities` resource, naming its current stage and its history."""
-    attributes = resource.attributes
+    """Project one `opportunities` resource, naming its current stage and its history.
+
+    The response model reads the record's attributes through its own aliases, so the four things
+    Backstop does not put in `attributes` are all that is supplied here. Raises `ValidationError`
+    for a record the model cannot read, which the caller drops on its own.
+    """
     stage_id = current_stage_id(resource)
-    return OpportunityResponse(
-        id=resource.id,
-        name=attributes.name,
-        stage=resolve_stage_name(stage_id, side_loaded=side_loaded, vocabulary=vocabulary),
-        stage_id=stage_id,
-        previous_stage=attributes.previous_stage,
-        is_open=attributes.is_open,
-        probability=attributes.probability,
-        requested_amount=attributes.requested_amount,
-        allocated_amount=attributes.allocated_amount,
-        currency=attributes.currency,
-        expected_investment_date=attributes.expected_investment_date,
-        closed_date=attributes.closed_date,
-        days_open=attributes.days_open,
-        days_in_current_stage=attributes.days_in_current_stage,
-        date_entered_current_stage=attributes.date_entered_current_stage,
-        custom_field_values=tuple(attributes.custom_field_values or ()),
-        stage_history=stage_history(
-            resource, document=document, side_loaded=side_loaded, vocabulary=vocabulary
-        ),
+    return OpportunityResponse.model_validate(
+        {
+            **resource.attributes,
+            "id": resource.id,
+            "stage": resolve_stage_name(stage_id, side_loaded=side_loaded, vocabulary=vocabulary),
+            "stage_id": stage_id,
+            "stage_history": stage_history(
+                resource, included=included, side_loaded=side_loaded, vocabulary=vocabulary
+            ),
+        }
     )
 
 
 def project_opportunities(
     resources: Sequence[OpportunityResource],
     *,
-    document: OpportunityDocument,
+    included: Sequence[dict[str, object]],
     vocabulary: Mapping[str, OpportunityStage],
 ) -> tuple[OpportunityResponse, ...]:
     """Project the fetched resources, indexing the side-loaded stages once for all of them.
 
-    `document` is the whole accumulated multi-page document, so a stage side-loaded with the first
-    page still names a deal that arrived on the last.
+    `included` is every side-load accumulated across the whole walk, so a stage side-loaded with
+    the first page still names a deal that arrived on the last.
+
+    A record the response model cannot read is warned about and dropped on its own — the party's
+    other deals are still an answer, and this is the whole reason the fetch does not hand the
+    page a typed schema.
     """
-    side_loaded = stage_names_from_included(document)
-    return tuple(
-        to_opportunity_response(
-            resource, document=document, side_loaded=side_loaded, vocabulary=vocabulary
-        )
-        for resource in resources
-    )
+    side_loaded = stage_names_from_included(included)
+    projected: list[OpportunityResponse] = []
+    for resource in resources:
+        try:
+            projected.append(
+                to_opportunity_response(
+                    resource, included=included, side_loaded=side_loaded, vocabulary=vocabulary
+                )
+            )
+        except ValidationError as exc:
+            logger.warning(
+                "opportunities.record.unreadable",
+                extra={"opportunity_id": resource.id},
+                exc_info=exc,
+            )
+    return tuple(projected)
 
 
 async def fetch_opportunities(
@@ -374,17 +338,16 @@ async def fetch_opportunities(
     """
     page = await client.paginate(
         f"/{segment}/{quote(entity_id, safe='')}/opportunities",
-        schema=BackstopApiResource[OpportunityAttributes],
+        # Attributes left as a plain dict so each record is validated on its own — see the module
+        # docstring: a typed page schema fails every opportunity over one malformed record.
+        schema=BackstopApiResource[dict[str, object]],
         params={"include": _INCLUDE},
         # Explicitly unbounded: `paginate` caps at 10_000 records by default, so passing nothing
         # would reintroduce a cap that never announces itself.
         max_records=None,
         page_size=_PAGE_SIZE,
     )
-    document = BackstopApiCollectionDocument[OpportunityAttributes](
-        data=page.items, included=page.included
-    )
-    fetched = project_opportunities(document.data, document=document, vocabulary=vocabulary)
+    fetched = project_opportunities(page.items, included=page.included, vocabulary=vocabulary)
     selected = order_by_date_entered(
         opportunity for opportunity in fetched if matches_status(opportunity, status)
     )

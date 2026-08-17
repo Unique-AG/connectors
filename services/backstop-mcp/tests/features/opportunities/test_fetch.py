@@ -6,6 +6,7 @@ stage-history entry carries `"relationships": null` and points at its stage thro
 its history references — the case the cached vocabulary exists for.
 """
 
+import logging
 from collections.abc import Sequence
 from datetime import date
 
@@ -13,9 +14,8 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopApiCollectionDocument, BackstopClient
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.opportunities.fetch import (
-    OpportunityAttributes,
     OpportunityFetchResult,
     OpportunityStatus,
     date_entered_order_key,
@@ -650,7 +650,35 @@ class TestOrdering:
 
 
 class TestMalformedRecords:
-    """A page is deserialized in one pass, so one bad record must not cost the party's answer."""
+    """Records are validated one at a time, so one bad record costs only itself."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_malformed_record_is_dropped_on_its_own_and_the_rest_returned(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The reason the page is not deserialized against a typed schema in one pass.
+
+        `regularCustomFieldValues` is the field this was found on in review: a value the model
+        cannot read used to fail every opportunity the party has, not just the record carrying it.
+        """
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity(
+                    "malformed", stage_id="42482", regularCustomFieldValues="not-a-list-of-fields"
+                ),
+                _opportunity("intact", stage_id="42482", name="Koch - CATS Select", isOpen=True),
+                included=[_side_loaded_stage("42482")],
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _fetch(client)
+
+        assert [deal.id for deal in result.opportunities] == ["intact"]
+        assert result.opportunities[0].name == "Koch - CATS Select"
+        assert (result.total, result.open_count) == (1, 1)
+        assert "opportunities.record.unreadable" in caplog.text
 
     @pytest.mark.asyncio
     @respx.mock
@@ -781,29 +809,21 @@ class TestResolveStageName:
 
 
 class TestStageNamesFromIncluded:
-    @staticmethod
-    def _document(
-        *included: dict[str, object],
-    ) -> BackstopApiCollectionDocument[OpportunityAttributes]:
-        return BackstopApiCollectionDocument[OpportunityAttributes].model_validate(
-            {"data": [], "included": list(included)}
-        )
-
     def test_every_side_loaded_stage_is_indexed_by_id(self) -> None:
-        document = self._document(_side_loaded_stage("42482"), _side_loaded_stage("96016"))
+        included = [_side_loaded_stage("42482"), _side_loaded_stage("96016")]
 
-        assert stage_names_from_included(document) == {"42482": "IDD", "96016": "Invested"}
+        assert stage_names_from_included(included) == {"42482": "IDD", "96016": "Invested"}
 
     def test_resources_of_another_type_are_not_indexed(self) -> None:
         """History entries sit in the same `included` array and carry no name at all."""
-        document = self._document(
+        included = [
             _history_entry("1", stage_id="42482", effective_date="2024-04-10"),
             _side_loaded_stage("42482"),
-        )
+        ]
 
-        assert stage_names_from_included(document) == {"42482": "IDD"}
+        assert stage_names_from_included(included) == {"42482": "IDD"}
 
     def test_a_stage_without_a_name_is_skipped(self) -> None:
-        document = self._document(resource("42482", "opportunity-stages", sortOrder=3))
+        unnamed = resource("42482", "opportunity-stages", sortOrder=3)
 
-        assert stage_names_from_included(document) == {}
+        assert stage_names_from_included([unnamed]) == {}

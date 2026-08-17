@@ -155,7 +155,7 @@ def _side_loaded[AttrT](
     *, document: BackstopApiResourceDocument[AttrT], planned: _PlannedInclude
 ) -> list[BaseModel]:
     """Every side-loaded resource for one include, projected, with the unusable ones dropped."""
-    raw_resources = follow_included(document, document.data, planned.include.relationship)
+    raw_resources = follow_included(document.included, document.data, planned.include.relationship)
     if not raw_resources and document.data.related_ids(planned.include.relationship):
         logger.warning(
             "includes.side_load.unresolved",
