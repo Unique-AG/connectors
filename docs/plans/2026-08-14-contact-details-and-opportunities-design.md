@@ -282,6 +282,15 @@ visible without a second call.
   schema, tools using it pass an explicit
   `@tool(..., output_schema=Response.model_json_schema(mode="validation"))`. Both properties verified
   together: `structuredContent` omits the key, and the schema still documents the field.
+
+  **It is not a drop-in for `exclude_none=True`.** The base is opt-in per model and does not recurse
+  into nested models that do not inherit it, whereas `exclude_none=True` strips every null in the
+  payload. `get_person` / `get_organization` rely on the wider behaviour: it sheds the ~25 null
+  attributes a person record ships, `resolved.name`, `as_of.modified_by`, and the unset fields on
+  each `employments` entry, while leaving `regularCustomFieldValues` intact (a plain dict, so
+  write-back still round-trips). Swapping the base in naively would restore all of those. Either
+  apply it to the nested models too, or leave those two tools' serialization alone. Tests pin the
+  behaviour in both directions — removing `exclude_none=True` fails nine of them.
 - All seven tools return typed models instead of `CallToolResult`. `results.py` is deleted —
   `tool_error` has zero call sites, and `tool_result`'s nine call sites become plain returns. Test
   helpers `tool_model` / `tool_model_union` collapse to the returned value, and `test_results.py`
@@ -314,7 +323,8 @@ visible without a second call.
   `included` nor the vocabulary, the entry is returned with its id and a null name.
 - **Absent versus empty is meaningful.** A requested to-many include with no data returns `[]`
   ("we looked, there are none"); an include that was not requested is absent from the payload
-  entirely via `OmitNoneModel`.
+  entirely. The includes models say *omitted*, not *null*, in their published descriptions,
+  because with null-dropping serialization a null never reaches the wire.
 - **Truncation is loud.** Exceeding `max_opportunities` sets `truncated: true` alongside `total`.
 
 ### Testing Strategy
