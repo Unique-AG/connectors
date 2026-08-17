@@ -1,7 +1,7 @@
 import os
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
-from typing import ClassVar, Self, cast
+from typing import Annotated, ClassVar, Self, cast
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from pydantic import (
@@ -10,9 +10,10 @@ from pydantic import (
     PostgresDsn,
     PrivateAttr,
     SecretStr,
+    field_validator,
     model_validator,
 )
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PKG_VERSION = pkg_version("office-mcp")
 
@@ -81,6 +82,23 @@ class LogLevel(StrEnum):
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
+
+
+class ToolsPreset(StrEnum):
+    """The named tool surfaces an operator may deploy — the names only, never their contents.
+
+    Here rather than in `tools/` so that a misspelled `TOOLS_PRESET` is a startup error listing the
+    values that would have worked, exactly as `AppEnv` and `LogLevel` above already are, and so the
+    Helm chart's schema can carry the same `enum` and fail a `helm install` at validation instead of
+    crash-looping a pod.
+
+    What each name expands to belongs to `tools/__init__.py`, the one module that knows which tools
+    exist. Config is upstream of everything, so a config that knew the tool set would invert that
+    dependency and be a second place the tool list lives — which is the duplication this whole
+    feature is built to avoid. One test asserts the two sides agree in both directions.
+    """
+
+    TEAMS = "teams"
 
 
 class AppConfig(BaseSettings):
@@ -157,6 +175,71 @@ class AppConfig(BaseSettings):
         own and restores the slash there.
         """
         return str(self.public_base_url).rstrip("/")
+
+
+class SurfaceConfig(BaseSettings):
+    """Which tools this deployment runs, and so what every user is asked to consent to at sign-in.
+
+    Exactly one of the two is a selection. Both set is an error naming which to remove rather than a
+    precedence rule nobody would remember; neither set is an error too, because **there is no
+    default**: a default of "every tool" would make the widest consent screen the thing an operator
+    gets by not choosing, which is the whole of what this knob exists to stop. `TOOLS_PRESET=teams`
+    keeps "everything" a one-word but chosen value.
+
+    Narrowing a live deployment costs nothing. Widening one adds a permission to the authorize
+    request, so every signed-in user meets AADSTS65001 on the new tool until they sign in again —
+    the same footnote the README carries for rotating the client secret.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
+
+    tools_preset: ToolsPreset | None = None
+    tools_enabled: Annotated[tuple[str, ...] | None, NoDecode] = None
+
+    @field_validator("tools_enabled", mode="before")
+    @classmethod
+    def _split_the_list_an_operator_writes(cls, value: object) -> object:
+        """Read `TOOLS_ENABLED=get_me,list_chats` as the list it looks like.
+
+        Trap: pydantic-settings JSON-decodes an env var whose field is a collection, and does it in
+        the settings source *before* any validator runs — so without `NoDecode` above, the one
+        spelling every operator writes aborts startup with a JSON error and the remedy would read
+        like a bug in this service. Blanks around the commas and a trailing one are absorbed; a
+        value that names nothing at all is left as an empty tuple, for the validator below to refuse
+        by name rather than to silently mean "no tools".
+        """
+        if not isinstance(value, str):
+            return value
+        return tuple(name.strip() for name in value.split(",") if name.strip())
+
+    @model_validator(mode="after")
+    def _require_exactly_one_selection(self) -> Self:
+        """Refuse to start on any of the three ways the two variables say nothing usable.
+
+        Every one of them is a deployment whose consent screen would not be what its operator
+        believes, and none of them is fixable after the fact: a permission not requested at sign-in
+        cannot be redeemed later, and one requested that the app registration does not carry fails
+        the authorize hop for every user — with nothing in this server's logs either way.
+        """
+        if self.tools_preset is not None and self.tools_enabled is not None:
+            raise ValueError(
+                "TOOLS_PRESET and TOOLS_ENABLED are alternatives and both are set: remove one. "
+                + f"Keep TOOLS_PRESET={self.tools_preset} for that named surface, or keep "
+                + "TOOLS_ENABLED to name the tools yourself"
+            )
+        if self.tools_enabled is not None and not self.tools_enabled:
+            raise ValueError(
+                "TOOLS_ENABLED is set but names no tool. Give it a comma-separated list of tool "
+                + f"names, or set TOOLS_PRESET to one of: {', '.join(ToolsPreset)}"
+            )
+        if self.tools_preset is None and self.tools_enabled is None:
+            raise ValueError(
+                "this deployment has no tool surface: set TOOLS_PRESET to one of "
+                + f"{', '.join(ToolsPreset)}, or TOOLS_ENABLED to a comma-separated list of tool "
+                + "names. There is deliberately no default, because the tools enabled decide which "
+                + "delegated Graph permissions every user of this connector consents to"
+            )
+        return self
 
 
 # Trap: these are Entra authority aliases that let any tenant sign in. AzureProvider derives one

@@ -44,7 +44,8 @@ two numbered rules that held those halves apart went with them.
    assembling collaborators the package is responsible for assembling — which is how a tool came
    to re-read its own config and ignore what `create_app` was given — and on `tools/` it is
    precisely how somebody imports `tools/get_me.py` directly and stops the registry being the one
-   place every tool module is named, which is where `GRAPH_SCOPES` comes from.
+   place every tool module is named — which is the list a selection is filtered over and every
+   Graph scope sign-in asks for is derived from.
 
    `shared/` is deliberately not listed, because it publishes no surface. It is a grouping whose
    `__init__` is documentation and whose *modules* are the units — `shared/identity.py` is who the
@@ -112,7 +113,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
 _SEAM = _SHARED / "seam.py"
 
 # The `BaseSettings` classes in config.py, which read the environment when constructed.
-_CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig"})
+_CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig", "SurfaceConfig"})
 
 # Files allowed to construct one, relative to `_SRC`. Both are the root of a program: `app.py` is
 # the composition root, and `main.py` is the server entrypoint that hands it its `AppConfig`.
@@ -471,8 +472,8 @@ class TestTheDetectionItself:
 
     def test_catches_reaching_past_the_registry_for_a_tool_file(self) -> None:
         """The case rule 8 gained with `tools/`: importing a tool module directly is how the
-        registry stops being the one place every tool is named, and `GRAPH_SCOPES` is derived
-        from exactly that list."""
+        registry stops being the one place every tool is named, and both what a selection is
+        filtered over and what sign-in asks for are derived from exactly that list."""
         assert _internal_imports("from office_mcp.tools.get_me import register", _SRC) == [
             ("office_mcp.tools.get_me", 1)
         ]
@@ -485,8 +486,8 @@ class TestTheDetectionItself:
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
-            "from office_mcp.tools import GRAPH_SCOPES\n"
-            + "from office_mcp.server import ready_response\n"
+            "from office_mcp.tools import register_tools, resolve\n"
+            + "from office_mcp.server import ready_response, surface_manifest\n"
             + "from office_mcp.graph_client import create_graph_transport\n"
             + "from office_mcp.shared.identity import PROFILE\n",
             _SRC,
