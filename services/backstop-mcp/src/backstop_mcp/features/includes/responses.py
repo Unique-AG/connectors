@@ -1,0 +1,300 @@
+"""The trimmed models a side-loaded resource is projected onto, and the two models they fill.
+
+These are the entity documentation. Every model carries a docstring and every field a
+`description`, so FastMCP publishes them in the tools' output schema and `describe_data_model`
+renders them without a second, drift-prone copy of the same prose.
+
+`extra="ignore"` does the trimming: a `contact-locations` resource ships 17 attributes and
+`ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 5. Where
+Backstop stores one fact twice — `city`/`cityResolvedName`, `state`/`stateResolvedName`,
+`country`/`countryResolvedName`, `isPrimaryLocation`/`primaryLocation` — only the plain name is
+bound and the twin is dropped, so a reader is never left deciding which of two spellings to
+believe.
+
+`OrganizationIncludesResponse` and `PersonIncludesResponse` are also the allowlist. A field *is*
+one exposed include: its `Include` metadata says what to ask Backstop for, and its annotation
+says whether the answer is one record or many and what it projects onto — so `resolve` needs no
+table beside them. A relationship with no field cannot be asked for at all (`activities` is
+unreachable by construction rather than by a runtime check), and the `Literal` alias beside each
+model is what the tools type their `include` parameter as, so an invalid name is rejected at the
+MCP boundary and the input schema lists the options.
+
+Include names are ours, not Backstop's, wherever Backstop's would mislead. Backstop's `emails`
+relationship is email *messages* (488 on one organization); the address book is `contactEmails`.
+An include literally named `emails` would invite a model to pull hundreds of messages while
+looking for an address, so it is exposed as `email_addresses`.
+"""
+
+from typing import Annotated, ClassVar, Literal
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+
+from backstop_mcp.features.includes.types import Include
+
+
+def _blank_to_none(value: object) -> object:
+    """Backstop sends `""` where it means "unset" — `fax` and `secondaryPhoneNumber` both do."""
+    return (value.strip() or None) if isinstance(value, str) else value
+
+
+# Annotated on the *union*, not on the `str` arm: a `BeforeValidator` inside
+# `Annotated[str, ...] | None` still has its result checked against `str`, so returning None for
+# a blank fails validation rather than selecting the None arm.
+_CleanStr = Annotated[str | None, BeforeValidator(_blank_to_none)]
+
+_PROJECTION_CONFIG = ConfigDict(extra="ignore", populate_by_name=True)
+
+
+class ContactLocationResponse(BaseModel):
+    """A postal address on file for a person or organization.
+
+    One entry per address Backstop holds, labelled by `location_title` ("Business", "Home"), with
+    the phone number that belongs to that address. Backstop's secondary phone number and fax are
+    not exposed.
+    """
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    location_title: _CleanStr = Field(
+        default=None,
+        alias="locationTitle",
+        description="What this address is, as labelled in Backstop — e.g. 'Business', 'Home'.",
+    )
+    address: _CleanStr = Field(
+        default=None,
+        description="Street address, including any suite or floor.",
+    )
+    city: _CleanStr = Field(default=None, description="City.")
+    state: _CleanStr = Field(
+        default=None,
+        description="State or province, usually as a code such as 'AZ'.",
+    )
+    country: _CleanStr = Field(
+        default=None,
+        description="Country, spelled out — e.g. 'United States of America'.",
+    )
+    postal_code: _CleanStr = Field(
+        default=None, alias="postalCode", description="Postal or ZIP code."
+    )
+    phone: _CleanStr = Field(
+        default=None,
+        alias="phoneNumber",
+        description="Phone number for this address, not for the contact in general.",
+    )
+    is_primary: bool | None = Field(
+        default=None,
+        alias="isPrimaryLocation",
+        description="Whether Backstop marks this as the contact's primary address.",
+    )
+
+
+class ContactEmailResponse(BaseModel):
+    """One email address from a contact's address book.
+
+    Not an email *message*: Backstop's `emails` relationship holds correspondence (hundreds of
+    it per organization) and is a different thing entirely. Retired addresses are returned
+    alongside live ones so past correspondence stays explainable — read `retired` before using
+    one.
+    """
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    email: _CleanStr = Field(default=None, description="The email address.")
+    # No default: an address whose status is unknown is worse than one that is missing. A
+    # `contact-emails` resource without `retired` fails validation and is dropped by the
+    # projection in `resolve`, rather than being handed over as if it were live.
+    retired: bool = Field(
+        description=(
+            "True when Backstop has retired this address: do NOT send mail to it. Retired "
+            + "addresses are kept for history and may belong to the contact's previous firm, or "
+            + "even to a different person. False means the address is current."
+        )
+    )
+
+
+class ContactCardResponse(BaseModel):
+    """Who a person is, in the few fields needed to recognise and reach them.
+
+    A summary attached to another record (an organization's primary contact), not the full
+    person — call `get_person` for that.
+    """
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    name: _CleanStr = Field(
+        default=None,
+        description="Display name as Backstop stores it, usually 'Last, First'.",
+    )
+    job_title: _CleanStr = Field(
+        default=None, alias="jobTitle", description="Job title at their organization."
+    )
+    email: _CleanStr = Field(
+        default=None,
+        description=(
+            "Primary email address on the person record. The full address book, including "
+            + "retired addresses, is the `email_addresses` include on `get_person`."
+        ),
+    )
+    phone: _CleanStr = Field(default=None, description="Primary phone number.")
+    company_name: _CleanStr = Field(
+        default=None,
+        alias="companyName",
+        description="Name of the organization the person works at.",
+    )
+
+
+class CompanyRefResponse(BaseModel):
+    """The organization a person works at, in the few fields needed to identify it.
+
+    A summary attached to a person record, not the full organization — call `get_organization`
+    for that.
+    """
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    name: _CleanStr = Field(default=None, description="Organization name as commonly used.")
+    legal_name: _CleanStr = Field(
+        default=None,
+        alias="legalName",
+        description="Registered legal name, when it differs from the common name.",
+    )
+    website: _CleanStr = Field(default=None, description="Organization website.")
+    city: _CleanStr = Field(default=None, description="City of the organization's address.")
+    state: _CleanStr = Field(default=None, description="State or province, usually as a code.")
+    country: _CleanStr = Field(default=None, description="Country, spelled out.")
+
+
+class InternalOwnerResponse(BaseModel):
+    """The colleague at *our* firm who owns this relationship.
+
+    A Backstop `system-users` record — one of our own staff, not the investor. Every field here
+    is an internal detail: `email` and `phone` reach our account owner at our own office, and
+    are not a way to contact the person or organization this is attached to. Their details are
+    on the record itself and on the `locations` / `email_addresses` includes.
+    """
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    name: _CleanStr = Field(default=None, description="Full name of our account owner.")
+    user_name: _CleanStr = Field(
+        default=None, alias="userName", description="Their Backstop login name."
+    )
+    email: _CleanStr = Field(
+        default=None, description="Their work email address at our firm, not the investor's."
+    )
+    phone: _CleanStr = Field(
+        default=None, alias="phoneNumber", description="Their office phone number at our firm."
+    )
+
+
+type OrganizationInclude = Literal[
+    "locations", "email_addresses", "primary_contact", "representative"
+]
+
+
+class OrganizationIncludesResponse(BaseModel):
+    """The related records side-loaded with an organization, one field per `include` value.
+
+    Every field distinguishes three answers: `null` means the include was not requested — we did
+    not look; `[]` means it was requested and there is nothing on file — we looked, there are
+    none; anything else is what was requested and found.
+    """
+
+    locations: Annotated[
+        list[ContactLocationResponse] | None,
+        Include(relationship="contactLocations", resource_type="contact-locations"),
+    ] = Field(
+        default=None,
+        description=(
+            "Postal addresses on file for the organization, from `include=locations`. Null when "
+            + "that include was not asked for; `[]` when it was and there are no addresses."
+        ),
+    )
+    email_addresses: Annotated[
+        list[ContactEmailResponse] | None,
+        Include(relationship="contactEmails", resource_type="contact-emails"),
+    ] = Field(
+        default=None,
+        description=(
+            "The organization's email address book, from `include=email_addresses` — addresses, "
+            + "not correspondence. Null when that include was not asked for; `[]` when it was "
+            + "and there are no addresses."
+        ),
+    )
+    primary_contact: Annotated[
+        ContactCardResponse | None,
+        Include(relationship="primaryContact", resource_type="people"),
+    ] = Field(
+        default=None,
+        description=(
+            "The person Backstop names as the organization's main point of contact, from "
+            + "`include=primary_contact`. Null when that include was not asked for and equally "
+            + "when it was and no primary contact is set."
+        ),
+    )
+    representative: Annotated[
+        InternalOwnerResponse | None,
+        Include(relationship="representative", resource_type="system-users"),
+    ] = Field(
+        default=None,
+        description=(
+            "The colleague at our own firm who owns this relationship, from "
+            + "`include=representative` — not a way to contact the organization. Null when that "
+            + "include was not asked for and equally when it was and nobody is assigned."
+        ),
+    )
+
+
+type PersonInclude = Literal["locations", "email_addresses", "company", "representative"]
+
+
+class PersonIncludesResponse(BaseModel):
+    """The related records side-loaded with a person, one field per `include` value.
+
+    Every field distinguishes three answers: `null` means the include was not requested — we did
+    not look; `[]` means it was requested and there is nothing on file — we looked, there are
+    none; anything else is what was requested and found.
+    """
+
+    locations: Annotated[
+        list[ContactLocationResponse] | None,
+        Include(relationship="contactLocations", resource_type="contact-locations"),
+    ] = Field(
+        default=None,
+        description=(
+            "Postal addresses on file for the person, from `include=locations`. Null when that "
+            + "include was not asked for; `[]` when it was and there are no addresses."
+        ),
+    )
+    email_addresses: Annotated[
+        list[ContactEmailResponse] | None,
+        Include(relationship="contactEmails", resource_type="contact-emails"),
+    ] = Field(
+        default=None,
+        description=(
+            "The person's email address book, from `include=email_addresses` — addresses, not "
+            + "correspondence, and retired addresses are flagged rather than hidden. Null when "
+            + "that include was not asked for; `[]` when it was and there are no addresses."
+        ),
+    )
+    company: Annotated[
+        CompanyRefResponse | None,
+        Include(relationship="company", resource_type="organizations"),
+    ] = Field(
+        default=None,
+        description=(
+            "The organization the person works at, from `include=company`. Null when that "
+            + "include was not asked for and equally when it was and no organization is linked."
+        ),
+    )
+    representative: Annotated[
+        InternalOwnerResponse | None,
+        Include(relationship="representative", resource_type="system-users"),
+    ] = Field(
+        default=None,
+        description=(
+            "The colleague at our own firm who owns this relationship, from "
+            + "`include=representative` — not a way to contact the person. Null when that "
+            + "include was not asked for and equally when it was and nobody is assigned."
+        ),
+    )
