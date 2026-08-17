@@ -102,7 +102,8 @@ there is no route to the full body. Do not quote `summary` as the whole message.
 
 There is no result total — Graph gives a per-page count, not a match count. Use `next_offset` to \
 page: a value means more matches, null means there is no page to advance to. Pass it back as \
-`offset` to advance. System messages ("Ada joined") are dropped: Graph gives them no author.
+`offset` to advance. Messages with no sender are dropped: Graph names no author on a system \
+message ("Ada joined") or on a deleted one.
 
 Search covers all user chats and channels; you cannot narrow to one. Use `sender`, dates or more \
 words to filter. Read `chat_id` or `channel_id` on each hit to see where it came from.
@@ -428,12 +429,13 @@ def _message(hit: SearchHit) -> MessageHit | None:
         return None
     sender = sender_of(resource.from_)
     if sender is None:
-        # A system event message — "Ada joined the chat", a call ending, a channel being renamed.
-        # Graph sends `from: null` and a body of the literal `<systemEventMessage/>` for these,
-        # and the human-readable sentence Teams shows is rendered by the client and never sent, so
-        # such a hit has neither an author nor any text. The `messageType` and `eventDetail`
-        # properties that would name it are not in search's retrievable set, which leaves the
-        # missing author as the signal — and it is the one Microsoft's own examples show.
+        # Graph named no sender. It documents the identity set as null "for a message that has been
+        # deleted or sent by the Microsoft Teams internal system; for example, event messages for
+        # addition of members" — "Ada joined the chat", a call ending, a channel being renamed. A
+        # system event message also carries a body of the literal `<systemEventMessage/>`, and the
+        # sentence Teams shows is rendered by the client and never sent, so such a hit has neither
+        # an author nor any text. The `messageType` and `eventDetail` properties that would name it
+        # are not in search's retrievable set, which leaves the missing sender as the signal.
         return None
     channel = resource.channel_identity
     team_id = channel.team_id if channel is not None else None
