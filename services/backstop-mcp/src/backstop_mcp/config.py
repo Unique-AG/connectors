@@ -235,6 +235,11 @@ class BackstopConfig(BaseSettings):
         int, BeforeValidator(_cap_custom_field_schema_ttl_minutes)
     ] = Field(default=60, ge=1, le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
 
+    # How long a fetched opportunity-stage vocabulary stays usable. Seven rows on the instance
+    # this was built against, and a stage is added about as often as a custom field, so the same
+    # one-hour default and 24-hour cap apply.
+    opportunity_stage_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
+
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
     # exactly; markers match case-insensitively as substrings of the type's name.
