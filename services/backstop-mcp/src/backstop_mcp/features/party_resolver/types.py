@@ -49,6 +49,23 @@ class PartyAttributes(BaseModel):
     last_name: _StrippedStr | None = Field(
         default=None, validation_alias=AliasChoices("lastName", "last_name")
     )
+    # Quick-search's `id` comes back prefixed (`organizations_341208613`), unusable against
+    # `/organizations/{id}`; `resourceId` is the real id. Other party endpoints don't send this
+    # attribute, so it's optional and `search.py` falls back to stripping the `id` prefix.
+    # `_NonEmptyStr` (not `_StrippedStr`) so a blank/whitespace-only value can't bind to `""` and
+    # slip past `search.py`'s `is not None` check — that would return `""` as the id instead of
+    # falling through to the prefix-strip fallback. Needs the same blank→None coercion as
+    # `PartyResolveItem` since `_NonEmptyStr` alone rejects (rather than coerces) blank input.
+    resource_id: _NonEmptyStr | None = Field(
+        default=None, validation_alias=AliasChoices("resourceId", "resource_id")
+    )
+
+    @field_validator("resource_id", mode="before")
+    @classmethod
+    def _blank_resource_id_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     def display_name(self) -> str | None:
         if self.name:
