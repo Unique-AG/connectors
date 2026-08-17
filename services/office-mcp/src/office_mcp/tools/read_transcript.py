@@ -155,8 +155,9 @@ async def read_transcript(
         f"from_seconds must not be after to_seconds, got {from_seconds} and {to_seconds}"
     )
 
-    # TODO: every page refetches and reparses the whole transcript, because `/content` has no
-    # ranged contract. Caching the parsed turns per handle is the fix.
+    # REVIEW: every page refetches and reparses the whole transcript, because `/content` has no
+    # ranged contract. Caching the parsed turns could help here, but the key must include the
+    # caller: the token is the caller's own, and Graph checks that caller's access on every read.
     content, attributed = await _content(client, handle)
 
     turns = _matching(
