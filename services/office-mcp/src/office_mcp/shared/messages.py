@@ -331,16 +331,21 @@ _UNDESCRIBED_EVENT = "a system event Microsoft Graph sent no detail for"
 def event_of(message: ChatMessage) -> str | None:
     """What this message is an event of, or None if a person wrote it.
 
-    Three independent signals guide the decision: `eventDetail`, `messageType`, and `from`. None
-    is reliable alone. `eventDetail` names the event when present. `messageType` other than
-    `Message` signals a non-authored event. `from` null marks system events. All three are needed
-    because Graph omits eventDetail on some events and sends `from: null` on others. Checking
-    only one would miss events or misidentify messages.
+    Three independent signals guide the decision: `eventDetail`, `messageType`, and the sender.
+    None is reliable alone. `eventDetail` names the event when present. `messageType` other than
+    `Message` signals a non-authored event. No sender marks system events. All three are needed
+    because Graph omits eventDetail on some events and names no author on others. Checking only
+    one would miss events or misidentify messages.
+
+    The sender signal is `sender_of` rather than `from` being null, so that the two answers cannot
+    disagree: `sender` null means nobody wrote it, and this is what then says what happened. Graph
+    also sends an identity set naming nobody, which is a message with no author just as much as a
+    null `from` is.
     """
     detail = message.event_detail
     if detail is not None:
         return _event_name(detail.odata_type) or _UNDESCRIBED_EVENT
-    if message.from_ is None or (
+    if sender_of(message.from_) is None or (
         message.message_type is not None and message.message_type != ChatMessageType.Message
     ):
         return _UNDESCRIBED_EVENT

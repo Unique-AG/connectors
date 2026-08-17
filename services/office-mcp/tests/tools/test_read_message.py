@@ -860,6 +860,28 @@ class TestTheMessagesThatHaveNoText:
         assert message.event is not None
         assert message.text is None
 
+    @pytest.mark.parametrize(
+        "sender",
+        [
+            pytest.param(None, id="null-from"),
+            pytest.param({}, id="identity-set-naming-nobody"),
+            pytest.param({"user": {}}, id="empty-user-object"),
+        ],
+    )
+    async def test_a_message_with_no_sender_always_says_what_happened_instead(
+        self, client: GraphServiceClient, graph: respx.MockRouter, sender: dict[str, object] | None
+    ) -> None:
+        """`sender` promises it is "null only when nobody wrote it, which `event` then describes",
+        so the two answers have to come from the same question. Graph names no author with a null
+        `from` and with an identity set holding nobody, and either one left `event` null would be a
+        message with no author and no explanation — a silent gap where a system event was."""
+        _reads(graph, message_payload(sender=sender, content=""))
+
+        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+
+        assert message.sender is None
+        assert message.event is not None, "a null sender must always be explained by an event"
+
     async def test_an_ordinary_message_has_no_event(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
