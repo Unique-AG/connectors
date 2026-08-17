@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Annotated, ClassVar, Literal
 from urllib.parse import quote
 
@@ -15,6 +16,11 @@ from backstop_mcp.features.data_hygiene import (
     as_of_response,
     entity_relationships,
     extract_as_of,
+)
+from backstop_mcp.features.includes import (
+    PersonInclude,
+    PersonIncludesResponse,
+    include_plan,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -50,6 +56,13 @@ class PersonResolvedResponse(BaseModel):
     resolved: ResolvedPartyResponse
     as_of: AsOf | None = None
     employments: list[EmploymentLinkResponse] = Field(default_factory=list)
+    included: PersonIncludesResponse | None = Field(
+        default=None,
+        description=(
+            "The related records asked for through `include`, side-loaded on the same request. "
+            "Absent when no include was asked for."
+        ),
+    )
 
 
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
@@ -94,6 +107,20 @@ async def get_person(
             ),
         ),
     ] = None,
+    include: Annotated[
+        Sequence[PersonInclude],
+        Field(
+            description=(
+                "Related records to side-load on the same request, returned under `included`: "
+                "`locations` for the postal addresses on file with their per-address phone "
+                "numbers; `email_addresses` for the person's address book, with retired "
+                "addresses flagged rather than hidden; `company` for the organization they "
+                "work at; `representative` for the colleague at our own firm who owns the "
+                "relationship, which is not a way to contact the person. Omit to return only "
+                "the person's own fields."
+            ),
+        ),
+    ] = (),
 ) -> CallToolResult:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
@@ -107,6 +134,12 @@ async def get_person(
     trip). `employments` lists every current and former organization link — always relay those
     entries; do not present a person as a current contact at an organization whose link has
     `status="former"` unless they explicitly asked for historical contacts.
+
+    Pass `include` to side-load related records on that same GET — addresses, the email address
+    book, their organization, the representative. They come back under `included`, where a
+    requested list is `[]` when there is nothing on file; omit `include` and only the person's
+    own fields are returned. `representative` is the colleague at our own firm who owns the
+    relationship, not a way to contact the person.
 
     `as_of` is plain provenance (modifiedTimestamp / modifiedBy). Relay it; do not treat
     record age as a staleness verdict.
@@ -129,9 +162,14 @@ async def get_person(
     # Quick-search for people uses the shared PERSON_* types, so a hit may be a
     # contact/employee; follow `party.search_type` instead of hard-coding `/people`.
     path = f"/{party.search_type}/{quote(party.id, safe='')}"
+    plan = include_plan(PersonIncludesResponse, requested=include)
+    # `plan.param` is empty when nothing was requested, so join only the non-empty parts.
+    include_param = ",".join(
+        part for part in (EntityRelationshipInclude.for_employment(), plan.param) if part
+    )
     document = await client.get(
         path,
-        params={"include": EntityRelationshipInclude.for_employment()},
+        params={"include": include_param} if include_param else None,
         schema=BackstopApiResourceDocument[PersonAttributes],
     )
     attributes = document.data.attributes
@@ -145,5 +183,14 @@ async def get_person(
             ),
             as_of=as_of_response(extract_as_of(attributes)),
             employments=index.links(),
-        )
+            included=plan.project(document=document) if plan.planned else None,
+        ),
+        # `exclude_none=True` drops every null from the whole payload, not just `included`: an
+        # absent key means "no value on the record", never "we did not look". `person` sheds most
+        # of the 31 attributes Backstop ships, and each `employments` entry sheds its unset
+        # fields; `regularCustomFieldValues` is a plain dict and survives untouched, so
+        # custom-field write-back still round-trips.
+        # Keep this when typed returns land: an `OmitNoneModel` base is opt-in per model and does
+        # not recurse into nested models, so swapping it in here would restore those nulls.
+        exclude_none=True,
     )
