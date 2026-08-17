@@ -84,7 +84,11 @@ def _configs(postgres: PostgresContainer) -> dict[str, object]:
 
 @pytest.fixture
 def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
-    """The real app, with its lifespan run."""
+    """The real app, with its lifespan run.
+
+    No `BACKSTOP_SERVICE_USERNAME` is configured, so the startup schema warm short-circuits
+    without touching Backstop — see `custom_fields/warmup.py`.
+    """
     app = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
     with TestClient(app) as client:
         yield client
@@ -134,6 +138,7 @@ class TestWiring:
     def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
         _ = app_client
         services = get_services()
+        assert services.custom_fields is not None
         assert services.backstop is not None
 
     def test_lifespan_teardown_releases_the_services(
@@ -164,13 +169,18 @@ class TestRoutes:
         assert response.json() == {"status": "ok"}
 
     def test_ready_reports_the_checks_it_ran(self, app_client: TestClient) -> None:
+        """Postgres is reachable here, and the schema is absent — ready, but honest about it."""
         response = _get(app_client, "/ready")
 
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "healthy"
 
-        assert _checks(body)["database"] is True
+        checks = _checks(body)
+        assert checks["database"] is True
+        # No service account and no snapshot row, so the glossary legitimately hasn't loaded —
+        # and that must not gate readiness.
+        assert checks["custom_field_schema"] is False
 
     def test_metrics_is_served(self, app_client: TestClient) -> None:
         response = _get(app_client, "/metrics")
@@ -270,3 +280,14 @@ class TestConfigTranslation:
 
         assert settings.max_attempts == config.max_retry_attempts
         assert settings.max_wait_ms == config.max_retry_wait_ms
+
+    def test_the_transport_is_not_handed_the_service_account(self) -> None:
+        """The knobs it has no business seeing must not have leaked in with the rest."""
+        field_names = set(type(transport_settings(BackstopConfig())).model_fields)
+
+        assert not field_names & {
+            "service_username",
+            "service_api_token",
+            "custom_field_overrides",
+            "custom_field_schema_ttl_minutes",
+        }

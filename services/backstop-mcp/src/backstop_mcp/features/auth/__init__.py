@@ -11,7 +11,11 @@ the absent re-export kept that from being a package cycle. Those types now live 
 """
 
 from backstop_mcp.features.auth.cleanup import cleanup_lifespan
-from backstop_mcp.features.auth.context import BackstopAuthContext
+from backstop_mcp.features.auth.context import (
+    BackstopAuthContext,
+    NotConnectedError,
+    current_subject,
+)
 from backstop_mcp.features.auth.crypto import load_key
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider
 from backstop_mcp.features.auth.throttle import ThrottleConfig
@@ -19,7 +23,9 @@ from backstop_mcp.features.auth.throttle import ThrottleConfig
 __all__ = [
     "BackstopAuthContext",
     "BackstopOAuthProvider",
+    "NotConnectedError",
     "ThrottleConfig",
     "cleanup_lifespan",
+    "current_subject",
     "load_key",
 ]
