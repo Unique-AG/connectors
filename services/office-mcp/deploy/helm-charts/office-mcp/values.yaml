@@ -41,6 +41,19 @@ env:
   # ENTRA_TENANT_ID and ENTRA_CLIENT_ID identify the app registration users sign in through;
   # both are required and set in the overlay (not secrets). ENTRA_TENANT_ID must be a single
   # tenant's ID — a multi-tenant authority is rejected at startup.
+  #
+  # The overlay must also set exactly one of TOOLS_PRESET and TOOLS_ENABLED — the tool surface this
+  # deployment runs, and so which delegated Graph permissions every user consents to at sign-in.
+  # Neither is defaulted here on purpose: a chart-level default would make the widest consent screen
+  # what a deployment gets by not choosing, which is what the knob exists to stop. values.schema.json
+  # requires one of the two, so a missing selection fails `helm install` instead of crash-looping the
+  # pod, and TOOLS_PRESET carries the valid names as an enum so a typo fails there too.
+  #   TOOLS_PRESET: teams              # every tool there is
+  #   TOOLS_ENABLED: get_me,list_chats # or name them; get_me is always on
+  # GET /manifest and the startup log print the resolved tools, the exact permissions and which of
+  # them need admin consent. That list is what an Entra administrator has to grant, and it is the
+  # only place it is written down: a scope the app registration does not carry fails at the authorize
+  # hop, for every user, with nothing in this service's logs.
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
