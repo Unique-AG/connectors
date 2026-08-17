@@ -182,6 +182,42 @@ class TestWhatTheCallerIsTold:
         assert [member.display_name for member in unnamed] == ["Ada Lovelace", "Alan Turing"]
         assert [member.email for member in unnamed] == [None, None], "emails are opt-in"
 
+    async def test_a_blank_topic_is_reported_as_no_topic_and_gets_a_roster(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Graph documents an unnamed chat as `topic: null`, and an empty string as neither in nor
+        out. It survives the SDK intact — kiota reads a string as a string — so `""` would be a name
+        to the roster test and no name to the reader, leaving a chat with nothing but its thread id
+        to identify it. A blank topic is reported as null instead.
+        """
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        chat_payload(
+                            "19:empty@thread.v2", topic="", members=[aad_member("Ada Lovelace")]
+                        ),
+                        chat_payload(
+                            "19:spaces@thread.v2", topic="   ", members=[aad_member("Alan Turing")]
+                        ),
+                    ]
+                },
+            )
+        )
+
+        listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
+
+        assert [chat.topic for chat in listed.chats] == [None, None]
+        rosters = [chat.members for chat in listed.chats]
+        assert all(roster is not None for roster in rosters), (
+            "a chat with no usable topic is identified by who is in it"
+        )
+        assert [[member.display_name for member in roster or []] for roster in rosters] == [
+            ["Ada Lovelace"],
+            ["Alan Turing"],
+        ]
+
     async def test_emails_are_returned_only_when_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
