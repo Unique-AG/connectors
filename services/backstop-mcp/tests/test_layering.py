@@ -63,6 +63,7 @@ _CONFIG_MODULE = "backstop_mcp.config"
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.backstop_client",
     "backstop_mcp.db",
+    "backstop_mcp.features.accounts",
     "backstop_mcp.features.activity_history",
     "backstop_mcp.features.auth",
     "backstop_mcp.features.custom_fields",

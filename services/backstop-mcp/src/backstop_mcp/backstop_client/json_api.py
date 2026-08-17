@@ -63,6 +63,50 @@ class BackstopApiResource[AttrT](BaseModel):
         return relationship.ids() if relationship is not None else ()
 
 
+class IncludedResource[AttrT](BaseModel):
+    """One entry of a document's `included` array, with its `attributes` parsed as `AttrT`.
+
+    `follow_included` hands back raw JSON:API dicts, so every caller of it has to parse them; this
+    is that shape, once. Deliberately *not* `BackstopApiResource`, which models a **primary**
+    resource: there `type` and `attributes` are required and `relationships` is a declared field,
+    and Backstop sends `"relationships": null` on some side-loads, which a declared `dict` field
+    rejects. `extra="ignore"` drops it here, along with `links` and the rest of the envelope.
+
+    `id` is kept. A side-load is usually a record the caller can go on to ask for by id, and a
+    projection that drops it leaves the reader holding a name to search by instead.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    id: _NonEmptyStr
+    type: _StrippedStr | None = None
+    attributes: AttrT
+
+
+def included_resource[ResourceT: BaseModel](
+    raw: dict[str, object] | None, *, schema: type[ResourceT]
+) -> ResourceT | None:
+    """One `included` entry as `schema` — an `IncludedResource[...]` — or `None`.
+
+    `None` in, `None` out, so a caller can pass the first entry `follow_included` returned, or the
+    absence of one, without branching first. An entry that does not validate is `None` too: one
+    unreadable side-load costs its own field, not the record it hangs off.
+    """
+    if raw is None:
+        return None
+    # JSON:API permits a resource object with no `attributes`. Reading that as an empty mapping
+    # keeps the identity of a side-load that carries nothing else, and costs nothing when the
+    # schema needs more than that: a required field is still missing, so the entry is still None.
+    empty: dict[str, object] = {}
+    payload: dict[str, object] = (
+        raw if isinstance(raw.get("attributes"), dict) else {**raw, "attributes": empty}
+    )
+    try:
+        return schema.model_validate(payload)
+    except ValidationError:
+        return None
+
+
 class _JsonApiDocument(BaseModel):
     # JSON:API puts `?include=`d resources here — same field pagination keeps on each page.
     # Without it, a by-id GET with `?include=entityRelationships` would silently drop the

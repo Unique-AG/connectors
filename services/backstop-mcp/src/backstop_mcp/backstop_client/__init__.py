@@ -31,9 +31,11 @@ from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopApiResourceDocument,
+    IncludedResource,
     ResourceRef,
     follow_included,
     included_by_type,
+    included_resource,
 )
 from backstop_mcp.backstop_client.pagination import PageResult, SinglePage
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
@@ -54,10 +56,12 @@ __all__ = [
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
+    "IncludedResource",
     "PageResult",
     "ResourceRef",
     "RetrySettings",
     "SinglePage",
     "follow_included",
     "included_by_type",
+    "included_resource",
 ]
