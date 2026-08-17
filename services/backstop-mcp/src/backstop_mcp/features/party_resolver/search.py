@@ -47,6 +47,15 @@ _BACKSTOP_SEARCH_TYPES: Mapping[SearchType, str] = {
     "employees": "PERSON_FIRST_NAME,PERSON_LAST_NAME",
 }
 
+# Singular kind shown on candidate labels (elicitation enum and ambiguous payload). The
+# structured `search_type` stays the API plural; the label is what a person reads.
+_SEARCH_TYPE_LABEL: Mapping[SearchType, str] = {
+    "organizations": "organization",
+    "contacts": "contact",
+    "people": "person",
+    "employees": "employee",
+}
+
 
 def normalized_email(value: str) -> str | None:
     """Return pydantic's normalized address, or `None` when `value` is not an email.
@@ -230,12 +239,26 @@ def _candidate_from_resource(
     resource_type = resource.type or "resource"
     resolved_search_type = party_search_type(resource_type) or search_type
     name = resource.attributes.display_name()
-    label = name if name is not None else f"{resource_type} #{resource.id}"
     party_id = _party_id(resource)
     # Backstop ids are not unique across collections. Namespace the elicit key by
     # search_type so `enhance_search_types` hits that share an id stay distinct options.
     return Candidate(
         key=f"{resolved_search_type}:{party_id}",
-        label=label,
+        label=_candidate_label(
+            name=name, search_type=resolved_search_type, party_id=party_id
+        ),
         value=ResolvedParty(id=party_id, search_type=resolved_search_type, name=name),
     )
+
+
+def _candidate_label(*, name: str | None, search_type: SearchType, party_id: str) -> str:
+    """Name plus entity kind, so elicitation and the ambiguous payload say what the hit is.
+
+    `search_type` on the candidate is still the API plural (`people`); the parenthetical is
+    the readable singular (`person`) so two 'Jane's of different kinds are distinguishable
+    without reading a sibling field.
+    """
+    kind = _SEARCH_TYPE_LABEL[search_type]
+    if name is not None:
+        return f"{name} ({kind})"
+    return f"{kind} #{party_id}"

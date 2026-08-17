@@ -53,8 +53,10 @@ class DataModelField(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    name: str
-    description: str
+    name: str = Field(description="Field name as it appears on the payload.")
+    description: str = Field(
+        description="What that field means, taken from the payload model itself."
+    )
 
 
 class DataModelEntity(BaseModel):
@@ -62,9 +64,13 @@ class DataModelEntity(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    name: str
-    purpose: str
-    fields: tuple[DataModelField, ...]
+    name: str = Field(description="Entity name as this server publishes it.")
+    purpose: str = Field(
+        description="What this entity is, taken from the payload model's docstring."
+    )
+    fields: tuple[DataModelField, ...] = Field(
+        description="Documented fields of this entity."
+    )
     produced_by: tuple[str, ...] = Field(
         description=(
             "Which tool, and which `include` when relevant, returns this entity. "
@@ -78,10 +84,13 @@ class StageVocabularyEntry(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    id: str
-    name: str
-    closed: bool
-    sort_order: int | None = None
+    id: str = Field(description="Backstop id of this stage.")
+    name: str = Field(description="Stage name as this instance publishes it.")
+    closed: bool = Field(description="True when this stage means the deal is closed.")
+    sort_order: int | None = Field(
+        default=None,
+        description="Pipeline order of this stage. Omitted when the instance does not publish one.",
+    )
 
 
 class ToolOwnership(BaseModel):
@@ -89,18 +98,25 @@ class ToolOwnership(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    concern: str
-    tools: tuple[str, ...]
+    concern: str = Field(description="Kind of question this row answers.")
+    tools: tuple[str, ...] = Field(description="Tools that answer that kind of question.")
 
 
 class DescribeDataModelResponse(BaseModel):
     """The entities this server returns, the stage vocabulary, and which tool owns what."""
 
-    entities: tuple[DataModelEntity, ...]
+    entities: tuple[DataModelEntity, ...] = Field(
+        description=(
+            "The entities this server returns, with field descriptions taken from the "
+            "payload models."
+        )
+    )
     stages: tuple[StageVocabularyEntry, ...] = Field(
         description="This instance's opportunity-stage vocabulary, Prospect through Closed."
     )
-    ownership: tuple[ToolOwnership, ...]
+    ownership: tuple[ToolOwnership, ...] = Field(
+        description="Which tool answers which kind of question."
+    )
 
 
 _OWNERSHIP: tuple[ToolOwnership, ...] = (

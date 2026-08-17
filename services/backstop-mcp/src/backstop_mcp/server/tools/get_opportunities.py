@@ -50,8 +50,16 @@ class OpportunitiesResolvedResponse(OmitNoneModel):
     deal names the stage it just left, and is omitted until it has moved at all.
     """
 
-    status: Literal["resolved"] = "resolved"
-    resolved: ResolvedPartyResponse
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the party was found and its pipeline fetched.",
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
     opportunities: tuple[OpportunityResponse, ...] = Field(
         description=(
             "The deals matching the requested status, newest first by the day each entered "

@@ -282,14 +282,14 @@ class TestGetPerson:
             candidates=[
                 PartyCandidateResponse(
                     key="people:p1",
-                    label="Jane A",
+                    label="Jane A (person)",
                     id="p1",
                     search_type="people",
                     name="Jane A",
                 ),
                 PartyCandidateResponse(
                     key="people:p2",
-                    label="Jane B",
+                    label="Jane B (person)",
                     id="p2",
                     search_type="people",
                     name="Jane B",
@@ -587,3 +587,29 @@ class TestGetPersonOmitsNullsFromTheWire:
         payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
 
         assert "as_of" not in payload
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolved_omits_name_when_the_record_has_none(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-person-nulls-4", "person-no-name")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(
+                200,
+                json=_person_document(
+                    EMPLOYEE_TYPE,
+                    attributes={
+                        "modifiedTimestamp": "2023-01-01T00:00:00Z",
+                        "modifiedBy": "crm-admin",
+                    },
+                ),
+            )
+        )
+
+        payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
+
+        resolved = object_dict(payload["resolved"])
+        assert resolved["id"] == "p9"
+        assert "name" not in resolved

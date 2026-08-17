@@ -34,7 +34,7 @@ class AttendeeResponse(OmitNoneModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
 
-    name: str | None = None
+    name: str | None = Field(default=None, description="Display name of the attendee.")
 
 
 class ActivityDetailResponse(OmitNoneModel):
@@ -49,15 +49,42 @@ class ActivityDetailResponse(OmitNoneModel):
         frozen=True, from_attributes=True, extra="ignore"
     )
 
-    activity_id: str
-    type: str | None = None
-    title: str | None = None
-    body: str
-    start: datetime | None = None
-    stop: datetime | None = None
-    location: str | None = None
-    time_zone: str | None = None
-    attendees: list[AttendeeResponse] = Field(default_factory=list)
+    activity_id: str = Field(
+        description="The activity this detail is for — the same handle that was passed in."
+    )
+    type: str | None = Field(
+        default=None,
+        description=(
+            "Activity kind as Backstop names it. Omitted for records that do not carry one."
+        ),
+    )
+    title: str | None = Field(default=None, description="Title as Backstop stores it.")
+    body: str = Field(
+        description=(
+            "Full converted markdown of the HTML description — unlike the timeline `gist`, "
+            "this is not truncated for a token budget."
+        )
+    )
+    start: datetime | None = Field(
+        default=None,
+        description="Meeting/call start time. Omitted for a note or document.",
+    )
+    stop: datetime | None = Field(
+        default=None,
+        description="Meeting/call end time. Omitted for a note or document.",
+    )
+    location: str | None = Field(
+        default=None,
+        description="Meeting/call location. Omitted for a note or document.",
+    )
+    time_zone: str | None = Field(
+        default=None,
+        description="Meeting/call time zone. Omitted for a note or document.",
+    )
+    attendees: list[AttendeeResponse] = Field(
+        default_factory=list,
+        description="People listed on a meeting/call. Empty for a note or document.",
+    )
 
 
 def to_activity_detail_response(

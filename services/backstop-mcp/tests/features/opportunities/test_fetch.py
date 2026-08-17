@@ -233,7 +233,7 @@ class TestProjection:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_current_stage_in_neither_keeps_its_id_with_a_null_name(
+    async def test_a_current_stage_in_neither_keeps_its_id_and_omits_the_name(
         self, client: BackstopClient
     ) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(
@@ -245,6 +245,9 @@ class TestProjection:
         deal = result.opportunities[0]
         assert deal.stage is None
         assert deal.stage_id == "70707"
+        dumped = deal.model_dump()
+        assert "stage" not in dumped
+        assert dumped["stage_id"] == "70707"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -457,7 +460,7 @@ class TestStageHistory:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_stage_in_neither_is_returned_with_a_null_name(
+    async def test_a_stage_in_neither_is_returned_with_the_name_omitted(
         self, client: BackstopClient
     ) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(
@@ -479,6 +482,9 @@ class TestStageHistory:
         assert history[0].stage is None
         assert history[0].stage_id == "70707"
         assert history[0].effective_date == date(2024, 4, 10)
+        dumped = history[0].model_dump()
+        assert "stage" not in dumped
+        assert dumped["stage_id"] == "70707"
 
     @pytest.mark.asyncio
     @respx.mock

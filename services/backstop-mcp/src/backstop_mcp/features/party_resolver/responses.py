@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from pydantic import BaseModel
+from pydantic import Field
 
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver.types import (
@@ -22,6 +22,7 @@ from backstop_mcp.features.resolution import (
     batch_ambiguous_response,
     unresolved_response,
 )
+from backstop_mcp.models import OmitNoneModel
 
 
 class PartyCandidateResponse(CandidateResponse):
@@ -29,24 +30,60 @@ class PartyCandidateResponse(CandidateResponse):
 
     `search_type` is the candidate's own collection (which may differ from the requested
     scope when `enhance_search_types` returns a cross-type hit) — callers must echo it
-    verbatim with `id` when retrying as a trusted `party_id`.
+    verbatim with `id` when retrying as a trusted `party_id`. `label` already names that
+    collection in readable form (`Capstone (organization)`, `Jane Doe (person)`), so
+    elicitation and this payload both show what the user is looking at.
     """
 
-    id: str
-    search_type: SearchType
-    name: str | None = None
+    label: str = Field(
+        description=(
+            "Display name and entity kind, e.g. 'Capstone (organization)' or "
+            "'Jane Doe (person)'. The kind is organization, person, contact, or employee."
+        )
+    )
+    id: str = Field(
+        description=(
+            "Backstop id of this candidate. Echo it with `search_type` when retrying as "
+            "`party_id` — never invent one."
+        )
+    )
+    search_type: SearchType = Field(
+        description=(
+            "Collection this candidate belongs to: organizations, people, contacts, or "
+            "employees. Echo it with `id` — a contact or employee id is not a people id."
+        )
+    )
+    name: str | None = Field(
+        default=None,
+        description="Display name as Backstop stores it. Omitted when resolve did not learn one.",
+    )
 
 
-class ResolvedPartyResponse(BaseModel):
+class ResolvedPartyResponse(OmitNoneModel):
     """The id/search_type/name a caller must pass back verbatim as a trusted `party_id` later.
 
     Never invent or guess these values — only return what a prior resolve call returned. Not a
     `CandidateResponse`: this is the single identity a call settled on, not one option among many.
+    `name` is omitted when resolve did not learn one, matching the absent-vs-null rule the
+    enclosing tools use.
     """
 
-    id: str
-    search_type: SearchType
-    name: str | None = None
+    id: str = Field(
+        description=(
+            "Backstop id of this party. Echo it with `search_type` as `party_id` later — "
+            "never invent one."
+        )
+    )
+    search_type: SearchType = Field(
+        description=(
+            "Collection this party belongs to: organizations, people, contacts, or employees. "
+            "Echo it with `id` — a contact or employee id is not a people id."
+        )
+    )
+    name: str | None = Field(
+        default=None,
+        description="Display name as Backstop stores it. Omitted when resolve did not learn one.",
+    )
 
 
 # Concrete parameterizations of the shared models. Plain assignments, not subclasses: pydantic

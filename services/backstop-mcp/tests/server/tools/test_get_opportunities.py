@@ -307,6 +307,19 @@ class TestGetOpportunities:
         with pytest.raises(BackstopApiError):
             await get_opportunities(ctx_never_elicit(), party_type="organization", party_id=_ORG_ID)
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_failed_opportunities_fetch_fails_the_call(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-opp-9", "opp-jade")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        respx.get(_OPPORTUNITIES_URL).mock(return_value=httpx.Response(500, json={"errors": []}))
+
+        with pytest.raises(BackstopApiError):
+            await get_opportunities(ctx_never_elicit(), party_type="organization", party_id=_ORG_ID)
+
     def test_docstring_says_there_is_no_cursor_and_names_previous_stage(self) -> None:
         doc = get_opportunities.__doc__
         assert doc is not None
@@ -324,6 +337,8 @@ class TestGetOpportunities:
         dumped = str(schema)
         assert "previous_stage" in dumped
         assert "LEFT" in dumped
+        assert "Omitted until the deal has moved" in dumped
+        assert "Omitted when this instance no longer publishes" in dumped
 
 
 class TestSearchTypeFor:

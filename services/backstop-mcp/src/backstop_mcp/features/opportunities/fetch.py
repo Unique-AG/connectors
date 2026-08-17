@@ -27,7 +27,7 @@ are read as the raw dicts they arrive as.
 **Side-loading does not cover the vocabulary.** 45 history entries on one party referenced 6
 distinct stage ids while only 3 arrived in `included`. Every stage id is therefore resolved
 against this response first and the cached vocabulary second; one in neither keeps its id and
-reports a null name, rather than being dropped or guessed at.
+omits the name, rather than being dropped or guessed at.
 
 **Records are validated one at a time.** The fetch pages with the attributes left as a plain
 dict, and `OpportunityResponse` then reads each record's own attributes through its aliases. A
@@ -82,8 +82,8 @@ def stage_ref_id(value: object) -> str | None:
 
     `ResourceRef.resource_id` is required, correctly — a reference nobody can resolve is not a
     reference — but failing on it would discard the whole history entry, its `effectiveDate` with
-    it. A stage this response cannot identify is reported as a null name beside the move that
-    happened, exactly as one the vocabulary can no longer name is.
+    it. A stage this response cannot identify is reported with the name omitted beside the move
+    that happened, exactly as one the vocabulary can no longer name is.
     """
     try:
         return ResourceRef.model_validate(value).resource_id

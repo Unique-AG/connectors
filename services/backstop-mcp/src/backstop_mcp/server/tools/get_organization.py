@@ -40,7 +40,10 @@ class OrganizationAttributes(OmitNoneModel, ProvenanceFields):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
 
-    name: str | None = None
+    name: str | None = Field(
+        default=None,
+        description="Organization name as Backstop stores it.",
+    )
 
 
 class OrganizationResolvedResponse(OmitNoneModel):
@@ -52,10 +55,31 @@ class OrganizationResolvedResponse(OmitNoneModel):
     age as a staleness verdict.
     """
 
-    status: Literal["resolved"] = "resolved"
-    organization: OrganizationAttributes
-    resolved: ResolvedPartyResponse
-    as_of: AsOf | None = None
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the organization was found and fetched.",
+    )
+    organization: OrganizationAttributes = Field(
+        description=(
+            "The organization's own Backstop attributes. Known keys (`name`, "
+            "`modifiedTimestamp`, `modifiedBy`) are documented; other keys are this "
+            "instance's fields passed through unchanged, including custom field values. "
+            "Call `list_custom_fields` for what those mean."
+        )
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
+    as_of: AsOf | None = Field(
+        default=None,
+        description=(
+            "When and by whom the organization record was last saved. Omitted when "
+            "unknown. Relay this; do not treat age as a staleness verdict."
+        ),
+    )
     included: OrganizationIncludesResponse | None = Field(
         default=None,
         description=(

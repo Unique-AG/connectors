@@ -52,7 +52,7 @@ class TestDisambiguateElicit:
         )
 
         result = await resolve_party(
-            ctx_accept("Capstone B"),
+            ctx_accept("Capstone B (organization)"),
             client,
             search_type="organizations",
             search="Capstone",

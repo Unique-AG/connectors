@@ -165,14 +165,14 @@ class TestGetOrganization:
             candidates=[
                 PartyCandidateResponse(
                     key="organizations:o1",
-                    label="Capstone A",
+                    label="Capstone A (organization)",
                     id="o1",
                     search_type="organizations",
                     name="Capstone A",
                 ),
                 PartyCandidateResponse(
                     key="organizations:o2",
-                    label="Capstone B",
+                    label="Capstone B (organization)",
                     id="o2",
                     search_type="organizations",
                     name="Capstone B",
@@ -673,3 +673,23 @@ class TestGetOrganizationOmitsNullsFromTheWire:
         payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
 
         assert "as_of" not in payload
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolved_omits_name_when_the_record_has_none(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-org-nulls-4", "org-no-name")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/organizations/o42").mock(
+            return_value=httpx.Response(
+                200,
+                json=_organization_document(attributes={"status": "active"}),
+            )
+        )
+
+        payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
+
+        resolved = object_dict(payload["resolved"])
+        assert resolved["id"] == "o42"
+        assert "name" not in resolved

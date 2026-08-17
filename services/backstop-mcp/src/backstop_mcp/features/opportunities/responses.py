@@ -17,8 +17,8 @@ descriptions are written against. `populate_by_name` is what still allows either
 
 Two of Backstop's own shapes are deliberately not reproduced. `previousStage` is a plain string
 naming the stage a deal has *left*, so it is described as such rather than left to read as the
-current one. And a stage this instance can no longer name keeps its id with a null name, in both
-`OpportunityResponse.stage` and `StageChangeResponse.stage`, because a move that happened is
+current one. And a stage this instance can no longer name keeps its id with the name omitted, in
+both `OpportunityResponse.stage` and `StageChangeResponse.stage`, because a move that happened is
 still a fact even when the vocabulary has moved on.
 """
 
@@ -57,7 +57,7 @@ class StageChangeResponse(OmitNoneModel):
     stage: str | None = Field(
         default=None,
         description=(
-            "Name of the stage the deal entered at this point. Null when this instance no "
+            "Name of the stage the deal entered at this point. Omitted when this instance no "
             + "longer publishes that stage — read `stage_id`, and do not infer the name from "
             + "the surrounding entries."
         ),
@@ -96,7 +96,7 @@ class OpportunityResponse(OmitNoneModel):
     stage: str | None = Field(
         default=None,
         description=(
-            "The stage the deal is in now. Null when this instance no longer publishes that "
+            "The stage the deal is in now. Omitted when this instance no longer publishes that "
             + "stage; read `stage_id` in that case."
         ),
     )
@@ -109,7 +109,7 @@ class OpportunityResponse(OmitNoneModel):
         validation_alias="previousStage",
         description=(
             "The stage the deal most recently LEFT — not where it is now, which is `stage`. "
-            + "Null until the deal has moved at all, since Backstop only records this once a "
+            + "Omitted until the deal has moved at all, since Backstop only records this once a "
             + "move has happened."
         ),
     )
@@ -145,7 +145,7 @@ class OpportunityResponse(OmitNoneModel):
     closed_date: LenientDate = Field(
         default=None,
         validation_alias="closedDate",
-        description="Day the deal closed; null while it is still open.",
+        description="Day the deal closed; omitted while it is still open.",
     )
     days_open: int | None = Field(
         default=None,

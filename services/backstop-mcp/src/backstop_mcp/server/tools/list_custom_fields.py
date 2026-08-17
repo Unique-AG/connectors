@@ -15,9 +15,19 @@ from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_s
 class ListCustomFieldsResponse(BaseModel):
     """Custom-field definitions grouped by the requested entity types."""
 
-    status: Literal["ok"] = "ok"
-    cache: Literal["ok", "stale"]
-    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]]
+    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
+    cache: Literal["ok", "stale"] = Field(
+        description=(
+            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
+            "previous catalog is served because refresh failed."
+        )
+    )
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]] = Field(
+        description=(
+            "Custom-field definitions keyed by the requested entity type. An entity with "
+            "none on file is still present with an empty list."
+        )
+    )
 
 
 def _definitions_for(

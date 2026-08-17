@@ -39,7 +39,10 @@ class PersonAttributes(OmitNoneModel, ProvenanceFields):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
 
-    name: str | None = None
+    name: str | None = Field(
+        default=None,
+        description="Display name as Backstop stores it, usually 'Last, First'.",
+    )
 
 
 class PersonResolvedResponse(OmitNoneModel):
@@ -51,11 +54,39 @@ class PersonResolvedResponse(OmitNoneModel):
     for historical contacts.
     """
 
-    status: Literal["resolved"] = "resolved"
-    person: PersonAttributes
-    resolved: ResolvedPartyResponse
-    as_of: AsOf | None = None
-    employments: list[EmploymentLinkResponse] = Field(default_factory=list)
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the person was found and fetched.",
+    )
+    person: PersonAttributes = Field(
+        description=(
+            "The person's own Backstop attributes. Known keys (`name`, `modifiedTimestamp`, "
+            "`modifiedBy`) are documented; other keys are this instance's fields passed "
+            "through unchanged, including custom field values. Call `list_custom_fields` "
+            "for what those mean."
+        )
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
+    as_of: AsOf | None = Field(
+        default=None,
+        description=(
+            "When and by whom the person record was last saved. Omitted when unknown. "
+            "Relay this; do not treat age as a staleness verdict."
+        ),
+    )
+    employments: list[EmploymentLinkResponse] = Field(
+        default_factory=list,
+        description=(
+            "Every current and former organization link. Do not present the person as a "
+            "current contact at any organization whose `status` is 'former' unless they "
+            "asked for historical contacts."
+        ),
+    )
     included: PersonIncludesResponse | None = Field(
         default=None,
         description=(
