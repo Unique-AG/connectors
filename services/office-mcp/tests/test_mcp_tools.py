@@ -964,7 +964,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """The turns are already timestamped and attributed in the answer, so the filters are named
-        in the same units the answer reports: seconds from the meeting's start, and the speaker as
+        in the same units the answer reports: seconds from transcription start, and the speaker as
         the transcript spells them. A model narrows only what it can see, and every one of these is
         optional — the unfiltered read stays the default."""
         tools = _named(await mcp_client.list_tools())
