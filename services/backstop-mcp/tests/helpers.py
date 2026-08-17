@@ -26,6 +26,10 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentRules,
     TypeVocabulary,
 )
+from backstop_mcp.features.opportunities import (
+    OpportunityStagesService,
+    create_opportunity_stages_service,
+)
 from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
@@ -71,6 +75,7 @@ def install_services(
     custom_fields: CustomFieldsService,
     employment_index_factory: EmploymentIndexFactory | None = None,
     activity_history_settings: ActivityHistorySettings | None = None,
+    opportunity_stages: OpportunityStagesService | None = None,
 ) -> Services:
     services = Services(
         backstop=backstop,
@@ -78,6 +83,7 @@ def install_services(
         employment_index_factory=employment_index_factory or build_employment_index_factory(),
         activity_history=activity_history_settings
         or ActivityHistorySettings(page_size=10, gist_max_chars=300),
+        opportunity_stages=opportunity_stages or opportunity_stages_service(),
     )
     configure_services(services)
     return services
@@ -122,6 +128,10 @@ def build_employment_index_factory(
 
 def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
     return create_custom_fields_service(ttl_minutes=ttl_minutes)
+
+
+def opportunity_stages_service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
+    return create_opportunity_stages_service(ttl_minutes=ttl_minutes)
 
 
 def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:

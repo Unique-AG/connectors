@@ -191,6 +191,7 @@ class TestWiring:
         services = get_services()
         assert services.custom_fields is not None
         assert services.backstop is not None
+        assert services.opportunity_stages is not None
 
     def test_lifespan_teardown_releases_the_services(
         self, postgres_container: PostgresContainer
@@ -330,10 +331,11 @@ class TestConfigTranslation:
         assert settings.max_attempts == config.max_retry_attempts
         assert settings.max_wait_ms == config.max_retry_wait_ms
 
-    def test_the_transport_is_not_handed_custom_field_knobs(self) -> None:
+    def test_the_transport_is_not_handed_feature_ttl_knobs(self) -> None:
         """The knobs it has no business seeing must not have leaked in with the rest."""
         field_names = set(type(transport_settings(BackstopConfig())).model_fields)
 
         assert not field_names & {
             "custom_field_schema_ttl_minutes",
+            "opportunity_stage_ttl_minutes",
         }
