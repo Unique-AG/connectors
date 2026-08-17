@@ -92,7 +92,7 @@
     },
     "env": {
       "type": "object",
-      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit. office-mcp additionally requires a tool surface here: exactly one of TOOLS_PRESET and TOOLS_ENABLED. This mirrors the base chart's own env contract because the chart schema is a shallow merge over it; keep it in step when the base chart changes.",
+      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit. office-mcp additionally requires a tool surface here: exactly one of TOOLS_PRESET and TOOLS_ENABLED. This mirrors the base chart's own env contract because the chart schema is a shallow merge over it; keep it in step when the base chart changes. Naming the two selection keys here also takes them out of additionalProperties, so unlike every other key they must be plain strings — the base chart's {value, if} object form is refused for them, loudly, at validation.",
       "additionalProperties": {
         "oneOf": [
           {

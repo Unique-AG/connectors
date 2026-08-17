@@ -100,7 +100,7 @@ asked to consent to. Set **exactly one** of:
 
 ```bash
 TOOLS_PRESET=teams                       # a named surface
-TOOLS_ENABLED=get_me,list_chats          # or name the tools
+TOOLS_ENABLED=get_me                     # or name the tools
 ```
 
 Both set is a startup error naming which to remove. Neither set is a startup error too: there is

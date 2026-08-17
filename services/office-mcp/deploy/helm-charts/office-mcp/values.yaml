@@ -49,7 +49,7 @@ env:
   # requires one of the two, so a missing selection fails `helm install` instead of crash-looping the
   # pod, and TOOLS_PRESET carries the valid names as an enum so a typo fails there too.
   #   TOOLS_PRESET: teams              # every tool there is
-  #   TOOLS_ENABLED: get_me,list_chats # or name them; get_me is always on
+  #   TOOLS_ENABLED: get_me            # or name them; get_me is always on
   # GET /manifest and the startup log print the resolved tools, the exact permissions and which of
   # them need admin consent. That list is what an Entra administrator has to grant, and it is the
   # only place it is written down: a scope the app registration does not carry fails at the authorize
