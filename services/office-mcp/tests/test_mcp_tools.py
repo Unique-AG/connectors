@@ -1892,14 +1892,42 @@ class TestCallingThem:
         assert content.call_count == 2, "paging and filtering are over the parsed turns, not Graph"
 
     @pytest.mark.usefixtures("obo")
+    async def test_a_padded_speaker_filter_still_names_the_speaker_over_the_protocol(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        """Padding survives the boundary: nothing between the client and the filter trims it. A miss
+        here answers "she said nothing", which is the outcome the blank-speaker refusal exists to
+        prevent."""
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_TRANSCRIPT_VTT.encode())
+        )
+
+        read = _structured(
+            await mcp_client.call_tool(
+                "read_transcript",
+                {
+                    "uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}",
+                    "speaker": " grace ",
+                },
+            )
+        )
+
+        assert [
+            turn["speaker"] for turn in cast("Sequence[Mapping[str, object]]", read["turns"])
+        ] == ["Grace Hopper"]
+
+    @pytest.mark.usefixtures("obo")
     @pytest.mark.parametrize(
         ("filters", "named"),
         [
             ({"from_seconds": 60, "to_seconds": 30}, "from_seconds"),
             ({"speaker": ""}, "speaker"),
             ({"speaker": "   "}, "speaker"),
+            ({"speaker": "\t\n"}, "speaker"),
         ],
-        ids=["inverted-window", "empty-speaker", "blank-speaker"],
+        ids=["inverted-window", "empty-speaker", "blank-speaker", "tabbed-speaker"],
     )
     async def test_a_filter_no_transcript_could_satisfy_is_refused_before_any_graph_request(
         self,
