@@ -503,7 +503,7 @@ def _from_html(
     # joiner rather than as the space it is meant to be.
     text = html.unescape(text).replace("\xa0", " ")
     text = _BLANK_LINES.sub("\n\n", text).strip()
-    return _CARD if _is_card_payload(text, attachments) else text
+    return _CARD if _is_card_payload(content, text, attachments) else text
 
 
 def _mention_text(tag: re.Match[str], mention_texts: dict[int, str | None]) -> str:
@@ -535,20 +535,31 @@ def _is_card(attachment: ChatMessageAttachment) -> bool:
     return (attachment.content_type or "").lower().startswith(_CARD_CONTENT_TYPES)
 
 
-def _is_card_payload(text: str, attachments: list[ChatMessageAttachment]) -> bool:
-    """Whether `text` is nothing but the payload of a card this message already carries.
+def _is_card_payload(
+    content: str, rewritten: str, attachments: list[ChatMessageAttachment]
+) -> bool:
+    """Whether the body is nothing but the payload of a card this message already carries.
 
     Teams sometimes leaves card JSON in `body.content` instead of `<attachment id="…">`. A body is
     only dropped when the message carries a card attachment whose `content` is that payload. The
     comparison uses parsed JSON, not raw text. Different spacing or escaping does not change the
     result. Looking like JSON is not evidence enough—a developer pasting config or an API response
     writes brace-and-type too. Everything else is what somebody wrote.
+
+    Three spellings of the body are tried, because no single one matches every shape Teams sends.
+    `content` is the body before the rewrites above, which delete markup and turn a non-breaking
+    space into a plain space: a payload carrying either of those survives only here. Its unescaped
+    form covers the one difference Graph itself makes—it escapes a body and never escapes
+    `attachment.content`. `rewritten` is the body after those rewrites, which is what uncovers a
+    payload Teams wrapped in markup of its own (`<div>`, `<p>`, a trailing `<br>`).
     """
-    payload = _json(text)
-    if payload is None:
-        return False
+    bodies = [
+        parsed
+        for parsed in (_json(content), _json(html.unescape(content)), _json(rewritten))
+        if parsed is not None
+    ]
     cards = (attachment for attachment in attachments if _is_card(attachment))
-    return any(_json(card.content) == payload for card in cards)
+    return any(_json(card.content) in bodies for card in cards)
 
 
 def _json(value: str | None) -> object | None:
