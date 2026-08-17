@@ -5,5 +5,6 @@
   "services/outlook-semantic-mcp": "3.3.0",
   "services/kyckr-mcp": "0.1.0",
   "services/hello-mcp": "0.1.0",
-  "services/kb-mcp": "0.1.1"
+  "services/kb-mcp": "0.1.1",
+  "services/backstop-mcp": "0.1.0"
 }
