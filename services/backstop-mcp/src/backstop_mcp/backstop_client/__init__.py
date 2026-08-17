@@ -31,6 +31,7 @@ from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopApiResourceDocument,
+    ResourceRef,
     follow_included,
     included_by_type,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
     "PageResult",
+    "ResourceRef",
     "RetrySettings",
     "SinglePage",
     "follow_included",

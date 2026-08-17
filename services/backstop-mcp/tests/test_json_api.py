@@ -5,12 +5,23 @@ from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopApiResourceDocument,
+    ResourceRef,
     follow_included,
 )
 
 
 class _Attrs(BaseModel):
     name: str
+
+
+# Backstop's inline reference format, field for field as the live instance sends it: this is
+# `opportunity-stage-history.attributes.stage` as it actually arrives.
+_STAGE_REF = {
+    "resourceType": "opportunity-stages",
+    "resourceId": "42482",
+    "resourceLink": "https://fb-rm-lg-26.backstopsolutions.com/backstop/api/opportunity-stages/42482",
+    "restricted": False,
+}
 
 
 class TestBackstopApiResourceDocument:
@@ -113,7 +124,7 @@ class TestFollowIncluded:
                 ],
             }
         )
-        related = follow_included(document, document.data, "entityRelationships")
+        related = follow_included(document.included, document.data, "entityRelationships")
 
         assert [item["id"] for item in related] == ["er2", "er1"]
 
@@ -145,7 +156,7 @@ class TestFollowIncluded:
                 ],
             }
         )
-        related = follow_included(document, document.data, "entityRelationships")
+        related = follow_included(document.included, document.data, "entityRelationships")
 
         assert len(related) == 1
         assert related[0]["type"] == "entity-relationships"
@@ -172,3 +183,35 @@ class TestBackstopApiResourceIdValidation:
         )
 
         assert resource.type == ""
+
+
+class TestResourceRef:
+    """Backstop's second reference format — inline in an attribute, not JSON:API linkage."""
+
+    def test_reads_the_three_fields_backstop_spells_in_camel_case(self) -> None:
+        reference = ResourceRef.model_validate(_STAGE_REF)
+
+        assert reference.model_dump() == {
+            "resource_id": "42482",
+            "resource_type": "opportunity-stages",
+            "resource_link": (
+                "https://fb-rm-lg-26.backstopsolutions.com/backstop/api/opportunity-stages/42482"
+            ),
+        }
+
+    def test_an_attribute_we_do_not_model_is_dropped(self) -> None:
+        assert "restricted" not in ResourceRef.model_validate(_STAGE_REF).model_dump()
+
+    def test_the_type_and_the_link_are_optional(self) -> None:
+        reference = ResourceRef.model_validate({"resourceId": "42482"})
+
+        assert (reference.resource_type, reference.resource_link) == (None, None)
+
+    def test_a_reference_with_no_id_is_rejected(self) -> None:
+        """A reference nobody can resolve is not a reference."""
+        with pytest.raises(ValidationError):
+            ResourceRef.model_validate({key: _STAGE_REF[key] for key in ("resourceType",)})
+
+    def test_a_blank_id_is_rejected_like_a_missing_one(self) -> None:
+        with pytest.raises(ValidationError):
+            ResourceRef.model_validate({**_STAGE_REF, "resourceId": "  "})

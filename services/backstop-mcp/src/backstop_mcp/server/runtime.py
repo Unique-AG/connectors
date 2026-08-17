@@ -15,6 +15,7 @@ from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
+from backstop_mcp.features.opportunities import OpportunityStagesService
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class Services:
     custom_fields: CustomFieldsService
     employment_index_factory: EmploymentIndexFactory
     activity_history: ActivityHistorySettings
+    opportunity_stages: OpportunityStagesService
 
 
 _services: Services | None = None
@@ -79,3 +81,7 @@ def get_employment_index_factory() -> EmploymentIndexFactory:
 
 def get_activity_history_settings() -> ActivityHistorySettings:
     return get_services().activity_history
+
+
+def get_opportunity_stages_service() -> OpportunityStagesService:
+    return get_services().opportunity_stages

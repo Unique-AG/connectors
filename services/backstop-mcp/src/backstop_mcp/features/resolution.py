@@ -268,8 +268,13 @@ async def elicit_choice[T](
 class CandidateResponse(BaseModel):
     """Base shape every candidate response shares. Subsystems subclass to add their fields."""
 
-    key: str
-    label: str
+    key: str = Field(
+        description=(
+            "Stable identity for this candidate. Echo it only as part of picking this option "
+            "— it is not a Backstop party id."
+        )
+    )
+    label: str = Field(description="What to show the user when asking which record they meant.")
 
 
 # Generic rather than "subclass and narrow `candidates`": a mutable `list[...]` field is
@@ -279,32 +284,53 @@ class CandidateResponse(BaseModel):
 class AmbiguousResponse[CandidateT: CandidateResponse](BaseModel):
     """Returned when a query matched several records and no single one could be chosen."""
 
-    status: Literal["ambiguous"] = "ambiguous"
-    query: str
-    scope: str
-    candidates: list[CandidateT] = Field(default_factory=list)
+    status: Literal["ambiguous"] = Field(
+        default="ambiguous",
+        description="Always 'ambiguous': more than one record matched and none was chosen.",
+    )
+    query: str = Field(description="The search text that produced these candidates.")
+    scope: str = Field(
+        description=("Collection the query was resolved against, e.g. 'organizations' or 'people'.")
+    )
+    candidates: list[CandidateT] = Field(
+        default_factory=list,
+        description=(
+            "The matching records. Show `label` to the user, then retry with that candidate's "
+            "`id` and `search_type` — never invent an id."
+        ),
+    )
 
 
 class NotFoundResponse(BaseModel):
     """Returned when a query matched no records. `query` is the exact term searched for."""
 
-    status: Literal["not_found"] = "not_found"
-    query: str
-    scope: str
+    status: Literal["not_found"] = Field(
+        default="not_found",
+        description="Always 'not_found': no record matched `query` in `scope`.",
+    )
+    query: str = Field(description="The search text that matched nothing.")
+    scope: str = Field(
+        description=("Collection the query was resolved against, e.g. 'organizations' or 'people'.")
+    )
 
 
 class BatchUnresolvedResponse[CandidateT: CandidateResponse](BaseModel):
-    index: int
-    query: str
-    scope: str
-    candidates: list[CandidateT] = Field(default_factory=list)
+    """One batch input that did not resolve, with the candidates (if any) for that input."""
+
+    index: int = Field(description="0-based index of this input in the original batch.")
+    query: str = Field(description="The search text for this input.")
+    scope: str = Field(description="Collection this input was resolved against.")
+    candidates: list[CandidateT] = Field(
+        default_factory=list,
+        description="Matching records for this input; empty when nothing matched.",
+    )
 
 
 class BatchResolvedResponse[ResolvedT](BaseModel):
     """One batch input that did resolve, kept so the model can continue with it."""
 
-    index: int
-    value: ResolvedT
+    index: int = Field(description="0-based index of this input in the original batch.")
+    value: ResolvedT = Field(description="The identity this input settled on.")
 
 
 class BatchAmbiguousResponse[CandidateT: CandidateResponse, ResolvedT](BaseModel):
@@ -314,9 +340,18 @@ class BatchAmbiguousResponse[CandidateT: CandidateResponse, ResolvedT](BaseModel
     and ask once about the rest — dropping them would force re-resolution of work already done.
     """
 
-    status: Literal["ambiguous"] = "ambiguous"
-    unresolved: list[BatchUnresolvedResponse[CandidateT]] = Field(default_factory=list)
-    resolved: list[BatchResolvedResponse[ResolvedT]] = Field(default_factory=list)
+    status: Literal["ambiguous"] = Field(
+        default="ambiguous",
+        description="Always 'ambiguous': at least one input in the batch did not resolve.",
+    )
+    unresolved: list[BatchUnresolvedResponse[CandidateT]] = Field(
+        default_factory=list,
+        description="Inputs that did not settle, each with its own candidates.",
+    )
+    resolved: list[BatchResolvedResponse[ResolvedT]] = Field(
+        default_factory=list,
+        description="Inputs that did settle — keep these rather than re-resolving them.",
+    )
 
 
 type ToCandidateResponse[T, CandidateT] = Callable[[Candidate[T]], CandidateT]

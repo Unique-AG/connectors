@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 
 from fastmcp.tools import tool
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from backstop_mcp.features.custom_fields import (
@@ -10,15 +10,24 @@ from backstop_mcp.features.custom_fields import (
     custom_field_entity_type_from_bean,
 )
 from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
-from backstop_mcp.server.tools.results import tool_result
 
 
 class ListCustomFieldsResponse(BaseModel):
     """Custom-field definitions grouped by the requested entity types."""
 
-    status: Literal["ok"] = "ok"
-    cache: Literal["ok", "stale"]
-    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]]
+    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
+    cache: Literal["ok", "stale"] = Field(
+        description=(
+            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
+            "previous catalog is served because refresh failed."
+        )
+    )
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]] = Field(
+        description=(
+            "Custom-field definitions keyed by the requested entity type. An entity with "
+            "none on file is still present with an empty list."
+        )
+    )
 
 
 def _definitions_for(
@@ -54,7 +63,7 @@ async def list_custom_fields(
         bool,
         Field(description="Do not pass true unless the user reports a missing field."),
     ] = False,
-) -> CallToolResult:
+) -> ListCustomFieldsResponse:
     """List custom-field definitions for the requested Backstop entity types.
 
     Use when you need the custom-field catalog (ids, types, layout, select options)
@@ -64,11 +73,9 @@ async def list_custom_fields(
     client = await get_backstop_client()
     service = get_custom_fields_service()
     catalog, cache = await service.get(client, refresh=refresh)
-    return tool_result(
-        ListCustomFieldsResponse(
-            cache=cache,
-            definitions_by_entity={
-                requested: _definitions_for(catalog, requested) for requested in entity_types
-            },
-        )
+    return ListCustomFieldsResponse(
+        cache=cache,
+        definitions_by_entity={
+            requested: _definitions_for(catalog, requested) for requested in entity_types
+        },
     )

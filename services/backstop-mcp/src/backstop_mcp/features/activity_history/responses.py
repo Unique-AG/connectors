@@ -20,7 +20,7 @@ import logging
 from datetime import date, datetime
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, ConfigDict, Field
 
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityItem,
@@ -43,6 +43,7 @@ from backstop_mcp.features.party_resolver import (
     party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.models import OmitNoneModel
 
 logger = logging.getLogger(__name__)
 
@@ -60,41 +61,102 @@ __all__ = [
 _MAX_RECIPIENTS = 3
 
 
-class ActivityRecordResponse(BaseModel):
+class ActivityRecordResponse(OmitNoneModel):
     """One meeting/call/note/document record on the timeline."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True, extra="ignore")
 
     # Plain field name required: pydantic discriminators reject AliasChoices on `type`.
-    type: BackstopActivityType
-    activity_id: str = Field(validation_alias=AliasChoices("activity_id", "id"))
-    resource_id: str | None = None
-    occurred_at: date | None = Field(
-        default=None, validation_alias=AliasChoices("occurred_at", "effective_date")
+    type: BackstopActivityType = Field(
+        description="Which stream this record is: meeting, call, note, or document."
     )
-    title: str | None = None
-    gist: str | None = None
-    gist_truncated: bool = False
-    description_length: int | None = None
+    activity_id: str = Field(
+        validation_alias=AliasChoices("activity_id", "id"),
+        description=(
+            "Handle for this record. Pass it to `get_activity_detail` for the full body — "
+            "never invent one."
+        ),
+    )
+    resource_id: str | None = Field(
+        default=None,
+        description=(
+            "Backstop resource id when present. Distinct from `activity_id`; used internally "
+            "for related fetches."
+        ),
+    )
+    occurred_at: date | None = Field(
+        default=None,
+        validation_alias=AliasChoices("occurred_at", "effective_date"),
+        description="Day this activity happened. Omitted when Backstop has no date.",
+    )
+    title: str | None = Field(default=None, description="Title as Backstop stores it.")
+    gist: str | None = Field(
+        default=None,
+        description=(
+            "Truncated markdown of the HTML body. Call `get_activity_detail` with "
+            "`activity_id` when `gist_truncated` is true, or whenever you need the full text."
+        ),
+    )
+    gist_truncated: bool = Field(
+        default=False,
+        description=(
+            "True when `gist` was cut to a token budget — the full body is on "
+            "`get_activity_detail`."
+        ),
+    )
+    description_length: int | None = Field(
+        default=None,
+        description=(
+            "Character length of the full converted body, present only when "
+            "`gist_truncated` is true."
+        ),
+    )
 
 
-class EmailRecordResponse(BaseModel):
+class EmailRecordResponse(OmitNoneModel):
     """One email record on the timeline. No gist: emails carry no HTML body to convert."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True, extra="ignore")
 
-    type: Literal["email"] = "email"
-    activity_id: str = Field(validation_alias=AliasChoices("activity_id", "id"))
-    occurred_at: datetime | None = Field(
-        default=None, validation_alias=AliasChoices("occurred_at", "sent_timestamp")
+    type: Literal["email"] = Field(default="email", description="Always 'email'.")
+    activity_id: str = Field(
+        validation_alias=AliasChoices("activity_id", "id"),
+        description=(
+            "Handle for this email on the timeline. Emails have no body on this tool — "
+            "subject and addresses only."
+        ),
     )
-    subject: str | None = None
-    from_email: str | None = None
-    to_emails: tuple[str, ...] = ()
-    to_emails_count: int | None = None
-    cc_emails: tuple[str, ...] = ()
-    cc_emails_count: int | None = None
-    has_attachments: bool | None = None
+    occurred_at: datetime | None = Field(
+        default=None,
+        validation_alias=AliasChoices("occurred_at", "sent_timestamp"),
+        description="When the email was sent.",
+    )
+    subject: str | None = Field(default=None, description="Email subject line.")
+    from_email: str | None = Field(default=None, description="Sender address.")
+    to_emails: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Up to three To: addresses. When more were on the wire, `to_emails_count` is the total."
+        ),
+    )
+    to_emails_count: int | None = Field(
+        default=None,
+        description="Total To: recipients, present only when more than three were capped.",
+    )
+    cc_emails: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Up to three Cc: addresses. When more were on the wire, `cc_emails_count` is the total."
+        ),
+    )
+    cc_emails_count: int | None = Field(
+        default=None,
+        description="Total Cc: recipients, present only when more than three were capped.",
+    )
+    has_attachments: bool | None = Field(
+        default=None,
+        description="Whether Backstop marked this email as having attachments.",
+    )
 
 
 type TimelineRecord = Annotated[
@@ -143,7 +205,13 @@ def to_timeline_record(item: ActivityItem | EmailItem, *, gist_max_chars: int) -
 class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
     """Resolved party identity plus `as_of` provenance from the same record."""
 
-    as_of: AsOf | None = None
+    as_of: AsOf | None = Field(
+        default=None,
+        description=(
+            "When and by whom the party record was last saved. Omitted when Backstop did "
+            "not provide it. Relay this; do not treat age as a staleness verdict."
+        ),
+    )
 
 
 def resolved_party_as_of_response(
@@ -161,12 +229,25 @@ def resolved_party_as_of_response(
     )
 
 
-class ActivityHistoryResolvedResponse(BaseModel):
+class ActivityHistoryResolvedResponse(OmitNoneModel):
     """`get_activity_history` once the party was resolved and its timeline fetched."""
 
-    status: Literal["resolved"] = "resolved"
-    resolved: ResolvedPartyAsOfResponse
-    groups: dict[ActivityType, ActivityGroup[TimelineRecord]]
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the party was found and its timeline fetched.",
+    )
+    resolved: ResolvedPartyAsOfResponse = Field(
+        description=(
+            "The party identity this call settled on, plus `as_of` provenance. Echo "
+            "`id` / `search_type` / `name` as `party_id` later."
+        )
+    )
+    groups: dict[ActivityType, ActivityGroup[TimelineRecord]] = Field(
+        description=(
+            "One entry per requested stream (meeting, call, note, email, document), not a "
+            "single merged timeline. Each group's `date_range` is that page's span."
+        )
+    )
 
 
 type GetActivityHistoryResponse = (

@@ -80,6 +80,7 @@ class TestBackstopConfigDefaults:
         assert config.default_page_size == 100
         assert config.report_page_size == 500
         assert config.custom_field_schema_ttl_minutes == 60
+        assert config.opportunity_stage_ttl_minutes == 60
         assert config.employment_relationship_type_ids == ()
         assert config.employment_relationship_type_markers == ("employ",)
         assert config.former_employment_relationship_type_ids == ()
@@ -112,6 +113,7 @@ class TestBackstopConfigDefaults:
         monkeypatch.setenv("BACKSTOP_DEFAULT_PAGE_SIZE", "50")
         monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "250")
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "120")
+        monkeypatch.setenv("BACKSTOP_OPPORTUNITY_STAGE_TTL_MINUTES", "30")
 
         config = BackstopConfig()
 
@@ -123,6 +125,7 @@ class TestBackstopConfigDefaults:
         assert config.default_page_size == 50
         assert config.report_page_size == 250
         assert config.custom_field_schema_ttl_minutes == 120
+        assert config.opportunity_stage_ttl_minutes == 30
 
     def test_employment_relationship_types_parse_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "1, 2,3")

@@ -2,7 +2,9 @@
 
 Everything here is domain logic — Backstop credential bridging (`auth`), CRM custom-field
 catalog fetch (`custom_fields`), name-to-record lookup (`party_resolver`), read-response
-provenance and departed-contact detection (`data_hygiene`), the shared entity-type vocabulary
+provenance and departed-contact detection (`data_hygiene`), a person's or organization's
+interaction record (`activity_history`), a party's pipeline (`opportunities`), the `?include=`
+allowlist and the shapes side-loads project onto (`includes`), the shared entity-type vocabulary
 (`entity_types`), and the resolution algebra party lookup uses (`resolution`).
 
 Layering rules, both enforced by `tests/test_layering.py`:
@@ -20,4 +22,20 @@ Note the asymmetry in the first list item: `features/` may read `config` directl
 allowed to be configured — `auth/cleanup.py` takes an `AuthConfig` and is clearer for it. A
 transport is only allowed to be *told*: it takes the frozen settings types in
 `backstop_client/settings.py`, which `create_app` translates config into.
+
+Type names say which side of the boundary a shape sits on, which matters most where our shape has
+stopped matching Backstop's:
+
+* **`Backstop*`** — the transport that speaks HTTP/JSON:API to Backstop (`BackstopClient`,
+  `BackstopApiResource`, `BackstopApiError`). The prefix means "this talks to Backstop", not
+  "this data came from Backstop".
+* **`*Attributes`** — a raw Backstop wire shape, 1:1 with their data model, under their field
+  names (`PersonAttributes`, `CustomFieldDefinitionAttributes`).
+* **`*Response`** — our curated, model-facing shape: trimmed, renamed where Backstop's naming
+  would mislead, and documented for the model that consumes it. Used for nested pieces as much as
+  for whole tool returns (`AttendeeResponse`, `EmploymentLinkResponse`).
+
+Backstop's `emails` relationship is email *messages*, so the address book is exposed as
+`email_addresses` holding a `ContactEmailResponse`. A `Backstop`-prefixed or `*Attributes` name
+there would assert their shape at exactly the point our code stops matching it.
 """

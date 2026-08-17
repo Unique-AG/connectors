@@ -13,10 +13,11 @@ are spelled out explicitly.
 from datetime import datetime
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from backstop_mcp.features.activity_history.fetch_activity_detail import ActivityDetail, Attendee
 from backstop_mcp.features.activity_history.gist_from_html import to_gist
+from backstop_mcp.models import OmitNoneModel
 
 __all__ = ["ActivityDetailResponse", "AttendeeResponse", "to_activity_detail_response"]
 
@@ -28,15 +29,15 @@ __all__ = ["ActivityDetailResponse", "AttendeeResponse", "to_activity_detail_res
 _FULL_BODY_MAX_CHARS = 10_000_000
 
 
-class AttendeeResponse(BaseModel):
+class AttendeeResponse(OmitNoneModel):
     """One trimmed attendee: a single display name (see `Attendee.name`'s fallback)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
 
-    name: str | None = None
+    name: str | None = Field(default=None, description="Display name of the attendee.")
 
 
-class ActivityDetailResponse(BaseModel):
+class ActivityDetailResponse(OmitNoneModel):
     """`get_activity_detail`'s payload: full body plus meeting specifics and attendees.
 
     `type`/`start`/`stop`/`location`/`time_zone` and `attendees` are populated only when
@@ -48,15 +49,42 @@ class ActivityDetailResponse(BaseModel):
         frozen=True, from_attributes=True, extra="ignore"
     )
 
-    activity_id: str
-    type: str | None = None
-    title: str | None = None
-    body: str
-    start: datetime | None = None
-    stop: datetime | None = None
-    location: str | None = None
-    time_zone: str | None = None
-    attendees: list[AttendeeResponse] = Field(default_factory=list)
+    activity_id: str = Field(
+        description="The activity this detail is for — the same handle that was passed in."
+    )
+    type: str | None = Field(
+        default=None,
+        description=(
+            "Activity kind as Backstop names it. Omitted for records that do not carry one."
+        ),
+    )
+    title: str | None = Field(default=None, description="Title as Backstop stores it.")
+    body: str = Field(
+        description=(
+            "Full converted markdown of the HTML description — unlike the timeline `gist`, "
+            "this is not truncated for a token budget."
+        )
+    )
+    start: datetime | None = Field(
+        default=None,
+        description="Meeting/call start time. Omitted for a note or document.",
+    )
+    stop: datetime | None = Field(
+        default=None,
+        description="Meeting/call end time. Omitted for a note or document.",
+    )
+    location: str | None = Field(
+        default=None,
+        description="Meeting/call location. Omitted for a note or document.",
+    )
+    time_zone: str | None = Field(
+        default=None,
+        description="Meeting/call time zone. Omitted for a note or document.",
+    )
+    attendees: list[AttendeeResponse] = Field(
+        default_factory=list,
+        description="People listed on a meeting/call. Empty for a note or document.",
+    )
 
 
 def to_activity_detail_response(

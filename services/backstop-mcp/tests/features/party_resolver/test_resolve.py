@@ -296,6 +296,10 @@ class TestQuickSearch:
         assert [c.id for c in response.candidates] == ["p1", "o2"]
         assert [c.search_type for c in response.candidates] == ["people", "organizations"]
         assert [c.key for c in response.candidates] == ["people:p1", "organizations:o2"]
+        assert [c.label for c in response.candidates] == [
+            "Jane A (person)",
+            "Jane Holdings (organization)",
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -327,6 +331,10 @@ class TestQuickSearch:
         assert [c.id for c in response.candidates] == ["1", "1"]
         assert [c.search_type for c in response.candidates] == ["people", "organizations"]
         assert [c.key for c in response.candidates] == ["people:1", "organizations:1"]
+        assert [c.label for c in response.candidates] == [
+            "Jane (person)",
+            "Jane (organization)",
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -378,6 +386,50 @@ class TestQuickSearch:
 
         assert exc_info.value.path == "/quick-search"
         assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"
+
+
+class TestCandidateLabel:
+    """The elicit enum and the ambiguous payload both name the entity kind next to the hit."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_named_hits_carry_the_singular_kind(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("o1", "organizations", name="Koch"),
+                    resource("p1", "people", name="Voss, Kent"),
+                    resource("c1", "contacts", name="Voss, Kent"),
+                    resource("e1", "employees", name="Lucas, Margaret"),
+                ),
+            )
+        )
+
+        result = await quick_search(
+            client,
+            search_type="organizations",
+            search="Koch",
+            options=QuickSearchOptions(enhance_search_types=True),
+        )
+
+        assert [candidate.label for candidate in result] == [
+            "Koch (organization)",
+            "Voss, Kent (person)",
+            "Voss, Kent (contact)",
+            "Lucas, Margaret (employee)",
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_hit_without_a_name_still_names_the_kind(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection(resource("o42", "organizations")))
+        )
+
+        result = await quick_search(client, search_type="organizations", search="unknown")
+
+        assert [candidate.label for candidate in result] == ["organization #o42"]
 
 
 class TestSearchTypeMapping:

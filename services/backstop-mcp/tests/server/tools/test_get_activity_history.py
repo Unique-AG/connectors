@@ -232,14 +232,14 @@ class TestFirstCallBySearch:
             candidates=[
                 PartyCandidateResponse(
                     key="organizations:o1",
-                    label="Capstone A",
+                    label="Capstone A (organization)",
                     id="o1",
                     search_type="organizations",
                     name="Capstone A",
                 ),
                 PartyCandidateResponse(
                     key="organizations:o2",
-                    label="Capstone B",
+                    label="Capstone B (organization)",
                     id="o2",
                     search_type="organizations",
                     name="Capstone B",

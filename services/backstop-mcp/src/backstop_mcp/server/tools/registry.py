@@ -6,16 +6,15 @@ Each entry is a `@tool`-decorated function (annotations live on the function).
 
 from collections.abc import Awaitable, Callable
 
-from mcp.types import CallToolResult
-
 from backstop_mcp.server.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.server.tools.get_activity_history import get_activity_history
+from backstop_mcp.server.tools.get_opportunities import get_opportunities
 from backstop_mcp.server.tools.get_organization import get_organization
 from backstop_mcp.server.tools.get_person import get_person
 from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
 from backstop_mcp.server.tools.system_info import get_system_info
 
-type ToolFunction = Callable[..., Awaitable[CallToolResult]]
+type ToolFunction = Callable[..., Awaitable[object]]
 
 TOOLS: tuple[ToolFunction, ...] = (
     get_system_info,
@@ -24,4 +23,5 @@ TOOLS: tuple[ToolFunction, ...] = (
     list_custom_fields,
     get_activity_history,
     get_activity_detail,
+    get_opportunities,
 )

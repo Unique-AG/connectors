@@ -6,6 +6,7 @@ from typing import Annotated, ClassVar, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backstop_mcp.features.activity_history.fetch_activities import ActivityType
+from backstop_mcp.models import OmitNoneModel
 
 __all__ = ["ActivityContinuation", "ActivityGroup", "DateRange"]
 
@@ -36,7 +37,7 @@ class DateRange(BaseModel):
         return self
 
 
-class ActivityContinuation(BaseModel):
+class ActivityContinuation(OmitNoneModel):
     """Params to fetch this stream's next page. Echo from a prior group's `next`; do not invent."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -81,7 +82,7 @@ class ActivityContinuation(BaseModel):
         return self
 
 
-class ActivityGroup[ItemT](BaseModel):
+class ActivityGroup[ItemT](OmitNoneModel):
     """One stream's page: which type, this page's items, this page's date span, and continuation."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)

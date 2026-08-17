@@ -36,8 +36,10 @@ from backstop_mcp.features.auth import (
 )
 from backstop_mcp.features.custom_fields import create_custom_fields_service
 from backstop_mcp.features.data_hygiene import create_employment_index_factory
+from backstop_mcp.features.opportunities import create_opportunity_stages_service
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
+from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.runtime import Services, configure_services, reset_services
 from backstop_mcp.server.tools import TOOLS
 
@@ -103,6 +105,9 @@ def create_app(
     custom_fields_service = create_custom_fields_service(
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
+    opportunity_stages_service = create_opportunity_stages_service(
+        ttl_minutes=backstop_config.opportunity_stage_ttl_minutes,
+    )
     employment_index_factory = create_employment_index_factory(
         employment_type_ids=backstop_config.employment_relationship_type_ids,
         employment_type_markers=backstop_config.employment_relationship_type_markers,
@@ -118,6 +123,7 @@ def create_app(
                 page_size=activity_history_config.page_size,
                 gist_max_chars=activity_history_config.gist_chars,
             ),
+            opportunity_stages=opportunity_stages_service,
         )
     )
 
@@ -137,6 +143,7 @@ def create_app(
         version=config.version,
         auth=auth_provider,
         lifespan=lifespan,
+        instructions=INSTRUCTIONS,
     )
     for fn in TOOLS:
         mcp.add_tool(fn)

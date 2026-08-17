@@ -58,12 +58,12 @@ def entity_relationships[AttrT](
     """`relationships` and `relationship_types` for an employment index, from one document."""
     return {
         "relationships": _parse_resources(
-            follow_included(document, document.data, EntityRelationshipRef.RELATIONSHIPS),
+            follow_included(document.included, document.data, EntityRelationshipRef.RELATIONSHIPS),
             schema=EntityRelationshipAttributes,
             kind="entityRelationships",
         ),
         "relationship_types": _parse_resources(
-            included_by_type(document, EntityRelationshipRef.TYPES_RESOURCE),
+            included_by_type(document.included, EntityRelationshipRef.TYPES_RESOURCE),
             schema=RelationshipTypeAttributes,
             kind="entity-relationship-types",
         ),

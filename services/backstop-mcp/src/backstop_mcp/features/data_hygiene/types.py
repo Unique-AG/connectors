@@ -8,6 +8,7 @@ from typing import Annotated, ClassVar
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.models import OmitNoneModel
 
 
 def _clean_or_none(value: object) -> object:
@@ -84,21 +85,38 @@ class ProvenanceFields(BaseModel):
     """Shared `modifiedTimestamp` / `modifiedBy` attributes for as-of provenance."""
 
     # `populate_by_name` so camelCase wire payloads and snake_case tool dumps both bind;
-    # without it, `tool_result`'s `by_alias=False` JSON leaves these fields at None and
+    # without it, a dump that does not serialize by alias leaves these fields at None and
     # parks the keys in `extra` when a subclass uses `extra="allow"`.
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    modified_timestamp: CleanStr = Field(default=None, alias="modifiedTimestamp")
-    modified_by: object | None = Field(default=None, alias="modifiedBy")
+    modified_timestamp: CleanStr = Field(
+        default=None,
+        alias="modifiedTimestamp",
+        description="When this record was last saved in Backstop.",
+    )
+    modified_by: object | None = Field(
+        default=None,
+        alias="modifiedBy",
+        description="Who last saved this record. Shape varies by instance.",
+    )
 
 
-class AsOf(BaseModel):
+class AsOf(OmitNoneModel):
     """Plain provenance from a Backstop record. No staleness verdict attached."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    modified_timestamp: CleanStr = None
-    modified_by: CleanStr = None
+    modified_timestamp: CleanStr = Field(
+        default=None,
+        description=(
+            "When the record was last saved in Backstop. Omitted when unknown. Relay this; "
+            "do not treat age as a staleness verdict."
+        ),
+    )
+    modified_by: CleanStr = Field(
+        default=None,
+        description="Who last saved the record, as Backstop stores it. Omitted when unknown.",
+    )
 
 
 class EmploymentStatus(StrEnum):

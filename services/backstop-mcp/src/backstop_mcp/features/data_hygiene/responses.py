@@ -6,6 +6,7 @@ from typing import ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
+from backstop_mcp.models import OmitNoneModel
 
 type EmploymentLinkStatus = Literal["current", "former"]
 
@@ -23,16 +24,28 @@ class DepartedContactResponse(BaseModel):
             " to the organization as a past employee) or 'end_date_passed'."
         )
     )
-    organization_id: str
-    organization_type: str
+    organization_id: str = Field(
+        description="Backstop id of the organization this employment has ended at."
+    )
+    organization_type: str = Field(
+        description="Collection of that organization, typically 'organizations'."
+    )
     end_date: date | None = Field(
         default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
     )
-    relationship_type_id: str | None = None
-    relationship_type_name: str | None = None
+    relationship_type_id: str | None = Field(
+        default=None, description="Backstop id of the relationship type, when known."
+    )
+    relationship_type_name: str | None = Field(
+        default=None,
+        description=(
+            "Name of the relationship type as this instance labels it, e.g. "
+            "'is a former employee of'."
+        ),
+    )
 
 
-class EmploymentLinkResponse(BaseModel):
+class EmploymentLinkResponse(OmitNoneModel):
     """One resolved person↔organization employment pair for tool payloads.
 
     Always carries both sides. `status` is `current` or `former`; unknown pairs are omitted
@@ -48,10 +61,16 @@ class EmploymentLinkResponse(BaseModel):
             "'former' appear here — pairs with no employment evidence are omitted."
         )
     )
-    person_id: str
-    person_type: str
-    organization_id: str
-    organization_type: str
+    person_id: str = Field(description="Backstop id of the person this employment belongs to.")
+    person_type: str = Field(
+        description="Collection of that person: people, contacts, or employees."
+    )
+    organization_id: str = Field(
+        description="Backstop id of the organization this employment links to."
+    )
+    organization_type: str = Field(
+        description="Collection of that organization, typically 'organizations'."
+    )
     signal: DepartureSignal | None = Field(
         default=None,
         description=(
@@ -62,8 +81,15 @@ class EmploymentLinkResponse(BaseModel):
     end_date: date | None = Field(
         default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
     )
-    relationship_type_id: str | None = None
-    relationship_type_name: str | None = None
+    relationship_type_id: str | None = Field(
+        default=None, description="Backstop id of the relationship type, when known."
+    )
+    relationship_type_name: str | None = Field(
+        default=None,
+        description=(
+            "Name of the relationship type as this instance labels it, e.g. 'is employee of'."
+        ),
+    )
 
 
 def as_of_response(as_of: AsOf | None) -> AsOf | None:
