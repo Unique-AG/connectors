@@ -27,6 +27,10 @@ from .conftest import channel_hit, chat_hit, search_response
 
 _MENTIONED = UUID("497b7a2a-9e1a-48d7-80e8-2965d2fc3a81")
 
+# The one field an application identity always carries: Microsoft documents its `id` as present and
+# its `displayName` as optional.
+_APPLICATION_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
+
 
 def _request(route: respx.Route) -> dict[str, object]:
     """The `searchRequest` the last call put on the wire."""
@@ -585,7 +589,7 @@ class TestWhatTheCallerIsTold:
                         chat_hit(
                             sender={
                                 "application": {
-                                    "id": "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061",
+                                    "id": _APPLICATION_ID,
                                     "displayName": "Build Notifier",
                                 }
                             }
@@ -601,7 +605,81 @@ class TestWhatTheCallerIsTold:
 
         sender = found.messages[0].sender
         assert sender.display_name == "Build Notifier"
+        assert sender.application_id == _APPLICATION_ID
         assert sender.user_id is None, "an application id is not a user id"
+
+    @pytest.mark.parametrize(
+        "application",
+        [
+            {"id": _APPLICATION_ID, "displayName": None},
+            {"id": _APPLICATION_ID, "displayName": ""},
+            {"id": _APPLICATION_ID},
+        ],
+    )
+    async def test_an_unnamed_application_keeps_its_id_and_its_hit(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        application: dict[str, object],
+    ) -> None:
+        """The three ways Graph declines to name a bot: a null display name, a blank one, and no
+        such property.
+
+        Microsoft documents an application identity's `displayName` as optional and its `id` as
+        not, so a bot Graph did not name is still a bot Graph identified. Deciding the hit on the
+        name discards the message and the id along with it — and `application_id` is then the only
+        thing a caller has to tell one bot from another.
+        """
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                200, json=search_response([chat_hit(sender={"application": application})])
+            )
+        )
+
+        found = await search_messages.search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25
+        )
+
+        assert len(found.messages) == 1, "an application Graph named is a sender, named or not"
+        sender = found.messages[0].sender
+        assert sender.application_id == _APPLICATION_ID
+        assert sender.display_name is None
+        assert sender.user_id is None, "an application id is not a user id"
+
+    @pytest.mark.parametrize(
+        "sender",
+        [
+            pytest.param({}, id="no-identity-at-all"),
+            pytest.param({"user": {}}, id="empty-user-object"),
+            pytest.param({"application": {}}, id="empty-application-object"),
+            pytest.param({"user": {"id": None, "displayName": None}}, id="user-naming-nobody"),
+            pytest.param({"application": {"displayName": "   "}}, id="application-naming-nobody"),
+        ],
+    )
+    async def test_an_identity_set_that_names_nobody_is_dropped(
+        self, client: GraphServiceClient, graph: respx.MockRouter, sender: dict[str, object]
+    ) -> None:
+        """No user, no application and no mailbox address means no sender to report.
+
+        The identity *object* being present says nothing — Graph sends an empty one — so the
+        decision is what is inside it. Reading presence as a sender would answer with a hit whose
+        every sender field is null, which a model can see but cannot attribute or cite: worse than
+        the drop, because it looks like an answer.
+        """
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                200,
+                json=search_response(
+                    [chat_hit(sender=sender), chat_hit(message_id="1770000000009")]
+                ),
+            )
+        )
+
+        found = await search_messages.search_messages(
+            client, criteria=SearchCriteria(query="release"), offset=0, size=25
+        )
+
+        assert [message.message_id for message in found.messages] == ["1770000000009"]
 
     async def test_system_event_messages_are_dropped(
         self, client: GraphServiceClient, graph: respx.MockRouter

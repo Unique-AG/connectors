@@ -42,8 +42,8 @@ registered tool's permissions reach the consent screen.
 **`shared/` is what a file-per-tool costs.** Two files are free to disagree, and this package is the
 list of things they must not: `handles.py` (the `teams:///` grammar — every shape this connector
 mints, its parser and its speller, and the permission each Teams surface is read under),
-`messages.py` (what a Teams message is — today the sender, normalised out of the two identity
-shapes Graph answers with, so that the same message found by one tool and read by another is not
+`messages.py` (what a Teams message is — today the sender, normalised out of every identity
+shape Graph answers with, so that the same message found by one tool and read by another is not
 reported with two different authors), `identity.py` (who the signed-in user is — `get_me` reports
 it, and it is the fact every other answer gets correlated against, so a second tool asking with a
 `GET /me` of its own would be a second answer to one question) and `seam.py` (the Graph client a tool is
