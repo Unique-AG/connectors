@@ -35,6 +35,23 @@ def _http_url_str(value: object) -> str:
 
 HttpUrlStr = Annotated[str, BeforeValidator(_http_url_str)]
 
+_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES = 24 * 60
+
+
+def _cap_custom_field_schema_ttl_minutes(value: object) -> object:
+    """Clamp leftover week-long TTL env values to 24h instead of failing startup."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return min(value, _CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except ValueError:
+            return value
+        return min(parsed, _CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
+    return value
+
 
 class AsyncpgConnectArgs(TypedDict, total=False):
     ssl: ssl.SSLContext
@@ -212,8 +229,11 @@ class BackstopConfig(BaseSettings):
 
     # How long a fetched custom-field catalog stays usable before it is re-fetched. Definitions
     # change rarely; the default is one hour. Capped at 24 hours so a stale catalog cannot sit
-    # for days after a CRM admin adds a field.
-    custom_field_schema_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
+    # for days after a CRM admin adds a field. Values above the cap (including the previous
+    # documented example of 10080) are clamped so existing deploys still boot.
+    custom_field_schema_ttl_minutes: Annotated[
+        int, BeforeValidator(_cap_custom_field_schema_ttl_minutes)
+    ] = Field(default=60, ge=1, le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
 
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id

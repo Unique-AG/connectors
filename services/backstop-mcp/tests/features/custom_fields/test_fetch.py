@@ -128,6 +128,27 @@ class TestDefinitionFromResource:
         assert definition is not None
         assert definition.select_options == []
 
+    def test_object_select_options_under_collection_key(self) -> None:
+        definition = definition_from_resource(
+            _definition_resource("1", selectOptions={"options": [{"id": "1", "label": "Active"}]})
+        )
+        assert definition is not None
+        assert definition.select_options == [{"id": "1", "label": "Active"}]
+
+    def test_object_select_options_under_data_list(self) -> None:
+        definition = definition_from_resource(
+            _definition_resource("1", selectOptions={"data": [{"id": "1", "label": "Active"}]})
+        )
+        assert definition is not None
+        assert definition.select_options == [{"id": "1", "label": "Active"}]
+
+    def test_object_select_options_under_data_resource(self) -> None:
+        definition = definition_from_resource(
+            _definition_resource("1", selectOptions={"data": {"id": "1", "label": "Active"}})
+        )
+        assert definition is not None
+        assert definition.select_options == [{"id": "1", "label": "Active"}]
+
 
 class TestCatalogGet:
     @pytest.mark.asyncio

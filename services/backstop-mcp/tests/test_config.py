@@ -151,9 +151,15 @@ class TestBackstopConfigDefaults:
         with pytest.raises(ValueError, match="report_page_size"):
             BackstopConfig(report_page_size=501)
 
-    def test_custom_field_schema_ttl_rejects_values_over_24_hours(self) -> None:
-        with pytest.raises(ValueError, match="custom_field_schema_ttl_minutes"):
-            BackstopConfig(custom_field_schema_ttl_minutes=24 * 60 + 1)
+    def test_custom_field_schema_ttl_caps_values_over_24_hours(self) -> None:
+        config = BackstopConfig(custom_field_schema_ttl_minutes=24 * 60 + 1)
+        assert config.custom_field_schema_ttl_minutes == 24 * 60
+
+    def test_custom_field_schema_ttl_caps_legacy_week_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "10080")
+        assert BackstopConfig().custom_field_schema_ttl_minutes == 24 * 60
 
     def test_custom_field_schema_ttl_rejects_zero(self) -> None:
         with pytest.raises(ValueError, match="custom_field_schema_ttl_minutes"):

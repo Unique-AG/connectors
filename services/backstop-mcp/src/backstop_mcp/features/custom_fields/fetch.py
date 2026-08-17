@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import cast
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
@@ -9,13 +10,30 @@ from backstop_mcp.features.custom_fields.types import (
 
 _DEFINITIONS_PATH = "/custom-field-definitions"
 _DEFINITIONS_PAGE_SIZE = 1000
+_ENTRY_COLLECTION_KEYS = ("entries", "lovEntries", "viewableEntries", "options", "values")
 
 type DefinitionResource = BackstopApiResource[CustomFieldDefinitionAttributes]
 
 
 def _select_options(value: object | None) -> list[object]:
+    """Keep a list of inline picklist options, including object-shaped collections."""
     if isinstance(value, list):
         return list(cast(list[object], value))
+    if not isinstance(value, Mapping):
+        return []
+    payload = cast(Mapping[str, object], value)
+    for key in _ENTRY_COLLECTION_KEYS:
+        items = payload.get(key)
+        if isinstance(items, list) and items:
+            return list(cast(list[object], items))
+    raw_select = payload.get("selectOptions")
+    if isinstance(raw_select, list) and raw_select:
+        return list(cast(list[object], raw_select))
+    raw_data = payload.get("data")
+    if isinstance(raw_data, list):
+        return list(cast(list[object], raw_data))
+    if isinstance(raw_data, Mapping):
+        return [dict(cast(Mapping[str, object], raw_data))]
     return []
 
 
