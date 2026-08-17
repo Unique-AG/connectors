@@ -230,21 +230,34 @@ _NO_CRITERIA = (
     + "can see, not an answer. Add the keywords, person or date range the question is about."
 )
 
-# The characters that would let a value be read as Keyword Query Language instead of as text:
-# whitespace separates terms, `:` `<` `>` `=` introduce a property restriction or a comparison,
-# `(` and `)` group, and `"` would close the quoting applied here. A value holding any of them is
-# quoted — which is what turns `sent>2020-01-01` into something to look for rather than a filter
-# the caller was never offered. A value holding none of them cannot express a restriction, so it is
-# left alone and stays a keyword. This is the guard `services/teams-mcp` ships merged, and it is
-# for a *filter value* — one scope term's argument, e.g. the `from:` in `from:"ada lovelace"`.
-_KQL_OPERATORS = re.compile(r'[\s:"<>=()]')
+# The characters that would let a caller's string be read as Keyword Query Language instead of as
+# text: whitespace separates terms, `:` `<` `>` `=` introduce a property restriction or a
+# comparison, `(` and `)` group, `"` would close the quoting applied here, and `*` is the wildcard.
+# A leading `-` is KQL's documented shorthand for NOT and negates what follows it. (`+` is the
+# shorthand for AND, which is the default anyway, so it needs no handling.) A string holding any of
+# these is quoted — which is what turns `sent>2020-01-01` into something to look for rather than a
+# filter the caller was never offered. A string holding none of them cannot express a restriction, a
+# wildcard or a negation, so it is left alone and stays a keyword.
+_KQL_OPERATORS = re.compile(r'[\s:"<>=()*]')
 
 
+def _needs_quoting(text: str) -> bool:
+    """Whether KQL would read `text` as an operator rather than as text to look for."""
+    return _KQL_OPERATORS.search(text) is not None or text.startswith("-")
+
+
+# `_quoted` is the guard `services/teams-mcp` ships merged, and it is for a *filter value* — one
+# scope term's argument, e.g. the `from:` in `from:"ada lovelace"`. A value needs the wildcard rule
+# as much as a word does: KQL documents `<property>:*` as a match on every item that has a value
+# for that property, so a `sender` of `*` asks for every message that has a sender. That is the
+# arbitrary sample of everything `_NO_CRITERIA` exists to refuse, reached through a query string
+# that is not empty. `from:ada*` is the same defect in miniature: prefix matching this tool never
+# offered.
 def _quoted(value: str) -> str:
     """A filter value, safe to put after a scope term. One value, therefore at most one term."""
-    if _KQL_OPERATORS.search(value) is None:
-        return value
-    return _phrase(value)
+    if _needs_quoting(value):
+        return _phrase(value)
+    return value
 
 
 # A caller's free text is not a filter value, and quoting it like one costs them every match whose
@@ -258,15 +271,13 @@ def _quoted(value: str) -> str:
 # themselves, and this is what tells those two apart.
 _PHRASE = re.compile(r'"([^"]*)"')
 
-# Beyond the operator characters above, a *word* has two further ways to be read as KQL. `*` is the
-# wildcard, and KQL's boolean and proximity operators are themselves words — "the operators are
-# case-sensitive (uppercase)", which is why the comparison below is too. Neither can smuggle in a
-# scope term, but both change what the search *means* rather than what it looks for: a bare `OR`
-# between two of the caller's words turns the AND they were promised into an OR. `-` is KQL's
-# documented shorthand for NOT and negates the word it precedes. (`+` is the shorthand for AND,
-# which is the default anyway, so it needs no handling.) All of these are quoted into literal text,
-# so every word of the query is looked for and none of it is obeyed.
-_KQL_WILDCARD = "*"
+# Beyond the rules above, a *word* has one further way to be read as KQL: KQL's boolean and
+# proximity operators are themselves words — "the operators are case-sensitive (uppercase)", which
+# is why the comparison below is too. Such a word cannot smuggle in a scope term, but it changes
+# what the search *means* rather than what it looks for: a bare `OR` between two of the caller's
+# words turns the AND they were promised into an OR. This is the one rule the two guards do not
+# share, because an operator word only operates between terms and a filter value never stands
+# there — it is glued to its scope term, so `from:OR` names a sender.
 _KQL_KEYWORDS = frozenset({"AND", "OR", "NOT", "NEAR", "ONEAR"})
 
 
@@ -295,12 +306,7 @@ def _keywords(text: str) -> list[str]:
 
 
 def _keyword(word: str) -> str:
-    if (
-        _KQL_OPERATORS.search(word) is not None
-        or _KQL_WILDCARD in word
-        or word.startswith("-")
-        or word in _KQL_KEYWORDS
-    ):
+    if _needs_quoting(word) or word in _KQL_KEYWORDS:
         return _phrase(word)
     return word
 
