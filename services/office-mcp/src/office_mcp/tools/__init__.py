@@ -3,9 +3,11 @@
 A tool is one file. It publishes `TOOL_NAME` (str), `GRAPH_PERMISSIONS` (tuple) and `register`
 (function). Adding a tool: one file plus one line here.
 
-TRAP: the scope list must be derived from the modules, never hand-written. At startup, `create_app`
-passes the selected tools' permissions to the auth provider. A forgotten permission means sign-in
-fails with AADSTS65001. Deriving it here guarantees every registered tool has consent.
+TRAP: the scope list must be derived from the modules, never hand-written. At startup,
+`create_app` passes the selected tools' permissions to the auth provider. A permission not
+consented at authorization time cannot be obtained later: the On-Behalf-Of exchange fails with
+AADSTS65001 per tool call, before the tool body runs. Deriving it here guarantees every
+registered tool has consent.
 
 An operator chooses which of these tools run. `resolve` answers with both halves at once: the
 modules to register, and the permissions to ask for. They are one object so they cannot disagree.
