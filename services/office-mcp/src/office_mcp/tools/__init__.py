@@ -56,10 +56,12 @@ from office_mcp.tools import get_me
 #
 # `ToolModule` is deliberately not one of them. It is the contract a tool file satisfies, and the
 # only place it can be checked is the `_TOOL_MODULES` annotation below — a tool file could not
-# import it even to declare it, since reaching for `office_mcp.tools` from inside `tools/` is what
-# the no-sibling-imports rule forbids, and that rule starts being asserted the moment there is a
-# second tool to confuse. A name on the front door that nothing may walk through is a promise to
-# nobody, so it stays private to this module and documents itself where it bites.
+# import it even to declare it, because this module imports every tool module above the line that
+# defines `ToolModule`, so a tool file importing it back is a circular import that fails at
+# collection. (The no-sibling-imports rule does not catch this one: it is asserted over `shared/`
+# and `graph_client/`, and the package's own front door is explicitly allowed.) A name on the front
+# door that nothing may walk through is a promise to nobody, so it stays private to this module and
+# documents itself where it bites.
 __all__ = ["ALWAYS_ON", "PRESETS", "TOOL_NAMES", "Selection", "register_tools", "resolve"]
 
 

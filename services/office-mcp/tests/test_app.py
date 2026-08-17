@@ -10,6 +10,7 @@ before any upstream call would happen.
 """
 
 import importlib
+import logging
 import os
 import pathlib
 from collections.abc import Callable, Iterator, Sequence
@@ -34,7 +35,7 @@ from office_mcp.app import create_app
 from office_mcp.auth import build_auth, build_oauth_storage
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
-from office_mcp.tools import Selection, register_tools, resolve
+from office_mcp.tools import ALWAYS_ON, Selection, register_tools, resolve
 
 _PUBLIC_BASE_URL = "https://office-mcp.example"
 
@@ -182,6 +183,47 @@ class TestRoutes:
         assert latency == {"python_http_request_duration_seconds"}, (
             f"expected one HTTP request-latency family, got {sorted(latency)}"
         )
+
+    def test_the_resolved_surface_is_served(self, app_client: TestClient) -> None:
+        """`/manifest` is where an operator reads the exact permission list without a pod's logs.
+
+        Asserted here rather than only against `surface_manifest`, because the spec asks for a log
+        line *and a route*: a test that calls the function directly passes just as happily with the
+        route deleted, and the permission list is the one thing about this deployment that cannot be
+        corrected after a tenant has consented to it.
+        """
+        response = _get(app_client, "/manifest")
+
+        assert response.status_code == 200
+        assert "resolved tool surface" in response.text
+        assert f"{ALWAYS_ON} (always on)" in response.text
+
+    def test_the_resolved_surface_is_logged_once_at_startup(
+        self, postgres_container: PostgresContainer, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """And the other half of it: an operator who never calls the route still finds the list in
+        the pod's log. Once, not per request — this runs in the lifespan, and a manifest that landed
+        on every call would bury the line that matters in a log nobody reads twice.
+        """
+        url = postgres_container.get_connection_url().replace("+psycopg2", "")
+        app = create_app(
+            config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
+            database_config=DatabaseConfig.model_validate({"url": url}),
+            entra_config=_entra_config(),
+            surface_config=_surface_config(),
+        )
+
+        with caplog.at_level(logging.INFO, logger=app_module.__name__), TestClient(app) as client:
+            _get(client, "/health")
+
+        logged = [
+            record.getMessage()
+            for record in caplog.records
+            if "resolved tool surface" in record.getMessage()
+        ]
+
+        assert len(logged) == 1, f"expected the surface logged once at startup, got {len(logged)}"
+        assert f"{ALWAYS_ON} (always on)" in logged[0]
 
 
 class TestAuthIsMountedAndEnforced:
