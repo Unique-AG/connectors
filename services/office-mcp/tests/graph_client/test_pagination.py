@@ -81,6 +81,25 @@ class TestTheCaps:
         assert collected.truncated
         assert len(graph.calls) == 1, "the second page must not be fetched to be discarded"
 
+    async def test_a_cap_that_stops_on_the_first_item_of_the_only_page_says_truncated(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Truncation is not read off @odata.nextLink alone. One page, no next link, and a cap
+        that stops on the first item still leaves two items the caller never sees."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={"value": [chat(1, "first"), chat(2, "second"), chat(3, "third")]},
+            )
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        collected = await collect_pages(first, client, limit=1)
+
+        assert topics(collected.items) == ["first"]
+        assert collected.truncated
+
     async def test_filtered_out_items_still_count_against_the_scan_cap(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
