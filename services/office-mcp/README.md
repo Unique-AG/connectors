@@ -23,7 +23,7 @@ This service owns no database schema or migrations. Its only table (oauth_kv) is
 
 **A tool is a file.** `tools/get_me.py` owns the tool name, description, Graph permissions, arguments,
 output shape, Graph request, and error messages. A new tool is one file plus one line in the registry.
-No base class, no decorator. A tool module publishes `GRAPH_PERMISSIONS` and `register`.
+No base class, no decorator. A tool module publishes `TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`.
 
 `tools/__init__.py` is the central registry. It assembles `GRAPH_SCOPES`—the union of every tool's
 `GRAPH_PERMISSIONS`—derived from the tool modules themselves, never by hand. Entra must receive all

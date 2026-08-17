@@ -21,7 +21,7 @@ from mcp.types import TextContent, Tool
 from starlette.applications import Starlette
 
 from office_mcp.app import create_app
-from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig
+from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.graph_client import GraphSettings, create_graph_transport
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -85,6 +85,11 @@ def graph() -> Iterator[respx.MockRouter]:
 
 
 def _build_app() -> Starlette:
+    """The app with every tool there is, which is the surface these tests are written against.
+
+    A selection is mandatory and has no default, so it is stated here. `teams` is "every tool" —
+    what a *narrowed* selection exposes is `tests/test_tool_selection.py`'s subject.
+    """
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -97,6 +102,7 @@ def _build_app() -> Starlette:
                 "client_secret": "s3cr3t",
             }
         ),
+        surface_config=SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
     )
 
 

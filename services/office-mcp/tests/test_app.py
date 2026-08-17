@@ -17,7 +17,9 @@ from types import ModuleType
 from typing import Protocol, cast, final, override
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
+from fastmcp import FastMCP
 from fastmcp.server.auth.providers.azure import AzureProvider
 from key_value.aio.protocols import AsyncKeyValue
 from key_value.aio.stores.postgresql import PostgreSQLStore
@@ -30,20 +32,22 @@ from testcontainers.community.postgres import PostgresContainer
 import office_mcp.app as app_module
 from office_mcp.app import create_app
 from office_mcp.auth import build_auth, build_oauth_storage
-from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig
+from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
-from office_mcp.tools import GRAPH_SCOPES as REGISTRY_SCOPES
+from office_mcp.tools import Selection, register_tools, resolve
 
 _PUBLIC_BASE_URL = "https://office-mcp.example"
 
 
 class _ToolModule(Protocol):
-    """The one thing this test reads off a tool file.
+    """The two things this test reads off a tool file.
 
-    `tools/__init__.py` owns the whole of a tool module's contract; this is the part of it that
-    has to reach the consent screen.
+    `tools/__init__.py` owns the whole of a tool module's contract; these are the parts of it that
+    decide what reaches the consent screen — the permissions, and the name a selection asks for the
+    tool by.
     """
 
+    TOOL_NAME: str
     GRAPH_PERMISSIONS: tuple[str, ...]
 
 
@@ -79,6 +83,17 @@ def _entra_config() -> EntraConfig:
     )
 
 
+def _surface_config() -> SurfaceConfig:
+    """Every tool there is, which is what this file is about.
+
+    A selection is mandatory — `create_app` refuses to start without one, deliberately — so every
+    test here has to state which surface it composes. `teams` is the widest and the one whose scope
+    list every assertion below is written against; the narrowed surfaces are
+    `tests/test_tool_selection.py`'s subject.
+    """
+    return SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS})
+
+
 # `starlette.testclient` returns httpx responses that this repo's strict type-checking sees as
 # partially unknown. Narrowed once here, so every assertion below is checked rather than
 # silently `Any`.
@@ -109,6 +124,7 @@ def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
         config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
         database_config=DatabaseConfig.model_validate({"url": url}),
         entra_config=_entra_config(),
+        surface_config=_surface_config(),
     )
     with TestClient(app) as client:
         yield client
@@ -212,30 +228,57 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     What a derivation cannot check is the *names*: every assertion that reads the tool files and
     compares them with a list built from those same files agrees with a typo, because the typo is
-    on both sides of it. So the last two assertions here compare them against
+    on both sides of it. So two of the assertions here compare them against
     `shared/seam.py`'s `REQUESTABLE_PERMISSIONS`, which is written out by hand precisely so that it
     is not a derivation, and against the one shape a permission tuple may not have.
+
+    Every assertion is written against the widest surface — `TOOLS_PRESET=teams`, every tool there
+    is — because that is the selection under which "every tool file's permissions" has anything to
+    mean. What a *narrowed* surface asks for is `tests/test_tool_selection.py`'s subject.
     """
 
-    def test_the_registry_has_something_to_contribute(self) -> None:
-        """Guards the guard: against an empty registry both assertions below hold vacuously —
+    def test_the_widest_surface_has_something_to_contribute(self) -> None:
+        """Guards the guard: against an empty registry every assertion below holds vacuously —
         `()` equals `()`, and every one of no tools is covered."""
-        assert REGISTRY_SCOPES, "tools/__init__.py derives no scopes"
+        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
 
-    def test_the_scope_list_is_the_registry_verbatim(self) -> None:
-        """`app.GRAPH_SCOPES` is the registry's tuple and not a copy assembled here: a second
-        derivation is a second place to forget a tool, and it would drift just as quietly."""
-        assert app_module.GRAPH_SCOPES == REGISTRY_SCOPES, (
-            "the scope list sign-in asks for is `tools/__init__.py`'s, in its order — anything "
-            + "else is a second derivation of the one value that cannot be corrected after "
-            + "consent"
+        assert selection.tools, "the widest preset resolves to no tools at all"
+        assert selection.graph_scopes, "the widest preset derives no scopes"
+
+    def test_the_scope_list_follows_the_tools_it_was_resolved_from(self) -> None:
+        """The scopes are that selection's own tools' permissions, deduplicated, in the order the
+        tools are in — not a set, and not a second union assembled anywhere else.
+
+        Read off the tool *files*, keyed by the selection's own tool order, so this is not a
+        derivation compared with itself: a permission dropped, added or reordered fails here, and
+        the order is what production is keyed by. Two tools naming the same permission is normal, so
+        a set comparison would let a reorder — or the loss of a tool whose every permission another
+        tool also names — pass unnoticed.
+        """
+        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        # Keyed by the name a selection uses, which is the tool file's own `TOOL_NAME` and not its
+        # file stem — the two agree today and nothing makes them.
+        by_name = {module.TOOL_NAME: module for _stem, module in _tool_modules()}
+
+        expected = tuple(
+            dict.fromkeys(
+                graph_scope(permission)
+                for name in selection.tools
+                for permission in by_name[name].GRAPH_PERMISSIONS
+            )
+        )
+
+        assert selection.graph_scopes == expected, (
+            "the scope list sign-in asks for is the selected tools' own permissions in the "
+            + "registry's order — anything else is a second derivation of the one value that "
+            + "cannot be corrected after consent"
         )
 
     def test_every_tool_file_has_its_permissions_on_that_list(self) -> None:
         """Read off the files rather than off the registry, which is the whole point: a tool file
         that was never added to `_TOOL_MODULES` registers nothing and asks for nothing, and a
         registry compared against itself would never say so."""
-        asked_for = set(app_module.GRAPH_SCOPES)
+        asked_for = set(resolve(preset=ToolsPreset.TEAMS, enabled=None).graph_scopes)
 
         missing = {
             f"{name}: {permission}"
@@ -285,11 +328,19 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
             + f"declares the permissions its own requests are made under: {sorted(empty)}"
         )
 
-    def test_create_app_hands_the_provider_that_exact_list(self) -> None:
-        """And not a second union assembled at the call site: a re-derivation is a second place
-        to forget a registry, and it would drift in exactly the same way and just as quietly.
-        Identity rather than equality, because that is the whole of what is being asserted."""
-        given: list[Sequence[str]] = []
+    def test_create_app_resolves_the_surface_once_and_both_halves_come_from_it(self) -> None:
+        """The scopes Entra is asked for belong to the very selection the tools were registered
+        from — asserted by identity, which is the whole of what is being asserted.
+
+        Two resolutions would be two chances to disagree about a tool, and the disagreement is
+        unfixable either way round: a tool registered whose permission was not requested fails at
+        its first call with AADSTS65001, and a permission requested for a tool nobody registered
+        widens every user's consent screen for a tool that is not there. So both consumers are
+        watched, and what is compared is the object rather than its contents — two lists that merely
+        looked equal would be exactly the second derivation this forbids.
+        """
+        asked_for: list[Sequence[str]] = []
+        registered: list[Selection] = []
 
         def _auth(
             entra: EntraConfig,
@@ -297,7 +348,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
             client_storage: AsyncKeyValue,
             graph_scopes: Sequence[str],
         ) -> AzureProvider:
-            given.append(graph_scopes)
+            asked_for.append(graph_scopes)
             return build_auth(
                 entra,
                 base_url=base_url,
@@ -305,24 +356,32 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
                 graph_scopes=graph_scopes,
             )
 
+        def _register(mcp: FastMCP, transport: httpx.AsyncClient, selection: Selection) -> None:
+            registered.append(selection)
+            register_tools(mcp, transport, selection)
+
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(app_module, "build_auth", _auth)
+            patch.setattr(app_module, "register_tools", _register)
             app = create_app(
                 config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
                 database_config=DatabaseConfig.model_validate(
                     {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
                 ),
                 entra_config=_entra_config(),
+                surface_config=_surface_config(),
             )
             # Run the lifespan so the Graph transport this builds is closed again; nothing here
             # reaches Postgres, which is only touched by a request.
             with TestClient(app):
                 pass
 
-        assert len(given) == 1, "the auth provider is built once, at the composition root"
-        assert given[0] is app_module.GRAPH_SCOPES, (
-            "create_app must pass the composition root's own GRAPH_SCOPES — a list rebuilt here "
-            + "is a second union to keep in step with the registries"
+        assert len(asked_for) == 1, "the auth provider is built once, at the composition root"
+        assert len(registered) == 1, "the tools are registered once, at the composition root"
+        assert asked_for[0] is registered[0].graph_scopes, (
+            "create_app must resolve the tool surface once and hand the same Selection's scopes to "
+            + "build_auth — a list rebuilt at the call site is a second derivation to keep in step "
+            + "with the one the tools came from"
         )
 
 
@@ -393,6 +452,7 @@ class TestReadyProbesTheConnectionSignInDependsOn:
             config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
             database_config=database_config,
             entra_config=entra_config,
+            surface_config=_surface_config(),
         )
 
         assert built, "create_app must build the OAuth state store"
@@ -436,6 +496,7 @@ class TestReadyReportsDatabaseUnreachable:
                 {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
             ),
             entra_config=_entra_config(),
+            surface_config=_surface_config(),
         )
         with TestClient(app) as client:
             response = _get(client, "/ready")
@@ -479,6 +540,9 @@ def main_module() -> Iterator[_MainModule]:
         os.environ["ENTRA_TENANT_ID"] = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
         os.environ["ENTRA_CLIENT_ID"] = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
         os.environ["ENTRA_CLIENT_SECRET"] = "s3cr3t"
+        # `create_app` builds a `SurfaceConfig` too, and it has no default on purpose: without a
+        # selection the import aborts, which is the same refusal an operator meets.
+        os.environ["TOOLS_PRESET"] = ToolsPreset.TEAMS
 
         # Imported through `importlib`, then widened via `object` before being narrowed: the
         # `import` statement form infers a literal `Module("office_mcp.main")` type that
