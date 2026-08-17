@@ -376,6 +376,25 @@ class TestWhatTheCallerIsTold:
             + "makes a null a dead end rather than an invitation to try something else"
         )
 
+    def test_the_chat_id_field_forbids_building_a_handle_rather_than_explaining_how(self) -> None:
+        """This wording is the whole guardrail, which is why it is asserted. A chat handle is not
+        enforcement-backed: `handles.message_handle` matches an unencoded `19:...@thread.v2`, so a
+        hand-built handle parses and reaches Graph. A description that names the second half of the
+        format teaches the recipe from the one tool that cannot supply it — `list_chats` returns no
+        message ids — so the prohibition is unconditional and the format is not spelled out here.
+        """
+        description = chats.ChatSummary.model_fields["chat_id"].description
+
+        assert description is not None
+        assert "cannot be assembled into one" in description
+        assert "message_id" not in description, (
+            "naming what a handle is missing is a recipe for assembling one, and this tool has no "
+            + "message id to hand a model that follows it"
+        )
+        assert "read_message" in description, (
+            "a model told not to build a handle still needs to know where a real one comes from"
+        )
+
     async def test_an_unknown_chat_type_does_not_fail_the_listing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

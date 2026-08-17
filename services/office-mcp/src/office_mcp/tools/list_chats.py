@@ -48,9 +48,10 @@ List the signed-in user's Microsoft Teams chats: one-to-one, group, and meeting 
 recent first. Returns id, type, topic, last-message time, and members (for unnamed chats).
 
 Use this to see which conversations are live, who is in them, and when each was last posted. No \
-message text is returned. Search_messages is the route to any. Chat_id here is what Microsoft \
-puts on every message in that chat, so this list names messages found elsewhere. Not an argument \
-to any tool. This returns chats only; channels live inside teams and are a different surface.
+message text is returned. Use search_messages to find a message. Use read_message for its full \
+text. Chat_id here is what Microsoft puts on every message in that chat, so this list names \
+messages found elsewhere. Not an argument to any tool. This returns chats only; channels live \
+inside teams and are a different surface.
 
 Meeting chats are conversations attached to a Teams meeting. The `topic` is the meeting subject. \
 `meeting_uri` is the only route from conversation to meeting. No calendar permission needed. \
@@ -86,8 +87,8 @@ class ChatSummary(BaseModel):
     chat_id: str = Field(
         description=(
             "Graph id for this chat (e.g. `19:...@thread.v2`). Microsoft puts this on every "
-            + "message in the chat. Do not try to assemble this into a message handle by itself; "
-            + "the handle format requires both chat_id and message_id."
+            + "message in the chat. Not a `teams:///` handle and cannot be assembled into one. "
+            + "read_message takes only a handle a tool result carries."
         )
     )
     chat_type: str = Field(
