@@ -113,10 +113,10 @@ class TestTheTwoVariablesAreOneChoice:
     def test_the_spelling_an_operator_writes_is_the_one_that_works(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Read out of the environment rather than handed in, because that is where the trap is: a
-        collection-typed setting is JSON-decoded by the settings source before any validator of ours
-        runs, so without `NoDecode` this exact value aborts startup with a JSON error and the remedy
-        reads like a bug in this service. Blanks and a trailing comma are absorbed with it.
+        """Read out of the environment rather than handed in, because the environment is the only
+        place the settings source runs at all: a collection-typed setting is JSON-decoded there,
+        before any validator of ours, and this asserts that the spelling every operator writes
+        survives that. Blanks and a trailing comma are absorbed with it.
         """
         monkeypatch.setenv("TOOLS_ENABLED", "get_me, list_chats ,read_message,")
 

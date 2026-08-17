@@ -133,7 +133,8 @@
         },
         "TOOLS_ENABLED": {
           "type": "string",
-          "description": "Which tools this deployment runs, as a comma-separated list of tool names, for a surface no preset covers. get_me is always on and need not be listed, so no deployment asks for less than User.Read. Set this or TOOLS_PRESET, never both. GET /manifest and the startup log print the resolved tools, the exact delegated permissions and which of them need admin consent — that list is what an Entra administrator has to grant."
+          "minLength": 1,
+          "description": "Which tools this deployment runs, as a comma-separated list of tool names, for a surface no preset covers. get_me is always on and need not be listed, so no deployment asks for less than User.Read. Set this or TOOLS_PRESET, never both. Must name at least one tool: an empty value is a selection that says nothing, which the server refuses to start on, and catching it here is the difference between a failed helm install and a crash-looping pod. GET /manifest and the startup log print the resolved tools, the exact delegated permissions and which of them need admin consent — that list is what an Entra administrator has to grant."
         }
       },
       "oneOf": [

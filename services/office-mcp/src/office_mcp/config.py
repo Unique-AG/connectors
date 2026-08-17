@@ -207,11 +207,16 @@ class SurfaceConfig(BaseSettings):
         """Read `TOOLS_ENABLED=get_me,list_chats` as the list it looks like.
 
         Trap: pydantic-settings JSON-decodes an env var whose field is a collection, and does it in
-        the settings source *before* any validator runs — so without `NoDecode` above, the one
-        spelling every operator writes aborts startup with a JSON error and the remedy would read
-        like a bug in this service. Blanks around the commas and a trailing one are absorbed; a
-        value that names nothing at all is left as an empty tuple, for the validator below to refuse
-        by name rather than to silently mean "no tools".
+        the settings source *before* any validator here runs. `NoDecode` above is what turns that
+        off, and it is deliberate rather than defensive: at the pinned version the decode failure is
+        *tolerated* because the field is a union, so the raw string reaches this validator either
+        way — but drop the `| None` and the same value becomes a `SettingsError` naming a field an
+        operator has never heard of. The annotation is what makes the spelling every operator writes
+        work on purpose instead of by accident.
+
+        Blanks around the commas and a trailing one are absorbed; a value that names nothing at all
+        is left as an empty tuple, for the validator below to refuse by name rather than to silently
+        mean "no tools".
         """
         if not isinstance(value, str):
             return value
