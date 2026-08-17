@@ -12,7 +12,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from types import UnionType
-from typing import get_args, get_origin, overload
+from typing import cast, get_args, get_origin, overload
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import FieldInfo
@@ -166,8 +166,23 @@ def _side_loaded[AttrT](
     ]
 
 
+def _with_resource_id(raw: dict[str, object]) -> object:
+    """A resource's `attributes`, with its JSON:API `id` folded in.
+
+    `id` is a top-level member of a resource object, not one of its attributes, so a projection
+    that wants to name the record it came from has to be handed it. It wins over any `id` already
+    inside `attributes` — Backstop puts foreign keys there, not this resource's own identity —
+    and a model that declares no `id` field drops it again under `extra="ignore"`.
+    """
+    attributes = raw.get("attributes")
+    if not isinstance(attributes, dict):
+        return attributes
+    entries = cast("dict[object, object]", attributes)
+    return {**{str(key): value for key, value in entries.items()}, "id": raw.get("id")}
+
+
 def _project(*, raw: dict[str, object], planned: _PlannedInclude) -> BaseModel | None:
-    """One side-loaded resource's `attributes` as the field's model, or `None` if unusable."""
+    """One side-loaded resource as the field's model, or `None` if unusable."""
     if raw.get("type") != planned.include.resource_type:
         logger.warning(
             "includes.side_load.unexpected_type",
@@ -179,7 +194,7 @@ def _project(*, raw: dict[str, object], planned: _PlannedInclude) -> BaseModel |
         )
         return None
     try:
-        return planned.model.model_validate(raw.get("attributes"))
+        return planned.model.model_validate(_with_resource_id(raw))
     except ValidationError as exc:
         logger.warning(
             "includes.side_load.unreadable",

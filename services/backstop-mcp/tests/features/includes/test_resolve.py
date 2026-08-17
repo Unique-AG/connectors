@@ -149,6 +149,7 @@ class TestProjectToMany:
         locations = included.locations
         assert locations is not None
         assert locations[0].model_dump() == {
+            "id": "loc-1",
             "location_title": "Business",
             "address": "18867 North Thompson Peak Parkway, Suite 250",
             "city": "Scottsdale",
@@ -247,6 +248,7 @@ class TestProjectToOne:
         card = included.primary_contact
         assert card is not None
         assert card.model_dump() == {
+            "id": "p1",
             "name": "Voss, Kent",
             "job_title": "Managing Director, Research",
             "email": "vossk@kochinvests.com",
@@ -279,6 +281,7 @@ class TestProjectToOne:
         owner = included.representative
         assert owner is not None
         assert owner.model_dump() == {
+            "id": "u1",
             "name": "Margaret Lucas",
             "user_name": "mlucas",
             "email": "margaret.lucas@capstoneco.com",
@@ -293,6 +296,86 @@ class TestProjectToOne:
         )
 
         assert included.company is None
+
+
+class TestAProjectionCarriesTheRecordsOwnId:
+    """Without it a projection is a dead end: the tools it points at refuse a guessed id."""
+
+    def test_the_primary_contact_carries_the_people_id_get_person_takes(self) -> None:
+        document = _organization(
+            relationships={"primaryContact": {"data": {"type": "people", "id": "341688185"}}},
+            included=[{"type": "people", "id": "341688185", "attributes": {"name": "Voss, Kent"}}],
+        )
+
+        included = include_plan(
+            OrganizationIncludesResponse, requested=["primary_contact"]
+        ).project(document=document)
+
+        card = included.primary_contact
+        assert card is not None
+        assert card.id == "341688185"
+
+    def test_the_company_carries_the_organizations_id_get_organization_takes(self) -> None:
+        document = _organization(
+            relationships={"company": {"data": {"type": "organizations", "id": "341208613"}}},
+            included=[
+                {
+                    "type": "organizations",
+                    "id": "341208613",
+                    "attributes": {"name": "Koch Investments Group"},
+                }
+            ],
+        )
+
+        included = include_plan(PersonIncludesResponse, requested=["company"]).project(
+            document=document
+        )
+
+        company = included.company
+        assert company is not None
+        assert company.id == "341208613"
+
+    def test_the_resource_id_wins_over_an_id_inside_attributes(self) -> None:
+        """Backstop puts foreign keys in `attributes`; the resource's own identity is above it."""
+        document = _organization(
+            relationships={"primaryContact": {"data": {"type": "people", "id": "p1"}}},
+            included=[
+                {
+                    "type": "people",
+                    "id": "p1",
+                    "attributes": {"id": "some-foreign-key", "name": "Voss, Kent"},
+                }
+            ],
+        )
+
+        included = include_plan(
+            OrganizationIncludesResponse, requested=["primary_contact"]
+        ).project(document=document)
+
+        card = included.primary_contact
+        assert card is not None
+        assert card.id == "p1"
+
+    def test_each_side_loaded_row_keeps_its_own_id(self) -> None:
+        document = _organization(
+            relationships={
+                "contactLocations": {
+                    "data": [
+                        {"type": "contact-locations", "id": "loc-1"},
+                        {"type": "contact-locations", "id": "loc-2"},
+                    ]
+                }
+            },
+            included=[_location("loc-1", "Business"), _location("loc-2", "Home")],
+        )
+
+        included = include_plan(OrganizationIncludesResponse, requested=["locations"]).project(
+            document=document
+        )
+
+        locations = included.locations
+        assert locations is not None
+        assert [location.id for location in locations] == ["loc-1", "loc-2"]
 
 
 class TestAMalformedSideLoadIsDroppedNotFatal:
@@ -441,7 +524,7 @@ class TestAPlanAnswersInTheModelItWasBuiltFrom:
         ).project(document=document)
 
         assert isinstance(included, OrganizationIncludesResponse)
-        assert included.primary_contact == ContactCardResponse(name="Voss, Kent")
+        assert included.primary_contact == ContactCardResponse(id="p1", name="Voss, Kent")
 
     def test_a_plan_built_from_the_person_model_answers_in_it(self) -> None:
         document = _organization(

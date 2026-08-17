@@ -3,6 +3,15 @@
 These are the entity documentation. Every model carries a docstring and every field a
 `description`, so FastMCP publishes them in the tools' output schema.
 
+Every model leads with `id`, the JSON:API resource id of the record it projects. That is a
+top-level member of a resource object rather than one of its attributes, which is why
+`resolve._project` folds it in explicitly. Without it a projection is a dead end:
+`ContactCardResponse` and `CompanyRefResponse` both tell the reader to call `get_person` /
+`get_organization` for the full record, and both of those refuse a `party_id` they did not hand
+out ("never invent or guess"), leaving only a name to search by and the ambiguity that comes with
+it. The ids are in the right space for that — `primary_contact` side-loads `people` and `company`
+side-loads `organizations`, which is what those two tools resolve against.
+
 `extra="ignore"` does the trimming: a `contact-locations` resource ships 17 attributes and
 `ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 5. Where
 Backstop stores one fact twice — `city`/`cityResolvedName`, `state`/`stateResolvedName`,
@@ -55,6 +64,10 @@ class ContactLocationResponse(OmitNoneModel):
 
     model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
 
+    id: _CleanStr = Field(
+        default=None,
+        description="Backstop `contact-locations` id for this address.",
+    )
     location_title: _CleanStr = Field(
         default=None,
         alias="locationTitle",
@@ -99,6 +112,10 @@ class ContactEmailResponse(OmitNoneModel):
 
     model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
 
+    id: _CleanStr = Field(
+        default=None,
+        description="Backstop `contact-emails` id for this address book entry.",
+    )
     email: _CleanStr = Field(default=None, description="The email address.")
     # No default: an address whose status is unknown is worse than one that is missing. A
     # `contact-emails` resource without `retired` fails validation and is dropped by the
@@ -116,11 +133,19 @@ class ContactCardResponse(OmitNoneModel):
     """Who a person is, in the few fields needed to recognise and reach them.
 
     A summary attached to another record (an organization's primary contact), not the full
-    person — call `get_person` for that.
+    person — call `get_person` with this record's `id` for that.
     """
 
     model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
 
+    id: _CleanStr = Field(
+        default=None,
+        description=(
+            "Backstop person id. Pass it as `party_id` to `get_person` for the full record — it "
+            + "is a `people` id, so leave `search_type` at its default. Use this rather than "
+            + "searching by name: the name alone can match more than one person."
+        ),
+    )
     name: _CleanStr = Field(
         default=None,
         description="Display name as Backstop stores it, usually 'Last, First'.",
@@ -147,11 +172,19 @@ class CompanyRefResponse(OmitNoneModel):
     """The organization a person works at, in the few fields needed to identify it.
 
     A summary attached to a person record, not the full organization — call `get_organization`
-    for that.
+    with this record's `id` for that.
     """
 
     model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
 
+    id: _CleanStr = Field(
+        default=None,
+        description=(
+            "Backstop organization id. Pass it as `party_id` to `get_organization` for the full "
+            + "record. Use this rather than searching by name: the name alone can match more "
+            + "than one organization."
+        ),
+    )
     name: _CleanStr = Field(default=None, description="Organization name as commonly used.")
     legal_name: _CleanStr = Field(
         default=None,
@@ -175,6 +208,10 @@ class InternalOwnerResponse(OmitNoneModel):
 
     model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
 
+    id: _CleanStr = Field(
+        default=None,
+        description="Backstop `system-users` id for this colleague at our own firm.",
+    )
     name: _CleanStr = Field(default=None, description="Full name of our account owner.")
     user_name: _CleanStr = Field(
         default=None, alias="userName", description="Their Backstop login name."
