@@ -295,6 +295,46 @@ class TestTheQueryItSends:
 
         assert _query_string(route) == 'from:"ada OR IsRead:false"'
 
+    @pytest.mark.parametrize(
+        ("sender", "expected"),
+        [
+            ("*", 'from:"*"'),
+            ("ada*", 'from:"ada*"'),
+            ("-ada", 'from:"-ada"'),
+            ("ada@example.invalid", "from:ada@example.invalid"),
+        ],
+    )
+    async def test_a_filter_value_is_quoted_only_where_kql_would_read_it_as_an_operator(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        sender: str,
+        expected: str,
+    ) -> None:
+        """A wildcard is the one injection a scope term's value can still carry, and the widest.
+
+        KQL reads `<property>:*` as a match on every item that has a value for that property, so
+        `from:*` asks for every message that has a sender — the arbitrary sample of everything the
+        no-criteria refusal exists to prevent, reached through a query string that is not empty, so
+        no emptiness check trips. `from:ada*` is the same defect in miniature: prefix matching this
+        tool never offered. A leading `-` is quoted for the same price, because a NOT read into a
+        filter value would invert it and answer the opposite question.
+
+        The last case is the one that must not change: an ordinary address quoted into a phrase
+        would alter every search this tool already serves.
+        """
+        route = graph.post("/search/query").mock(
+            return_value=httpx.Response(200, json=search_response([]))
+        )
+
+        _ = await search_messages.search_messages(
+            client, criteria=SearchCriteria(sender=sender), offset=0, size=25
+        )
+
+        sent = _query_string(route)
+        assert sent.count('"') % 2 == 0, f"the quoting is closable from inside: {sent}"
+        assert sent == expected
+
     async def test_an_ordinary_value_is_left_as_a_keyword(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
