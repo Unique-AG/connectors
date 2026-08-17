@@ -5,6 +5,9 @@ An MCP server for Microsoft 365 via Microsoft Graph API.
 Users sign in with their own Microsoft account. The server acts as each user. It exposes `get_me`
 (the signed-in user's profile) now, with more tools in future PRs.
 
+An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
+user to consent to are exactly the union of what those tools need — see **Tool surface** below.
+
 ## Layout
 
 ```
@@ -15,8 +18,8 @@ src/office_mcp/
   logging.py metrics.py  Cross-cutting utilities.
   graph_client/          Microsoft Graph transport (official SDK).
   shared/                Code that two or more tools must share.
-  tools/                 One file per tool, plus permissions registry.
-  server/                /ready endpoint (not a tool).
+  tools/                 One file per tool, plus the registry that selects and unions them.
+  server/                /ready and /manifest endpoints (not tools).
 ```
 
 This service owns no database schema or migrations. Its only table (oauth_kv) is created by the OAuth store.
@@ -25,11 +28,13 @@ This service owns no database schema or migrations. Its only table (oauth_kv) is
 output shape, Graph request, and error messages. A new tool is one file plus one line in the registry.
 No base class, no decorator. A tool module publishes `TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`.
 
-`tools/__init__.py` is the central registry. It assembles `GRAPH_SCOPES`—the union of every tool's
-`GRAPH_PERMISSIONS`—derived from the tool modules themselves, never by hand. Entra must receive all
-Graph permissions at startup. A forgotten permission cannot be obtained later. The registry reads the
-tool *files* from disk to ensure every registered tool declares its permissions, and `tests/test_app.py`
-verifies this.
+`tools/__init__.py` is the central registry. `resolve()` turns an operator's selection into both
+halves of one answer: the tool modules to register, and the union of their `GRAPH_PERMISSIONS` as the
+scope list sign-in asks for. Both are derived from the tool modules themselves, never written by
+hand. Entra must receive every Graph permission at startup—a forgotten one cannot be obtained
+later—so `create_app` resolves once and hands the same `Selection` to `build_auth` and
+`register_tools`. `tests/test_app.py` reads the tool *files* from disk to verify that every
+registered tool's permissions reach the consent screen.
 
 **`shared/` is code that two tools cannot disagree on:** `identity.py` (who the signed-in user is—
 every other answer correlates against this) and `seam.py` (On-Behalf-Of token and Graph error
@@ -69,10 +74,10 @@ starting. Some only make every login fail, with no startup error:
   all tokens against one issuer derived from this value, so multi-tenant values would reject all of
   them rather than accept all tenants due to issuer mismatch)
 
-**Graph permissions.** Tools declare what they need. `create_app` passes the union to the provider as
-`additional_authorize_scopes`. Entra issues one token per resource. The code exchange asks for this
-service's scope only. Tools redeem Graph permissions per call via On-Behalf-Of. A permission never
-requested at sign-in cannot be consented to.
+**Graph permissions.** Tools declare what they need. `create_app` passes the union of the *selected*
+tools' permissions to the provider as `additional_authorize_scopes`. Entra issues one token per
+resource. The code exchange asks for this service's scope only. Tools redeem Graph permissions per
+call via On-Behalf-Of. A permission never requested at sign-in cannot be consented to.
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
@@ -85,7 +90,54 @@ database user needs CREATE on its schema. No migration exists because the column
 library's to define and keep in sync — a revision duplicating them would be ours to keep in sync,
 which breaks when the library changes its schema. Rows are encrypted with a key derived from the
 client secret. Rotating the secret requires each signed-in user to re-login once. A decryption
-failure is a cache miss, not an error.
+failure is a cache miss, not an error. Widening the tool surface costs the same re-login, for the
+same reason: the authorize request changes.
+
+## Tool surface
+
+Which tools a deployment runs, and therefore which delegated permissions every one of its users is
+asked to consent to. Set **exactly one** of:
+
+```bash
+TOOLS_PRESET=teams                       # a named surface
+TOOLS_ENABLED=get_me,list_chats          # or name the tools
+```
+
+Both set is a startup error naming which to remove. Neither set is a startup error too: there is
+**no default**, because a default of "every tool" would make the widest consent screen what a
+deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-word but chosen value.
+
+| preset | tools |
+| --- | --- |
+| `teams` | every tool there is |
+
+`get_me` is **always on**, whatever the selection. It is how the server resolves "me"—the identity
+every other answer is correlated against—and `User.Read` is the least-privileged delegated permission
+Microsoft publishes and needs no administrator. So `TOOLS_ENABLED` lists only the rest, presets need
+not mention it, and **no deployment asks for zero permissions**: every one asks for at least
+`User.Read`. Naming it explicitly is accepted, not an error.
+
+An unknown tool name, an unknown preset, an empty list, both variables, or neither each aborts
+startup and names the remedy. A typo never quietly costs a tool.
+
+**The manifest.** At startup, and on `GET /manifest`, the server prints what it resolved to: the
+tools, the exact delegated permissions in Entra's spelling, and which of them need admin consent.
+That list is what an operator hands their Entra administrator, and it is the only place it is written
+down—so it is worth reading before the first sign-in rather than after. A scope the app registration
+does not carry fails at the *authorize* hop, for every user, with nothing in this service's logs:
+Azure omits Graph scopes from the session token, so the server cannot check its own ask against the
+registration. The manifest prints no consent URL; provisioning the registration is out of scope.
+
+The manifest also warns when an exposed tool's description points a model at a tool this deployment
+does not expose. It only warns—tool prose references its siblings densely, and requiring every
+mention would drag permissions into a deployment that wanted none of them.
+
+Narrowing a live deployment is free. Widening one adds a permission to the authorize request, so
+every signed-in user meets AADSTS65001 on the new tool until they sign in again.
+
+In Helm, this rides the chart's existing `env:` map. `values.yaml` deliberately defaults neither
+variable, and `values.schema.json` requires exactly one and carries the preset names as an `enum`, so
+a missing or misspelled selection fails `helm install` instead of crash-looping a pod.
 
 ## Microsoft Graph
 
@@ -130,6 +182,8 @@ store creates its table on first use.
 - Probe: `GET /probe` (process-up via setup_ops)
 - Ready: `GET /ready` (503 when Postgres unreachable; asks the OAuth store, the only connection
   a sign-in depends on. A different connection could report ready while sign-in still fails.)
+- Manifest: `GET /manifest` (the resolved tool surface and the exact permissions sign-in asks for;
+  unauthenticated, and it leaks nothing—the same scopes are in the authorize URL already)
 - Metrics: `GET /metrics` (Prometheus via setup_ops). Beside unique_toolkit's own HTTP series, four
   say what this connector asked Microsoft Graph for: `graph_requests_total{operation,status}`,
   `graph_request_duration_seconds{operation}`, `graph_throttled_total{operation,retried}` and
