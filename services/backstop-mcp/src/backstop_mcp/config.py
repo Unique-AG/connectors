@@ -165,14 +165,18 @@ class AppConfig(BaseSettings):
 
 
 class BackstopConfig(BaseSettings):
-    """Where to reach the Backstop REST API, and how the shared HTTP client is tuned.
+    """Where to reach the Backstop REST API.
 
     Credentials are NOT configured here: each connecting MCP client completes the hosted
     login form (username + personal API token), which is verified against Backstop and then
     stored encrypted in Postgres. Tool calls load that per-user credential and send
-    `Authorization: Basic ...` + `token: true` to Backstop. See `features/auth/provider.py`,
+    `Authorization: Basic ...` + `token: true` to Backstop. See `auth/provider.py`,
     `backstop_client/`, and https://backstopsolutions.elevio.help/en/articles/1018 /
     .../236.
+
+    Also carries the tuning knobs for the shared HTTP client: timeouts, per-user concurrency
+    limits, retry behavior for 429s, and default pagination sizes. Custom-field overrides and
+    the departed-contact vocabulary land here once those features do.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_")
@@ -283,7 +287,7 @@ class DatabaseConfig(BaseSettings):
 class AuthConfig(BaseSettings):
     """Retention and sweep cadence for the OAuth rows this service issues.
 
-    See `features/auth/cleanup.py`: without a periodic sweep, `pending_authorizations`,
+    See `auth/cleanup.py`: without a periodic sweep, `pending_authorizations`,
     `authorization_codes` and — chiefly — `oauth_tokens` grow without bound.
     """
 
@@ -306,7 +310,7 @@ class AuthConfig(BaseSettings):
     # how long dead rows linger — never whether an expired token is accepted.
     cleanup_interval_hours: float = Field(default=6.0, gt=0)
 
-    # Failed-login throttling for the hosted Backstop login form (see `features/auth/throttle.py`).
+    # Failed-login throttling for the hosted Backstop login form (see `auth/throttle.py`).
     # Without it, `POST /backstop/login` forwards any username/token pair to Backstop, which
     # makes it a credential-testing oracle for anyone who can start an OAuth flow.
     login_max_attempts: int = Field(default=10, ge=1)
