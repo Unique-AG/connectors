@@ -24,7 +24,7 @@ from backstop_mcp.features.includes.responses import (
     PersonInclude,
     PersonIncludesResponse,
 )
-from backstop_mcp.features.includes.types import Include, ResourceRef
+from backstop_mcp.features.includes.types import Include
 
 __all__ = [
     "CompanyRefResponse",
@@ -38,6 +38,5 @@ __all__ = [
     "OrganizationIncludesResponse",
     "PersonInclude",
     "PersonIncludesResponse",
-    "ResourceRef",
     "include_plan",
 ]
