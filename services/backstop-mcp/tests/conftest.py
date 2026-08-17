@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -13,6 +14,20 @@ from backstop_mcp.server.runtime import reset_services
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 _SERVICE_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture(autouse=True)
+def _undo_logger_disabling() -> None:
+    """Re-enable every logger `logging.config.fileConfig` switched off.
+
+    `db/migrations/env.py` calls it when the session's migrations run, and its
+    `disable_existing_loggers` default kills every logger created before that point — which is
+    every module logger imported at collection time. Without this, `caplog` captures nothing in
+    a full-suite run, and only in a full-suite run.
+    """
+    for logger in logging.root.manager.loggerDict.values():
+        if isinstance(logger, logging.Logger):
+            logger.disabled = False
 
 
 @pytest.fixture(autouse=True)
