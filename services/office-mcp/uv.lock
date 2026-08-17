@@ -1561,9 +1561,11 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "starlette" },
     { name = "tenacity" },
     { name = "typing-extensions" },
     { name = "unique-mcp" },
+    { name = "unique-toolkit", extra = ["monitoring", "otel"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1592,9 +1594,11 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "pydantic-settings", specifier = "==2.14.2" },
     { name = "python-dotenv", specifier = "==1.2.2" },
+    { name = "starlette", specifier = "==1.3.1" },
     { name = "tenacity", specifier = "==9.1.4" },
     { name = "typing-extensions", specifier = "==4.16.0" },
     { name = "unique-mcp", specifier = "==2026.34.0.dev3" },
+    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.34.0.dev7" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.52.0" },
 ]
 
