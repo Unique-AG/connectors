@@ -98,9 +98,13 @@ async def collect_pages[T](
 def _stopped_short(iterator: PageIterator) -> bool:
     """Whether the walk stopped with items still on offer.
 
-    Two scenarios: a page was left part-read (pause_index between first and last item), or the
-    last page read carried an @odata.nextLink. An empty page with a next link also counts;
-    Graph returns those, and the iterator treats empty pages as the end.
+    Two scenarios: a page was left part-read, or the last page read carried an @odata.nextLink.
+    An empty page with a next link also counts; Graph returns those, and the iterator treats
+    empty pages as the end.
+
+    pause_index is a resume offset, not an item position. It counts the items consumed from the
+    current page, so a stop on the first item leaves 1. A value above zero and below the page
+    length means some but not all of this page was read.
     """
     page = iterator.current_page
     part_read = 0 < iterator.pause_index < len(page.value or [])
