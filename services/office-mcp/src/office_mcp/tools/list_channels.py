@@ -22,6 +22,7 @@ from typing import Annotated
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.channel import Channel
 from msgraph.generated.teams.item.channels.channels_request_builder import ChannelsRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
@@ -46,6 +47,14 @@ MAX_CHANNELS = 200
 # Excludes `email` (expensive). Excludes `isArchived`: archived channels are a Teams preview
 # feature. Excludes `layoutType`: Graph documents it as always null on this collection.
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
+
+# `membershipType` is an evolvable enum, and `shared` sits after the `unknownFutureValue` sentinel
+# in it: Graph answers a shared channel with the sentinel unless the request asks for unknown
+# members. The sentinel is worse here than a null — the SDK's enum names a member for that literal,
+# so it reaches the answer as the word `unknownFutureValue`, which says nothing about the channel.
+# Graph filters on the real value either way, so `$filter=membershipType eq 'shared'` needs no
+# header; this listing reports the type rather than filtering on it, and so does need one.
+_PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
 
@@ -83,8 +92,8 @@ class ChannelSummary(BaseModel):
     membership_type: str | None = Field(
         description=(
             "`standard` for all team members, `private` for a member-list channel, or `shared` "
-            + "for a channel shared with other teams. Null if the type predates this code. "
-            + "Channels the user is not a member of do not appear."
+            + "for a channel shared with other teams. Null for a type Microsoft adds after this "
+            + "code. Channels the user is not a member of do not appear."
         )
     )
     created_at: datetime | None = Field(
@@ -106,25 +115,38 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
     """The channels of `team_id` the signed-in user can see, up to `limit`."""
     assert 1 <= limit <= MAX_CHANNELS, f"limit must be within 1..{MAX_CHANNELS}, got {limit}"
 
+    headers = _headers()
     configuration = RequestConfiguration[_ChannelsQuery](
         query_parameters=ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters(
             select=list(_CHANNEL_FIELDS)
-        )
+        ),
+        headers=headers,
     )
     with graph_errors():
         first_page = await client.teams.by_team_id(team_id).channels.get(
             request_configuration=configuration
         )
         assert first_page is not None, "Graph answered a channel listing with no collection"
-        collected = await collect_pages(first_page, client, limit=limit)
+        collected = await collect_pages(first_page, client, limit=limit, headers=headers)
 
     return ChannelList(channels=[_channel(channel) for channel in collected.items])
 
 
+def _headers() -> HeadersCollection:
+    """A `HeadersCollection` with the `Prefer` header, for the first page and every page after it.
+
+    Built per request: the default is shared by all configurations, so adding to it would affect
+    every Graph request this connector makes.
+    """
+    headers = HeadersCollection()
+    headers.add(*_PREFER_UNKNOWN_ENUMS)
+    return headers
+
+
 def _channel(channel: Channel) -> ChannelSummary:
     assert channel.id is not None, "Graph returned a channel with no id"
-    # `ChannelMembershipType` subclasses `str`; each member equals its own wire value. Unknown
-    # membership types deserialize to None rather than raising (Graph SDK behavior).
+    # `ChannelMembershipType` subclasses `str`; each member equals its own wire value. A type the
+    # SDK's enum names no member for deserializes to None rather than raising.
     return ChannelSummary(
         channel_id=channel.id,
         display_name=channel.display_name,

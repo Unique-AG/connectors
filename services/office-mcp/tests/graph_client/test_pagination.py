@@ -7,6 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 import respx
+from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.chat import Chat
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -107,6 +108,42 @@ class TestFollowingNextLink:
 
         assert topics(collected.items) == ["one", "two", "three", "newest"]
         assert not collected.capped, "nothing stopped this walk but the end of the collection"
+
+
+class TestTheHeadersItCarries:
+    async def test_the_headers_it_is_given_go_on_every_page_it_follows(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`PageIterator` starts with an empty header collection and stamps it onto every next-page
+        request, so a header the caller's own first request needed reaches page two only if the walk
+        is given it. `Prefer: include-unknown-enum-members` is the case that made this a parameter:
+        Graph answers an evolvable enum for the header the request carried, so a walk that dropped
+        it would answer page one in one shape and page two in another.
+        """
+        mock_two_pages(graph)
+        first = await client.me.chats.get()
+        assert first is not None
+        headers = HeadersCollection()
+        headers.add("Prefer", "include-unknown-enum-members")
+
+        _ = await collect_pages(first, client, limit=10, headers=headers)
+
+        assert graph.calls.last.request.headers["prefer"] == "include-unknown-enum-members"
+        assert headers.keys() == ["prefer"], (
+            "the walk copies what it was given rather than adding to it — the request adapter puts "
+            "`Authorization` on whichever collection it is handed"
+        )
+
+    async def test_a_walk_given_no_headers_sends_none_of_its_own(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        mock_two_pages(graph)
+        first = await client.me.chats.get()
+        assert first is not None
+
+        _ = await collect_pages(first, client, limit=10)
+
+        assert "prefer" not in graph.calls.last.request.headers
 
 
 class TestTheCaps:

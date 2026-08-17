@@ -15,6 +15,11 @@ empty pages: if it carries nextLink, keep going.
 Empty run bound: Following empty pages needs its own bound separate from item cap. `MAX_EMPTY_PAGES`
 is that bound, counted per run on its own—never pooled with item budget.
 
+Headers do not travel with the cursor: `PageIterator` starts with an empty header collection and
+stamps it onto every next-page request. A header the caller's own first request needed—`Prefer:
+include-unknown-enum-members`, say—reaches page two only if the walk is given it too. Without that,
+page one answers in one shape and page two in another, which is a half-fix that looks like a fix.
+
 Search paging not handled: POST /search/query uses from/size offsets, not cursors.
 """
 
@@ -22,6 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, cast
 
+from kiota_abstractions.headers_collection import HeadersCollection
 from kiota_abstractions.serialization.parsable import Parsable
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
@@ -111,12 +117,17 @@ async def collect_pages[T](
     limit: int,
     matches: Callable[[T], bool] | None = None,
     max_scanned: int = MAX_SCANNED_ITEMS,
+    headers: HeadersCollection | None = None,
 ) -> CollectedItems[T]:
     """Walk first_page and successors, keeping matching items up to limit.
 
     The SDK deserializes every page with `type(first_page)`, so the item a page hands back is
     always what the caller's own collection response declared it holds. The cast to `T` only
     names that guarantee; it does not create it.
+
+    `headers` go on every page this walk fetches. The caller sets them on its own first request and
+    passes the same collection here, because the walk's requests are the caller's request continued
+    and Graph answers a page for the header it was asked under.
     """
     items: list[T] = []
     scanned = 0
@@ -143,6 +154,11 @@ async def collect_pages[T](
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         error_mapping={"XXX": ODataError},
     )
+    if headers is not None:
+        # Not `set_headers`: it splats a dict into `add_all`, which takes a `HeadersCollection`.
+        # Copying into the iterator's own collection also keeps the caller's untouched — the request
+        # adapter adds `Authorization` to whichever one it is handed.
+        iterator.headers.add_all(headers)
     empty_pages_in_a_row = 0
     # The count is recorded on the way out however the walk ended: the walk worth seeing on a
     # dashboard is the one that read fifty pages before giving up, and that one leaves by a raise.
