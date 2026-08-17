@@ -1,8 +1,7 @@
 """The trimmed models a side-loaded resource is projected onto, and the two models they fill.
 
 These are the entity documentation. Every model carries a docstring and every field a
-`description`, so FastMCP publishes them in the tools' output schema and `describe_data_model`
-renders them without a second, drift-prone copy of the same prose.
+`description`, so FastMCP publishes them in the tools' output schema.
 
 `extra="ignore"` does the trimming: a `contact-locations` resource ships 17 attributes and
 `ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 5. Where

@@ -6,7 +6,6 @@ Each entry is a `@tool`-decorated function (annotations live on the function).
 
 from collections.abc import Awaitable, Callable
 
-from backstop_mcp.server.tools.describe_data_model import describe_data_model
 from backstop_mcp.server.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.server.tools.get_activity_history import get_activity_history
 from backstop_mcp.server.tools.get_opportunities import get_opportunities
@@ -25,5 +24,4 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_activity_history,
     get_activity_detail,
     get_opportunities,
-    describe_data_model,
 )

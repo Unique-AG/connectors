@@ -1,7 +1,8 @@
 """Short orientation FastMCP puts in context for every conversation.
 
-Kept brief on purpose: this is present on every call. Field-level documentation, the include
-allowlist, and the stage vocabulary live on `describe_data_model`.
+Kept brief on purpose: this is present on every call. Field-level documentation lives on each
+tool's output schema; include names live on the `include` parameter of `get_person` /
+`get_organization`.
 """
 
 INSTRUCTIONS = """\
@@ -15,10 +16,8 @@ Meetings, calls, notes, emails, documents: get_activity_history, then get_activi
 for a full body. Do not look for those on get_person / get_organization.
 
 Pipeline stage and timing: get_opportunities. `previous_stage` is the stage the deal just \
-left, not where it is now. There is no cursor; the whole party's pipeline is returned.
+left, not where it is now. There is no cursor; the whole party's pipeline is returned. \
+Stage names are this instance's vocabulary, returned on each deal.
 
 Custom-field names and types: list_custom_fields.
-
-Call describe_data_model for field descriptions, include names, the stage vocabulary, and \
-this ownership map.
 """

@@ -176,7 +176,8 @@ async def get_opportunities(
     open-only answer still says how many closed deals exist.
 
     `stage` is where the deal is now. `previous_stage` is the stage it most recently LEFT, and
-    is omitted until the deal has moved at all — do not read it as the current stage.
+    is omitted until the deal has moved at all — do not read it as the current stage. Stage
+    names are this instance's vocabulary, returned on each deal.
     """
     client = await get_backstop_client()
     result = await resolve_party(

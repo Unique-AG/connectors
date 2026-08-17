@@ -325,6 +325,7 @@ class TestGetOpportunities:
         assert doc is not None
         assert "no cursor" in doc.lower()
         assert "LEFT" in doc
+        assert "vocabulary" in doc.lower()
 
     def test_is_registered(self) -> None:
         assert get_opportunities in TOOLS
