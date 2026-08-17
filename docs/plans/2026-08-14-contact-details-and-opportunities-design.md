@@ -133,11 +133,11 @@ the question, the same worst case is roughly 50 KB and the p50 party about 1.5 K
 
 Three parts, plus one cross-cutting change.
 
-**An include registry.** A per-segment table maps a semantic include name to a Backstop
-relationship, the JSON:API `type` its resources arrive under, and a trimmed projection model. The
-table *is* the allowlist, so `activities` is unreachable by construction rather than by a runtime
+**An include registry.** One model per segment maps a semantic include name to a Backstop
+relationship, the JSON:API `type` its resources arrive under, and a trimmed projection model. That
+model *is* the allowlist, so `activities` is unreachable by construction rather than by a runtime
 check. `get_person` and `get_organization` each gain one `include` parameter typed as a `Literal`
-of their table's keys, so an invalid name is rejected at the MCP boundary and the input schema
+of its field names, so an invalid name is rejected at the MCP boundary and the input schema
 self-documents the options.
 
 The registry is deliberately **not** a generic recursive hydrator over `included`. A hydrator that
@@ -162,28 +162,86 @@ paths cannot drift from the payload because they *are* the payload's schema.
 
 ### Architecture
 
+**Naming.** Three conventions, two of which already existed in the codebase and are now written
+down in `features/__init__.py`. `Backstop*` prefixes the transport layer that speaks HTTP/JSON:API
+(`BackstopClient`, `BackstopApiResource`) — it means "this talks to Backstop", not "this data came
+from Backstop". `*Attributes` is a raw Backstop wire shape, 1:1 with their data model and their
+field names (`PersonAttributes`, `OrganizationAttributes`). `*Response` is our curated,
+model-facing shape — already used for nested pieces, not just whole tool returns
+(`AttendeeResponse`, `EmploymentLinkResponse`). Every model this design adds is the third kind, so
+they are `*Response` and live in each feature's `responses.py`. Naming them `Backstop*` would
+assert Backstop's shape at exactly the point the code stops matching it: `contactEmails` is
+deliberately exposed as `email_addresses` because Backstop's `emails` means messages.
+
 **`features/includes/`**
 
-- `types.py` — `IncludeSpec(relationship, resource_type, model, to_one)`, and `ResourceRef` for the
-  inline `{resourceType, resourceId, resourceLink}` format so that second format is handled
-  explicitly wherever it appears rather than silently mishandled.
-- `projections.py` — `ContactLocation`, `ContactEmail{email, retired}`, `ContactCard`, `CompanyRef`,
-  `InternalOwner`. Each has a model docstring and `Field(description=...)` on every field; this is
-  the single source for the entity documentation. `extra="ignore"` does the trimming: 8 fields kept
-  of a location's 17; 5 of a person's 25 for a contact card.
-- `registry.py` — `ORGANIZATION_INCLUDES` (`locations`, `email_addresses`, `primary_contact`,
-  `representative`) and `PERSON_INCLUDES` (`locations`, `email_addresses`, `company`,
-  `representative`).
-- `resolve.py` — `include_param(specs, requested)` building the query string, and
-  `project(document, resource, specs, requested)` returning `{name: model | [model]}` on top of
-  `follow_included`.
+**The includes model is the registry.** There is no separate table. Each segment has one
+`*IncludesResponse` model whose fields *are* the allowlist, and each field carries the two facts
+Backstop needs as `Annotated` metadata:
 
-`InternalOwner` is documented as *our* account owner (a `system-users` resource, e.g. "Margaret
+```python
+class OrganizationIncludesResponse(BaseModel):
+    locations: Annotated[
+        list[ContactLocationResponse] | None,
+        Include(relationship="contactLocations", resource_type="contact-locations"),
+    ] = Field(default=None, description="…")
+```
+
+The annotation already states the other two facts an earlier draft kept in an `IncludeSpec` row:
+`list[X] | None` is to-many onto `X`, `X | None` is to-one. So nothing restates anything, and the
+drift test that would have held a table and a model in sync is unnecessary rather than merely
+passing.
+
+Two measured constraints shape this:
+
+- The metadata object **must be a frozen dataclass, not a pydantic model**. A `BaseModel` inside
+  `Annotated[...]` hijacks the field's schema — it becomes `{"$ref": "#/$defs/Include"}` and the
+  real type disappears. This is the one place in this service where a dataclass is required rather
+  than preferred.
+- The field types must be concrete, not `dict[str, BaseModel]`. Measured: that publishes as
+  `additionalProperties: {$ref: "#/$defs/BaseModel"}`, dropping all 19 `Field(description=...)`
+  strings — silently defeating this design's third pillar, which is that the descriptions reach the
+  caller *as* the payload's schema. Tests pin both, and fail if either regresses.
+
+Modules:
+
+- `types.py` — `Include(relationship, resource_type)`, and `ResourceRef` for the inline
+  `{resourceType, resourceId, resourceLink}` format so that second format is handled explicitly
+  wherever it appears rather than silently mishandled.
+- `responses.py` — the five projections (`ContactLocationResponse`,
+  `ContactEmailResponse{email, retired}`, `ContactCardResponse`, `CompanyRefResponse`,
+  `InternalOwnerResponse`), plus `OrganizationIncludesResponse` / `PersonIncludesResponse` and the
+  `Literal` alias beside each. Every model has a docstring and every field a
+  `Field(description=...)`; this is the single source for the entity documentation. `extra="ignore"`
+  does the trimming: 8 fields kept of a location's 17; 5 of a person's 31 for a contact card.
+- `resolve.py` — one entry point, `include_plan(into, *, requested) -> IncludePlan[into]`, carrying
+  `plan.param` (the `?include=` value) and `plan.project(document=…) -> into`. Stating the request
+  once means the query value cannot be built from one segment while the answer is projected into
+  another. `param` is `""` when nothing is requested, so `get_person` — which always side-loads
+  `entityRelationships` — must not emit a leading comma when composing.
+
+  `include_plan` carries one `@overload` per segment, so requesting a person include against the
+  organization model is a compile error and the call site gets completion on the valid names. A
+  single generic signature cannot do this: a PEP 695 bound may not reference another type
+  parameter (`error: TypeVar constraint type cannot be generic`), and the workarounds are silently
+  widened rather than rejected — measured, basedpyright solves the mismatched call as
+  `Sequence[str]`, or as `Plan[Org | Person]` when the include names are owner-typed marker
+  objects. The cost is that `resolve.py` imports the two concrete models; that is accepted, since
+  segments are few and the alternative is no check at all.
+
+The plan takes only the document: for a by-id document the resource is always `document.data`.
+Field semantics are `None` = not requested, `[]` = requested and empty, value = found.
+
+The one remaining hand-written restatement is each `Literal` alias, which must be static for the
+MCP input schema; a test asserts its members equal its model's field names, in order.
+
+`InternalOwnerResponse` is documented as *our* account owner (a `system-users` resource, e.g. "Margaret
 Lucas" with an internal `userName` and office phone), explicitly not a way to contact the investor.
 
-**`get_person` / `get_organization`** gain the `include` parameter, pass `include_param(...)` into
-their existing single GET, and add `included` to their response models. `get_person` keeps its
-unconditional `entityRelationships` side-load for `employments`; the registry composes with it.
+**`get_person` / `get_organization`** gain the `include` parameter, pass `plan.param` into their
+existing single GET, and add `included` to their response models. `get_person` keeps its
+unconditional `entityRelationships` side-load for `employments`; the plan's `param` composes with
+it, and is `""` when nothing was requested.
 
 Record `attributes` keep their current `extra="allow"` passthrough, **including
 `regularCustomFieldValues`**. This is a deliberate deviation from UN-23680's "no read tool returns
@@ -195,10 +253,10 @@ presented as met.
 
 - `stages.py` — TTL-cached `GET /opportunity-stages` (7 rows), following the `custom_fields_service`
   pattern.
-- `projections.py` — `OpportunityRecord` (name, `stage`, `previous_stage`, `is_open`, `probability`,
+- `responses.py` — `OpportunityResponse` (name, `stage`, `previous_stage`, `is_open`, `probability`,
   `requested_amount`, `allocated_amount`, `currency`, `expected_investment_date`, `closed_date`,
   `days_open`, `days_in_current_stage`, `date_entered_current_stage`, `custom_field_values`) and
-  `StageChange(stage, effective_date)`.
+  `StageChangeResponse(stage, effective_date)`.
 - `fetch.py` — walks the sub-collection with `client.paginate()` at `page[limit]=100`, resolves each
   opportunity's current stage from `included` via `follow_included`, resolves each history entry's
   inline `ResourceRef` against `included` then the cached vocabulary, then filters by `status`
@@ -228,7 +286,7 @@ visible without a second call.
   `tool_error` has zero call sites, and `tool_result`'s nine call sites become plain returns. Test
   helpers `tool_model` / `tool_model_union` collapse to the returned value, and `test_results.py`
   goes away.
-- `describe_data_model` — a read-only tool rendering, from the registry: each entity's purpose, its
+- `describe_data_model` — a read-only tool rendering, from the includes models: each entity's purpose, its
   fields with descriptions, which tool and which `include` produces it, the 7-stage vocabulary, and
   an ownership map (contact details → `get_person`/`get_organization`; meetings, calls, notes,
   emails, documents → `get_activity_history`; pipeline → `get_opportunities`; custom field names →
@@ -241,7 +299,7 @@ visible without a second call.
 ### Error Handling
 
 - **Invalid include names never reach runtime.** The `Literal` parameter type means FastMCP rejects
-  them at the boundary; `include_param` treats an unrecognised name as an internal invariant.
+  them at the boundary; `include_plan` treats an unrecognised name as an internal invariant.
 - **Party resolution is unchanged** — the existing `ambiguous` / `not_found` union responses and
   elicitation.
 - **Upstream failures propagate.** `BackstopClient` already raises `BackstopAuthError` /
@@ -280,7 +338,7 @@ The existing harness fits: `respx`-mocked upstream, real `Services` installed th
 - `include` omitted → no `included` key at all.
 - Output schema published and documenting a nullable field on a tool using `OmitNoneModel`.
 
-`include_param`, the status filter, the ordering key and stage resolution are pure functions and get
+`include_plan`, the status filter, the ordering key and stage resolution are pure functions and get
 direct unit tests.
 
 ## Out of Scope
@@ -301,10 +359,11 @@ direct unit tests.
 
 ## Tasks
 
-1. **Include registry and projection models** — Add `features/includes/` with `IncludeSpec`,
+1. **Include registry and projection models** — Add `features/includes/` with `Include`,
    `ResourceRef`, the five projection models (docstrings plus per-field descriptions), and the
-   `ORGANIZATION_INCLUDES` / `PERSON_INCLUDES` tables. Add `include_param()` and `project()` on top
-   of the existing `follow_included`.
+   `OrganizationIncludesResponse` / `PersonIncludesResponse` models whose annotated fields are the
+   allowlist. Add `include_plan()` and `IncludePlan.project()` on top of the existing
+   `follow_included`.
 
 2. **Wire `include` into `get_person` and `get_organization`** — Add the `Literal`-typed `include`
    parameter, pass the built `include=` param into the existing single GET, and add `included` to
@@ -314,7 +373,7 @@ direct unit tests.
    `custom_fields_service` pattern, exposing id → (name, closed, sort order).
 
 4. **Opportunities fetch, projection, filter and sort** — Add `features/opportunities/` with
-   `OpportunityRecord` and `StageChange`, a paginated sub-collection fetch using
+   `OpportunityResponse` and `StageChangeResponse`, a paginated sub-collection fetch using
    `include=stage,stageHistory`, current-stage resolution from `included`, history resolution via
    the inline `ResourceRef` then the vocabulary, `status` filtering, `dateEnteredCurrentStage`
    ordering, and the `max_opportunities` truncation guard.
