@@ -10,14 +10,21 @@ from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel
 
 
-def tool_result(payload: BaseModel) -> CallToolResult:
+def tool_result(payload: BaseModel, *, exclude_none: bool = False) -> CallToolResult:
     """Serialize a domain payload as a single JSON text content block.
 
     Uses Python field names (`by_alias=False`) so tool JSON matches the pydantic models the
-    server types against, not Backstop's camelCase wire aliases.
+    server types against, not Backstop's camelCase wire aliases. `exclude_none` defaults to
+    `False` so existing callers' wire shape is unaffected; pass `True` for a payload that relies
+    on absent-vs-null (e.g. activity history's token-budget fields).
     """
     return CallToolResult(
-        content=[TextContent(type="text", text=payload.model_dump_json(by_alias=False))]
+        content=[
+            TextContent(
+                type="text",
+                text=payload.model_dump_json(by_alias=False, exclude_none=exclude_none),
+            )
+        ]
     )
 
 

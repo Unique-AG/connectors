@@ -15,7 +15,9 @@ from backstop_mcp.backstop_client.errors import (
 )
 from backstop_mcp.backstop_client.pagination import (
     PageResult,
+    SinglePage,
     paginate_all,
+    parse_page,
 )
 from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings
@@ -60,7 +62,7 @@ type RequestGate = Callable[[str], AbstractAsyncContextManager[None]]
 
 
 class BackstopClient:
-    """Async wrapper hiding httpx behind `.get/.post/.patch/.delete/.paginate()`.
+    """Async wrapper hiding httpx behind `.get/.post/.patch/.delete/.paginate()/.fetch_page()`.
 
     Built by `BackstopClientFactory` — tool implementations never construct this themselves,
     and never construct settings either (the factory owns the one set translated from config by
@@ -159,6 +161,40 @@ class BackstopClient:
             max_records=max_records,
             first_page_params=first_page_params,
         )
+
+    async def fetch_page(
+        self,
+        path: str,
+        *,
+        schema: type[T],
+        params: dict[str, object] | None = None,
+        page_size: int | None = None,
+        offset: int = 0,
+    ) -> SinglePage[T]:
+        """Fetch and parse exactly one page — no `links.next` walk.
+
+        Unlike `.paginate()`, which only fills in the limit/offset params a caller didn't
+        already supply, `fetch_page` always sets both from `page_size`/`offset`: the whole
+        point of this primitive is that the caller controls the exact page on every call, so
+        there is no "first page vs later pages" distinction to preserve.
+
+        Page size defaults the same way `.paginate()`'s does — `report_page_size` for the slow
+        report/analytics endpoints, `default_page_size` elsewhere — and the parameter names come
+        from settings (`page_limit_param` / `page_offset_param`) for the same reason: a wrong
+        name fails silently, since Backstop just ignores an unknown query param.
+
+        The returned `SinglePage.total_count` is `meta.totalResourceCount` verbatim, and is not
+        trustworthy on endpoints where a date filter degrades it to a running count rather than
+        a true total.
+        """
+        page_params = dict(params) if params is not None else {}
+        page_params[self._settings.page_limit_param] = (
+            page_size if page_size is not None else self._default_page_size(path)
+        )
+        page_params[self._settings.page_offset_param] = offset
+
+        response = await self.raw_request("GET", path, params=page_params)
+        return parse_page(response.content, schema, path=path)
 
     def _deserialize(self, content: bytes, schema: type[T], *, path: str) -> T:
         return cast(T, deserialize(content, schema, path=path))

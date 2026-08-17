@@ -337,13 +337,22 @@ class TestGlossaryScopesComeFromToolMeta:
     def test_registered_tools_declare_scopes_on_meta(self) -> None:
         from fastmcp.tools.function_tool import ToolMeta
 
+        from backstop_mcp.server.tools.get_activity_detail import get_activity_detail
+        from backstop_mcp.server.tools.get_activity_history import get_activity_history
         from backstop_mcp.server.tools.get_organization import get_organization
         from backstop_mcp.server.tools.get_person import get_person
         from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
         from backstop_mcp.server.tools.registry import TOOLS
         from backstop_mcp.server.tools.system_info import get_system_info
 
-        assert (get_system_info, get_organization, get_person, list_custom_fields) == TOOLS
+        assert (
+            get_system_info,
+            get_organization,
+            get_person,
+            list_custom_fields,
+            get_activity_history,
+            get_activity_detail,
+        ) == TOOLS
 
         org_meta = getattr(get_organization, "__fastmcp__", None)
         assert isinstance(org_meta, ToolMeta)

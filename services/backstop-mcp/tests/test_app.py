@@ -16,8 +16,13 @@ from mcp.server.auth.provider import AccessToken
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
-from backstop_mcp.app import create_app, retry_settings, transport_settings
+from backstop_mcp.app import (
+    create_app,
+    retry_settings,
+    transport_settings,
+)
 from backstop_mcp.config import (
+    ActivityHistoryConfig,
     AppConfig,
     AuthConfig,
     BackstopConfig,
@@ -134,6 +139,22 @@ class TestWiring:
         """A second `BackstopConfig()` read from the environment would silently ignore the knobs."""
         _ = app_client
         assert get_services().backstop.settings.base_url == _BASE_URL
+
+    def test_services_carry_the_configured_activity_history_settings(
+        self, postgres_container: PostgresContainer
+    ) -> None:
+        """Same failure shape as the transport settings above: a re-read would silently win."""
+        configs = {
+            **_configs(postgres_container),
+            "activity_history_config": ActivityHistoryConfig(page_size=25, gist_chars=500),
+        }
+        app = create_app(**configs)  # pyright: ignore[reportArgumentType]
+
+        with TestClient(app):
+            settings = get_services().activity_history
+
+        assert settings.page_size == 25
+        assert settings.gist_max_chars == 500
 
     def test_the_departed_detector_owns_the_employment_types_create_app_was_given(
         self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
@@ -310,7 +331,7 @@ class TestConfigTranslation:
             assert getattr(settings, name) == getattr(config, name), name
 
     def test_retry_settings_carry_the_configured_values(self) -> None:
-        """Checked by hand because these two are the only renamed pair."""
+        """Checked by hand: `max_retry_wait_ms` is renamed to `max_wait_ms` on the domain type."""
         config = BackstopConfig(max_retry_attempts=2, max_retry_wait_ms=5_000)
 
         settings = retry_settings(config)
