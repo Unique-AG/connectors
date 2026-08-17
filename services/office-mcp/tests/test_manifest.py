@@ -90,6 +90,24 @@ class TestTheTableAnswersForEveryPermissionAToolCanDeclare:
             + "each one with its verdict from Microsoft's permissions reference"
         )
 
+    def test_it_answers_for_nothing_else(self) -> None:
+        """The other direction, which only became assertable in this PR.
+
+        The table was written complete while most of the permissions in it were still ahead of the
+        tools that declare them, so for most of this stack a misspelled entry sat unchecked: the
+        totality test above is satisfied by the names that *are* requestable, and a wrong one
+        simply waits — it would have failed for most of the commits behind this one. The eighth and
+        last permission arrives with the recordings tool, in this same PR, so the two sides can now
+        be pinned to each other — and a name in the table no tool can declare is now a failing test
+        rather than an `AssertionError` from the manifest the day its tool lands.
+        """
+        unrequestable = sorted(set(NEEDS_ADMIN_CONSENT) - REQUESTABLE_PERMISSIONS)
+
+        assert not unrequestable, (
+            f"NEEDS_ADMIN_CONSENT answers for {unrequestable}, which no tool may declare — either "
+            + "the spelling is wrong, or the permission was removed and its verdict left behind"
+        )
+
     def test_the_verdicts_are_not_all_the_same_answer(self) -> None:
         """Guards the guard: a table of all-`False` would satisfy the totality check above while
         telling every operator that no permission ever needs an administrator."""

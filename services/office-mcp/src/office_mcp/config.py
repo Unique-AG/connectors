@@ -101,9 +101,19 @@ class ToolsPreset(StrEnum):
     exist. Config is upstream of everything, so a config that knew the tool set would invert that
     dependency and be a second place the tool list lives — which is the duplication this whole
     feature is built to avoid. One test asserts the two sides agree in both directions.
+
+    The names carry a product axis (`teams-`) from the start, because this connector grows to
+    Outlook and SharePoint, and `outlook-*` names then join the table without re-cutting these. They
+    are opaque table keys and not a grammar: nothing prefix-matches them and nothing expands them.
     """
 
     TEAMS = "teams"
+    TEAMS_CHAT = "teams-chat"
+    TEAMS_MESSAGES = "teams-messages"
+    TEAMS_CHANNELS = "teams-channels"
+    TEAMS_TRANSCRIPTS = "teams-transcripts"
+    TEAMS_RECORDINGS = "teams-recordings"
+    TEAMS_MEETINGS = "teams-meetings"
 
 
 class AppConfig(BaseSettings):

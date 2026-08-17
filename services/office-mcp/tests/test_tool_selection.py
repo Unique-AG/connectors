@@ -21,9 +21,9 @@ nine pull requests. The stubs are the three things the registry reads off a tool
 nothing else.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import final
+from typing import cast, final
 
 import httpx
 import pytest
@@ -32,6 +32,7 @@ from pydantic import ValidationError
 
 import office_mcp.tools as tools_module
 from office_mcp.config import SurfaceConfig, ToolsPreset
+from office_mcp.server.manifest import NEEDS_ADMIN_CONSENT
 from office_mcp.shared.seam import graph_scope
 from office_mcp.tools import ALWAYS_ON, PRESETS, TOOL_NAMES, register_tools, resolve
 
@@ -345,3 +346,309 @@ class TestRegisteringWhatWasSelected:
             listed = {tool.name for tool in await mcp.list_tools()}
 
         assert listed == set(selection.tools)
+
+
+# Which tool mints the argument each consumer takes, written out rather than derived. Permissions do
+# not encode it and nothing in `src/` guards it: a selection that enables a consumer without its
+# producer starts, and the tool's own refusal names the missing tool on first use (F4 of the
+# design). Catching it there would need a second declaration on every tool file, an enum of argument
+# sources, a module in `shared/` to hold it and a validator — a large mechanism for a
+# misconfiguration the operator caused explicitly. What the presets *we ship* promise is narrower
+# and worth one assertion each: every tool in one can get its arguments from another member of it.
+_ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
+    "list_channels": {"team_id": ("list_teams",)},
+    "browse_channel": {
+        "team_id": ("list_teams",),
+        "channel_id": ("list_channels", "search_messages"),
+    },
+    "read_message": {"uri": ("search_messages", "browse_channel")},
+    # An Entra object id, which `get_me` is one source of by that argument's own description. Always
+    # satisfied, because `get_me` is the floor — recorded anyway, so the guard below can insist that
+    # an argument naming a tool is classified as minted rather than as the caller's to compose.
+    "search_messages": {"mentions": ("get_me",)},
+    "list_meeting_transcripts": {"meeting_uri": ("list_chats",)},
+    "read_transcript": {"uri": ("list_meeting_transcripts",)},
+    "list_meeting_recordings": {"meeting_uri": ("list_chats",)},
+}
+
+
+# Arguments a caller composes rather than receives: `search_messages` requires at least one search
+# criterion, which its schema says with nine one-name `anyOf` branches. None is minted by a tool, so
+# none needs a producer — and listing them is what makes that a decision rather than a blind spot.
+# An argument named here has been looked at and found not to be a handle.
+_COMPOSED_BY_THE_CALLER: frozenset[str] = frozenset(
+    {
+        "query",
+        "sender",
+        "recipient",
+        "sent_after",
+        "sent_before",
+        "has_attachment",
+        "is_read",
+        "mentions_me",
+    }
+)
+
+
+def _required_arguments(schema: Mapping[str, object]) -> set[str]:
+    """Every argument a tool's schema requires, wherever the schema says so.
+
+    Not just the top-level `required`: a tool that requires "at least one of these" says it with a
+    `required` inside each branch of an `anyOf`, and reading only the top level would report
+    `search_messages` as requiring nothing at all. So the whole schema is walked, and classifying is
+    done above rather than by where JSON Schema happened to put the word.
+    """
+    found: set[str] = set()
+    pending: list[object] = [schema]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, Mapping):
+            for key, value in cast("Mapping[str, object]", node).items():
+                if key == "required" and isinstance(value, list):
+                    found |= {name for name in cast("list[object]", value) if isinstance(name, str)}
+                else:
+                    pending.append(value)
+        elif isinstance(node, list):
+            pending.extend(cast("list[object]", node))
+    return found
+
+
+def _tools_named_by(schema: Mapping[str, object], argument: str, *, besides: str) -> list[str]:
+    """The tools `argument`'s own description names, other than the tool it belongs to."""
+    properties = schema.get("properties", {})
+    assert isinstance(properties, Mapping), f"expected properties, got {properties!r}"
+    field = cast("Mapping[str, object]", properties).get(argument, {})
+    description = str(cast("Mapping[str, object]", field).get("description", ""))
+    return [name for name in TOOL_NAMES if name != besides and name in description]
+
+
+class TestEveryCuratedPresetIsUsableOnItsOwn:
+    """A preset is a use case, so every tool in one has to be reachable inside it.
+
+    The failure this catches can have **no permission signature at all**. `teams-messages` without
+    `search_messages` asks for the identical three permissions — `User.Read`, `Chat.Read` and
+    `ChannelMessage.Read.All`, because `read_message` declares the last two itself — and exposes a
+    `read_message` nothing in the preset can address, since the handle it takes is minted by a tool
+    that is not there. Nothing about the consent screen would look wrong.
+
+    Written per preset against a table of argument sources, which is the trade the design records
+    (F4): the presets we ship are hand-written sets, so their sanity is one assertion each rather
+    than a mechanism in the registry. A hand-written `TOOLS_ENABLED` may still name a consumer
+    without its producer, and the tool's own refusal names the missing tool on first use.
+    """
+
+    def test_the_table_is_about_tools_this_server_has(self) -> None:
+        """Guards the guard: a stale name on either side would quietly stop the check below from
+        checking anything."""
+        named = {*_ARGUMENT_SOURCES} | {
+            producer
+            for arguments in _ARGUMENT_SOURCES.values()
+            for producers in arguments.values()
+            for producer in producers
+        }
+
+        assert not named - set(TOOL_NAMES), (
+            f"unknown tools in the table: {sorted(named - set(TOOL_NAMES))}"
+        )
+
+    async def test_the_table_answers_for_every_argument_a_tool_requires(self) -> None:
+        """And guards it from the side that actually goes stale: the arguments, read off the live
+        schemas rather than off the table.
+
+        A tool arriving with a required argument nobody classified would leave the check below
+        passing while saying nothing about that argument — which is how the table came to record
+        only one of `browse_channel`'s two required ids. Every required argument has to be one of
+        two things: minted by another tool, or composed by the caller. Nothing may be neither.
+        """
+        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        mcp: FastMCP = FastMCP("argument-survey", version="0")
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            required = {
+                tool.name: _required_arguments(tool.parameters) for tool in await mcp.list_tools()
+            }
+
+        unclassified = {
+            name: sorted(arguments - set(_ARGUMENT_SOURCES.get(name, {})) - _COMPOSED_BY_THE_CALLER)
+            for name, arguments in required.items()
+            if arguments - set(_ARGUMENT_SOURCES.get(name, {})) - _COMPOSED_BY_THE_CALLER
+        }
+
+        assert not unclassified, (
+            "every required argument is either minted by a tool — record which, in "
+            + "_ARGUMENT_SOURCES — or composed by the caller, in _COMPOSED_BY_THE_CALLER. These "
+            + f"are neither, so the check below says nothing about them: {unclassified}"
+        )
+
+    async def test_an_argument_whose_prose_names_a_tool_is_classified_as_minted(self) -> None:
+        """The classification's own guard, and the reason it is not just a claim in a comment.
+
+        `_COMPOSED_BY_THE_CALLER` is a flat list of names, so putting a handle in it would satisfy
+        the completeness check above and quietly stop the reachability check below from asking about
+        that tool at all. What tells the two apart is already written where it cannot drift: a
+        minted argument names its producer in its own description, because that is how a model is
+        told where to get one. So an argument whose prose names a tool must be recorded as minted.
+        """
+        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        mcp: FastMCP = FastMCP("prose-survey", version="0")
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            listed = await mcp.list_tools()
+
+        misclassified = {
+            f"{tool.name}.{argument}": named
+            for tool in listed
+            for argument in _required_arguments(tool.parameters)
+            if argument not in _ARGUMENT_SOURCES.get(tool.name, {})
+            for named in [_tools_named_by(tool.parameters, argument, besides=tool.name)]
+            if named
+        }
+
+        assert not misclassified, (
+            "these arguments say in their own description which tool mints them, so they belong in "
+            + f"_ARGUMENT_SOURCES and not in _COMPOSED_BY_THE_CALLER: {misclassified}"
+        )
+
+    def test_nothing_is_both_minted_and_composed(self) -> None:
+        """The other half: an argument recorded in both places would be checked under whichever the
+        code happened to consult first."""
+        minted = {argument for arguments in _ARGUMENT_SOURCES.values() for argument in arguments}
+
+        assert not minted & _COMPOSED_BY_THE_CALLER, (
+            f"classified twice: {sorted(minted & _COMPOSED_BY_THE_CALLER)}"
+        )
+
+    @pytest.mark.parametrize("preset", list(ToolsPreset))
+    def test_every_tool_in_it_can_obtain_its_arguments_from_another_member(
+        self, preset: ToolsPreset
+    ) -> None:
+        """Every argument, not every tool: `browse_channel` takes a `team_id` and a `channel_id`
+        from two different tools, so a preset holding one producer and not the other exposes a tool
+        reachable for one of its arguments and not the other."""
+        selection = resolve(preset=preset, enabled=None)
+        exposed = set(selection.tools)
+
+        unreachable = {
+            f"{tool}.{argument}": producers
+            for tool in selection.tools
+            for argument, producers in _ARGUMENT_SOURCES.get(tool, {}).items()
+            if not set(producers) & exposed
+        }
+
+        assert not unreachable, f"{preset} exposes arguments nothing in it can mint: " + ", ".join(
+            f"{where} needs one of {producers}" for where, producers in unreachable.items()
+        )
+
+    @pytest.mark.parametrize("preset", list(ToolsPreset))
+    def test_it_is_narrower_than_everything_or_is_everything(self, preset: ToolsPreset) -> None:
+        """A curated preset that quietly resolved to the whole surface would ask every tenant for
+        every permission while reading as a narrow deployment — the exact thing this feature exists
+        to stop, hidden behind a name that promises the opposite."""
+        selection = resolve(preset=preset, enabled=None)
+
+        if preset is ToolsPreset.TEAMS:
+            assert set(selection.tools) == set(TOOL_NAMES)
+        else:
+            assert set(selection.tools) < set(TOOL_NAMES), f"{preset} is the whole surface"
+
+
+# What each curated preset costs a tenant, transcribed from the design document's own table: the
+# permissions it asks every user to consent to, how many of those need an administrator, and how
+# many tools it exposes (counting the always-on floor). Written out rather than derived from
+# `PRESETS`, because a derivation agrees with any mistake in `PRESETS` — which is what makes the
+# promise these presets exist for, "one admin consent and no ChannelMessage.Read.All for a
+# transcripts deployment", checkable rather than circular. The test below it states that one row on
+# its own, because it is the row the feature was built for.
+_PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
+    (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 2),
+    (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 4),
+    (
+        ToolsPreset.TEAMS_CHANNELS,
+        ("User.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All"),
+        1,
+        4,
+    ),
+    (
+        ToolsPreset.TEAMS_TRANSCRIPTS,
+        ("User.Read", "Chat.Read", "OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
+        1,
+        4,
+    ),
+    (
+        ToolsPreset.TEAMS_RECORDINGS,
+        ("User.Read", "Chat.Read", "OnlineMeetings.Read", "OnlineMeetingRecording.Read.All"),
+        1,
+        3,
+    ),
+    (
+        ToolsPreset.TEAMS_MEETINGS,
+        (
+            "User.Read",
+            "Chat.Read",
+            "OnlineMeetings.Read",
+            "OnlineMeetingTranscript.Read.All",
+            "OnlineMeetingRecording.Read.All",
+        ),
+        2,
+        5,
+    ),
+    (
+        ToolsPreset.TEAMS,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChannelMessage.Read.All",
+            "OnlineMeetings.Read",
+            "OnlineMeetingTranscript.Read.All",
+            "OnlineMeetingRecording.Read.All",
+        ),
+        3,
+        10,
+    ),
+)
+
+
+class TestWhatEachPresetCostsATenant:
+    """The consent screen each preset produces, which is the whole of what an operator is choosing.
+
+    This is the assertion the feature is for. A preset whose tools drifted would still resolve,
+    still register and still start; the only visible difference would be a permission on a consent
+    screen a tenant already agreed to, and by then the deployment cannot be narrowed without every
+    user signing in again.
+    """
+
+    def test_every_preset_has_a_cost_written_down(self) -> None:
+        """Guards the guard: a preset added without a row here is a surface whose consent screen
+        nothing checks."""
+        priced = {preset for preset, _permissions, _consents, _tools in _PRESET_COST}
+
+        assert priced == set(ToolsPreset), (
+            f"no cost recorded for {sorted(set(ToolsPreset) - priced)}"
+        )
+
+    @pytest.mark.parametrize(("preset", "permissions", "consents", "tools"), _PRESET_COST)
+    def test_it_asks_for_exactly_the_permissions_the_design_promises(
+        self, preset: ToolsPreset, permissions: tuple[str, ...], consents: int, tools: int
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        needing_an_administrator = [
+            permission for permission in selection.permissions if NEEDS_ADMIN_CONSENT[permission]
+        ]
+
+        assert set(selection.permissions) == set(permissions)
+        assert len(selection.permissions) == len(permissions), "a permission is asked for twice"
+        assert len(needing_an_administrator) == consents, (
+            f"{preset} needs {needing_an_administrator}, and the design promises {consents}"
+        )
+        assert len(selection.tools) == tools
+
+    def test_the_transcripts_deployment_does_not_pay_for_channel_messages(self) -> None:
+        """The commercially important row, stated on its own because it is the claim the design is
+        built on: reading meeting transcripts costs one admin consent and does not drag in the
+        permission to read every channel message in the tenant."""
+        selection = resolve(preset=ToolsPreset.TEAMS_TRANSCRIPTS, enabled=None)
+
+        assert "ChannelMessage.Read.All" not in selection.permissions
+        assert graph_scope("ChannelMessage.Read.All") not in selection.graph_scopes
