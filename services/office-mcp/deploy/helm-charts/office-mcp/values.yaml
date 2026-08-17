@@ -153,3 +153,15 @@ networkPolicy:
       enabled: false
     ephemeralPorts:
       enabled: false
+    # Entra sign-in and Graph both run server-side over 443. Without this rule DNS still
+    # resolves and /ready still passes, so the only symptom is that every login fails.
+    egress:
+      microsoft:
+        toFQDNs:
+          - matchName: login.microsoftonline.com
+          - matchName: graph.microsoft.com
+          - matchPattern: "*.microsoft.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
