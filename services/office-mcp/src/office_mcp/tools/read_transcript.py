@@ -188,8 +188,9 @@ def _matching(
     """Turns matching all filters.
 
     Time test is overlap (both bounds inclusive). Speaker test is substring, case-insensitive.
+    Whitespace around the speaker filter is ignored.
     """
-    wanted = speaker.casefold() if speaker is not None else None
+    wanted = speaker.strip().casefold() if speaker is not None else None
     return [
         turn
         for turn in turns

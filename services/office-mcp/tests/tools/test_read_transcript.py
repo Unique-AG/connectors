@@ -341,15 +341,25 @@ class TestNarrowingWhatComesBack:
 
     @pytest.mark.parametrize(
         "speaker",
-        ["ada", "ADA LOVELACE", "lovelace", "Lovelace"],
-        ids=["given", "shouted", "sur", "cased"],
+        [
+            "ada",
+            "ADA LOVELACE",
+            "lovelace",
+            "Lovelace",
+            " ada ",
+            "\tlovelace\n",
+            "  Ada Lovelace  ",
+        ],
+        ids=["given", "shouted", "sur", "cased", "padded-given", "tabbed-sur", "padded-full"],
     )
     async def test_a_speaker_is_matched_case_insensitively_and_by_part_of_the_name(
         self, client: GraphServiceClient, graph: respx.MockRouter, speaker: str
     ) -> None:
         """A model writes the name it read in a previous answer, or the half of it the caller said.
         An exact, case-sensitive match would answer "nobody said that" to a question about somebody
-        who spoke — a wrong answer with the shape of a right one."""
+        who spoke — a wrong answer with the shape of a right one. A copied name carries the
+        whitespace around it, and the turn's own speaker is stripped at parse time, so the filter is
+        stripped as well."""
         _spoken(graph)
 
         read = await reader.read_transcript(
