@@ -108,9 +108,12 @@ Therefore open/closed filtering and ordering are both ours, in memory.
 - `include=stage,stageHistory` on the sub-collection returns everything in **one** request: Koch →
   17 opportunities + 45 history entries + 3 stage resources; the largest party → 33 + 95 + 3.
 - History entries are thin: `effectiveDate` plus a stage pointer.
-- The pointer is **not** a JSON:API relationship. `relationships` is `{}` and the pointer sits in
-  `attributes.stage` as `{resourceType, resourceId, resourceLink}` — Backstop's second, inline
-  reference format, also used by `regularCustomFieldValues` values ("Attendee 1" →
+- The pointer is **not** a JSON:API relationship. `relationships` is JSON **`null`** — re-measured;
+  an earlier draft of this doc said `{}`, and the difference matters because
+  `BackstopApiResource.model_validate` rejects `null` outright (`Input should be a valid
+  dictionary`), so these entries must be read as the raw dicts they arrive as. The pointer sits in
+  `attributes.stage` as `{resourceType, resourceId, resourceLink, restricted}` — Backstop's second,
+  inline reference format, also used by `regularCustomFieldValues` values ("Attendee 1" →
   `people/341672203`). `follow_included` does not understand this format.
 - 45 history entries referenced **6** distinct stage ids while only **3** arrived in `included`.
   The missing ones resolve against `GET /opportunity-stages`, which is 7 rows total:
@@ -266,9 +269,15 @@ presented as met.
 outward would let a party whose open deals sit on page 3 receive an authoritative-looking empty
 answer for `status="open"`, and would order each page correctly but the list wrongly. Since no party
 in the instance exceeds 50 opportunities, one request at `page[limit]=100` covers every party today.
-A configured `max_opportunities` (default ~200) bounds growth: exceeding it returns what was
-fetched plus `total` and `truncated: true`, so a partial answer can never read as complete. This
-differs from `get_activity_history`, which *does* expose cursors — because activity streams are
+There is **no cap either** — the fetch walks the party's whole sub-collection with
+`max_records=None`. An earlier draft configured a `max_opportunities` guard (default ~200) that
+returned `truncated: true` when exceeded, and it was dropped: at 6× the largest party in the
+instance it could never fire, and *because* no cursor is exposed, a cap that did fire would leave
+the caller unable to retrieve the rest — so it could only ever convert a complete answer into an
+unrecoverable partial one. Note `paginate` defaults to `max_records=10_000`, so `None` has to be
+passed explicitly or the cap returns silently.
+
+This differs from `get_activity_history`, which *does* expose cursors — because activity streams are
 genuinely unbounded (355+ per party) while opportunities are bounded and need whole-set operations.
 
 `status` defaults to `all`, with `open_count` and `closed_count` on the response so the split is
@@ -325,7 +334,13 @@ visible without a second call.
   ("we looked, there are none"); an include that was not requested is absent from the payload
   entirely. The includes models say *omitted*, not *null*, in their published descriptions,
   because with null-dropping serialization a null never reaches the wire.
-- **Truncation is loud.** Exceeding `max_opportunities` sets `truncated: true` alongside `total`.
+- **A malformed record must not cost the party.** `client.paginate` deserializes a whole page in one
+  pass, so any required field on the wire model fails every opportunity that party has, not just the
+  bad one. Every attribute is therefore optional and tolerant of an explicit `null` — including
+  `regularCustomFieldValues`, which is not among the fields measured as never-null.
+- **A history entry outlives its stage pointer.** An entry whose inline reference is unusable is
+  still returned with its `effective_date`, with the stage name and id null — dropping it would lose
+  a real stage move because of an unreadable pointer.
 
 ### Testing Strategy
 
@@ -344,7 +359,10 @@ The existing harness fits: `respx`-mocked upstream, real `Services` installed th
 - A history stage named from the cached vocabulary when absent from `included`.
 - An unnameable stage id surfaced with a null name rather than dropped.
 - Ordering by `dateEnteredCurrentStage` descending across a multi-page fetch.
-- `truncated` / `total` set when the cap is exceeded.
+- `total` is the count actually fetched, not Backstop's `meta.totalResourceCount`.
+- A record whose `regularCustomFieldValues` is `null` does not fail the party's whole fetch.
+- An unparseable `dateEnteredCurrentStage` sorts last rather than as "newest", and does not raise.
+- A stage side-loaded on page 1 names a deal on page 2.
 - `include` omitted → no `included` key at all.
 - Output schema published and documenting a nullable field on a tool using `OmitNoneModel`.
 
@@ -385,12 +403,12 @@ direct unit tests.
 4. **Opportunities fetch, projection, filter and sort** — Add `features/opportunities/` with
    `OpportunityResponse` and `StageChangeResponse`, a paginated sub-collection fetch using
    `include=stage,stageHistory`, current-stage resolution from `included`, history resolution via
-   the inline `ResourceRef` then the vocabulary, `status` filtering, `dateEnteredCurrentStage`
-   ordering, and the `max_opportunities` truncation guard.
+   the inline `ResourceRef` then the vocabulary, `status` filtering, and `dateEnteredCurrentStage`
+   ordering. No cap — the whole sub-collection is walked.
 
 5. **`get_opportunities` tool** — Wire party resolution to the fetch, return `open_count` /
-   `closed_count` / `total` / `truncated` alongside the records, and register the tool. Document in
-   the docstring that `previous_stage` names the vacated stage and that there is no cursor.
+   `closed_count` / `total` alongside the records, and register the tool. Document in the docstring
+   that `previous_stage` names the vacated stage and that there is no cursor.
 
 6. **Typed returns and output schemas** — Add `OmitNoneModel`, convert all seven tools to typed
    returns with `output_schema=` where the serializer is used, delete `results.py`, simplify
