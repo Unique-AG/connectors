@@ -296,6 +296,22 @@ class TestPublicBaseUrl:
         with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
             AppConfig.model_validate({"app_env": AppEnv.PRODUCTION, "public_base_url": url})
 
+    def test_production_rejects_a_cleartext_url(self) -> None:
+        """A reachable host is not enough. The discovery, authorize and token endpoints are
+        published under this URL, and the auth provider only warns about http."""
+        with pytest.raises(ValueError, match="https"):
+            AppConfig.model_validate(
+                {"app_env": AppEnv.PRODUCTION, "public_base_url": "http://office-mcp.example"}
+            )
+
+    def test_a_cleartext_url_is_allowed_outside_production(self) -> None:
+        """The guard is production-only. A local run holds no certificate for its own host."""
+        config = AppConfig.model_validate(
+            {"app_env": AppEnv.DEVELOPMENT, "public_base_url": "http://office-mcp.example"}
+        )
+
+        assert config.issuer == "http://office-mcp.example"
+
     def test_rejects_malformed_public_base_url(self) -> None:
         with pytest.raises(ValidationError):
             AppConfig.model_validate(
