@@ -51,5 +51,5 @@ BACKSTOP_CONCURRENCY_WAIT = _meter.create_histogram(
 )
 CUSTOM_FIELD_SCHEMA_LOADS = _meter.create_counter(
     "custom_field_schema_loads_total",
-    description="Custom-field schema loads, by source (backstop refresh, snapshot, stale reuse).",
+    description="Custom-field schema loads, by source (backstop refresh, stale reuse).",
 )

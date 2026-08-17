@@ -4,23 +4,31 @@ from fastmcp.tools import tool
 from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import BaseModel, Field
 
-from backstop_mcp.features.auth import current_subject
 from backstop_mcp.features.custom_fields import (
-    CustomFieldDefinitionResponse,
-    definition_response,
+    CustomFieldDefinition,
+    CustomFieldEntityType,
+    custom_field_entity_type_from_bean,
 )
-from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
 from backstop_mcp.server.tools.results import tool_result
 
 
 class ListCustomFieldsResponse(BaseModel):
-    """Full custom-field catalog for one entity type."""
+    """Custom-field definitions grouped by the requested entity types."""
 
     status: Literal["ok"] = "ok"
-    entity_type: EntityType
-    count: int
-    definitions: list[CustomFieldDefinitionResponse] = Field(default_factory=list)
+    cache: Literal["ok", "stale"]
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]]
+
+
+def _definitions_for(
+    catalog: list[CustomFieldDefinition], entity_type: CustomFieldEntityType
+) -> list[CustomFieldDefinition]:
+    return [
+        definition
+        for definition in catalog
+        if custom_field_entity_type_from_bean(definition.entity_type) == entity_type
+    ]
 
 
 @tool(
@@ -32,44 +40,35 @@ class ListCustomFieldsResponse(BaseModel):
     ),
 )
 async def list_custom_fields(
-    entity_type: Annotated[
-        EntityType,
+    entity_types: Annotated[
+        list[CustomFieldEntityType],
         Field(
+            min_length=1,
             description=(
-                "Backstop entity type whose custom-field definitions to list: "
-                "organizations, people, contacts, employees, opportunities, or accounts."
+                "Backstop entity types whose custom-field definitions to list: "
+                "organizations, people, accounts, opportunities, products, or party."
             ),
         ),
     ],
     refresh: Annotated[
         bool,
-        Field(
-            description=(
-                "When true, re-fetch custom-field definitions from Backstop into the cache "
-                "instead of using the cached catalog."
-            ),
-        ),
+        Field(description="Do not pass true unless the user reports a missing field."),
     ] = False,
 ) -> CallToolResult:
-    """List custom-field definitions for one Backstop entity type.
+    """List custom-field definitions for the requested Backstop entity types.
 
-    Use when a tool glossary is missing, truncated, or you need the full catalog (ids, types,
-    aliases, allowed values) for organizations, people, contacts, employees, opportunities, or
-    accounts. Pass refresh=true to re-fetch definitions from Backstop into the cache.
+    Use when you need the custom-field catalog (ids, types, layout, select options)
+    for one or more of organizations, people, accounts, opportunities, products, or party.
+    Pass refresh=true only when the user reports a missing field.
     """
     client = await get_backstop_client()
     service = get_custom_fields_service()
-    subject = current_subject()
-    if refresh:
-        await service.refresh(client, subject=subject)
-    else:
-        await service.ensure_fresh(client, subject=subject)
-
-    definitions = service.definitions_for(entity_type.value, subject=subject)
+    catalog, cache = await service.get(client, refresh=refresh)
     return tool_result(
         ListCustomFieldsResponse(
-            entity_type=entity_type,
-            count=len(definitions),
-            definitions=[definition_response(definition) for definition in definitions],
+            cache=cache,
+            definitions_by_entity={
+                requested: _definitions_for(catalog, requested) for requested in entity_types
+            },
         )
     )

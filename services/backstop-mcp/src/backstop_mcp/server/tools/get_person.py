@@ -7,7 +7,6 @@ from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
-from backstop_mcp.features.custom_fields import glossary_meta
 from backstop_mcp.features.data_hygiene import (
     AsOf,
     EmploymentLinkResponse,
@@ -17,7 +16,6 @@ from backstop_mcp.features.data_hygiene import (
     entity_relationships,
     extract_as_of,
 )
-from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
@@ -64,7 +62,6 @@ type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResol
         idempotentHint=True,
         openWorldHint=False,
     ),
-    meta=glossary_meta(EntityType.PEOPLE),
 )
 async def get_person(
     ctx: Context,
@@ -114,8 +111,8 @@ async def get_person(
     `as_of` is plain provenance (modifiedTimestamp / modifiedBy). Relay it; do not treat
     record age as a staleness verdict.
 
-    When the custom-field glossary on this tool is truncated or missing, call
-    `list_custom_fields` with entity_type=people.
+    When you need custom field names for this person, call `list_custom_fields` with
+    entity_types including people.
     """
     client = await get_backstop_client()
     result = await resolve_party(

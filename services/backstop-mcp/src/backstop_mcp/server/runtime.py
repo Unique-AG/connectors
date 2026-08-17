@@ -19,7 +19,7 @@ from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
 
 @dataclass(frozen=True)
 class Services:
-    """Everything a tool or middleware may need, resolved once at startup."""
+    """Everything a tool may need, resolved once at startup."""
 
     backstop: BackstopClientFactory
     custom_fields: CustomFieldsService

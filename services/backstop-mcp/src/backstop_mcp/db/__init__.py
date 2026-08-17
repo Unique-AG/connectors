@@ -14,7 +14,6 @@ from backstop_mcp.db.engine import (
 from backstop_mcp.db.models import (
     AuthorizationCode,
     BackstopCredential,
-    CustomFieldSchemaSnapshot,
     LoginAttempt,
     OAuthClient,
     OAuthToken,
@@ -24,7 +23,6 @@ from backstop_mcp.db.models import (
 __all__ = [
     "AuthorizationCode",
     "BackstopCredential",
-    "CustomFieldSchemaSnapshot",
     "LoginAttempt",
     "OAuthClient",
     "OAuthToken",

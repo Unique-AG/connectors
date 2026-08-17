@@ -10,7 +10,6 @@ from collections.abc import Sequence
 from datetime import date
 
 from pydantic import SecretStr
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.app import retry_settings, transport_settings
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
@@ -20,7 +19,6 @@ from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.auth.context import BackstopAuthContext
 from backstop_mcp.features.custom_fields import (
     CustomFieldsService,
-    FieldOverride,
     create_custom_fields_service,
 )
 from backstop_mcp.features.data_hygiene import (
@@ -122,19 +120,8 @@ def build_employment_index_factory(
     )
 
 
-def custom_fields_service(
-    session_factory: async_sessionmaker[AsyncSession],
-    *,
-    base_url: str = BASE_URL,
-    overrides: dict[str, FieldOverride] | None = None,
-    ttl_minutes: int = 60,
-) -> CustomFieldsService:
-    return create_custom_fields_service(
-        session_factory=session_factory,
-        base_url=base_url,
-        overrides=overrides or {},
-        ttl_minutes=ttl_minutes,
-    )
+def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
+    return create_custom_fields_service(ttl_minutes=ttl_minutes)
 
 
 def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:

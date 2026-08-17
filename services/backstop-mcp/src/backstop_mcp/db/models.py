@@ -158,22 +158,3 @@ class LoginAttempt(Base):
     username: Mapped[str] = mapped_column(String)
     source_ip: Mapped[str | None] = mapped_column(String, nullable=True)
     attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
-class CustomFieldSchemaSnapshot(Base):
-    """Cached Backstop custom-field definitions for one API base_url + caller subject.
-
-    Keyed by subject so a refresh under one caller's credentials cannot populate another
-    caller's catalog (custom-field metadata can differ by ACL).
-    """
-
-    __tablename__: str = "custom_field_schema_snapshots"
-
-    base_url: Mapped[str] = mapped_column(String, primary_key=True)
-    subject: Mapped[str] = mapped_column(String, primary_key=True)
-    payload: Mapped[object] = mapped_column(JSON)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )

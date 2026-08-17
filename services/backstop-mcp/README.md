@@ -9,8 +9,8 @@ a Backstop username + personal API token. That credential is verified against Ba
 never as a shared service account. Failed logins are rate-limited per username
 (`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
 
-Tools resolve records by name rather than by ID: "Capstone" or "Investor Status" is looked up
-against the live instance, and an ambiguous match asks the user to pick one.
+Tools resolve parties by name rather than by ID: "Capstone" is looked up against the live
+instance, and an ambiguous match asks the user to pick one.
 
 ## Layout
 
@@ -23,14 +23,13 @@ src/backstop_mcp/
     resolution.py          the shared "which record is that?" algebra + ambiguity policy
     entity_types.py        canonical Backstop entity-type vocabulary
     auth/                  Backstop credential bridging: login form, encryption, token rotation
-    custom_fields/         CRM custom-field schema discovery, caching and resolution
+    custom_fields/         CRM custom-field catalog fetch and in-memory cache
     party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
     data_hygiene/          employment edges, departed contacts, as-of provenance
     activity_history/      merged meeting/call/note/document/email timeline, paged by cursor
   server/                how it's exposed over MCP
     runtime.py             the process-wide service holder tools reach through
     tools/                 tool functions + the single registry declaring them
-    middleware/            FastMCP and ASGI middleware
   backstop_client/       HTTP transport: auth headers, concurrency gate, retries, pagination
   db/                    SQLAlchemy models, engine, alembic migrations
 ```
@@ -51,9 +50,7 @@ uv run backstop-mcp
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
-- Ready: `GET /ready` — 503 when Postgres is unreachable. Also reports whether the
-  custom-field schema has loaded, which never gates readiness: it fills lazily per caller,
-  and tools degrade to `list_custom_fields` without it
+- Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
 Generate an encryption key with:

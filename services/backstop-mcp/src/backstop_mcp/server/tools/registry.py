@@ -1,8 +1,7 @@
 """The single declaration of which tools this server exposes.
 
-Each entry is a `@tool`-decorated function (annotations / glossary meta live on the function).
-`create_app` registers from this list via `mcp.add_tool`. Glossary scopes are read from tool
-`meta` at tools/list time — not restated here.
+Each entry is a `@tool`-decorated function (annotations live on the function).
+`create_app` registers from this list via `mcp.add_tool`.
 """
 
 from collections.abc import Awaitable, Callable

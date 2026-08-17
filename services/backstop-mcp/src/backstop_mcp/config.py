@@ -6,9 +6,7 @@ from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, TypedDict, cast
 
 from pydantic import (
-    BaseModel,
     BeforeValidator,
-    ConfigDict,
     Field,
     HttpUrl,
     PostgresDsn,
@@ -20,22 +18,6 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
-
-
-class CustomFieldOverrideConfig(BaseModel):
-    """Human-facing overlay for a CRM custom-field definition (env JSON value).
-
-    The deserialization shape only. `create_app` converts these to
-    `features.custom_fields.FieldOverride` — the domain's own type — so the custom-field feature
-    never imports this module for something that isn't configuration.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
-
-    display_name: str | None = None
-    aliases: list[str] = Field(default_factory=list)
-    description: str | None = None
-
 
 PKG_VERSION = pkg_version("backstop-mcp")
 
@@ -52,6 +34,23 @@ def _http_url_str(value: object) -> str:
 
 
 HttpUrlStr = Annotated[str, BeforeValidator(_http_url_str)]
+
+_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES = 24 * 60
+
+
+def _cap_custom_field_schema_ttl_minutes(value: object) -> object:
+    """Clamp leftover week-long TTL env values to 24h instead of failing startup."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return min(value, _CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except ValueError:
+            return value
+        return min(parsed, _CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
+    return value
 
 
 class AsyncpgConnectArgs(TypedDict, total=False):
@@ -228,24 +227,13 @@ class BackstopConfig(BaseSettings):
     page_limit_param: str = Field(default="page[limit]", min_length=1)
     page_offset_param: str = Field(default="page[offset]", min_length=1)
 
-    # Optional human overlays for weird CRM custom-field names (e.g. `is1` → Investor Status).
-    # Env value is JSON: {"organizations:is1": {"display_name": "...", "aliases": [...]}}.
-    # Keys are entityType:crmName — see custom_fields/overrides.py. crmName is the CRM's own
-    # field identifier, unique per entity type and stable across tenants, unlike the numeric
-    # definitionId (which is opaque and differs per Backstop instance).
-    custom_field_overrides: dict[str, CustomFieldOverrideConfig] = Field(default_factory=dict)
-
-    # How long a persisted custom-field schema snapshot stays usable before it's re-fetched.
-    # Field definitions change rarely (a CRM admin adding a field), so the default is a week;
-    # lower it if an instance's schema churns and stale glossaries start misleading callers.
-    custom_field_schema_ttl_minutes: int = Field(default=7 * 24 * 60, ge=1)
-
-    # Optional service account used ONLY to warm the custom-field schema snapshot at startup,
-    # so the very first user's tools/list already carries the glossary. Without it the schema
-    # is fetched lazily by the first authenticated caller instead. This token sees instance-wide
-    # custom-field metadata, so treat it like any other shared secret.
-    service_username: str | None = None
-    service_api_token: SecretStr | None = None
+    # How long a fetched custom-field catalog stays usable before it is re-fetched. Definitions
+    # change rarely; the default is one hour. Capped at 24 hours so a stale catalog cannot sit
+    # for days after a CRM admin adds a field. Values above the cap (including the previous
+    # documented example of 10080) are clamped so existing deploys still boot.
+    custom_field_schema_ttl_minutes: Annotated[
+        int, BeforeValidator(_cap_custom_field_schema_ttl_minutes)
+    ] = Field(default=60, ge=1, le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
 
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
@@ -293,15 +281,6 @@ class BackstopConfig(BaseSettings):
             items = cast(list[object], value)
             return tuple(str(item).strip() for item in items if str(item).strip())
         return value
-
-    @model_validator(mode="after")
-    def _require_complete_service_account(self) -> "BackstopConfig":
-        """Reject a half-configured service account rather than silently skipping warming."""
-        if (self.service_username is None) != (self.service_api_token is None):
-            raise ValueError(
-                "BACKSTOP_SERVICE_USERNAME and BACKSTOP_SERVICE_API_TOKEN must be set together"
-            )
-        return self
 
 
 class ActivityHistoryConfig(BaseSettings):

@@ -1,9 +1,8 @@
-"""Canonical Backstop entity-type vocabulary shared by party and custom-field resolution.
+"""Shared Backstop entity-type vocabulary (party search and employment classification).
 
 One singular-alias table, one normalizer, one known-type list. Party search is a closed subset
-(`SearchType`); custom-field tools accept free-form strings that go through
-`normalize_entity_type` so CRM singulars (`organization`) land on the same plural keys the
-schema index and party tools use.
+(`SearchType`). The custom-field catalog uses a separate enum (`CustomFieldEntityType` in
+`features/custom_fields/entity_types.py`), not this module.
 """
 
 import re
@@ -23,7 +22,7 @@ class EntityType(StrEnum):
 
 
 # Party-searchable resource types. Closed because `/quick-search` and the email-field map only
-# make sense for these four; custom-field glossaries also cover opportunities/accounts.
+# make sense for these four.
 type SearchType = Literal["organizations", "contacts", "people", "employees"]
 
 PARTY_SEARCH_TYPES: Final[frozenset[EntityType]] = frozenset(
@@ -35,8 +34,8 @@ PARTY_SEARCH_TYPES: Final[frozenset[EntityType]] = frozenset(
     }
 )
 
-# Backstop's `custom-field-definitions.entityType` is singular ("organization") while the API
-# path segment is plural ("organizations"). Plural forms are accepted via `EntityType(...)`.
+# Party tools and employment accept CRM singulars ("organization") as well as API path-segment
+# plurals ("organizations"). Plural forms are accepted via `EntityType(...)`.
 _SINGULAR_ALIASES: dict[str, EntityType] = {
     "organization": EntityType.ORGANIZATIONS,
     "contact": EntityType.CONTACTS,
@@ -46,8 +45,8 @@ _SINGULAR_ALIASES: dict[str, EntityType] = {
     "account": EntityType.ACCOUNTS,
 }
 
-# The entity types this connector surfaces glossaries and tools for — derived from the enum
-# rather than restated, so adding a member can't leave the two lists disagreeing.
+# The entity types this connector names — derived from the enum rather than restated, so
+# adding a member can't leave the two lists disagreeing.
 KNOWN_ENTITY_TYPES: tuple[EntityType, ...] = tuple(EntityType)
 
 _COLLAPSE_RE = re.compile(r"[\s_-]+")

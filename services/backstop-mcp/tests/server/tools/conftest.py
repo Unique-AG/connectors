@@ -18,7 +18,7 @@ from backstop_mcp.backstop_client import BackstopClientFactory
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.features.auth.context import BackstopAuthContext
 from backstop_mcp.features.auth.credential_store import save_credential
-from backstop_mcp.features.custom_fields import CustomFieldsService, FieldOverride
+from backstop_mcp.features.custom_fields import CustomFieldsService
 from tests.helpers import BASE_URL, client_factory, custom_fields_service, install_services
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
@@ -50,7 +50,6 @@ async def connect_user(
         api_token: str = "token",
         *,
         base_url: str = BASE_URL,
-        overrides: dict[str, FieldOverride] | None = None,
     ) -> ConnectedUser:
         key = Fernet.generate_key()
 
@@ -82,7 +81,7 @@ async def connect_user(
             ),
         )
         built.append(factory)
-        service = custom_fields_service(session_factory, base_url=base_url, overrides=overrides)
+        service = custom_fields_service()
         install_services(backstop=factory, custom_fields=service)
         return ConnectedUser(subject=subject, custom_fields=service, clients=factory)
 

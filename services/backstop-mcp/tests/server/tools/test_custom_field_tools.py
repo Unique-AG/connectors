@@ -1,11 +1,13 @@
 from collections.abc import Callable
+from typing import cast, get_args
 
 import httpx
 import pytest
 import respx
+from pydantic import TypeAdapter, ValidationError
+from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.custom_fields import FieldOverride
-from backstop_mcp.features.entity_types import EntityType
+from backstop_mcp.features.custom_fields import CustomFieldEntityType
 from backstop_mcp.server.tools.list_custom_fields import (
     ListCustomFieldsResponse,
     list_custom_fields,
@@ -15,32 +17,13 @@ from tests.server.tools.helpers import tool_model
 
 type ConnectUser = Callable[..., object]
 
-_OVERRIDES: dict[str, FieldOverride] = {
-    "organizations:is1": FieldOverride(
-        display_name="Investor Status",
-        aliases=("investor status",),
-    )
-}
-
 
 def tenant(name: str) -> str:
-    """A distinct Backstop base URL per test.
-
-    Schema snapshots are keyed by base URL and the test Postgres persists for the whole
-    session, so sharing one URL would let an earlier test's snapshot satisfy a later test's
-    `ensure_fresh` and skip the fetch under test.
-    """
+    """A distinct Backstop base URL per test so mocked routes cannot leak across cases."""
     return f"{BASE_URL}/{name}"
 
 
-def _lov_entries_route(base_url: str) -> respx.Route:
-    return respx.get(f"{base_url}/lov-entries").mock(
-        return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
-    )
-
-
 def _definitions_route(base_url: str, *definitions: dict[str, object]) -> respx.Route:
-    _lov_entries_route(base_url)
     return respx.get(f"{base_url}/custom-field-definitions").mock(
         return_value=httpx.Response(200, json={"data": list(definitions), "links": {"next": None}})
     )
@@ -51,8 +34,37 @@ def _investor_status(**extra: object) -> dict[str, object]:
         "99",
         "custom-field-definitions",
         name="is1",
-        entityType="Organization",
+        entityType="OrganizationBean",
         fieldType="picklist",
+        isTimeSeries=False,
+        selectOptions=[{"label": "Active"}],
+        tabName="Overview",
+        groupName="Status",
+        layoutName="Organization",
+        resourceType="organizations",
+        **extra,
+    )
+
+
+def _person_grade(**extra: object) -> dict[str, object]:
+    return resource(
+        "100",
+        "custom-field-definitions",
+        name="grade",
+        entityType="PersonBean",
+        fieldType="text",
+        isTimeSeries=False,
+        **extra,
+    )
+
+
+def _account_name(**extra: object) -> dict[str, object]:
+    return resource(
+        "101",
+        "custom-field-definitions",
+        name="accountName",
+        entityType="AccountBean",
+        fieldType="text",
         isTimeSeries=False,
         **extra,
     )
@@ -61,34 +73,124 @@ def _investor_status(**extra: object) -> dict[str, object]:
 class TestListCustomFieldsTool:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_lists_definitions_for_entity_type(self, connect_user: ConnectUser) -> None:
+    async def test_lists_definitions_for_requested_types(self, connect_user: ConnectUser) -> None:
         base_url = tenant("cf-list")
-        await connect_user("user-cf-list-1", "cf-list-bob", base_url=base_url, overrides=_OVERRIDES)  # pyright: ignore[reportGeneralTypeIssues]
-        _definitions_route(base_url, _investor_status(selectOptions=[{"label": "Active"}]))
+        await connect_user("user-cf-list-1", "cf-list-bob", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
+        _definitions_route(base_url, _investor_status(), _person_grade(), _account_name())
 
         result = tool_model(
-            await list_custom_fields(entity_type=EntityType.ORGANIZATIONS, refresh=True),
+            await list_custom_fields(
+                entity_types=[CustomFieldEntityType.ORGANIZATIONS, CustomFieldEntityType.PEOPLE],
+                refresh=True,
+            ),
             ListCustomFieldsResponse,
         )
 
-        assert result.entity_type == EntityType.ORGANIZATIONS
-        assert result.count == 1
-        assert result.definitions[0].definition_id == "99"
-        assert result.definitions[0].display_name == "Investor Status"
-        assert result.definitions[0].allowed_values[0].label == "Active"
+        assert result.status == "ok"
+        assert result.cache == "ok"
+        assert list(result.definitions_by_entity) == [
+            CustomFieldEntityType.ORGANIZATIONS,
+            CustomFieldEntityType.PEOPLE,
+        ]
+        organizations = result.definitions_by_entity[CustomFieldEntityType.ORGANIZATIONS]
+        people = result.definitions_by_entity[CustomFieldEntityType.PEOPLE]
+        assert [item.id for item in organizations] == ["99"]
+        assert [item.id for item in people] == ["100"]
+        assert organizations[0].entity_type == "OrganizationBean"
+        assert people[0].entity_type == "PersonBean"
+        assert organizations[0].select_options == [{"label": "Active"}]
+        assert organizations[0].tab_name == "Overview"
+        assert organizations[0].group_name == "Status"
+        assert organizations[0].layout_name == "Organization"
+        assert organizations[0].resource_type == "organizations"
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_empty_entity_type_returns_empty_catalog(self, connect_user: ConnectUser) -> None:
+    async def test_preserves_request_order(self, connect_user: ConnectUser) -> None:
+        base_url = tenant("cf-list-order")
+        await connect_user("user-cf-list-order", "cf-list-order", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
+        _definitions_route(base_url, _investor_status(), _person_grade())
+
+        result = tool_model(
+            await list_custom_fields(
+                entity_types=[CustomFieldEntityType.PEOPLE, CustomFieldEntityType.ORGANIZATIONS],
+                refresh=True,
+            ),
+            ListCustomFieldsResponse,
+        )
+        assert list(result.definitions_by_entity) == [
+            CustomFieldEntityType.PEOPLE,
+            CustomFieldEntityType.ORGANIZATIONS,
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_empty_requested_type_is_present(self, connect_user: ConnectUser) -> None:
         base_url = tenant("cf-list-empty")
         await connect_user("user-cf-list-2", "cf-list-carol", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
         _definitions_route(base_url, _investor_status())
 
         result = tool_model(
-            await list_custom_fields(entity_type=EntityType.PEOPLE, refresh=True),
+            await list_custom_fields(
+                entity_types=[CustomFieldEntityType.PEOPLE],
+                refresh=True,
+            ),
             ListCustomFieldsResponse,
         )
 
-        assert result.entity_type == EntityType.PEOPLE
-        assert result.count == 0
-        assert result.definitions == []
+        assert list(result.definitions_by_entity) == [CustomFieldEntityType.PEOPLE]
+        assert result.definitions_by_entity[CustomFieldEntityType.PEOPLE] == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_surfaces_stale_cache(self, connect_user: ConnectUser) -> None:
+        base_url = tenant("cf-list-stale")
+        await connect_user("user-cf-list-stale", "cf-list-stale", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
+        route = _definitions_route(base_url, _investor_status())
+
+        first = tool_model(
+            await list_custom_fields(
+                entity_types=[CustomFieldEntityType.ORGANIZATIONS],
+                refresh=True,
+            ),
+            ListCustomFieldsResponse,
+        )
+        assert first.cache == "ok"
+
+        route.mock(side_effect=httpx.ConnectError("backstop down"))
+
+        result = tool_model(
+            await list_custom_fields(
+                entity_types=[CustomFieldEntityType.ORGANIZATIONS],
+                refresh=True,
+            ),
+            ListCustomFieldsResponse,
+        )
+        assert result.cache == "stale"
+        assert result.definitions_by_entity[CustomFieldEntityType.ORGANIZATIONS][0].id == "99"
+
+
+class TestListCustomFieldsInput:
+    def test_rejects_contacts_and_employees(self) -> None:
+        with pytest.raises(ValidationError):
+            TypeAdapter(list_custom_fields).validate_python({"entity_types": ["contacts"]})
+        with pytest.raises(ValidationError):
+            TypeAdapter(list_custom_fields).validate_python({"entity_types": ["employees"]})
+
+    def test_rejects_empty_entity_types(self) -> None:
+        with pytest.raises(ValidationError):
+            TypeAdapter(list_custom_fields).validate_python({"entity_types": []})
+
+    def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
+        doc = list_custom_fields.__doc__ or ""
+        assert "refresh=true" in doc
+        assert "missing field" in doc
+
+        annotations = cast("dict[str, object]", list_custom_fields.__annotations__)
+        field_info = next(
+            item
+            for item in cast("tuple[object, ...]", get_args(annotations["refresh"]))
+            if isinstance(item, FieldInfo)
+        )
+        assert field_info.description is not None
+        assert "missing field" in field_info.description

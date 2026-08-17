@@ -47,13 +47,6 @@ def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, s
 
 type AuthFailureHook = Callable[[], Awaitable[None]]
 type HttpClientProvider = Callable[[], Awaitable[httpx.AsyncClient]]
-# Resolves a client authenticated as the in-flight MCP caller — in practice
-# `BackstopClientFactory.for_current_caller`. Long-lived collaborators that need to call
-# Backstop on a caller's behalf (the glossary middleware, the departed-contact detector) take
-# this rather than the factory itself, matching how `BackstopClient` receives its own
-# collaborators. It resolves the caller's stored credential, so calling it costs a DB read plus
-# a decrypt: acquire one only on a path that will actually make a request.
-type CallerClientProvider = Callable[[], Awaitable["BackstopClient"]]
 # Acquired around a *single* upstream request (see `BackstopClient.raw_request`), never around a
 # whole tool invocation — Backstop's limit is on concurrent requests, and a caller that holds
 # a slot across an elicitation prompt or a batch of gathered calls either starves itself or
