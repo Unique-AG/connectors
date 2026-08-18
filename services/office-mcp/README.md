@@ -165,8 +165,9 @@ answers `403` while `list_meeting_recordings` answers normally, which one combin
 could not do without either failing the whole call or growing a status per artifact — and the
 per-artifact status is exactly what makes the "read `status` first" shape unreadable.
 `OnlineMeetingRecording.Read.All` needs admin consent in its own right and separately from the
-transcript permission, so a tenant can grant either without the other and each tool's 403 names only
-the one its own request was made under.
+transcript permission, so a tenant can grant either without the other. Each tool names only the
+permissions its own request needs, and it names all of them, because neither Graph nor Entra says
+which one is missing.
 
 **A recording is answered as metadata and availability; its bytes are never returned, by anything
 here.** Graph streams an MP4 inline with no ranged contract on that path, a Teams meeting can run
