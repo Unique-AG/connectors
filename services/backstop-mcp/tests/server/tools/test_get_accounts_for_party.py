@@ -6,11 +6,9 @@ import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
+from backstop_mcp.features.accounts import PartyAccountsResolvedResponse
 from backstop_mcp.features.resolution import NotFoundResponse
-from backstop_mcp.server.tools.get_accounts_for_party import (
-    PartyAccountsResolvedResponse,
-    get_accounts_for_party,
-)
+from backstop_mcp.server.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.server.tools.registry import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import BASE_URL, resource

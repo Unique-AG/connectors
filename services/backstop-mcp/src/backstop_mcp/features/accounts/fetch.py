@@ -2,8 +2,10 @@
 
 `filter[owner]` / `filter[owner.id]` are 400, and organizations have no `/accounts` subcollection.
 By-product listing uses `filter[product.id][eq]`. By-party listing walks `/accounts` and keeps
-rows whose `relationships.owner` linkage id equals the party id. Open means the `closedDate`
-key is absent.
+rows the party owns: the `relationships.owner` linkage id first, since that needs no side-load,
+then the projected owner id, which is `specificResource.resourceId` for an organization owner.
+Matching only the linkage would drop exactly the rows whose owner id the tool goes on to echo.
+Open means the `closedDate` key is absent.
 """
 
 from collections.abc import Sequence
@@ -11,6 +13,7 @@ from collections.abc import Sequence
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.accounts.project import (
     AccountApiResponse,
+    account_owner,
     project_account,
     project_accounts,
     split_open,
@@ -74,5 +77,18 @@ def _owned_accounts(
     return tuple(
         project_account(resource, included=included)
         for resource in resources
-        if owner_id in resource.related_ids(_OWNER)
+        if _owns(resource, included=included, owner_id=owner_id)
     )
+
+
+def _owns(
+    resource: AccountApiResponse,
+    *,
+    included: Sequence[dict[str, object]],
+    owner_id: str,
+) -> bool:
+    """Linkage id first — it costs nothing and works without the `owner` include."""
+    if owner_id in resource.related_ids(_OWNER):
+        return True
+    owner = account_owner(resource, included=included)
+    return owner is not None and owner.id == owner_id

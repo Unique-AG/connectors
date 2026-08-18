@@ -2,6 +2,10 @@
 
 Every field carries a description so FastMCP can publish it. `OmitNoneModel` drops nulls:
 a missing figure is absent, never `0.0`. A `0.0` Backstop published is a real point and is kept.
+
+Both tools' resolved responses live here rather than one here and one in its tool module: the
+account row, the closed-account hint, and the figure shape are shared, and a caller comparing
+`get_product_positions` to `get_accounts_for_party` is reading one vocabulary.
 """
 
 from datetime import date as Date
@@ -10,6 +14,7 @@ from typing import Literal
 from pydantic import Field
 
 from backstop_mcp.features.accounts.types import (
+    AccountListing,
     AccountOwner,
     AccountPosition,
     AccountRecord,
@@ -17,9 +22,10 @@ from backstop_mcp.features.accounts.types import (
     ProductPositions,
     ResolvedProduct,
     SeriesError,
+    SeriesFigure,
     SeriesName,
-    SeriesPoint,
 )
+from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
     Candidate,
@@ -122,8 +128,23 @@ class InvestorTypeResponse(OmitNoneModel):
     name: str | None = Field(default=None, description="Investor-type name, e.g. 'Fund of Funds'.")
 
 
+class UnvaluedPointResponse(OmitNoneModel):
+    """A dated point Backstop has published without a number yet (its UI shows `-`)."""
+
+    date: Date = Field(description="The day Backstop has a point for but no value on.")
+    value_status: str | None = Field(
+        default=None,
+        description="Backstop's `valueStatus` on that point when it sent one.",
+    )
+
+
 class FigureResponse(OmitNoneModel):
-    """One latest series point: the number, the day it is as-of, and status when Backstop sent it.
+    """One series figure: the number, the day it is as-of, and status when Backstop sent it.
+
+    This is the latest point on the series that carries a value — not blindly the latest point.
+    Backstop publishes a dated row before the number lands, and reporting that row would turn a
+    live position into "no data". When the newest row is one of those, it is reported separately
+    as `newer_point_without_value` and this figure stays the last real number.
 
     `value_status` is omitted when Backstop omitted it — do not read that as `ACTUAL`. Recent
     `values` points are often `ESTIMATE`.
@@ -133,7 +154,8 @@ class FigureResponse(OmitNoneModel):
         default=None,
         description=(
             "The point's amount, in the account's `currency`. `0.0` is a real published zero, "
-            "not a missing series."
+            "not a missing series. Absent means no point in the whole series carries a number "
+            "yet — `date` is then the newest dated point, not an amount you can report."
         ),
     )
     date: Date = Field(description="The day this point is as-of. Each figure has its own date.")
@@ -142,6 +164,14 @@ class FigureResponse(OmitNoneModel):
         description=(
             "Backstop's `valueStatus` when present (`ESTIMATE` / `ACTUAL`). Omitted when "
             "Backstop did not send one — not defaulted to `ACTUAL`."
+        ),
+    )
+    newer_point_without_value: UnvaluedPointResponse | None = Field(
+        default=None,
+        description=(
+            "Set when Backstop has a *newer* dated point on this series with no number on it "
+            "yet. `value` and `date` above are the latest point that does carry a number, so "
+            "the figure is real but stale — say so rather than reporting it as current."
         ),
     )
 
@@ -295,10 +325,22 @@ def product_ref_response(product: ResolvedProduct) -> ProductRefResponse:
     return ProductRefResponse(id=product.id, name=product.name, short_name=product.short_name)
 
 
-def figure_response(point: SeriesPoint | None) -> FigureResponse | None:
-    if point is None:
+def figure_response(figure: SeriesFigure | None) -> FigureResponse | None:
+    """Report the latest valued point, naming the newer valueless one when there is one."""
+    if figure is None:
         return None
-    return FigureResponse(value=point.value, date=point.date, value_status=point.value_status)
+    reported = figure.valued if figure.valued is not None else figure.latest
+    newer = (
+        UnvaluedPointResponse(date=figure.latest.date, value_status=figure.latest.value_status)
+        if figure.valued is not None and figure.latest.value is None
+        else None
+    )
+    return FigureResponse(
+        value=reported.value,
+        date=reported.date,
+        value_status=reported.value_status,
+        newer_point_without_value=newer,
+    )
 
 
 def owner_response(owner: AccountOwner | None) -> OwnerResponse | None:
@@ -345,25 +387,22 @@ def position_row_response(position: AccountPosition) -> PositionRowResponse:
     )
 
 
-def product_positions_response(result: ProductPositions) -> "ProductPositionsResolvedResponse":
-    hint = None
-    if result.closed_omitted and not result.accounts:
-        hint = (
-            "This product has accounts, but all of them are closed. Pass include_closed=true "
+def closed_hint(*, closed_omitted: int, returned: int, subject: str) -> str | None:
+    """Why an empty or short account list is not "owns nothing".
+
+    A bare `[]` reads as "this product has no investors". `subject` is the noun the sentence is
+    about — the two tools differ only in that word.
+    """
+    if not closed_omitted:
+        return None
+    if not returned:
+        return (
+            f"This {subject} has accounts, but all of them are closed. Pass include_closed=true "
             "to list them."
         )
-    elif result.closed_omitted:
-        hint = (
-            f"{result.closed_omitted} closed account(s) were omitted. Pass include_closed=true "
-            "to include them."
-        )
-    return ProductPositionsResolvedResponse(
-        product=product_ref_response(result.product),
-        accounts=tuple(position_row_response(position) for position in result.accounts),
-        closed_omitted=result.closed_omitted,
-        aum=figure_response(result.aum),
-        aum_diverges=result.aum_diverges,
-        include_closed_hint=hint,
+    return (
+        f"{closed_omitted} closed account(s) were omitted. Pass include_closed=true "
+        "to include them."
     )
 
 
@@ -396,6 +435,15 @@ class ProductPositionsResolvedResponse(OmitNoneModel):
             "Distinguishes a product with no accounts from one whose accounts are all closed."
         )
     )
+    accounts_omitted: int = Field(
+        default=0,
+        description=(
+            "How many open accounts were listed but returned without figures because this "
+            "product exceeds the per-call fan-out cap. Greater than zero means `accounts` is a "
+            "partial list and `balance_total` is a partial sum — say so rather than totalling "
+            "them as if complete."
+        ),
+    )
     aum: FigureResponse | None = Field(
         default=None,
         description=(
@@ -404,11 +452,27 @@ class ProductPositionsResolvedResponse(OmitNoneModel):
             "was found."
         ),
     )
+    balance_total: float | None = Field(
+        default=None,
+        description=(
+            "Sum of the balances in `accounts`. Accounts whose `values` series had no number "
+            "are left out rather than counted as zero, and balances are summed without currency "
+            "conversion. Omitted when no account returned a balance."
+        ),
+    )
+    aum_difference: float | None = Field(
+        default=None,
+        description=(
+            "`balance_total` minus `aum`: positive means the returned balances add up to more "
+            "than the product's reported total. Omitted when either side is missing."
+        ),
+    )
     aum_diverges: bool = Field(
         description=(
-            "True when a latest assets-under-management (AUM) figure exists and does not match "
-            "the sum of returned account balances. Usually closed-but-still-valued accounts "
-            "excluded by the open default. Not a hard failure."
+            "True when `aum_difference` exceeds 0.5% of assets under management (AUM). The two "
+            "are as-of different dates and the open default excludes closed-but-still-valued "
+            "accounts, so a small gap is normal — this is a tolerance verdict, not a failure. "
+            "Weigh `aum_difference` yourself before reporting a mismatch."
         )
     )
     include_closed_hint: str | None = Field(
@@ -416,5 +480,77 @@ class ProductPositionsResolvedResponse(OmitNoneModel):
         description=(
             "Set when closed accounts were omitted. Tells the caller to pass "
             "`include_closed=true` rather than treating an empty list as 'no investors'."
+        ),
+    )
+
+
+class PartyAccountsResolvedResponse(OmitNoneModel):
+    """`get_accounts_for_party` after the party was found and its accounts listed.
+
+    Listing and status only — no series fan-out. An empty `accounts` list with
+    `closed_omitted>0` means every owned account is closed.
+    """
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the party was found and its accounts listed.",
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
+    accounts: tuple[AccountRowResponse, ...] = Field(
+        description=(
+            "Accounts this party owns, across products. Each row includes the product "
+            "`{id, name, short_name}` from the include. No balances or series."
+        )
+    )
+    closed_omitted: int = Field(
+        description=(
+            "How many owned accounts were dropped because `include_closed` is false. "
+            "Distinguishes a party with no accounts from one whose accounts are all closed."
+        )
+    )
+    include_closed_hint: str | None = Field(
+        default=None,
+        description=(
+            "Set when closed accounts were omitted. Pass `include_closed=true` rather than "
+            "treating an empty list as 'this party owns nothing'."
+        ),
+    )
+
+
+def product_positions_response(result: ProductPositions) -> ProductPositionsResolvedResponse:
+    reconciliation = result.reconciliation
+    return ProductPositionsResolvedResponse(
+        product=product_ref_response(result.product),
+        accounts=tuple(position_row_response(position) for position in result.accounts),
+        closed_omitted=result.closed_omitted,
+        accounts_omitted=result.accounts_omitted,
+        aum=figure_response(result.aum),
+        balance_total=reconciliation.balance_total,
+        aum_difference=reconciliation.difference,
+        aum_diverges=reconciliation.diverges,
+        include_closed_hint=closed_hint(
+            closed_omitted=result.closed_omitted,
+            returned=len(result.accounts),
+            subject="product",
+        ),
+    )
+
+
+def party_accounts_response(
+    *, resolved: ResolvedPartyResponse, listing: AccountListing
+) -> PartyAccountsResolvedResponse:
+    return PartyAccountsResolvedResponse(
+        resolved=resolved,
+        accounts=tuple(account_row_response(account) for account in listing.accounts),
+        closed_omitted=listing.closed_omitted,
+        include_closed_hint=closed_hint(
+            closed_omitted=listing.closed_omitted,
+            returned=len(listing.accounts),
+            subject="party",
         ),
     )

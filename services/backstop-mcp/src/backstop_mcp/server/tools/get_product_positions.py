@@ -85,14 +85,21 @@ async def get_product_positions(
     - `invested` from `totalInvested` (lifetime cumulative)
     - `redemptions` from `totalRedemptions` (lifetime cumulative)
 
-    Each figure is `{value, date, valueStatus?}` with that series' own date. `valueStatus` is
-    passed through when Backstop sends it (recent `values` are often `ESTIMATE`) and omitted
-    when it does not — do not invent `ACTUAL`. A missing series is omitted, never `0.0`.
+    Each figure is `{value, date, valueStatus?}` with that series' own date, and is the latest
+    point that carries a number — Backstop publishes a dated row before the value lands, and
+    `newer_point_without_value` names that row when it exists, so a stale figure is reported as
+    stale rather than as current. `valueStatus` is passed through when Backstop sends it (recent
+    `values` are often `ESTIMATE`) and omitted when it does not — do not invent `ACTUAL`. A
+    missing series is omitted, never `0.0`.
 
     `aum` is assets under management: the product's total reported value, not one investor's
-    balance. It is compared to the sum of returned balances; `aum_diverges` is a flag, not a
-    failure. An empty `accounts` list with `closed_omitted>0` means every account is closed —
-    pass `include_closed=true` rather than reading that as "no investors".
+    balance. `balance_total` and `aum_difference` show it against the sum of returned balances;
+    `aum_diverges` is a 0.5% tolerance verdict, not a failure — the two figures are as-of
+    different dates and the open default excludes closed-but-still-valued accounts.
+
+    An empty `accounts` list with `closed_omitted>0` means every account is closed — pass
+    `include_closed=true` rather than reading that as "no investors". `accounts_omitted>0`
+    means the product exceeded the per-call fan-out cap and `accounts` is a partial list.
     """
     if (product_id is None) == (product is None):
         raise ValueError("Exactly one of product_id or product must be provided")
@@ -117,7 +124,8 @@ async def get_product_positions(
             "product_id": resolved.id,
             "returned": len(positions.accounts),
             "closed_omitted": positions.closed_omitted,
-            "aum_diverges": positions.aum_diverges,
+            "accounts_omitted": positions.accounts_omitted,
+            "aum_diverges": positions.reconciliation.diverges,
         },
     )
     return product_positions_response(positions)

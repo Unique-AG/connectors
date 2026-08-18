@@ -12,12 +12,14 @@ __all__ = [
     "AccountOwner",
     "AccountPosition",
     "AccountRecord",
+    "AumReconciliation",
     "ProductPositions",
     "InvestorType",
     "ProductCandidate",
     "ProductResolution",
     "ResolvedProduct",
     "SeriesError",
+    "SeriesFigure",
     "SeriesName",
     "SeriesPoint",
     "SeriesPointAttributes",
@@ -204,6 +206,23 @@ class SeriesPoint(BaseModel):
     value_status: str | None = None
 
 
+class SeriesFigure(BaseModel):
+    """What a series reported: its latest point, and the latest point carrying a value.
+
+    The two are the same point whenever Backstop's newest row has a number. They differ when
+    Backstop publishes a dated row ahead of the value — the UI shows `-` for it. Keeping only
+    `latest` would report a live position as "no data"; keeping only `valued` would hide that
+    Backstop has since moved the series on. Both are kept and the caller is told which is which.
+
+    `valued` is `None` only when no point in the series carries a value at all.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    latest: SeriesPoint
+    valued: SeriesPoint | None = None
+
+
 type SeriesName = Literal["values", "totalInvested", "totalRedemptions"]
 
 
@@ -226,17 +245,34 @@ class AccountPosition(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     account: AccountRecord
-    balance: SeriesPoint | None = None
-    invested: SeriesPoint | None = None
-    redemptions: SeriesPoint | None = None
+    balance: SeriesFigure | None = None
+    invested: SeriesFigure | None = None
+    redemptions: SeriesFigure | None = None
     errors: tuple[SeriesError, ...] = ()
+
+
+class AumReconciliation(BaseModel):
+    """Latest assets under management (AUM) against the sum of returned account balances.
+
+    The two are never expected to agree to the cent: they are as-of different dates, the open
+    default excludes closed-but-still-valued accounts, and balances are summed without currency
+    conversion. So `diverges` is a *tolerance* verdict, not an equality test, and `difference`
+    is published so the caller can judge the magnitude itself rather than trust a bare flag.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    balance_total: float | None = None
+    difference: float | None = None
+    diverges: bool = False
 
 
 class ProductPositions(BaseModel):
     """Listed accounts with figures, plus product assets under management (AUM).
 
-    AUM is the product's total reported value, not one investor's balance. `aum_diverges` is
-    set when that total does not match the sum of returned account balances.
+    AUM is the product's total reported value, not one investor's balance. `accounts_omitted`
+    is how many listed open accounts were dropped before the series fan-out because the product
+    exceeded the per-call cap.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -244,5 +280,6 @@ class ProductPositions(BaseModel):
     product: ResolvedProduct
     accounts: tuple[AccountPosition, ...]
     closed_omitted: int = 0
-    aum: SeriesPoint | None = None
-    aum_diverges: bool = False
+    accounts_omitted: int = 0
+    aum: SeriesFigure | None = None
+    reconciliation: AumReconciliation = AumReconciliation()

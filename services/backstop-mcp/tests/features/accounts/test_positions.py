@@ -6,16 +6,18 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
 from backstop_mcp.features.accounts.positions import (
-    aum_diverges,
+    MAX_POSITION_ACCOUNTS,
     fetch_positions,
     fetch_product_aum,
     fetch_product_positions,
+    reconcile,
 )
 from backstop_mcp.features.accounts.types import (
     AccountListing,
     AccountPosition,
     AccountRecord,
     ResolvedProduct,
+    SeriesFigure,
     SeriesPoint,
 )
 from tests.helpers import BASE_URL, FIXED_TODAY
@@ -60,14 +62,17 @@ class TestFetchPositions:
         (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),), today=FIXED_TODAY)
 
         assert position.account.id == _ACCOUNT_A
-        assert position.balance == SeriesPoint(
+        assert position.balance is not None
+        assert position.balance.valued == SeriesPoint(
             date=date(2026, 7, 31), value=11.0, value_status="ESTIMATE"
         )
-        assert position.invested == SeriesPoint(
+        assert position.invested is not None
+        assert position.invested.valued == SeriesPoint(
             date=date(2026, 7, 31), value=100.0, value_status=None
         )
         assert position.redemptions is not None
-        assert position.redemptions.value == 5.0
+        assert position.redemptions.valued is not None
+        assert position.redemptions.valued.value == 5.0
         assert position.errors == ()
 
     @pytest.mark.asyncio
@@ -113,13 +118,15 @@ class TestFetchPositions:
         assert first.account.id == _ACCOUNT_A
         assert first.balance is None
         assert first.invested is not None
-        assert first.invested.value == 100.0
+        assert first.invested.valued is not None
+        assert first.invested.valued.value == 100.0
         assert len(first.errors) == 1
         assert first.errors[0].series == "values"
         assert "500" in first.errors[0].message
         assert second.account.id == _ACCOUNT_B
         assert second.balance is not None
-        assert second.balance.value == 20.0
+        assert second.balance.valued is not None
+        assert second.balance.valued.value == 20.0
         assert second.errors == ()
 
     @pytest.mark.asyncio
@@ -141,56 +148,74 @@ _PRODUCT = ResolvedProduct(id="1292283", name="CGUP", short_name="CGUP")
 _AUM_URL = f"{BASE_URL}/products/1292283/aums"
 
 
+def _figure(value: float | None, *, day: int = 31) -> SeriesFigure:
+    point = SeriesPoint(date=date(2026, 7, day), value=value)
+    return SeriesFigure(latest=point, valued=point if value is not None else None)
+
+
 def _position(
     account_id: str,
     *,
-    balance: SeriesPoint | None = None,
+    balance: SeriesFigure | None = None,
 ) -> AccountPosition:
     return AccountPosition(account=_record(account_id), balance=balance)
 
 
-class TestAumDiverges:
-    def test_flags_when_summed_balances_differ_from_aum(self) -> None:
-        assert (
-            aum_diverges(
-                (
-                    _position("1", balance=SeriesPoint(date=date(2026, 7, 31), value=10.0)),
-                    _position("2", balance=SeriesPoint(date=date(2026, 7, 31), value=20.0)),
-                ),
-                SeriesPoint(date=date(2026, 7, 31), value=40.0),
-            )
-            is True
+class TestReconcile:
+    def test_flags_when_summed_balances_differ_beyond_tolerance(self) -> None:
+        result = reconcile(
+            (_position("1", balance=_figure(10.0)), _position("2", balance=_figure(20.0))),
+            _figure(40.0),
         )
+
+        assert result.balance_total == 30.0
+        assert result.difference == -10.0
+        assert result.diverges is True
 
     def test_matches_when_the_sum_equals_aum(self) -> None:
-        assert (
-            aum_diverges(
-                (_position("1", balance=SeriesPoint(date=date(2026, 7, 31), value=30.0)),),
-                SeriesPoint(date=date(2026, 7, 31), value=30.0),
-            )
-            is False
-        )
+        result = reconcile((_position("1", balance=_figure(30.0)),), _figure(30.0))
+
+        assert result.difference == 0.0
+        assert result.diverges is False
+
+    def test_a_gap_inside_the_tolerance_is_not_divergence(self) -> None:
+        result = reconcile((_position("1", balance=_figure(1_000_000.0)),), _figure(1_002_000.0))
+
+        assert result.diverges is False
+        assert result.difference == -2000.0
+
+    def test_a_gap_past_the_tolerance_is_divergence(self) -> None:
+        result = reconcile((_position("1", balance=_figure(1_000_000.0)),), _figure(1_010_000.0))
+
+        assert result.diverges is True
 
     def test_omitted_balances_are_not_treated_as_zero(self) -> None:
-        assert (
-            aum_diverges(
-                (
-                    _position("1", balance=SeriesPoint(date=date(2026, 7, 31), value=10.0)),
-                    _position("2"),
-                ),
-                SeriesPoint(date=date(2026, 7, 31), value=30.0),
-            )
-            is True
+        result = reconcile(
+            (_position("1", balance=_figure(10.0)), _position("2")),
+            _figure(30.0),
         )
 
+        assert result.balance_total == 10.0
+        assert result.diverges is True
+
+    def test_a_balance_still_awaiting_its_value_is_left_out_of_the_sum(self) -> None:
+        result = reconcile((_position("1", balance=_figure(None)),), _figure(30.0))
+
+        assert result.balance_total is None
+        assert result.diverges is False
+
     def test_no_aum_cannot_diverge(self) -> None:
-        assert (
-            aum_diverges(
-                (_position("1", balance=SeriesPoint(date=date(2026, 7, 31), value=10.0)),),
-                None,
-            )
-            is False
-        )
+        result = reconcile((_position("1", balance=_figure(10.0)),), None)
+
+        assert result.balance_total == 10.0
+        assert result.difference is None
+        assert result.diverges is False
+
+    def test_no_balances_cannot_diverge(self) -> None:
+        result = reconcile((_position("1"),), _figure(30.0))
+
+        assert result.balance_total is None
+        assert result.diverges is False
 
 
 class TestFetchProductAum:
@@ -203,7 +228,8 @@ class TestFetchProductAum:
 
         aum = await fetch_product_aum(client, "1292283", today=FIXED_TODAY)
 
-        assert aum == SeriesPoint(date=date(2026, 7, 31), value=1000.0, value_status=None)
+        assert aum is not None
+        assert aum.valued == SeriesPoint(date=date(2026, 7, 31), value=1000.0, value_status=None)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -236,8 +262,33 @@ class TestFetchProductPositions:
         )
 
         assert result.aum is not None
-        assert result.aum.value == 99.0
-        assert result.aum_diverges is True
+        assert result.aum.valued is not None
+        assert result.aum.valued.value == 99.0
+        assert result.reconciliation.diverges is True
+        assert result.reconciliation.balance_total == 10.0
+        assert result.reconciliation.difference == -89.0
         assert result.closed_omitted == 2
+        assert result.accounts_omitted == 0
         assert result.accounts[0].balance is not None
-        assert result.accounts[0].balance.value == 10.0
+        assert result.accounts[0].balance.valued is not None
+        assert result.accounts[0].balance.valued.value == 10.0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_caps_the_fan_out_and_publishes_what_it_dropped(
+        self, client: BackstopClient
+    ) -> None:
+        listed = tuple(_record(str(index)) for index in range(MAX_POSITION_ACCOUNTS + 3))
+        for series in ("values", "totalInvested", "totalRedemptions"):
+            respx.get(url__regex=rf"{BASE_URL}/accounts/\d+/{series}").mock(return_value=_page())
+        respx.get(_AUM_URL).mock(return_value=_page())
+
+        result = await fetch_product_positions(
+            client,
+            AccountListing(accounts=listed),
+            product=_PRODUCT,
+            today=FIXED_TODAY,
+        )
+
+        assert len(result.accounts) == MAX_POSITION_ACCOUNTS
+        assert result.accounts_omitted == 3

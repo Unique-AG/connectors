@@ -9,10 +9,10 @@ from respx.models import Call
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.accounts.latest import (
     SeriesPointResource,
-    fetch_latest_point,
-    latest_point,
+    fetch_latest_figure,
+    latest_figure,
 )
-from backstop_mcp.features.accounts.types import SeriesPoint
+from backstop_mcp.features.accounts.types import SeriesFigure, SeriesPoint
 from tests.helpers import BASE_URL, FIXED_TODAY
 
 _PATH = "/accounts/27871657/values"
@@ -45,9 +45,9 @@ def _page(
     return httpx.Response(200, json=payload)
 
 
-class TestLatestPoint:
+class TestLatestFigure:
     def test_picks_the_greatest_date(self) -> None:
-        point = latest_point(
+        point = latest_figure(
             (
                 _resource("1", date="2026-05-31", value=10.0, valueStatus="ACTUAL"),
                 _resource("2", date="2026-06-15", value=11.0, valueStatus="ESTIMATE"),
@@ -55,14 +55,11 @@ class TestLatestPoint:
             )
         )
 
-        assert point == SeriesPoint(
-            date=date(2026, 6, 30),
-            value=12.0,
-            value_status="ACTUAL",
-        )
+        latest = SeriesPoint(date=date(2026, 6, 30), value=12.0, value_status="ACTUAL")
+        assert point == SeriesFigure(latest=latest, valued=latest)
 
     def test_a_mid_month_point_after_month_end_wins(self) -> None:
-        point = latest_point(
+        point = latest_figure(
             (
                 _resource("1", date="2026-06-30", value=100.0, valueStatus="ACTUAL"),
                 _resource("2", date="2026-07-15", value=101.5, valueStatus="ESTIMATE"),
@@ -70,17 +67,19 @@ class TestLatestPoint:
         )
 
         assert point is not None
-        assert point.date == date(2026, 7, 15)
-        assert point.value == 101.5
-        assert point.value_status == "ESTIMATE"
+        assert point.valued is not None
+        assert point.valued.date == date(2026, 7, 15)
+        assert point.valued.value == 101.5
+        assert point.valued.value_status == "ESTIMATE"
 
     def test_omits_value_status_when_backstop_omits_it(self) -> None:
-        point = latest_point((_resource("1", date="2026-06-30", value=50.0),))
+        point = latest_figure((_resource("1", date="2026-06-30", value=50.0),))
 
-        assert point == SeriesPoint(date=date(2026, 6, 30), value=50.0, value_status=None)
+        latest = SeriesPoint(date=date(2026, 6, 30), value=50.0, value_status=None)
+        assert point == SeriesFigure(latest=latest, valued=latest)
 
     def test_skips_points_without_a_date(self) -> None:
-        point = latest_point(
+        point = latest_figure(
             (
                 _resource("1", value=1.0),
                 _resource("2", date="2026-01-31", value=2.0),
@@ -88,17 +87,45 @@ class TestLatestPoint:
         )
 
         assert point is not None
-        assert point.date == date(2026, 1, 31)
-        assert point.value == 2.0
+        assert point.valued is not None
+        assert point.valued.date == date(2026, 1, 31)
+        assert point.valued.value == 2.0
 
     def test_empty_page_is_none(self) -> None:
-        assert latest_point(()) is None
+        assert latest_figure(()) is None
 
     def test_all_undated_points_are_none(self) -> None:
-        assert latest_point((_resource("1", value=1.0),)) is None
+        assert latest_figure((_resource("1", value=1.0),)) is None
+
+    def test_a_dated_point_without_a_value_does_not_shadow_the_last_number(self) -> None:
+        figure = latest_figure(
+            (
+                _resource("1", date="2026-06-30", value=1_000_000.0, valueStatus="ACTUAL"),
+                _resource("2", date="2026-07-31", valueStatus="ESTIMATE"),
+            )
+        )
+
+        assert figure is not None
+        assert figure.latest.date == date(2026, 7, 31)
+        assert figure.latest.value is None
+        assert figure.valued is not None
+        assert figure.valued.date == date(2026, 6, 30)
+        assert figure.valued.value == 1_000_000.0
+
+    def test_a_series_of_valueless_points_has_no_valued_point(self) -> None:
+        figure = latest_figure(
+            (
+                _resource("1", date="2026-06-30"),
+                _resource("2", date="2026-07-31"),
+            )
+        )
+
+        assert figure is not None
+        assert figure.latest.date == date(2026, 7, 31)
+        assert figure.valued is None
 
 
-class TestFetchLatestPoint:
+class TestFetchLatestFigure:
     @pytest.mark.asyncio
     @respx.mock
     async def test_uses_the_ninety_day_window_when_it_has_points(
@@ -108,13 +135,14 @@ class TestFetchLatestPoint:
             return_value=_page(_point("1", date="2026-07-31", value=9.0, valueStatus="ESTIMATE"))
         )
 
-        point = await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
 
         params = route.calls.last.request.url.params
         assert route.call_count == 1
         assert params["filter[date][ge]"] == _NINETY_CUTOFF
         assert params["page[limit]"] == "100"
-        assert point == SeriesPoint(date=date(2026, 7, 31), value=9.0, value_status="ESTIMATE")
+        latest = SeriesPoint(date=date(2026, 7, 31), value=9.0, value_status="ESTIMATE")
+        assert point == SeriesFigure(latest=latest, valued=latest)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -128,14 +156,15 @@ class TestFetchLatestPoint:
             ]
         )
 
-        point = await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
 
         assert route.call_count == 2
         assert _call_params(route, 0)["filter[date][ge]"] == _NINETY_CUTOFF
         assert _call_params(route, 1)["filter[date][ge]"] == _YEAR_CUTOFF
         assert point is not None
-        assert point.date == date(2025, 12, 31)
-        assert point.value_status is None
+        assert point.valued is not None
+        assert point.valued.date == date(2025, 12, 31)
+        assert point.valued.value_status is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -151,13 +180,14 @@ class TestFetchLatestPoint:
             ]
         )
 
-        point = await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
 
         assert route.call_count == 4
         assert "filter[date][ge]" not in _call_params(route, 2)
         assert point is not None
-        assert point.date == date(2020, 6, 15)
-        assert point.value == 2.0
+        assert point.valued is not None
+        assert point.valued.date == date(2020, 6, 15)
+        assert point.valued.value == 2.0
 
     @pytest.mark.asyncio
     @respx.mock
@@ -171,18 +201,62 @@ class TestFetchLatestPoint:
             ]
         )
 
-        point = await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
 
         assert point is not None
-        assert point.date == date(2026, 7, 15)
-        assert point.value_status == "ESTIMATE"
+        assert point.valued is not None
+        assert point.valued.date == date(2026, 7, 15)
+        assert point.valued.value_status == "ESTIMATE"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_widens_past_a_window_holding_only_valueless_points(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(_URL).mock(
+            side_effect=[
+                _page(_point("1", date="2026-07-31", valueStatus="ESTIMATE")),
+                _page(
+                    _point("0", date="2026-01-31", value=7.0, valueStatus="ACTUAL"),
+                    _point("1", date="2026-07-31", valueStatus="ESTIMATE"),
+                ),
+            ]
+        )
+
+        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
+
+        assert route.call_count == 2
+        assert _call_params(route, 1)["filter[date][ge]"] == _YEAR_CUTOFF
+        assert point is not None
+        assert point.latest.date == date(2026, 7, 31)
+        assert point.valued is not None
+        assert point.valued.value == 7.0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_series_with_no_number_anywhere_still_reports_its_latest_date(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_URL).mock(
+            side_effect=[
+                _page(_point("1", date="2026-07-31")),
+                _page(_point("1", date="2026-07-31")),
+                _page(_point("1", date="2026-07-31")),
+            ]
+        )
+
+        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
+
+        assert point is not None
+        assert point.valued is None
+        assert point.latest.date == date(2026, 7, 31)
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_empty_series_is_none(self, client: BackstopClient) -> None:
         respx.get(_URL).mock(side_effect=[_page(), _page(), _page()])
 
-        assert await fetch_latest_point(client, _PATH, today=FIXED_TODAY) is None
+        assert await fetch_latest_figure(client, _PATH, today=FIXED_TODAY) is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -195,4 +269,4 @@ class TestFetchLatestPoint:
         )
 
         with pytest.raises(BackstopResponseSchemaError):
-            await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
+            await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)

@@ -41,12 +41,15 @@ def _account(
     }
 
 
-def _owner(owner_id: str, *, name: str) -> dict[str, object]:
+def _owner(owner_id: str, *, name: str, specific_id: str | None = None) -> dict[str, object]:
     return resource(
         owner_id,
         "contacts",
         name=name,
-        specificResource={"resourceType": "organizations", "resourceId": owner_id},
+        specificResource={
+            "resourceType": "organizations",
+            "resourceId": specific_id or owner_id,
+        },
     )
 
 
@@ -248,6 +251,28 @@ class TestFetchAccountsForParty:
 
         assert [account.id for account in listing.accounts] == ["open"]
         assert listing.closed_omitted == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_matches_the_projected_owner_id_when_it_differs_from_the_linkage(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                _account("1", owner_id="contact-1", name="Vehicle A"),
+                _account("2", owner_id=_OTHER_OWNER_ID, name="Not Theirs"),
+                included=[
+                    _owner("contact-1", name="PSP Investments", specific_id=_OWNER_ID),
+                    _owner(_OTHER_OWNER_ID, name="Someone Else"),
+                ],
+            )
+        )
+
+        listing = await fetch_accounts_for_party(client, owner_id=_OWNER_ID)
+
+        assert [account.id for account in listing.accounts] == ["1"]
+        assert listing.accounts[0].owner is not None
+        assert listing.accounts[0].owner.id == _OWNER_ID
 
     @pytest.mark.asyncio
     @respx.mock

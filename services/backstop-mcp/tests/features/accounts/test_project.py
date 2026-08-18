@@ -42,9 +42,12 @@ def _owner(
     name: str,
     resource_type: str | None = None,
     json_api_type: str = "contacts",
+    specific_id: str | None = None,
 ) -> dict[str, object]:
     specific: dict[str, object] | None = (
-        None if resource_type is None else {"resourceType": resource_type, "resourceId": owner_id}
+        None
+        if resource_type is None
+        else {"resourceType": resource_type, "resourceId": specific_id or owner_id}
     )
     return resource(owner_id, json_api_type, name=name, specificResource=specific)
 
@@ -80,6 +83,36 @@ class TestProjectOwner:
             id="341688185",
             name="PSP Investments",
             resource_type="organizations",
+        )
+
+    def test_specific_resource_supplies_the_id_that_goes_with_its_type(self) -> None:
+        owner = project_owner(
+            _owner(
+                "contact-1",
+                name="PSP Investments",
+                resource_type="organizations",
+                specific_id="341688185",
+            )
+        )
+
+        assert owner == AccountOwner(
+            id="341688185",
+            name="PSP Investments",
+            resource_type="organizations",
+        )
+
+    def test_a_specific_resource_without_a_type_leaves_the_envelope_identity(self) -> None:
+        owner = project_owner(
+            resource(
+                "contact-1",
+                "contacts",
+                name="PSP Investments",
+                specificResource={"resourceId": "341688185"},
+            )
+        )
+
+        assert owner == AccountOwner(
+            id="contact-1", name="PSP Investments", resource_type="contacts"
         )
 
     def test_person_owner_keeps_json_api_type(self) -> None:

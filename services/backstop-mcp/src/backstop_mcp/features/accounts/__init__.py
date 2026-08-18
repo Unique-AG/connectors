@@ -14,9 +14,11 @@ from backstop_mcp.features.accounts.positions import fetch_product_positions
 from backstop_mcp.features.accounts.product import resolve_product
 from backstop_mcp.features.accounts.responses import (
     AccountRowResponse,
+    PartyAccountsResolvedResponse,
     ProductAmbiguousResponse,
     ProductPositionsResolvedResponse,
     account_row_response,
+    party_accounts_response,
     product_positions_response,
     unresolved_product_response,
 )
@@ -36,6 +38,7 @@ __all__ = [
     "AccountRecord",
     "AccountRowResponse",
     "InvestorType",
+    "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
     "ProductPositionsResolvedResponse",
@@ -45,6 +48,7 @@ __all__ = [
     "fetch_accounts_for_party",
     "fetch_accounts_for_product",
     "fetch_product_positions",
+    "party_accounts_response",
     "product_positions_response",
     "resolve_product",
     "unresolved_product_response",

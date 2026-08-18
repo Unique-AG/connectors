@@ -149,6 +149,7 @@ class TestGetProductPositions:
         first = object_dict(object_list(tool_payload(result)["accounts"])[0])
         assert "redemptions" not in first
         assert "value_status" not in object_dict(first["invested"])
+        assert "newer_point_without_value" not in object_dict(first["balance"])
 
     @pytest.mark.asyncio
     @respx.mock
@@ -255,6 +256,66 @@ class TestGetProductPositions:
         assert result.aum_diverges is True
         assert result.aum is not None
         assert result.aum.value == 99.0
+        assert result.balance_total == 10.0
+        assert result.aum_difference == -89.0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_gap_inside_the_tolerance_does_not_flag(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-pos-9", "pos-jack")  # pyright: ignore[reportGeneralTypeIssues]
+        respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))
+        )
+        _mock_series(
+            _ACCOUNT_ID,
+            values=_series_page(_point("1", date="2026-07-31", value=1_000_000.0)),
+        )
+        respx.get(_AUM_URL).mock(
+            return_value=_series_page(_point("aum", date="2026-07-31", value=1_002_000.0))
+        )
+
+        result = tool_model(
+            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            ProductPositionsResolvedResponse,
+        )
+
+        assert result.aum_diverges is False
+        assert result.aum_difference == -2000.0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_newer_valueless_point_does_not_hide_the_last_number(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-pos-10", "pos-kate")  # pyright: ignore[reportGeneralTypeIssues]
+        respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))
+        )
+        _mock_series(
+            _ACCOUNT_ID,
+            values=_series_page(
+                _point("1", date="2026-06-30", value=1_000_000.0, valueStatus="ACTUAL"),
+                _point("2", date="2026-07-31", valueStatus="ESTIMATE"),
+            ),
+        )
+        respx.get(_AUM_URL).mock(return_value=_series_page())
+
+        result = tool_model(
+            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            ProductPositionsResolvedResponse,
+        )
+
+        balance = result.accounts[0].balance
+        assert balance is not None
+        assert balance.value == 1_000_000.0
+        assert balance.date.isoformat() == "2026-06-30"
+        assert balance.newer_point_without_value is not None
+        assert balance.newer_point_without_value.date.isoformat() == "2026-07-31"
+        assert result.balance_total == 1_000_000.0
 
     @pytest.mark.asyncio
     @respx.mock
@@ -338,3 +399,6 @@ class TestGetProductPositions:
         assert "qualified purchaser" in dumped
         assert "product_id" in dumped
         assert "ESTIMATE" in dumped
+        assert "newer_point_without_value" in dumped
+        assert "aum_difference" in dumped
+        assert "accounts_omitted" in dumped

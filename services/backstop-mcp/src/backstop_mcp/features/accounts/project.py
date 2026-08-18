@@ -53,19 +53,31 @@ def account_is_open(attributes: AccountAttributes) -> bool:
 def project_owner(raw: dict[str, object] | None) -> AccountOwner | None:
     """The `owner` side-load as an identity.
 
-    `specificResource.resourceType` wins over the JSON:API `type`: an organization owner arrives
-    as a `contacts` resource, and `organizations` is the answer a caller can act on.
+    `specificResource` wins over the JSON:API envelope: an organization owner arrives as a
+    `contacts` resource, and `organizations` is the answer a caller can act on. The id is taken
+    from the *same* reference as the type, never mixed — `resourceId` is what exists in the
+    collection `resourceType` names, and every description tells the model to echo this id back
+    as a `party_id`. On this instance the two happen to be equal; a projection that assumed so
+    would hand back an unusable id the day they are not.
     """
     owner = included_resource(raw, schema=_OwnerInclude)
     if owner is None:
         return None
     specific = owner.attributes.specific_resource
-    specific_type = None if specific is None else specific.resource_type
-    return AccountOwner(
-        id=owner.id,
-        name=owner.attributes.name,
-        resource_type=specific_type or owner.type,
-    )
+    if specific is not None and specific.resource_type is not None:
+        return AccountOwner(
+            id=specific.resource_id,
+            name=owner.attributes.name,
+            resource_type=specific.resource_type,
+        )
+    return AccountOwner(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
+
+
+def account_owner(
+    resource: AccountApiResponse, *, included: Sequence[dict[str, object]]
+) -> AccountOwner | None:
+    """The projected owner of one account, or `None` when the include is absent."""
+    return project_owner(_first_included(included, resource, _OWNER))
 
 
 def project_investor_type(raw: dict[str, object] | None) -> InvestorType | None:
@@ -91,7 +103,7 @@ def project_account(
         {
             **resource.attributes.model_dump(),
             "id": resource.id,
-            "owner": project_owner(_first_included(included, resource, _OWNER)),
+            "owner": account_owner(resource, included=included),
             "investor_type": project_investor_type(
                 _first_included(included, resource, _INVESTOR_TYPE)
             ),
