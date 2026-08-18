@@ -154,8 +154,8 @@ setting to transcript resources, so nothing else here is affected.
 The two meeting permissions are separate scopes and are granted independently, which is the point of
 asking for both: `OnlineMeetings.Read` is the least privilege Microsoft documents for resolving a
 join URL to a meeting and needs no administrator, while reading the transcript collection needs one.
-A tenant can grant the first and withhold the second, and the tool's 403 then names the one its own
-request was made under.
+A tenant can grant the first and withhold the second. Neither Graph's 403 nor Entra's AADSTS65001
+says which of the two is missing, so every refusal names both.
 
 `ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
 enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
