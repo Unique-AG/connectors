@@ -6,6 +6,7 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.accounts import resolve_product
+from backstop_mcp.features.accounts.product import LARGE_CATALOG
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, collection, resource
@@ -80,26 +81,66 @@ class TestTheRequest:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_does_not_walk_links_next(self, client: BackstopClient) -> None:
-        route = respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
+    async def test_walks_links_next_to_the_end_of_the_catalog(self, client: BackstopClient) -> None:
+        route = respx.get(_PRODUCTS_URL).mock(
+            side_effect=[
+                _index(
+                    _product("100", name="Blue Capital I", short_name="BLUC"), next_url=_NEXT_PAGE
+                ),
+                _index(_product("999", name="Page Two Fund", short_name="P2F")),
+            ]
+        )
 
-        await resolve_product(ctx_never_elicit(), client, product="CGUP")
+        result = await resolve_product(ctx_never_elicit(), client, product="P2F")
 
-        assert route.call_count == 1
+        assert route.call_count == 2
+        assert isinstance(result, Resolved)
+        assert result.value.id == "999"
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_warns_when_the_index_is_truncated(
+    async def test_a_second_page_id_is_not_reported_absent(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(
+            side_effect=[
+                _sample_index(next_url=_NEXT_PAGE),
+                _index(_product("999", name="Page Two Fund", short_name="P2F")),
+            ]
+        )
+
+        result = await resolve_product(ctx_never_elicit(), client, product_id="999")
+
+        assert isinstance(result, Resolved)
+        assert result.value.short_name == "P2F"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_small_catalog_does_not_warn(
         self, client: BackstopClient, caplog: pytest.LogCaptureFixture
     ) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
         with caplog.at_level(logging.WARNING):
             await resolve_product(ctx_never_elicit(), client, product="CGUP")
 
-        assert [record.message for record in caplog.records] == [
-            "accounts.products.index_truncated"
-        ]
+        assert caplog.records == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_warns_when_the_catalog_is_large_enough_to_want_caching(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        oversized = _index(
+            *(
+                _product(str(index), name=f"Fund {index}", short_name=f"F{index}")
+                for index in range(LARGE_CATALOG + 1)
+            )
+        )
+        respx.get(_PRODUCTS_URL).mock(return_value=oversized)
+
+        with caplog.at_level(logging.WARNING):
+            await resolve_product(ctx_never_elicit(), client, product="F1")
+
+        assert [record.message for record in caplog.records] == ["accounts.products.index_large"]
 
 
 class TestResolveSearch:
@@ -189,47 +230,10 @@ class TestResolveProductId:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_trusted_id_survives_a_truncated_index_unhydrated(
-        self, client: BackstopClient
-    ) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
-
-        outcome = await resolve_product(ctx_never_elicit(), client, product_id="999999")
-
-        assert isinstance(outcome, Resolved)
-        assert outcome.value.id == "999999"
-        assert outcome.value.name is None
-        assert outcome.value.short_name is None
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_a_truncated_index_still_hydrates_an_id_it_does_hold(
-        self, client: BackstopClient
-    ) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
-
-        outcome = await resolve_product(ctx_never_elicit(), client, product_id="1292283")
-
-        assert isinstance(outcome, Resolved)
-        assert outcome.value.short_name == "CGUP"
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_a_blank_product_id_is_not_found_even_when_truncated(
-        self, client: BackstopClient
-    ) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
-
-        outcome = await resolve_product(ctx_never_elicit(), client, product_id="   ")
-
-        assert isinstance(outcome, NotFound)
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_a_complete_index_can_prove_an_id_absent(self, client: BackstopClient) -> None:
+    async def test_a_blank_product_id_is_not_found(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
-        outcome = await resolve_product(ctx_never_elicit(), client, product_id="999999")
+        outcome = await resolve_product(ctx_never_elicit(), client, product_id="   ")
 
         assert isinstance(outcome, NotFound)
 

@@ -13,12 +13,15 @@ feat(backstop-mcp,main): add `get_product_positions` and `get_accounts_for_party
   `filter[product.id][eq]`, defaults to open (`closedDate` key absent), and fans out `values` /
   `totalInvested` / `totalRedemptions` taking `max(date)` in a documented `filter[date][ge]`
   window — not `sort=-date` (silently ignored; default order is oldest first).
-- Resolve products against a single-request index (`/products?fields=name,configuration`), matching
-  on id, `productShortName`, or name, and reusing `resolution.py`. `/products` cannot filter on
-  `shortName`; `/quick-search` of a product name returns an organization whose id no account
-  filter accepts. That index hydrates an id with a name — it does not authorize one — so a
-  trusted `product_id` missing from a *truncated* index resolves unhydrated instead of
-  `not_found`, while a complete index can still prove absence and does.
+- Resolve products against a `/products?fields=name,configuration` index walked to the end 200
+  rows at a page, matching on id, `productShortName`, or name, and reusing `resolution.py`.
+  `/products` cannot filter on `shortName` (400) or on id, and `/quick-search` of a product name
+  returns an organization whose id no account filter accepts — so the whole catalog is the
+  lookup, and walking it whole is what lets `not_found` mean *absent* rather than *not on page
+  one*. This instance returns 72 products, all with a `productShortName`, three duplicated
+  (`PKAP`, `BLUC`, `CPOL`). Past 400 the per-call re-read stops paying for itself and a TTL cache
+  becomes the answer, so that case logs `accounts.products.index_large` rather than passing
+  silently.
 - Return each figure as `{value, date, valueStatus?}` with the account `currency`, taking the
   latest point that carries a **value** rather than blindly the latest point: Backstop publishes
   a dated row before the number lands (its UI shows `-`), and reporting that row would turn a

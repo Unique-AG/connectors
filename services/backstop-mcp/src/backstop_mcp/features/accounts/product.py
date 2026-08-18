@@ -8,16 +8,21 @@ display name. Product callers also type `productShortName` (`CGUP`), and that pa
 - Searching the same string as `ORGANIZATION` can hit a CRM company whose id no account
   `filter[product.id]` accepts.
 
-The catalog is one `GET /products?fields=name,configuration` page (limit 200). Match is local:
-id, then exact `productShortName`, then exact name, then name substring. Duplicate short names
-(`BLUC`) go through one `elicit_choice`. The same response hydrates `short_name`.
+The catalog is `GET /products?fields=name,configuration`, walked to the end 200 rows at a page.
+Match is local: id, then exact `productShortName`, then exact name, then name substring.
+Duplicate short names (`BLUC`) go through one `elicit_choice`. The same response hydrates
+`short_name`.
 
-That page is the whole catalog on any instance we have seen, but it is not guaranteed to be. A
-trusted `product_id` must not depend on it: the index is there to *hydrate* an id with a name,
-not to authorize it, and `/accounts?filter[product.id][eq]` accepts the id either way. So a
-`product_id` missing from a **truncated** index resolves unhydrated rather than `not_found` —
-the page could not prove absence. A complete index can, and still returns `not_found`, which is
-what keeps an invented id from silently becoming "this product has no investors".
+Walking it whole rather than reading page one is what lets `not_found` mean *absent* instead of
+*not on this page* — a trusted `product_id` echoed from a prior resolve, or handed back by
+`get_accounts_for_party`, has to resolve on any catalog size, and `/products` cannot be filtered
+down to one id (`filter[shortName]` is 400, and nothing filters on id here).
+
+Every product is read on every call, and the catalog is small enough for that: this instance
+returns 72 in one page, all with a `productShortName`, three of them duplicated (`PKAP`, `BLUC`,
+`CPOL`). Past `LARGE_CATALOG` the assumption is no longer safe — re-reading the whole catalog
+per call starts costing real requests, and a TTL cache like the opportunity-stage vocabulary
+would be the answer. So that case warns rather than passing silently.
 """
 
 import logging
@@ -35,7 +40,6 @@ from backstop_mcp.features.resolution import (
     Ambiguous,
     Candidate,
     NotFound,
-    Resolved,
     elicit_choice,
     from_candidates,
 )
@@ -45,6 +49,11 @@ logger = logging.getLogger(__name__)
 _PRODUCTS_PATH = "/products"
 _PRODUCT_FIELDS = "name,configuration"
 _PRODUCT_INDEX_PAGE_SIZE = 200
+
+# Two full pages. This instance returns 72, so anything past this is a different kind of tenant
+# and the "re-read the catalog every call" trade stops paying for itself.
+LARGE_CATALOG = 400
+
 _SCOPE = "products"
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
@@ -131,37 +140,28 @@ async def resolve_product(
         "Exactly one of product_id or product must be provided"
     )
 
-    page = await client.fetch_page(
+    page = await client.paginate(
         _PRODUCTS_PATH,
         schema=_ProductResource,
         params={"fields": _PRODUCT_FIELDS},
+        max_records=None,
         page_size=_PRODUCT_INDEX_PAGE_SIZE,
     )
     products = tuple(
         ResolvedProduct.from_attributes(resource.id, resource.attributes) for resource in page.items
     )
-    truncated = page.next_path is not None or (
-        page.total_count is not None and page.total_count > len(products)
-    )
-    if truncated:
+    if len(products) > LARGE_CATALOG:
         logger.warning(
-            "accounts.products.index_truncated",
+            "accounts.products.index_large",
             extra={
                 "returned": len(products),
                 "total_count": page.total_count,
-                "has_next": page.next_path is not None,
+                "threshold": LARGE_CATALOG,
             },
         )
 
     if product_id is not None:
-        trusted = product_id.strip()
-        outcome = match_product(products, trusted, id_only=True)
-        if trusted and truncated and isinstance(outcome, NotFound):
-            logger.info(
-                "accounts.products.trusted_id_unhydrated",
-                extra={"product_id": trusted, "total_count": page.total_count},
-            )
-            return Resolved(value=ResolvedProduct(id=trusted))
+        outcome = match_product(products, product_id.strip(), id_only=True)
     else:
         assert product is not None
         outcome = match_product(products, product)
