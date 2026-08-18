@@ -20,7 +20,7 @@ from backstop_mcp.features.accounts.types import (
     SeriesFigure,
     SeriesPoint,
 )
-from tests.helpers import BASE_URL, FIXED_TODAY
+from tests.helpers import BASE_URL
 
 _ACCOUNT_A = "27871657"
 _ACCOUNT_B = "28124025"
@@ -48,8 +48,8 @@ class TestFetchPositions:
     async def test_attaches_the_three_series_per_account(self, client: BackstopClient) -> None:
         respx.get(_series_url(_ACCOUNT_A, "values")).mock(
             return_value=_page(
-                _point("1", date="2026-06-30", value=10.0, valueStatus="ACTUAL"),
                 _point("2", date="2026-07-31", value=11.0, valueStatus="ESTIMATE"),
+                _point("1", date="2026-06-30", value=10.0, valueStatus="ACTUAL"),
             )
         )
         respx.get(_series_url(_ACCOUNT_A, "totalInvested")).mock(
@@ -59,7 +59,7 @@ class TestFetchPositions:
             return_value=_page(_point("4", date="2026-07-31", value=5.0))
         )
 
-        (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),), today=FIXED_TODAY)
+        (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),))
 
         assert position.account.id == _ACCOUNT_A
         assert position.balance is not None
@@ -84,7 +84,7 @@ class TestFetchPositions:
         respx.get(_series_url(_ACCOUNT_A, "totalInvested")).mock(return_value=_page())
         respx.get(_series_url(_ACCOUNT_A, "totalRedemptions")).mock(return_value=_page())
 
-        (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),), today=FIXED_TODAY)
+        (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),))
 
         assert position.balance is None
         assert position.invested is None
@@ -112,7 +112,6 @@ class TestFetchPositions:
         first, second = await fetch_positions(
             client,
             (_record(_ACCOUNT_A, name="A"), _record(_ACCOUNT_B, name="B")),
-            today=FIXED_TODAY,
         )
 
         assert first.account.id == _ACCOUNT_A
@@ -137,11 +136,11 @@ class TestFetchPositions:
         respx.get(_series_url(_ACCOUNT_A, "totalRedemptions")).mock(return_value=_page())
 
         with pytest.raises(BackstopAuthError):
-            await fetch_positions(client, (_record(_ACCOUNT_A),), today=FIXED_TODAY)
+            await fetch_positions(client, (_record(_ACCOUNT_A),))
 
     @pytest.mark.asyncio
     async def test_no_accounts_makes_no_requests(self, client: BackstopClient) -> None:
-        assert await fetch_positions(client, (), today=FIXED_TODAY) == ()
+        assert await fetch_positions(client, ()) == ()
 
 
 _PRODUCT = ResolvedProduct(id="1292283", name="CGUP", short_name="CGUP")
@@ -226,7 +225,7 @@ class TestFetchProductAum:
     ) -> None:
         respx.get(_AUM_URL).mock(return_value=_page(_point("1", date="2026-07-31", value=1000.0)))
 
-        aum = await fetch_product_aum(client, "1292283", today=FIXED_TODAY)
+        aum = await fetch_product_aum(client, "1292283")
 
         assert aum is not None
         assert aum.valued == SeriesPoint(date=date(2026, 7, 31), value=1000.0, value_status=None)
@@ -240,7 +239,7 @@ class TestFetchProductAum:
             return_value=httpx.Response(500, json={"errors": [{"detail": "aum boom"}]})
         )
 
-        assert await fetch_product_aum(client, "1292283", today=FIXED_TODAY) is None
+        assert await fetch_product_aum(client, "1292283") is None
 
 
 class TestFetchProductPositions:
@@ -258,7 +257,6 @@ class TestFetchProductPositions:
             client,
             AccountListing(accounts=(_record(_ACCOUNT_A),), closed_omitted=2),
             product=_PRODUCT,
-            today=FIXED_TODAY,
         )
 
         assert result.aum is not None
@@ -287,7 +285,6 @@ class TestFetchProductPositions:
             client,
             AccountListing(accounts=listed),
             product=_PRODUCT,
-            today=FIXED_TODAY,
         )
 
         assert len(result.accounts) == MAX_POSITION_ACCOUNTS

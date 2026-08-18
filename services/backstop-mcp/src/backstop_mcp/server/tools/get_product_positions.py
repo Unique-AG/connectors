@@ -2,11 +2,10 @@
 
 A product is what many tenants call a fund, vehicle, or share class — that mapping lives here,
 not in a `fund` parameter. Figures come from three series (`values`, `totalInvested`,
-`totalRedemptions`), each as the latest point in a dated window, never `sort=-date`.
+`totalRedemptions`), each the latest valued point on the first 10 rows of `sort=-date`.
 """
 
 import logging
-from datetime import date
 from typing import Annotated
 
 from fastmcp import Context
@@ -92,10 +91,10 @@ async def get_product_positions(
     `values` are often `ESTIMATE`) and omitted when it does not — do not invent `ACTUAL`. A
     missing series is omitted, never `0.0`.
 
-    `aum` is assets under management: the product's total reported value, not one investor's
+    `aum` is assets under management: the product's latest `/aums` point, not one investor's
     balance. `balance_total` and `aum_difference` show it against the sum of returned balances;
-    `aum_diverges` is a 0.5% tolerance verdict, not a failure — the two figures are as-of
-    different dates and the open default excludes closed-but-still-valued accounts.
+    `aum_diverges` is a 0.5% tolerance verdict, not a failure — the open default excludes
+    closed-but-still-valued accounts.
 
     An empty `accounts` list with `closed_omitted>0` means every account is closed — pass
     `include_closed=true` rather than reading that as "no investors". `accounts_omitted>0`
@@ -117,7 +116,7 @@ async def get_product_positions(
     listing = await fetch_accounts_for_product(
         client, product_id=resolved.id, include_closed=include_closed
     )
-    positions = await fetch_product_positions(client, listing, product=resolved, today=date.today())
+    positions = await fetch_product_positions(client, listing, product=resolved)
     logger.info(
         "accounts.product_positions.completed",
         extra={

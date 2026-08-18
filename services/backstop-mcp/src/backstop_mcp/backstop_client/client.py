@@ -115,10 +115,11 @@ class BackstopClient:
         params: dict[str, object] | None = None,
         max_records: int | None = 10_000,
         page_size: int | None = None,
+        parallel: bool = False,
     ) -> PageResult[T]:
-        """Walk a `links.next` chain, applying `params` (plus a default page size and a zero
+        """Read a whole collection, applying `params` (plus a default page size and a zero
         offset) to the first page only — every later page is driven entirely by the literal
-        URL/path Backstop returns, which already encodes its own query params.
+        URL/path Backstop returns in `links.next`, which already encodes its own query params.
 
         Page size defaults to `report_page_size` for the slow report/analytics endpoints and
         `default_page_size` elsewhere; `page_size` overrides both. The parameter *names* come
@@ -129,6 +130,13 @@ class BackstopClient:
         complete series (rather than a preview) need. Each page is deserialized as
         `_Page[schema]` in one pass, so a malformed envelope or item on any page fails the
         whole call rather than silently skipping it.
+
+        `parallel=True` requests page two onwards concurrently by offset rather than following
+        `links.next` one page at a time, which is a large win on any multi-page collection —
+        five requests run in the gate where a serial chain runs one. It relies on
+        `meta.totalResourceCount` being a true total, so it is off by default and must only be
+        set for endpoints where that holds; see `paginate_all` for what goes wrong when it does
+        not.
         """
         first_page_params = dict(params) if params is not None else {}
         limit_param = self._settings.page_limit_param
@@ -137,8 +145,9 @@ class BackstopClient:
             first_page_params[limit_param] = (
                 page_size if page_size is not None else self._default_page_size(path)
             )
-        # Backstop requires the offset to be a multiple of the limit; 0 always satisfies that
-        # and every later page comes from `links.next`, which carries its own offset.
+        # Backstop requires the offset to be a multiple of the limit; 0 always satisfies that.
+        # Later pages carry their own offset — from `links.next` serially, or from
+        # `offset_params` below, which strides by the page size the first page actually returned.
         if offset_param not in first_page_params:
             first_page_params[offset_param] = 0
 
@@ -147,12 +156,16 @@ class BackstopClient:
         ) -> httpx.Response:
             return await self.raw_request("GET", page_path, params=page_params)
 
+        def offset_params(offset: int) -> dict[str, object]:
+            return {**first_page_params, offset_param: offset}
+
         return await paginate_all(
             fetch_page=fetch_page,
             first_path=path,
             schema=schema,
             max_records=max_records,
             first_page_params=first_page_params,
+            offset_params=offset_params if parallel else None,
         )
 
     async def fetch_page(

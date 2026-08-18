@@ -185,5 +185,5 @@ class TestGetAccountsForParty:
         dumped = str(schema)
         assert "general-partner" in dumped
         assert "anti-money-laundering" in dumped
-        assert "qualified purchaser" in dumped
+        assert "Investor accreditation" in dumped
         assert "domiciled in the United States" in dumped

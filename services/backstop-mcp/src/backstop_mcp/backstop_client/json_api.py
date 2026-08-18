@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from http import HTTPStatus
 from typing import Annotated, ClassVar
 
 from pydantic import (
@@ -9,6 +10,8 @@ from pydantic import (
     TypeAdapter,
     ValidationError,
 )
+
+from backstop_mcp.backstop_client.errors import BackstopApiError
 
 # PEP 695 generic syntax (not typing.Generic/TypeVar) — pydantic 2.13 resolves
 # `BackstopApiResource[SomeModel]` to a concrete model at runtime either way, but this form
@@ -115,13 +118,25 @@ class _JsonApiDocument(BaseModel):
 
 
 class BackstopApiResourceDocument[AttrT](_JsonApiDocument):
-    """A by-id JSON:API document: `data` is exactly one resource.
+    """A by-id JSON:API document: `data` is one resource, or null for a record Backstop has none.
 
-    Null primary data is a schema failure (Backstop returns 404 for missing by-id records,
-    which the client raises before deserialization).
+    Most by-id endpoints answer a missing record with 404, which the client raises before
+    deserialization — but not all of them do. `/entity-activity-details/{unknown_id}` answers
+    `200 {"data": null, "included": []}` (verified live, for a malformed id and for a well-formed
+    one nobody owns alike), while `/meeting-or-calls/{unknown_id}` on the same instance 404s.
+    Modelling `data` as required turned that first case into a `BackstopResponseSchemaError`
+    ("Input should be an object") that reads like a broken schema rather than a missing record, so
+    it is optional here and `require_data` converts null primary data into the 404 a
+    better-behaved endpoint would have sent.
     """
 
-    data: BackstopApiResource[AttrT]
+    data: BackstopApiResource[AttrT] | None = None
+
+    def require_data(self, *, path: str) -> BackstopApiResource[AttrT]:
+        """This document's primary resource, or a 404 `BackstopApiError` naming `path`."""
+        if self.data is None:
+            raise BackstopApiError(HTTPStatus.NOT_FOUND, f"Backstop holds no record at {path!r}.")
+        return self.data
 
 
 class BackstopApiCollectionDocument[AttrT](_JsonApiDocument):
@@ -164,18 +179,22 @@ class ResourceRef(BaseModel):
 
 def follow_included[AttrT](
     included: Sequence[dict[str, object]],
-    resource: BackstopApiResource[AttrT],
+    resource: BackstopApiResource[AttrT] | None,
     relationship_name: str,
 ) -> list[dict[str, object]]:
     """The entries of `included` linked from `resource` via `relationship_name`.
 
     Takes the side-loaded resources rather than the document they arrived in, so a paginated walk
-    can hand over its accumulated `included` without building an intermediate document.
+    can hand over its accumulated `included` without building an intermediate document. A `None`
+    resource — a document whose primary data was null — has no linkage to follow, so it yields
+    nothing rather than forcing every caller to narrow before asking.
 
     Matches entries by JSON:API identity `(type, id)` — ids alone are not unique across resource
     types in the same `included` array (e.g. entity-relationships and entity-relationship-types
     can share numeric ids). Order follows the relationship linkage, not the `included` order.
     """
+    if resource is None:
+        return []
     relationship = resource.relationships.get(relationship_name)
     if relationship is None or relationship.data is None:
         return []

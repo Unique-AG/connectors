@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.accounts import resolve_product
 from backstop_mcp.features.accounts.product import LARGE_CATALOG
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
@@ -12,6 +12,7 @@ from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_n
 from tests.helpers import BASE_URL, collection, resource
 
 _PRODUCTS_URL = f"{BASE_URL}/products"
+_PRODUCT_URL = f"{BASE_URL}/products/1292283"
 _NEXT_PAGE = f"{BASE_URL}/products?page[offset]=200"
 
 
@@ -28,6 +29,24 @@ def _product(
         "products",
         name=name,
         configuration={"productShortName": short_name},
+    )
+
+
+def _document(product: dict[str, object]) -> httpx.Response:
+    return httpx.Response(200, json={"data": product})
+
+
+def _not_found(product_id: str) -> httpx.Response:
+    return httpx.Response(
+        404,
+        json={
+            "errors": [
+                {
+                    "code": "ResourceNotFoundException",
+                    "title": f"Resource products not found by id {product_id}",
+                }
+            ]
+        },
     )
 
 
@@ -99,18 +118,27 @@ class TestTheRequest:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_second_page_id_is_not_reported_absent(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCTS_URL).mock(
-            side_effect=[
-                _sample_index(next_url=_NEXT_PAGE),
-                _index(_product("999", name="Page Two Fund", short_name="P2F")),
-            ]
+    async def test_a_trusted_id_does_not_read_the_catalog_at_all(
+        self, client: BackstopClient
+    ) -> None:
+        """Catalog size cannot defeat an echoed id, because the catalog is never consulted."""
+        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+        route = respx.get(_PRODUCT_URL).mock(
+            return_value=_document(
+                _product(
+                    "1292283",
+                    name="Capstone Global Unconstrained Portfolio",
+                    short_name="CGUP",
+                )
+            )
         )
 
-        result = await resolve_product(ctx_never_elicit(), client, product_id="999")
+        result = await resolve_product(ctx_never_elicit(), client, product_id="1292283")
 
         assert isinstance(result, Resolved)
-        assert result.value.short_name == "P2F"
+        assert catalog.call_count == 0
+        assert route.call_count == 1
+        assert route.calls.last.request.url.params["fields"] == "name,configuration"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -218,8 +246,18 @@ class TestResolveSearch:
 class TestResolveProductId:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_product_id_is_looked_up_in_the_index(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+    async def test_product_id_is_fetched_by_id_and_hydrates_the_name(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(
+            return_value=_document(
+                _product(
+                    "1292283",
+                    name="Capstone Global Unconstrained Portfolio",
+                    short_name="CGUP",
+                )
+            )
+        )
 
         result = await resolve_product(ctx_never_elicit(), client, product_id="1292283")
 
@@ -230,23 +268,50 @@ class TestResolveProductId:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_blank_product_id_is_not_found(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+    async def test_a_blank_product_id_is_not_found_without_a_request(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(url__startswith=_PRODUCTS_URL).mock(return_value=_sample_index())
 
         outcome = await resolve_product(ctx_never_elicit(), client, product_id="   ")
 
         assert isinstance(outcome, NotFound)
+        assert route.call_count == 0
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unknown_product_id_is_not_found(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+    async def test_a_404_is_not_found(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/products/999").mock(return_value=_not_found("999"))
 
         result = await resolve_product(ctx_never_elicit(), client, product_id="999")
 
         assert isinstance(result, NotFound)
         assert result.query == "999"
         assert result.scope == "products"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_non_404_error_stays_an_error(self, client: BackstopClient) -> None:
+        """A 403 must not be reported to the model as "no such product"."""
+        respx.get(_PRODUCT_URL).mock(
+            return_value=httpx.Response(403, json={"errors": [{"title": "Forbidden"}]})
+        )
+
+        with pytest.raises(BackstopApiError) as exc_info:
+            await resolve_product(ctx_never_elicit(), client, product_id="1292283")
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_null_data_document_is_also_not_found(self, client: BackstopClient) -> None:
+        """Some by-id endpoints answer a missing record `200 {"data": null}` instead of 404."""
+        respx.get(_PRODUCT_URL).mock(return_value=httpx.Response(200, json={"data": None}))
+
+        result = await resolve_product(ctx_never_elicit(), client, product_id="1292283")
+
+        assert isinstance(result, NotFound)
+        assert result.query == "1292283"
 
 
 class TestElicit:

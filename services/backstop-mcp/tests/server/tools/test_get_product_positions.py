@@ -22,12 +22,18 @@ type ConnectUser = Callable[..., object]
 _PRODUCT_ID = "1292283"
 _ACCOUNT_ID = "27871657"
 _PRODUCTS_URL = f"{BASE_URL}/products"
+_PRODUCT_URL = f"{BASE_URL}/products/{_PRODUCT_ID}"
 _ACCOUNTS_URL = f"{BASE_URL}/accounts"
 _AUM_URL = f"{BASE_URL}/products/{_PRODUCT_ID}/aums"
 
 
 def _product_page(*products: dict[str, object]) -> httpx.Response:
     return httpx.Response(200, json={"data": list(products)})
+
+
+def _product_document(product: dict[str, object]) -> httpx.Response:
+    """A trusted `product_id` resolves by id, so it reads a document rather than the catalog."""
+    return httpx.Response(200, json={"data": product})
 
 
 def _cgup() -> dict[str, object]:
@@ -118,8 +124,8 @@ class TestGetProductPositions:
         _mock_series(
             _ACCOUNT_ID,
             values=_series_page(
-                _point("1", date="2026-06-30", value=10.0, valueStatus="ACTUAL"),
                 _point("2", date="2026-07-31", value=11.0, valueStatus="ESTIMATE"),
+                _point("1", date="2026-06-30", value=10.0, valueStatus="ACTUAL"),
             ),
             invested=_series_page(_point("3", date="2026-07-31", value=100.0)),
         )
@@ -171,7 +177,7 @@ class TestGetProductPositions:
         self, connect_user: ConnectUser
     ) -> None:
         await connect_user("user-pos-3", "pos-dave")  # pyright: ignore[reportGeneralTypeIssues]
-        respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
         respx.get(_AUM_URL).mock(return_value=_series_page())
 
@@ -396,7 +402,7 @@ class TestGetProductPositions:
         assert "assets under management" in dumped
         assert "general-partner" in dumped
         assert "anti-money-laundering" in dumped
-        assert "qualified purchaser" in dumped
+        assert "accreditation" in dumped
         assert "product_id" in dumped
         assert "ESTIMATE" in dumped
         assert "newer_point_without_value" in dumped

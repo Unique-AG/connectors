@@ -8,7 +8,10 @@ config injection under test are the real ones.
 
 from collections.abc import Sequence
 from datetime import date
+from typing import Protocol, cast
 
+import httpx
+import respx
 from pydantic import SecretStr
 
 from backstop_mcp.app import retry_settings, transport_settings
@@ -132,6 +135,27 @@ def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
 
 def opportunity_stages_service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
     return create_opportunity_stages_service(ttl_minutes=ttl_minutes)
+
+
+class _RecordedCall(Protocol):
+    @property
+    def request(self) -> httpx.Request: ...
+
+
+def recorded_requests(calls: object) -> list[httpx.Request]:
+    """Every request a respx call log recorded, in call order.
+
+    Takes either one route's `route.calls` or the module-level `respx.calls`. Neither is typed,
+    so iterating them directly yields `Unknown`; and `route.calls.last` only ever shows the final
+    request, which is no help when what is under test is the *set* of requests — as it is for
+    offset paging, or for asserting a relationship was never followed.
+    """
+    return [call.request for call in cast("Sequence[_RecordedCall]", calls)]
+
+
+def recorded_params(route: respx.Route) -> list[httpx.QueryParams]:
+    """Query params of every call one respx route recorded, in call order."""
+    return [request.url.params for request in recorded_requests(route.calls)]
 
 
 def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:

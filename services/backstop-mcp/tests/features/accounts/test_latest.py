@@ -1,10 +1,8 @@
-from datetime import date, timedelta
-from typing import cast
+from datetime import date
 
 import httpx
 import pytest
 import respx
-from respx.models import Call
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.accounts.latest import (
@@ -13,18 +11,10 @@ from backstop_mcp.features.accounts.latest import (
     latest_figure,
 )
 from backstop_mcp.features.accounts.types import SeriesFigure, SeriesPoint
-from tests.helpers import BASE_URL, FIXED_TODAY
+from tests.helpers import BASE_URL
 
 _PATH = "/accounts/27871657/values"
 _URL = f"{BASE_URL}{_PATH}"
-_NEXT = f"{_PATH}?page[offset]=100"
-_NINETY_CUTOFF = (FIXED_TODAY - timedelta(days=90)).isoformat()
-_YEAR_CUTOFF = (FIXED_TODAY - timedelta(days=365)).isoformat()
-
-
-def _call_params(route: respx.Route, index: int) -> httpx.QueryParams:
-    """respx's `CallList` subclasses a bare `list`, so indexing it types as unknown."""
-    return cast(Call, route.calls[index]).request.url.params
 
 
 def _point(point_id: str, **attributes: object) -> dict[str, object]:
@@ -35,14 +25,8 @@ def _resource(point_id: str, **attributes: object) -> SeriesPointResource:
     return SeriesPointResource.model_validate(_point(point_id, **attributes))
 
 
-def _page(
-    *points: dict[str, object],
-    next_url: str | None = None,
-) -> httpx.Response:
-    payload: dict[str, object] = {"data": list(points)}
-    if next_url is not None:
-        payload["links"] = {"next": next_url}
-    return httpx.Response(200, json=payload)
+def _page(*points: dict[str, object]) -> httpx.Response:
+    return httpx.Response(200, json={"data": list(points)})
 
 
 class TestLatestFigure:
@@ -128,80 +112,31 @@ class TestLatestFigure:
 class TestFetchLatestFigure:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_uses_the_ninety_day_window_when_it_has_points(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_asks_for_the_ten_newest_rows(self, client: BackstopClient) -> None:
         route = respx.get(_URL).mock(
             return_value=_page(_point("1", date="2026-07-31", value=9.0, valueStatus="ESTIMATE"))
         )
 
-        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH)
 
         params = route.calls.last.request.url.params
         assert route.call_count == 1
-        assert params["filter[date][ge]"] == _NINETY_CUTOFF
-        assert params["page[limit]"] == "100"
+        assert params["sort"] == "-date"
+        assert params["page[limit]"] == "10"
         latest = SeriesPoint(date=date(2026, 7, 31), value=9.0, value_status="ESTIMATE")
         assert point == SeriesFigure(latest=latest, valued=latest)
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_widens_to_a_year_when_ninety_days_are_empty(
-        self, client: BackstopClient
-    ) -> None:
-        route = respx.get(_URL).mock(
-            side_effect=[
-                _page(),
-                _page(_point("1", date="2025-12-31", value=4.0)),
-            ]
-        )
-
-        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
-
-        assert route.call_count == 2
-        assert _call_params(route, 0)["filter[date][ge]"] == _NINETY_CUTOFF
-        assert _call_params(route, 1)["filter[date][ge]"] == _YEAR_CUTOFF
-        assert point is not None
-        assert point.valued is not None
-        assert point.valued.date == date(2025, 12, 31)
-        assert point.valued.value_status is None
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_paginates_unfiltered_when_both_windows_are_empty(
-        self, client: BackstopClient
-    ) -> None:
-        route = respx.get(_URL).mock(
-            side_effect=[
-                _page(),
-                _page(),
-                _page(_point("1", date="2020-01-31", value=1.0), next_url=_NEXT),
-                _page(_point("2", date="2020-06-15", value=2.0)),
-            ]
-        )
-
-        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
-
-        assert route.call_count == 4
-        assert "filter[date][ge]" not in _call_params(route, 2)
-        assert point is not None
-        assert point.valued is not None
-        assert point.valued.date == date(2020, 6, 15)
-        assert point.valued.value == 2.0
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_paginates_the_window_so_an_older_first_page_cannot_win(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_picks_max_date_on_the_page(self, client: BackstopClient) -> None:
         respx.get(_URL).mock(
-            side_effect=[
-                _page(_point("1", date="2026-05-31", value=10.0), next_url=_NEXT),
-                _page(_point("2", date="2026-07-15", value=11.0, valueStatus="ESTIMATE")),
-            ]
+            return_value=_page(
+                _point("1", date="2026-05-31", value=10.0),
+                _point("2", date="2026-07-15", value=11.0, valueStatus="ESTIMATE"),
+            )
         )
 
-        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH)
 
         assert point is not None
         assert point.valued is not None
@@ -210,23 +145,18 @@ class TestFetchLatestFigure:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_widens_past_a_window_holding_only_valueless_points(
+    async def test_a_valueless_newest_row_does_not_hide_the_last_number(
         self, client: BackstopClient
     ) -> None:
-        route = respx.get(_URL).mock(
-            side_effect=[
-                _page(_point("1", date="2026-07-31", valueStatus="ESTIMATE")),
-                _page(
-                    _point("0", date="2026-01-31", value=7.0, valueStatus="ACTUAL"),
-                    _point("1", date="2026-07-31", valueStatus="ESTIMATE"),
-                ),
-            ]
+        respx.get(_URL).mock(
+            return_value=_page(
+                _point("2", date="2026-07-31", valueStatus="ESTIMATE"),
+                _point("1", date="2026-06-30", value=7.0, valueStatus="ACTUAL"),
+            )
         )
 
-        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
+        point = await fetch_latest_figure(client, _PATH)
 
-        assert route.call_count == 2
-        assert _call_params(route, 1)["filter[date][ge]"] == _YEAR_CUTOFF
         assert point is not None
         assert point.latest.date == date(2026, 7, 31)
         assert point.valued is not None
@@ -234,39 +164,17 @@ class TestFetchLatestFigure:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_series_with_no_number_anywhere_still_reports_its_latest_date(
-        self, client: BackstopClient
-    ) -> None:
-        respx.get(_URL).mock(
-            side_effect=[
-                _page(_point("1", date="2026-07-31")),
-                _page(_point("1", date="2026-07-31")),
-                _page(_point("1", date="2026-07-31")),
-            ]
-        )
-
-        point = await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
-
-        assert point is not None
-        assert point.valued is None
-        assert point.latest.date == date(2026, 7, 31)
-
-    @pytest.mark.asyncio
-    @respx.mock
     async def test_empty_series_is_none(self, client: BackstopClient) -> None:
-        respx.get(_URL).mock(side_effect=[_page(), _page(), _page()])
+        respx.get(_URL).mock(return_value=_page())
 
-        assert await fetch_latest_figure(client, _PATH, today=FIXED_TODAY) is None
+        assert await fetch_latest_figure(client, _PATH) is None
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_malformed_point_fails_the_page(self, client: BackstopClient) -> None:
         respx.get(_URL).mock(
-            return_value=_page(
-                _point("ok", date="2026-07-31", value=1.0),
-                _point("bad", date="2026-07-31", value="not-a-number"),
-            )
+            return_value=_page(_point("bad", date="2026-07-31", value="not-a-number"))
         )
 
         with pytest.raises(BackstopResponseSchemaError):
-            await fetch_latest_figure(client, _PATH, today=FIXED_TODAY)
+            await fetch_latest_figure(client, _PATH)

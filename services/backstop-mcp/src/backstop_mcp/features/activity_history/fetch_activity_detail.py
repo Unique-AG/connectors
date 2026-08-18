@@ -1,29 +1,26 @@
-"""Fetch layer for `get_activity_detail`: `entity-activity-details` plus the attendees endpoint.
+"""Fetch layer for `get_activity_detail`: the detail record, meeting specifics, and attendees.
 
-Unlike every other endpoint this feature talks to, the wire field names here were NOT
-byte-verified against a live Backstop instance — the design doc only gives prose descriptions
-("start/stop timestamps, location, time_zone" for `entity-activity-details`; "name, firstName,
-lastName" for the attendees endpoint), not confirmed JSON spellings. Every attribute below is
-therefore optional, every model uses `extra="ignore"`, and every ambiguous field carries a couple
-of plausible `AliasChoices` spellings (following the `xxxTimestamp`/camelCase convention this
-API's other confirmed fields — `effectiveDate`, `sentTimestamp`, `createdTimestamp` — use) so a
-wrong guess degrades to `None`/empty rather than crashing the tool. Guessed aliases, flagged for
-live verification:
-- `start`/`stop`: `startTimestamp`/`stopTimestamp` (camelCase), `start`/`stop` (bare), and
-  `start_timestamp`/`stop_timestamp` (snake_case).
-- `location`: `location`, `locationName`, `location_name`.
-- `time_zone`: `timeZone`, `time_zone`.
-`description` (the full HTML body) and `type` (the meeting/call discriminator) are confirmed by
-the design doc, so they carry no aliases.
+Three endpoints, all keyed by the **bare** `ActivityHandle.resource_id` — the
+`specificResource.resourceId` a timeline record already carries — never the composite
+`{resourceType}_{resourceId}` handle the `/activities` view uses for its own resource ids (see
+`activity_handle.py`). Every field name below was byte-verified against a live instance:
 
-`activity_id` is the same prefixed id a timeline record already carries (e.g.
-`meeting-or-calls_76280387`) — Backstop's polymorphic activities view uses that form. The typed
-`meeting-or-calls` collection (and its `/attendees` relationship) uses the bare
-`specificResource.resourceId` (e.g. `76280387`), so `fetch_attendees` strips the
-`meeting-or-calls_` prefix before interpolating the path. Only a meeting/call ever carries
-attendees on this instance, and that shape is always labelled with the `meeting-or-calls_`
-prefix (confirmed, not a guess) — `is_meeting_or_call` lets a caller decide locally, from the id
-string alone, whether to fetch attendees at all.
+- `/entity-activity-details/{resource_id}` — `type`, `title` and `description` (the full HTML
+  body), for any activity kind. It carries nothing else worth reading: the whole attribute set is
+  `attachments`, `fbId`, `description`, `type`, `title`, plus `attachedTo` on a document.
+- `/meeting-or-calls/{resource_id}` — `startTimestamp`, `stopTimestamp`, `location` and
+  `timeZone`. These live here and NOT on the detail record, which is why they are a separate
+  fetch; a sparse `fields=` works, so only those four are requested.
+- `/meeting-or-calls/{resource_id}/attendees` — the trimmed attendee list.
+
+The latter two are valid only for a `meeting-or-calls` handle — both 404 for a note's or a
+document's resource id — so `ActivityHandle.is_meeting_or_call` gates them.
+
+Known Backstop imprecision, deliberately passed through rather than papered over: the detail
+record's `type` is `"meeting"` for a call as well as a meeting (verified on a `PHONE_OUT` record),
+so it does not distinguish the two the way the timeline's own `type` does. Only
+`/meeting-or-calls/{id}`'s `type` (`FACE_TO_FACE`, `PHONE_OUT`, ...) does, and this layer does not
+request it.
 """
 
 import logging
@@ -31,7 +28,7 @@ from datetime import datetime
 from typing import ClassVar
 from urllib.parse import quote
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
@@ -44,13 +41,14 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ActivityDetail",
     "Attendee",
+    "MeetingSpecifics",
     "fetch_activity_detail",
     "fetch_attendees",
-    "is_meeting_or_call",
+    "fetch_meeting_specifics",
 ]
 
-_MEETING_OR_CALL_PREFIX = "meeting-or-calls_"
 _ATTENDEE_FIELDS = "name,firstName,lastName"
+_MEETING_SPECIFIC_FIELDS = "startTimestamp,stopTimestamp,location,timeZone"
 
 
 class _ActivityDetailAttributes(BaseModel):
@@ -59,30 +57,25 @@ class _ActivityDetailAttributes(BaseModel):
     type: str | None = None
     title: str | None = None
     description: str | None = None
-    start: datetime | None = Field(
-        default=None, validation_alias=AliasChoices("startTimestamp", "start", "start_timestamp")
-    )
-    stop: datetime | None = Field(
-        default=None, validation_alias=AliasChoices("stopTimestamp", "stop", "stop_timestamp")
-    )
-    location: str | None = Field(
-        default=None, validation_alias=AliasChoices("location", "locationName", "location_name")
-    )
-    time_zone: str | None = Field(
-        default=None, validation_alias=AliasChoices("timeZone", "time_zone")
-    )
+
+
+class _MeetingSpecificAttributes(BaseModel):
+    # `populate_by_name` so the aliased fields can also be set by their Python name in a plain
+    # keyword constructor call, not only through `model_validate` of a wire payload.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    start: datetime | None = Field(default=None, validation_alias="startTimestamp")
+    stop: datetime | None = Field(default=None, validation_alias="stopTimestamp")
+    location: str | None = None
+    time_zone: str | None = Field(default=None, validation_alias="timeZone")
 
 
 class _AttendeeAttributes(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str | None = None
-    first_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("firstName", "first_name")
-    )
-    last_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("lastName", "last_name")
-    )
+    first_name: str | None = Field(default=None, validation_alias="firstName")
+    last_name: str | None = Field(default=None, validation_alias="lastName")
 
     def display_name(self) -> str | None:
         """Same "name, else first+last" fallback as `PartyAttributes.display_name()`."""
@@ -93,20 +86,25 @@ class _AttendeeAttributes(BaseModel):
 
 
 _ActivityDetailDocument = BackstopApiResourceDocument[_ActivityDetailAttributes]
+_MeetingSpecificDocument = BackstopApiResourceDocument[_MeetingSpecificAttributes]
 
 
 class ActivityDetail(BaseModel):
-    """One `entity-activity-details` record.
-
-    Meeting-specific fields are `None` for a note/document.
-    """
+    """One `entity-activity-details` record — what Backstop stores for any activity kind."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    id: str
+    resource_id: str
     type: str | None
     title: str | None
     description: str | None
+
+
+class MeetingSpecifics(BaseModel):
+    """When and where one meeting/call happened, from `/meeting-or-calls/{resource_id}`."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     start: datetime | None
     stop: datetime | None
     location: str | None
@@ -121,49 +119,29 @@ class Attendee(BaseModel):
     name: str | None
 
 
-def is_meeting_or_call(activity_id: str) -> bool:
-    """Whether `activity_id` names a meeting/call — the only shape with attendees.
+async def fetch_activity_detail(client: BackstopClient, *, resource_id: str) -> ActivityDetail:
+    """Fetch one activity's detail record by its bare resource id.
 
-    Confirmed fact (not a guess): this instance always prefixes meeting/call ids with
-    `meeting-or-calls_`, for both meetings and calls, since they're indistinguishable on the
-    list endpoint. Notes/documents never carry this prefix.
+    No `fields=` sparse fieldset: the record is five attributes wide, so restricting it saves
+    nothing worth the extra failure mode.
     """
-    return activity_id.startswith(_MEETING_OR_CALL_PREFIX)
-
-
-async def fetch_activity_detail(client: BackstopClient, *, activity_id: str) -> ActivityDetail:
-    """Fetch one activity's full detail record. No `fields=` sparse fieldset: since the exact
-    wire spellings for the meeting-specific attributes aren't confirmed, restricting to guessed
-    names risks Backstop dropping an attribute that's actually spelled differently — fetching
-    the whole record and letting `AliasChoices` sort out the spelling is the safer default.
-    """
-    logger.debug("activity_history.detail.fetch", extra={"activity_id": activity_id})
-    document = await client.get(
-        f"/entity-activity-details/{quote(activity_id, safe='')}",
-        schema=_ActivityDetailDocument,
-    )
-    attributes = document.data.attributes
+    logger.debug("activity_history.detail.fetch", extra={"resource_id": resource_id})
+    path = f"/entity-activity-details/{quote(resource_id, safe='')}"
+    document = await client.get(path, schema=_ActivityDetailDocument)
+    # Null primary data here means "no such activity" — this endpoint answers 200 rather than
+    # 404 for an id it cannot resolve, including a composite handle passed through by mistake.
+    resource = document.require_data(path=path)
+    attributes = resource.attributes
     detail = ActivityDetail(
-        id=document.data.id,
+        resource_id=resource.id,
         type=attributes.type,
         title=attributes.title,
         description=attributes.description,
-        start=attributes.start,
-        stop=attributes.stop,
-        location=attributes.location,
-        time_zone=attributes.time_zone,
     )
-    if is_meeting_or_call(activity_id) and all(
-        value is None for value in (detail.start, detail.stop, detail.location, detail.time_zone)
-    ):
-        logger.debug(
-            "activity_history.detail.meeting_fields_empty",
-            extra={"activity_id": activity_id, "type": detail.type},
-        )
     logger.info(
         "activity_history.detail.fetched",
         extra={
-            "activity_id": activity_id,
+            "resource_id": resource_id,
             "type": detail.type,
             "has_description": detail.description is not None,
         },
@@ -171,13 +149,36 @@ async def fetch_activity_detail(client: BackstopClient, *, activity_id: str) -> 
     return detail
 
 
-async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[Attendee, ...]:
-    """Fetch the trimmed attendee list for one meeting/call. Only call when `is_meeting_or_call`."""
-    resource_id = activity_id.removeprefix(_MEETING_OR_CALL_PREFIX)
-    logger.debug(
-        "activity_history.attendees.fetch",
-        extra={"activity_id": activity_id, "resource_id": resource_id},
+async def fetch_meeting_specifics(client: BackstopClient, *, resource_id: str) -> MeetingSpecifics:
+    """Fetch one meeting/call's timings and location. Only call for a meeting-or-calls handle."""
+    logger.debug("activity_history.meeting_specifics.fetch", extra={"resource_id": resource_id})
+    path = f"/meeting-or-calls/{quote(resource_id, safe='')}"
+    document = await client.get(
+        path,
+        params={"fields": _MEETING_SPECIFIC_FIELDS},
+        schema=_MeetingSpecificDocument,
     )
+    attributes = document.require_data(path=path).attributes
+    specifics = MeetingSpecifics(
+        start=attributes.start,
+        stop=attributes.stop,
+        location=attributes.location,
+        time_zone=attributes.time_zone,
+    )
+    logger.info(
+        "activity_history.meeting_specifics.fetched",
+        extra={
+            "resource_id": resource_id,
+            "has_start": specifics.start is not None,
+            "has_location": specifics.location is not None,
+        },
+    )
+    return specifics
+
+
+async def fetch_attendees(client: BackstopClient, *, resource_id: str) -> tuple[Attendee, ...]:
+    """Fetch the trimmed attendee list for one meeting/call by its bare resource id."""
+    logger.debug("activity_history.attendees.fetch", extra={"resource_id": resource_id})
     page = await client.paginate(
         f"/meeting-or-calls/{quote(resource_id, safe='')}/attendees",
         params={"fields": _ATTENDEE_FIELDS},
@@ -189,10 +190,10 @@ async def fetch_attendees(client: BackstopClient, *, activity_id: str) -> tuple[
     if nameless:
         logger.debug(
             "activity_history.attendees.nameless",
-            extra={"activity_id": activity_id, "nameless": nameless, "total": len(attendees)},
+            extra={"resource_id": resource_id, "nameless": nameless, "total": len(attendees)},
         )
     logger.info(
         "activity_history.attendees.fetched",
-        extra={"activity_id": activity_id, "count": len(attendees)},
+        extra={"resource_id": resource_id, "count": len(attendees)},
     )
     return attendees

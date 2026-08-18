@@ -5,10 +5,11 @@ Standing caveats (documents excluded from the token budget concerns, same-day em
 ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
 see the design doc's "Token budget" section. This module carries no prose `notes` field.
 
-`resource_type` is deliberately never surfaced: for meeting/call it is always the literal,
-uninformative string `"meeting-or-calls"` (`stream` already says which), and notes/documents
-don't reliably carry a derivable prefix at all (see `fetch_activities.py`'s module docstring).
-`resource_id` is kept — a real pointer a future detail/documents tool can use.
+Neither `resource_type` nor `resource_id` is surfaced on its own: `activity_id` is already the
+composite `{resourceType}_{resourceId}` (see `activity_handle.py`), so the two halves are always
+delivered together. A bare `resource_id` would be an id with no collection to look it up in —
+unusable on its own, and easy to mistake for something `get_activity_detail` accepts. `type`
+already says which stream a record came from.
 
 Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurred_at`) use
 `validation_alias` + `from_attributes`. Gist conversion, recipient capping, and the

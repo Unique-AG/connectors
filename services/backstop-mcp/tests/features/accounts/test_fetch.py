@@ -9,7 +9,7 @@ from backstop_mcp.features.accounts import (
     fetch_accounts_for_party,
     fetch_accounts_for_product,
 )
-from tests.helpers import BASE_URL, resource
+from tests.helpers import BASE_URL, recorded_params, resource
 
 _ACCOUNTS_URL = f"{BASE_URL}/accounts"
 _NEXT_PAGE = "/accounts?page[offset]=100"
@@ -57,6 +57,7 @@ def _page(
     *accounts: dict[str, object],
     included: Sequence[dict[str, object]] = (),
     next_url: str | None = None,
+    total_count: int | None = None,
 ) -> httpx.Response:
     payload: dict[str, object] = {
         "data": list(accounts),
@@ -64,7 +65,26 @@ def _page(
     }
     if next_url is not None:
         payload["links"] = {"next": next_url}
+    if total_count is not None:
+        payload["meta"] = {"totalResourceCount": total_count}
     return httpx.Response(200, json=payload)
+
+
+# The attributes `AccountAttributes` reads. `fields=` is what keeps a full walk affordable, and
+# what would silently blank a column if this set ever fell behind the model.
+_EXPECTED_FIELDS = {
+    "name",
+    "currency",
+    "accountStartDate",
+    "closedDate",
+    "ownershipType",
+    "investorQualification",
+    "isEmployeeAccount",
+    "isGpAccount",
+    "amlCheckComplete",
+    "newIssueEligible",
+    "usDomiciled",
+}
 
 
 class TestFetchAccountsForProduct:
@@ -94,6 +114,7 @@ class TestFetchAccountsForProduct:
         assert params["filter[product.id][eq]"] == _PRODUCT_ID
         assert params["include"] == "owner,investorType"
         assert params["page[limit]"] == "100"
+        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
         assert "product" not in params["include"]
         assert len(listing.accounts) == 1
         assert listing.accounts[0].owner is not None
@@ -195,6 +216,7 @@ class TestFetchAccountsForParty:
         assert "filter[owner.id][eq]" not in params
         assert "filter[owner][eq]" not in params
         assert params["include"] == "owner,investorType,product"
+        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
         assert listing.accounts[0].product is not None
         assert listing.accounts[0].product.short_name == "CGUP"
 
@@ -273,6 +295,24 @@ class TestFetchAccountsForParty:
         assert [account.id for account in listing.accounts] == ["1"]
         assert listing.accounts[0].owner is not None
         assert listing.accounts[0].owner.id == _OWNER_ID
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_pages_by_offset_when_backstop_reports_a_total(
+        self, client: BackstopClient
+    ) -> None:
+        """815 accounts is 9 pages; serially that is 97s, by offset 9s."""
+        route = respx.get(_ACCOUNTS_URL).mock(
+            side_effect=[
+                _page(_account("1", owner_id=_OWNER_ID, name="First"), total_count=2),
+                _page(_account("2", owner_id=_OWNER_ID, name="Second"), total_count=2),
+            ]
+        )
+
+        listing = await fetch_accounts_for_party(client, owner_id=_OWNER_ID)
+
+        assert [account.id for account in listing.accounts] == ["1", "2"]
+        assert sorted(params["page[offset]"] for params in recorded_params(route)) == ["0", "1"]
 
     @pytest.mark.asyncio
     @respx.mock

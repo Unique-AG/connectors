@@ -11,6 +11,7 @@ from backstop_mcp.server.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.server.tools.get_activity_history import get_activity_history
 from backstop_mcp.server.tools.get_opportunities import get_opportunities
 from backstop_mcp.server.tools.get_organization import get_organization
+from backstop_mcp.server.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.server.tools.get_person import get_person
 from backstop_mcp.server.tools.get_product_positions import get_product_positions
 from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
@@ -28,4 +29,5 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_opportunities,
     get_product_positions,
     get_accounts_for_party,
+    get_people_for_party,
 )

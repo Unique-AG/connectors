@@ -10,7 +10,9 @@ Backstop CRM. People and organizations are the records; tools own different ques
 
 Contact details (emails, locations, primary contact, the organization a person works at): \
 get_person / get_organization with `include`. `representative` is our internal account owner, \
-not a way to reach the investor. Retired email addresses are flagged — do not write to them.
+not a way to reach the investor. Retired email addresses are flagged — do not write to them. \
+People at an organization, with employment status there: get_people_for_party. \
+`numberOfEmployees` on the organization record is not a roster.
 
 Meetings, calls, notes, emails, documents: get_activity_history, then get_activity_detail \
 for a full body. Do not look for those on get_person / get_organization.

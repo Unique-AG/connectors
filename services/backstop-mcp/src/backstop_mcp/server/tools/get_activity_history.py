@@ -106,8 +106,9 @@ async def get_activity_history(
             "streams": list(args.continuations),
         },
     )
+    party_path = f"/{args.segment}/{quote(args.entity_id, safe='')}"
     document = await client.get(
-        f"/{args.segment}/{quote(args.entity_id, safe='')}",
+        party_path,
         schema=BackstopApiResourceDocument[PartyAttributes],
     )
     page_calls: dict[ActivityType, Coroutine[None, None, ActivityPage | EmailPage]] = {
@@ -151,7 +152,7 @@ async def get_activity_history(
             next=grouped.next,
         )
 
-    attributes = document.data.attributes
+    attributes = document.require_data(path=party_path).attributes
     open_streams = [
         activity_type for activity_type, group in groups.items() if group.next is not None
     ]

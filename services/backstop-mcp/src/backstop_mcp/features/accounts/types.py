@@ -14,6 +14,7 @@ __all__ = [
     "AccountRecord",
     "AumReconciliation",
     "ProductPositions",
+    "InvestorQualification",
     "InvestorType",
     "ProductCandidate",
     "ProductResolution",
@@ -85,6 +86,15 @@ type ProductCandidate = Candidate[ResolvedProduct]
 type ProductResolution = Resolution[ResolvedProduct]
 
 
+class InvestorQualification(BaseModel):
+    """`attributes.investorQualification` on an account: `{status?, option?}`."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", frozen=True)
+
+    status: _CleanStr = None
+    option: _CleanStr = None
+
+
 class AccountAttributes(BaseModel):
     """Wire shape of an `accounts` resource's `attributes` used for listing."""
 
@@ -95,11 +105,13 @@ class AccountAttributes(BaseModel):
     account_start_date: LenientDate = Field(default=None, alias="accountStartDate")
     closed_date: LenientDate = Field(default=None, alias="closedDate")
     ownership_type: _StrippedStr | None = Field(default=None, alias="ownershipType")
-    investor_qualification: _StrippedStr | None = Field(default=None, alias="investorQualification")
+    investor_qualification: InvestorQualification | None = Field(
+        default=None, alias="investorQualification"
+    )
     is_employee_account: bool | None = Field(default=None, alias="isEmployeeAccount")
     is_gp_account: bool | None = Field(default=None, alias="isGpAccount")
     aml_check_complete: bool | None = Field(default=None, alias="amlCheckComplete")
-    new_issue_eligible: bool | None = Field(default=None, alias="newIssueEligible")
+    new_issue_eligible: _StrippedStr | None = Field(default=None, alias="newIssueEligible")
     us_domiciled: bool | None = Field(default=None, alias="usDomiciled")
 
 
@@ -160,11 +172,11 @@ class AccountRecord(BaseModel):
     account_start_date: date | None = None
     closed_date: date | None = None
     ownership_type: str | None = None
-    investor_qualification: str | None = None
+    investor_qualification: InvestorQualification | None = None
     is_employee_account: bool | None = None
     is_gp_account: bool | None = None
     aml_check_complete: bool | None = None
-    new_issue_eligible: bool | None = None
+    new_issue_eligible: str | None = None
     us_domiciled: bool | None = None
     is_open: bool
 
@@ -214,7 +226,7 @@ class SeriesFigure(BaseModel):
     `latest` would report a live position as "no data"; keeping only `valued` would hide that
     Backstop has since moved the series on. Both are kept and the caller is told which is which.
 
-    `valued` is `None` only when no point in the series carries a value at all.
+    `valued` is `None` only when no point on the fetched page carries a value at all.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)

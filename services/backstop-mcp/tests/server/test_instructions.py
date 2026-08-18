@@ -8,7 +8,8 @@ class TestInstructions:
         assert "get_opportunities" in INSTRUCTIONS
         assert "get_product_positions" in INSTRUCTIONS
         assert "assets under management" in INSTRUCTIONS
-        assert "get_accounts_for_party" in INSTRUCTIONS
+        assert "get_people_for_party" in INSTRUCTIONS
+        assert "numberOfEmployees" in INSTRUCTIONS
         assert "get_activity_history" in INSTRUCTIONS
         assert "representative" in INSTRUCTIONS
         assert "list_custom_fields" in INSTRUCTIONS

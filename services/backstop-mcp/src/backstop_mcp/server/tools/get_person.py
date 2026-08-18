@@ -204,7 +204,7 @@ async def get_person(
         params={"include": include_param} if include_param else None,
         schema=BackstopApiResourceDocument[PersonAttributes],
     )
-    attributes = document.data.attributes
+    attributes = document.require_data(path=path).attributes
     index = get_employment_index_factory().index(**entity_relationships(document))
 
     return PersonResolvedResponse(

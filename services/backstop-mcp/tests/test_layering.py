@@ -70,6 +70,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.data_hygiene",
     "backstop_mcp.features.includes",
     "backstop_mcp.features.opportunities",
+    "backstop_mcp.features.org_people",
     "backstop_mcp.features.party_resolver",
     "backstop_mcp.server.tools",
 )

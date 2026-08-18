@@ -137,34 +137,6 @@ class TestNoMatch:
         assert result.scope == "products"
 
 
-class TestProductIdSelector:
-    def test_product_id_looked_up_in_the_index(self) -> None:
-        result = match_product(CATALOG, "1292283", id_only=True)
-
-        assert isinstance(result, Resolved)
-        assert result.value.name == "Capstone Global Unconstrained Portfolio"
-        assert result.value.short_name == "CGUP"
-
-    def test_unknown_product_id_is_not_found(self) -> None:
-        result = match_product(CATALOG, "999", id_only=True)
-
-        assert isinstance(result, NotFound)
-        assert result.query == "999"
-        assert result.scope == "products"
-
-    def test_product_id_does_not_fall_through_to_short_name(self) -> None:
-        result = match_product(CATALOG, "CGUP", id_only=True)
-
-        assert isinstance(result, NotFound)
-        assert result.query == "CGUP"
-
-    def test_product_id_does_not_fall_through_to_name(self) -> None:
-        result = match_product(CATALOG, "Unconstrained", id_only=True)
-
-        assert isinstance(result, NotFound)
-        assert result.query == "Unconstrained"
-
-
 class TestLabel:
     def test_label_includes_short_name_when_present(self) -> None:
         assert product_label(CGUP) == "Capstone Global Unconstrained Portfolio (CGUP)"

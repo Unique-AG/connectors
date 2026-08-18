@@ -7,7 +7,13 @@ from backstop_mcp.features.accounts.project import (
     project_owner,
     split_open,
 )
-from backstop_mcp.features.accounts.types import AccountAttributes, AccountOwner, AccountRecord
+from backstop_mcp.features.accounts.responses import account_row_response
+from backstop_mcp.features.accounts.types import (
+    AccountAttributes,
+    AccountOwner,
+    AccountRecord,
+    InvestorQualification,
+)
 from tests.helpers import resource
 
 _AccountResource = AccountApiResponse
@@ -50,6 +56,30 @@ def _owner(
         else {"resourceType": resource_type, "resourceId": specific_id or owner_id}
     )
     return resource(owner_id, json_api_type, name=name, specificResource=specific)
+
+
+class TestAccountAttributesWire:
+    def test_accepts_qualification_object_and_eligibility_enum(self) -> None:
+        attributes = AccountAttributes.model_validate(
+            {
+                "name": "Row",
+                "investorQualification": {"status": "REG_UNKNOWN", "option": "UNKNOWN"},
+                "newIssueEligible": "NOT_ELIGIBLE",
+            }
+        )
+
+        assert attributes.investor_qualification == InvestorQualification(
+            status="REG_UNKNOWN", option="UNKNOWN"
+        )
+        assert attributes.new_issue_eligible == "NOT_ELIGIBLE"
+
+    def test_qualification_may_omit_status(self) -> None:
+        attributes = AccountAttributes.model_validate(
+            {"investorQualification": {"option": "UNKNOWN"}, "newIssueEligible": "N/A"}
+        )
+
+        assert attributes.investor_qualification == InvestorQualification(option="UNKNOWN")
+        assert attributes.new_issue_eligible == "N/A"
 
 
 class TestAccountIsOpen:
@@ -145,11 +175,11 @@ class TestProjectAccount:
             currency="USD",
             accountStartDate="2019-03-01",
             ownershipType="Direct",
-            investorQualification="QP",
+            investorQualification={"status": "REG_UNKNOWN", "option": "UNKNOWN"},
             isEmployeeAccount=False,
             isGpAccount=False,
             amlCheckComplete=True,
-            newIssueEligible=True,
+            newIssueEligible="ELIGIBLE",
             usDomiciled=False,
         )
 
@@ -173,6 +203,10 @@ class TestProjectAccount:
         assert record.account_start_date == date(2019, 3, 1)
         assert record.is_open is True
         assert record.aml_check_complete is True
+        assert record.investor_qualification == InvestorQualification(
+            status="REG_UNKNOWN", option="UNKNOWN"
+        )
+        assert record.new_issue_eligible == "ELIGIBLE"
 
     def test_missing_includes_leave_fields_unset(self) -> None:
         record = project_account(
@@ -227,3 +261,29 @@ class TestSplitOpen:
 
         assert [account.id for account in listing.accounts] == ["1", "2"]
         assert listing.closed_omitted == 0
+
+
+class TestAccountRowResponse:
+    def test_passes_through_qualification_object_and_eligibility_enum(self) -> None:
+        row = account_row_response(
+            AccountRecord(
+                id="1",
+                is_open=True,
+                investor_qualification=InvestorQualification(
+                    status="REG_UNKNOWN", option="UNKNOWN"
+                ),
+                new_issue_eligible="ELIGIBLE",
+            )
+        )
+
+        assert row.investor_qualification is not None
+        assert row.investor_qualification.status == "REG_UNKNOWN"
+        assert row.investor_qualification.option == "UNKNOWN"
+        assert row.new_issue_eligible == "ELIGIBLE"
+
+    def test_empty_qualification_is_omitted(self) -> None:
+        row = account_row_response(
+            AccountRecord(id="1", is_open=True, investor_qualification=InvestorQualification())
+        )
+
+        assert row.investor_qualification is None

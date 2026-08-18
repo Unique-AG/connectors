@@ -13,7 +13,6 @@ help.
 import asyncio
 import logging
 from collections.abc import Sequence
-from datetime import date
 from typing import Literal
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
@@ -32,7 +31,7 @@ from backstop_mcp.features.accounts.types import (
 
 logger = logging.getLogger(__name__)
 
-# Three series per account, each 1-3 requests, behind a per-user gate of 5. 500 accounts is
+# Three series per account, one request each, behind a per-user gate of 5. 500 accounts is
 # already ~1500 queued requests; past that a single tool call stops being a call and starts
 # being a batch job.
 MAX_POSITION_ACCOUNTS = 500
@@ -54,25 +53,16 @@ _FIELD: dict[SeriesName, Literal["balance", "invested", "redemptions"]] = {
 async def fetch_positions(
     client: BackstopClient,
     accounts: Sequence[AccountRecord],
-    *,
-    today: date,
 ) -> tuple[AccountPosition, ...]:
     """Attach the three series to every account. Order matches `accounts`."""
     if not accounts:
         return ()
-    return tuple(
-        await asyncio.gather(*(_position(client, account, today=today) for account in accounts))
-    )
+    return tuple(await asyncio.gather(*(_position(client, account) for account in accounts)))
 
 
-async def _position(
-    client: BackstopClient,
-    account: AccountRecord,
-    *,
-    today: date,
-) -> AccountPosition:
+async def _position(client: BackstopClient, account: AccountRecord) -> AccountPosition:
     results = await asyncio.gather(
-        *(_series_point(client, account.id, series, today=today) for series in _SERIES),
+        *(_series_point(client, account.id, series) for series in _SERIES),
         return_exceptions=True,
     )
     figures: dict[str, SeriesFigure | None] = {
@@ -106,12 +96,11 @@ async def fetch_product_positions(
     listing: AccountListing,
     *,
     product: ResolvedProduct,
-    today: date,
 ) -> ProductPositions:
     """Fan out account series and product assets under management (AUM).
 
-    AUM is the product's total reported value. Flag when it does not match the sum of
-    returned account balances.
+    AUM is the product's total reported value — the latest `/aums` point, same as each
+    account series. Flag when it does not match the sum of returned account balances.
     """
     fanned = listing.accounts[:MAX_POSITION_ACCOUNTS]
     accounts_omitted = len(listing.accounts) - len(fanned)
@@ -125,8 +114,8 @@ async def fetch_product_positions(
             },
         )
     accounts, aum = await asyncio.gather(
-        fetch_positions(client, fanned, today=today),
-        fetch_product_aum(client, product.id, today=today),
+        fetch_positions(client, fanned),
+        fetch_product_aum(client, product.id),
     )
     return ProductPositions(
         product=product,
@@ -138,14 +127,9 @@ async def fetch_product_positions(
     )
 
 
-async def fetch_product_aum(
-    client: BackstopClient,
-    product_id: str,
-    *,
-    today: date,
-) -> SeriesFigure | None:
+async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFigure | None:
     try:
-        return await fetch_latest_figure(client, f"/products/{product_id}/aums", today=today)
+        return await fetch_latest_figure(client, f"/products/{product_id}/aums")
     except BackstopAuthError:
         raise
     except Exception as exc:
@@ -188,7 +172,5 @@ async def _series_point(
     client: BackstopClient,
     account_id: str,
     series: SeriesName,
-    *,
-    today: date,
 ) -> SeriesFigure | None:
-    return await fetch_latest_figure(client, f"/accounts/{account_id}/{series}", today=today)
+    return await fetch_latest_figure(client, f"/accounts/{account_id}/{series}")

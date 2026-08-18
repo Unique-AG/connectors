@@ -53,6 +53,7 @@ class EntityRelationshipRef(StrEnum):
 
     RELATIONSHIPS = "entityRelationships"
     TYPE = "entityRelationshipType"
+    RELATIONSHIPS_RESOURCE = "entity-relationships"
     TYPES_RESOURCE = "entity-relationship-types"
 
 

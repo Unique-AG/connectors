@@ -1,6 +1,7 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from backstop_mcp.backstop_client.errors import BackstopApiError
 from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
@@ -42,9 +43,31 @@ class TestBackstopApiResourceDocument:
         assert isinstance(doc.data.attributes, _Attrs)
         assert doc.data.attributes.name == "Acme"
 
-    def test_rejects_null_data(self) -> None:
-        with pytest.raises(ValidationError):
-            BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+    def test_accepts_null_data_so_a_missing_record_is_not_a_schema_error(self) -> None:
+        """`/entity-activity-details/{unknown}` answers `200 {"data": null}` rather than 404.
+
+        Modelling `data` as required turned that into a `BackstopResponseSchemaError` reading
+        like a broken schema instead of a missing record.
+        """
+        doc = BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+
+        assert doc.data is None
+
+    def test_require_data_turns_null_primary_data_into_a_404(self) -> None:
+        doc = BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+
+        with pytest.raises(BackstopApiError) as exc_info:
+            doc.require_data(path="/entity-activity-details/999")
+
+        assert exc_info.value.status_code == 404
+        assert "/entity-activity-details/999" in str(exc_info.value)
+
+    def test_require_data_returns_the_resource_when_present(self) -> None:
+        doc = BackstopApiResourceDocument[_Attrs].model_validate(
+            {"data": {"id": "1", "type": "party", "attributes": {"name": "Acme"}}}
+        )
+
+        assert doc.require_data(path="/party/1").id == "1"
 
     def test_rejects_a_collection(self) -> None:
         with pytest.raises(ValidationError):

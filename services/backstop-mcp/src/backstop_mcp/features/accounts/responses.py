@@ -18,6 +18,7 @@ from backstop_mcp.features.accounts.types import (
     AccountOwner,
     AccountPosition,
     AccountRecord,
+    InvestorQualification,
     InvestorType,
     ProductPositions,
     ResolvedProduct,
@@ -128,6 +129,25 @@ class InvestorTypeResponse(OmitNoneModel):
     name: str | None = Field(default=None, description="Investor-type name, e.g. 'Fund of Funds'.")
 
 
+class InvestorQualificationResponse(OmitNoneModel):
+    """Backstop's `investorQualification` object on the account."""
+
+    status: str | None = Field(
+        default=None,
+        description=(
+            "Regulatory status Backstop stored (e.g. 'REG_UNKNOWN'). Omitted when Backstop "
+            "did not send one."
+        ),
+    )
+    option: str | None = Field(
+        default=None,
+        description=(
+            "Qualification option Backstop stored (e.g. 'UNKNOWN'). Omitted when Backstop "
+            "did not send one."
+        ),
+    )
+
+
 class UnvaluedPointResponse(OmitNoneModel):
     """A dated point Backstop has published without a number yet (its UI shows `-`)."""
 
@@ -154,7 +174,7 @@ class FigureResponse(OmitNoneModel):
         default=None,
         description=(
             "The point's amount, in the account's `currency`. `0.0` is a real published zero, "
-            "not a missing series. Absent means no point in the whole series carries a number "
+            "not a missing series. Absent means no point in the fetched page carries a number "
             "yet — `date` is then the newest dated point, not an amount you can report."
         ),
     )
@@ -228,11 +248,11 @@ class AccountRowResponse(OmitNoneModel):
             "Omitted when unset."
         ),
     )
-    investor_qualification: str | None = Field(
+    investor_qualification: InvestorQualificationResponse | None = Field(
         default=None,
         description=(
-            "Investor accreditation as Backstop stores it (e.g. 'QP' for qualified purchaser). "
-            "Omitted when unset."
+            "Investor accreditation as `{status?, option?}`. Omitted when Backstop did not "
+            "send the object."
         ),
     )
     is_employee_account: bool | None = Field(
@@ -252,10 +272,11 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=("True when Backstop marks anti-money-laundering (AML) checks as complete."),
     )
-    new_issue_eligible: bool | None = Field(
+    new_issue_eligible: str | None = Field(
         default=None,
         description=(
-            "True when Backstop marks the account eligible for new-issue securities (IPOs)."
+            "New-issue (IPO) eligibility as Backstop stores it (`ELIGIBLE`, `NOT_ELIGIBLE`, "
+            "`N/A`, `UNKNOWN`). Omitted when unset."
         ),
     )
     us_domiciled: bool | None = Field(
@@ -355,6 +376,14 @@ def investor_type_response(investor_type: InvestorType | None) -> InvestorTypeRe
     return InvestorTypeResponse(id=investor_type.id, name=investor_type.name)
 
 
+def investor_qualification_response(
+    qualification: InvestorQualification | None,
+) -> InvestorQualificationResponse | None:
+    if qualification is None or (qualification.status is None and qualification.option is None):
+        return None
+    return InvestorQualificationResponse(status=qualification.status, option=qualification.option)
+
+
 def account_row_response(account: AccountRecord) -> AccountRowResponse:
     return AccountRowResponse.model_validate(
         {
@@ -362,6 +391,9 @@ def account_row_response(account: AccountRecord) -> AccountRowResponse:
             "owner": owner_response(account.owner),
             "investor_type": investor_type_response(account.investor_type),
             "product": product_ref_response(account.product) if account.product else None,
+            "investor_qualification": investor_qualification_response(
+                account.investor_qualification
+            ),
         }
     )
 
@@ -469,10 +501,10 @@ class ProductPositionsResolvedResponse(OmitNoneModel):
     )
     aum_diverges: bool = Field(
         description=(
-            "True when `aum_difference` exceeds 0.5% of assets under management (AUM). The two "
-            "are as-of different dates and the open default excludes closed-but-still-valued "
-            "accounts, so a small gap is normal — this is a tolerance verdict, not a failure. "
-            "Weigh `aum_difference` yourself before reporting a mismatch."
+            "True when `aum_difference` exceeds 0.5% of assets under management (AUM). The open "
+            "default excludes closed-but-still-valued accounts, so a small gap is normal — this "
+            "is a tolerance verdict, not a failure. Weigh `aum_difference` yourself before "
+            "reporting a mismatch."
         )
     )
     include_closed_hint: str | None = Field(

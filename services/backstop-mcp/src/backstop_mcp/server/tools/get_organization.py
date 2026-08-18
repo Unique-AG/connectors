@@ -156,7 +156,8 @@ async def get_organization(
     Relay that provenance to the user; do not treat record age as a staleness verdict.
 
     When you need custom field names for this organization, call `list_custom_fields` with
-    entity_types including organizations.
+    entity_types including organizations. `numberOfEmployees` is not a roster — use
+    `get_people_for_party` for the people Backstop actually links to this organization.
     """
     client = await get_backstop_client()
     result = await resolve_party(
@@ -177,7 +178,7 @@ async def get_organization(
         params={"include": plan.param} if plan.param else None,
         schema=BackstopApiResourceDocument[OrganizationAttributes],
     )
-    attributes = document.data.attributes
+    attributes = document.require_data(path=path).attributes
     return OrganizationResolvedResponse(
         organization=attributes,
         resolved=party_response(

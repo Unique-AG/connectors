@@ -8,29 +8,39 @@ display name. Product callers also type `productShortName` (`CGUP`), and that pa
 - Searching the same string as `ORGANIZATION` can hit a CRM company whose id no account
   `filter[product.id]` accepts.
 
-The catalog is `GET /products?fields=name,configuration`, walked to the end 200 rows at a page.
-Match is local: id, then exact `productShortName`, then exact name, then name substring.
-Duplicate short names (`BLUC`) go through one `elicit_choice`. The same response hydrates
-`short_name`.
+A trusted `product_id` is read straight from `GET /products/{id}?fields=name,configuration`, and
+a 404 is the `not_found`. That is one 300-byte request that cannot be defeated by catalog size,
+which is what an echoed id needs — from a prior resolve, or handed back by
+`get_accounts_for_party`.
+
+A name or short name has no by-id equivalent — `/products` filters only on `createdTimestamp,
+entityTypeId, modifiedTimestamp, name, otherId`, so nothing filters on either one. That path reads
+the catalog — `GET /products?fields=name,configuration`, walked to the end 200 rows at a page —
+and matches locally: exact id, then exact `productShortName`, then exact name, then name
+substring. Duplicate short names (`BLUC`) go through one `elicit_choice`. The same response
+hydrates `short_name`.
 
 Walking it whole rather than reading page one is what lets `not_found` mean *absent* instead of
-*not on this page* — a trusted `product_id` echoed from a prior resolve, or handed back by
-`get_accounts_for_party`, has to resolve on any catalog size, and `/products` cannot be filtered
-down to one id (`filter[shortName]` is 400, and nothing filters on id here).
-
-Every product is read on every call, and the catalog is small enough for that: this instance
-returns 72 in one page, all with a `productShortName`, three of them duplicated (`PKAP`, `BLUC`,
-`CPOL`). Past `LARGE_CATALOG` the assumption is no longer safe — re-reading the whole catalog
-per call starts costing real requests, and a TTL cache like the opportunity-stage vocabulary
-would be the answer. So that case warns rather than passing silently.
+*not on this page*. The catalog is small enough for that: this instance returns 72 in one page,
+all with a `productShortName`, three of them duplicated (`PKAP`, `BLUC`, `CPOL`). Past
+`LARGE_CATALOG` the assumption is no longer safe — re-reading the whole catalog per search starts
+costing real requests, and a TTL cache like the opportunity-stage vocabulary would be the answer.
+So that case warns rather than passing silently.
 """
 
 import logging
 from collections.abc import Sequence
+from http import HTTPStatus
+from urllib.parse import quote
 
 from fastmcp import Context
 
-from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopApiResource,
+    BackstopApiResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.features.accounts.types import (
     ProductAttributes,
     ProductResolution,
@@ -56,8 +66,9 @@ LARGE_CATALOG = 400
 
 _SCOPE = "products"
 
-# Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
+# Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _ProductResource = BackstopApiResource[ProductAttributes]
+_ProductDocument = BackstopApiResourceDocument[ProductAttributes]
 
 
 def product_label(product: ResolvedProduct) -> str:
@@ -81,23 +92,18 @@ def _resolution(hits: Sequence[ResolvedProduct], *, query: str) -> ProductResolu
     )
 
 
-def match_product(
-    products: Sequence[ResolvedProduct],
-    query: str,
-    *,
-    id_only: bool = False,
-) -> ProductResolution:
+def match_product(products: Sequence[ResolvedProduct], query: str) -> ProductResolution:
     """Match `query` against a parsed product index.
 
-    Order: exact id, exact short name, exact name, name substring. `id_only` is the
-    `product_id=` path: look up the id so the name is filled in, and do not fall through.
+    Order: exact id, exact short name, exact name, name substring. A caller can type an id into
+    `product`, so the id match stays here even though `product_id=` is answered by id lookup.
     """
     query = query.strip()
     if not query:
         return NotFound(query=query, scope=_SCOPE)
 
     id_hits = tuple(product for product in products if product.id == query)
-    if id_only or id_hits:
+    if id_hits:
         return _resolution(id_hits, query=query)
 
     needle = query.casefold()
@@ -125,6 +131,35 @@ def match_product(
     return _resolution(substring_hits, query=query)
 
 
+async def _fetch_product(client: BackstopClient, product_id: str) -> ProductResolution:
+    """Read one product by trusted id, or `NotFound` when Backstop holds no such record.
+
+    Only a missing record is an answer; every other error stays an error, so a permissions or
+    transport failure is never reported to the model as "no such product". `require_data` is
+    inside the `try` so that both shapes Backstop uses for a missing record reach the same
+    `NotFound` — a real 404, which is what `/products/{unknown}` sends, and the
+    `200 {"data": null}` some other by-id endpoints answer with instead.
+    """
+    product_id = product_id.strip()
+    if not product_id:
+        return NotFound(query=product_id, scope=_SCOPE)
+
+    path = f"{_PRODUCTS_PATH}/{quote(product_id, safe='')}"
+    try:
+        document = await client.get(
+            path, params={"fields": _PRODUCT_FIELDS}, schema=_ProductDocument
+        )
+        resource = document.require_data(path=path)
+    except BackstopApiError as exc:
+        if exc.status_code != HTTPStatus.NOT_FOUND:
+            raise
+        return NotFound(query=product_id, scope=_SCOPE)
+
+    return _resolution(
+        (ResolvedProduct.from_attributes(resource.id, resource.attributes),), query=product_id
+    )
+
+
 async def resolve_product(
     ctx: Context,
     client: BackstopClient,
@@ -134,12 +169,17 @@ async def resolve_product(
 ) -> ProductResolution:
     """Resolve one product from a trusted id, a short name, or a name search.
 
-    Exactly one of `product_id` or `product` must be set. Ambiguous matches elicit once.
+    Exactly one of `product_id` or `product` must be set. A trusted id is one by-id request; a
+    search reads the catalog. Ambiguous matches elicit once.
     """
     assert (product_id is None) != (product is None), (
         "Exactly one of product_id or product must be provided"
     )
 
+    if product_id is not None:
+        return await _fetch_product(client, product_id)
+
+    assert product is not None
     page = await client.paginate(
         _PRODUCTS_PATH,
         schema=_ProductResource,
@@ -160,12 +200,7 @@ async def resolve_product(
             },
         )
 
-    if product_id is not None:
-        outcome = match_product(products, product_id.strip(), id_only=True)
-    else:
-        assert product is not None
-        outcome = match_product(products, product)
-
+    outcome = match_product(products, product)
     if isinstance(outcome, Ambiguous):
         return await elicit_choice(
             ctx,
