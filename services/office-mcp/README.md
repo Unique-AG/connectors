@@ -77,8 +77,9 @@ On-Behalf-Of exchange hands tools the caller's Graph token as a string; this pac
 - **Throttling is the SDK's.** Its retry middleware waits out Retry-After on 429/503/504 three
   times, on asyncio.sleep, so a wait never blocks the event loop. This is Graph's documented
   contract. Nothing here re-implements it. There is no rate limiter. What is added is the typed
-  outcome: when retries are outlasted, callers get GraphThrottled with retry_after_seconds, not
-  a status code to re-interpret.
+  outcome: a 429 that outlasts the retries reaches callers as GraphThrottled with
+  retry_after_seconds, not a status code to re-interpret. An outlasted 503 or 504 reaches them
+  as GraphUnavailable.
 
 - **Errors are four categories**, because those are the four remedies: GraphThrottled (429),
   GraphForbidden (401/403), GraphNotFound (404), GraphUnavailable (5xx or unreachable). Wrap

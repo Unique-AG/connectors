@@ -1,7 +1,8 @@
 """Configuration for the Graph transport, injected not read from environment.
 
 graph_client/ cannot import office_mcp.config. A transport that reads the environment can
-diverge from the app's config. create_app translates app config into this type and injects it.
+diverge from the app's config. create_app will translate app config into this type and
+inject it.
 """
 
 from dataclasses import dataclass
