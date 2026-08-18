@@ -11,6 +11,13 @@ display name. Product callers also type `productShortName` (`CGUP`), and that pa
 The catalog is one `GET /products?fields=name,configuration` page (limit 200). Match is local:
 id, then exact `productShortName`, then exact name, then name substring. Duplicate short names
 (`BLUC`) go through one `elicit_choice`. The same response hydrates `short_name`.
+
+That page is the whole catalog on any instance we have seen, but it is not guaranteed to be. A
+trusted `product_id` must not depend on it: the index is there to *hydrate* an id with a name,
+not to authorize it, and `/accounts?filter[product.id][eq]` accepts the id either way. So a
+`product_id` missing from a **truncated** index resolves unhydrated rather than `not_found` —
+the page could not prove absence. A complete index can, and still returns `not_found`, which is
+what keeps an invented id from silently becoming "this product has no investors".
 """
 
 import logging
@@ -28,6 +35,7 @@ from backstop_mcp.features.resolution import (
     Ambiguous,
     Candidate,
     NotFound,
+    Resolved,
     elicit_choice,
     from_candidates,
 )
@@ -146,7 +154,14 @@ async def resolve_product(
         )
 
     if product_id is not None:
-        outcome = match_product(products, product_id.strip(), id_only=True)
+        trusted = product_id.strip()
+        outcome = match_product(products, trusted, id_only=True)
+        if trusted and truncated and isinstance(outcome, NotFound):
+            logger.info(
+                "accounts.products.trusted_id_unhydrated",
+                extra={"product_id": trusted, "total_count": page.total_count},
+            )
+            return Resolved(value=ResolvedProduct(id=trusted))
     else:
         assert product is not None
         outcome = match_product(products, product)

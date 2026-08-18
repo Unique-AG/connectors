@@ -189,6 +189,52 @@ class TestResolveProductId:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_a_trusted_id_survives_a_truncated_index_unhydrated(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
+
+        outcome = await resolve_product(ctx_never_elicit(), client, product_id="999999")
+
+        assert isinstance(outcome, Resolved)
+        assert outcome.value.id == "999999"
+        assert outcome.value.name is None
+        assert outcome.value.short_name is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_truncated_index_still_hydrates_an_id_it_does_hold(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
+
+        outcome = await resolve_product(ctx_never_elicit(), client, product_id="1292283")
+
+        assert isinstance(outcome, Resolved)
+        assert outcome.value.short_name == "CGUP"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_blank_product_id_is_not_found_even_when_truncated(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index(next_url=_NEXT_PAGE))
+
+        outcome = await resolve_product(ctx_never_elicit(), client, product_id="   ")
+
+        assert isinstance(outcome, NotFound)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_complete_index_can_prove_an_id_absent(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+
+        outcome = await resolve_product(ctx_never_elicit(), client, product_id="999999")
+
+        assert isinstance(outcome, NotFound)
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_unknown_product_id_is_not_found(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
 
