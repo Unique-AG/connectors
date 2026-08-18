@@ -368,6 +368,31 @@ class TestNarrowingWhatComesBack:
 
         assert [turn.speaker for turn in read.turns] == ["Ada Lovelace", "Ada Lovelace"]
 
+    async def test_an_entity_in_a_speaker_name_is_unescaped_like_the_words(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """WebVTT escapes `&` inside a cue payload, so a display name that holds one arrives
+        encoded. The name is what a model reports and what `speaker` matches against, so it is
+        unescaped exactly as the words are. Left encoded, a filter written from the reported name
+        would answer "nobody said that" about somebody who spoke."""
+        graph.get(_CONTENT).mock(
+            return_value=httpx.Response(
+                200,
+                content=(
+                    b"WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n"
+                    b"<v Ada &amp; Charles>Both of us &amp; nobody else.</v>\n"
+                ),
+            )
+        )
+
+        read = await reader.read_transcript(
+            client, handle=_transcript(), offset=0, limit=200, speaker="ada & charles"
+        )
+
+        assert [(turn.speaker, turn.text) for turn in read.turns] == [
+            ("Ada & Charles", "Both of us & nobody else.")
+        ]
+
     async def test_a_speaker_and_a_window_narrow_together(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

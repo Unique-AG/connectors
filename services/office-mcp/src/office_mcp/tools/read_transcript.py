@@ -296,7 +296,7 @@ def _turn(block: str, *, attributed: bool) -> TranscriptTurn | None:
 def _spoken(payload: str, *, attributed: bool) -> tuple[str | None, str]:
     """Payload as (speaker, words). Extract speaker before stripping markup."""
     voice = _VOICE.search(payload) if attributed else None
-    speaker = voice.group("speaker").strip() if voice is not None else None
+    speaker = html.unescape(voice.group("speaker")).strip() if voice is not None else None
     said = voice.group("said") if voice is not None else payload
     words = html.unescape(_MARKUP.sub("", said)).replace("\xa0", " ")
     return (speaker or None, " ".join(words.split()))
