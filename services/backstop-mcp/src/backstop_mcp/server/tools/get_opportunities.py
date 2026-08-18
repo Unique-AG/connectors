@@ -1,7 +1,7 @@
 """`get_opportunities`: a party's pipeline, with stage names and stage history.
 
-Resolves the party the same way `get_activity_history` does (`party_type` plus a trusted
-`party_id` or a `search`, with an optional `search_type` echo), then overlaps the party's
+Resolves the party the same way `get_activity_history` does (`search_type` plus a trusted
+`party_id` or a `search`), then overlaps the party's
 `/{segment}/{id}/opportunities?include=stage,stageHistory` walk with the TTL-cached stage
 vocabulary. Filtering by `status` and ordering by `dateEnteredCurrentStage` happen in memory:
 Backstop 400s `filter[isOpen]` and silently ignores `sort=` on this sub-collection.
@@ -38,8 +38,6 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client, get_opportunity_stages_service
 
 logger = logging.getLogger(__name__)
-
-type PartyKind = Literal["organization", "person"]
 
 
 class OpportunitiesResolvedResponse(OmitNoneModel):
@@ -88,16 +86,6 @@ type GetOpportunitiesResponse = (
 )
 
 
-def search_type_for(party_type: PartyKind, search_type: SearchType | None) -> SearchType:
-    if search_type is None:
-        return "organizations" if party_type == "organization" else "people"
-    if party_type == "organization" and search_type != "organizations":
-        raise ValueError("search_type must be organizations when party_type is organization")
-    if party_type == "person" and search_type == "organizations":
-        raise ValueError("search_type must not be organizations when party_type is person")
-    return search_type
-
-
 def _resolved_response(
     *, resolved: ResolvedPartyResponse, fetched: OpportunityFetchResult
 ) -> OpportunitiesResolvedResponse:
@@ -121,9 +109,17 @@ def _resolved_response(
 )
 async def get_opportunities(
     ctx: Context,
-    party_type: Annotated[
-        PartyKind,
-        Field(description="Which kind of party to fetch the pipeline for."),
+    search_type: Annotated[
+        SearchType,
+        Field(
+            description=(
+                "Which Backstop collection to resolve the party against — fold the caller's "
+                "wording to one of the four. A company, firm, fund, institution, or manager is "
+                "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
+                "when a prior resolve echoed one (echo it back — a contact or employee id is "
+                "not a people id) or the caller clearly means an internal staff member."
+            ),
+        ),
     ],
     party_id: Annotated[
         str | None,
@@ -144,16 +140,6 @@ async def get_opportunities(
             ),
         ),
     ] = None,
-    search_type: Annotated[
-        SearchType | None,
-        Field(
-            description=(
-                "Collection to resolve against. Echo `search_type` from a prior resolve when "
-                "retrying with `party_id` — a contact or employee id is not a people id. "
-                "Defaults from `party_type` (people or organizations)."
-            ),
-        ),
-    ] = None,
     status: Annotated[
         OpportunityStatus,
         Field(
@@ -166,9 +152,9 @@ async def get_opportunities(
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
 
-    Pass `party_type` plus a trusted `party_id` (from a prior resolve echo — never invent or
-    guess one) or `search`. When retrying with `party_id`, echo that resolve's `search_type`
-    too if it is not `people`/`organizations` — a contact or employee id is not a people id.
+    Pass `search_type` plus a trusted `party_id` (from a prior resolve echo — never invent or
+    guess one) or `search`. When retrying with `party_id`, pass that resolve's `search_type`
+    — a contact or employee id is not a people id.
 
     There is no cursor. The whole party's pipeline is returned, filtered by `status` (`open` /
     `closed` / `all`, default `all`) and ordered newest-first by the day each deal entered its
@@ -183,7 +169,7 @@ async def get_opportunities(
     result = await resolve_party(
         ctx,
         client,
-        search_type=search_type_for(party_type, search_type),
+        search_type=search_type,
         party_id=party_id,
         search=search,
     )

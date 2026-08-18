@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
@@ -10,11 +10,15 @@ from backstop_mcp.features.resolution import Candidate, Resolution
 __all__ = [
     "AccountListing",
     "AccountOwner",
+    "AccountPosition",
     "AccountRecord",
+    "ProductPositions",
     "InvestorType",
     "ProductCandidate",
     "ProductResolution",
     "ResolvedProduct",
+    "SeriesError",
+    "SeriesName",
     "SeriesPoint",
     "SeriesPointAttributes",
 ]
@@ -198,3 +202,47 @@ class SeriesPoint(BaseModel):
     date: date
     value: float | None = None
     value_status: str | None = None
+
+
+type SeriesName = Literal["values", "totalInvested", "totalRedemptions"]
+
+
+class SeriesError(BaseModel):
+    """One series that failed for an account — siblings on the same row still stand."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    series: SeriesName
+    message: str
+
+
+class AccountPosition(BaseModel):
+    """One listed account with the three series attached.
+
+    A missing figure is `None` (empty series), never `0.0`. A `0.0` that Backstop published is
+    kept. Failures go in `errors` so one 500 does not drop the row or its siblings.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    account: AccountRecord
+    balance: SeriesPoint | None = None
+    invested: SeriesPoint | None = None
+    redemptions: SeriesPoint | None = None
+    errors: tuple[SeriesError, ...] = ()
+
+
+class ProductPositions(BaseModel):
+    """Listed accounts with figures, plus product assets under management (AUM).
+
+    AUM is the product's total reported value, not one investor's balance. `aum_diverges` is
+    set when that total does not match the sum of returned account balances.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    product: ResolvedProduct
+    accounts: tuple[AccountPosition, ...]
+    closed_omitted: int = 0
+    aum: SeriesPoint | None = None
+    aum_diverges: bool = False

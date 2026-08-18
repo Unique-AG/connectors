@@ -16,6 +16,11 @@ def object_dict(value: object) -> dict[str, object]:
     return cast(dict[str, object], value)
 
 
+def object_list(value: object) -> list[object]:
+    assert isinstance(value, list)
+    return cast(list[object], value)
+
+
 def tool_payload(result: BaseModel) -> dict[str, object]:
     return object_dict(result.model_dump(mode="json"))
 

@@ -19,5 +19,12 @@ Pipeline stage and timing: get_opportunities. `previous_stage` is the stage the 
 left, not where it is now. There is no cursor; the whole party's pipeline is returned. \
 Stage names are this instance's vocabulary, returned on each deal.
 
+Current balances and lifetime invested/redeemed for a product (tenants may say fund, \
+vehicle, or share class): get_product_positions. Each figure has its own date. \
+`valueStatus` is passed through when Backstop sends it and omitted when it does not. \
+A missing series is omitted, never zeroed. `aum` is assets under management — the \
+product's total value, not one investor's balance. Accounts a party owns: \
+get_accounts_for_party (listing and status only — no series).
+
 Custom-field names and types: list_custom_fields.
 """

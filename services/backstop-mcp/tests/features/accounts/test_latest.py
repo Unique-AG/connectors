@@ -1,8 +1,10 @@
 from datetime import date, timedelta
+from typing import cast
 
 import httpx
 import pytest
 import respx
+from respx.models import Call
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.accounts.latest import (
@@ -18,6 +20,11 @@ _URL = f"{BASE_URL}{_PATH}"
 _NEXT = f"{_PATH}?page[offset]=100"
 _NINETY_CUTOFF = (FIXED_TODAY - timedelta(days=90)).isoformat()
 _YEAR_CUTOFF = (FIXED_TODAY - timedelta(days=365)).isoformat()
+
+
+def _call_params(route: respx.Route, index: int) -> httpx.QueryParams:
+    """respx's `CallList` subclasses a bare `list`, so indexing it types as unknown."""
+    return cast(Call, route.calls[index]).request.url.params
 
 
 def _point(point_id: str, **attributes: object) -> dict[str, object]:
@@ -124,8 +131,8 @@ class TestFetchLatestPoint:
         point = await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
 
         assert route.call_count == 2
-        assert route.calls[0].request.url.params["filter[date][ge]"] == _NINETY_CUTOFF
-        assert route.calls[1].request.url.params["filter[date][ge]"] == _YEAR_CUTOFF
+        assert _call_params(route, 0)["filter[date][ge]"] == _NINETY_CUTOFF
+        assert _call_params(route, 1)["filter[date][ge]"] == _YEAR_CUTOFF
         assert point is not None
         assert point.date == date(2025, 12, 31)
         assert point.value_status is None
@@ -147,7 +154,7 @@ class TestFetchLatestPoint:
         point = await fetch_latest_point(client, _PATH, today=FIXED_TODAY)
 
         assert route.call_count == 4
-        assert "filter[date][ge]" not in route.calls[2].request.url.params
+        assert "filter[date][ge]" not in _call_params(route, 2)
         assert point is not None
         assert point.date == date(2020, 6, 15)
         assert point.value == 2.0

@@ -59,7 +59,8 @@ Backstop sends it).
 
 Each series is `GET /accounts/{id}/{series}?filter[date][ge]={cutoff}&page[limit]=100`, taking
 `max(date)` client-side. A fourth call, `GET /products/{id}/aums` with the same window, is the
-product AUM; the sum of returned balances is compared against it and a flag is set on divergence.
+product's assets under management (AUM — the product's total reported value, not one investor's
+balance); the sum of returned balances is compared against it and a flag is set on divergence.
 
 Product matching is local: `product_id`, then `productShortName`, then name (exact before
 substring). `/products` cannot filter on `shortName` (`400`). `/quick-search` of a product name as
@@ -78,8 +79,8 @@ Typical calls:
 ```json
 { "name": "get_product_positions", "arguments": { "product": "CGUP" } }
 { "name": "get_product_positions", "arguments": { "product_id": "1292283" } }
-{ "name": "get_accounts_for_party", "arguments": { "party_type": "organization", "search": "PSP Investments" } }
-{ "name": "get_accounts_for_party", "arguments": { "party_type": "organization", "party_id": "341688185" } }
+{ "name": "get_accounts_for_party", "arguments": { "search_type": "organizations", "search": "PSP Investments" } }
+{ "name": "get_accounts_for_party", "arguments": { "search_type": "organizations", "party_id": "341688185" } }
 ```
 
 Portable: no hardcoded product ids or short names. Entry point is polymorphic `/accounts`, so a
@@ -107,10 +108,17 @@ server/tools/get_accounts_for_party.py
    Open = `closedDate` key absent. `include_closed` (default false) keeps the rest.
 3. Per open account, three calls: `GET /accounts/{id}/{values|totalInvested|totalRedemptions}`
    with `filter[date][ge]={cutoff}&page[limit]=100`, `max(date)` in `latest.py`. Default lookback
-   90 days; widen once; then paginate. Existing per-user gate (`max_concurrent_requests_per_user:
-   5`) queues the fan-out. This uses documented `filter[date]` rather than undocumented
-   `sort=-date&page[limit]=1`.
-4. `GET /products/{id}/aums` with the same window — latest AUM vs sum of returned balances.
+   90 days; widen once to a year; then paginate the unfiltered series. Existing per-user gate
+   (`max_concurrent_requests_per_user: 5`) queues the fan-out.
+
+   Do **not** `sort=-date&page[limit]=1` and take the first row. Backstop silently drops query
+   params it does not implement (same trap as `sort=` on party opportunities: both directions
+   came back byte-identical). Default order on `/accounts/{id}/values` is oldest first, so an
+   ignored sort would return the first historical point as "current". `filter[date][ge]` is
+   documented and actually filters; a 90-day window fits in one page of 100, and `max(date)`
+   over that window is the latest point without trusting sort.
+4. `GET /products/{id}/aums` with the same window — latest assets under management (AUM, the
+   product's total value) vs sum of returned balances.
 
 **`get_accounts_for_party`**
 
@@ -122,12 +130,19 @@ server/tools/get_accounts_for_party.py
 status bundle from UN-23681: `accountStartDate`, `closedDate`, `ownershipType`,
 `investorQualification`, `isEmployeeAccount`, `isGpAccount`, `amlCheckComplete`,
 `newIssueEligible`, `usDomiciled`. Product tool adds each figure as `{value, date, valueStatus?}`
-(status omitted when Backstop omits it) and product AUM. Party tool adds product
+(status omitted when Backstop omits it) and product assets under management (AUM). Party tool
+adds product
 `{id, name, short_name}`.
 
 Each series carries **its own** date. Collapsing them into one as-of would fabricate a number.
 
-Owner is projected like `features/includes/` (identity only), not the contact custom-field dump.
+Owner is projected to `{id, name, resource_type}` — the same restraint `features/includes/`
+shows, but **not through it**. That package is the person/organization MCP include *allowlist*:
+it plans a caller-selected set of include names, projects a by-id document, and keeps
+`attributes` only, dropping the resource id. All three are wrong here — the includes are fixed
+and unconditional, this is a collection walk over one shared `included` array, and the ids are
+part of the answer (`product.id` is what `get_product_positions` takes back). What the two
+genuinely share is the layer below: `backstop_client.follow_included` and `IncludedResource`.
 Unbounded series are never asked for via `include=`. Naming (product ≈ fund / vehicle / share
 class) lives in tool descriptions and server instructions. `describe_data_model` may move into
 those; do not depend on it. If it remains, a row is nice-to-have.
@@ -167,7 +182,8 @@ error sits on that row. This API does return 500s on some bad filters (`filter[i
 gate plus `retry.py` on 429 / `Retry-After` already queues the fan-out. The party tool's walk is
 sequential pagination, not a burst.
 
-**Reconciliation.** AUM vs sum of returned balances: divergence is a flag, not a hard failure.
+**Reconciliation.** Assets under management (AUM, the product's total value) vs sum of returned
+balances: divergence is a flag, not a hard failure.
 Closed-but-still-valued accounts excluded by the open default are the usual cause.
 
 ### Testing Strategy
@@ -231,17 +247,21 @@ page, so it is unit-tested without the HTTP client.
 
 2. **Add shared account listing and projections** — `paginate_all()` on `/accounts` with
    `include=owner,investorType` (and `product` when listing by party), split open from closed on
-   `closedDate` key absence, and project owner / investor type / product onto small models.
+   `closedDate` key absence, and project owner / investor type / product onto small models. Each
+   side-load is read once, as an `IncludedResource[...]` — the shared envelope beside
+   `follow_included`, which keeps the resource id.
 
-3. **Add latest-point selection over a date window** — Fetch a series with `filter[date][ge]`,
-   select `max(date)` client-side, and widen then paginate when the window is empty. Pure
-   function over a parsed response.
+3. **Add latest-point selection over a date window** — Fetch a series with `filter[date][ge]`
+   (not `sort=-date`: silently ignored, and default order is oldest first), select `max(date)`
+   client-side, and widen then paginate when the window is empty. Pure function over a parsed
+   response.
 
 4. **Fan out the three series per open account** — Compose listing with latest-point selection
    for `values`, `totalInvested`, and `totalRedemptions`. Let the existing per-user concurrency
    gate queue the requests, and collect per-account failures instead of aborting the call.
 
-5. **Add product AUM and the reconciliation check** — Fetch `/products/{id}/aums`, take its
+5. **Add product assets under management (AUM) and the reconciliation check** — Fetch
+   `/products/{id}/aums`, take its
    latest point, compare against the sum of returned balances, and set a flag on divergence.
 
 6. **Register `get_product_positions`** — Product resolve + filtered listing + series fan-out +

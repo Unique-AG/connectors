@@ -50,9 +50,17 @@ class ActivityHistoryFirstPageInput(BaseModel):
     """Start a new activity timeline for a party."""
 
     type: Literal["first"]
-    party_type: Annotated[
-        Literal["organization", "person"],
-        Field(description="Which kind of party to fetch the timeline for."),
+    search_type: Annotated[
+        SearchType,
+        Field(
+            description=(
+                "Which Backstop collection to resolve the party against — fold the caller's "
+                "wording to one of the four. A company, firm, fund, institution, or manager is "
+                "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
+                "when a prior resolve echoed one (echo it back — a contact or employee id is "
+                "not a people id) or the caller clearly means an internal staff member."
+            ),
+        ),
     ]
     party_id: Annotated[
         _NonEmptyStr | None,
@@ -70,16 +78,6 @@ class ActivityHistoryFirstPageInput(BaseModel):
             description=(
                 "Name or email to resolve when no trusted `party_id` is available. Exactly one "
                 "of `party_id` or `search` must be provided."
-            ),
-        ),
-    ] = None
-    search_type: Annotated[
-        SearchType | None,
-        Field(
-            description=(
-                "Collection to resolve against. Echo `search_type` from a prior resolve when "
-                "retrying with `party_id` — a contact or employee id is not a people id. "
-                "Defaults from `party_type` (people or organizations)."
             ),
         ),
     ] = None
@@ -138,18 +136,6 @@ class ActivityHistoryFirstPageInput(BaseModel):
             raise ValueError("Exactly one of party_id or search must be provided")
         if self.party_id is not None and "/" in self.party_id:
             raise ValueError(f"party_id {self.party_id!r} must not contain '/'")
-        return self
-
-    @model_validator(mode="after")
-    def _search_type_matches_party_type(self) -> Self:
-        if self.search_type is None:
-            return self
-        if self.party_type == "organization" and self.search_type != "organizations":
-            raise ValueError("search_type must be organizations when party_type is organization")
-        if self.party_type == "person" and self.search_type == "organizations":
-            raise ValueError(
-                "search_type must be people, contacts, or employees when party_type is person"
-            )
         return self
 
     @model_validator(mode="after")
@@ -238,10 +224,6 @@ class FetchArgs:
     continuations: Mapping[ActivityType, ActivityContinuation]
 
 
-def segment_for(party_type: Literal["organization", "person"]) -> Segment:
-    return "organizations" if party_type == "organization" else "people"
-
-
 def effective_activity_types(
     activity_types: list[ActivityType] | None,
 ) -> tuple[ActivityType, ...]:
@@ -281,7 +263,6 @@ async def extract_fetch_activity_history_args(
             )
             return args
         case ActivityHistoryFirstPageInput(
-            party_type=party_type,
             party_id=party_id,
             search=search,
             search_type=search_type,
@@ -293,7 +274,7 @@ async def extract_fetch_activity_history_args(
             result = await resolve_party(
                 ctx,
                 client,
-                search_type=search_type if search_type is not None else segment_for(party_type),
+                search_type=search_type,
                 party_id=party_id,
                 search=search,
             )
@@ -301,7 +282,7 @@ async def extract_fetch_activity_history_args(
                 logger.info(
                     "activity_history.args.unresolved",
                     extra={
-                        "party_type": party_type,
+                        "search_type": search_type,
                         "has_party_id": party_id is not None,
                         "has_search": search is not None,
                         "status": result.status,
@@ -312,7 +293,7 @@ async def extract_fetch_activity_history_args(
             effective_types = effective_activity_types(activity_types)
             page_size = limit if limit is not None else get_activity_history_settings().page_size
             # Person quick-search uses shared PERSON_* types, so a hit may be contacts/
-            # employees — follow `party.search_type` like `get_person`, not `party_type`.
+            # employees — follow `party.search_type` like `get_person`, not the requested one.
             args = FetchArgs(
                 segment=party.search_type,
                 entity_id=party.id,

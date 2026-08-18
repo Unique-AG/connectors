@@ -131,7 +131,7 @@ class TestFirstCallByTrustedPartyId:
 
         result = tool_model(
             await get_activity_history(
-                ctx_never_elicit(), _first(party_type="organization", party_id="o42")
+                ctx_never_elicit(), _first(search_type="organizations", party_id="o42")
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -183,7 +183,7 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(
-                    party_type="organization",
+                    search_type="organizations",
                     search="Capstone",
                     activity_types=["meeting"],
                 ),
@@ -221,7 +221,7 @@ class TestFirstCallBySearch:
 
         result = tool_model(
             await get_activity_history(
-                ctx_decline(), _first(party_type="organization", search="Capstone")
+                ctx_decline(), _first(search_type="organizations", search="Capstone")
             ),
             PartyAmbiguousResponse,
         )
@@ -261,7 +261,7 @@ class TestFirstCallBySearch:
 
         result = tool_model_union(
             await get_activity_history(
-                ctx_never_elicit(), _first(party_type="person", search="Nope")
+                ctx_never_elicit(), _first(search_type="people", search="Nope")
             ),
             ActivityHistoryResolvedResponse | PartyAmbiguousResponse | NotFoundResponse,
         )
@@ -313,7 +313,7 @@ class TestFirstCallBySearch:
         result = tool_model(
             await get_activity_history(
                 ctx_never_elicit(),
-                _first(party_type="person", search="Jane Contact", activity_types=["meeting"]),
+                _first(search_type="people", search="Jane Contact", activity_types=["meeting"]),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -362,7 +362,6 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(
-                    party_type="person",
                     party_id="c9",
                     search_type="contacts",
                     activity_types=["meeting"],
@@ -503,7 +502,7 @@ class TestResumedCall:
         )
 
         first_result = await get_activity_history(
-            ctx_never_elicit(), _first(party_type="organization", party_id="o42")
+            ctx_never_elicit(), _first(search_type="organizations", party_id="o42")
         )
         first_payload = tool_payload(first_result)
 
@@ -545,18 +544,18 @@ class TestResumedCall:
 
 
 class TestRequestShape:
-    def test_first_page_input_requires_party_type(self) -> None:
+    def test_first_page_input_requires_search_type(self) -> None:
         with pytest.raises(ValidationError):
             ActivityHistoryFirstPageInput.model_validate({"type": "first", "party_id": "o42"})
 
     def test_first_page_input_rejects_non_positive_limit(self) -> None:
         with pytest.raises(ValidationError):
             ActivityHistoryFirstPageInput.model_validate(
-                {"type": "first", "party_type": "organization", "party_id": "o42", "limit": 0}
+                {"type": "first", "search_type": "organizations", "party_id": "o42", "limit": 0}
             )
         with pytest.raises(ValidationError):
             ActivityHistoryFirstPageInput.model_validate(
-                {"type": "first", "party_type": "organization", "party_id": "o42", "limit": -1}
+                {"type": "first", "search_type": "organizations", "party_id": "o42", "limit": -1}
             )
 
     def test_first_page_input_rejects_since_after_until(self) -> None:
@@ -564,31 +563,17 @@ class TestRequestShape:
             ActivityHistoryFirstPageInput.model_validate(
                 {
                     "type": "first",
-                    "party_type": "organization",
+                    "search_type": "organizations",
                     "party_id": "o42",
                     "since": "2026-02-01",
                     "until": "2026-01-01",
                 }
             )
 
-    def test_first_page_input_rejects_search_type_that_does_not_match_party_type(self) -> None:
+    def test_first_page_input_rejects_an_unknown_search_type(self) -> None:
         with pytest.raises(ValidationError):
             ActivityHistoryFirstPageInput.model_validate(
-                {
-                    "type": "first",
-                    "party_type": "person",
-                    "party_id": "c9",
-                    "search_type": "organizations",
-                }
-            )
-        with pytest.raises(ValidationError):
-            ActivityHistoryFirstPageInput.model_validate(
-                {
-                    "type": "first",
-                    "party_type": "organization",
-                    "party_id": "o42",
-                    "search_type": "contacts",
-                }
+                {"type": "first", "search_type": "prospects", "party_id": "o42"}
             )
 
     def test_next_page_input_requires_next_search_type_and_entity_id(self) -> None:
@@ -669,7 +654,7 @@ class TestPartialFailurePropagates:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(
-                    party_type="organization",
+                    search_type="organizations",
                     party_id="o5",
                     activity_types=["meeting", "note"],
                 ),
@@ -695,7 +680,7 @@ class TestDocumentInclusion:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(
-                    party_type="organization",
+                    search_type="organizations",
                     party_id="o9",
                     activity_types=["document"],
                 ),
@@ -726,7 +711,7 @@ class TestWireOmitsNone:
         payload = tool_payload(
             await get_activity_history(
                 ctx_never_elicit(),
-                _first(party_type="organization", party_id="o42", activity_types=["meeting"]),
+                _first(search_type="organizations", party_id="o42", activity_types=["meeting"]),
             )
         )
 
