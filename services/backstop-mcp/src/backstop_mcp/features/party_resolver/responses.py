@@ -5,10 +5,10 @@ from collections.abc import Mapping
 from pydantic import Field
 
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.party_resolver.types import (
-    PartyAttributes,
+from backstop_mcp.features.party_resolver.api_responses import PartyAttributes
+from backstop_mcp.features.party_resolver.internal_dto import (
     PartyCandidate,
-    ResolvedParty,
+    ResolvedPartyDto,
 )
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
@@ -95,7 +95,7 @@ PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateResponse, Res
 
 
 def party_response(
-    party: ResolvedParty,
+    party: ResolvedPartyDto,
     *,
     attributes: Mapping[str, object] | None = None,
 ) -> ResolvedPartyResponse:
@@ -120,7 +120,7 @@ def party_candidate_response(candidate: PartyCandidate) -> PartyCandidateRespons
 
 
 def unresolved_party_response(
-    result: Unresolved[ResolvedParty],
+    result: Unresolved[ResolvedPartyDto],
 ) -> PartyAmbiguousResponse | NotFoundResponse:
     """Convert a non-`Resolved` `resolve_party` outcome into the standard tool response."""
     return unresolved_response(
@@ -131,7 +131,7 @@ def unresolved_party_response(
 
 
 def unresolved_parties_response(
-    result: BatchAmbiguous[ResolvedParty],
+    result: BatchAmbiguous[ResolvedPartyDto],
 ) -> PartyBatchAmbiguousResponse:
     """One combined payload for a batch where at least one party didn't resolve."""
     return batch_ambiguous_response(

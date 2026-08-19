@@ -16,38 +16,19 @@ translation happens once instead of at each call site.
 """
 
 import logging
-from typing import ClassVar
 
 from fastmcp.exceptions import ToolError
-from pydantic import BaseModel, ConfigDict
+
+from backstop_mcp.features.activity_history.internal_dto import ActivityHandleDto
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["MEETING_OR_CALL_RESOURCE_TYPE", "ActivityHandle", "parse_activity_handle"]
+__all__ = ["MEETING_OR_CALL_RESOURCE_TYPE", "ActivityHandleDto", "parse_activity_handle"]
 
 MEETING_OR_CALL_RESOURCE_TYPE = "meeting-or-calls"
 
 
-class ActivityHandle(BaseModel):
-    """One decoded `activity_id`: which Backstop collection, and the bare id within it."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    resource_type: str
-    resource_id: str
-
-    @property
-    def is_meeting_or_call(self) -> bool:
-        """Whether this names a meeting/call — the only shape with timings and attendees.
-
-        Both `/meeting-or-calls/{id}` and its `/attendees` relationship 404 for a note's or a
-        document's resource id, so this gates those two fetches rather than merely optimising
-        them away.
-        """
-        return self.resource_type == MEETING_OR_CALL_RESOURCE_TYPE
-
-
-def parse_activity_handle(activity_id: str) -> ActivityHandle:
+def parse_activity_handle(activity_id: str) -> ActivityHandleDto:
     """Split a timeline `activity_id` into its resource type and bare resource id.
 
     Splits on the LAST underscore: resource ids are numeric, while a resource type can carry
@@ -61,4 +42,4 @@ def parse_activity_handle(activity_id: str) -> ActivityHandle:
             + "'{resource_type}_{resource_id}' (e.g. 'meeting-or-calls_76537547', "
             + "'notes_26018215'), exactly as a get_activity_history record reports it."
         )
-    return ActivityHandle(resource_type=resource_type, resource_id=resource_id)
+    return ActivityHandleDto(resource_type=resource_type, resource_id=resource_id)

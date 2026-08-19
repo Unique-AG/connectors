@@ -18,7 +18,10 @@ from backstop_mcp.features.data_hygiene import (
     RelationshipTypeAttributes,
 )
 from backstop_mcp.features.includes import ContactCardResponse
-from backstop_mcp.features.org_people.types import OrgPeopleListing, PersonAtOrganization
+from backstop_mcp.features.org_people.internal_dto import (
+    OrgPeopleListingDto,
+    PersonAtOrganizationDto,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +40,7 @@ async def fetch_people_for_organization(
     *,
     organization_id: str,
     include_former: bool,
-) -> OrgPeopleListing:
+) -> OrgPeopleListingDto:
     """People the employment index ties to `organization_id`.
 
     Current staff are one paginated walk of `/organizations/{id}/employees` with
@@ -110,9 +113,9 @@ async def fetch_people_for_organization(
     )
     cards = {resource.id: resource.attributes for resource in page.items}
     people = tuple(
-        PersonAtOrganization(employment=link, card=cards.get(link.person_id)) for link in links
+        PersonAtOrganizationDto(employment=link, card=cards.get(link.person_id)) for link in links
     )
-    return OrgPeopleListing(
+    return OrgPeopleListingDto(
         people=people,
         former_omitted=former_omitted,
         people_omitted=people_omitted,

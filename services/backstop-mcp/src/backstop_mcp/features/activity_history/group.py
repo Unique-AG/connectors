@@ -10,21 +10,23 @@ from collections.abc import Sequence
 from datetime import UTC, date
 
 from backstop_mcp.features.activity_history.fetch_activities import (
-    ActivityItem,
     ActivityType,
-    EmailItem,
+)
+from backstop_mcp.features.activity_history.internal_dto import (
+    ActivityItemDto,
+    DateRangeDto,
+    EmailItemDto,
 )
 from backstop_mcp.features.activity_history.models import (
     ActivityContinuation,
     ActivityGroup,
-    DateRange,
 )
 
 __all__ = ["group_page"]
 
 
-def _occurred_date(item: ActivityItem | EmailItem) -> date | None:
-    if isinstance(item, EmailItem):
+def _occurred_date(item: ActivityItemDto | EmailItemDto) -> date | None:
+    if isinstance(item, EmailItemDto):
         sent = item.sent_timestamp
         if sent is None:
             return None
@@ -33,15 +35,15 @@ def _occurred_date(item: ActivityItem | EmailItem) -> date | None:
     return item.effective_date
 
 
-def _date_range(items: Sequence[ActivityItem | EmailItem]) -> DateRange | None:
+def _date_range(items: Sequence[ActivityItemDto | EmailItemDto]) -> DateRangeDto | None:
     dates = [occurred for item in items if (occurred := _occurred_date(item)) is not None]
     if not dates:
         return None
-    return DateRange(start=min(dates), end=max(dates))
+    return DateRangeDto(start=min(dates), end=max(dates))
 
 
 def group_page(
-    items: Sequence[ActivityItem | EmailItem],
+    items: Sequence[ActivityItemDto | EmailItemDto],
     *,
     activity_type: ActivityType,
     end_of_stream: bool,
@@ -49,7 +51,7 @@ def group_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityGroup[ActivityItem | EmailItem]:
+) -> ActivityGroup[ActivityItemDto | EmailItemDto]:
     """Pass items through in fetch order; attach this page's date_range and next."""
     grouped = tuple(items)
     return ActivityGroup(

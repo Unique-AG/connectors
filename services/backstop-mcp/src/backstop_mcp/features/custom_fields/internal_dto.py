@@ -1,32 +1,11 @@
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field
 
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
-
-
-class CustomFieldDefinitionAttributes(BaseModel):
-    """Wire shape for `custom-field-definitions` attributes (subset we need)."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    name: _StrippedStr | None = None
-    entity_type: _StrippedStr | None = Field(default=None, alias="entityType")
-    field_type: _StrippedStr | None = Field(default=None, alias="fieldType")
-    field_type_display: _StrippedStr | None = Field(default=None, alias="fieldTypeDisplay")
-    is_time_series: bool | None = Field(default=None, alias="isTimeSeries")
-    select_options: object | None = Field(default=None, alias="selectOptions")
-    tab_name: _StrippedStr | None = Field(default=None, alias="tabName")
-    group_name: _StrippedStr | None = Field(default=None, alias="groupName")
-    layout_name: _StrippedStr | None = Field(default=None, alias="layoutName")
-    resource_type: _StrippedStr | None = Field(default=None, alias="resourceType")
-    description: _StrippedStr | None = None
-    required: bool | None = None
-    client_required: bool | None = Field(default=None, alias="clientRequired")
-    system_defined: bool | None = Field(default=None, alias="systemDefined")
+__all__ = ["CustomFieldDefinitionDto"]
 
 
-class CustomFieldDefinition(BaseModel):
+class CustomFieldDefinitionDto(BaseModel):
     """A CRM custom-field definition from Backstop attributes."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)

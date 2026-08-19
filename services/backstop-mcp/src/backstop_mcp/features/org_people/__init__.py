@@ -11,17 +11,23 @@ returned.
 """
 
 from backstop_mcp.features.org_people.fetch import fetch_people_for_organization
+from backstop_mcp.features.org_people.internal_dto import (
+    OrgPeopleListingDto,
+    PersonAtOrganizationDto,
+)
 from backstop_mcp.features.org_people.responses import (
     OrgPeopleResolvedResponse,
     PersonAtOrganizationResponse,
     org_people_response,
 )
-from backstop_mcp.features.org_people.types import OrgPeopleListing, PersonAtOrganization
+
+OrgPeopleListing = OrgPeopleListingDto
+PersonAtOrganization = PersonAtOrganizationDto
 
 __all__ = [
-    "OrgPeopleListing",
+    "OrgPeopleListingDto",
     "OrgPeopleResolvedResponse",
-    "PersonAtOrganization",
+    "PersonAtOrganizationDto",
     "PersonAtOrganizationResponse",
     "fetch_people_for_organization",
     "org_people_response",

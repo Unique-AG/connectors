@@ -11,11 +11,13 @@ opportunity's stage history names only some of the stages it points at, and the 
 here. See `stages.py`.
 """
 
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.fetch import (
     OpportunityFetchResult,
     OpportunityStatus,
     fetch_opportunities,
 )
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
     StageChangeResponse,
@@ -30,6 +32,8 @@ __all__ = [
     "OpportunityFetchResult",
     "OpportunityResponse",
     "OpportunityStage",
+    "OpportunityStageDto",
+    "OpportunityStageAttributes",
     "OpportunityStagesService",
     "OpportunityStatus",
     "StageChangeResponse",

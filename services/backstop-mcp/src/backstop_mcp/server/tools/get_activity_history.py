@@ -24,9 +24,9 @@ from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.activity_history import (
     ActivityGroup,
     ActivityHistoryResolvedResponse,
-    ActivityPage,
+    ActivityPageDto,
     ActivityType,
-    EmailPage,
+    EmailPageDto,
     GetActivityHistoryResponse,
     TimelineRecord,
     fetch_activities_page_by_type,
@@ -111,7 +111,7 @@ async def get_activity_history(
         party_path,
         schema=BackstopApiResourceDocument[PartyAttributes],
     )
-    page_calls: dict[ActivityType, Coroutine[None, None, ActivityPage | EmailPage]] = {
+    page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
         activity_type: fetch_activities_page_by_type(
             client,
             activity_type=activity_type,
@@ -125,7 +125,7 @@ async def get_activity_history(
         for activity_type, continuation in args.continuations.items()
     }
     activities = await asyncio.gather(*page_calls.values())
-    pages: dict[ActivityType, ActivityPage | EmailPage] = dict(
+    pages: dict[ActivityType, ActivityPageDto | EmailPageDto] = dict(
         zip(page_calls.keys(), activities, strict=True)
     )
 

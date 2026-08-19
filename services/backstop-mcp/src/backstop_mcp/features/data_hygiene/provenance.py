@@ -3,13 +3,14 @@
 from collections.abc import Mapping
 from typing import cast
 
-from backstop_mcp.features.data_hygiene.types import AsOf, ProvenanceFields
+from backstop_mcp.features.data_hygiene.api_responses import ProvenanceAttributes
+from backstop_mcp.features.data_hygiene.responses import AsOfResponse
 
 # Where an instance nests the actor object rather than sending a bare string.
 _ACTOR_NAME_KEYS = ("name", "displayName", "display_name", "id")
 
 
-def extract_as_of(attributes: ProvenanceFields | None) -> AsOf | None:
+def extract_as_of(attributes: ProvenanceAttributes | None) -> AsOfResponse | None:
     """Build provenance from `modified_timestamp` / `modified_by` when either is present.
 
     Returns `None` when both are missing so callers can omit an empty envelope rather than
@@ -20,13 +21,16 @@ def extract_as_of(attributes: ProvenanceFields | None) -> AsOf | None:
     modified_by = _modified_by(attributes.modified_by)
     if attributes.modified_timestamp is None and modified_by is None:
         return None
-    return AsOf(modified_timestamp=attributes.modified_timestamp, modified_by=modified_by)
+    return AsOfResponse(
+        modified_timestamp=attributes.modified_timestamp,
+        modified_by=modified_by,
+    )
 
 
 def _modified_by(value: object) -> str | None:
     """The actor as a name, whether Backstop sent a string or an object.
 
-    `AsOf.modified_by` cleans whatever this returns, so blank strings pulled out of a nested
+    `AsOfResponse.modified_by` cleans whatever this returns, so blank strings pulled out of a nested
     actor are absence there rather than a check here.
     """
     if isinstance(value, str):

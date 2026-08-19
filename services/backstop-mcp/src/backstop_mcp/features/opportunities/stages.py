@@ -1,11 +1,13 @@
 import asyncio
 import logging
 from datetime import timedelta
-from typing import Annotated, ClassVar
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import StringConstraints
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
@@ -21,30 +23,7 @@ _FAILURE_COOLDOWN = timedelta(seconds=30)
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 
-class OpportunityStageAttributes(BaseModel):
-    """Wire shape for `opportunity-stages` attributes (the vocabulary subset).
-
-    Every field is optional because `client.paginate` deserializes a whole page in one pass: a
-    required field would fail the entire seven-row fetch over one malformed row. Optional fields
-    plus the drop in `stage_from_resource` keep one bad row from costing the other six.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    name: _StrippedStr | None = None
-    sort_order: int | None = Field(default=None, alias="sortOrder")
-    closed: bool | None = None
-
-
-class OpportunityStage(BaseModel):
-    """One row of the instance's opportunity-stage vocabulary."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    id: str
-    name: str
-    closed: bool = False
-    sort_order: int | None = None
+OpportunityStage = OpportunityStageDto
 
 
 type StageResource = BackstopApiResource[OpportunityStageAttributes]

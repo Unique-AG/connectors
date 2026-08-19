@@ -23,11 +23,11 @@ from backstop_mcp.features.activity_history import (
     ActivityType,
     Segment,
 )
-from backstop_mcp.features.data_hygiene import ProvenanceFields
+from backstop_mcp.features.data_hygiene import ProvenanceAttributes
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    ResolvedParty,
+    ResolvedPartyDto,
     resolve_party,
     unresolved_party_response,
 )
@@ -194,7 +194,7 @@ type ActivityHistoryPageInput = Annotated[
 ]
 
 
-class PartyAttributes(ProvenanceFields):
+class PartyAttributes(ProvenanceAttributes):
     """Minimal attributes this tool needs from the party fetch: a display name plus provenance.
 
     `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
@@ -220,7 +220,7 @@ class FetchArgs:
 
     segment: Segment
     entity_id: str
-    party: ResolvedParty
+    party: ResolvedPartyDto
     continuations: Mapping[ActivityType, ActivityContinuation]
 
 
@@ -250,7 +250,7 @@ async def extract_fetch_activity_history_args(
             args = FetchArgs(
                 segment=search_type,
                 entity_id=entity_id,
-                party=ResolvedParty(id=entity_id, search_type=search_type, name=None),
+                party=ResolvedPartyDto(id=entity_id, search_type=search_type, name=None),
                 continuations=dict(continuations),
             )
             logger.info(

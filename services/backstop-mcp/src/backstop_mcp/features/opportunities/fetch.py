@@ -53,13 +53,11 @@ from backstop_mcp.backstop_client import (
     included_by_type,
 )
 from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
     StageChangeResponse,
-)
-from backstop_mcp.features.opportunities.stages import (
-    OpportunityStage,
-    OpportunityStageAttributes,
 )
 from backstop_mcp.models import OmitNoneModel
 
@@ -156,7 +154,7 @@ def resolve_stage_name(
     stage_id: str | None,
     *,
     side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> str | None:
     """Name a stage from this response's side-loads, then from the cached vocabulary.
 
@@ -225,7 +223,7 @@ def stage_history(
     *,
     included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> tuple[StageChangeResponse, ...]:
     """One deal's stage moves, in the order Backstop links them.
 
@@ -267,7 +265,7 @@ def to_opportunity_response(
     *,
     included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> OpportunityResponse:
     """Project one `opportunities` resource, naming its current stage and its history.
 
@@ -293,7 +291,7 @@ def project_opportunities(
     resources: Sequence[OpportunityResource],
     *,
     included: Sequence[dict[str, object]],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> tuple[OpportunityResponse, ...]:
     """Project the fetched resources, indexing the side-loaded stages once for all of them.
 
@@ -323,8 +321,8 @@ def project_opportunities(
 
 
 async def _resolved_vocabulary(
-    vocabulary: Mapping[str, OpportunityStage] | Awaitable[Mapping[str, OpportunityStage]],
-) -> dict[str, OpportunityStage]:
+    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
+) -> dict[str, OpportunityStageDto]:
     """The vocabulary mapping, whether the caller already had it or is still fetching it.
 
     A Mapping is returned as a new dict; an awaitable is awaited. `fetch_opportunities` gathers
@@ -342,7 +340,7 @@ async def fetch_opportunities(
     segment: SearchType,
     entity_id: str,
     status: OpportunityStatus = "all",
-    vocabulary: Mapping[str, OpportunityStage] | Awaitable[Mapping[str, OpportunityStage]],
+    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
 ) -> OpportunityFetchResult:
     """Every opportunity for one party, `status`-filtered and newest stage move first.
 
