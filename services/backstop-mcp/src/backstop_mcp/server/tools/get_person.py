@@ -13,7 +13,6 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentLinkResponse,
     EntityRelationshipInclude,
     ProvenanceAttributes,
-    as_of_response,
     entity_relationships,
     extract_as_of,
 )
@@ -25,7 +24,6 @@ from backstop_mcp.features.includes import (
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -209,10 +207,10 @@ async def get_person(
 
     return PersonResolvedResponse(
         person=attributes,
-        resolved=party_response(
+        resolved=ResolvedPartyResponse.from_party(
             party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=as_of_response(extract_as_of(attributes)),
+        as_of=extract_as_of(attributes),
         employments=index.links(),
         included=plan.project(document=document) if plan.planned else None,
     )

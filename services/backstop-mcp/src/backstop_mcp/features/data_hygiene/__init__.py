@@ -32,8 +32,6 @@ from backstop_mcp.features.data_hygiene.responses import (
     AsOfResponse,
     DepartedContactResponse,
     EmploymentLinkResponse,
-    as_of_response,
-    departed_response,
 )
 from backstop_mcp.features.data_hygiene.service import (
     EmploymentIndexFactory,
@@ -64,10 +62,8 @@ __all__ = [
     "ProvenanceAttributes",
     "RelationshipTypeAttributes",
     "TypeVocabularyDto",
-    "as_of_response",
     "build_employment_index",
     "create_employment_index_factory",
-    "departed_response",
     "entity_relationships",
     "extract_as_of",
 ]

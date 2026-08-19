@@ -2,14 +2,13 @@
 vocabulary.
 """
 
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field
 
 from backstop_mcp.features.accounts.internal_dto import AccountListingDto
 from backstop_mcp.features.accounts.responses.shared import (
     AccountRowResponse,
-    account_row_response,
     closed_hint,
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyResponse
@@ -53,17 +52,15 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
         ),
     )
 
-
-def party_accounts_response(
-    *, resolved: ResolvedPartyResponse, listing: AccountListingDto
-) -> PartyAccountsResolvedResponse:
-    return PartyAccountsResolvedResponse(
-        resolved=resolved,
-        accounts=tuple(account_row_response(account) for account in listing.accounts),
-        closed_omitted=listing.closed_omitted,
-        include_closed_hint=closed_hint(
+    @classmethod
+    def from_listing(cls, listing: AccountListingDto, *, resolved: ResolvedPartyResponse) -> Self:
+        return cls(
+            resolved=resolved,
+            accounts=tuple(AccountRowResponse.from_record(account) for account in listing.accounts),
             closed_omitted=listing.closed_omitted,
-            returned=len(listing.accounts),
-            subject="party",
-        ),
-    )
+            include_closed_hint=closed_hint(
+                closed_omitted=listing.closed_omitted,
+                returned=len(listing.accounts),
+                subject="party",
+            ),
+        )

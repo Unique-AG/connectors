@@ -40,7 +40,7 @@ class BackstopTransportSettings(BaseModel):
 
 
 class RetrySettings(BaseModel):
-    """The two numbers the 429-retry policy is derived from. See `retry.build_retry_policy`."""
+    """The two numbers the 429-retry policy is derived from. See `RetryPolicy.from_settings`."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 

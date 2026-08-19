@@ -102,6 +102,32 @@ class BackstopApiError(ToolError):
         self.code = code
         self.errors = errors
 
+    @classmethod
+    def from_response(cls, response: httpx.Response) -> "BackstopApiError":
+        """Turn a 4xx/5xx `httpx.Response` into the right `BackstopApiError` subclass.
+
+        Parses the full JSON:API `errors[]` body (accepting `detail` and/or `title`), falling back
+        to a distinct unparseable-body message rather than crashing on malformed/empty responses.
+        429s are further classified into `BackstopRateLimitError` with a best-effort `limit_kind`.
+        """
+        parsed_errors = _parse_error_details(response) or ()
+        joined = _join_messages(parsed_errors)
+        detail = joined if joined is not None else _fallback_message(response)
+        code = _first_code(parsed_errors)
+
+        if response.status_code == 429:
+            limit_kind = _classify_limit_kind(detail, code) if joined is not None else None
+            return BackstopRateLimitError(
+                response.status_code,
+                detail,
+                code,
+                errors=parsed_errors,
+                limit_kind=limit_kind,
+                retry_after_seconds=_parse_retry_after(response),
+            )
+
+        return cls(response.status_code, detail, code, errors=parsed_errors)
+
 
 class BackstopRateLimitError(BackstopApiError):
     """Raised for a Backstop 429, with a best-effort limit classification.
@@ -242,29 +268,3 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
         when = when.replace(tzinfo=UTC)
     delay = (when - datetime.now(UTC)).total_seconds()
     return max(delay, 0.0)
-
-
-def parse_json_api_error(response: httpx.Response) -> BackstopApiError:
-    """Turn a 4xx/5xx `httpx.Response` into the right `BackstopApiError` subclass.
-
-    Parses the full JSON:API `errors[]` body (accepting `detail` and/or `title`), falling back
-    to a distinct unparseable-body message rather than crashing on malformed/empty responses.
-    429s are further classified into `BackstopRateLimitError` with a best-effort `limit_kind`.
-    """
-    parsed_errors = _parse_error_details(response) or ()
-    joined = _join_messages(parsed_errors)
-    detail = joined if joined is not None else _fallback_message(response)
-    code = _first_code(parsed_errors)
-
-    if response.status_code == 429:
-        limit_kind = _classify_limit_kind(detail, code) if joined is not None else None
-        return BackstopRateLimitError(
-            response.status_code,
-            detail,
-            code,
-            errors=parsed_errors,
-            limit_kind=limit_kind,
-            retry_after_seconds=_parse_retry_after(response),
-        )
-
-    return BackstopApiError(response.status_code, detail, code, errors=parsed_errors)

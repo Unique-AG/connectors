@@ -1,6 +1,6 @@
 """MCP-facing people-at-organization listing."""
 
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field
 
@@ -52,6 +52,21 @@ class PersonAtOrganizationResponse(OmitNoneModel):
         )
     )
 
+    @classmethod
+    def from_person(cls, row: PersonAtOrganizationDto) -> Self:
+        card = row.card
+        employment = row.employment
+        return cls(
+            id=employment.person_id,
+            search_type=employment.person_type,
+            name=None if card is None else card.name,
+            job_title=None if card is None else card.job_title,
+            email=None if card is None else card.email,
+            phone=None if card is None else card.phone,
+            company_name=None if card is None else card.company_name,
+            employment=employment,
+        )
+
 
 class OrgPeopleResolvedResponse(OmitNoneModel):
     """`get_people_for_party` after the organization was found and its people listed."""
@@ -95,45 +110,26 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
         ),
     )
 
-
-def person_at_organization_response(
-    row: PersonAtOrganizationDto,
-) -> PersonAtOrganizationResponse:
-    card = row.card
-    employment = row.employment
-    return PersonAtOrganizationResponse(
-        id=employment.person_id,
-        search_type=employment.person_type,
-        name=None if card is None else card.name,
-        job_title=None if card is None else card.job_title,
-        email=None if card is None else card.email,
-        phone=None if card is None else card.phone,
-        company_name=None if card is None else card.company_name,
-        employment=employment,
-    )
-
-
-def org_people_response(
-    *, resolved: ResolvedPartyResponse, listing: OrgPeopleListingDto
-) -> OrgPeopleResolvedResponse:
-    returned = len(listing.people)
-    hint = None
-    if listing.former_omitted:
-        if returned == 0:
-            hint = (
-                "No current employees were returned; "
-                f"{listing.former_omitted} former-employment link(s) were omitted. "
-                "Pass include_former=true rather than treating this as no people on file."
-            )
-        else:
-            hint = (
-                f"{listing.former_omitted} former-employment link(s) were omitted. "
-                "Pass include_former=true to include them."
-            )
-    return OrgPeopleResolvedResponse(
-        resolved=resolved,
-        people=tuple(person_at_organization_response(row) for row in listing.people),
-        former_omitted=listing.former_omitted,
-        people_omitted=listing.people_omitted,
-        include_former_hint=hint,
-    )
+    @classmethod
+    def from_listing(cls, listing: OrgPeopleListingDto, *, resolved: ResolvedPartyResponse) -> Self:
+        returned = len(listing.people)
+        hint = None
+        if listing.former_omitted:
+            if returned == 0:
+                hint = (
+                    "No current employees were returned; "
+                    f"{listing.former_omitted} former-employment link(s) were omitted. "
+                    "Pass include_former=true rather than treating this as no people on file."
+                )
+            else:
+                hint = (
+                    f"{listing.former_omitted} former-employment link(s) were omitted. "
+                    "Pass include_former=true to include them."
+                )
+        return cls(
+            resolved=resolved,
+            people=tuple(PersonAtOrganizationResponse.from_person(row) for row in listing.people),
+            former_omitted=listing.former_omitted,
+            people_omitted=listing.people_omitted,
+            include_former_hint=hint,
+        )

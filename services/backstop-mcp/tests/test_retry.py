@@ -6,7 +6,7 @@ import pytest
 import tenacity
 
 from backstop_mcp.backstop_client.errors import BackstopRateLimitError
-from backstop_mcp.backstop_client.retry import build_retry_policy
+from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import RetrySettings
 
 
@@ -22,7 +22,7 @@ def _retry_state(
 class TestRetryPredicate:
     def test_concurrency_breach_within_ceiling_is_retryable(self) -> None:
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         exc = BackstopRateLimitError(
             429, "Concurrency limit exceeded", limit_kind="concurrency", retry_after_seconds=1.0
         )
@@ -34,7 +34,7 @@ class TestRetryPredicate:
         self, limit_kind: Literal["minute", "hour", "day"]
     ) -> None:
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         exc = BackstopRateLimitError(
             429,
             "Quota exceeded",
@@ -48,7 +48,7 @@ class TestRetryPredicate:
         """`limit_kind is None` is the easiest case to get backwards: uncertain classification
         must fail closed, same as a confirmed quota breach."""
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         exc = BackstopRateLimitError(
             429, "Rate limited", limit_kind=None, retry_after_seconds=0.001
         )
@@ -57,7 +57,7 @@ class TestRetryPredicate:
 
     def test_wait_exceeding_ceiling_is_not_retryable_even_for_concurrency(self) -> None:
         settings = RetrySettings(max_attempts=5, max_wait_ms=1_000)  # 1 second ceiling
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         exc = BackstopRateLimitError(
             429,
             "Concurrency limit exceeded",
@@ -69,14 +69,14 @@ class TestRetryPredicate:
 
     def test_non_rate_limit_exception_is_not_retryable(self) -> None:
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
 
         assert retrying.retry(_retry_state(retrying, ValueError("boom"))) is False
 
 
 class TestWaitStrategy:
     def test_floors_sub_second_retry_after_to_initial_backoff(self) -> None:
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=30_000)
         ).build_retrying()
         exc = BackstopRateLimitError(
@@ -89,7 +89,7 @@ class TestWaitStrategy:
         assert retrying.wait(_retry_state(retrying, exc)) == 1.0
 
     def test_honours_retry_after_above_the_floor(self) -> None:
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=30_000)
         ).build_retrying()
         exc = BackstopRateLimitError(
@@ -110,7 +110,7 @@ class TestBuildRetryingIntegration:
         # (1s); here we only care that two concurrency 429s still recover.
         monkeypatch.setattr("backstop_mcp.backstop_client.retry._BACKOFF_INITIAL_SECONDS", 0.01)
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         calls = 0
 
         async def flaky() -> str:
@@ -135,7 +135,7 @@ class TestBuildRetryingIntegration:
 
     async def test_quota_breach_propagates_original_error_immediately(self) -> None:
         settings = RetrySettings(max_attempts=5, max_wait_ms=30_000)
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         calls = 0
 
         async def always_quota_limited() -> str:
@@ -156,7 +156,7 @@ class TestBuildRetryingIntegration:
 
     async def test_concurrency_breach_exceeding_ceiling_propagates_immediately(self) -> None:
         settings = RetrySettings(max_attempts=5, max_wait_ms=1_000)  # 1s ceiling
-        retrying = build_retry_policy(settings).build_retrying()
+        retrying = RetryPolicy.from_settings(settings).build_retrying()
         calls = 0
 
         async def always_over_ceiling() -> str:
@@ -211,7 +211,7 @@ class TestRateLimitMetric:
 
     def test_records_a_retried_concurrency_breach(self, monkeypatch: pytest.MonkeyPatch) -> None:
         recorded = self._recorded(monkeypatch)
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=30_000)
         ).build_retrying()
         exc = BackstopRateLimitError(
@@ -223,7 +223,7 @@ class TestRateLimitMetric:
 
     def test_records_an_unretried_quota_breach(self, monkeypatch: pytest.MonkeyPatch) -> None:
         recorded = self._recorded(monkeypatch)
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=30_000)
         ).build_retrying()
         exc = BackstopRateLimitError(429, "Daily quota exceeded", limit_kind="day")
@@ -236,7 +236,7 @@ class TestRateLimitMetric:
     ) -> None:
         """`limit_kind=None` is the fail-closed case; it still has to be countable."""
         recorded = self._recorded(monkeypatch)
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=30_000)
         ).build_retrying()
         exc = BackstopRateLimitError(429, "Too many requests")
@@ -248,7 +248,7 @@ class TestRateLimitMetric:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         recorded = self._recorded(monkeypatch)
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=1_000)
         ).build_retrying()
         exc = BackstopRateLimitError(
@@ -262,7 +262,7 @@ class TestRateLimitMetric:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         recorded = self._recorded(monkeypatch)
-        retrying = build_retry_policy(
+        retrying = RetryPolicy.from_settings(
             RetrySettings(max_attempts=5, max_wait_ms=30_000)
         ).build_retrying()
 
@@ -275,12 +275,12 @@ class TestRetryPolicyIsolation:
         """Tenacity keeps per-call state in a `threading.local()`, which every coroutine on one
         event loop shares — so the wrapper must not be reused across concurrent requests even
         though the policy it comes from is."""
-        policy = build_retry_policy(RetrySettings(max_attempts=5, max_wait_ms=30_000))
+        policy = RetryPolicy.from_settings(RetrySettings(max_attempts=5, max_wait_ms=30_000))
 
         assert policy.build_retrying() is not policy.build_retrying()
 
     def test_the_policy_itself_is_reused(self) -> None:
-        policy = build_retry_policy(RetrySettings(max_attempts=5, max_wait_ms=30_000))
+        policy = RetryPolicy.from_settings(RetrySettings(max_attempts=5, max_wait_ms=30_000))
 
         first = policy.build_retrying()
         second = policy.build_retrying()

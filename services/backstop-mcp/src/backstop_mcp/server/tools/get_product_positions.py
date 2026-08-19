@@ -18,9 +18,7 @@ from backstop_mcp.features.accounts import (
     ProductPositionsResolvedResponse,
     fetch_accounts_for_product,
     fetch_product_positions,
-    product_positions_response,
     resolve_product,
-    unresolved_product_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
@@ -106,7 +104,7 @@ async def get_product_positions(
     client = await get_backstop_client()
     outcome = await resolve_product(ctx, client, product_id=product_id, product=product)
     if not isinstance(outcome, Resolved):
-        return unresolved_product_response(outcome)
+        return ProductAmbiguousResponse.from_unresolved(outcome)
 
     resolved = outcome.value
     logger.info(
@@ -127,4 +125,4 @@ async def get_product_positions(
             "aum_diverges": positions.reconciliation.diverges,
         },
     )
-    return product_positions_response(positions)
+    return ProductPositionsResolvedResponse.from_positions(positions)

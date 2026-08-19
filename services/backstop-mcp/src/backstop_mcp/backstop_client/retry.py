@@ -11,6 +11,7 @@ deliberate and is explained on `RetryPolicy`.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Self
 
 import tenacity
 
@@ -163,11 +164,11 @@ class RetryPolicy:
             reraise=True,
         )
 
-
-def build_retry_policy(settings: RetrySettings) -> RetryPolicy:
-    """Derive the shareable retry policy from settings. Called once, from the factory."""
-    return RetryPolicy(
-        predicate=_build_retry_predicate(settings),
-        wait=_build_wait_strategy(),
-        max_attempts=settings.max_attempts,
-    )
+    @classmethod
+    def from_settings(cls, settings: RetrySettings) -> Self:
+        """Derive the shareable retry policy from settings. Called once, from the factory."""
+        return cls(
+            predicate=_build_retry_predicate(settings),
+            wait=_build_wait_strategy(),
+            max_attempts=settings.max_attempts,
+        )

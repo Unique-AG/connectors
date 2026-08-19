@@ -28,10 +28,10 @@ from backstop_mcp.features.activity_history import (
     ActivityType,
     EmailPageDto,
     GetActivityHistoryResponse,
+    ResolvedPartyAsOfResponse,
     TimelineRecord,
     fetch_activities_page_by_type,
     group_page,
-    resolved_party_as_of_response,
     to_timeline_record,
 )
 from backstop_mcp.models import published_output_schema
@@ -167,6 +167,6 @@ async def get_activity_history(
         },
     )
     return ActivityHistoryResolvedResponse(
-        resolved=resolved_party_as_of_response(args.party, attributes),
+        resolved=ResolvedPartyAsOfResponse.from_party(args.party, attributes=attributes),
         groups=groups,
     )

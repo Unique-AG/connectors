@@ -17,7 +17,6 @@ from backstop_mcp.features.activity_history import (
     EmailItem,
     EmailRecordResponse,
     ResolvedPartyAsOfResponse,
-    resolved_party_as_of_response,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
@@ -176,9 +175,9 @@ class TestActivityHistoryResolvedResponse:
         assert not hasattr(response, "as_of")
 
     def test_merges_party_identity_and_as_of(self) -> None:
-        resolved = resolved_party_as_of_response(
+        resolved = ResolvedPartyAsOfResponse.from_party(
             ResolvedParty(id="1", search_type="people", name="Ada"),
-            ProvenanceAttributes.model_validate(
+            attributes=ProvenanceAttributes.model_validate(
                 {"modifiedTimestamp": "2024-01-01", "modifiedBy": "alice"}
             ),
         )

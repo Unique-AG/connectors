@@ -18,7 +18,6 @@ from backstop_mcp.features.org_people.internal_dto import (
 from backstop_mcp.features.org_people.responses import (
     OrgPeopleResolvedResponse,
     PersonAtOrganizationResponse,
-    org_people_response,
 )
 
 OrgPeopleListing = OrgPeopleListingDto
@@ -30,5 +29,4 @@ __all__ = [
     "PersonAtOrganizationDto",
     "PersonAtOrganizationResponse",
     "fetch_people_for_organization",
-    "org_people_response",
 ]

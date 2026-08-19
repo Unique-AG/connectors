@@ -226,33 +226,6 @@ def stage_history(
     return tuple(changes)
 
 
-def to_opportunity_response(
-    resource: OpportunityResource,
-    *,
-    included: Sequence[dict[str, object]],
-    side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStageDto],
-) -> OpportunityResponse:
-    """Project one `opportunities` resource, naming its current stage and its history.
-
-    The response model reads the record's attributes through its own aliases, so the four things
-    Backstop does not put in `attributes` are all that is supplied here. Raises `ValidationError`
-    for a record the model cannot read, which the caller drops on its own.
-    """
-    stage_id = current_stage_id(resource)
-    return OpportunityResponse.model_validate(
-        {
-            **resource.attributes,
-            "id": resource.id,
-            "stage": resolve_stage_name(stage_id, side_loaded=side_loaded, vocabulary=vocabulary),
-            "stage_id": stage_id,
-            "stage_history": stage_history(
-                resource, included=included, side_loaded=side_loaded, vocabulary=vocabulary
-            ),
-        }
-    )
-
-
 def project_opportunities(
     resources: Sequence[OpportunityResource],
     *,
@@ -272,9 +245,20 @@ def project_opportunities(
     projected: list[OpportunityResponse] = []
     for resource in resources:
         try:
+            stage_id = current_stage_id(resource)
             projected.append(
-                to_opportunity_response(
-                    resource, included=included, side_loaded=side_loaded, vocabulary=vocabulary
+                OpportunityResponse.from_resource(
+                    resource,
+                    stage=resolve_stage_name(
+                        stage_id, side_loaded=side_loaded, vocabulary=vocabulary
+                    ),
+                    stage_id=stage_id,
+                    stage_history=stage_history(
+                        resource,
+                        included=included,
+                        side_loaded=side_loaded,
+                        vocabulary=vocabulary,
+                    ),
                 )
             )
         except ValidationError as exc:

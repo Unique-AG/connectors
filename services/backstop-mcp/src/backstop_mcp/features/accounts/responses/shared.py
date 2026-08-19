@@ -7,6 +7,7 @@ than being duplicated per tool. `OmitNoneModel` drops nulls: a missing figure is
 """
 
 from datetime import date as Date
+from typing import Self
 
 from pydantic import Field
 
@@ -42,6 +43,10 @@ class ProductRefResponse(OmitNoneModel):
         ),
     )
 
+    @classmethod
+    def from_product(cls, product: ResolvedProductDto) -> Self:
+        return cls(id=product.id, name=product.name, short_name=product.short_name)
+
 
 class OwnerResponse(OmitNoneModel):
     """The party on the account — identity only, not the contact-card dump."""
@@ -59,12 +64,24 @@ class OwnerResponse(OmitNoneModel):
         ),
     )
 
+    @classmethod
+    def from_owner(cls, owner: AccountOwnerDto | None) -> Self | None:
+        if owner is None:
+            return None
+        return cls(id=owner.id, name=owner.name, resource_type=owner.resource_type)
+
 
 class InvestorTypeResponse(OmitNoneModel):
     """The account's investor type, identity only."""
 
     id: str = Field(description="Backstop investor-type id.")
     name: str | None = Field(default=None, description="Investor-type name, e.g. 'Fund of Funds'.")
+
+    @classmethod
+    def from_investor_type(cls, investor_type: InvestorTypeDto | None) -> Self | None:
+        if investor_type is None:
+            return None
+        return cls(id=investor_type.id, name=investor_type.name)
 
 
 class InvestorQualificationResponse(OmitNoneModel):
@@ -84,6 +101,12 @@ class InvestorQualificationResponse(OmitNoneModel):
             "did not send one."
         ),
     )
+
+    @classmethod
+    def from_attributes(cls, qualification: InvestorQualificationAttributes | None) -> Self | None:
+        if qualification is None or (qualification.status is None and qualification.option is None):
+            return None
+        return cls(status=qualification.status, option=qualification.option)
 
 
 class UnvaluedPointResponse(OmitNoneModel):
@@ -132,6 +155,24 @@ class FigureResponse(OmitNoneModel):
             "the figure is real but stale — say so rather than reporting it as current."
         ),
     )
+
+    @classmethod
+    def from_figure(cls, figure: SeriesFigureDto | None) -> Self | None:
+        """Report the latest valued point, naming the newer valueless one when there is one."""
+        if figure is None:
+            return None
+        reported = figure.valued if figure.valued is not None else figure.latest
+        newer = (
+            UnvaluedPointResponse(date=figure.latest.date, value_status=figure.latest.value_status)
+            if figure.valued is not None and figure.latest.value is None
+            else None
+        )
+        return cls(
+            value=reported.value,
+            date=reported.date,
+            value_status=reported.value_status,
+            newer_point_without_value=newer,
+        )
 
 
 class SeriesErrorResponse(OmitNoneModel):
@@ -225,6 +266,29 @@ class AccountRowResponse(OmitNoneModel):
         description="True when `closedDate` was absent on the account. A present null is closed."
     )
 
+    @classmethod
+    def from_record(cls, account: AccountRecordDto) -> Self:
+        return cls(
+            id=account.id,
+            name=account.name,
+            owner=OwnerResponse.from_owner(account.owner),
+            investor_type=InvestorTypeResponse.from_investor_type(account.investor_type),
+            product=ProductRefResponse.from_product(account.product) if account.product else None,
+            currency=account.currency,
+            account_start_date=account.account_start_date,
+            closed_date=account.closed_date,
+            ownership_type=account.ownership_type,
+            investor_qualification=InvestorQualificationResponse.from_attributes(
+                account.investor_qualification
+            ),
+            is_employee_account=account.is_employee_account,
+            is_gp_account=account.is_gp_account,
+            aml_check_complete=account.aml_check_complete,
+            new_issue_eligible=account.new_issue_eligible,
+            us_domiciled=account.us_domiciled,
+            is_open=account.is_open,
+        )
+
 
 class PositionRowResponse(AccountRowResponse):
     """An account row plus current balance, lifetime invested, and lifetime redemptions."""
@@ -258,61 +322,31 @@ class PositionRowResponse(AccountRowResponse):
         ),
     )
 
-
-def product_ref_response(product: ResolvedProductDto) -> ProductRefResponse:
-    return ProductRefResponse(id=product.id, name=product.name, short_name=product.short_name)
-
-
-def figure_response(figure: SeriesFigureDto | None) -> FigureResponse | None:
-    """Report the latest valued point, naming the newer valueless one when there is one."""
-    if figure is None:
-        return None
-    reported = figure.valued if figure.valued is not None else figure.latest
-    newer = (
-        UnvaluedPointResponse(date=figure.latest.date, value_status=figure.latest.value_status)
-        if figure.valued is not None and figure.latest.value is None
-        else None
-    )
-    return FigureResponse(
-        value=reported.value,
-        date=reported.date,
-        value_status=reported.value_status,
-        newer_point_without_value=newer,
-    )
-
-
-def owner_response(owner: AccountOwnerDto | None) -> OwnerResponse | None:
-    if owner is None:
-        return None
-    return OwnerResponse(id=owner.id, name=owner.name, resource_type=owner.resource_type)
-
-
-def investor_type_response(investor_type: InvestorTypeDto | None) -> InvestorTypeResponse | None:
-    if investor_type is None:
-        return None
-    return InvestorTypeResponse(id=investor_type.id, name=investor_type.name)
-
-
-def investor_qualification_response(
-    qualification: InvestorQualificationAttributes | None,
-) -> InvestorQualificationResponse | None:
-    if qualification is None or (qualification.status is None and qualification.option is None):
-        return None
-    return InvestorQualificationResponse(status=qualification.status, option=qualification.option)
-
-
-def account_row_response(account: AccountRecordDto) -> AccountRowResponse:
-    return AccountRowResponse.model_validate(
-        {
-            **account.model_dump(),
-            "owner": owner_response(account.owner),
-            "investor_type": investor_type_response(account.investor_type),
-            "product": product_ref_response(account.product) if account.product else None,
-            "investor_qualification": investor_qualification_response(
-                account.investor_qualification
-            ),
-        }
-    )
+    @classmethod
+    def from_position(cls, position: AccountPositionDto) -> Self:
+        row = AccountRowResponse.from_record(position.account)
+        return cls(
+            id=row.id,
+            name=row.name,
+            owner=row.owner,
+            investor_type=row.investor_type,
+            product=row.product,
+            currency=row.currency,
+            account_start_date=row.account_start_date,
+            closed_date=row.closed_date,
+            ownership_type=row.ownership_type,
+            investor_qualification=row.investor_qualification,
+            is_employee_account=row.is_employee_account,
+            is_gp_account=row.is_gp_account,
+            aml_check_complete=row.aml_check_complete,
+            new_issue_eligible=row.new_issue_eligible,
+            us_domiciled=row.us_domiciled,
+            is_open=row.is_open,
+            balance=FigureResponse.from_figure(position.balance),
+            invested=FigureResponse.from_figure(position.invested),
+            redemptions=FigureResponse.from_figure(position.redemptions),
+            errors=_series_errors(position.errors),
+        )
 
 
 def _series_errors(errors: tuple[SeriesErrorDto, ...]) -> tuple[SeriesErrorResponse, ...] | None:
@@ -320,19 +354,6 @@ def _series_errors(errors: tuple[SeriesErrorDto, ...]) -> tuple[SeriesErrorRespo
         return None
     return tuple(
         SeriesErrorResponse(series=error.series, message=error.message) for error in errors
-    )
-
-
-def position_row_response(position: AccountPositionDto) -> PositionRowResponse:
-    row = account_row_response(position.account)
-    return PositionRowResponse.model_validate(
-        {
-            **row.model_dump(),
-            "balance": figure_response(position.balance),
-            "invested": figure_response(position.invested),
-            "redemptions": figure_response(position.redemptions),
-            "errors": _series_errors(position.errors),
-        }
     )
 
 

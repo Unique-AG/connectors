@@ -19,11 +19,10 @@ from pydantic import Field
 from backstop_mcp.features.org_people import (
     OrgPeopleResolvedResponse,
     fetch_people_for_organization,
-    org_people_response,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    party_response,
+    ResolvedPartyResponse,
     resolve_party,
     unresolved_party_response,
 )
@@ -128,4 +127,6 @@ async def get_people_for_party(
             "people_omitted": listing.people_omitted,
         },
     )
-    return org_people_response(resolved=party_response(party), listing=listing)
+    return OrgPeopleResolvedResponse.from_listing(
+        listing, resolved=ResolvedPartyResponse.from_party(party)
+    )
