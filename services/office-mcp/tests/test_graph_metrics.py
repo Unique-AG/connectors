@@ -10,6 +10,8 @@ process-wide and cumulative, and the rest of the suite drives the same tools und
 operation names.
 """
 
+import ast
+import pathlib
 from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
 
 import httpx
@@ -258,3 +260,67 @@ class TestAPagedWalkReportsWhatItRead:
             await _walk_chats(client, limit=50)
 
         assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == before + 3
+
+
+_TOOLS = pathlib.Path(__file__).resolve().parents[1] / "src" / "office_mcp" / "tools"
+
+
+def _tool_sources() -> list[pathlib.Path]:
+    return sorted(path for path in _TOOLS.glob("*.py") if path.name != "__init__.py")
+
+
+def _source_id(source: pathlib.Path) -> str:
+    """Test id for one module: `list_chats.py`, not an absolute path."""
+    return source.name
+
+
+def _graph_errors_calls(source: pathlib.Path) -> list[ast.Call]:
+    """Every `graph_errors(...)` in one module, however it was spelled."""
+    return [
+        node
+        for node in ast.walk(ast.parse(source.read_text()))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "graph_errors"
+    ]
+
+
+class TestEveryToolNamesItselfWhenItCallsGraph:
+    """The ratchet under the label, and the reason `operation` is worth having at all.
+
+    `graph_errors` accepts no operation and then records nothing, which is deliberate: a name
+    invented for a caller that supplied none would read on a dashboard as a real operation. The cost
+    of that choice is that a tool which forgets goes missing from the Graph metrics with nothing
+    failing anywhere. This is what fails instead.
+
+    Asserted through the AST rather than on the text, so that a call written across two lines counts
+    and a `graph_errors` inside a docstring does not.
+    """
+
+    def test_the_tools_are_actually_there(self) -> None:
+        """Guards the guard: no tool files means every assertion below passes over nothing."""
+        sources = _tool_sources()
+        assert len(sources) > 1, f"no tool modules found under {_TOOLS}"
+        assert any(_graph_errors_calls(source) for source in sources)
+
+    @pytest.mark.parametrize("source", _tool_sources(), ids=_source_id)
+    def test_every_graph_call_is_named_after_the_tool_that_makes_it(
+        self, source: pathlib.Path
+    ) -> None:
+        unnamed = [
+            call.lineno
+            for call in _graph_errors_calls(source)
+            if [argument for argument in call.args if _names_the_tool(argument)] == []
+            and [keyword for keyword in call.keywords if _names_the_tool(keyword.value)] == []
+        ]
+        assert not unnamed, (
+            f"{source.name} calls graph_errors without its own TOOL_NAME at line(s) "
+            + f"{unnamed}. Every Graph call a tool makes is counted under `operation`, and a call "
+            + "that names nothing is counted nowhere — the tool goes missing from "
+            + f"{GRAPH_REQUESTS_TOTAL} rather than showing up under a wrong name."
+        )
+
+
+def _names_the_tool(argument: ast.expr) -> bool:
+    """Whether this argument is the module's own `TOOL_NAME`, and not a literal spelled again."""
+    return isinstance(argument, ast.Name) and argument.id == "TOOL_NAME"

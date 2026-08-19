@@ -184,7 +184,7 @@ async def list_recent_chats(
             top=limit,
         )
     )
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         first_page = await client.me.chats.get(request_configuration=configuration)
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
