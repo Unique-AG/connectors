@@ -70,12 +70,14 @@ _CHANNEL_ID = "19:general@thread.tacv2"
 _CHAT_ID = "19:release@thread.v2"
 _MESSAGE_ID = "1770000000000"
 _MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+_TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0002"
 _JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0?context=%7b%22Tid%22%3a%22x%22%7d"
 )
 _CHAT_MESSAGE_URI = f"teams:///chats/{quote(_CHAT_ID, safe='')}/messages/{_MESSAGE_ID}"
 _MEETING_URI = f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"
+_TRANSCRIPT_URI = f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,7 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
         {"meeting_uri": _MEETING_URI},
         ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
     ),
+    "read_transcript": _Refused({"uri": _TRANSCRIPT_URI}, ("OnlineMeetingTranscript.Read.All",)),
 }
 
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
