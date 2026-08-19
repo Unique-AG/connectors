@@ -14,7 +14,6 @@ from backstop_mcp.features.data_hygiene import (
     EntityRelationshipInclude,
     ProvenanceAttributes,
     entity_relationships,
-    extract_as_of,
 )
 from backstop_mcp.features.includes import (
     PersonInclude,
@@ -214,7 +213,7 @@ async def get_person(
         resolved=ResolvedPartyResponse.from_party(
             party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=extract_as_of(attributes),
+        as_of=AsOfResponse.from_attributes(attributes),
         employments=index.links(),
         included=plan.project(document=document) if plan.planned else None,
     )

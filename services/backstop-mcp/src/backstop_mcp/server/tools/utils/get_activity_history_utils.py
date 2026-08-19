@@ -199,7 +199,7 @@ class PartyRecordResponse(ProvenanceAttributes):
     `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
     surfaces the raw attribute dump, only `name` (for the resolve echo) and provenance (for
     `as_of`). People records often omit `name` and send `firstName`/`lastName` instead; keep
-    those so a `type="next"` page (where `ResolvedParty.name` is None) can still rebuild it.
+    those so a `type="next"` page (where `ResolvedPartyDto.name` is None) can still rebuild it.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)

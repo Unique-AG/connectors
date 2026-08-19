@@ -6,7 +6,7 @@ from mcp.shared.exceptions import McpError
 from mcp.types import METHOD_NOT_FOUND, ClientCapabilities, ErrorData
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.party_resolver import ResolvedParty, resolve_party
+from backstop_mcp.features.party_resolver import ResolvedPartyDto, resolve_party
 from backstop_mcp.features.resolution import Ambiguous, Candidate, Resolved, elicit_choice
 from tests.features.party_resolver.helpers import (
     BASE_URL,
@@ -29,15 +29,15 @@ def _two_org_hits() -> dict[str, object]:
     )
 
 
-def _candidate(party_id: str, label: str) -> Candidate[ResolvedParty]:
+def _candidate(party_id: str, label: str) -> Candidate[ResolvedPartyDto]:
     return Candidate(
         key=party_id,
         label=label,
-        value=ResolvedParty(id=party_id, search_type="organizations", name=label),
+        value=ResolvedPartyDto(id=party_id, search_type="organizations", name=label),
     )
 
 
-def _ambiguous(*candidates: Candidate[ResolvedParty]) -> Ambiguous[ResolvedParty]:
+def _ambiguous(*candidates: Candidate[ResolvedPartyDto]) -> Ambiguous[ResolvedPartyDto]:
     return Ambiguous(query="Capstone", scope="organizations", candidates=candidates)
 
 

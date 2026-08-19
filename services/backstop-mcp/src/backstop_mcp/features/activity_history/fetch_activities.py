@@ -154,9 +154,7 @@ async def fetch_activity_page(
     )
     raw_count = len(page.items)
     items = tuple(
-        ActivityItemDto.model_validate(
-            {**resource.attributes.model_dump(), "id": resource.id, "stream": stream}
-        )
+        ActivityItemDto.from_attributes(resource.id, stream, resource.attributes)
         for resource in page.items
     )
     if since is not None and until is not None:
@@ -213,7 +211,7 @@ async def fetch_email_page(
         offset=offset,
     )
     items = tuple(
-        EmailItemDto.model_validate({**resource.attributes.model_dump(), "id": resource.id})
+        EmailItemDto.from_attributes(resource.id, resource.attributes)
         for resource in page.items
     )
     end_of_stream = len(page.items) < limit

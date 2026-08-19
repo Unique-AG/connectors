@@ -325,27 +325,15 @@ class PositionRowResponse(AccountRowResponse):
     @classmethod
     def from_position(cls, position: AccountPositionDto) -> Self:
         row = AccountRowResponse.from_record(position.account)
-        return cls(
-            id=row.id,
-            name=row.name,
-            owner=row.owner,
-            investor_type=row.investor_type,
-            product=row.product,
-            currency=row.currency,
-            account_start_date=row.account_start_date,
-            closed_date=row.closed_date,
-            ownership_type=row.ownership_type,
-            investor_qualification=row.investor_qualification,
-            is_employee_account=row.is_employee_account,
-            is_gp_account=row.is_gp_account,
-            aml_check_complete=row.aml_check_complete,
-            new_issue_eligible=row.new_issue_eligible,
-            us_domiciled=row.us_domiciled,
-            is_open=row.is_open,
-            balance=FigureResponse.from_figure(position.balance),
-            invested=FigureResponse.from_figure(position.invested),
-            redemptions=FigureResponse.from_figure(position.redemptions),
-            errors=_series_errors(position.errors),
+        # Dump every AccountRowResponse field so a new row field cannot be dropped here.
+        return cls.model_validate(
+            {
+                **row.model_dump(),
+                "balance": FigureResponse.from_figure(position.balance),
+                "invested": FigureResponse.from_figure(position.invested),
+                "redemptions": FigureResponse.from_figure(position.redemptions),
+                "errors": _series_errors(position.errors),
+            }
         )
 
 

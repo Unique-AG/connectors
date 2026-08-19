@@ -1,9 +1,6 @@
 import asyncio
 import logging
 from datetime import timedelta
-from typing import Annotated
-
-from pydantic import StringConstraints
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
@@ -20,34 +17,8 @@ _STAGES_PAGE_SIZE = 100
 # that a recovered instance is picked up without an operator waiting on the TTL.
 _FAILURE_COOLDOWN = timedelta(seconds=30)
 
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
-
-OpportunityStage = OpportunityStageDto
-
-
-type StageResource = BackstopApiResource[OpportunityStageAttributes]
-
-
-def stage_from_resource(resource: StageResource) -> OpportunityStage | None:
-    """Map one `opportunity-stages` resource onto the vocabulary shape.
-
-    Returns None when `name` is missing — naming a stage is the whole point of this vocabulary,
-    so an unnamed row would only masquerade as a resolution.
-    """
-    name = resource.attributes.name
-    if not name:
-        return None
-
-    return OpportunityStage(
-        id=resource.id,
-        name=name,
-        closed=bool(resource.attributes.closed),
-        sort_order=resource.attributes.sort_order,
-    )
-
-
-async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, OpportunityStage]:
+async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, OpportunityStageDto]:
     """Fetch the instance's opportunity-stage vocabulary, keyed by stage id."""
     page = await client.paginate(
         _STAGES_PATH,
@@ -56,9 +27,9 @@ async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, Opportun
         page_size=_STAGES_PAGE_SIZE,
     )
 
-    stages: dict[str, OpportunityStage] = {}
+    stages: dict[str, OpportunityStageDto] = {}
     for resource in page.items:
-        stage = stage_from_resource(resource)
+        stage = OpportunityStageDto.from_resource(resource)
         if stage is not None:
             stages[stage.id] = stage
     return stages
@@ -85,13 +56,13 @@ class OpportunityStagesService:
     """
 
     def __init__(self, *, ttl: timedelta) -> None:
-        self._stages: dict[str, OpportunityStage] | None = None
+        self._stages: dict[str, OpportunityStageDto] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._cooldown: TimedGate = TimedGate(duration=_FAILURE_COOLDOWN)
         self._failure: Exception | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
 
-    async def get(self, client: BackstopClient) -> dict[str, OpportunityStage]:
+    async def get(self, client: BackstopClient) -> dict[str, OpportunityStageDto]:
         cached = self._stages
         if cached is not None and self._freshness.within():
             return dict(cached)

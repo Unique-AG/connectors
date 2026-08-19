@@ -26,8 +26,8 @@ from backstop_mcp.features.custom_fields import (
 )
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
-    EmploymentRules,
-    TypeVocabulary,
+    EmploymentRulesDto,
+    TypeVocabularyDto,
 )
 from backstop_mcp.features.opportunities import (
     OpportunityStagesService,
@@ -107,8 +107,8 @@ def build_employment_index_factory(
     """
     config = backstop_config()
     return EmploymentIndexFactory(
-        rules=EmploymentRules(
-            employment=TypeVocabulary(
+        rules=EmploymentRulesDto(
+            employment=TypeVocabularyDto(
                 type_ids=frozenset(employment_type_ids),
                 name_markers=frozenset(
                     config.employment_relationship_type_markers
@@ -116,7 +116,7 @@ def build_employment_index_factory(
                     else employment_markers
                 ),
             ),
-            former=TypeVocabulary(
+            former=TypeVocabularyDto(
                 type_ids=frozenset(former_type_ids),
                 name_markers=frozenset(
                     config.former_employment_relationship_type_markers

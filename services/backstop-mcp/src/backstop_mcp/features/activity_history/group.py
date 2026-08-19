@@ -14,12 +14,12 @@ from backstop_mcp.features.activity_history.fetch_activities import (
 )
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityItemDto,
-    DateRangeDto,
     EmailItemDto,
 )
 from backstop_mcp.features.activity_history.responses import (
     ActivityContinuationResponse,
     ActivityGroupResponse,
+    DateRangeResponse,
 )
 
 __all__ = ["group_page"]
@@ -35,11 +35,11 @@ def _occurred_date(item: ActivityItemDto | EmailItemDto) -> date | None:
     return item.effective_date
 
 
-def _date_range(items: Sequence[ActivityItemDto | EmailItemDto]) -> DateRangeDto | None:
+def _date_range(items: Sequence[ActivityItemDto | EmailItemDto]) -> DateRangeResponse | None:
     dates = [occurred for item in items if (occurred := _occurred_date(item)) is not None]
     if not dates:
         return None
-    return DateRangeDto(start=min(dates), end=max(dates))
+    return DateRangeResponse(start=min(dates), end=max(dates))
 
 
 def group_page(

@@ -6,8 +6,8 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.party_resolver import (
-    PartyResolveItem,
-    QuickSearchOptions,
+    PartyResolveItemDto,
+    QuickSearchOptionsDto,
     resolve_parties,
     resolve_party,
     unresolved_parties_response,
@@ -220,7 +220,7 @@ class TestQuickSearch:
             client,
             search_type="organizations",
             search="Capstone",
-            quick_search_options=QuickSearchOptions(
+            quick_search_options=QuickSearchOptionsDto(
                 limit=5,
                 show_all=True,
                 enhance_search_types=True,
@@ -258,7 +258,7 @@ class TestQuickSearch:
             client,
             search_type="organizations",
             search="Jane",
-            quick_search_options=QuickSearchOptions(enhance_search_types=True),
+            quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
         )
 
         assert isinstance(result, Resolved)
@@ -287,7 +287,7 @@ class TestQuickSearch:
             client,
             search_type="organizations",
             search="Jane",
-            quick_search_options=QuickSearchOptions(enhance_search_types=True),
+            quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
         )
         assert isinstance(result, Ambiguous)
 
@@ -322,7 +322,7 @@ class TestQuickSearch:
             client,
             search_type="organizations",
             search="Jane",
-            quick_search_options=QuickSearchOptions(enhance_search_types=True),
+            quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
         )
         assert isinstance(result, Ambiguous)
 
@@ -410,7 +410,7 @@ class TestCandidateLabel:
             client,
             search_type="organizations",
             search="Koch",
-            options=QuickSearchOptions(enhance_search_types=True),
+            options=QuickSearchOptionsDto(enhance_search_types=True),
         )
 
         assert [candidate.label for candidate in result] == [
@@ -716,9 +716,9 @@ class TestBatchResolve:
             client,
             search_type="organizations",
             items=[
-                PartyResolveItem(party_id="trusted-1", name="Trusted Org"),
-                PartyResolveItem(search="Missing Co"),
-                PartyResolveItem(search="Alpha"),
+                PartyResolveItemDto(party_id="trusted-1", name="Trusted Org"),
+                PartyResolveItemDto(search="Missing Co"),
+                PartyResolveItemDto(search="Alpha"),
             ],
         )
 
@@ -753,8 +753,8 @@ class TestBatchResolve:
             client,
             search_type="organizations",
             items=[
-                PartyResolveItem(party_id="trusted-1"),
-                PartyResolveItem(search="Solo"),
+                PartyResolveItemDto(party_id="trusted-1"),
+                PartyResolveItemDto(search="Solo"),
             ],
         )
 
@@ -783,7 +783,7 @@ class TestBatchResolve:
             return await resolve_parties(
                 client,
                 search_type="organizations",
-                items=[PartyResolveItem(search=f"Co {i}") for i in range(3)],
+                items=[PartyResolveItemDto(search=f"Co {i}") for i in range(3)],
             )
 
         task = asyncio.create_task(run())
@@ -815,7 +815,7 @@ class TestBatchResolve:
         result = await resolve_parties(
             client,
             search_type="organizations",
-            items=[PartyResolveItem(search="Nope"), PartyResolveItem(search="Alpha")],
+            items=[PartyResolveItemDto(search="Nope"), PartyResolveItemDto(search="Alpha")],
         )
         assert isinstance(result, BatchAmbiguous)
 
@@ -953,25 +953,25 @@ class TestInvalidArgs:
 
     def test_party_resolve_item_rejects_both(self) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
-            PartyResolveItem(party_id="o1", search="Capstone")
+            PartyResolveItemDto(party_id="o1", search="Capstone")
 
     def test_party_resolve_item_rejects_neither(self) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
-            PartyResolveItem()
+            PartyResolveItemDto()
 
     def test_party_resolve_item_treats_blank_selectors_as_unset(self) -> None:
-        item = PartyResolveItem(party_id="  ", search="Capstone")
+        item = PartyResolveItemDto(party_id="  ", search="Capstone")
         assert item.party_id is None
         assert item.search == "Capstone"
 
-        item = PartyResolveItem(party_id="o1", search="")
+        item = PartyResolveItemDto(party_id="o1", search="")
         assert item.party_id == "o1"
         assert item.search is None
 
     def test_party_resolve_item_treats_blank_name_as_unset(self) -> None:
-        item = PartyResolveItem(party_id="o1", name="   ")
+        item = PartyResolveItemDto(party_id="o1", name="   ")
         assert item.name is None
-        item = PartyResolveItem(party_id="o1", name="")
+        item = PartyResolveItemDto(party_id="o1", name="")
         assert item.name is None
-        item = PartyResolveItem(party_id="o1", name=" Capstone ")
+        item = PartyResolveItemDto(party_id="o1", name=" Capstone ")
         assert item.name == "Capstone"

@@ -14,7 +14,8 @@ class OpportunityStageAttributes(BaseModel):
 
     Every field is optional because `client.paginate` deserializes a whole page in one pass: a
     required field would fail the entire seven-row fetch over one malformed row. Optional fields
-    plus the drop in `stage_from_resource` keep one bad row from costing the other six.
+    plus the drop in `OpportunityStageDto.from_resource` keep one bad row from costing the other
+    six.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")

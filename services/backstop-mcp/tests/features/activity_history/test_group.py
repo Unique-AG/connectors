@@ -1,7 +1,7 @@
 """`group_page`: per-stream date_range and next continuation, over a plain in-memory page.
 
 `group_page` is a pure, synchronous function — no HTTP, no `respx`, no async fixtures. Each test
-builds a list of `ActivityItem`/`EmailItem` plus fetch params, which is the whole point of
+builds a list of `ActivityItemDto`/`EmailItemDto` plus fetch params, which is the whole point of
 decoupling fetching from grouping: the helper cannot tell a synthetic fixture from a page a
 real `BackstopClient`-backed layer fetched.
 
@@ -21,10 +21,10 @@ from pydantic import ValidationError
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityGroupResponse,
-    ActivityItem,
+    ActivityItemDto,
     ActivityType,
-    DateRange,
-    EmailItem,
+    DateRangeResponse,
+    EmailItemDto,
     group_page,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
@@ -32,8 +32,8 @@ from backstop_mcp.features.activity_history.fetch_activities import BackstopActi
 
 def _activity(
     item_id: str, stream: BackstopActivityType, effective_date: date | None
-) -> ActivityItem:
-    return ActivityItem(
+) -> ActivityItemDto:
+    return ActivityItemDto(
         id=item_id,
         stream=stream,
         title=None,
@@ -46,8 +46,8 @@ def _activity(
     )
 
 
-def _email(item_id: str, sent_timestamp: datetime | None) -> EmailItem:
-    return EmailItem(
+def _email(item_id: str, sent_timestamp: datetime | None) -> EmailItemDto:
+    return EmailItemDto(
         id=item_id,
         subject=None,
         sent_timestamp=sent_timestamp,
@@ -60,7 +60,7 @@ def _email(item_id: str, sent_timestamp: datetime | None) -> EmailItem:
 
 
 def _group(
-    items: Sequence[ActivityItem | EmailItem],
+    items: Sequence[ActivityItemDto | EmailItemDto],
     *,
     activity_type: ActivityType = "meeting",
     end_of_stream: bool,
@@ -68,7 +68,7 @@ def _group(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityGroupResponse[ActivityItem | EmailItem]:
+) -> ActivityGroupResponse[ActivityItemDto | EmailItemDto]:
     return group_page(
         items,
         activity_type=activity_type,
@@ -89,7 +89,7 @@ class TestDateRange:
         ]
         result = _group(items, end_of_stream=True, limit=10, offset=0)
 
-        assert result.date_range == DateRange(start=date(2026, 1, 1), end=date(2026, 3, 1))
+        assert result.date_range == DateRangeResponse(start=date(2026, 1, 1), end=date(2026, 3, 1))
 
     def test_returns_none_when_page_is_empty(self) -> None:
         result = _group((), end_of_stream=True, limit=10, offset=0)
@@ -109,7 +109,7 @@ class TestDateRange:
         ]
         result = _group(items, end_of_stream=True, limit=10, offset=0)
 
-        assert result.date_range == DateRange(start=date(2026, 2, 1), end=date(2026, 2, 1))
+        assert result.date_range == DateRangeResponse(start=date(2026, 2, 1), end=date(2026, 2, 1))
 
     def test_email_timestamp_contributes_its_utc_date(self) -> None:
         # 23:00 US Eastern is the next calendar day in UTC.
@@ -118,7 +118,9 @@ class TestDateRange:
             [_email("e1", sent)], activity_type="email", end_of_stream=True, limit=10, offset=0
         )
 
-        assert result.date_range == DateRange(start=date(2026, 1, 16), end=date(2026, 1, 16))
+        assert result.date_range == DateRangeResponse(
+            start=date(2026, 1, 16), end=date(2026, 1, 16)
+        )
 
     def test_naive_email_timestamp_is_treated_as_utc(self) -> None:
         sent = datetime(2026, 1, 15, 23, 0)
@@ -126,7 +128,9 @@ class TestDateRange:
             [_email("e1", sent)], activity_type="email", end_of_stream=True, limit=10, offset=0
         )
 
-        assert result.date_range == DateRange(start=date(2026, 1, 15), end=date(2026, 1, 15))
+        assert result.date_range == DateRangeResponse(
+            start=date(2026, 1, 15), end=date(2026, 1, 15)
+        )
 
 
 class TestNext:
@@ -192,10 +196,10 @@ class TestItems:
 class TestDateRangeBounds:
     def test_rejects_start_after_end(self) -> None:
         with pytest.raises(ValidationError, match="date_range.start must not be after"):
-            DateRange(start=date(2026, 2, 1), end=date(2026, 1, 1))
+            DateRangeResponse(start=date(2026, 2, 1), end=date(2026, 1, 1))
 
     def test_accepts_equal_start_and_end(self) -> None:
-        span = DateRange(start=date(2026, 1, 1), end=date(2026, 1, 1))
+        span = DateRangeResponse(start=date(2026, 1, 1), end=date(2026, 1, 1))
         assert span.start == span.end
 
 

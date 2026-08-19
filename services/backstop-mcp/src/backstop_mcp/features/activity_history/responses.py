@@ -1,5 +1,5 @@
 """Wire response models for an activity-history tool payload, and the pure conversion from a
-fetched item (`ActivityItem` / `EmailItem`) to its wire shape (`TimelineRecord`).
+fetched item (`ActivityItemDto` / `EmailItemDto`) to its wire shape (`TimelineRecord`).
 
 Standing caveats (documents excluded from the token budget concerns, same-day email-vs-activity
 ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
@@ -33,14 +33,12 @@ from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     ActivityItemDto,
     AttendeeDto,
-    DateRangeDto,
     EmailItemDto,
     MeetingSpecificsDto,
 )
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
-    extract_as_of,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -59,6 +57,7 @@ __all__ = [
     "ActivityDetailResponse",
     "AttendeeResponse",
     "ActivityRecordResponse",
+    "DateRangeResponse",
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
     "ResolvedPartyAsOfResponse",
@@ -120,6 +119,27 @@ class ActivityContinuationResponse(OmitNoneModel):
         return self
 
 
+class DateRangeResponse(OmitNoneModel):
+    """Min/max `occurred_at` among this page's dated items."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    start: Annotated[
+        date,
+        Field(description="Oldest `occurred_at` date among this page's dated items."),
+    ]
+    end: Annotated[
+        date,
+        Field(description="Newest `occurred_at` date among this page's dated items."),
+    ]
+
+    @model_validator(mode="after")
+    def _start_not_after_end(self) -> Self:
+        if self.start > self.end:
+            raise ValueError("date_range.start must not be after date_range.end")
+        return self
+
+
 class ActivityGroupResponse[ItemT](OmitNoneModel):
     """One stream's page: which type, this page's items, this page's date span, and continuation."""
 
@@ -134,7 +154,7 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
         Field(description="This page's records for `activity_type`, in Backstop fetch order."),
     ]
     date_range: Annotated[
-        DateRangeDto | None,
+        DateRangeResponse | None,
         Field(
             description=(
                 "Oldest and newest `occurred_at` dates among this page's dated items. Omitted "
@@ -346,7 +366,7 @@ class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
             id=resolved.id,
             search_type=resolved.search_type,
             name=resolved.name,
-            as_of=extract_as_of(provenance),
+            as_of=AsOfResponse.from_attributes(provenance),
         )
 
 
@@ -377,7 +397,7 @@ type GetActivityHistoryResponse = (
 
 
 class AttendeeResponse(OmitNoneModel):
-    """One trimmed attendee: a single display name (see `Attendee.name`'s fallback)."""
+    """One trimmed attendee: a single display name (see `AttendeeAttributes.display_name`)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
 

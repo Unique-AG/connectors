@@ -56,7 +56,6 @@ from backstop_mcp.features.activity_history.internal_dto import (
     ActivityItemDto,
     ActivityPageDto,
     AttendeeDto,
-    DateRangeDto,
     EmailItemDto,
     EmailPageDto,
     MeetingSpecificsDto,
@@ -68,6 +67,7 @@ from backstop_mcp.features.activity_history.responses import (
     ActivityHistoryResolvedResponse,
     ActivityRecordResponse,
     AttendeeResponse,
+    DateRangeResponse,
     EmailRecordResponse,
     GetActivityHistoryResponse,
     ResolvedPartyAsOfResponse,
@@ -75,16 +75,6 @@ from backstop_mcp.features.activity_history.responses import (
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
-
-ActivityDetail = ActivityDetailDto
-ActivityHandle = ActivityHandleDto
-ActivityItem = ActivityItemDto
-ActivityPage = ActivityPageDto
-Attendee = AttendeeDto
-DateRange = DateRangeDto
-EmailItem = EmailItemDto
-EmailPage = EmailPageDto
-MeetingSpecifics = MeetingSpecificsDto
 
 __all__ = [
     "ActivityContinuationResponse",
@@ -101,7 +91,7 @@ __all__ = [
     "AttendeeDto",
     "AttendeeResponse",
     "BackstopActivityType",
-    "DateRangeDto",
+    "DateRangeResponse",
     "EmailItemDto",
     "EmailPageDto",
     "EmailRecordResponse",
