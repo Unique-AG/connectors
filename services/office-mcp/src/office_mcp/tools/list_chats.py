@@ -38,15 +38,13 @@ from msgraph.generated.users.item.chats.chats_request_builder import ChatsReques
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import collect_pages, graph_client_for, graph_errors
+from office_mcp.graph_client import collect_pages, graph_errors
 from office_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_chats"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)
-
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 MAX_CHATS = 50
 
@@ -237,6 +235,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     `transport` is the long-lived client from `create_graph_transport`. This tool borrows it per
     call and does not own it; `create_app` closes it on shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -265,11 +265,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = False,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> ChatList:
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await list_recent_chats(
-                graph_client_for(transport, graph_token),
-                limit=limit,
-                include_member_emails=include_member_emails,
-            )
+        return await list_recent_chats(
+            client,
+            limit=limit,
+            include_member_emails=include_member_emails,
+        )
