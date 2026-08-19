@@ -11,6 +11,7 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from unique_mcp.monitoring import setup_ops
+from unique_toolkit.monitoring import configure_tracing
 
 from office_mcp.config import AppConfig, DatabaseConfig
 from office_mcp.logging import configure_logging
@@ -43,6 +44,16 @@ def create_app(
 
     configure_logging(config)
     configure_metrics(config)
+    # Here, beside configure_metrics, rather than in main.py where kb-mcp puts it: everything that
+    # depends on a tracer provider — OpenTelemetryMiddleware, the two middlewares below, FastMCP's
+    # own spans — is assembled in this function, and main.py is not the only caller of it. Installed
+    # from main.py, `create_app()` would compose an instrumented app against a provider only the CLI
+    # entrypoint had installed. kb-mcp's main() *is* its composition root, so its placement is the
+    # same decision, not a different one.
+    # The version is passed rather than left to TracingSettings, which would read the bare VERSION
+    # env var: config.version is this service's one source of truth for it, as in metrics.py.
+    # Self-disabling when no OTEL_* variable is set, so a test process stays untraced.
+    configure_tracing(service_name="office-mcp", service_version=config.version)
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
