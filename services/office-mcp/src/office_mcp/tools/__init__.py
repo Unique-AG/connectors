@@ -47,7 +47,7 @@ from typing import Protocol
 import httpx
 from fastmcp import FastMCP
 
-from office_mcp.shared.seam import graph_scope
+from office_mcp.shared.seam import ToolAdvice, graph_scope
 from office_mcp.tools import get_me
 
 # The whole of what this package promises, and the reason it is entered through here: a caller
@@ -62,7 +62,15 @@ from office_mcp.tools import get_me
 # and `graph_client/`, and the package's own front door is explicitly allowed.) A name on the front
 # door that nothing may walk through is a promise to nobody, so it stays private to this module and
 # documents itself where it bites.
-__all__ = ["ALWAYS_ON", "PRESETS", "TOOL_NAMES", "Selection", "register_tools", "resolve"]
+__all__ = [
+    "ALWAYS_ON",
+    "PRESETS",
+    "TOOL_NAMES",
+    "Selection",
+    "graph_advice",
+    "register_tools",
+    "resolve",
+]
 
 
 class ToolModule(Protocol):
@@ -203,6 +211,26 @@ def _every_name_known(enabled: Sequence[str]) -> tuple[str, ...]:
             + f"The tools it has are: {', '.join(TOOL_NAMES)}"
         )
     return tuple(enabled)
+
+
+def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
+    """What `GraphAdviceMiddleware` words each selected tool's refusals from.
+
+    Derived from the modules, exactly as the scope list above is, and for the same reason: a
+    hand-written table would be a second copy of which permissions a tool calls under, and the two
+    copies disagreeing is a 403 that sends an administrator after a permission that was never
+    missing. Filtered by the selection, so it says nothing about a tool this deployment does not
+    expose.
+
+    `not_found` is left unset here. The sentence a 404 needs instead of the default belongs to the
+    tool that knows where its argument came from, and while a tool still opens its own mapping block
+    that is where it says it.
+    """
+    return {
+        module.TOOL_NAME: ToolAdvice(permissions=module.GRAPH_PERMISSIONS)
+        for module in _TOOL_MODULES
+        if module.TOOL_NAME in selection.tools
+    }
 
 
 def register_tools(mcp: FastMCP, transport: httpx.AsyncClient, selection: Selection) -> None:
