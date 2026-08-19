@@ -46,9 +46,9 @@ mints, its parser and its speller, and the permission each Teams surface is read
 shape Graph answers with, so that the same message found by one tool and read by another is not
 reported with two different authors), `identity.py` (who the signed-in user is — `get_me` reports
 it, and it is the fact every other answer gets correlated against, so a second tool asking with a
-`GET /me` of its own would be a second answer to one question) and `seam.py` (the Graph client a tool is
-handed, with the per-tool On-Behalf-Of token inside it, and the Graph-failure-to-advice mapping, because a model reads every refusal on
-this server as one voice). A
+`GET /me` of its own would be a second answer to one question) and `seam.py` (the Graph client a
+tool is handed, with the per-tool On-Behalf-Of token inside it, and the Graph-failure-to-advice
+mapping, because a model reads every refusal on this server as one voice). A
 thing belongs there when two tools would otherwise each need a copy *and* a difference between the
 copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
