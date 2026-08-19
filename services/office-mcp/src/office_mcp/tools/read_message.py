@@ -117,7 +117,7 @@ async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> 
     This endpoint does not support `$select` or `$expand`. Mentions and attachments always arrive
     with the message.
     """
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         message = await _get(client, handle)
 
     assert message is not None, "Graph answered a message read with no message"
