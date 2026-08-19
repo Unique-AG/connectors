@@ -28,18 +28,14 @@ from msgraph.generated.teams.item.channels.channels_request_builder import Chann
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import collect_pages, graph_client_for, graph_errors
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.graph_client import collect_pages, graph_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_channels"
 
 # The cheap "basic" scope for channel identity. Reading messages needs `ChannelMessage.Read.All`;
 # a tenant often grants this one and withholds the broad one, so the two are named separately.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
-
-# Built at import, not in the parameter default: rebuilding the descriptor on every registration
-# is a lint error.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Window size and limit cap. Graph accepts no `$top` here; this bounds requests per call.
 MAX_CHANNELS = 200
@@ -162,6 +158,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     The tool borrows `transport` per call and does not own it. `create_app` closes it on
     shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -193,9 +191,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = 50,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> ChannelList:
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await list_channels(
-                graph_client_for(transport, graph_token), team_id=team_id, limit=limit
-            )
+        return await list_channels(client, team_id=team_id, limit=limit)
