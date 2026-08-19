@@ -211,8 +211,7 @@ async def fetch_email_page(
         offset=offset,
     )
     items = tuple(
-        EmailItemDto.from_attributes(resource.id, resource.attributes)
-        for resource in page.items
+        EmailItemDto.from_attributes(resource.id, resource.attributes) for resource in page.items
     )
     end_of_stream = len(page.items) < limit
     logger.info(
