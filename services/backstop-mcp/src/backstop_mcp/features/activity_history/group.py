@@ -17,9 +17,9 @@ from backstop_mcp.features.activity_history.internal_dto import (
     DateRangeDto,
     EmailItemDto,
 )
-from backstop_mcp.features.activity_history.models import (
-    ActivityContinuation,
-    ActivityGroup,
+from backstop_mcp.features.activity_history.responses import (
+    ActivityContinuationResponse,
+    ActivityGroupResponse,
 )
 
 __all__ = ["group_page"]
@@ -51,17 +51,17 @@ def group_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityGroup[ActivityItemDto | EmailItemDto]:
+) -> ActivityGroupResponse[ActivityItemDto | EmailItemDto]:
     """Pass items through in fetch order; attach this page's date_range and next."""
     grouped = tuple(items)
-    return ActivityGroup(
+    return ActivityGroupResponse(
         activity_type=activity_type,
         items=grouped,
         date_range=_date_range(grouped),
         next=(
             None
             if end_of_stream
-            else ActivityContinuation(
+            else ActivityContinuationResponse(
                 limit=limit,
                 offset=offset + len(grouped),
                 since=since,

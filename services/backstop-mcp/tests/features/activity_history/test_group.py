@@ -19,8 +19,8 @@ import pytest
 from pydantic import ValidationError
 
 from backstop_mcp.features.activity_history import (
-    ActivityContinuation,
-    ActivityGroup,
+    ActivityContinuationResponse,
+    ActivityGroupResponse,
     ActivityItem,
     ActivityType,
     DateRange,
@@ -68,7 +68,7 @@ def _group(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityGroup[ActivityItem | EmailItem]:
+) -> ActivityGroupResponse[ActivityItem | EmailItem]:
     return group_page(
         items,
         activity_type=activity_type,
@@ -134,7 +134,9 @@ class TestNext:
         items = [_activity(f"m{i}", "meeting", date(2026, 1, 10 - i)) for i in range(5)]
         result = _group(items, end_of_stream=False, limit=5, offset=10)
 
-        assert result.next == ActivityContinuation(limit=5, offset=15, since=None, until=None)
+        assert result.next == ActivityContinuationResponse(
+            limit=5, offset=15, since=None, until=None
+        )
 
     def test_returns_none_when_page_is_short(self) -> None:
         result = _group(
@@ -162,7 +164,7 @@ class TestNext:
             until=date(2026, 12, 31),
         )
 
-        assert result.next == ActivityContinuation(
+        assert result.next == ActivityContinuationResponse(
             limit=3,
             offset=1,
             since=date(2020, 1, 1),
@@ -200,12 +202,14 @@ class TestDateRangeBounds:
 class TestActivityContinuationBounds:
     def test_rejects_since_after_until(self) -> None:
         with pytest.raises(ValidationError, match="since must not be after until"):
-            ActivityContinuation(limit=10, offset=0, since=date(2026, 2, 1), until=date(2026, 1, 1))
+            ActivityContinuationResponse(
+                limit=10, offset=0, since=date(2026, 2, 1), until=date(2026, 1, 1)
+            )
 
     def test_rejects_non_positive_limit(self) -> None:
         with pytest.raises(ValidationError):
-            ActivityContinuation(limit=0, offset=0)
+            ActivityContinuationResponse(limit=0, offset=0)
 
     def test_rejects_negative_offset(self) -> None:
         with pytest.raises(ValidationError):
-            ActivityContinuation(limit=10, offset=-1)
+            ActivityContinuationResponse(limit=10, offset=-1)

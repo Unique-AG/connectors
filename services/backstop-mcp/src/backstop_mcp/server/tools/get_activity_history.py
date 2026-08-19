@@ -22,7 +22,7 @@ from mcp.types import ToolAnnotations
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.activity_history import (
-    ActivityGroup,
+    ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
     ActivityPageDto,
     ActivityType,
@@ -130,7 +130,7 @@ async def get_activity_history(
     )
 
     gist_max_chars = get_activity_history_settings().gist_max_chars
-    groups: dict[ActivityType, ActivityGroup[TimelineRecord]] = {}
+    groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
     for activity_type, continuation in args.continuations.items():
         page = pages[activity_type]
         grouped = group_page(
@@ -145,7 +145,7 @@ async def get_activity_history(
         wire_items = tuple(
             to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items
         )
-        groups[activity_type] = ActivityGroup(
+        groups[activity_type] = ActivityGroupResponse(
             activity_type=grouped.activity_type,
             items=wire_items,
             date_range=grouped.date_range,

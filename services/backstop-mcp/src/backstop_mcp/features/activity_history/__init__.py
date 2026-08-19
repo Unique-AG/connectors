@@ -61,12 +61,10 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EmailPageDto,
     MeetingSpecificsDto,
 )
-from backstop_mcp.features.activity_history.models import (
-    ActivityContinuation,
-    ActivityGroup,
-)
 from backstop_mcp.features.activity_history.responses import (
+    ActivityContinuationResponse,
     ActivityDetailResponse,
+    ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
     ActivityRecordResponse,
     AttendeeResponse,
@@ -91,10 +89,10 @@ EmailPage = EmailPageDto
 MeetingSpecifics = MeetingSpecificsDto
 
 __all__ = [
-    "ActivityContinuation",
+    "ActivityContinuationResponse",
     "ActivityDetailDto",
     "ActivityDetailResponse",
-    "ActivityGroup",
+    "ActivityGroupResponse",
     "ActivityHandleDto",
     "ActivityHistoryResolvedResponse",
     "ActivityHistorySettings",

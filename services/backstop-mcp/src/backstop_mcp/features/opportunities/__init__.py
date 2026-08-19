@@ -13,12 +13,12 @@ here. See `stages.py`.
 
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.fetch import (
-    OpportunityFetchResult,
     OpportunityStatus,
     fetch_opportunities,
 )
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.responses import (
+    OpportunityFetchResponse,
     OpportunityResponse,
     StageChangeResponse,
 )
@@ -29,7 +29,7 @@ from backstop_mcp.features.opportunities.stages import (
 )
 
 __all__ = [
-    "OpportunityFetchResult",
+    "OpportunityFetchResponse",
     "OpportunityResponse",
     "OpportunityStage",
     "OpportunityStageDto",

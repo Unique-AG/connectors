@@ -10,7 +10,7 @@ gist rather than an error.
 from datetime import UTC, date, datetime
 
 from backstop_mcp.features.activity_history import (
-    ActivityGroup,
+    ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
     ActivityItem,
     ActivityRecordResponse,
@@ -21,7 +21,7 @@ from backstop_mcp.features.activity_history import (
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
-from backstop_mcp.features.data_hygiene import AsOf, ProvenanceFields
+from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceFields
 from backstop_mcp.features.party_resolver import ResolvedParty
 
 _DEFAULT_ACTIVITY_DATE = date(2026, 1, 15)
@@ -158,7 +158,7 @@ class TestEmailRecord:
 class TestActivityHistoryResolvedResponse:
     def test_accepts_groups_and_has_no_flat_records_or_cursor(self) -> None:
         record = to_timeline_record(_activity_item(), gist_max_chars=300)
-        group = ActivityGroup(
+        group = ActivityGroupResponse(
             activity_type="meeting",
             items=(record,),
             date_range=None,
@@ -187,5 +187,5 @@ class TestActivityHistoryResolvedResponse:
             id="1",
             search_type="people",
             name="Ada",
-            as_of=AsOf(modified_timestamp="2024-01-01", modified_by="alice"),
+            as_of=AsOfResponse(modified_timestamp="2024-01-01", modified_by="alice"),
         )

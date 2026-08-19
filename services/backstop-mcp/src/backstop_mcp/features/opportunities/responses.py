@@ -180,3 +180,37 @@ class OpportunityResponse(OmitNoneModel):
             + "behind `stage`."
         ),
     )
+
+
+class OpportunityFetchResponse(OmitNoneModel):
+    """One party's opportunities after filtering and ordering, plus what the whole set says.
+
+    `total` and the two counts are over everything fetched — the party's complete set, since the
+    fetch walks their whole sub-collection — so `status="open"` still reports how many closed
+    deals exist.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    opportunities: tuple[OpportunityResponse, ...] = Field(
+        description=(
+            "The deals matching the requested status, newest first by the day each entered its "
+            + "current stage."
+        )
+    )
+    total: int = Field(
+        description=(
+            "Every opportunity fetched for this party, before filtering by status — so the "
+            + "number they have in total. Counted here rather than read from Backstop's own "
+            + "`meta.totalResourceCount`."
+        )
+    )
+    open_count: int = Field(
+        description=(
+            "How many of those are open, whatever status was asked for — so an answer about "
+            + "open deals still says how many exist."
+        )
+    )
+    closed_count: int = Field(
+        description="How many of those are closed, counted the same way as `open_count`."
+    )

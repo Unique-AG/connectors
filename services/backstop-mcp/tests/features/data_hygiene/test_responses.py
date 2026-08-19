@@ -8,7 +8,7 @@ from datetime import date
 from typing import cast
 
 from backstop_mcp.features.data_hygiene import (
-    AsOf,
+    AsOfResponse,
     DepartedContactResponse,
     DepartedEmployment,
     DepartureSignal,
@@ -26,11 +26,11 @@ class TestAsOf:
 
     def test_both_fields_are_carried(self) -> None:
         assert as_of_response(
-            AsOf(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
-        ) == AsOf(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
+            AsOfResponse(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
+        ) == AsOfResponse(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
 
     def test_a_partial_signal_is_carried_as_is(self) -> None:
-        assert as_of_response(AsOf(modified_timestamp="2024-01-01")) == AsOf(
+        assert as_of_response(AsOfResponse(modified_timestamp="2024-01-01")) == AsOfResponse(
             modified_timestamp="2024-01-01", modified_by=None
         )
 

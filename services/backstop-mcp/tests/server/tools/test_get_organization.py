@@ -5,7 +5,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopResponseSchemaError
-from backstop_mcp.features.data_hygiene import AsOf
+from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import InternalOwnerResponse
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -132,7 +132,9 @@ class TestGetOrganization:
         assert result.resolved == ResolvedPartyResponse(
             id="o42", search_type="organizations", name="Capstone"
         )
-        assert result.as_of == AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops")
+        assert result.as_of == AsOfResponse(
+            modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"
+        )
 
     @pytest.mark.asyncio
     @respx.mock
