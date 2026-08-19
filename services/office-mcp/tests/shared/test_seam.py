@@ -3,10 +3,18 @@
 These assertions are about *advice*, not wording: each one pins the fact that distinguishes one
 remedy from another, because getting those wrong is what makes a model retry a call that can never
 succeed, or give up on one that would have worked a second later.
+
+Both routes to a message are driven here: the block a tool still opens around its own Graph call,
+and `GraphAdviceMiddleware`, which covers dependency resolution as well and is what the blocks are
+being replaced by. Whether the two agree is `tests/test_error_mapping.py`'s subject, over the real
+stack.
 """
 
 import pytest
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import MiddlewareContext
+from fastmcp.tools.base import ToolResult
+from mcp.types import CallToolRequestParams
 
 from office_mcp.graph_client import (
     GraphFailure,
@@ -15,10 +23,19 @@ from office_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
-from office_mcp.shared.seam import entra_token_errors, graph_tool_errors
+from office_mcp.shared.seam import (
+    GraphAdviceMiddleware,
+    TokenExchangeFailed,
+    ToolAdvice,
+    graph_tool_errors,
+)
 
 _PERMISSION = "Chat.Read"
 _CHANNELS = "ChannelMessage.Read.All"
+
+# The tool every failure below is attributed to, and what the middleware is told about it.
+_TOOL = "read_something"
+_ADVICE = GraphAdviceMiddleware({_TOOL: ToolAdvice(permissions=(_PERMISSION,))})
 
 # What azure-identity's `OnBehalfOfCredential.get_token` reports when the delegated permission was
 # never consented to, trimmed of its trace ids.
@@ -35,10 +52,46 @@ def _message(failure: GraphFailure) -> str:
     return str(raised.value)
 
 
-def _token_message(failure: Exception) -> str:
-    with pytest.raises(ToolError) as raised, entra_token_errors(_PERMISSION):
-        raise failure
+async def _middleware_message(delivered: BaseException) -> str:
+    """What the middleware answers a call that failed with `delivered`.
+
+    Driven through `on_call_tool` rather than through a helper, because the hook is where the
+    decision is: what it catches is never the failure itself, and mistaking one for the other is
+    the defect this exists to catch.
+    """
+
+    async def refuse(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+        _ = context
+        raise delivered
+
+    context = MiddlewareContext(message=CallToolRequestParams(name=_TOOL, arguments={}))
+    with pytest.raises(ToolError) as raised:
+        _ = await _ADVICE.on_call_tool(context, refuse)
     return str(raised.value)
+
+
+def _as_fastmcp_delivers_it(failure: BaseException) -> ToolError:
+    """`failure` inside the two wrappers FastMCP puts between a failed dependency and a middleware.
+
+    The dependency engine reports anything that is not a `FastMCPError` as a `RuntimeError` naming
+    the parameter (fastmcp 3.4.5, `fastmcp/server/dependencies.py:686`) and the tool caller
+    re-raises that as a `ToolError` naming the tool (`fastmcp/server/server.py:1357`). Built here
+    rather than reached for, so that this file needs no server; that the real chain is this shape is
+    pinned end to end in `tests/test_error_mapping.py` and `tests/test_mcp_tools.py`.
+    """
+    dependency = RuntimeError(f"Failed to resolve dependency 'graph_token' for {_TOOL}")
+    dependency.__cause__ = failure
+    delivered = ToolError(f"Error calling tool '{_TOOL}': {dependency}")
+    delivered.__cause__ = dependency
+    return delivered
+
+
+async def _token_message(failure: Exception, *permissions: str) -> str:
+    return await _middleware_message(
+        _as_fastmcp_delivers_it(
+            TokenExchangeFailed(permissions=permissions or (_PERMISSION,), cause=failure)
+        )
+    )
 
 
 class TestTheTwoRemediesGraphCannotTellApart:
@@ -156,11 +209,13 @@ class TestTheRefusalThatHappensBeforeGraph:
 
     Same remedy as the 403 above, reached a step earlier — and the step matters, because this one
     happens while FastMCP is resolving the tool's token dependency, where the default report is
-    "Failed to resolve dependency 'graph_token'".
+    "Failed to resolve dependency 'graph_token'". The dependency raises `TokenExchangeFailed`, which
+    arrives at the middleware under two wrappers; the assertions are what a model reads at the end
+    of that.
     """
 
-    def test_an_unconsented_permission_names_the_permission_and_the_remedy(self) -> None:
-        message = _token_message(RuntimeError(_UNCONSENTED))
+    async def test_an_unconsented_permission_names_the_permission_and_the_remedy(self) -> None:
+        message = await _token_message(RuntimeError(_UNCONSENTED))
 
         assert message.count(_PERMISSION) >= 1
         assert "administrator" in message
@@ -168,47 +223,116 @@ class TestTheRefusalThatHappensBeforeGraph:
         assert "sign in" in message, "consent granted after sign-in needs a new token"
         assert "retrying will not help" in message.lower()
 
-    def test_it_says_the_call_never_happened(self) -> None:
+    async def test_it_says_the_call_never_happened(self) -> None:
         """Unlike every Graph failure above, nothing was asked of Microsoft 365 here — a model
         that believes otherwise reports the read as attempted-and-refused."""
-        message = _token_message(RuntimeError(_UNCONSENTED))
+        message = await _token_message(RuntimeError(_UNCONSENTED))
 
         assert "never reached Microsoft Graph" in message
 
-    def test_entras_own_code_survives_for_whoever_has_to_diagnose_it(self) -> None:
-        message = _token_message(RuntimeError(_UNCONSENTED))
+    async def test_it_says_nothing_about_resolving_a_dependency(self) -> None:
+        """The wrappers are FastMCP's own vocabulary and name a parameter of a function the model
+        never sees. Being the outermost thing to touch the failure is what lets the middleware
+        replace that report rather than decorate it."""
+        message = await _token_message(RuntimeError(_UNCONSENTED))
+
+        assert "resolve dependency" not in message
+        assert "graph_token" not in message
+
+    async def test_entras_own_code_survives_for_whoever_has_to_diagnose_it(self) -> None:
+        message = await _token_message(RuntimeError(_UNCONSENTED))
 
         assert "AADSTS65001" in message
         assert "Send an interactive authorization request" not in message, (
             "the model cannot act on Entra's prose, and it is not addressed to this connector"
         )
 
-    def test_a_failure_entra_never_answered_is_still_actionable(self) -> None:
+    async def test_a_failure_entra_never_answered_is_still_actionable(self) -> None:
         """No AADSTS code means the exchange never got as far as Entra — a broken connector, not
         a refused user. The permission is still named, because it is still what was being asked
         for, and the exception type is the only evidence there is."""
-        message = _token_message(ValueError("no access token available"))
+        message = await _token_message(ValueError("no access token available"))
 
         assert _PERMISSION in message
         assert "AADSTS" not in message, "no code was invented"
         assert "ValueError" in message
 
-    def test_an_exchange_for_several_permissions_names_them_all(self) -> None:
+    async def test_an_exchange_for_several_permissions_names_them_all(self) -> None:
         """A tool needing two permissions gets one token or none: Entra redeems the scopes together
         and refuses them together, saying no more about which one was unconsented than a Graph 403
         does. Naming one of two would send an administrator to grant a permission that may already
-        be there, and the second attempt fails identically."""
-        with pytest.raises(ToolError) as raised, entra_token_errors(_PERMISSION, _CHANNELS):
-            raise RuntimeError(_UNCONSENTED)
-        message = str(raised.value)
+        be there, and the second attempt fails identically.
+
+        The permissions come off the failure rather than out of the middleware's table, which is why
+        this reads two while the table for `_TOOL` holds one: the exchange knows what it asked for,
+        and a token is exchanged once for whatever a tool declares.
+        """
+        message = await _token_message(RuntimeError(_UNCONSENTED), _PERMISSION, _CHANNELS)
 
         assert _PERMISSION in message
         assert _CHANNELS in message
         assert "grant the delegated permissions" in message, "plural, or it reads as one of them"
         assert "administrator" in message
 
-    def test_a_token_that_arrives_passes_through_untouched(self) -> None:
-        with entra_token_errors(_PERMISSION):
-            token = "synthetic-obo-graph-token"
 
-        assert token == "synthetic-obo-graph-token"
+class TestWhatTheMiddlewareLeavesAlone:
+    """The middleware words a refusal *or* keeps its hands off it. There is nothing in between.
+
+    Every case here is a failure that already says the right thing, and re-wording any of them would
+    replace a message somebody wrote on purpose with one worded from a table.
+    """
+
+    async def test_it_words_a_graph_refusal_the_way_the_tool_block_does(self) -> None:
+        """The mapping the per-tool blocks are being replaced by, driven on its own. Byte equality
+        rather than keywords: this is the whole promise of moving the mapping out of ten tools."""
+        refusal = GraphForbidden(
+            "nope", status=403, code="Authorization_RequestDenied", request_id="req-7"
+        )
+        delivered = ToolError(f"Error calling tool '{_TOOL}': {refusal}")
+        delivered.__cause__ = refusal
+
+        assert await _middleware_message(delivered) == _message(
+            GraphForbidden(
+                "nope", status=403, code="Authorization_RequestDenied", request_id="req-7"
+            )
+        )
+
+    async def test_a_refusal_a_tool_already_worded_is_passed_through_unchanged(self) -> None:
+        """The double mapping, and the reason it is harmless: a tool that still opens its own block
+        produces the message, and the middleware recognises it by type rather than re-deriving it —
+        which matters most where the two would differ, a tool naming fewer permissions than it
+        declares."""
+        with pytest.raises(ToolError) as raised, graph_tool_errors(_CHANNELS):
+            raise GraphForbidden("nope", status=403, code=None, request_id=None)
+        advised = raised.value
+
+        assert await _middleware_message(advised) == str(advised)
+        assert _CHANNELS in str(advised), "the tool's own permission, not the table's"
+        assert _PERMISSION not in str(advised)
+
+    async def test_a_tool_error_about_an_argument_is_not_a_graph_failure(self) -> None:
+        """A handle of the wrong shape is refused before Graph is reached, and the tool that owns
+        the shape is the only thing that can explain it."""
+        refusal = ToolError("read_transcript takes teams:///transcripts/{a}/{b}.")
+
+        assert await _middleware_message(refusal) == str(refusal)
+
+    async def test_a_refusal_for_an_unknown_tool_keeps_its_own_report(self) -> None:
+        """Unreachable while the table and the registration come from one resolved selection, and
+        asserted anyway: the alternative was an `assert`, which would answer a caller who could have
+        acted on a 403 with an internal error nobody can act on.
+        """
+        blind = GraphAdviceMiddleware({})
+        refusal = GraphForbidden("nope", status=403, code=None, request_id=None)
+        delivered = ToolError(f"Error calling tool '{_TOOL}': {refusal}")
+        delivered.__cause__ = refusal
+
+        async def refuse(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+            _ = context
+            raise delivered
+
+        context = MiddlewareContext(message=CallToolRequestParams(name=_TOOL, arguments={}))
+        with pytest.raises(ToolError) as raised:
+            _ = await blind.on_call_tool(context, refuse)
+
+        assert raised.value is delivered

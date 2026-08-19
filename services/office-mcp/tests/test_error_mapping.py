@@ -23,6 +23,7 @@ failure the other's to diagnose, and this one deliberately refuses every Graph r
 answering it.
 """
 
+import logging
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass
 from typing import cast
@@ -41,7 +42,11 @@ from starlette.applications import Starlette
 from office_mcp.app import create_app
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.graph_client import GraphForbidden
-from office_mcp.shared.seam import graph_tool_errors
+from office_mcp.shared.seam import (
+    GraphAdviceMiddleware,
+    ToolAdvice,
+    graph_tool_errors,
+)
 from office_mcp.tools import Selection, resolve
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -78,6 +83,21 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
 # list rather than a second copy of it.
 _SELECTION: Selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+
+# The MCP middleware chain the composed app ends up with, outside-in. Two of the four belong to
+# other packages, so the assertion is on names: what is load-bearing is which side of the operations
+# layer the advice sits on rather than the types themselves.
+_CHAIN = (
+    "GraphAdviceMiddleware",
+    "TraceContextRestoreMiddleware",
+    "DereferenceRefsMiddleware",
+    "_McpMetrics",
+)
+
+# Two synthetic tools that refuse identically, one of them mapping its own refusal first.
+_DOUBLY_MAPPED = "read_twice"
+_MAPPED_ONCE = "read_once"
+_PERMISSION = "Chat.Read"
 
 
 class _StubOboCredential:
@@ -126,6 +146,38 @@ def graph() -> Iterator[respx.MockRouter]:
 
 
 @pytest.fixture
+def two_tools() -> FastMCP[None]:
+    """One server, the advice middleware, and one refusal raised on either side of a `with` block.
+
+    This is the only place the middleware's own wording of a Graph refusal is reachable through a
+    real call: every registered tool still opens its own block, and that block is what the client
+    reads. So a tool without one is written here, beside a tool with one, both refused identically.
+    """
+    mcp: FastMCP[None] = FastMCP(
+        "Two Tools",
+        middleware=[
+            GraphAdviceMiddleware(
+                {
+                    _DOUBLY_MAPPED: ToolAdvice(permissions=(_PERMISSION,)),
+                    _MAPPED_ONCE: ToolAdvice(permissions=(_PERMISSION,)),
+                }
+            )
+        ],
+    )
+
+    @mcp.tool(name=_DOUBLY_MAPPED)
+    async def read_twice() -> str:
+        with graph_tool_errors(_PERMISSION):
+            raise _refused()
+
+    @mcp.tool(name=_MAPPED_ONCE)
+    async def read_once() -> str:
+        raise _refused()
+
+    return mcp
+
+
+@pytest.fixture
 def app() -> Starlette:
     """The app with every tool there is, composed as production composes it."""
     return create_app(
@@ -151,13 +203,28 @@ async def mcp_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
         yield client
 
 
+def _refused() -> GraphForbidden:
+    """The refusal as a failure rather than a response. Built per call: it carries a traceback."""
+    return GraphForbidden(
+        "denied", status=403, code="Authorization_RequestDenied", request_id=_REQUEST_ID
+    )
+
+
 def _advice_for(permissions: tuple[str, ...]) -> str:
     """What this refusal reads as, asked of the mapping directly."""
     with pytest.raises(ToolError) as raised, graph_tool_errors(*permissions):
-        raise GraphForbidden(
-            "denied", status=403, code="Authorization_RequestDenied", request_id=_REQUEST_ID
-        )
+        raise _refused()
     return str(raised.value)
+
+
+def _chain(error: BaseException) -> list[BaseException]:
+    """`error` and everything it was raised from."""
+    walked: list[BaseException] = []
+    cause: BaseException | None = error
+    while cause is not None and not any(one is cause for one in walked):
+        walked.append(cause)
+        cause = cause.__cause__
+    return walked
 
 
 class TestEveryToolTranslatesItsOwnRefusal:
@@ -211,3 +278,55 @@ class TestEveryToolTranslatesItsOwnRefusal:
             assert permission in message, message
         for permission in unrelated:
             assert permission not in message, f"{tool} named {permission}, which it never used"
+
+
+class TestWhereTheMappingSits:
+    def test_the_advice_is_outside_the_operations_layer(self, app: Starlette) -> None:
+        """The order is load-bearing in both directions. Outside `_McpMetrics`, a refusal is logged
+        and counted as it happened, with the Graph failure still under it, and the client is handed
+        the polished text; inside it, every operator-facing record of a 403 would read as the advice
+        and the cause chain would be gone.
+        """
+        server = cast("FastMCP[None]", app.state.fastmcp_server)
+
+        assert tuple(type(middleware).__name__ for middleware in server.middleware) == _CHAIN
+
+    @pytest.mark.usefixtures("obo", "graph")
+    async def test_the_operations_layer_logs_the_failure_untranslated(
+        self, mcp_client: Client[FastMCPTransport], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """What being outside it buys, asserted on the record rather than on the order.
+
+        The exception type in that record is whichever layer worded the refusal and is not pinned
+        here; the Graph failure under it is what has to survive, because it carries the status and
+        the request id that make a production 403 traceable.
+        """
+        with caplog.at_level(logging.ERROR, logger="unique_mcp"), pytest.raises(ToolError):
+            _ = await mcp_client.call_tool("get_me", {})
+
+        logged = [record for record in caplog.records if record.exc_info is not None]
+        assert logged, "the operations layer logged nothing about a failed call"
+        raised = logged[-1].exc_info
+        assert raised is not None and raised[1] is not None
+        causes = _chain(raised[1])
+
+        assert any(isinstance(cause, GraphForbidden) for cause in causes), causes
+
+
+class TestMappingTwiceChangesNothing:
+    async def test_a_surviving_tool_block_and_the_middleware_agree_word_for_word(
+        self, two_tools: FastMCP[None]
+    ) -> None:
+        """What makes this stack rebasable one step at a time: the mapping can move out of a tool
+        without the message moving. The tool that still maps its own refusal is mapped twice — by
+        its block, then by the middleware that sees the result — and reads identically to the tool
+        the middleware alone maps.
+        """
+        async with Client(FastMCPTransport(two_tools)) as client:
+            with pytest.raises(ToolError) as doubly:
+                _ = await client.call_tool(_DOUBLY_MAPPED, {})
+            with pytest.raises(ToolError) as once:
+                _ = await client.call_tool(_MAPPED_ONCE, {})
+
+        assert str(doubly.value) == str(once.value)
+        assert str(doubly.value) == _advice_for((_PERMISSION,))

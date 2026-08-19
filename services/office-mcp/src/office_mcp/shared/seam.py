@@ -16,11 +16,37 @@ the scopes asked for. It is a dependency default, so it never appears in a tool'
 the model cannot see it and cannot supply it.
 
 `GraphToken` wraps it for one reason: a dependency is resolved *outside* the tool body, so an
-exchange Entra refuses never enters the body and never reaches the `graph_tool_errors` block inside
-it. FastMCP reports it as "Failed to resolve dependency 'graph_token' for get_me", which tells
-a model nothing it can act on. The one thing it does pass through untouched is a `FastMCPError` —
-so raising `ToolError` here, from the permissions this instance was built for, is what makes an
+exchange Entra refuses never enters the body and never reaches the mapping inside it. FastMCP
+reports it as "Failed to resolve dependency 'graph_token' for get_me", which tells a model nothing
+it can act on. So the wrapper raises `TokenExchangeFailed`, which carries the permissions the
+exchange asked for and is deliberately NOT a `FastMCPError`: `fastmcp.server.dependencies` lets
+`FastMCPError` subclasses out of dependency resolution unwrapped and wraps everything else, and
+being wrapped is what lets the middleware below recognise it by type. That is what makes an
 unconsented permission as fixable before the Graph call as a 403 is after it.
+
+One Mapping, Not One Per Tool
+
+`GraphAdviceMiddleware` is where a failure becomes advice. It wraps every `tools/call`, so it covers
+the tool body and the dependency resolution that runs before it, and it is the outermost middleware
+so the operations layer below still logs the untranslated failure with its cause chain intact.
+
+It words a Graph refusal from a table its constructor is handed: one entry per registered tool,
+built in `tools/__init__.py` from each tool module's own `GRAPH_PERMISSIONS` so it cannot drift from
+the registered surface. The permissions travel that way rather than on the tool itself, because a
+tool's `tags` are a set — the order the names are read in is prose, and a set loses it — and a
+tool's `meta` is published to every client in `tools/list`, which would put this connector's
+permission names on the wire for nobody to read.
+
+Trap: the middleware never sees a `GraphFailure`. FastMCP re-raises whatever leaves a tool as
+`ToolError` (fastmcp 3.4.5, `fastmcp/server/server.py:1356`), and the dependency engine wraps a
+failed dependency in a `RuntimeError` before that, so what has to be recognised is two links down a
+`__cause__` chain. The chain is walked and matched on type. Matching FastMCP's own message text
+instead would break on a wording change nobody here would review.
+
+A tool that still opens its own mapping block keeps it: the message that block produced is what
+reaches the client, byte for byte, because it arrives as a type the middleware leaves alone. That is
+what lets a tool say something narrower than its declared tuple — `read_message` reads one surface
+under one of the two permissions its token was exchanged for — while the middleware covers the rest.
 
 One instance covers one exchange, however many permissions that exchange asks for, because Entra
 redeems them together and refuses them together: a tool needing two gets one token or none. Naming
@@ -51,19 +77,23 @@ here is scoped to the permissions the failing call was made under.
 
 The same missing permission also has an earlier, uglier shape: if it was never consented to,
 Entra refuses the On-Behalf-Of exchange (AADSTS65001) and Graph is never reached at all. That
-failure is `entra_token_errors`, and it says the same thing as the 403 above — because from the
-caller's side it *is* the same thing, and the remedy is identical.
+failure is worded by `_token_advice`, and it says the same thing as the 403 above — because from
+the caller's side it *is* the same thing, and the remedy is identical.
 """
 
 import re
-from collections.abc import Generator
+from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from types import TracebackType
 from typing import cast, override
 
 from fastmcp.dependencies import Dependency
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools.base import ToolResult
+from mcp.types import CallToolRequestParams
 
 from office_mcp.graph_client import (
     GraphFailure,
@@ -109,8 +139,27 @@ def graph_scope(permission: str) -> str:
     return f"{_GRAPH_SCOPE_PREFIX}{permission}"
 
 
+class TokenExchangeFailed(Exception):
+    """The On-Behalf-Of exchange produced no token, carrying what it asked for and what went wrong.
+
+    Deliberately not a `FastMCPError`, which is what makes it findable: FastMCP wraps every other
+    exception a dependency raises in a `RuntimeError` naming the parameter, and that wrapping is the
+    signal a `FastMCPError` would skip. So this arrives at `GraphAdviceMiddleware` as a link in a
+    `__cause__` chain, recognised by type, and the wording lives in one place with every other
+    remedy rather than at the point of failure.
+    """
+
+    def __init__(self, *, permissions: tuple[str, ...], cause: BaseException) -> None:
+        super().__init__(f"Microsoft 365 issued no token for {_named(permissions)}")
+        self.permissions: tuple[str, ...] = permissions
+        # The exception the exchange actually failed with. Kept as a field as well as on
+        # `__cause__`, because it is an input to the advice — Entra's own `AADSTS` code is in its
+        # message — and reading it off `__cause__` would depend on how this was raised.
+        self.cause: BaseException = cause
+
+
 class GraphToken(Dependency[str]):
-    """`EntraOBOToken` for a tool's permissions, with the refusal explained in terms of them.
+    """`EntraOBOToken` for a tool's permissions, reporting a refusal as one that knows them.
 
     The exchange itself is untouched: `__aenter__` delegates to FastMCP's dependency, which owns
     the credential cache, and `__aexit__` delegates so any cleanup it grows is not dropped.
@@ -129,8 +178,17 @@ class GraphToken(Dependency[str]):
 
     @override
     async def __aenter__(self) -> str:
-        with entra_token_errors(*self._permissions):
+        try:
             return await self._exchange.__aenter__()
+        except Exception as failure:
+            # Every exception, not a type: azure-identity reports a refused exchange as
+            # `ClientAuthenticationError`, and `_EntraOBOToken.__aenter__` raises plain
+            # `RuntimeError`s of its own before it ever gets that far — no access token in context,
+            # or an auth provider that is not Entra's (fastmcp 3.4.5,
+            # `fastmcp/server/auth/providers/azure.py:838,848`). Nothing that arrives here produced
+            # a token, and the remedy starts the same way for all of them, so a type check on the
+            # innermost cause would only be a way to miss two of them.
+            raise TokenExchangeFailed(permissions=self._permissions, cause=failure) from failure
 
     @override
     async def __aexit__(
@@ -158,6 +216,95 @@ def graph_token(*permissions: str) -> str:
     return cast("str", cast("object", GraphToken(*permissions)))
 
 
+class Advised(ToolError):
+    """A tool error whose message is already the advice below.
+
+    The type is the whole of what stops the middleware from wording a refusal twice. A type rather
+    than a mark on the message, because the two wordings are not always the same one: a tool that
+    narrows the permissions of its own call reports fewer than it declares, and re-wording that from
+    the table would name a permission that was never missing.
+
+    Design decision: no leading underscore, although nothing outside this module refers to it. The
+    class name reaches an operator: `unique_mcp`'s tool metrics label every failed call with
+    `type(error).__name__`, and that layer sits inside this one, so a refusal a tool worded for
+    itself is counted under this name. It reads `ToolError` again once no tool words its own.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class ToolAdvice:
+    """What one tool's failures are worded from.
+
+    `permissions` is the tuple the tool's own Graph calls are made under, in the order the message
+    names them. `not_found` is the sentence its 404 needs instead of the default one, which assumes
+    the id was a caller's to check; a tool whose argument is a handle another tool minted needs its
+    own, and it is that tool's to write.
+    """
+
+    permissions: tuple[str, ...]
+    not_found: str | None = None
+
+
+class GraphAdviceMiddleware(Middleware):
+    """Answer every refused tool call with the remedy for it, wherever in the call it happened."""
+
+    def __init__(self, advice: Mapping[str, ToolAdvice]) -> None:
+        self._advice: Mapping[str, ToolAdvice] = advice
+
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[CallToolRequestParams],
+        call_next: CallNext[CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        try:
+            return await call_next(context)
+        except Exception as error:
+            advised = self._advised(error, context.message.name)
+            if advised is None:
+                raise
+            # `from error` keeps the whole chain: this is the last thing to touch the failure, but a
+            # span or a log sink further out still reads the cause it was raised from.
+            raise advised from error
+
+    def _advised(self, error: BaseException, tool: str) -> ToolError | None:
+        """The advice for this failure, or `None` when there is nothing here to say about it.
+
+        `None` covers three cases that must all leave the failure exactly as it is: a refusal the
+        tool already worded (`Advised`), a `ToolError` about an argument (a handle of the wrong
+        shape), and anything that is not a Graph or token failure at all.
+        """
+        for cause in _causes(error):
+            if isinstance(cause, Advised):
+                return None
+            if isinstance(cause, TokenExchangeFailed):
+                return ToolError(_token_advice(cause.cause, cause.permissions))
+            if isinstance(cause, GraphFailure):
+                known = self._advice.get(tool)
+                # A tool with no entry cannot be worded, and cannot happen: the table and the
+                # registration both come from one resolved selection. Left as it arrived rather than
+                # asserted, because an assertion here would replace a refusal a model could act on
+                # with one nobody can.
+                if known is None:
+                    return None
+                return ToolError(_advice(cause, known.permissions, known.not_found))
+        return None
+
+
+def _causes(error: BaseException) -> Iterator[BaseException]:
+    """`error` and everything it was raised from, outermost first.
+
+    Cycle-safe rather than trusting the chain: `raise X from Y` accepts a loop, and a loop here
+    would hang the request instead of answering it.
+    """
+    seen: set[int] = set()
+    cause: BaseException | None = error
+    while cause is not None and id(cause) not in seen:
+        seen.add(id(cause))
+        yield cause
+        cause = cause.__cause__
+
+
 @contextmanager
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
     """Map any Graph failure raised in this block onto an actionable MCP tool error.
@@ -177,30 +324,7 @@ def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Genera
     try:
         yield
     except GraphFailure as failure:
-        raise ToolError(_advice(failure, permissions, not_found)) from failure
-
-
-@contextmanager
-def entra_token_errors(*permissions: str) -> Generator[None]:
-    """Map a failed On-Behalf-Of exchange in this block onto an actionable MCP tool error.
-
-    Wrap the *acquisition* of a Graph token, not the Graph call: this is the failure that happens
-    before any request is made, and the one FastMCP would otherwise report as "Failed to resolve
-    dependency 'graph_token'" — a message that names neither the missing permission nor the
-    remedy, because FastMCP's dependency resolver knows neither. It re-raises `ToolError`
-    untouched (`fastmcp.server.dependencies` lets `FastMCPError` subclasses out of dependency
-    resolution unwrapped, which is what makes this interception point work at all).
-
-    `permissions` are the delegated Graph permissions the exchange asked for, and where it asked
-    for more than one, all of them are named: an exchange is refused as a whole, so an
-    administrator given only one name may grant the wrong permission and see the same failure —
-    the same reason `graph_tool_errors` names them all for a 403.
-    """
-    assert permissions, "a token exchange asks for at least one permission"
-    try:
-        yield
-    except Exception as failure:
-        raise ToolError(_token_advice(failure, permissions)) from failure
+        raise Advised(_advice(failure, permissions, not_found)) from failure
 
 
 # Entra puts a machine-readable code in every token-endpoint failure (`AADSTS65001` is "the user

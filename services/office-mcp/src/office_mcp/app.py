@@ -18,7 +18,8 @@ from office_mcp.graph_client import GraphSettings, create_graph_transport
 from office_mcp.logging import configure_logging
 from office_mcp.metrics import configure_metrics
 from office_mcp.server import ready_response, surface_manifest
-from office_mcp.tools import register_tools, resolve
+from office_mcp.shared.seam import GraphAdviceMiddleware
+from office_mcp.tools import graph_advice, register_tools, resolve
 from office_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRestoreMiddleware
 
 __all__ = ["create_app"]
@@ -93,7 +94,15 @@ def create_app(
         "Office MCP",
         version=config.version,
         auth=auth,
-        middleware=[TraceContextRestoreMiddleware()],
+        # A middleware passed here ends up outermost, ahead of FastMCP's own and of the
+        # operations layer `setup_ops` appends below, and that is where the advice one belongs: a
+        # client reads the polished refusal while the operations layer still logs the untranslated
+        # failure and the cause chain under it. The table comes from the same resolution that
+        # registers the tools, so it cannot name a tool this deployment does not expose.
+        middleware=[
+            GraphAdviceMiddleware(graph_advice(selection)),
+            TraceContextRestoreMiddleware(),
+        ],
         lifespan=lifespan,
     )
     register_tools(mcp, graph_transport, selection)
