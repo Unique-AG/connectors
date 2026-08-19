@@ -286,7 +286,7 @@ async def list_meeting_recordings(
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
 
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingRecordings(
