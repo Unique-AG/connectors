@@ -16,18 +16,18 @@ from collections.abc import Sequence
 from typing import Literal
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
-from backstop_mcp.features.accounts.latest import fetch_latest_figure
-from backstop_mcp.features.accounts.types import (
-    AccountListing,
-    AccountPosition,
-    AccountRecord,
-    AumReconciliation,
-    ProductPositions,
-    ResolvedProduct,
-    SeriesError,
-    SeriesFigure,
+from backstop_mcp.features.accounts.internal_dto import (
+    AccountListingDto,
+    AccountPositionDto,
+    AccountRecordDto,
+    AumReconciliationDto,
+    ProductPositionsDto,
+    ResolvedProductDto,
+    SeriesErrorDto,
+    SeriesFigureDto,
     SeriesName,
 )
+from backstop_mcp.features.accounts.latest import fetch_latest_figure
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +52,25 @@ _FIELD: dict[SeriesName, Literal["balance", "invested", "redemptions"]] = {
 
 async def fetch_positions(
     client: BackstopClient,
-    accounts: Sequence[AccountRecord],
-) -> tuple[AccountPosition, ...]:
+    accounts: Sequence[AccountRecordDto],
+) -> tuple[AccountPositionDto, ...]:
     """Attach the three series to every account. Order matches `accounts`."""
     if not accounts:
         return ()
     return tuple(await asyncio.gather(*(_position(client, account) for account in accounts)))
 
 
-async def _position(client: BackstopClient, account: AccountRecord) -> AccountPosition:
+async def _position(client: BackstopClient, account: AccountRecordDto) -> AccountPositionDto:
     results = await asyncio.gather(
         *(_series_point(client, account.id, series) for series in _SERIES),
         return_exceptions=True,
     )
-    figures: dict[str, SeriesFigure | None] = {
+    figures: dict[str, SeriesFigureDto | None] = {
         "balance": None,
         "invested": None,
         "redemptions": None,
     }
-    errors: list[SeriesError] = []
+    errors: list[SeriesErrorDto] = []
     for series, result in zip(_SERIES, results, strict=True):
         if isinstance(result, BackstopAuthError):
             raise result
@@ -79,10 +79,10 @@ async def _position(client: BackstopClient, account: AccountRecord) -> AccountPo
                 "accounts.series.failed",
                 extra={"account_id": account.id, "series": series, "error": str(result)},
             )
-            errors.append(SeriesError(series=series, message=str(result)))
+            errors.append(SeriesErrorDto(series=series, message=str(result)))
             continue
         figures[_FIELD[series]] = result
-    return AccountPosition(
+    return AccountPositionDto(
         account=account,
         balance=figures["balance"],
         invested=figures["invested"],
@@ -93,10 +93,10 @@ async def _position(client: BackstopClient, account: AccountRecord) -> AccountPo
 
 async def fetch_product_positions(
     client: BackstopClient,
-    listing: AccountListing,
+    listing: AccountListingDto,
     *,
-    product: ResolvedProduct,
-) -> ProductPositions:
+    product: ResolvedProductDto,
+) -> ProductPositionsDto:
     """Fan out account series and product assets under management (AUM).
 
     AUM is the product's total reported value — the latest `/aums` point, same as each
@@ -117,7 +117,7 @@ async def fetch_product_positions(
         fetch_positions(client, fanned),
         fetch_product_aum(client, product.id),
     )
-    return ProductPositions(
+    return ProductPositionsDto(
         product=product,
         accounts=accounts,
         closed_omitted=listing.closed_omitted,
@@ -127,7 +127,7 @@ async def fetch_product_positions(
     )
 
 
-async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFigure | None:
+async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFigureDto | None:
     try:
         return await fetch_latest_figure(client, f"/products/{product_id}/aums")
     except BackstopAuthError:
@@ -137,7 +137,9 @@ async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFi
         return None
 
 
-def reconcile(accounts: Sequence[AccountPosition], aum: SeriesFigure | None) -> AumReconciliation:
+def reconcile(
+    accounts: Sequence[AccountPositionDto], aum: SeriesFigureDto | None
+) -> AumReconciliationDto:
     """Sum the returned balances and compare them to latest assets under management.
 
     Missing balances (empty series, a point published without a number yet, or a failed fetch)
@@ -155,13 +157,13 @@ def reconcile(accounts: Sequence[AccountPosition], aum: SeriesFigure | None) -> 
         and position.balance.valued.value is not None
     )
     if not balances:
-        return AumReconciliation()
+        return AumReconciliationDto()
     total = sum(balances)
     if aum is None or aum.valued is None or aum.valued.value is None:
-        return AumReconciliation(balance_total=total)
+        return AumReconciliationDto(balance_total=total)
     difference = total - aum.valued.value
     tolerance = max(abs(aum.valued.value) * _AUM_RELATIVE_TOLERANCE, _AUM_ABSOLUTE_TOLERANCE)
-    return AumReconciliation(
+    return AumReconciliationDto(
         balance_total=total,
         difference=difference,
         diverges=abs(difference) > tolerance,
@@ -172,5 +174,5 @@ async def _series_point(
     client: BackstopClient,
     account_id: str,
     series: SeriesName,
-) -> SeriesFigure | None:
+) -> SeriesFigureDto | None:
     return await fetch_latest_figure(client, f"/accounts/{account_id}/{series}")

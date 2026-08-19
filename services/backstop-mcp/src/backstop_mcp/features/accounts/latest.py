@@ -15,11 +15,8 @@ from collections.abc import Sequence
 from datetime import date
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.features.accounts.types import (
-    SeriesFigure,
-    SeriesPoint,
-    SeriesPointAttributes,
-)
+from backstop_mcp.features.accounts.api_responses import SeriesPointAttributes
+from backstop_mcp.features.accounts.internal_dto import SeriesFigureDto, SeriesPointDto
 
 _PAGE_SIZE = 10
 _SORT = "sort"
@@ -28,7 +25,7 @@ _SORT = "sort"
 SeriesPointResource = BackstopApiResource[SeriesPointAttributes]
 
 
-def latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigure | None:
+def latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigureDto | None:
     """The greatest-`date` point and the greatest-`date` point with a value, or `None`.
 
     `valued` is the same object as `latest` whenever the newest row carries a number, and `None`
@@ -39,12 +36,12 @@ def latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigure | No
         return None
     latest = max(points, key=_by_date)
     if latest.value is not None:
-        return SeriesFigure(latest=latest, valued=latest)
+        return SeriesFigureDto(latest=latest, valued=latest)
     valued = tuple(point for point in points if point.value is not None)
-    return SeriesFigure(latest=latest, valued=max(valued, key=_by_date) if valued else None)
+    return SeriesFigureDto(latest=latest, valued=max(valued, key=_by_date) if valued else None)
 
 
-async def fetch_latest_figure(client: BackstopClient, path: str) -> SeriesFigure | None:
+async def fetch_latest_figure(client: BackstopClient, path: str) -> SeriesFigureDto | None:
     """Latest figure on `path`: first 10 rows of `sort=-date`, then `latest_figure`."""
     page = await client.fetch_page(
         path,
@@ -55,12 +52,12 @@ async def fetch_latest_figure(client: BackstopClient, path: str) -> SeriesFigure
     return latest_figure(page.items)
 
 
-def _by_date(point: SeriesPoint) -> date:
+def _by_date(point: SeriesPointDto) -> date:
     return point.date
 
 
-def _dated_point(resource: SeriesPointResource) -> SeriesPoint | None:
+def _dated_point(resource: SeriesPointResource) -> SeriesPointDto | None:
     point_date = resource.attributes.date
     if point_date is None:
         return None
-    return SeriesPoint.model_validate({**resource.attributes.model_dump(), "date": point_date})
+    return SeriesPointDto.model_validate({**resource.attributes.model_dump(), "date": point_date})
