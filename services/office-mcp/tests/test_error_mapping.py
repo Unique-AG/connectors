@@ -78,6 +78,7 @@ class _Refused:
 # One entry per tool, and this file grows one as each tool arrives.
 _EVERY_TOOL: Mapping[str, _Refused] = {
     "get_me": _Refused({}, ("User.Read",)),
+    "list_chats": _Refused({}, ("Chat.Read",)),
 }
 
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
