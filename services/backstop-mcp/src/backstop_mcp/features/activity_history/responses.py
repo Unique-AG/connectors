@@ -14,12 +14,13 @@ already says which stream a record came from.
 Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurred_at`) use
 `validation_alias` + `from_attributes`. Gist conversion, recipient capping, and the
 `stream`→`type` assignment (kept explicit: discriminators reject aliases on `type`) stay in
-`to_timeline_record`.
+`ActivityRecordResponse.from_item` / `EmailRecordResponse.from_item`.
 """
 
 import logging
+from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Annotated, ClassVar, Literal, Self
+from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
@@ -39,14 +40,12 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
-    as_of_response,
     extract_as_of,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyDto,
     ResolvedPartyResponse,
-    party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
@@ -64,9 +63,7 @@ __all__ = [
     "GetActivityHistoryResponse",
     "ResolvedPartyAsOfResponse",
     "TimelineRecord",
-    "resolved_party_as_of_response",
     "to_timeline_record",
-    "to_activity_detail_response",
 ]
 
 _MAX_RECIPIENTS = 3
@@ -209,6 +206,20 @@ class ActivityRecordResponse(OmitNoneModel):
         ),
     )
 
+    @classmethod
+    def from_item(cls, item: ActivityItemDto, *, gist_max_chars: int) -> Self:
+        gist = to_gist(item.description or "", max_chars=gist_max_chars)
+        return cls(
+            type=item.stream,
+            activity_id=item.id,
+            resource_id=item.resource_id,
+            occurred_at=item.effective_date,
+            title=item.title,
+            gist=gist.text,
+            gist_truncated=gist.truncated,
+            description_length=gist.full_length if gist.truncated else None,
+        )
+
 
 class EmailRecordResponse(OmitNoneModel):
     """One email record on the timeline. No gist: emails carry no HTML body to convert."""
@@ -255,6 +266,22 @@ class EmailRecordResponse(OmitNoneModel):
         description="Whether Backstop marked this email as having attachments.",
     )
 
+    @classmethod
+    def from_item(cls, item: EmailItemDto) -> Self:
+        to_emails, to_emails_count = _cap_recipients(item.to_emails)
+        cc_emails, cc_emails_count = _cap_recipients(item.cc_emails)
+        return cls(
+            activity_id=item.id,
+            occurred_at=item.sent_timestamp,
+            subject=item.subject,
+            from_email=item.from_email,
+            to_emails=to_emails,
+            to_emails_count=to_emails_count,
+            cc_emails=cc_emails,
+            cc_emails_count=cc_emails_count,
+            has_attachments=item.has_attachments,
+        )
+
 
 type TimelineRecord = Annotated[
     ActivityRecordResponse | EmailRecordResponse, Field(discriminator="type")
@@ -275,30 +302,13 @@ def _cap_recipients(emails: tuple[str, ...]) -> tuple[tuple[str, ...], int | Non
 def to_timeline_record(
     item: ActivityItemDto | EmailItemDto, *, gist_max_chars: int
 ) -> TimelineRecord:
-    """Convert one fetched item to its wire shape. Pure: no HTTP, no config lookups."""
-    if isinstance(item, EmailItemDto):
-        to_emails, to_emails_count = _cap_recipients(item.to_emails)
-        cc_emails, cc_emails_count = _cap_recipients(item.cc_emails)
-        return EmailRecordResponse.model_validate(item).model_copy(
-            update={
-                "to_emails": to_emails,
-                "to_emails_count": to_emails_count,
-                "cc_emails": cc_emails,
-                "cc_emails_count": cc_emails_count,
-            }
-        )
+    """Convert one fetched item to its wire shape. Pure: no HTTP, no config lookups.
 
-    assert isinstance(item, ActivityItemDto)
-    gist = to_gist(item.description or "", max_chars=gist_max_chars)
-    return ActivityRecordResponse.model_validate(
-        {
-            **item.model_dump(),
-            "type": item.stream,
-            "gist": gist.text,
-            "gist_truncated": gist.truncated,
-            "description_length": gist.full_length if gist.truncated else None,
-        }
-    )
+    Picks the union arm; construction lives on the concrete models.
+    """
+    if isinstance(item, EmailItemDto):
+        return EmailRecordResponse.from_item(item)
+    return ActivityRecordResponse.from_item(item, gist_max_chars=gist_max_chars)
 
 
 class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
@@ -312,20 +322,32 @@ class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
         ),
     )
 
-
-def resolved_party_as_of_response(
-    party: ResolvedPartyDto,
-    attributes: ProvenanceAttributes,
-) -> ResolvedPartyAsOfResponse:
-    resolved = party_response(
-        party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
-    )
-    return ResolvedPartyAsOfResponse(
-        id=resolved.id,
-        search_type=resolved.search_type,
-        name=resolved.name,
-        as_of=as_of_response(extract_as_of(attributes)),
-    )
+    @classmethod
+    @override
+    def from_party(
+        cls,
+        party: ResolvedPartyDto,
+        *,
+        attributes: Mapping[str, object] | ProvenanceAttributes | None = None,
+    ) -> Self:
+        if isinstance(attributes, ProvenanceAttributes):
+            dump: Mapping[str, object] | None = attributes.model_dump(
+                by_alias=True, exclude_none=True
+            )
+            provenance: ProvenanceAttributes | None = attributes
+        elif attributes is None:
+            dump = None
+            provenance = None
+        else:
+            dump = attributes
+            provenance = ProvenanceAttributes.model_validate(attributes)
+        resolved = ResolvedPartyResponse.from_party(party, attributes=dump)
+        return cls(
+            id=resolved.id,
+            search_type=resolved.search_type,
+            name=resolved.name,
+            as_of=extract_as_of(provenance),
+        )
 
 
 class ActivityHistoryResolvedResponse(OmitNoneModel):
@@ -413,27 +435,30 @@ class ActivityDetailResponse(OmitNoneModel):
         description="People listed on a meeting/call. Empty for a note or document.",
     )
 
+    @classmethod
+    def from_detail(
+        cls,
+        *,
+        activity_id: str,
+        detail: ActivityDetailDto,
+        specifics: MeetingSpecificsDto | None,
+        attendees: tuple[AttendeeDto, ...],
+    ) -> Self:
+        """Convert the fetched parts to the tool's wire shape. Pure: no HTTP.
 
-def to_activity_detail_response(
-    *,
-    activity_id: str,
-    detail: ActivityDetailDto,
-    specifics: MeetingSpecificsDto | None,
-    attendees: tuple[AttendeeDto, ...],
-) -> ActivityDetailResponse:
-    """Convert the fetched parts to the tool's wire shape. Pure: no HTTP.
-
-    `activity_id` is echoed from the caller's composite handle rather than rebuilt from
-    `detail.resource_id`, so what comes back is byte-identical to what went in — and stays
-    a handle the model can pass straight back to this tool.
-    """
-    gist = to_gist(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
-    return ActivityDetailResponse.model_validate(
-        {
-            **detail.model_dump(exclude={"resource_id", "description"}),
-            **(specifics.model_dump() if specifics is not None else {}),
-            "activity_id": activity_id,
-            "body": gist.text,
-            "attendees": attendees,
-        }
-    )
+        `activity_id` is echoed from the caller's composite handle rather than rebuilt from
+        `detail.resource_id`, so what comes back is byte-identical to what went in — and stays
+        a handle the model can pass straight back to this tool.
+        """
+        gist = to_gist(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
+        return cls(
+            activity_id=activity_id,
+            type=detail.type,
+            title=detail.title,
+            body=gist.text,
+            start=None if specifics is None else specifics.start,
+            stop=None if specifics is None else specifics.stop,
+            location=None if specifics is None else specifics.location,
+            time_zone=None if specifics is None else specifics.time_zone,
+            attendees=[AttendeeResponse(name=attendee.name) for attendee in attendees],
+        )

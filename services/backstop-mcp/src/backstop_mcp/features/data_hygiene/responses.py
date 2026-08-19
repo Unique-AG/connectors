@@ -1,7 +1,7 @@
 """Tool-facing responses for provenance and employment links."""
 
 from datetime import date
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -66,6 +66,19 @@ class DepartedContactResponse(BaseModel):
         ),
     )
 
+    @classmethod
+    def from_departure(cls, departure: DepartedEmploymentDto | None) -> Self | None:
+        if departure is None:
+            return None
+        return cls(
+            signal=departure.signal,
+            organization_id=departure.organization_id,
+            organization_type=departure.organization_type,
+            end_date=departure.end_date,
+            relationship_type_id=departure.relationship_type_id,
+            relationship_type_name=departure.relationship_type_name,
+        )
+
 
 class EmploymentLinkResponse(OmitNoneModel):
     """One resolved person↔organization employment pair for tool payloads.
@@ -112,15 +125,3 @@ class EmploymentLinkResponse(OmitNoneModel):
             "Name of the relationship type as this instance labels it, e.g. 'is employee of'."
         ),
     )
-
-
-def as_of_response(as_of: AsOfResponse | None) -> AsOfResponse | None:
-    return as_of
-
-
-def departed_response(
-    departure: DepartedEmploymentDto | None,
-) -> DepartedContactResponse | None:
-    if departure is None:
-        return None
-    return DepartedContactResponse.model_validate(departure)

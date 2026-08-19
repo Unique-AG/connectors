@@ -2,7 +2,7 @@
 vocabulary.
 """
 
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field
 
@@ -12,9 +12,6 @@ from backstop_mcp.features.accounts.responses.shared import (
     PositionRowResponse,
     ProductRefResponse,
     closed_hint,
-    figure_response,
-    position_row_response,
-    product_ref_response,
 )
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
@@ -56,6 +53,17 @@ class ProductCandidateResponse(CandidateResponse):
         description="`productShortName` (e.g. 'CGUP'). Omitted when the product has none.",
     )
 
+    @classmethod
+    def from_candidate(cls, candidate: Candidate[ResolvedProductDto]) -> Self:
+        product = candidate.value
+        return cls(
+            key=candidate.key,
+            label=candidate.label,
+            id=product.id,
+            name=product.name,
+            short_name=product.short_name,
+        )
+
 
 class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
@@ -73,6 +81,14 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
             "candidate's `id` as `product_id` — never invent one."
         ),
     )
+
+    @classmethod
+    def from_unresolved(cls, result: Unresolved[ResolvedProductDto]) -> Self | NotFoundResponse:
+        return unresolved_response(
+            result,
+            ambiguous_model=cls,
+            to_candidate=ProductCandidateResponse.from_candidate,
+        )
 
 
 class ProductPositionsResolvedResponse(OmitNoneModel):
@@ -152,44 +168,23 @@ class ProductPositionsResolvedResponse(OmitNoneModel):
         ),
     )
 
-
-def product_candidate_response(
-    candidate: Candidate[ResolvedProductDto],
-) -> ProductCandidateResponse:
-    product = candidate.value
-    return ProductCandidateResponse(
-        key=candidate.key,
-        label=candidate.label,
-        id=product.id,
-        name=product.name,
-        short_name=product.short_name,
-    )
-
-
-def unresolved_product_response(
-    result: Unresolved[ResolvedProductDto],
-) -> ProductAmbiguousResponse | NotFoundResponse:
-    return unresolved_response(
-        result,
-        ambiguous_model=ProductAmbiguousResponse,
-        to_candidate=product_candidate_response,
-    )
-
-
-def product_positions_response(result: ProductPositionsDto) -> ProductPositionsResolvedResponse:
-    reconciliation = result.reconciliation
-    return ProductPositionsResolvedResponse(
-        product=product_ref_response(result.product),
-        accounts=tuple(position_row_response(position) for position in result.accounts),
-        closed_omitted=result.closed_omitted,
-        accounts_omitted=result.accounts_omitted,
-        aum=figure_response(result.aum),
-        balance_total=reconciliation.balance_total,
-        aum_difference=reconciliation.difference,
-        aum_diverges=reconciliation.diverges,
-        include_closed_hint=closed_hint(
+    @classmethod
+    def from_positions(cls, result: ProductPositionsDto) -> Self:
+        reconciliation = result.reconciliation
+        return cls(
+            product=ProductRefResponse.from_product(result.product),
+            accounts=tuple(
+                PositionRowResponse.from_position(position) for position in result.accounts
+            ),
             closed_omitted=result.closed_omitted,
-            returned=len(result.accounts),
-            subject="product",
-        ),
-    )
+            accounts_omitted=result.accounts_omitted,
+            aum=FigureResponse.from_figure(result.aum),
+            balance_total=reconciliation.balance_total,
+            aum_difference=reconciliation.difference,
+            aum_diverges=reconciliation.diverges,
+            include_closed_hint=closed_hint(
+                closed_omitted=result.closed_omitted,
+                returned=len(result.accounts),
+                subject="product",
+            ),
+        )

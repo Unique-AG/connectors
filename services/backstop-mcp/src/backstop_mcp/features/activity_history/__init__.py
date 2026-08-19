@@ -15,7 +15,7 @@ items) and `next` continuation (`None` once that stream is exhausted). Items pas
 fetch order — no client-side re-sort. See `group.py`.
 
 `ActivityRecordResponse`/`EmailRecordResponse`/`TimelineRecord`/`to_timeline_record`: the wire
-shape of one fetched item and the pure conversion into it. `ActivityHistoryResolvedResponse`/
+shape of one fetched item and the union conversion into it. `ActivityHistoryResolvedResponse`/
 `GetActivityHistoryResponse`: the top-level tool response union. See `responses.py`.
 
 `fetch_activity_detail`/`fetch_meeting_specifics`/`fetch_attendees`: the `get_activity_detail`
@@ -23,7 +23,7 @@ fetch primitive — one activity's full `entity-activity-details` record plus, f
 meeting-or-calls handle, timings and attendees. `parse_activity_handle` splits the timeline
 `activity_id` into `{resource_type, resource_id}`; `ActivityHandleDto.is_meeting_or_call` gates
 the two `/meeting-or-calls` fetches. See `fetch_activity_detail.py` and `activity_handle.py`.
-`ActivityDetailResponse`/`AttendeeResponse`/`to_activity_detail_response`: that tool's wire shape
+`ActivityDetailResponse`/`AttendeeResponse`: that tool's wire shape
 and the pure conversion into it. See `responses.py`.
 
 `ActivityHistorySettings`: the per-stream page size and gist truncation budget, translated from
@@ -72,8 +72,6 @@ from backstop_mcp.features.activity_history.responses import (
     GetActivityHistoryResponse,
     ResolvedPartyAsOfResponse,
     TimelineRecord,
-    resolved_party_as_of_response,
-    to_activity_detail_response,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
@@ -121,8 +119,6 @@ __all__ = [
     "fetch_meeting_specifics",
     "group_page",
     "parse_activity_handle",
-    "resolved_party_as_of_response",
-    "to_activity_detail_response",
     "to_gist",
     "to_timeline_record",
 ]

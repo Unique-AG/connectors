@@ -12,7 +12,7 @@ from backstop_mcp.features.accounts.project import (
     project_owner,
     split_open,
 )
-from backstop_mcp.features.accounts.responses import account_row_response
+from backstop_mcp.features.accounts.responses import AccountRowResponse
 from tests.helpers import resource
 
 _AccountResource = AccountApiResponse
@@ -266,7 +266,7 @@ class TestSplitOpen:
 
 class TestAccountRowResponse:
     def test_passes_through_qualification_object_and_eligibility_enum(self) -> None:
-        row = account_row_response(
+        row = AccountRowResponse.from_record(
             AccountRecordDto(
                 id="1",
                 is_open=True,
@@ -283,7 +283,7 @@ class TestAccountRowResponse:
         assert row.new_issue_eligible == "ELIGIBLE"
 
     def test_empty_qualification_is_omitted(self) -> None:
-        row = account_row_response(
+        row = AccountRowResponse.from_record(
             AccountRecordDto(
                 id="1", is_open=True, investor_qualification=InvestorQualificationAttributes()
             )

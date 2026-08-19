@@ -8,36 +8,18 @@ from datetime import date
 from typing import cast
 
 from backstop_mcp.features.data_hygiene import (
-    AsOfResponse,
     DepartedContactResponse,
     DepartedEmployment,
     DepartureSignal,
     EmploymentStatus,
-    as_of_response,
-    departed_response,
 )
 from backstop_mcp.features.data_hygiene.employment import EmploymentIndex
 from backstop_mcp.features.data_hygiene.internal_dto import EmploymentEdgeDto as EmploymentEdge
 
 
-class TestAsOf:
-    def test_nothing_to_echo_stays_none(self) -> None:
-        assert as_of_response(None) is None
-
-    def test_both_fields_are_carried(self) -> None:
-        assert as_of_response(
-            AsOfResponse(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
-        ) == AsOfResponse(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
-
-    def test_a_partial_signal_is_carried_as_is(self) -> None:
-        assert as_of_response(AsOfResponse(modified_timestamp="2024-01-01")) == AsOfResponse(
-            modified_timestamp="2024-01-01", modified_by=None
-        )
-
-
 class TestDepartedResponse:
     def test_a_current_person_has_nothing_to_echo(self) -> None:
-        assert departed_response(None) is None
+        assert DepartedContactResponse.from_departure(None) is None
 
     def test_every_field_is_carried(self) -> None:
         departed = DepartedEmployment(
@@ -49,7 +31,7 @@ class TestDepartedResponse:
             relationship_type_name="is a former employee of",
         )
 
-        assert departed_response(departed) == DepartedContactResponse(
+        assert DepartedContactResponse.from_departure(departed) == DepartedContactResponse(
             signal=DepartureSignal.FORMER_TYPE,
             organization_id="o1",
             organization_type="organizations",
@@ -59,7 +41,7 @@ class TestDepartedResponse:
         )
 
     def test_the_signal_serializes_as_the_word_the_user_sees(self) -> None:
-        response = departed_response(
+        response = DepartedContactResponse.from_departure(
             DepartedEmployment(
                 signal=DepartureSignal.END_DATE,
                 organization_id="o1",

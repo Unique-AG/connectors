@@ -8,7 +8,7 @@ Both models are validated straight from a record's raw `attributes` — the came
 `extra="ignore"` below are what make that possible, and are the reason there is no separate wire
 model to copy field for field. The few things Backstop does not put in `attributes` (the resource
 id, the resolved stage name and id, the stage history) are supplied alongside by
-`fetch.to_opportunity_response`. Validating one record at a time is deliberate: it is what keeps
+`OpportunityResponse.from_resource`. Validating one record at a time is deliberate: it is what keeps
 a single malformed deal from costing a party their whole pipeline.
 
 Backstop's names arrive as `validation_alias`, not `alias`, so they are read on the way in without
@@ -22,10 +22,11 @@ both `OpportunityResponse.stage` and `StageChangeResponse.stage`, because a move
 still a fact even when the vocabulary has moved on.
 """
 
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Self
 
 from pydantic import BeforeValidator, ConfigDict, Field, StringConstraints
 
+from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.models import OmitNoneModel
 
@@ -180,6 +181,31 @@ class OpportunityResponse(OmitNoneModel):
             + "behind `stage`."
         ),
     )
+
+    @classmethod
+    def from_resource(
+        cls,
+        resource: BackstopApiResource[dict[str, object]],
+        *,
+        stage: str | None,
+        stage_id: str | None,
+        stage_history: tuple[StageChangeResponse, ...],
+    ) -> Self:
+        """Project one `opportunities` resource, naming its current stage and its history.
+
+        The response model reads the record's attributes through its own aliases, so the four
+        things Backstop does not put in `attributes` are all that is supplied here. Raises
+        `ValidationError` for a record the model cannot read, which the caller drops on its own.
+        """
+        return cls.model_validate(
+            {
+                **resource.attributes,
+                "id": resource.id,
+                "stage": stage,
+                "stage_id": stage_id,
+                "stage_history": stage_history,
+            }
+        )
 
 
 class OpportunityFetchResponse(OmitNoneModel):

@@ -9,7 +9,6 @@ from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
-    parse_json_api_error,
 )
 
 
@@ -42,7 +41,7 @@ class TestParseJsonApiErrorWellFormed:
             json={"errors": [{"status": "404", "code": "not_found", "detail": "No such record"}]},
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopApiError)
         assert error.status_code == 404
@@ -55,7 +54,7 @@ class TestParseJsonApiErrorWellFormed:
     def test_ignores_code_when_absent(self) -> None:
         response = httpx.Response(400, json={"errors": [{"detail": "Bad request"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "Bad request"
         assert error.code is None
@@ -74,7 +73,7 @@ class TestParseJsonApiErrorWellFormed:
             },
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "Find all lov-entries is not allowed."
         assert error.code == "UnsupportedRequestException"
@@ -87,7 +86,7 @@ class TestParseJsonApiErrorWellFormed:
             json={"errors": [{"title": "Short title", "detail": "Longer detail"}]},
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "Longer detail"
 
@@ -102,7 +101,7 @@ class TestParseJsonApiErrorWellFormed:
             },
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "First problem; Second problem"
         assert error.code == "a"
@@ -116,7 +115,7 @@ class TestParseJsonApiErrorMalformedBody:
     def test_non_json_body_falls_back(self) -> None:
         response = httpx.Response(500, text="not json at all")
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.status_code == 500
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
@@ -126,7 +125,7 @@ class TestParseJsonApiErrorMalformedBody:
     def test_empty_body_falls_back(self) -> None:
         response = httpx.Response(500)
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
         assert error.errors == ()
@@ -134,7 +133,7 @@ class TestParseJsonApiErrorMalformedBody:
     def test_empty_errors_array_falls_back(self) -> None:
         response = httpx.Response(500, json={"errors": []})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
         assert error.errors == ()
@@ -142,7 +141,7 @@ class TestParseJsonApiErrorMalformedBody:
     def test_errors_without_message_fields_fall_back(self) -> None:
         response = httpx.Response(500, json={"errors": [{"status": "500"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
         assert len(error.errors) == 1
@@ -153,7 +152,7 @@ class TestParseJsonApiErrorRateLimit:
     def test_recognizes_concurrency_limit_kind(self) -> None:
         response = httpx.Response(429, json={"errors": [{"detail": "Concurrency limit exceeded"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.limit_kind == "concurrency"
@@ -161,7 +160,7 @@ class TestParseJsonApiErrorRateLimit:
     def test_recognizes_minute_limit_kind_case_insensitively(self) -> None:
         response = httpx.Response(429, json={"errors": [{"detail": "PER-MINUTE quota hit"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.limit_kind == "minute"
@@ -171,7 +170,7 @@ class TestParseJsonApiErrorRateLimit:
             429, json={"errors": [{"code": "daily_limit", "detail": "Quota exceeded"}]}
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.limit_kind == "day"
@@ -179,7 +178,7 @@ class TestParseJsonApiErrorRateLimit:
     def test_does_not_misclassify_incidental_day_substring(self) -> None:
         response = httpx.Response(429, json={"errors": [{"detail": "Please try again today"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.limit_kind is None
@@ -187,7 +186,7 @@ class TestParseJsonApiErrorRateLimit:
     def test_unrecognizable_body_yields_none_limit_kind(self) -> None:
         response = httpx.Response(429, json={"errors": [{"detail": "Too many requests"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.limit_kind is None
@@ -195,7 +194,7 @@ class TestParseJsonApiErrorRateLimit:
     def test_malformed_body_yields_none_limit_kind(self) -> None:
         response = httpx.Response(429, text="not json")
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.limit_kind is None
@@ -207,7 +206,7 @@ class TestParseJsonApiErrorRateLimit:
             json={"errors": [{"detail": "Too many requests"}]},
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds == 30.0
@@ -215,7 +214,7 @@ class TestParseJsonApiErrorRateLimit:
     def test_retry_after_absent_yields_none(self) -> None:
         response = httpx.Response(429, json={"errors": [{"detail": "Too many requests"}]})
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds is None
@@ -227,7 +226,7 @@ class TestParseJsonApiErrorRateLimit:
             json={"errors": [{"detail": "Too many requests"}]},
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds is None
@@ -249,7 +248,7 @@ class TestParseJsonApiErrorRateLimit:
             json={"errors": [{"detail": "Too many requests"}]},
         )
 
-        error = parse_json_api_error(response)
+        error = BackstopApiError.from_response(response)
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds == 30.0

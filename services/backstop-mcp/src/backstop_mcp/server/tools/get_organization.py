@@ -11,7 +11,6 @@ from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
-    as_of_response,
     extract_as_of,
 )
 from backstop_mcp.features.includes import (
@@ -22,7 +21,6 @@ from backstop_mcp.features.includes import (
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -181,9 +179,9 @@ async def get_organization(
     attributes = document.require_data(path=path).attributes
     return OrganizationResolvedResponse(
         organization=attributes,
-        resolved=party_response(
+        resolved=ResolvedPartyResponse.from_party(
             party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=as_of_response(extract_as_of(attributes)),
+        as_of=extract_as_of(attributes),
         included=plan.project(document=document) if plan.planned else None,
     )

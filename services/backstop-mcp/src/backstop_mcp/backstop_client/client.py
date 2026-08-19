@@ -11,7 +11,6 @@ from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopAuthError,
     BackstopErrorDetail,
-    parse_json_api_error,
 )
 from backstop_mcp.backstop_client.pagination import (
     PageResult,
@@ -277,9 +276,9 @@ class BackstopClient:
                     "Backstop rejected the stored credential — please reconnect."
                 )
             if response.is_error:
-                # Covers 429 too — parse_json_api_error returns a BackstopRateLimitError
+                # Covers 429 too — BackstopApiError.from_response returns a BackstopRateLimitError
                 # for those, which the retry predicate in retry.py inspects.
-                raise parse_json_api_error(response)
+                raise BackstopApiError.from_response(response)
             return response
 
         logger.debug("backstop.request.start", extra={"method": method, "path": path})
