@@ -40,7 +40,8 @@ Endpoints:
 - Traces: off unless an `OTEL_*` variable says where to send them. `OTEL_TRACES_EXPORTER=console`
   prints spans to stderr; an `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends them to a collector and
   needs nothing else. `.env.example` lists the knobs, the chart wires them from
-  `internalServices.dependencies.otelTraces.enabled`.
+  `internalServices.dependencies.otelTraces.enabled`. Latency stays on `/metrics` only: the ASGI
+  instrumentation's own duration histogram is switched off so one series measures it.
 
 ## Tests
 

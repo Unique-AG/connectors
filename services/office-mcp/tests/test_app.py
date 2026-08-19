@@ -81,6 +81,32 @@ class TestRoutes:
 
         assert response.status_code == 200
 
+    def test_only_one_family_measures_request_latency(self, app_client: TestClient) -> None:
+        """Two histograms for one latency is a dashboard that disagrees with itself.
+
+        `OpenTelemetryMiddleware` brings its own instruments, and left to the global meter provider
+        they land in the same registry `/metrics` scrapes as unique_toolkit's — so a scrape would
+        answer `http_server_duration_milliseconds` *and* `python_http_request_duration_seconds` for
+        the same requests, differing in unit, in bucket boundaries and in labels. `app.py` hands
+        that middleware a no-op meter provider so the toolkit series is the only one; this is what
+        says so. Asserted on the family names rather than on the middleware's arguments, because
+        what must not regress is the scrape.
+        """
+        # A request has to have been served before a latency histogram exists to find. The scrape
+        # itself does not count: it is still in flight when the registry is read.
+        assert _get(app_client, "/health").status_code == 200
+
+        histograms = {
+            line.split()[2]
+            for line in _get(app_client, "/metrics").text.splitlines()
+            if line.startswith("# TYPE ") and line.endswith(" histogram")
+        }
+        latency = {name for name in histograms if "http" in name and "duration" in name}
+
+        assert latency == {"python_http_request_duration_seconds"}, (
+            f"expected one HTTP request-latency family, got {sorted(latency)}"
+        )
+
 
 class TestReadyReportsDatabaseUnreachable:
     def test_ready_is_503_when_postgres_is_unreachable(self) -> None:
