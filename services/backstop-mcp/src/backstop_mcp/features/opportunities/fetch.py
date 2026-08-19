@@ -40,10 +40,10 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Iterable, Mapping, Sequence
 from datetime import date
-from typing import ClassVar, Literal
+from typing import Literal
 from urllib.parse import quote
 
-from pydantic import ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
@@ -56,10 +56,10 @@ from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.responses import (
+    OpportunityFetchResponse,
     OpportunityResponse,
     StageChangeResponse,
 )
-from backstop_mcp.models import OmitNoneModel
 
 logger = logging.getLogger(__name__)
 
@@ -87,40 +87,6 @@ def stage_ref_id(value: object) -> str | None:
         return ResourceRef.model_validate(value).resource_id
     except ValidationError:
         return None
-
-
-class OpportunityFetchResult(OmitNoneModel):
-    """One party's opportunities after filtering and ordering, plus what the whole set says.
-
-    `total` and the two counts are over everything fetched — the party's complete set, since the
-    fetch walks their whole sub-collection — so `status="open"` still reports how many closed
-    deals exist.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    opportunities: tuple[OpportunityResponse, ...] = Field(
-        description=(
-            "The deals matching the requested status, newest first by the day each entered its "
-            + "current stage."
-        )
-    )
-    total: int = Field(
-        description=(
-            "Every opportunity fetched for this party, before filtering by status — so the "
-            + "number they have in total. Counted here rather than read from Backstop's own "
-            + "`meta.totalResourceCount`."
-        )
-    )
-    open_count: int = Field(
-        description=(
-            "How many of those are open, whatever status was asked for — so an answer about "
-            + "open deals still says how many exist."
-        )
-    )
-    closed_count: int = Field(
-        description="How many of those are closed, counted the same way as `open_count`."
-    )
 
 
 def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
@@ -341,7 +307,7 @@ async def fetch_opportunities(
     entity_id: str,
     status: OpportunityStatus = "all",
     vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
-) -> OpportunityFetchResult:
+) -> OpportunityFetchResponse:
     """Every opportunity for one party, `status`-filtered and newest stage move first.
 
     Walks the party's whole sub-collection: both the filter and the ordering are over the
@@ -373,7 +339,7 @@ async def fetch_opportunities(
     selected = order_by_date_entered(
         opportunity for opportunity in fetched if matches_status(opportunity, status)
     )
-    result = OpportunityFetchResult(
+    result = OpportunityFetchResponse(
         opportunities=selected,
         total=len(fetched),
         open_count=sum(1 for opportunity in fetched if opportunity.is_open is True),

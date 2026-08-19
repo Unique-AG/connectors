@@ -19,9 +19,9 @@ Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurr
 
 import logging
 from datetime import date, datetime
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, ClassVar, Literal, Self
 
-from pydantic import AliasChoices, ConfigDict, Field
+from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityType,
@@ -32,10 +32,10 @@ from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     ActivityItemDto,
     AttendeeDto,
+    DateRangeDto,
     EmailItemDto,
     MeetingSpecificsDto,
 )
-from backstop_mcp.features.activity_history.models import ActivityGroup
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
@@ -54,6 +54,8 @@ from backstop_mcp.models import OmitNoneModel
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ActivityContinuationResponse",
+    "ActivityGroupResponse",
     "ActivityHistoryResolvedResponse",
     "ActivityDetailResponse",
     "AttendeeResponse",
@@ -69,6 +71,90 @@ __all__ = [
 
 _MAX_RECIPIENTS = 3
 _FULL_BODY_MAX_CHARS = 10_000_000
+
+
+def _require_since_not_after_until(since: date | None, until: date | None) -> None:
+    if since is not None and until is not None and since > until:
+        raise ValueError("since must not be after until")
+
+
+class ActivityContinuationResponse(OmitNoneModel):
+    """Params to fetch this stream's next page. Echo from a prior group's `next`; do not invent."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    limit: Annotated[
+        int,
+        Field(gt=0, description="Page size for this stream. Copy from the prior group's `next`."),
+    ]
+    offset: Annotated[
+        int,
+        Field(
+            ge=0,
+            description=(
+                "Next `page[offset]` for this stream. Copy from the prior group's `next`."
+            ),
+        ),
+    ]
+    since: Annotated[
+        date | None,
+        Field(
+            default=None,
+            description=(
+                "Lower date bound for this stream, copied from the prior group's `next`. "
+                "Omitted (or null) when this stream has no lower bound — do not invent one."
+            ),
+        ),
+    ] = None
+    until: Annotated[
+        date | None,
+        Field(
+            default=None,
+            description=(
+                "Upper date bound for this stream, copied from the prior group's `next`. "
+                "Omitted (or null) when this stream has no upper bound — do not invent one."
+            ),
+        ),
+    ] = None
+
+    @model_validator(mode="after")
+    def _since_not_after_until(self) -> Self:
+        _require_since_not_after_until(self.since, self.until)
+        return self
+
+
+class ActivityGroupResponse[ItemT](OmitNoneModel):
+    """One stream's page: which type, this page's items, this page's date span, and continuation."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    activity_type: Annotated[
+        ActivityType,
+        Field(description="Which stream this group is: meeting, call, note, email, or document."),
+    ]
+    items: Annotated[
+        tuple[ItemT, ...],
+        Field(description="This page's records for `activity_type`, in Backstop fetch order."),
+    ]
+    date_range: Annotated[
+        DateRangeDto | None,
+        Field(
+            description=(
+                "Oldest and newest `occurred_at` dates among this page's dated items. Omitted "
+                "(or null) when the page is empty or every item lacks a date."
+            ),
+        ),
+    ] = None
+    next: Annotated[
+        ActivityContinuationResponse | None,
+        Field(
+            description=(
+                "Params to fetch this stream's next page. Omitted (or null) once the stream is "
+                "exhausted. To continue, copy this object into a `type=next` request's `next` "
+                "map under this `activity_type`."
+            ),
+        ),
+    ] = None
 
 
 class ActivityRecordResponse(OmitNoneModel):
@@ -254,7 +340,7 @@ class ActivityHistoryResolvedResponse(OmitNoneModel):
             "`id` / `search_type` / `name` as `party_id` later."
         )
     )
-    groups: dict[ActivityType, ActivityGroup[TimelineRecord]] = Field(
+    groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = Field(
         description=(
             "One entry per requested stream (meeting, call, note, email, document), not a "
             "single merged timeline. Each group's `date_range` is that page's span."

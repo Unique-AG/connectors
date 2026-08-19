@@ -19,7 +19,7 @@ from pydantic import (
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
-    ActivityContinuation,
+    ActivityContinuationResponse,
     ActivityType,
     Segment,
 )
@@ -168,7 +168,7 @@ class ActivityHistoryNextPageInput(BaseModel):
         ),
     ]
     next: Annotated[
-        dict[ActivityType, ActivityContinuation],
+        dict[ActivityType, ActivityContinuationResponse],
         Field(
             min_length=1,
             description=(
@@ -221,7 +221,7 @@ class FetchArgs:
     segment: Segment
     entity_id: str
     party: ResolvedPartyDto
-    continuations: Mapping[ActivityType, ActivityContinuation]
+    continuations: Mapping[ActivityType, ActivityContinuationResponse]
 
 
 def effective_activity_types(
@@ -299,7 +299,7 @@ async def extract_fetch_activity_history_args(
                 entity_id=party.id,
                 party=party,
                 continuations={
-                    activity_type: ActivityContinuation(
+                    activity_type: ActivityContinuationResponse(
                         limit=page_size,
                         offset=0,
                         since=since,

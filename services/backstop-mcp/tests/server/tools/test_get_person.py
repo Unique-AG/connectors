@@ -4,7 +4,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.data_hygiene import AsOf, DepartureSignal, EmploymentLinkResponse
+from backstop_mcp.features.data_hygiene import (
+    AsOfResponse,
+    DepartureSignal,
+    EmploymentLinkResponse,
+)
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,
@@ -132,7 +136,7 @@ class TestGetPerson:
                 relationship_type_name="is a former employee of",
             )
         ]
-        assert result.as_of == AsOf(
+        assert result.as_of == AsOfResponse(
             modified_timestamp="2023-01-01T00:00:00Z", modified_by="crm-admin"
         )
         # The nested hop is what populates each relationship's own type linkage, and it has to

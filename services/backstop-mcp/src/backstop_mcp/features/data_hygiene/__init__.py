@@ -40,7 +40,6 @@ from backstop_mcp.features.data_hygiene.service import (
     create_employment_index_factory,
 )
 
-AsOf = AsOfResponse
 ProvenanceFields = ProvenanceAttributes
 DepartedEmployment = DepartedEmploymentDto
 EmploymentRules = EmploymentRulesDto

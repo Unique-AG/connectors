@@ -1,6 +1,6 @@
 import pytest
 
-from backstop_mcp.features.data_hygiene import AsOf, ProvenanceFields, extract_as_of
+from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceFields, extract_as_of
 
 
 def _attrs(payload: dict[str, object]) -> ProvenanceFields:
@@ -16,15 +16,15 @@ class TestExtractAsOf:
     def test_extracts_timestamp_and_by(self) -> None:
         assert extract_as_of(
             _attrs({"modifiedTimestamp": "2024-01-01T00:00:00Z", "modifiedBy": "alice"})
-        ) == AsOf(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
+        ) == AsOfResponse(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
 
     def test_timestamp_alone_is_enough(self) -> None:
-        assert extract_as_of(_attrs({"modifiedTimestamp": "2024-01-01"})) == AsOf(
+        assert extract_as_of(_attrs({"modifiedTimestamp": "2024-01-01"})) == AsOfResponse(
             modified_timestamp="2024-01-01", modified_by=None
         )
 
     def test_actor_alone_is_enough(self) -> None:
-        assert extract_as_of(_attrs({"modifiedBy": "alice"})) == AsOf(
+        assert extract_as_of(_attrs({"modifiedBy": "alice"})) == AsOfResponse(
             modified_timestamp=None, modified_by="alice"
         )
 
@@ -32,7 +32,7 @@ class TestExtractAsOf:
         assert extract_as_of(_attrs({"modifiedTimestamp": "  ", "modifiedBy": ""})) is None
 
     def test_values_are_stripped(self) -> None:
-        assert extract_as_of(_attrs({"modifiedTimestamp": " 2024-01-01 "})) == AsOf(
+        assert extract_as_of(_attrs({"modifiedTimestamp": " 2024-01-01 "})) == AsOfResponse(
             modified_timestamp="2024-01-01", modified_by=None
         )
 
@@ -52,7 +52,7 @@ class TestNestedModifiedBy:
         ],
     )
     def test_the_first_readable_label_wins(self, actor: dict[str, str], expected: str) -> None:
-        assert extract_as_of(_attrs({"modifiedBy": actor})) == AsOf(
+        assert extract_as_of(_attrs({"modifiedBy": actor})) == AsOfResponse(
             modified_timestamp=None, modified_by=expected
         )
 

@@ -16,7 +16,6 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.opportunities.fetch import (
-    OpportunityFetchResult,
     OpportunityStatus,
     date_entered_order_key,
     fetch_opportunities,
@@ -25,7 +24,10 @@ from backstop_mcp.features.opportunities.fetch import (
     resolve_stage_name,
     stage_names_from_included,
 )
-from backstop_mcp.features.opportunities.responses import OpportunityResponse
+from backstop_mcp.features.opportunities.responses import (
+    OpportunityFetchResponse,
+    OpportunityResponse,
+)
 from backstop_mcp.features.opportunities.stages import OpportunityStage
 from tests.helpers import BASE_URL, resource
 
@@ -130,7 +132,7 @@ async def _fetch(
     *,
     status: OpportunityStatus = "all",
     vocabulary: dict[str, OpportunityStage] | None = None,
-) -> OpportunityFetchResult:
+) -> OpportunityFetchResponse:
     return await fetch_opportunities(
         client,
         segment="organizations",

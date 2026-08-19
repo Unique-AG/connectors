@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_history import (
-    ActivityContinuation,
+    ActivityContinuationResponse,
     ActivityHistoryResolvedResponse,
     ActivityRecordResponse,
     ActivityType,
@@ -24,7 +24,7 @@ from backstop_mcp.features.activity_history import (
     ResolvedPartyAsOfResponse,
     TimelineRecord,
 )
-from backstop_mcp.features.data_hygiene import AsOf
+from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, PartyCandidateResponse
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -88,7 +88,7 @@ def _next(
     *,
     search_type: SearchType,
     entity_id: str,
-    next: dict[ActivityType, ActivityContinuation],
+    next: dict[ActivityType, ActivityContinuationResponse],
 ) -> ActivityHistoryNextPageInput:
     return ActivityHistoryNextPageInput(
         type="next", search_type=search_type, entity_id=entity_id, next=next
@@ -140,7 +140,7 @@ class TestFirstCallByTrustedPartyId:
             id="o42",
             search_type="organizations",
             name="Capstone",
-            as_of=AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
+            as_of=AsOfResponse(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
         )
         assert documents.call_count == 1
         assert set(result.groups) == {"meeting", "call", "note", "email", "document"}
@@ -405,7 +405,7 @@ class TestResumedCall:
                 _next(
                     search_type="organizations",
                     entity_id="o42",
-                    next={"meeting": ActivityContinuation(limit=10, offset=3)},
+                    next={"meeting": ActivityContinuationResponse(limit=10, offset=3)},
                 ),
             ),
             ActivityHistoryResolvedResponse,
@@ -455,7 +455,7 @@ class TestResumedCall:
                 _next(
                     search_type="people",
                     entity_id="p9",
-                    next={"meeting": ActivityContinuation(limit=10, offset=3)},
+                    next={"meeting": ActivityContinuationResponse(limit=10, offset=3)},
                 ),
             ),
             ActivityHistoryResolvedResponse,
@@ -465,7 +465,7 @@ class TestResumedCall:
             id="p9",
             search_type="people",
             name="Jane Doe",
-            as_of=AsOf(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
+            as_of=AsOfResponse(modified_timestamp="2025-03-01T10:00:00Z", modified_by="ops"),
         )
 
     @pytest.mark.asyncio
