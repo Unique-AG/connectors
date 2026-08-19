@@ -164,7 +164,8 @@ class ActivityRecordResponse(OmitNoneModel):
 
     # Plain field name required: pydantic discriminators reject AliasChoices on `type`.
     type: BackstopActivityType = Field(
-        description="Which stream this record is: meeting, call, note, or document."
+        title="Type",
+        description="Which stream this record is: meeting, call, note, or document.",
     )
     activity_id: str = Field(
         validation_alias=AliasChoices("activity_id", "id"),
@@ -354,7 +355,7 @@ type GetActivityHistoryResponse = (
 
 
 class AttendeeResponse(OmitNoneModel):
-    """One trimmed attendee: a single display name (see `AttendeeDto.name`'s fallback)."""
+    """One trimmed attendee: a single display name (see `Attendee.name`'s fallback)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
 
@@ -366,8 +367,9 @@ class ActivityDetailResponse(OmitNoneModel):
 
     `type`, `title` and `body` come from `entity-activity-details`; `start`/`stop`/`location`/
     `time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is only
-    fetched for a meeting-or-calls handle. They are therefore absent for a note or document
-    because nobody asked, not because Backstop returned nothing.
+    fetched for a meeting-or-calls handle (it 404s for a note or document — see
+    `fetch_activity_detail.py`). They are therefore absent for a note or document because nobody
+    asked, not because Backstop returned nothing.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(

@@ -16,7 +16,7 @@ __all__ = [
     "MeetingSpecificsDto",
 ]
 
-type BackstopActivityType = Literal["meeting", "call", "note", "document"]
+BackstopActivityType = Literal["meeting", "call", "note", "document"]
 
 
 class ActivityItemDto(BaseModel):
@@ -89,6 +89,8 @@ class AttendeeDto(BaseModel):
 
 
 class DateRangeDto(BaseModel):
+    """Min/max `occurred_at` among this page's dated items."""
+
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     start: Annotated[
