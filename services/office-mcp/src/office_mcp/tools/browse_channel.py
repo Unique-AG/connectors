@@ -178,7 +178,7 @@ async def browse_channel(
             expand=["replies"], top=limit
         )
     )
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         page = await (
             client.teams.by_team_id(team_id)
             .channels.by_channel_id(channel_id)
