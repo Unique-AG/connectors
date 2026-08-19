@@ -221,10 +221,8 @@ def graph_client_for(transport: httpx.AsyncClient, access_token: str) -> GraphSe
     # request, well after construction, so setting it here is the same kind of correction as the
     # base_url above.
     #
-    # Trap: this does not close every leak. `UrlReplaceHandler` sets `url.full` on its own span
-    # without consulting these options at all (kiota_http/middleware/url_replace_handler.py:44), and
-    # that handler carries the `/me` rewrite, so it cannot be switched off. Removing that one needs
-    # either an upstream fix or a span filter where the tracer provider is built. See
-    # `tests/graph_client/test_spans.py`.
+    # This closes the request span only. The other place the SDK sets `url.full` never reads these
+    # options; `_QuietUrlReplaceHandler`, installed on the transport, is what closes that one. See
+    # `tests/graph_client/test_spans.py`, which asserts over both.
     adapter.observability_options = _NO_EUII_SPAN_ATTRIBUTES
     return GraphServiceClient(request_adapter=adapter)
