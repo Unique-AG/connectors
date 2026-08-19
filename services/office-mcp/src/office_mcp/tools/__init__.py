@@ -43,7 +43,7 @@ without knowing which others exist.
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import httpx
 from fastmcp import FastMCP
@@ -95,6 +95,20 @@ class ToolModule(Protocol):
 
     @staticmethod
     def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None: ...
+
+
+@runtime_checkable
+class _NarrowsItsNotFound(Protocol):
+    """A tool that knows what a 404 on its own argument means, and says so instead of the default.
+
+    Checked at runtime and kept out of `ToolModule`, because it is true of two tools out of ten. On
+    the protocol every module has to satisfy it would be an attribute the other eight carried empty
+    to satisfy a type checker — and the default advice is right for all eight, since their arguments
+    are ids a caller passed in rather than handles this connector minted.
+    """
+
+    @property
+    def GRAPH_NOT_FOUND(self) -> str: ...
 
 
 # Every tool this server has, in the order they are registered and the order their permissions are
@@ -220,15 +234,24 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
     missing. Filtered by the selection, so it says nothing about a tool this deployment does not
     expose.
 
-    `not_found` is left unset here. The sentence a 404 needs instead of the default belongs to the
-    tool that knows where its argument came from, and while a tool still opens its own mapping block
-    that is where it says it.
+    `not_found` comes off the module the same way, for the two tools that publish one. The sentence
+    a 404 needs instead of the default belongs to the tool that knows where its argument came
+    from — a handle another tool minted cannot be a caller's typo — so the tool writes the prose and
+    this reads it, rather than the wording living next to the failure in ten places.
     """
     return {
-        module.TOOL_NAME: ToolAdvice(permissions=module.GRAPH_PERMISSIONS)
+        module.TOOL_NAME: ToolAdvice(
+            permissions=module.GRAPH_PERMISSIONS,
+            not_found=_not_found_advice(module),
+        )
         for module in _TOOL_MODULES
         if module.TOOL_NAME in selection.tools
     }
+
+
+def _not_found_advice(module: ToolModule) -> str | None:
+    """The sentence this tool's 404 needs, or `None` to leave the default one in place."""
+    return module.GRAPH_NOT_FOUND if isinstance(module, _NarrowsItsNotFound) else None
 
 
 def register_tools(mcp: FastMCP, transport: httpx.AsyncClient, selection: Selection) -> None:

@@ -397,13 +397,16 @@ class TestTheToolsThisServerAdvertises:
     async def test_every_tool_is_listed_and_none_asks_for_a_client(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The Graph client, and the On-Behalf-Of token inside it, are dependencies. A model that
-        was shown either one as an argument would be asked for a value only this server can make."""
+        """The Graph client, the On-Behalf-Of token inside it and the request context are all
+        dependencies. A model shown any of them as an argument would be asked for a value only this
+        server can make."""
         tools = _named(await mcp_client.list_tools())
 
         assert set(tools) == {"get_me", "list_chats", "search_messages", "read_message"}
         for tool in tools.values():
-            assert "client" not in _properties(tool.inputSchema)
+            arguments = _properties(tool.inputSchema)
+            assert "client" not in arguments
+            assert "ctx" not in arguments
 
     async def test_get_me_takes_no_arguments(self, mcp_client: Client[FastMCPTransport]) -> None:
         tools = _named(await mcp_client.list_tools())

@@ -54,10 +54,13 @@ failed dependency in a `RuntimeError` before that, so what has to be recognised 
 `__cause__` chain. The chain is walked and matched on type. Matching FastMCP's own message text
 instead would break on a wording change nobody here would review.
 
-A tool that still opens its own mapping block keeps it: the message that block produced is what
-reaches the client, byte for byte, because it arrives as a type the middleware leaves alone. That is
-what lets a tool say something narrower than its declared tuple — `read_message` reads one surface
-under one of the two permissions its token was exchanged for — while the middleware covers the rest.
+A tool says something narrower than its declared tuple by saying so. `read_message` reads one
+surface under one of the two permissions its token was exchanged for, and `narrowed_to` carries that
+to the middleware on the call's own state, because the tool learns which surface it is reading from
+its argument — per call, and long after the table was built.
+
+A tool that still opens its own mapping block keeps its own message instead: what that block
+produced reaches the client byte for byte, because it arrives as a type the middleware leaves alone.
 
 Error Messages
 
@@ -90,6 +93,7 @@ from types import TracebackType
 from typing import cast, override
 
 import httpx
+from fastmcp import Context
 from fastmcp.dependencies import Dependency, Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
@@ -247,6 +251,42 @@ class ToolAdvice:
     not_found: str | None = None
 
 
+# The state key one tool writes and the middleware below reads. Namespaced, because the state store
+# is shared with every other writer in the process; these two are its only writer and reader.
+_NARROWED_PERMISSIONS = "office_mcp.narrowed_permissions"
+
+
+async def narrowed_to(ctx: Context, *permissions: str) -> None:
+    """Say that this call reached Graph under fewer permissions than its tool declares.
+
+    A tool whose token was exchanged for two permissions and whose call uses one has to say which,
+    or its 403 names a permission that was never missing and an administrator grants it for nothing.
+    The table cannot say it: which surface is being read is learned from the argument, per call, and
+    the table is built once at startup.
+
+    Request state rather than session state, which is what `serializable=False` buys: the narrowing
+    is about this one call. Session state outlives the call by a day, so a second call to the same
+    tool would be worded from the first call's handle.
+    """
+    assert permissions, "a Graph call is made under at least one permission"
+    await ctx.set_state(_NARROWED_PERMISSIONS, permissions, serializable=False)
+
+
+async def _narrowed_permissions(ctx: Context | None) -> tuple[str, ...] | None:
+    """What `narrowed_to` said about this call, or `None` when it said nothing.
+
+    `None` for nine tools out of ten, and for every call that never reached Graph. There is no
+    context at all on a path with no request behind it, which is a middleware driven directly by a
+    test rather than anything in production.
+
+    `get_state` is typed `Any`, because the store holds whatever any writer put there. The cast
+    asserts what `narrowed_to` guarantees about this one key rather than what the store promises.
+    """
+    if ctx is None:
+        return None
+    return cast("tuple[str, ...] | None", await ctx.get_state(_NARROWED_PERMISSIONS))
+
+
 class GraphAdviceMiddleware(Middleware):
     """Answer every refused tool call with the remedy for it, wherever in the call it happened."""
 
@@ -262,19 +302,26 @@ class GraphAdviceMiddleware(Middleware):
         try:
             return await call_next(context)
         except Exception as error:
-            advised = self._advised(error, context.message.name)
+            narrowed = await _narrowed_permissions(context.fastmcp_context)
+            advised = self._advised(error, context.message.name, narrowed)
             if advised is None:
                 raise
             # `from error` keeps the whole chain: this is the last thing to touch the failure, but a
             # span or a log sink further out still reads the cause it was raised from.
             raise advised from error
 
-    def _advised(self, error: BaseException, tool: str) -> ToolError | None:
+    def _advised(
+        self, error: BaseException, tool: str, narrowed: tuple[str, ...] | None
+    ) -> ToolError | None:
         """The advice for this failure, or `None` when there is nothing here to say about it.
 
         `None` covers three cases that must all leave the failure exactly as it is: a refusal the
         tool already worded (`Advised`), a `ToolError` about an argument (a handle of the wrong
         shape), and anything that is not a Graph or token failure at all.
+
+        `narrowed` wins over the table when the tool said its call used fewer permissions than it
+        declares. A token refusal ignores it: the exchange happens before the argument is parsed and
+        asked for every permission, so naming one of them would hide the one that was refused.
         """
         for cause in _causes(error):
             if isinstance(cause, Advised):
@@ -289,7 +336,8 @@ class GraphAdviceMiddleware(Middleware):
                 # with one nobody can.
                 if known is None:
                     return None
-                return ToolError(_advice(cause, known.permissions, known.not_found))
+                permissions = known.permissions if narrowed is None else narrowed
+                return ToolError(_advice(cause, permissions, known.not_found))
         return None
 
 

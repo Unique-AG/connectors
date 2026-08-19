@@ -293,6 +293,30 @@ class TestEveryToolTranslatesItsOwnRefusal:
         for permission in unrelated:
             assert permission not in message, f"{tool} named {permission}, which it never used"
 
+    @pytest.mark.usefixtures("obo", "graph")
+    async def test_a_narrowed_refusal_does_not_word_the_next_call_in_the_session(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """`read_message` is the one tool that tells the middleware its call used fewer permissions
+        than it declares, and it says so on the state of that one call.
+
+        Said on the session's state instead — one keyword apart, and a day's lifetime — every later
+        refusal in the session would be worded from this handle: the refused search below would name
+        `Chat.Read` alone, and the permission that was actually missing would never be asked for.
+        Two calls on one client, because a fresh client per call is exactly what would hide it.
+        """
+        with pytest.raises(ToolError) as narrowed:
+            _ = await mcp_client.call_tool(
+                "read_message", dict(_EVERY_TOOL["read_message"].arguments)
+            )
+        with pytest.raises(ToolError) as after:
+            _ = await mcp_client.call_tool(
+                "search_messages", dict(_EVERY_TOOL["search_messages"].arguments)
+            )
+
+        assert str(narrowed.value) == _advice_for(_EVERY_TOOL["read_message"].permissions)
+        assert str(after.value) == _advice_for(_EVERY_TOOL["search_messages"].permissions)
+
 
 class TestWhereTheMappingSits:
     def test_the_advice_is_outside_the_operations_layer(self, app: Starlette) -> None:
