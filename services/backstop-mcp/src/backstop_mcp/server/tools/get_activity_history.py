@@ -36,7 +36,7 @@ from backstop_mcp.features.activity_history import (
 )
 from backstop_mcp.models import published_output_schema
 from backstop_mcp.server.runtime import get_activity_history_settings, get_backstop_client
-from backstop_mcp.server.tools.utils.get_activity_history_utils import (
+from backstop_mcp.server.tools.utils.activity_history import (
     ActivityHistoryFirstPageInput,
     ActivityHistoryNextPageInput,
     ActivityHistoryPageInput,
