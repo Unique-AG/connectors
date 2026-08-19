@@ -122,7 +122,7 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
         ),
         headers=headers,
     )
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         first_page = await client.teams.by_team_id(team_id).channels.get(
             request_configuration=configuration
         )
