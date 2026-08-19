@@ -6,6 +6,7 @@ from typing import Protocol, cast
 import asyncpg
 from fastmcp import FastMCP
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -76,7 +77,14 @@ def create_app(
 
     return mcp.http_app(
         middleware=[
-            Middleware(OpenTelemetryMiddleware),
+            # A no-op meter provider on purpose. Left to the global one, this middleware's own
+            # instruments resolve against the provider metrics.py aims at the toolkit registry, and
+            # /metrics then serves two histograms for one latency: http_server_duration_milliseconds
+            # beside unique_toolkit's python_http_request_duration_seconds. The toolkit series is
+            # the one the house dashboards read, and its python_http_requests_in_progress covers
+            # what http_server_active_requests would have said, so the toolkit series stays the only
+            # one. Spans are unaffected — the tracer provider is untouched.
+            Middleware(OpenTelemetryMiddleware, meter_provider=NoOpMeterProvider()),
             ops_middleware,
         ]
     )
