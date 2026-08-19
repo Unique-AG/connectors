@@ -78,7 +78,7 @@ async def list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
     """Return up to `limit` teams."""
     assert 1 <= limit <= MAX_TEAMS, f"limit must be within 1..{MAX_TEAMS}, got {limit}"
 
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         first_page = await client.me.joined_teams.get()
         assert first_page is not None, "Graph answered GET /me/joinedTeams with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
