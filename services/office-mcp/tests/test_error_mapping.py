@@ -69,7 +69,13 @@ _TEAM_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
 _CHANNEL_ID = "19:general@thread.tacv2"
 _CHAT_ID = "19:release@thread.v2"
 _MESSAGE_ID = "1770000000000"
+_MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+_JOIN_WEB_URL = (
+    "https://teams.microsoft.invalid/l/meetup-join/"
+    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0?context=%7b%22Tid%22%3a%22x%22%7d"
+)
 _CHAT_MESSAGE_URI = f"teams:///chats/{quote(_CHAT_ID, safe='')}/messages/{_MESSAGE_ID}"
+_MEETING_URI = f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"
 
 
 @dataclass(frozen=True)
@@ -98,6 +104,10 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
     "list_channels": _Refused({"team_id": _TEAM_ID}, ("Channel.ReadBasic.All",)),
     "browse_channel": _Refused(
         {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}, ("ChannelMessage.Read.All",)
+    ),
+    "list_meeting_transcripts": _Refused(
+        {"meeting_uri": _MEETING_URI},
+        ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
     ),
 }
 
