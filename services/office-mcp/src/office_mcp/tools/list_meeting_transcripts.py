@@ -272,7 +272,7 @@ async def list_meeting_transcripts(
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
 
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingTranscripts(
