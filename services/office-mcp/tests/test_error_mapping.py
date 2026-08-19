@@ -92,6 +92,7 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
     "list_chats": _Refused({}, ("Chat.Read",)),
     "search_messages": _Refused({"query": "release"}, ("Chat.Read", "ChannelMessage.Read.All")),
     "read_message": _Refused({"uri": _CHAT_MESSAGE_URI}, ("Chat.Read",)),
+    "list_teams": _Refused({}, ("Team.ReadBasic.All",)),
 }
 
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
