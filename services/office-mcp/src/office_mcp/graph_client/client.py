@@ -20,6 +20,7 @@ from kiota_abstractions.authentication import (
 )
 from kiota_abstractions.request_option import RequestOption
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
+from kiota_http.observability_options import ObservabilityOptions
 from msgraph.graph_request_adapter import GraphRequestAdapter
 from msgraph.graph_request_adapter import options as sdk_middleware_options
 from msgraph.graph_service_client import GraphServiceClient
@@ -35,6 +36,18 @@ assert _GRAPH_HOSTNAME is not None, f"national cloud endpoint has no host: {_GRA
 
 # Only host allowed to receive the caller's delegated token.
 _GRAPH_HOSTS = AllowedHostsValidator([_GRAPH_HOSTNAME])
+
+# Kiota calls a Graph URL "EUII" and puts it on every request span as `url.full` by default
+# (`ObservabilityOptions.include_euii_attributes`, kiota_http/observability_options.py:9). In this
+# service that URL *is* the sensitive part: `/chats/{chat}/messages/{message}`,
+# `/users/{user}/onlineMeetings/{meeting}/transcripts/{transcript}`. A trace backend keeps span
+# attributes for weeks and is read by anyone who can read traces, so with tracing switched on those
+# ids leave the pod. Turned off here; `url.uri_template` stays, and a template is what a latency
+# breakdown is grouped by anyway.
+#
+# One instance, not one per call: `graph_client_for` runs per request, and the object is only ever
+# read.
+_NO_EUII_SPAN_ATTRIBUTES = ObservabilityOptions(include_euii_attributes=False)
 
 
 class _CallerTokenProvider(AccessTokenProvider):
@@ -118,4 +131,16 @@ def graph_client_for(transport: httpx.AsyncClient, access_token: str) -> GraphSe
     # causing `/v1.0//users/...`. Graph tolerates the empty path segment; nothing else on the
     # way there is promised to.
     adapter.base_url = _GRAPH_BASE_URL
+    # Assigned rather than passed: `GraphRequestAdapter.__init__` takes only an auth provider and a
+    # client, and drops its base class's `observability_options` parameter on the floor
+    # (msgraph/graph_request_adapter.py:22-26). The attribute is public and is read once per
+    # request, well after construction, so setting it here is the same kind of correction as the
+    # base_url above.
+    #
+    # Trap: this does not close every leak. `UrlReplaceHandler` sets `url.full` on its own span
+    # without consulting these options at all (kiota_http/middleware/url_replace_handler.py:44), and
+    # that handler carries the `/me` rewrite, so it cannot be switched off. Removing that one needs
+    # either an upstream fix or a span filter where the tracer provider is built. See
+    # `tests/graph_client/test_spans.py`.
+    adapter.observability_options = _NO_EUII_SPAN_ATTRIBUTES
     return GraphServiceClient(request_adapter=adapter)
