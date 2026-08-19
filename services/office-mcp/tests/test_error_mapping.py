@@ -112,6 +112,10 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
         ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
     ),
     "read_transcript": _Refused({"uri": _TRANSCRIPT_URI}, ("OnlineMeetingTranscript.Read.All",)),
+    "list_meeting_recordings": _Refused(
+        {"meeting_uri": _MEETING_URI},
+        ("OnlineMeetings.Read", "OnlineMeetingRecording.Read.All", "User.Read"),
+    ),
 }
 
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
