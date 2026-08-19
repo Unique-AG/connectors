@@ -31,10 +31,11 @@ stopped matching Backstop's:
   `BackstopApiResource`, `BackstopApiError`). The prefix means "this talks to Backstop", not
   "this data came from Backstop".
 * **`*Attributes`** — a raw Backstop wire shape, 1:1 with their data model, under their field
-  names (`PersonAttributes`, `CustomFieldDefinitionAttributes`).
+  names (`CustomFieldDefinitionAttributes`).
 * **`*Response`** — our curated, model-facing shape: trimmed, renamed where Backstop's naming
   would mislead, and documented for the model that consumes it. Used for nested pieces as much as
-  for whole tool returns (`AttendeeResponse`, `EmploymentLinkResponse`).
+  for whole tool returns (`PersonRecordResponse`, `OrganizationRecordResponse`, `AttendeeResponse`,
+  `EmploymentLinkResponse`).
 
 Backstop's `emails` relationship is email *messages*, so the address book is exposed as
 `email_addresses` holding a `ContactEmailResponse`. A `Backstop`-prefixed or `*Attributes` name

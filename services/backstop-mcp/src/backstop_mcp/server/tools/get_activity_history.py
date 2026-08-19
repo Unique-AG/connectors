@@ -41,7 +41,7 @@ from backstop_mcp.server.tools.utils.get_activity_history_utils import (
     ActivityHistoryNextPageInput,
     ActivityHistoryPageInput,
     FetchArgs,
-    PartyAttributes,
+    PartyRecordResponse,
     extract_fetch_activity_history_args,
 )
 
@@ -109,7 +109,7 @@ async def get_activity_history(
     party_path = f"/{args.segment}/{quote(args.entity_id, safe='')}"
     document = await client.get(
         party_path,
-        schema=BackstopApiResourceDocument[PartyAttributes],
+        schema=BackstopApiResourceDocument[PartyRecordResponse],
     )
     page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
         activity_type: fetch_activities_page_by_type(

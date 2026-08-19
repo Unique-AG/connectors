@@ -31,7 +31,7 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
 
 
-class OrganizationAttributes(OmitNoneModel, ProvenanceAttributes):
+class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
     `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
@@ -59,7 +59,7 @@ class OrganizationResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the organization was found and fetched.",
     )
-    organization: OrganizationAttributes = Field(
+    organization: OrganizationRecordResponse = Field(
         description=(
             "The organization's own Backstop attributes. Known keys (`name`, "
             "`modifiedTimestamp`, `modifiedBy`) are documented; other keys are this "
@@ -176,7 +176,7 @@ async def get_organization(
     document = await client.get(
         path,
         params={"include": plan.param} if plan.param else None,
-        schema=BackstopApiResourceDocument[OrganizationAttributes],
+        schema=BackstopApiResourceDocument[OrganizationRecordResponse],
     )
     attributes = document.require_data(path=path).attributes
     return OrganizationResolvedResponse(
