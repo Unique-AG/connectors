@@ -1831,16 +1831,11 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
         caplog: pytest.LogCaptureFixture,
+        recorded_spans: InMemorySpanExporter,
     ) -> None:
         """A transcript is the most sensitive content this connector touches — a verbatim record of
         what people said in a room — so the rule search and read are held to is tightest here: the
         words reach the caller and no log line and no span attribute anywhere in the process."""
-        exporter = InMemorySpanExporter()
-        provider = trace.get_tracer_provider()
-        if not isinstance(provider, TracerProvider):
-            provider = TracerProvider()
-            trace.set_tracer_provider(provider)
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
         secret = "acquisition-of-northwind-traders"
         vtt = f"WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n<v Ada Lovelace>{secret}</v>\n"
         graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=_MEETING))
@@ -1857,8 +1852,10 @@ class TestCallingThem:
         assert turns[0]["text"] == secret, "the transcript has to have been returned"
         for record in caplog.records:
             assert secret not in _record_text(record), f"logged by {record.name}"
-        for span in exporter.get_finished_spans():
-            assert secret not in str(span.attributes)
+        spans = recorded_spans.get_finished_spans()
+        assert spans, "nothing was traced, so the span half of this test asserts over an empty list"
+        for span in spans:
+            assert secret not in str(span.attributes), f"on span {span.name}"
 
     @pytest.mark.usefixtures("obo")
     async def test_a_transcript_is_read_narrowed_to_a_speaker_and_to_a_stretch_of_the_meeting(
