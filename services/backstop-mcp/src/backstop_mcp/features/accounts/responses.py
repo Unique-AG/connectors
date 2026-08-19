@@ -13,17 +13,17 @@ from typing import Literal
 
 from pydantic import Field
 
-from backstop_mcp.features.accounts.types import (
-    AccountListing,
-    AccountOwner,
-    AccountPosition,
-    AccountRecord,
-    InvestorQualification,
-    InvestorType,
-    ProductPositions,
-    ResolvedProduct,
-    SeriesError,
-    SeriesFigure,
+from backstop_mcp.features.accounts.api_responses import InvestorQualificationAttributes
+from backstop_mcp.features.accounts.internal_dto import (
+    AccountListingDto,
+    AccountOwnerDto,
+    AccountPositionDto,
+    AccountRecordDto,
+    InvestorTypeDto,
+    ProductPositionsDto,
+    ResolvedProductDto,
+    SeriesErrorDto,
+    SeriesFigureDto,
     SeriesName,
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyResponse
@@ -321,7 +321,9 @@ class PositionRowResponse(AccountRowResponse):
     )
 
 
-def product_candidate_response(candidate: Candidate[ResolvedProduct]) -> ProductCandidateResponse:
+def product_candidate_response(
+    candidate: Candidate[ResolvedProductDto],
+) -> ProductCandidateResponse:
     product = candidate.value
     return ProductCandidateResponse(
         key=candidate.key,
@@ -333,7 +335,7 @@ def product_candidate_response(candidate: Candidate[ResolvedProduct]) -> Product
 
 
 def unresolved_product_response(
-    result: Unresolved[ResolvedProduct],
+    result: Unresolved[ResolvedProductDto],
 ) -> ProductAmbiguousResponse | NotFoundResponse:
     return unresolved_response(
         result,
@@ -342,11 +344,11 @@ def unresolved_product_response(
     )
 
 
-def product_ref_response(product: ResolvedProduct) -> ProductRefResponse:
+def product_ref_response(product: ResolvedProductDto) -> ProductRefResponse:
     return ProductRefResponse(id=product.id, name=product.name, short_name=product.short_name)
 
 
-def figure_response(figure: SeriesFigure | None) -> FigureResponse | None:
+def figure_response(figure: SeriesFigureDto | None) -> FigureResponse | None:
     """Report the latest valued point, naming the newer valueless one when there is one."""
     if figure is None:
         return None
@@ -364,27 +366,27 @@ def figure_response(figure: SeriesFigure | None) -> FigureResponse | None:
     )
 
 
-def owner_response(owner: AccountOwner | None) -> OwnerResponse | None:
+def owner_response(owner: AccountOwnerDto | None) -> OwnerResponse | None:
     if owner is None:
         return None
     return OwnerResponse(id=owner.id, name=owner.name, resource_type=owner.resource_type)
 
 
-def investor_type_response(investor_type: InvestorType | None) -> InvestorTypeResponse | None:
+def investor_type_response(investor_type: InvestorTypeDto | None) -> InvestorTypeResponse | None:
     if investor_type is None:
         return None
     return InvestorTypeResponse(id=investor_type.id, name=investor_type.name)
 
 
 def investor_qualification_response(
-    qualification: InvestorQualification | None,
+    qualification: InvestorQualificationAttributes | None,
 ) -> InvestorQualificationResponse | None:
     if qualification is None or (qualification.status is None and qualification.option is None):
         return None
     return InvestorQualificationResponse(status=qualification.status, option=qualification.option)
 
 
-def account_row_response(account: AccountRecord) -> AccountRowResponse:
+def account_row_response(account: AccountRecordDto) -> AccountRowResponse:
     return AccountRowResponse.model_validate(
         {
             **account.model_dump(),
@@ -398,7 +400,7 @@ def account_row_response(account: AccountRecord) -> AccountRowResponse:
     )
 
 
-def _series_errors(errors: tuple[SeriesError, ...]) -> tuple[SeriesErrorResponse, ...] | None:
+def _series_errors(errors: tuple[SeriesErrorDto, ...]) -> tuple[SeriesErrorResponse, ...] | None:
     if not errors:
         return None
     return tuple(
@@ -406,7 +408,7 @@ def _series_errors(errors: tuple[SeriesError, ...]) -> tuple[SeriesErrorResponse
     )
 
 
-def position_row_response(position: AccountPosition) -> PositionRowResponse:
+def position_row_response(position: AccountPositionDto) -> PositionRowResponse:
     row = account_row_response(position.account)
     return PositionRowResponse.model_validate(
         {
@@ -554,7 +556,7 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
     )
 
 
-def product_positions_response(result: ProductPositions) -> ProductPositionsResolvedResponse:
+def product_positions_response(result: ProductPositionsDto) -> ProductPositionsResolvedResponse:
     reconciliation = result.reconciliation
     return ProductPositionsResolvedResponse(
         product=product_ref_response(result.product),
@@ -574,7 +576,7 @@ def product_positions_response(result: ProductPositions) -> ProductPositionsReso
 
 
 def party_accounts_response(
-    *, resolved: ResolvedPartyResponse, listing: AccountListing
+    *, resolved: ResolvedPartyResponse, listing: AccountListingDto
 ) -> PartyAccountsResolvedResponse:
     return PartyAccountsResolvedResponse(
         resolved=resolved,

@@ -1,5 +1,10 @@
 from datetime import date
 
+from backstop_mcp.features.accounts.api_responses import (
+    AccountAttributes,
+    InvestorQualificationAttributes,
+)
+from backstop_mcp.features.accounts.internal_dto import AccountOwnerDto, AccountRecordDto
 from backstop_mcp.features.accounts.project import (
     AccountApiResponse,
     account_is_open,
@@ -8,12 +13,6 @@ from backstop_mcp.features.accounts.project import (
     split_open,
 )
 from backstop_mcp.features.accounts.responses import account_row_response
-from backstop_mcp.features.accounts.types import (
-    AccountAttributes,
-    AccountOwner,
-    AccountRecord,
-    InvestorQualification,
-)
 from tests.helpers import resource
 
 _AccountResource = AccountApiResponse
@@ -68,7 +67,7 @@ class TestAccountAttributesWire:
             }
         )
 
-        assert attributes.investor_qualification == InvestorQualification(
+        assert attributes.investor_qualification == InvestorQualificationAttributes(
             status="REG_UNKNOWN", option="UNKNOWN"
         )
         assert attributes.new_issue_eligible == "NOT_ELIGIBLE"
@@ -78,7 +77,9 @@ class TestAccountAttributesWire:
             {"investorQualification": {"option": "UNKNOWN"}, "newIssueEligible": "N/A"}
         )
 
-        assert attributes.investor_qualification == InvestorQualification(option="UNKNOWN")
+        assert attributes.investor_qualification == InvestorQualificationAttributes(
+            option="UNKNOWN"
+        )
         assert attributes.new_issue_eligible == "N/A"
 
 
@@ -109,7 +110,7 @@ class TestProjectOwner:
             _owner("341688185", name="PSP Investments", resource_type="organizations")
         )
 
-        assert owner == AccountOwner(
+        assert owner == AccountOwnerDto(
             id="341688185",
             name="PSP Investments",
             resource_type="organizations",
@@ -125,7 +126,7 @@ class TestProjectOwner:
             )
         )
 
-        assert owner == AccountOwner(
+        assert owner == AccountOwnerDto(
             id="341688185",
             name="PSP Investments",
             resource_type="organizations",
@@ -141,14 +142,14 @@ class TestProjectOwner:
             )
         )
 
-        assert owner == AccountOwner(
+        assert owner == AccountOwnerDto(
             id="contact-1", name="PSP Investments", resource_type="contacts"
         )
 
     def test_person_owner_keeps_json_api_type(self) -> None:
         owner = project_owner(resource("99", "people", name="Ada Lovelace"))
 
-        assert owner == AccountOwner(id="99", name="Ada Lovelace", resource_type="people")
+        assert owner == AccountOwnerDto(id="99", name="Ada Lovelace", resource_type="people")
 
     def test_blank_id_is_dropped(self) -> None:
         assert project_owner({"id": "  ", "type": "contacts", "attributes": {}}) is None
@@ -190,7 +191,7 @@ class TestProjectAccount:
 
         assert record.id == "27871657"
         assert record.name == "PSP CGUP"
-        assert record.owner == AccountOwner(
+        assert record.owner == AccountOwnerDto(
             id="341688185",
             name="PSP Investments",
             resource_type="organizations",
@@ -203,7 +204,7 @@ class TestProjectAccount:
         assert record.account_start_date == date(2019, 3, 1)
         assert record.is_open is True
         assert record.aml_check_complete is True
-        assert record.investor_qualification == InvestorQualification(
+        assert record.investor_qualification == InvestorQualificationAttributes(
             status="REG_UNKNOWN", option="UNKNOWN"
         )
         assert record.new_issue_eligible == "ELIGIBLE"
@@ -241,8 +242,8 @@ class TestProjectAccount:
 
 
 class TestSplitOpen:
-    def _record(self, account_id: str, *, is_open: bool) -> AccountRecord:
-        return AccountRecord(id=account_id, is_open=is_open)
+    def _record(self, account_id: str, *, is_open: bool) -> AccountRecordDto:
+        return AccountRecordDto(id=account_id, is_open=is_open)
 
     def test_default_drops_closed_and_counts_them(self) -> None:
         listing = split_open(
@@ -266,10 +267,10 @@ class TestSplitOpen:
 class TestAccountRowResponse:
     def test_passes_through_qualification_object_and_eligibility_enum(self) -> None:
         row = account_row_response(
-            AccountRecord(
+            AccountRecordDto(
                 id="1",
                 is_open=True,
-                investor_qualification=InvestorQualification(
+                investor_qualification=InvestorQualificationAttributes(
                     status="REG_UNKNOWN", option="UNKNOWN"
                 ),
                 new_issue_eligible="ELIGIBLE",
@@ -283,7 +284,9 @@ class TestAccountRowResponse:
 
     def test_empty_qualification_is_omitted(self) -> None:
         row = account_row_response(
-            AccountRecord(id="1", is_open=True, investor_qualification=InvestorQualification())
+            AccountRecordDto(
+                id="1", is_open=True, investor_qualification=InvestorQualificationAttributes()
+            )
         )
 
         assert row.investor_qualification is None

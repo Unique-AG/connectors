@@ -1,21 +1,22 @@
+from backstop_mcp.features.accounts.api_responses import ProductAttributes
+from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto
 from backstop_mcp.features.accounts.product import (
     match_product,
     product_label,
 )
-from backstop_mcp.features.accounts.types import ProductAttributes, ResolvedProduct
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 
-CGUP = ResolvedProduct(
+CGUP = ResolvedProductDto(
     id="1292283",
     name="Capstone Global Unconstrained Portfolio",
     short_name="CGUP",
 )
-BLUC_I = ResolvedProduct(id="100", name="Blue Capital I", short_name="BLUC")
-BLUC_II = ResolvedProduct(id="101", name="Blue Capital II", short_name="BLUC")
-ALPHA_GROWTH = ResolvedProduct(id="200", name="Alpha Growth Fund", short_name="AGRW")
-ALPHA_VALUE = ResolvedProduct(id="201", name="Alpha Value Fund", short_name="AVAL")
-NO_SHORT = ResolvedProduct(id="600", name="No Short Name Fund", short_name=None)
-NAMELESS = ResolvedProduct(id="700", name=None, short_name="NONM")
+BLUC_I = ResolvedProductDto(id="100", name="Blue Capital I", short_name="BLUC")
+BLUC_II = ResolvedProductDto(id="101", name="Blue Capital II", short_name="BLUC")
+ALPHA_GROWTH = ResolvedProductDto(id="200", name="Alpha Growth Fund", short_name="AGRW")
+ALPHA_VALUE = ResolvedProductDto(id="201", name="Alpha Value Fund", short_name="AVAL")
+NO_SHORT = ResolvedProductDto(id="600", name="No Short Name Fund", short_name=None)
+NAMELESS = ResolvedProductDto(id="700", name=None, short_name="NONM")
 
 CATALOG = (CGUP, BLUC_I, BLUC_II, ALPHA_GROWTH, ALPHA_VALUE, NO_SHORT, NAMELESS)
 
@@ -28,7 +29,7 @@ class TestExactId:
         assert result.value == CGUP
 
     def test_id_match_is_case_sensitive(self) -> None:
-        products = (ResolvedProduct(id="AbC", name="Other", short_name="OTHR"),)
+        products = (ResolvedProductDto(id="AbC", name="Other", short_name="OTHR"),)
 
         result = match_product(products, "abc")
 
@@ -36,7 +37,7 @@ class TestExactId:
 
     def test_id_is_matched_before_short_name(self) -> None:
         colliding = (
-            ResolvedProduct(id="CGUP", name="Something Else", short_name="OTHER"),
+            ResolvedProductDto(id="CGUP", name="Something Else", short_name="OTHER"),
             CGUP,
         )
 
@@ -164,9 +165,9 @@ class TestProductFromAttributes:
             }
         )
 
-        assert ResolvedProduct.from_attributes("1292283", attributes) == CGUP
+        assert ResolvedProductDto.from_attributes("1292283", attributes) == CGUP
 
     def test_missing_configuration_leaves_short_name_unset(self) -> None:
         attributes = ProductAttributes.model_validate({"name": "No Short Name Fund"})
 
-        assert ResolvedProduct.from_attributes("600", attributes) == NO_SHORT
+        assert ResolvedProductDto.from_attributes("600", attributes) == NO_SHORT

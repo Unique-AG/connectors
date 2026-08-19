@@ -10,6 +10,15 @@ from backstop_mcp.features.accounts.fetch import (
     fetch_accounts_for_party,
     fetch_accounts_for_product,
 )
+from backstop_mcp.features.accounts.internal_dto import (
+    AccountListingDto,
+    AccountOwnerDto,
+    AccountRecordDto,
+    InvestorTypeDto,
+    ProductCandidate,
+    ProductResolution,
+    ResolvedProductDto,
+)
 from backstop_mcp.features.accounts.positions import fetch_product_positions
 from backstop_mcp.features.accounts.product import resolve_product
 from backstop_mcp.features.accounts.responses import (
@@ -22,28 +31,19 @@ from backstop_mcp.features.accounts.responses import (
     product_positions_response,
     unresolved_product_response,
 )
-from backstop_mcp.features.accounts.types import (
-    AccountListing,
-    AccountOwner,
-    AccountRecord,
-    InvestorType,
-    ProductCandidate,
-    ProductResolution,
-    ResolvedProduct,
-)
 
 __all__ = [
-    "AccountListing",
-    "AccountOwner",
-    "AccountRecord",
+    "AccountListingDto",
+    "AccountOwnerDto",
+    "AccountRecordDto",
     "AccountRowResponse",
-    "InvestorType",
+    "InvestorTypeDto",
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
     "ProductPositionsResolvedResponse",
     "ProductResolution",
-    "ResolvedProduct",
+    "ResolvedProductDto",
     "account_row_response",
     "fetch_accounts_for_party",
     "fetch_accounts_for_product",
