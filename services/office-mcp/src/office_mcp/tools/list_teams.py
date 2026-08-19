@@ -18,16 +18,12 @@ from msgraph.generated.models.team import Team
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import collect_pages, graph_client_for, graph_errors
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.graph_client import collect_pages, graph_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_teams"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)
-
-# Build at import time. A call inside the parameter default would rebuild it on every
-# registration. Both of this repo's lint checkers reject that.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # A safety valve on Graph request count, not a Graph-imposed page size. Graph accepts no page
 # size on this collection.
@@ -98,6 +94,8 @@ def _team(team: Team) -> TeamSummary:
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     """Register this tool."""
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -118,7 +116,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = 50,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> TeamList:
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await list_teams(graph_client_for(transport, graph_token), limit=limit)
+        return await list_teams(client, limit=limit)
