@@ -165,6 +165,11 @@ def graph_errors(operation: str | None = None) -> Generator[None]:
             code=None,
             request_id=None,
         ) from error
+    except GraphFailure as failure:
+        # Raised inside the block rather than translated here: `collect_pages` refusing a collection
+        # Graph will not end is the one that happens.
+        status = _status_of(failure)
+        raise
     finally:
         record_graph_call(operation, status=status, seconds=perf_counter() - started)
 

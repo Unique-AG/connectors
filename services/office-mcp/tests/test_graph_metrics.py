@@ -10,7 +10,7 @@ process-wide and cumulative, and the rest of the suite drives the same tools und
 operation names.
 """
 
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
 
 import httpx
 import pytest
@@ -29,6 +29,7 @@ from office_mcp.graph_client import (
     GraphForbidden,
     GraphSettings,
     GraphThrottled,
+    collect_pages,
     create_graph_transport,
     graph_client_for,
     graph_errors,
@@ -39,6 +40,7 @@ GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
 CALLER_TOKEN = "synthetic-graph-access-token"
 
+_CHATS_PATH = "/me/chats"
 _ME = {"id": "00000000-0000-4000-8000-000000000001", "displayName": "Ada Lovelace"}
 
 
@@ -109,6 +111,21 @@ def _value(metric: str, **labels: str) -> float:
     matched = [value for keys, value in _samples(metric).items() if wanted <= keys]
     assert len(matched) <= 1, f"{metric}{labels} matched {len(matched)} series"
     return matched[0] if matched else 0.0
+
+
+async def _walk_chats(client: GraphServiceClient, *, limit: int) -> None:
+    from msgraph.generated.models.chat_collection_response import ChatCollectionResponse
+
+    first = await client.me.chats.get()
+    assert isinstance(first, ChatCollectionResponse)
+    _ = await collect_pages(first, client, limit=limit)
+
+
+def _page(chat_ids: Sequence[str], next_link: str | None = None) -> Mapping[str, object]:
+    page: dict[str, object] = {"value": [{"id": chat_id} for chat_id in chat_ids]}
+    if next_link is not None:
+        page["@odata.nextLink"] = next_link
+    return page
 
 
 class TestAGraphCallIsCountedAndTimed:
@@ -218,3 +235,26 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
             _ = await client.me.get()
 
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false") == before + 1
+
+
+class TestAPagedWalkReportsWhatItRead:
+    async def test_the_pages_a_walk_read_include_the_callers_own_first_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Three pages for one call is the number worth seeing: the item cap bounds a walk, so the
+        request count it costs is only visible here."""
+        second = f"{GRAPH_V1}/me/chats?$skiptoken=two"
+        third = f"{GRAPH_V1}/me/chats?$skiptoken=three"
+        graph.get(_CHATS_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page(["c-1"], second)),
+                httpx.Response(200, json=_page(["c-2"], third)),
+                httpx.Response(200, json=_page(["c-3"])),
+            ]
+        )
+        before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats")
+
+        with graph_errors("list_chats"):
+            await _walk_chats(client, limit=50)
+
+        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == before + 3
