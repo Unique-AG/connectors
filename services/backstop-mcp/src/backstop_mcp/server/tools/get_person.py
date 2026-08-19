@@ -34,7 +34,7 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
 
 
-class PersonAttributes(OmitNoneModel, ProvenanceAttributes):
+class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
     """Person resource attributes; extras preserved for the tool payload."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
@@ -58,7 +58,7 @@ class PersonResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the person was found and fetched.",
     )
-    person: PersonAttributes = Field(
+    person: PersonRecordResponse = Field(
         description=(
             "The person's own Backstop attributes. Known keys (`name`, `modifiedTimestamp`, "
             "`modifiedBy`) are documented; other keys are this instance's fields passed "
@@ -202,7 +202,7 @@ async def get_person(
     document = await client.get(
         path,
         params={"include": include_param} if include_param else None,
-        schema=BackstopApiResourceDocument[PersonAttributes],
+        schema=BackstopApiResourceDocument[PersonRecordResponse],
     )
     attributes = document.require_data(path=path).attributes
     index = get_employment_index_factory().index(**entity_relationships(document))

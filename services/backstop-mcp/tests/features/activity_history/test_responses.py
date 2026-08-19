@@ -21,7 +21,7 @@ from backstop_mcp.features.activity_history import (
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
-from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceFields
+from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceAttributes
 from backstop_mcp.features.party_resolver import ResolvedParty
 
 _DEFAULT_ACTIVITY_DATE = date(2026, 1, 15)
@@ -178,7 +178,7 @@ class TestActivityHistoryResolvedResponse:
     def test_merges_party_identity_and_as_of(self) -> None:
         resolved = resolved_party_as_of_response(
             ResolvedParty(id="1", search_type="people", name="Ada"),
-            ProvenanceFields.model_validate(
+            ProvenanceAttributes.model_validate(
                 {"modifiedTimestamp": "2024-01-01", "modifiedBy": "alice"}
             ),
         )

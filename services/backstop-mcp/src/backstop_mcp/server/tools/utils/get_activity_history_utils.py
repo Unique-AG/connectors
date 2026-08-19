@@ -194,7 +194,7 @@ type ActivityHistoryPageInput = Annotated[
 ]
 
 
-class PartyAttributes(ProvenanceAttributes):
+class PartyRecordResponse(ProvenanceAttributes):
     """Minimal attributes this tool needs from the party fetch: a display name plus provenance.
 
     `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never

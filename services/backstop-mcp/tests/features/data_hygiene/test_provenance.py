@@ -1,10 +1,10 @@
 import pytest
 
-from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceFields, extract_as_of
+from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceAttributes, extract_as_of
 
 
-def _attrs(payload: dict[str, object]) -> ProvenanceFields:
-    return ProvenanceFields.model_validate(payload)
+def _attrs(payload: dict[str, object]) -> ProvenanceAttributes:
+    return ProvenanceAttributes.model_validate(payload)
 
 
 class TestExtractAsOf:

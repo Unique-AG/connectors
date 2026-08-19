@@ -15,7 +15,7 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools.get_organization import (
     GetOrganizationResponse,
-    OrganizationAttributes,
+    OrganizationRecordResponse,
     OrganizationResolvedResponse,
     get_organization,
 )
@@ -121,7 +121,7 @@ class TestGetOrganization:
         # `type`/`id` are already echoed under `resolved`.
         # `model_validate`, not kwargs: `status` is an `extra="allow"` passthrough and the
         # provenance fields bind by alias, neither of which the synthesized `__init__` knows.
-        assert result.organization == OrganizationAttributes.model_validate(
+        assert result.organization == OrganizationRecordResponse.model_validate(
             {
                 "name": "Capstone",
                 "status": "active",
@@ -265,7 +265,7 @@ class TestGetOrganization:
         await connect_user("user-org-4", "org-erin.ng")  # pyright: ignore[reportGeneralTypeIssues]
 
         # `id` is entirely absent from the organization resource — fails
-        # `BackstopApiResourceDocument[OrganizationAttributes]` schema validation outright.
+        # `BackstopApiResourceDocument[OrganizationRecordResponse]` schema validation outright.
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
             return_value=httpx.Response(
                 200,
@@ -277,7 +277,9 @@ class TestGetOrganization:
             await get_organization(ctx_never_elicit(), party_id="trusted-9")
 
         assert exc_info.value.path == "/organizations/trusted-9"
-        assert exc_info.value.schema_name == "BackstopApiResourceDocument[OrganizationAttributes]"
+        assert exc_info.value.schema_name == (
+            "BackstopApiResourceDocument[OrganizationRecordResponse]"
+        )
 
     @pytest.mark.asyncio
     @respx.mock
