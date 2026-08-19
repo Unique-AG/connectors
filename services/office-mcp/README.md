@@ -123,9 +123,11 @@ store creates its table on first use.
   prints spans to stderr; an `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends them to a collector and
   needs nothing else. `.env.example` lists the knobs, the chart wires them from
   `internalServices.dependencies.otelTraces.enabled`. Latency stays on `/metrics` only: the ASGI
-  instrumentation's own duration histogram is switched off so one series measures it. A Graph
-  request span carries the URL template and not the URL: the SDK sets the full URL by default, and
-  a Graph URL here is a chat, message or transcript id and almost nothing else.
+  instrumentation's own duration histogram is switched off so one series measures it. No span
+  carries a Graph URL: the SDK sets the full URL as `url.full` by default in two places—the request
+  span and the URL replacer's own span—and both are closed, because a Graph URL here is a chat,
+  message or transcript id and almost nothing else. The request span keeps `url.uri_template`,
+  which is what a latency breakdown groups by.
 
 ## Tests
 
