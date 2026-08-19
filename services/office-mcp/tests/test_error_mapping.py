@@ -187,9 +187,11 @@ def graph() -> Iterator[respx.MockRouter]:
 def two_tools() -> FastMCP[None]:
     """One server, the advice middleware, and one refusal raised on either side of a `with` block.
 
-    This is the only place the middleware's own wording of a Graph refusal is reachable through a
-    real call: every registered tool still opens its own block, and that block is what the client
-    reads. So a tool without one is written here, beside a tool with one, both refused identically.
+    Every registered tool is now on the middleware's side of that block, which is what the rest of
+    this file drives. These two are what keeps the other side honest: a tool that words its own
+    refusal is still passed through untouched, and reads identically to one the middleware words —
+    so the escape stays available, and moving a mapping in either direction stays a change nobody
+    calling this server can see.
     """
     mcp: FastMCP[None] = FastMCP(
         "Two Tools",
@@ -376,13 +378,13 @@ class TestWhereTheMappingSits:
 
 
 class TestMappingTwiceChangesNothing:
-    async def test_a_surviving_tool_block_and_the_middleware_agree_word_for_word(
+    async def test_a_tool_block_and_the_middleware_agree_word_for_word(
         self, two_tools: FastMCP[None]
     ) -> None:
-        """What makes this stack rebasable one step at a time: the mapping can move out of a tool
-        without the message moving. The tool that still maps its own refusal is mapped twice — by
-        its block, then by the middleware that sees the result — and reads identically to the tool
-        the middleware alone maps.
+        """What made this stack rebasable one tool at a time, and what keeps a tool free to word one
+        refusal for itself: the mapping moves without the message moving. The tool that maps its own
+        refusal is mapped twice — by its block, then by the middleware that sees the result — and
+        reads identically to the tool the middleware alone maps.
         """
         async with Client(FastMCPTransport(two_tools)) as client:
             with pytest.raises(ToolError) as doubly:
