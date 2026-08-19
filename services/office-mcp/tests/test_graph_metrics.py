@@ -261,6 +261,30 @@ class TestAPagedWalkReportsWhatItRead:
 
         assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == before + 3
 
+    async def test_a_nested_unnamed_block_does_not_erase_the_name_in_scope(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`graph_errors` blocks nest: `tools/get_me.py` opens a named one around the unnamed one in
+        `shared/identity.py`. An inner block with nothing to say about the operation must leave the
+        name alone, or a walk one level down becomes uncountable — and it would go quiet without
+        anything failing."""
+        graph.get(_CHATS_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json=_page(["c-1"], f"{GRAPH_V1}/me/chats?$skiptoken=two")),
+                httpx.Response(200, json=_page(["c-2"])),
+            ]
+        )
+        pages = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats")
+        counted = _value(GRAPH_REQUESTS_TOTAL, operation="list_chats", status="ok")
+
+        with graph_errors("list_chats"), graph_errors():
+            await _walk_chats(client, limit=50)
+
+        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == pages + 2
+        assert _value(GRAPH_REQUESTS_TOTAL, operation="list_chats", status="ok") == counted + 1, (
+            "the inner block names no operation, so it counts nothing of its own"
+        )
+
 
 _TOOLS = pathlib.Path(__file__).resolve().parents[1] / "src" / "office_mcp" / "tools"
 
