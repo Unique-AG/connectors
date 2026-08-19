@@ -382,6 +382,7 @@ class TestGetOrganizationIncludes:
             ("Home", False),
         ]
         assert locations[0].model_dump() == {
+            "id": "loc-1",
             "location_title": "Business",
             "address": "18867 North Thompson Peak Parkway, Suite 250",
             "city": "Scottsdale",
@@ -467,6 +468,7 @@ class TestGetOrganizationIncludes:
         card = included.primary_contact
         assert card is not None
         assert card.model_dump() == {
+            "id": "p1",
             "name": "Voss, Kent",
             "job_title": "Managing Director, Research",
             "email": "vossk@kochinvests.com",
@@ -523,6 +525,7 @@ class TestGetOrganizationIncludes:
         owner = included.representative
         assert isinstance(owner, InternalOwnerResponse)
         assert owner.model_dump() == {
+            "id": "u1",
             "name": "Margaret Lucas",
             "user_name": "mlucas",
             "email": "margaret.lucas@capstoneco.com",
