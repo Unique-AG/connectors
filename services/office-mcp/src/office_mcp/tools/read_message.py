@@ -20,7 +20,7 @@ Report the event, not the emptiness.
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -34,7 +34,7 @@ from msgraph.generated.teams.item.channels.item.messages.item.chat_message_item_
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_mcp.graph_client import graph_client_for, graph_errors
+from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     CHAT_PERMISSION,
@@ -42,17 +42,13 @@ from office_mcp.shared.handles import (
     message_handle,
 )
 from office_mcp.shared.messages import TeamsMessage, message_of
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
 
 TOOL_NAME = "read_message"
 
 # Token exchange requests both because the handle is parsed after the exchange happens.
 # Read uses `Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
-
-# Built once at import. A call inside a parameter default rebuilds this on every registration.
-# That is a lint error in both of this repo's checkers.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 _DESCRIPTION = """\
 Read one Microsoft Teams message in full, from the `uri` handle search_messages produces: the \
@@ -91,7 +87,10 @@ _BAD_HANDLE = (
     + "no mail, files or sites. Retrying this value will fail identically."
 )
 
-_UNREADABLE = (
+# Read by `tools/__init__.py` into the advice table `GraphAdviceMiddleware` words a 404 from. Public
+# for that reason: the default advice ("check the id came from a tool response verbatim") is wrong
+# here, because the handle did come from one, and this tool is the only thing that knows that.
+GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return this message. The handle is well formed, so this is not a "
     + "bad argument. This is not evidence that the message does not exist: Graph answers "
     + "deleted, never existed, and invisible-to-user identically and does not say which. "
@@ -159,6 +158,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     `transport` is the long-lived client from `create_graph_transport`. This tool borrows it per
     call and does not own it; `create_app` closes it on shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -180,12 +181,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        graph_token: str = _TOKEN,
+        ctx: Context,
+        client: GraphServiceClient = graph,
     ) -> TeamsMessage:
         handle = message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        # Use only the permission for this surface. The token was exchanged for both because
-        # the handle is parsed after the exchange happens.
-        with graph_tool_errors(handle.permission, not_found=_UNREADABLE):
-            return await read_message(graph_client_for(transport, graph_token), handle=handle)
+        # Use only the permission for this surface. The token was exchanged for both because the
+        # handle is parsed after the exchange happens — so the mapping, which runs outside this call
+        # and never sees the handle, is told which of the two this read was made under.
+        await narrowed_to(ctx, handle.permission)
+        return await read_message(client, handle=handle)
