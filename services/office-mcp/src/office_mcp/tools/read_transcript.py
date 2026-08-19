@@ -216,8 +216,8 @@ async def _content(client: GraphServiceClient, handle: TranscriptHandle) -> tupl
     that blocks transcripts answers with the same `403`. It has no retry that fixes it. Retrying
     that case would waste a call and report the wrong remedy.
 
-    Each attempt uses its own `graph_errors()` block. The raw SDK error carries no inner code
-    before translation. One block around both attempts would let the first failure pass the
+    Each attempt uses its own `graph_errors(TOOL_NAME)` block. The raw SDK error carries no inner
+    code before translation. One block around both attempts would let the first failure pass the
     `except` clause untranslated.
     """
     endpoint = (
@@ -226,14 +226,14 @@ async def _content(client: GraphServiceClient, handle: TranscriptHandle) -> tupl
         .content
     )
     try:
-        with graph_errors():
+        with graph_errors(TOOL_NAME):
             attributed = await endpoint.get(
                 request_configuration=RequestConfiguration(headers=_accepting(_ATTRIBUTED_FORMAT))
             )
     except GraphForbidden as refusal:
         if refusal.inner_code != _SPEAKER_ATTRIBUTION_REFUSED:
             raise
-        with graph_errors():
+        with graph_errors(TOOL_NAME):
             unattributed = await endpoint.get(
                 request_configuration=RequestConfiguration(headers=_accepting(_UNATTRIBUTED_FORMAT))
             )
