@@ -21,6 +21,11 @@ exchange asked for and is deliberately NOT a `FastMCPError`: `fastmcp.server.dep
 being wrapped is what lets the middleware below recognise it by type. That is what makes an
 unconsented permission as fixable before the Graph call as a 403 is after it.
 
+One instance covers one exchange, however many permissions that exchange asks for, because Entra
+redeems them together and refuses them together: a tool needing two gets one token or none. Naming
+all of them is therefore the same requirement as it is for a 403 — the refusal does not say which
+one was missing.
+
 The Client A Tool Is Handed
 
 `graph_client_for_caller` is the whole of what a tool needs to reach Graph. It is built in
@@ -54,19 +59,7 @@ reaches the client, byte for byte, because it arrives as a type the middleware l
 what lets a tool say something narrower than its declared tuple — `read_message` reads one surface
 under one of the two permissions its token was exchanged for — while the middleware covers the rest.
 
-One instance covers one exchange, however many permissions that exchange asks for, because Entra
-redeems them together and refuses them together: a tool needing two gets one token or none. Naming
-all of them is therefore the same requirement as it is for a 403 — the refusal does not say which
-one was missing.
-
-Models' only options are: retry, retry later, sign in, ask administrator, or stop. Every message
-names one. `Microsoft 365` comes first (not "Graph"—models don't call Graph). Then remedy and
-whether retrying helps. Then operator evidence in parentheses. Graph details only where they explain
-(404 means three things) or operators need their own label (`Graph request id` for support).
-
-TRAP: `GraphForbidden` covers 401 and 403. Only status separates them: 401 means sign in again,
-403 means ask administrator. 403 is only actionable if it names the permission. Graph never does.
-The tool does—every mapping here is scoped to the permissions the failing call used.
+Error Messages
 
 Every message here is written to one shape. The thing that refused comes first and is always
 "Microsoft 365" — not "Microsoft Graph", which is the name of an API the caller is not calling.
