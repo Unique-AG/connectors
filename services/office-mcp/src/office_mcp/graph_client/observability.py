@@ -90,8 +90,8 @@ _pages_scanned = _meter.create_histogram(
     ),
 )
 
-# How `collect_pages` learns which operation it is walking for. Set once, by `graph_errors`, around
-# the block that makes the call; a walk is always inside one, because a walk outside one lets an
+# How `collect_pages` learns which operation it is walking for. Set by `graph_errors` around the
+# block that makes the call; a walk is always inside one, because a walk outside one lets an
 # unclassified SDK error escape to a tool. Threading the name through `collect_pages` as well would
 # be a second argument to keep in agreement with the first, for a value that is already in scope.
 _OPERATION: ContextVar[str | None] = ContextVar("office_mcp_graph_operation", default=None)
@@ -99,7 +99,15 @@ _OPERATION: ContextVar[str | None] = ContextVar("office_mcp_graph_operation", de
 
 @contextmanager
 def graph_operation(operation: str | None) -> Generator[None]:
-    """Name the operation every Graph call inside this block is counted under."""
+    """Name the operation every Graph call inside this block is counted under.
+
+    No name leaves the one already in scope alone rather than clearing it: `graph_errors` blocks do
+    nest — `tools/get_me.py` opens a named one around the unnamed one in `shared/identity.py` — and
+    an inner block saying nothing about the operation must not make a walk inside it uncountable.
+    """
+    if operation is None:
+        yield
+        return
     token = _OPERATION.set(operation)
     try:
         yield
