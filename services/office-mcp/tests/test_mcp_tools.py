@@ -828,16 +828,11 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
         caplog: pytest.LogCaptureFixture,
+        recorded_spans: InMemorySpanExporter,
     ) -> None:
         """A message body is as sensitive as the query that found it, and this tool is the one that
         actually returns message content — so the same rule search is held to holds here, over the
         whole call and both destinations."""
-        exporter = InMemorySpanExporter()
-        provider = trace.get_tracer_provider()
-        if not isinstance(provider, TracerProvider):
-            provider = TracerProvider()
-            trace.set_tracer_provider(provider)
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
         secret = "acquisition-of-northwind-traders"
         payload = {**_MESSAGE, "body": {"contentType": "text", "content": secret}}
         _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=payload))
@@ -848,8 +843,10 @@ class TestCallingThem:
         assert _structured(result)["text"] == secret, "the text has to have been returned"
         for record in caplog.records:
             assert secret not in _record_text(record), f"logged by {record.name}"
-        for span in exporter.get_finished_spans():
-            assert secret not in str(span.attributes)
+        spans = recorded_spans.get_finished_spans()
+        assert spans, "nothing was traced, so the span half of this test asserts over an empty list"
+        for span in spans:
+            assert secret not in str(span.attributes), f"on span {span.name}"
 
     @pytest.mark.usefixtures("obo")
     async def test_a_multi_word_query_reaches_graph_as_words_over_the_real_protocol(
