@@ -7,19 +7,19 @@ credential at rest, and resolving "which MCP subject is this" — and depends on
 the reverse. Keeping the direction one-way is what `tests/test_layering.py` asserts.
 """
 
-from dataclasses import dataclass
-from typing import Protocol
+from typing import ClassVar, Protocol
 
-from pydantic import SecretStr
+from pydantic import BaseModel, ConfigDict, SecretStr
 
 
-@dataclass(frozen=True)
-class BackstopCredentialSecret:
+class BackstopCredentialSecret(BaseModel):
     """A user's Backstop username + personal API token, decrypted and held in memory only.
 
     `api_token` is a `SecretStr` so an accidental `logger.info(credential)` (or any repr/str
     conversion) prints `**********` instead of the token — call `.get_secret_value()` to use it.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     username: str
     api_token: SecretStr

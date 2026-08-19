@@ -203,7 +203,11 @@ async def get_person(
         schema=BackstopApiResourceDocument[PersonRecordResponse],
     )
     attributes = document.require_data(path=path).attributes
-    index = get_employment_index_factory().index(**entity_relationships(document))
+    loaded = entity_relationships(document)
+    index = get_employment_index_factory().index(
+        relationships=loaded.relationships,
+        relationship_types=loaded.relationship_types,
+    )
 
     return PersonResolvedResponse(
         person=attributes,

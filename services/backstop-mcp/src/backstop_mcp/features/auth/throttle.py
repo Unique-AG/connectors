@@ -19,9 +19,10 @@ credential-guessing bound, not a hard quota.
 """
 
 import logging
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import ClassVar
 
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -35,9 +36,10 @@ logger = logging.getLogger(__name__)
 MAX_USERNAME_LENGTH = 320
 
 
-@dataclass(frozen=True)
-class ThrottleConfig:
+class ThrottleConfig(BaseModel):
     """The limit to apply. Derived from `AuthConfig` at the composition root."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     max_attempts: int
     window: timedelta

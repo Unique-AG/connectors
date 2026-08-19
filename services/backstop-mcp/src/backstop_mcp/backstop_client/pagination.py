@@ -47,8 +47,7 @@ def _resource_identity(resource: dict[str, object]) -> tuple[str, str]:
     return (str(resource.get("type", "")), str(resource.get("id", "")))
 
 
-@dataclass
-class SinglePage(Generic[T]):
+class SinglePage[T](BaseModel):
     """One parsed JSON:API page — the primitive both `fetch_page` and `paginate_all` share.
 
     `total_count` is `meta.totalResourceCount` verbatim — untrustworthy on any endpoint where a
@@ -58,8 +57,8 @@ class SinglePage(Generic[T]):
     pagination still works via `page[offset]`.
     """
 
-    items: list[T] = field(default_factory=list)
-    included: list[dict[str, object]] = field(default_factory=list)
+    items: list[T] = Field(default_factory=list)
+    included: list[dict[str, object]] = Field(default_factory=list)
     total_count: int | None = None
     next_path: str | None = None
 
@@ -75,7 +74,8 @@ def parse_page(content: bytes, schema: type[T], *, path: str) -> SinglePage[T]:
     # this GenericAlias key, so a 10k-record walk does not rebuild schemas per page/item.
     page_schema = _Page[schema]
     page = cast(_Page[T], deserialize(content, page_schema, path=path))
-    return SinglePage(
+    # Already validated as `_Page[T]`; `model_construct` skips a second pass over every item.
+    return SinglePage[T].model_construct(
         items=page.data,
         included=page.included,
         total_count=page.meta.total_resource_count if page.meta is not None else None,
@@ -83,16 +83,15 @@ def parse_page(content: bytes, schema: type[T], *, path: str) -> SinglePage[T]:
     )
 
 
-@dataclass
-class PageResult(Generic[T]):
+class PageResult[T](BaseModel):
     """Accumulated result of reading every page of a JSON:API collection.
 
     `included` holds the side-loaded resources from every page, deduplicated by
     (`type`, `id`) — JSON:API repeats an included resource on each page that references it.
     """
 
-    items: list[T] = field(default_factory=list)
-    included: list[dict[str, object]] = field(default_factory=list)
+    items: list[T] = Field(default_factory=list)
+    included: list[dict[str, object]] = Field(default_factory=list)
     total_count: int | None = None
     truncated: bool = False
 
@@ -161,7 +160,7 @@ async def paginate_all(
     that size and the callback must send it as the limit; Backstop rejects an offset that is not
     a multiple of the limit on the wire.
     """
-    accumulator: _Accumulator[T] = _Accumulator(PageResult())
+    accumulator: _Accumulator[T] = _Accumulator(PageResult[T].model_construct())
     first = parse_page(
         (await fetch_page(first_path, first_page_params)).content, schema, path=first_path
     )

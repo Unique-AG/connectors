@@ -1,15 +1,15 @@
 """Wall-clock duration gate for freshness / cooldown / refresh-floor checks."""
 
-from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
+from pydantic import BaseModel, Field
 
-@dataclass
-class TimedGate:
+
+class TimedGate(BaseModel):
     """Tracks whether a stamped instant is still within a fixed duration."""
 
     duration: timedelta
-    marked_at: datetime | None = field(default=None, repr=False)
+    marked_at: datetime | None = Field(default=None, repr=False)
 
     def within(self) -> bool:
         if self.marked_at is None:
