@@ -4,6 +4,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstr
 
 from backstop_mcp.backstop_client import ResourceRef
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.lenient import LenientBool, LenientFloat
 
 __all__ = [
     "AccountAttributes",
@@ -68,11 +69,11 @@ class AccountAttributes(BaseModel):
     investor_qualification: InvestorQualificationAttributes | None = Field(
         default=None, alias="investorQualification"
     )
-    is_employee_account: bool | None = Field(default=None, alias="isEmployeeAccount")
-    is_gp_account: bool | None = Field(default=None, alias="isGpAccount")
-    aml_check_complete: bool | None = Field(default=None, alias="amlCheckComplete")
+    is_employee_account: LenientBool = Field(default=None, alias="isEmployeeAccount")
+    is_gp_account: LenientBool = Field(default=None, alias="isGpAccount")
+    aml_check_complete: LenientBool = Field(default=None, alias="amlCheckComplete")
     new_issue_eligible: _StrippedStr | None = Field(default=None, alias="newIssueEligible")
-    us_domiciled: bool | None = Field(default=None, alias="usDomiciled")
+    us_domiciled: LenientBool = Field(default=None, alias="usDomiciled")
 
 
 class OwnerAttributes(BaseModel):
@@ -105,5 +106,5 @@ class SeriesPointAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     date: LenientDate = None
-    value: float | None = None
+    value: LenientFloat = None
     value_status: _CleanStr = Field(default=None, alias="valueStatus")

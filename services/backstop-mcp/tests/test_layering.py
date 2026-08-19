@@ -42,7 +42,10 @@
 5. **Feature model layers flow downward.** A `*Attributes` class lives in `api_responses*`, a
    `*Dto` class in `internal_dto*`, and a `*Response` class in `responses*`. Imports among those
    three modules run one way only (`responses` → `internal_dto` → `api_responses`) within a
-   feature. No governed model declares `extra="forbid"`. `features/includes/` is exempt: its
+   feature. No model declares `extra="forbid"`. `*Attributes` declare `extra="ignore"`;
+   `extra="allow"` is only where passthrough is the point (`PersonRecordResponse`,
+   `OrganizationRecordResponse`, `SystemInfoResponse`). `features/includes/` is exempt from
+   the layer filenames: its
    projection models intentionally combine camelCase aliases with FastMCP descriptions, so the
    response class *is* the wire shape. `features/resolution.py` is cross-cutting rather than
    per-feature and keeps its filename.
@@ -290,6 +293,48 @@ def _extra_forbid_violations(source: str, path: pathlib.Path) -> list[str]:
     ]
 
 
+def _model_config_value(stmt: ast.stmt) -> ast.expr | None:
+    if (
+        isinstance(stmt, ast.AnnAssign)
+        and isinstance(stmt.target, ast.Name)
+        and stmt.target.id == "model_config"
+    ):
+        return stmt.value
+    if isinstance(stmt, ast.Assign) and any(
+        isinstance(target, ast.Name) and target.id == "model_config" for target in stmt.targets
+    ):
+        return stmt.value
+    return None
+
+
+def _config_extra(node: ast.ClassDef) -> str | None:
+    for stmt in node.body:
+        value = _model_config_value(stmt)
+        if isinstance(value, ast.Call):
+            for keyword in value.keywords:
+                if (
+                    keyword.arg == "extra"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ):
+                    return keyword.value.value
+    return None
+
+
+def _attributes_extra_violations(source: str, path: pathlib.Path) -> list[str]:
+    tree = ast.parse(source, filename=str(path))
+    return [
+        (
+            f"{path.relative_to(_SRC)}:{node.lineno} class {node.name} declares "
+            + f'extra={extra!r}, expected "ignore"'
+        )
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        and node.name.endswith("Attributes")
+        and (extra := _config_extra(node)) != "ignore"
+    ]
+
+
 def _governed_model_sources() -> list[pathlib.Path]:
     return sorted(source for source in _FEATURES.rglob("*.py") if _is_governed_model_source(source))
 
@@ -431,6 +476,30 @@ class TestTheDetectionItself:
             _FEATURES / "accounts" / "api_responses.py",
         )
 
+    def test_catches_attributes_class_missing_extra_ignore(self) -> None:
+        assert _attributes_extra_violations(
+            "class PartyAttributes:\n    model_config = ConfigDict(extra='allow')\n",
+            _FEATURES / "party_resolver" / "api_responses.py",
+        ) == [
+            "features/party_resolver/api_responses.py:1 class PartyAttributes declares "
+            + "extra='allow', expected \"ignore\""
+        ]
+
+    def test_catches_attributes_class_with_no_extra(self) -> None:
+        assert _attributes_extra_violations(
+            "class PartyAttributes:\n    pass\n",
+            _FEATURES / "party_resolver" / "api_responses.py",
+        ) == [
+            "features/party_resolver/api_responses.py:1 class PartyAttributes declares "
+            + 'extra=None, expected "ignore"'
+        ]
+
+    def test_accepts_attributes_class_with_extra_ignore(self) -> None:
+        assert not _attributes_extra_violations(
+            'class PartyAttributes:\n    model_config = ConfigDict(extra="ignore")\n',
+            _FEATURES / "party_resolver" / "api_responses.py",
+        )
+
 
 class TestFeaturesDoNotImportServer:
     def test_the_feature_tree_is_actually_there(self) -> None:
@@ -549,9 +618,16 @@ class TestFeatureModelLayers:
             + "\n  ".join(violations)
         )
 
-    @pytest.mark.parametrize("source", _governed_model_layer_sources(), ids=_source_id)
+    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
     def test_no_model_declares_extra_forbid(self, source: pathlib.Path) -> None:
         violations = _extra_forbid_violations(source.read_text(), source)
-        assert not violations, 'no governed model may declare extra="forbid":\n  ' + "\n  ".join(
-            violations
+        assert not violations, 'no model may declare extra="forbid":\n  ' + "\n  ".join(violations)
+
+    @pytest.mark.parametrize("source", _governed_model_layer_sources(), ids=_source_id)
+    def test_attributes_declare_extra_ignore(self, source: pathlib.Path) -> None:
+        violations = _attributes_extra_violations(source.read_text(), source)
+        assert not violations, (
+            '*Attributes default to extra="ignore"; extra="allow" is only for passthrough '
+            + "responses:\n  "
+            + "\n  ".join(violations)
         )

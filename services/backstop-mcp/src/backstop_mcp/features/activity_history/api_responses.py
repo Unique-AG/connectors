@@ -1,9 +1,9 @@
-from datetime import datetime
 from typing import ClassVar
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from backstop_mcp.dates import LenientDate
+from backstop_mcp.dates import LenientDate, LenientDatetime
+from backstop_mcp.lenient import LenientBool
 
 __all__ = [
     "ActivityAttributes",
@@ -37,10 +37,10 @@ class ActivityAttributes(BaseModel):
     specific_resource: SpecificResourceAttributes | None = Field(
         default=None, validation_alias=AliasChoices("specificResource", "specific_resource")
     )
-    created_timestamp: datetime | None = Field(
+    created_timestamp: LenientDatetime = Field(
         default=None, validation_alias=AliasChoices("createdTimestamp", "created_timestamp")
     )
-    modified_timestamp: datetime | None = Field(
+    modified_timestamp: LenientDatetime = Field(
         default=None, validation_alias=AliasChoices("modifiedTimestamp", "modified_timestamp")
     )
 
@@ -49,19 +49,21 @@ class EmailAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     subject: str | None = None
-    sent_timestamp: datetime | None = Field(
+    sent_timestamp: LenientDatetime = Field(
         default=None, validation_alias=AliasChoices("sentTimestamp", "sent_timestamp")
     )
     from_email: str | None = Field(
         default=None, validation_alias=AliasChoices("fromEmail", "from_email")
     )
     to_emails: list[str] = Field(
-        default_factory=list, validation_alias=AliasChoices("toEmails", "to_emails")
+        default_factory=list,
+        validation_alias=AliasChoices("toEmails", "to_emails"),
     )
     cc_emails: list[str] = Field(
-        default_factory=list, validation_alias=AliasChoices("ccEmails", "cc_emails")
+        default_factory=list,
+        validation_alias=AliasChoices("ccEmails", "cc_emails"),
     )
-    has_attachments: bool | None = Field(
+    has_attachments: LenientBool = Field(
         default=None, validation_alias=AliasChoices("hasAttachments", "has_attachments")
     )
     content_url: str | None = Field(
@@ -80,8 +82,8 @@ class ActivityDetailAttributes(BaseModel):
 class MeetingSpecificAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    start: datetime | None = Field(default=None, validation_alias="startTimestamp")
-    stop: datetime | None = Field(default=None, validation_alias="stopTimestamp")
+    start: LenientDatetime = Field(default=None, validation_alias="startTimestamp")
+    stop: LenientDatetime = Field(default=None, validation_alias="stopTimestamp")
     location: str | None = None
     time_zone: str | None = Field(default=None, validation_alias="timeZone")
 

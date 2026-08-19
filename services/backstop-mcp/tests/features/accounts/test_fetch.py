@@ -176,12 +176,26 @@ class TestFetchAccountsForProduct:
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_page(
                 _account("ok", name="Keep"),
-                _account("bad", name="Drop", isEmployeeAccount="not-a-bool"),
+                {"type": "accounts", "attributes": {"name": "Drop"}},
             )
         )
 
         with pytest.raises(BackstopResponseSchemaError):
             await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_non_bool_flag_is_absence_not_a_failed_page(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(_account("ok", name="Keep", isEmployeeAccount="not-a-bool"))
+        )
+
+        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+
+        assert [account.id for account in listing.accounts] == ["ok"]
+        assert listing.accounts[0].is_employee_account is None
 
 
 class TestFetchAccountsForParty:

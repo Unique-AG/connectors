@@ -22,70 +22,76 @@ BackstopActivityType = Literal["meeting", "call", "note", "document"]
 class ActivityItemDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, populate_by_name=True)
 
+    # A row with no id is not a record: timeline handles and detail fetches key on it.
     id: str
+    # Without the stream the row cannot be typed or routed onto the right collection.
     stream: BackstopActivityType
-    title: str | None
-    description: str | None
-    effective_date: date | None
+    title: str | None = None
+    description: str | None = None
+    effective_date: date | None = None
     resource_type: str | None = Field(
         default=None, validation_alias=AliasPath("specific_resource", "resource_type")
     )
     resource_id: str | None = Field(
         default=None, validation_alias=AliasPath("specific_resource", "resource_id")
     )
-    created_timestamp: datetime | None
-    modified_timestamp: datetime | None
+    created_timestamp: datetime | None = None
+    modified_timestamp: datetime | None = None
 
 
 class EmailItemDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
+    # A row with no id is not a record: timeline handles key on it.
     id: str
-    subject: str | None
-    sent_timestamp: datetime | None
-    from_email: str | None
-    to_emails: tuple[str, ...]
-    cc_emails: tuple[str, ...]
-    has_attachments: bool | None
-    content_url: str | None
+    subject: str | None = None
+    sent_timestamp: datetime | None = None
+    from_email: str | None = None
+    to_emails: tuple[str, ...] = ()
+    cc_emails: tuple[str, ...] = ()
+    has_attachments: bool | None = None
+    content_url: str | None = None
 
 
 class ActivityPageDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    items: tuple[ActivityItemDto, ...]
+    items: tuple[ActivityItemDto, ...] = ()
+    # Without this, a short page and a full page are indistinguishable.
     end_of_stream: bool
 
 
 class EmailPageDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    items: tuple[EmailItemDto, ...]
+    items: tuple[EmailItemDto, ...] = ()
+    # Without this, a short page and a full page are indistinguishable.
     end_of_stream: bool
 
 
 class ActivityDetailDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
+    # Without a resource id the detail cannot be keyed back to the handle that fetched it.
     resource_id: str
-    type: str | None
-    title: str | None
-    description: str | None
+    type: str | None = None
+    title: str | None = None
+    description: str | None = None
 
 
 class MeetingSpecificsDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    start: datetime | None
-    stop: datetime | None
-    location: str | None
-    time_zone: str | None
+    start: datetime | None = None
+    stop: datetime | None = None
+    location: str | None = None
+    time_zone: str | None = None
 
 
 class AttendeeDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    name: str | None
+    name: str | None = None
 
 
 class DateRangeDto(BaseModel):
