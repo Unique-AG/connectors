@@ -15,7 +15,7 @@ from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_client_for
+from office_mcp.graph_client import graph_client_for, graph_errors
 from office_mcp.shared import identity
 from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
 
@@ -72,8 +72,16 @@ class SignedInUser(BaseModel):
 
 
 async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
-    """Return the caller's profile with the five properties this tool promises."""
-    return _profile(await identity.signed_in_user(client))
+    """Return the caller's profile with the five properties this tool promises.
+
+    The `graph_errors` block here does nothing about failures — `shared/identity.py` opens its own
+    and classifies them — and everything about naming them: `operation` is the tool's own name, and
+    a tool file is the only thing that knows it. Every other tool opens its named block at its own
+    Graph call; this one's Graph call is in `shared/`, so the block comes out one level up rather
+    than the name going one level down.
+    """
+    with graph_errors(TOOL_NAME):
+        return _profile(await identity.signed_in_user(client))
 
 
 def _profile(user: User) -> SignedInUser:
