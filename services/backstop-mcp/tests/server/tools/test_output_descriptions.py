@@ -71,6 +71,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "ActivityDetailResponse",
         "ActivityRecordResponse",
         "AsOf",
+        "AccountRowResponse",
         "ContactEmailResponse",
         "CustomFieldDefinition",
         "EmailRecordResponse",
@@ -78,6 +79,8 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "OpportunityResponse",
         "PartyCandidateResponse",
         "PersonResolvedResponse",
+        "PositionRowResponse",
+        "ProductPositionsResolvedResponse",
         "ResolvedPartyResponse",
     } <= names
 

@@ -1,21 +1,22 @@
 """`get_activity_detail`: full converted body, meeting specifics, and attendees for one activity.
 
-`activity_id` alone is a complete, self-sufficient handle — no party resolution needed. Fetches
-`entity-activity-details/{activity_id}` and, when `activity_id` looks like a meeting/call (the
-`meeting-or-calls_` prefix — the only shape that ever carries attendees on this instance),
-`/meeting-or-calls/{resourceId}/attendees` CONCURRENTLY via `asyncio.gather`, mirroring
-`get_activity_history`'s stream fan-out rather than gating the attendees fetch on the details
-response. The attendees path uses the bare resource id (prefix stripped), not the polymorphic
-timeline id.
+`activity_id` alone is a complete, self-sufficient handle — no party resolution needed. It is the
+composite `{resourceType}_{resourceId}` a timeline record carries, so decoding it yields both the
+bare resource id every detail endpoint wants and the resource type that says which endpoints
+apply (see `activity_handle.py`).
 
-Caveat: the wire field names this depends on for `entity-activity-details`'s meeting specifics
-and the attendees shape were not byte-verified against a live Backstop instance the way this
-feature's other endpoints were — see `fetch_activity_detail.py`'s module docstring for exactly
-which spellings are guesses. A wrong guess degrades to `None`/empty rather than crashing.
+For a meeting/call all three fetches — the detail record, the meeting specifics, and the
+attendees — run CONCURRENTLY via `asyncio.gather`, mirroring `get_activity_history`'s stream
+fan-out rather than gating the two `/meeting-or-calls` calls on the detail response. A note or
+document is one request: both `/meeting-or-calls` paths 404 for a resource id that is not a
+meeting/call.
 
-A 404 from Backstop (an invented or stale `activity_id`) propagates as `BackstopApiError` — no
-bespoke not-found response, matching `get_person`/`get_activity_history`'s convention that
-`activity_id` must only ever be a value the caller got from a prior timeline response.
+A stale or invented `activity_id` raises rather than returning a bespoke not-found response,
+matching `get_person`/`get_activity_history`'s convention that it must only ever be a value the
+caller got from a prior timeline response. A handle that is not `{resourceType}_{resourceId}` at
+all fails locally as a `ToolError`; one that is well-formed but unknown becomes a 404
+`BackstopApiError` (`/entity-activity-details` answers 200 with null primary data for those, which
+`BackstopApiResourceDocument.require_data` converts).
 """
 
 import asyncio
@@ -28,12 +29,11 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.features.activity_history import (
-    ActivityDetail,
     ActivityDetailResponse,
-    Attendee,
     fetch_activity_detail,
     fetch_attendees,
-    is_meeting_or_call,
+    fetch_meeting_specifics,
+    parse_activity_handle,
     to_activity_detail_response,
 )
 from backstop_mcp.models import published_output_schema
@@ -74,24 +74,30 @@ async def get_activity_detail(
     """
     _ = ctx
     client = await get_backstop_client()
-    detail: ActivityDetail
-    attendees: tuple[Attendee, ...]
-    fetch_attendees_for = is_meeting_or_call(activity_id)
+    handle = parse_activity_handle(activity_id)
+    resource_id = handle.resource_id
     logger.info(
         "activity_history.detail.get.start",
-        extra={"activity_id": activity_id, "fetch_attendees": fetch_attendees_for},
+        extra={
+            "activity_id": activity_id,
+            "resource_type": handle.resource_type,
+            "resource_id": resource_id,
+            "meeting_or_call": handle.is_meeting_or_call,
+        },
     )
-    if fetch_attendees_for:
-        detail, attendees = await asyncio.gather(
-            fetch_activity_detail(client, activity_id=activity_id),
-            fetch_attendees(client, activity_id=activity_id),
+    if handle.is_meeting_or_call:
+        detail, specifics, attendees = await asyncio.gather(
+            fetch_activity_detail(client, resource_id=resource_id),
+            fetch_meeting_specifics(client, resource_id=resource_id),
+            fetch_attendees(client, resource_id=resource_id),
         )
     else:
         logger.debug(
-            "activity_history.detail.get.skip_attendees",
-            extra={"activity_id": activity_id},
+            "activity_history.detail.get.skip_meeting_fetches",
+            extra={"activity_id": activity_id, "resource_type": handle.resource_type},
         )
-        detail = await fetch_activity_detail(client, activity_id=activity_id)
+        detail = await fetch_activity_detail(client, resource_id=resource_id)
+        specifics = None
         attendees = ()
 
     logger.info(
@@ -103,4 +109,6 @@ async def get_activity_detail(
             "has_body": detail.description is not None,
         },
     )
-    return to_activity_detail_response(detail, attendees)
+    return to_activity_detail_response(
+        activity_id=activity_id, detail=detail, specifics=specifics, attendees=attendees
+    )

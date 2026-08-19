@@ -23,7 +23,7 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig
 from tests.helpers import BASE_URL as _BASE_URL
-from tests.helpers import client_factory, credential
+from tests.helpers import client_factory, credential, recorded_params
 
 _BASIC_AUTH = "Basic " + base64.b64encode(b"bob.smith:p@55W0rd321!").decode()
 
@@ -463,6 +463,116 @@ class TestPaginate:
             total_count=None,
             truncated=False,
         )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_parallel_requests_later_pages_by_offset_under_the_gate(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        """`parallel=True` carries the caller's params onto every offset, not just page one."""
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "1"}, {"id": "2"}],
+                        "meta": {"totalResourceCount": 5},
+                    },
+                ),
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "3"}, {"id": "4"}],
+                        "meta": {"totalResourceCount": 5},
+                    },
+                ),
+                httpx.Response(
+                    200, json={"data": [{"id": "5"}], "meta": {"totalResourceCount": 5}}
+                ),
+            ]
+        )
+
+        result = await factory.for_credential(_credential()).paginate(
+            "/records",
+            schema=_Record,
+            params={"fields": "name"},
+            page_size=2,
+            max_records=None,
+            parallel=True,
+        )
+
+        assert [record.id for record in result.items] == ["1", "2", "3", "4", "5"]
+        requested = recorded_params(route)
+        assert sorted(params["page[offset]"] for params in requested) == ["0", "2", "4"]
+        assert {params["fields"] for params in requested} == {"name"}
+        assert {params["page[limit]"] for params in requested} == {"2"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_parallel_rewrites_limit_to_the_capped_page_size(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        """A capped first page must not keep the originally requested limit on later offsets."""
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "1"}, {"id": "2"}],
+                        "meta": {"totalResourceCount": 5},
+                    },
+                ),
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "3"}, {"id": "4"}],
+                        "meta": {"totalResourceCount": 5},
+                    },
+                ),
+                httpx.Response(
+                    200, json={"data": [{"id": "5"}], "meta": {"totalResourceCount": 5}}
+                ),
+            ]
+        )
+
+        result = await factory.for_credential(_credential()).paginate(
+            "/records",
+            schema=_Record,
+            page_size=10,
+            max_records=None,
+            parallel=True,
+        )
+
+        assert [record.id for record in result.items] == ["1", "2", "3", "4", "5"]
+        requested = recorded_params(route)
+        assert requested[0]["page[limit]"] == "10"
+        assert sorted(params["page[offset]"] for params in requested) == ["0", "2", "4"]
+        assert {params["page[limit]"] for params in requested[1:]} == {"2"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_paginate_is_serial_by_default(self, factory: BackstopClientFactory) -> None:
+        """A true total is not enough on its own — the fan-out has to be asked for."""
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "1"}],
+                        "meta": {"totalResourceCount": 2},
+                        "links": {"next": "/records?page[offset]=1"},
+                    },
+                ),
+                httpx.Response(200, json={"data": [{"id": "2"}], "links": {"next": None}}),
+            ]
+        )
+
+        result = await factory.for_credential(_credential()).paginate(
+            "/records", schema=_Record, page_size=1, max_records=None
+        )
+
+        assert [record.id for record in result.items] == ["1", "2"]
+        assert recorded_params(route)[1]["page[offset]"] == "1"
 
     @pytest.mark.asyncio
     @respx.mock

@@ -24,7 +24,7 @@ The policy itself:
 import logging
 from collections import Counter
 from collections.abc import Callable, Sequence
-from typing import Annotated, ClassVar, Literal, Protocol, cast
+from typing import Annotated, Any, ClassVar, Literal, Protocol, cast
 
 from fastmcp import Context
 from fastmcp.server.elicitation import AcceptedElicitation
@@ -271,7 +271,7 @@ class CandidateResponse(BaseModel):
     key: str = Field(
         description=(
             "Stable identity for this candidate. Echo it only as part of picking this option "
-            "— it is not a Backstop party id."
+            "— it is not a Backstop record id."
         )
     )
     label: str = Field(description="What to show the user when asking which record they meant.")
@@ -290,13 +290,16 @@ class AmbiguousResponse[CandidateT: CandidateResponse](BaseModel):
     )
     query: str = Field(description="The search text that produced these candidates.")
     scope: str = Field(
-        description=("Collection the query was resolved against, e.g. 'organizations' or 'people'.")
+        description=(
+            "Collection the query was resolved against, e.g. 'organizations', 'people', "
+            "or 'products'."
+        )
     )
     candidates: list[CandidateT] = Field(
         default_factory=list,
         description=(
             "The matching records. Show `label` to the user, then retry with that candidate's "
-            "`id` and `search_type` — never invent an id."
+            "`id` (and `search_type` when the candidate has one) — never invent an id."
         ),
     )
 
@@ -310,7 +313,10 @@ class NotFoundResponse(BaseModel):
     )
     query: str = Field(description="The search text that matched nothing.")
     scope: str = Field(
-        description=("Collection the query was resolved against, e.g. 'organizations' or 'people'.")
+        description=(
+            "Collection the query was resolved against, e.g. 'organizations', 'people', "
+            "or 'products'."
+        )
     )
 
 
@@ -358,16 +364,24 @@ type ToCandidateResponse[T, CandidateT] = Callable[[Candidate[T]], CandidateT]
 type ToResolvedResponse[T, ResolvedT] = Callable[[T], ResolvedT]
 
 
-def unresolved_response[T, CandidateT: CandidateResponse](
+def unresolved_response[
+    T,
+    CandidateT: CandidateResponse,
+    AmbiguousT: AmbiguousResponse[Any],
+](
     result: Unresolved[T],
     *,
-    ambiguous_model: type[AmbiguousResponse[CandidateT]],
+    ambiguous_model: type[AmbiguousT],
     to_candidate: ToCandidateResponse[T, CandidateT],
-) -> AmbiguousResponse[CandidateT] | NotFoundResponse:
+) -> AmbiguousT | NotFoundResponse:
     """Convert a non-`Resolved` outcome into this subsystem's standard tool response.
 
     Callers short-circuit on this before doing any tool-specific fetch: there is nothing left
     to look up until the caller either picks a candidate or narrows the query.
+
+    Generic over the ambiguous model itself, not just its candidate type, so a subsystem that
+    subclasses `AmbiguousResponse` to reword its schema (`ProductAmbiguousResponse`) gets that
+    subclass back rather than the base.
     """
     if isinstance(result, NotFound):
         return NotFoundResponse(query=result.query, scope=result.scope)

@@ -15,7 +15,11 @@ from typing import ClassVar
 
 from pydantic import ConfigDict, Field
 
-from backstop_mcp.features.activity_history.fetch_activity_detail import ActivityDetail, Attendee
+from backstop_mcp.features.activity_history.fetch_activity_detail import (
+    ActivityDetail,
+    Attendee,
+    MeetingSpecifics,
+)
 from backstop_mcp.features.activity_history.gist_from_html import to_gist
 from backstop_mcp.models import OmitNoneModel
 
@@ -40,9 +44,11 @@ class AttendeeResponse(OmitNoneModel):
 class ActivityDetailResponse(OmitNoneModel):
     """`get_activity_detail`'s payload: full body plus meeting specifics and attendees.
 
-    `type`/`start`/`stop`/`location`/`time_zone` and `attendees` are populated only when
-    `entity-activity-details` actually returns them — naturally `None`/empty for a note or
-    document, never special-cased by `type` here (see `fetch_activity_detail.py`).
+    `type`, `title` and `body` come from `entity-activity-details`; `start`/`stop`/`location`/
+    `time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is only
+    fetched for a meeting-or-calls handle (it 404s for a note or document — see
+    `fetch_activity_detail.py`). They are therefore absent for a note or document because nobody
+    asked, not because Backstop returned nothing.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
@@ -88,14 +94,24 @@ class ActivityDetailResponse(OmitNoneModel):
 
 
 def to_activity_detail_response(
-    detail: ActivityDetail, attendees: tuple[Attendee, ...]
+    *,
+    activity_id: str,
+    detail: ActivityDetail,
+    specifics: MeetingSpecifics | None,
+    attendees: tuple[Attendee, ...],
 ) -> ActivityDetailResponse:
-    """Convert the fetched detail plus attendees to the tool's wire shape. Pure: no HTTP."""
+    """Convert the fetched parts to the tool's wire shape. Pure: no HTTP.
+
+    `activity_id` is echoed from the caller's composite handle rather than rebuilt from
+    `detail.resource_id`, so what comes back is byte-identical to what went in — and stays a
+    handle the model can pass straight back to this tool.
+    """
     gist = to_gist(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
     return ActivityDetailResponse.model_validate(
         {
-            **detail.model_dump(exclude={"id", "description"}),
-            "activity_id": detail.id,
+            **detail.model_dump(exclude={"resource_id", "description"}),
+            **(specifics.model_dump() if specifics is not None else {}),
+            "activity_id": activity_id,
             "body": gist.text,
             "attendees": attendees,
         }

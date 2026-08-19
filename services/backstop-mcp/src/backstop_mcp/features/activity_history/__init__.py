@@ -18,10 +18,11 @@ fetch order — no client-side re-sort. See `group.py`.
 shape of one fetched item and the pure conversion into it. `ActivityHistoryResolvedResponse`/
 `GetActivityHistoryResponse`: the top-level tool response union. See `responses.py`.
 
-`fetch_activity_detail`/`fetch_attendees`/`is_meeting_or_call`: the `get_activity_detail` fetch
-primitive — one activity's full `entity-activity-details` record plus its (conditional)
-attendees. See `fetch_activity_detail.py`'s module docstring for the wire field names guessed
-there, not byte-verified against a live instance the way the rest of this feature was.
+`fetch_activity_detail`/`fetch_meeting_specifics`/`fetch_attendees`: the `get_activity_detail`
+fetch primitive — one activity's full `entity-activity-details` record plus, for a
+meeting-or-calls handle, timings and attendees. `parse_activity_handle` splits the timeline
+`activity_id` into `{resource_type, resource_id}`; `ActivityHandle.is_meeting_or_call` gates
+the two `/meeting-or-calls` fetches. See `fetch_activity_detail.py` and `activity_handle.py`.
 `ActivityDetailResponse`/`AttendeeResponse`/`to_activity_detail_response`: that tool's wire shape
 and the pure conversion into it. See `activity_detail_responses.py`.
 
@@ -35,6 +36,10 @@ from backstop_mcp.features.activity_history.activity_detail_responses import (
     ActivityDetailResponse,
     AttendeeResponse,
     to_activity_detail_response,
+)
+from backstop_mcp.features.activity_history.activity_handle import (
+    ActivityHandle,
+    parse_activity_handle,
 )
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityItem,
@@ -51,9 +56,10 @@ from backstop_mcp.features.activity_history.fetch_activities import (
 from backstop_mcp.features.activity_history.fetch_activity_detail import (
     ActivityDetail,
     Attendee,
+    MeetingSpecifics,
     fetch_activity_detail,
     fetch_attendees,
-    is_meeting_or_call,
+    fetch_meeting_specifics,
 )
 from backstop_mcp.features.activity_history.gist_from_html import Gist, to_gist
 from backstop_mcp.features.activity_history.group import group_page
@@ -79,6 +85,7 @@ __all__ = [
     "ActivityDetail",
     "ActivityDetailResponse",
     "ActivityGroup",
+    "ActivityHandle",
     "ActivityHistoryResolvedResponse",
     "ActivityHistorySettings",
     "ActivityItem",
@@ -94,6 +101,7 @@ __all__ = [
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
     "Gist",
+    "MeetingSpecifics",
     "ResolvedPartyAsOfResponse",
     "Segment",
     "TimelineRecord",
@@ -102,8 +110,9 @@ __all__ = [
     "fetch_activities_page_by_type",
     "fetch_attendees",
     "fetch_email_page",
+    "fetch_meeting_specifics",
     "group_page",
-    "is_meeting_or_call",
+    "parse_activity_handle",
     "resolved_party_as_of_response",
     "to_activity_detail_response",
     "to_gist",

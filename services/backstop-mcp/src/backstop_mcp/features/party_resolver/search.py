@@ -142,12 +142,13 @@ async def fetch_party_name(
     Used to honour "every successful resolution echoes the resolved name + Party ID" on the
     trusted-`party_id` path, where no search ran and so no name was ever seen.
     """
+    path = f"/{search_type}/{quote(party_id, safe='')}"
     document = await client.get(
-        f"/{search_type}/{quote(party_id, safe='')}",
+        path,
         params={"fields": "name,firstName,lastName"},
         schema=_PartyResourceDocument,
     )
-    return document.data.attributes.display_name()
+    return document.require_data(path=path).attributes.display_name()
 
 
 def _quick_search_params(

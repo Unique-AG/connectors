@@ -1,17 +1,24 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from backstop_mcp.backstop_client.errors import BackstopApiError
 from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopApiResourceDocument,
+    IncludedResource,
     ResourceRef,
     follow_included,
+    included_resource,
 )
 
 
 class _Attrs(BaseModel):
     name: str
+
+
+class _OptionalAttrs(BaseModel):
+    name: str | None = None
 
 
 # Backstop's inline reference format, field for field as the live instance sends it: this is
@@ -36,9 +43,31 @@ class TestBackstopApiResourceDocument:
         assert isinstance(doc.data.attributes, _Attrs)
         assert doc.data.attributes.name == "Acme"
 
-    def test_rejects_null_data(self) -> None:
-        with pytest.raises(ValidationError):
-            BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+    def test_accepts_null_data_so_a_missing_record_is_not_a_schema_error(self) -> None:
+        """`/entity-activity-details/{unknown}` answers `200 {"data": null}` rather than 404.
+
+        Modelling `data` as required turned that into a `BackstopResponseSchemaError` reading
+        like a broken schema instead of a missing record.
+        """
+        doc = BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+
+        assert doc.data is None
+
+    def test_require_data_turns_null_primary_data_into_a_404(self) -> None:
+        doc = BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
+
+        with pytest.raises(BackstopApiError) as exc_info:
+            doc.require_data(path="/entity-activity-details/999")
+
+        assert exc_info.value.status_code == 404
+        assert "/entity-activity-details/999" in str(exc_info.value)
+
+    def test_require_data_returns_the_resource_when_present(self) -> None:
+        doc = BackstopApiResourceDocument[_Attrs].model_validate(
+            {"data": {"id": "1", "type": "party", "attributes": {"name": "Acme"}}}
+        )
+
+        assert doc.require_data(path="/party/1").id == "1"
 
     def test_rejects_a_collection(self) -> None:
         with pytest.raises(ValidationError):
@@ -215,3 +244,60 @@ class TestResourceRef:
     def test_a_blank_id_is_rejected_like_a_missing_one(self) -> None:
         with pytest.raises(ValidationError):
             ResourceRef.model_validate({**_STAGE_REF, "resourceId": "  "})
+
+
+class TestIncludedResource:
+    """Reading one entry of an `included` array — what `follow_included` hands back."""
+
+    def test_keeps_the_identity_alongside_the_parsed_attributes(self) -> None:
+        entry = included_resource(
+            {"id": "42", "type": "products", "attributes": {"name": "Acme"}},
+            schema=IncludedResource[_Attrs],
+        )
+
+        assert entry is not None
+        assert (entry.id, entry.type, entry.attributes.name) == ("42", "products", "Acme")
+
+    def test_null_relationships_does_not_reject_the_entry(self) -> None:
+        """`BackstopApiResource` declares `relationships`, so a wire null fails it — not here."""
+        entry = included_resource(
+            {"id": "42", "type": "products", "attributes": {"name": "Acme"}, "relationships": None},
+            schema=IncludedResource[_Attrs],
+        )
+
+        assert entry is not None
+
+    def test_nothing_to_read_is_none_rather_than_a_branch_at_the_call_site(self) -> None:
+        assert included_resource(None, schema=IncludedResource[_Attrs]) is None
+
+    def test_an_entry_that_does_not_validate_is_dropped_on_its_own(self) -> None:
+        assert (
+            included_resource({"id": "42", "type": "products"}, schema=IncludedResource[_Attrs])
+            is None
+        )
+
+    def test_a_blank_id_is_dropped_like_a_missing_one(self) -> None:
+        assert (
+            included_resource(
+                {"id": "  ", "type": "products", "attributes": {"name": "Acme"}},
+                schema=IncludedResource[_Attrs],
+            )
+            is None
+        )
+
+    def test_absent_attributes_still_yields_the_identity_when_the_schema_allows_it(self) -> None:
+        """JSON:API permits a resource object with no `attributes` — that must not cost the id."""
+        entry = included_resource(
+            {"id": "42", "type": "products"}, schema=IncludedResource[_OptionalAttrs]
+        )
+
+        assert entry is not None
+        assert (entry.id, entry.attributes.name) == ("42", None)
+
+    def test_the_json_api_type_is_optional(self) -> None:
+        entry = included_resource(
+            {"id": "42", "attributes": {"name": "Acme"}}, schema=IncludedResource[_Attrs]
+        )
+
+        assert entry is not None
+        assert entry.type is None

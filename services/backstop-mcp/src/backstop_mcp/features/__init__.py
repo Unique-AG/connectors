@@ -1,11 +1,12 @@
 """Feature implementations: what this connector actually does.
 
 Everything here is domain logic — Backstop credential bridging (`auth`), CRM custom-field
-catalog fetch (`custom_fields`), name-to-record lookup (`party_resolver`), read-response
-provenance and departed-contact detection (`data_hygiene`), a person's or organization's
-interaction record (`activity_history`), a party's pipeline (`opportunities`), the `?include=`
-allowlist and the shapes side-loads project onto (`includes`), the shared entity-type vocabulary
-(`entity_types`), and the resolution algebra party lookup uses (`resolution`).
+catalog fetch (`custom_fields`), name-to-record lookup (`party_resolver`), product index and
+match (`accounts`), read-response provenance and departed-contact detection (`data_hygiene`), a
+person's or organization's interaction record (`activity_history`), a party's pipeline
+(`opportunities`), the `?include=` allowlist and the shapes side-loads project onto
+(`includes`), the shared entity-type vocabulary (`entity_types`), and the resolution algebra
+party lookup uses (`resolution`).
 
 Layering rules, both enforced by `tests/test_layering.py`:
 

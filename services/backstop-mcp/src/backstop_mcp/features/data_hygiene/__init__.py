@@ -26,9 +26,11 @@ from backstop_mcp.features.data_hygiene.types import (
     DepartureSignal,
     EmploymentRules,
     EmploymentStatus,
+    EntityRelationshipAttributes,
     EntityRelationshipInclude,
     EntityRelationshipRef,
     ProvenanceFields,
+    RelationshipTypeAttributes,
     TypeVocabulary,
 )
 
@@ -42,9 +44,11 @@ __all__ = [
     "EmploymentLinkResponse",
     "EmploymentRules",
     "EmploymentStatus",
+    "EntityRelationshipAttributes",
     "EntityRelationshipInclude",
     "EntityRelationshipRef",
     "ProvenanceFields",
+    "RelationshipTypeAttributes",
     "TypeVocabulary",
     "as_of_response",
     "build_employment_index",
