@@ -24,10 +24,10 @@ from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import GraphForbidden, graph_client_for, graph_errors
+from office_mcp.graph_client import GraphForbidden, graph_errors
 from office_mcp.shared.handles import TranscriptHandle, transcript_handle
 from office_mcp.shared.meetings import TRANSCRIPT_PERMISSION
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "read_transcript"
 
@@ -35,8 +35,6 @@ TOOL_NAME = "read_transcript"
 # permissions. `list_meeting_transcripts` also declares it; both tools read the same resource.
 # Named in `shared/meetings.py` to avoid duplication across tool files (rule 4 keeps them apart).
 GRAPH_PERMISSIONS: tuple[str, ...] = (TRANSCRIPT_PERMISSION,)
-
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Max turns per call. Bounds context size; whole transcript fetches either way.
 MAX_TURNS = 500
@@ -89,7 +87,11 @@ _BLANK_SPEAKER = (
 
 # Transcript not deleted by user; ages out with meeting (~60 days after one-off). Say the meeting
 # "expires", not "expired": the policy is what makes it unreadable, not a past event.
-_TRANSCRIPT_UNREADABLE = (
+#
+# Read by `tools/__init__.py` into the advice table `GraphAdviceMiddleware` words a 404 from. Public
+# for that reason: the default advice tells a caller to check the id came from a tool response
+# verbatim, which a handle `list_meeting_transcripts` minted did.
+GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this transcript. The handle is well formed. Most likely the "
     + "meeting expires after about 60 days for a one-off; transcripts age out with it. Call "
     + "list_meeting_transcripts again to see what remains. If not listed there, retrying will not "
@@ -314,6 +316,8 @@ def _seconds(timestamp: str) -> float:
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     """Register this tool against the shared Graph transport."""
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -383,7 +387,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> Transcript:
         handle = transcript_handle(uri)
         if handle is None:
@@ -394,13 +398,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             raise ToolError(_INVERTED_TIME_WINDOW)
         if speaker is not None and not speaker.strip():
             raise ToolError(_BLANK_SPEAKER)
-        with graph_tool_errors(*GRAPH_PERMISSIONS, not_found=_TRANSCRIPT_UNREADABLE):
-            return await read_transcript(
-                graph_client_for(transport, graph_token),
-                handle=handle,
-                offset=offset,
-                limit=limit,
-                from_seconds=from_seconds,
-                to_seconds=to_seconds,
-                speaker=speaker,
-            )
+        return await read_transcript(
+            client,
+            handle=handle,
+            offset=offset,
+            limit=limit,
+            from_seconds=from_seconds,
+            to_seconds=to_seconds,
+            speaker=speaker,
+        )
