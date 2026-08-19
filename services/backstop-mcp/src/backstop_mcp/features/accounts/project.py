@@ -101,17 +101,13 @@ def project_account(
     *,
     included: Sequence[dict[str, object]],
 ) -> AccountRecordDto:
-    return AccountRecordDto.model_validate(
-        {
-            **resource.attributes.model_dump(),
-            "id": resource.id,
-            "owner": account_owner(resource, included=included),
-            "investor_type": project_investor_type(
-                _first_included(included, resource, _INVESTOR_TYPE)
-            ),
-            "product": project_included_product(_first_included(included, resource, _PRODUCT)),
-            "is_open": account_is_open(resource.attributes),
-        }
+    return AccountRecordDto.from_attributes(
+        resource.id,
+        resource.attributes,
+        owner=account_owner(resource, included=included),
+        investor_type=project_investor_type(_first_included(included, resource, _INVESTOR_TYPE)),
+        product=project_included_product(_first_included(included, resource, _PRODUCT)),
+        is_open=account_is_open(resource.attributes),
     )
 
 

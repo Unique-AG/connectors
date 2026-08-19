@@ -425,7 +425,7 @@ class TestResumedCall:
     async def test_rebuilds_person_name_from_first_and_last_on_next_page(
         self, connect_user: ConnectUser
     ) -> None:
-        """Next pages omit ResolvedParty.name; the party GET often has firstName/lastName only."""
+        """Next pages omit ResolvedPartyDto.name; the party GET often has first/last name only."""
         await connect_user("user-ah-5c", "person-gina")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/people/p9").mock(

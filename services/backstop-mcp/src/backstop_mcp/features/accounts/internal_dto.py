@@ -1,11 +1,13 @@
 from datetime import date
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.features.accounts.api_responses import (
+    AccountAttributes,
     InvestorQualificationAttributes,
     ProductAttributes,
+    SeriesPointAttributes,
 )
 from backstop_mcp.features.resolution import Candidate, Resolution
 
@@ -99,6 +101,36 @@ class AccountRecordDto(BaseModel):
     us_domiciled: bool | None = None
     is_open: bool
 
+    @classmethod
+    def from_attributes(
+        cls,
+        account_id: str,
+        attributes: AccountAttributes,
+        *,
+        owner: AccountOwnerDto | None,
+        investor_type: InvestorTypeDto | None,
+        product: ResolvedProductDto | None,
+        is_open: bool,
+    ) -> Self:
+        return cls(
+            id=account_id,
+            name=attributes.name,
+            owner=owner,
+            investor_type=investor_type,
+            product=product,
+            currency=attributes.currency,
+            account_start_date=attributes.account_start_date,
+            closed_date=attributes.closed_date,
+            ownership_type=attributes.ownership_type,
+            investor_qualification=attributes.investor_qualification,
+            is_employee_account=attributes.is_employee_account,
+            is_gp_account=attributes.is_gp_account,
+            aml_check_complete=attributes.aml_check_complete,
+            new_issue_eligible=attributes.new_issue_eligible,
+            us_domiciled=attributes.us_domiciled,
+            is_open=is_open,
+        )
+
 
 class AccountListingDto(BaseModel):
     """Projected accounts after the open/closed split.
@@ -125,6 +157,13 @@ class SeriesPointDto(BaseModel):
     date: date
     value: float | None = None
     value_status: str | None = None
+
+    @classmethod
+    def from_attributes(cls, attributes: SeriesPointAttributes) -> Self | None:
+        point_date = attributes.date
+        if point_date is None:
+            return None
+        return cls(date=point_date, value=attributes.value, value_status=attributes.value_status)
 
 
 class SeriesFigureDto(BaseModel):

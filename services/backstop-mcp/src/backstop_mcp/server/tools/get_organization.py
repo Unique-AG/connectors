@@ -11,7 +11,6 @@ from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
-    extract_as_of,
 )
 from backstop_mcp.features.includes import (
     OrganizationInclude,
@@ -33,7 +32,8 @@ class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
     `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
-    `extract_as_of` can read provenance from the model rather than string keys on a dump.
+    `AsOfResponse.from_attributes` can read provenance from the model rather than string keys
+    on a dump.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
@@ -182,6 +182,6 @@ async def get_organization(
         resolved=ResolvedPartyResponse.from_party(
             party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=extract_as_of(attributes),
+        as_of=AsOfResponse.from_attributes(attributes),
         included=plan.project(document=document) if plan.planned else None,
     )

@@ -17,10 +17,6 @@ from backstop_mcp.features.party_resolver.responses import (
     unresolved_party_response,
 )
 
-ResolvedParty = ResolvedPartyDto
-PartyResolveItem = PartyResolveItemDto
-QuickSearchOptions = QuickSearchOptionsDto
-
 __all__ = [
     "BatchPartyResolution",
     "PartyAmbiguousResponse",

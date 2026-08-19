@@ -20,9 +20,6 @@ from backstop_mcp.features.org_people.responses import (
     PersonAtOrganizationResponse,
 )
 
-OrgPeopleListing = OrgPeopleListingDto
-PersonAtOrganization = PersonAtOrganizationDto
-
 __all__ = [
     "OrgPeopleListingDto",
     "OrgPeopleResolvedResponse",

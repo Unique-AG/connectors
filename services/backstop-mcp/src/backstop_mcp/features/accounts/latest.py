@@ -57,7 +57,4 @@ def _by_date(point: SeriesPointDto) -> date:
 
 
 def _dated_point(resource: SeriesPointResource) -> SeriesPointDto | None:
-    point_date = resource.attributes.date
-    if point_date is None:
-        return None
-    return SeriesPointDto.model_validate({**resource.attributes.model_dump(), "date": point_date})
+    return SeriesPointDto.from_attributes(resource.attributes)

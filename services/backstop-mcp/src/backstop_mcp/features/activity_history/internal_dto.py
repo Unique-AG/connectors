@@ -1,7 +1,12 @@
 from datetime import date, datetime
-from typing import Annotated, ClassVar, Literal, Self
+from typing import ClassVar, Literal, Self
 
-from pydantic import AliasPath, BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict
+
+from backstop_mcp.features.activity_history.api_responses import (
+    ActivityAttributes,
+    EmailAttributes,
+)
 
 __all__ = [
     "ActivityDetailDto",
@@ -10,7 +15,6 @@ __all__ = [
     "ActivityPageDto",
     "AttendeeDto",
     "BackstopActivityType",
-    "DateRangeDto",
     "EmailItemDto",
     "EmailPageDto",
     "MeetingSpecificsDto",
@@ -20,7 +24,7 @@ BackstopActivityType = Literal["meeting", "call", "note", "document"]
 
 
 class ActivityItemDto(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, populate_by_name=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     # A row with no id is not a record: timeline handles and detail fetches key on it.
     id: str
@@ -29,14 +33,30 @@ class ActivityItemDto(BaseModel):
     title: str | None = None
     description: str | None = None
     effective_date: date | None = None
-    resource_type: str | None = Field(
-        default=None, validation_alias=AliasPath("specific_resource", "resource_type")
-    )
-    resource_id: str | None = Field(
-        default=None, validation_alias=AliasPath("specific_resource", "resource_id")
-    )
+    resource_type: str | None = None
+    resource_id: str | None = None
     created_timestamp: datetime | None = None
     modified_timestamp: datetime | None = None
+
+    @classmethod
+    def from_attributes(
+        cls,
+        item_id: str,
+        stream: BackstopActivityType,
+        attributes: ActivityAttributes,
+    ) -> Self:
+        specific = attributes.specific_resource
+        return cls(
+            id=item_id,
+            stream=stream,
+            title=attributes.title,
+            description=attributes.description,
+            effective_date=attributes.effective_date,
+            resource_type=None if specific is None else specific.resource_type,
+            resource_id=None if specific is None else specific.resource_id,
+            created_timestamp=attributes.created_timestamp,
+            modified_timestamp=attributes.modified_timestamp,
+        )
 
 
 class EmailItemDto(BaseModel):
@@ -51,6 +71,19 @@ class EmailItemDto(BaseModel):
     cc_emails: tuple[str, ...] = ()
     has_attachments: bool | None = None
     content_url: str | None = None
+
+    @classmethod
+    def from_attributes(cls, item_id: str, attributes: EmailAttributes) -> Self:
+        return cls(
+            id=item_id,
+            subject=attributes.subject,
+            sent_timestamp=attributes.sent_timestamp,
+            from_email=attributes.from_email,
+            to_emails=tuple(attributes.to_emails),
+            cc_emails=tuple(attributes.cc_emails),
+            has_attachments=attributes.has_attachments,
+            content_url=attributes.content_url,
+        )
 
 
 class ActivityPageDto(BaseModel):
@@ -92,27 +125,6 @@ class AttendeeDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     name: str | None = None
-
-
-class DateRangeDto(BaseModel):
-    """Min/max `occurred_at` among this page's dated items."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    start: Annotated[
-        date,
-        Field(description="Oldest `occurred_at` date among this page's dated items."),
-    ]
-    end: Annotated[
-        date,
-        Field(description="Newest `occurred_at` date among this page's dated items."),
-    ]
-
-    @model_validator(mode="after")
-    def _start_not_after_end(self) -> Self:
-        if self.start > self.end:
-            raise ValueError("date_range.start must not be after date_range.end")
-        return self
 
 
 class ActivityHandleDto(BaseModel):

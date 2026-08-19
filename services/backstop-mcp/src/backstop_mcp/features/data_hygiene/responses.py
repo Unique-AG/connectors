@@ -1,11 +1,12 @@
 """Tool-facing responses for provenance and employment links."""
 
+from collections.abc import Mapping
 from datetime import date
-from typing import ClassVar, Literal, Self
+from typing import ClassVar, Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.features.data_hygiene.api_responses import CleanStr
+from backstop_mcp.features.data_hygiene.api_responses import CleanStr, ProvenanceAttributes
 from backstop_mcp.features.data_hygiene.internal_dto import (
     DepartedEmploymentDto,
     DepartureSignal,
@@ -31,6 +32,23 @@ class AsOfResponse(OmitNoneModel):
         default=None,
         description="Who last saved the record, as Backstop stores it. Omitted when unknown.",
     )
+
+    @classmethod
+    def from_attributes(cls, attributes: ProvenanceAttributes | None) -> Self | None:
+        """Build provenance from `modified_timestamp` / `modified_by` when either is present.
+
+        Returns `None` when both are missing so callers can omit an empty envelope rather than
+        echo `{null, null}`. No verdict is attached — age is left for the user to interpret.
+        """
+        if attributes is None:
+            return None
+        modified_by = _actor_name(attributes.modified_by)
+        if attributes.modified_timestamp is None and modified_by is None:
+            return None
+        return cls(
+            modified_timestamp=attributes.modified_timestamp,
+            modified_by=modified_by,
+        )
 
 
 class DepartedContactResponse(BaseModel):
@@ -124,4 +142,25 @@ class EmploymentLinkResponse(OmitNoneModel):
         description=(
             "Name of the relationship type as this instance labels it, e.g. 'is employee of'."
         ),
+    )
+
+
+def _actor_name(value: object) -> str | None:
+    """The actor as a name, whether Backstop sent a string or an object.
+
+    `AsOfResponse.modified_by` cleans whatever this returns, so blank strings pulled out of a
+    nested actor are absence there rather than a check here.
+    """
+    if isinstance(value, str):
+        return value.strip() or None
+    if not isinstance(value, Mapping):
+        return None
+    actor = cast("Mapping[str, object]", value)
+    return next(
+        (
+            text.strip()
+            for key in ("name", "displayName", "display_name", "id")
+            if isinstance(text := actor.get(key), str) and text.strip()
+        ),
+        None,
     )
