@@ -80,7 +80,7 @@ def _as_fastmcp_delivers_it(failure: BaseException) -> ToolError:
     rather than reached for, so that this file needs no server; that the real chain is this shape is
     pinned end to end in `tests/test_error_mapping.py` and `tests/test_mcp_tools.py`.
     """
-    dependency = RuntimeError(f"Failed to resolve dependency 'graph_token' for {_TOOL}")
+    dependency = RuntimeError(f"Failed to resolve dependency 'client' for {_TOOL}")
     dependency.__cause__ = failure
     delivered = ToolError(f"Error calling tool '{_TOOL}': {dependency}")
     delivered.__cause__ = dependency
@@ -224,8 +224,9 @@ class TestTheRefusalThatHappensBeforeGraph:
     """A permission nobody consented to fails in the On-Behalf-Of exchange, not in Graph.
 
     Same remedy as the 403 above, reached a step earlier — and the step matters, because this one
-    happens while FastMCP is resolving the tool's token dependency, where the default report is
-    "Failed to resolve dependency 'graph_token'". The dependency raises `TokenExchangeFailed`, which
+    happens while FastMCP is resolving the client the tool is handed, where the default report is
+    "Failed to resolve dependency 'client'". The token dependency inside it raises
+    `TokenExchangeFailed`, which
     arrives at the middleware under two wrappers; the assertions are what a model reads at the end
     of that.
     """
@@ -253,7 +254,7 @@ class TestTheRefusalThatHappensBeforeGraph:
         message = await _token_message(RuntimeError(_UNCONSENTED))
 
         assert "resolve dependency" not in message
-        assert "graph_token" not in message
+        assert "dependency 'client'" not in message, "nor the parameter the wrapper names"
 
     async def test_entras_own_code_survives_for_whoever_has_to_diagnose_it(self) -> None:
         message = await _token_message(RuntimeError(_UNCONSENTED))

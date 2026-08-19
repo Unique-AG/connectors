@@ -775,7 +775,8 @@ class TestWhatAModelIsToldWhenGraphRefuses:
 
         This is also the assertion that says the wording here is *ours*: the exchange happens inside
         FastMCP's dependency resolution, so without the wrapper the model reads "Failed to resolve
-        dependency 'graph_token' for search_messages" and can act on none of it.
+        dependency 'client' for search_teams_messages" — a parameter of a function the model never
+        sees — and can act on none of it.
         """
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
         obo.refusal = ClientAuthenticationError(

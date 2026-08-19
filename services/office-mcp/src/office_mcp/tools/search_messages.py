@@ -66,10 +66,10 @@ from msgraph.generated.search.query.query_post_response import QueryPostResponse
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_client_for, graph_errors
+from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, MessageHandle
 from office_mcp.shared.messages import MessageSender, sender_of
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "search_messages"
 
@@ -81,10 +81,6 @@ TOOL_NAME = "search_messages"
 # are `shared/handles.py`'s, because which of them a *read* is made under is decided by the surface
 # a handle addresses; a search is made under both, having no handle yet.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
-
-# Built once at import. A call inside a parameter default rebuilds the descriptor on every
-# registration, and both of this repo's checkers report that as an error.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Graph documents a general `size` maximum of 1000. No chatMessage-specific ceiling is published;
 # Graph caps the `message` and `event` entities at 25. This tool uses 50 on undocumented ground,
@@ -479,6 +475,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     `transport` is the long-lived `httpx.AsyncClient` from `create_graph_transport`; the tool
     borrows it per call and never owns it. `create_app` closes it on shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     # Declared and registered in two steps rather than with `@mcp.tool`, which does both and hands
     # back the function. `add_tool` returns the registered tool, which is the only way to reach the
@@ -580,7 +578,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=("Results per page. Default 25, maximum " + f"{MAX_RESULTS}."),
             ),
         ] = 25,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> MessageSearchResults:
         criteria = SearchCriteria(
             query=query,
@@ -595,13 +593,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         )
         if criteria.is_empty:
             raise ToolError(_NO_CRITERIA)
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await search_messages(
-                graph_client_for(transport, graph_token),
-                criteria=criteria,
-                offset=offset,
-                size=size,
-            )
+        return await search_messages(
+            client,
+            criteria=criteria,
+            offset=offset,
+            size=size,
+        )
 
     _require_a_criterion(mcp.add_tool(search_teams_messages))
 
