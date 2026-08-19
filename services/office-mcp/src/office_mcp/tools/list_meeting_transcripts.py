@@ -60,7 +60,7 @@ from msgraph.generated.models.call_transcript import CallTranscript
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_client_for, graph_errors
+from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import MeetingHandle, TranscriptHandle, meeting_handle
 from office_mcp.shared.meetings import (
     MAX_ARTIFACT_SCAN,
@@ -70,7 +70,7 @@ from office_mcp.shared.meetings import (
     newest_in_window,
     resolve_meeting,
 )
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_meeting_transcripts"
 
@@ -83,9 +83,6 @@ TOOL_NAME = "list_meeting_transcripts"
 # transcript content needs only TRANSCRIPT_PERMISSION. Withholding OnlineMeetings.Read would not
 # block that.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
-
-# Built at import: a call inside a parameter default rebuilds it on every registration.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Maximum transcripts to return. Graph documents `$top` but publishes no ceiling, so this is ours.
 MAX_TRANSCRIPTS = 50
@@ -338,6 +335,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     `transport` is a shared, long-lived client. This tool borrows it per call and does not own
     it. `create_app` closes it on shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -405,17 +404,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = False,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> MeetingTranscripts:
         handle = meeting_handle(meeting_uri)
         if handle is None:
             raise ToolError(_NOT_A_MEETING_HANDLE)
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await list_meeting_transcripts(
-                graph_client_for(transport, graph_token),
-                handle=handle,
-                started_after=started_after,
-                started_before=started_before,
-                limit=limit,
-                include_scan_completeness=include_scan_completeness,
-            )
+        return await list_meeting_transcripts(
+            client,
+            handle=handle,
+            started_after=started_after,
+            started_before=started_before,
+            limit=limit,
+            include_scan_completeness=include_scan_completeness,
+        )
