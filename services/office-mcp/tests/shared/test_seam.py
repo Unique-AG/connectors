@@ -4,10 +4,11 @@ These assertions are about *advice*, not wording: each one pins the fact that di
 remedy from another, because getting those wrong is what makes a model retry a call that can never
 succeed, or give up on one that would have worked a second later.
 
-Both routes to a message are driven here: the block a tool still opens around its own Graph call,
-and `GraphAdviceMiddleware`, which covers dependency resolution as well and is what the blocks are
-being replaced by. Whether the two agree is `tests/test_error_mapping.py`'s subject, over the real
-stack.
+Both routes to a message are driven here: `graph_tool_errors`, which maps a failure where it
+happens, and `GraphAdviceMiddleware`, which covers every registered tool and the dependency
+resolution no block could reach. No tool opens a block any more, so the first route is now the
+mapping asked directly — which is what makes it worth comparing the second against. Whether the two
+agree end to end is `tests/test_error_mapping.py`'s subject, over the real stack.
 """
 
 import pytest
@@ -334,9 +335,10 @@ class TestWhatTheMiddlewareLeavesAlone:
     replace a message somebody wrote on purpose with one worded from a table.
     """
 
-    async def test_it_words_a_graph_refusal_the_way_the_tool_block_does(self) -> None:
-        """The mapping the per-tool blocks are being replaced by, driven on its own. Byte equality
-        rather than keywords: this is the whole promise of moving the mapping out of ten tools."""
+    async def test_it_words_a_graph_refusal_the_way_the_mapping_itself_does(self) -> None:
+        """The middleware beside the mapping it delegates to, driven on its own. Byte equality
+        rather than keywords: one wording for a refusal is the whole promise of moving the mapping
+        out of ten tool bodies, and a wording that drifted here would drift for every tool."""
         refusal = GraphForbidden(
             "nope", status=403, code="Authorization_RequestDenied", request_id="req-7"
         )
@@ -349,11 +351,14 @@ class TestWhatTheMiddlewareLeavesAlone:
             )
         )
 
-    async def test_a_refusal_a_tool_already_worded_is_passed_through_unchanged(self) -> None:
-        """The double mapping, and the reason it is harmless: a tool that still opens its own block
-        produces the message, and the middleware recognises it by type rather than re-deriving it —
-        which matters most where the two would differ, a tool naming fewer permissions than it
-        declares."""
+    async def test_a_refusal_already_worded_by_the_mapping_is_passed_through_unchanged(
+        self,
+    ) -> None:
+        """The double mapping, and the reason it is harmless: whatever `graph_tool_errors` worded
+        arrives as a type the middleware recognises rather than re-derives. No tool opens a block
+        today, so this is the guard on the escape rather than on the ten bodies it replaced — and
+        it matters exactly where the two wordings would differ, a call naming fewer permissions
+        than its tool declares."""
         with pytest.raises(ToolError) as raised, graph_tool_errors(_CHANNELS):
             raise GraphForbidden("nope", status=403, code=None, request_id=None)
         advised = raised.value

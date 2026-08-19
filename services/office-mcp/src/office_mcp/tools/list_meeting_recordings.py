@@ -51,7 +51,7 @@ from msgraph.generated.models.call_recording import CallRecording
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_client_for, graph_errors
+from office_mcp.graph_client import graph_errors
 from office_mcp.shared import identity
 from office_mcp.shared.handles import MeetingHandle, meeting_handle
 from office_mcp.shared.meetings import (
@@ -63,7 +63,7 @@ from office_mcp.shared.meetings import (
     newest_in_window,
     resolve_meeting,
 )
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_meeting_recordings"
 
@@ -75,10 +75,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
     RECORDING_PERMISSION,
     identity.GRAPH_PERMISSION,
 )
-
-# Built once at import: a call inside a parameter default rebuilds the descriptor on every
-# registration and is a lint error in both of this repo's checkers.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Max recordings per call. A one-off meeting has 1–2; a series has 1 per recorded occurrence.
 # Graph sets no ceiling on `$top`; this limit is ours.
@@ -396,6 +392,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     The tool borrows `transport` per call and does not own it. `create_app` closes it on
     shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -463,17 +461,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = False,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> MeetingRecordings:
         handle = meeting_handle(meeting_uri)
         if handle is None:
             raise ToolError(_NOT_A_MEETING_HANDLE)
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await list_meeting_recordings(
-                graph_client_for(transport, graph_token),
-                handle=handle,
-                started_after=started_after,
-                started_before=started_before,
-                limit=limit,
-                include_scan_completeness=include_scan_completeness,
-            )
+        return await list_meeting_recordings(
+            client,
+            handle=handle,
+            started_after=started_after,
+            started_before=started_before,
+            limit=limit,
+            include_scan_completeness=include_scan_completeness,
+        )

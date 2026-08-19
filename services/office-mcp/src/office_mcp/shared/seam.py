@@ -59,8 +59,10 @@ surface under one of the two permissions its token was exchanged for, and `narro
 to the middleware on the call's own state, because the tool learns which surface it is reading from
 its argument — per call, and long after the table was built.
 
-A tool that still opens its own mapping block keeps its own message instead: what that block
-produced reaches the client byte for byte, because it arrives as a type the middleware leaves alone.
+No tool opens its own mapping block any more, and one still may: what `graph_tool_errors` produces
+reaches the client byte for byte, because it arrives as a type the middleware leaves alone. That is
+the escape a tool needs to say something the table cannot be taught, and it is what the middleware's
+own wording is compared against, message for message, in `tests/shared/test_seam.py`.
 
 Error Messages
 
@@ -251,8 +253,9 @@ class Advised(ToolError):
 
     Design decision: no leading underscore, although nothing outside this module refers to it. The
     class name reaches an operator: `unique_mcp`'s tool metrics label every failed call with
-    `type(error).__name__`, and that layer sits inside this one, so a refusal a tool worded for
-    itself is counted under this name. It reads `ToolError` again once no tool words its own.
+    `type(error).__name__`, and that layer sits inside this one. No tool words its own refusal
+    today, so what an operator reads is `ToolError`; the day one needs to again, the count moves to
+    this name rather than becoming invisible.
     """
 
 
@@ -377,6 +380,13 @@ def _causes(error: BaseException) -> Iterator[BaseException]:
 @contextmanager
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
     """Map Graph failures onto actionable tool errors. Name all permissions—Graph doesn't.
+
+    The mapping applied where the failure happens, rather than at `tools/call`. No tool opens one:
+    `GraphAdviceMiddleware` covers every registered tool, including the dependency resolution a
+    block never could, and it words a refusal from this same function. What is left here is the one
+    route a tool would take to say something the table cannot carry, and the reference the
+    middleware is compared against message for message — a comparison worth having precisely
+    because the two are reached differently.
 
     `not_found` replaces the default advice for a 404. The default advice assumes the id comes
     verbatim from a tool response. That assumption is wrong for a handle that another tool
