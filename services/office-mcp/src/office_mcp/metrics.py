@@ -32,7 +32,7 @@ _VIEWS = (
     View(
         instrument_name=GRAPH_PAGES_SCANNED,
         # Nearly every walk reads one page, so the low end is spelled out one page at a time. A walk
-        # that gives up on a collection Graph will not end lands just past ten pages of nothing,
+        # that gives up on a collection Graph will not end lands just past 10 (`MAX_EMPTY_PAGES`),
         # and only the item scan cap bounds anything above that.
         aggregation=ExplicitBucketHistogramAggregation((1, 2, 3, 5, 10, 25, 50, 100, 250, 1000)),
     ),
