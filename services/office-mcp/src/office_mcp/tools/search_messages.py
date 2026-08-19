@@ -391,7 +391,7 @@ async def search_messages(
             )
         ]
     )
-    with graph_errors():
+    with graph_errors(TOOL_NAME):
         response = await client.search.query.post(body)
 
     assert response is not None, "Graph answered POST /search/query with no response"
