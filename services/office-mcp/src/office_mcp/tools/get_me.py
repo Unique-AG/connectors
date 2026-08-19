@@ -15,17 +15,13 @@ from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_client_for, graph_errors
+from office_mcp.graph_client import graph_errors
 from office_mcp.shared import identity
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "get_me"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
-
-# Built once, at import, not inside a parameter default. A default rebuilds it on every
-# registration. Both of this repo's linters reject that.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 _DESCRIPTION = """\
 Return the signed-in user's profile: user_id, display_name, email, user_principal_name, job_title.
@@ -101,6 +97,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     The tool borrows the transport per call.
     """
+    # Here rather than at module level, because this is where `transport` is: the dependency closes
+    # over it, and a default is evaluated when the `def` below runs, which is inside this call. A
+    # name in the default rather than the call itself — a call there is ruff's B008.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -108,6 +108,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
-    async def get_me(graph_token: str = _TOKEN) -> SignedInUser:
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await get_signed_in_user(graph_client_for(transport, graph_token))
+    async def get_me(client: GraphServiceClient = graph) -> SignedInUser:
+        return await get_signed_in_user(client)

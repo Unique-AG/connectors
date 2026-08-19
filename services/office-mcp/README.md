@@ -37,9 +37,9 @@ later—so `create_app` resolves once and hands the same `Selection` to `build_a
 registered tool's permissions reach the consent screen.
 
 **`shared/` is code that two tools cannot disagree on:** `identity.py` (who the signed-in user is—
-every other answer correlates against this) and `seam.py` (On-Behalf-Of token and Graph error
-messages). A thing belongs here when two tools need it and a difference between them breaks callers.
-Nothing else belongs here.
+every other answer correlates against this) and `seam.py` (the Graph client a tool is handed, with
+the On-Behalf-Of token inside it, and Graph error messages). A thing belongs here when two tools
+need it and a difference between them breaks callers. Nothing else belongs here.
 
 **Layering rules:**
 - `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP.
