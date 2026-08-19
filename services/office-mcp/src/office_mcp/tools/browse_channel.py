@@ -43,7 +43,7 @@ from msgraph.generated.teams.item.channels.item.messages.messages_request_builde
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_client_for, graph_errors
+from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle
 from office_mcp.shared.messages import (
     MAX_REPLIES_PER_POST,
@@ -51,17 +51,13 @@ from office_mcp.shared.messages import (
     event_of,
     message_of,
 )
-from office_mcp.shared.seam import READ_ONLY, graph_token, graph_tool_errors
+from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "browse_channel"
 
 # Import CHANNEL_PERMISSION to avoid misspelling — handle vocabulary owns surface permissions.
 # Several tools declare one permission; deduplication is the registry's job.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
-
-# Built at import time. A parameter default call rebuilds the descriptor on every registration,
-# which trips a lint error in both of this repo's checkers.
-_TOKEN: str = graph_token(*GRAPH_PERMISSIONS)
 
 # Graph's documented ceiling on `$top` for a channel's messages — the whole of one request.
 MAX_POSTS = 50
@@ -250,6 +246,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     `transport` is the long-lived `httpx.AsyncClient` from `create_graph_transport`; the tool
     borrows it per call and never owns it. `create_app` closes it on shutdown.
     """
+    # Built here because this is where `transport` is, and named rather than called in the default.
+    graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
@@ -308,13 +306,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = False,
-        graph_token: str = _TOKEN,
+        client: GraphServiceClient = graph,
     ) -> ChannelPosts:
-        with graph_tool_errors(*GRAPH_PERMISSIONS):
-            return await browse_channel(
-                graph_client_for(transport, graph_token),
-                team_id=team_id,
-                channel_id=channel_id,
-                limit=limit,
-                include_window_completeness=include_window_completeness,
-            )
+        return await browse_channel(
+            client,
+            team_id=team_id,
+            channel_id=channel_id,
+            limit=limit,
+            include_window_completeness=include_window_completeness,
+        )
