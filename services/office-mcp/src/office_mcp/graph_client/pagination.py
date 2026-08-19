@@ -28,6 +28,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from msgraph_core.tasks import PageIterator
 
 from office_mcp.graph_client.errors import GraphPagingUnending
+from office_mcp.graph_client.observability import current_graph_operation, record_pages_scanned
 
 
 class GraphCollection[T](Protocol):
@@ -120,6 +121,10 @@ async def collect_pages[T](
     items: list[T] = []
     scanned = 0
     capped = False
+    # The caller's own first request counts: it is the first page this walk read, and the point of
+    # the histogram is what one call cost Graph. The operation it is counted under comes from the
+    # `graph_errors` block this walk runs inside — see `observability.py`.
+    pages = 1
 
     def visit(item: Parsable) -> bool:
         nonlocal scanned, capped
@@ -139,25 +144,31 @@ async def collect_pages[T](
         error_mapping={"XXX": ODataError},
     )
     empty_pages_in_a_row = 0
-    while True:
-        looked_at_before = scanned
-        # `enumerate`'s return value conflates two different stops: the page ran out, or `visit`
-        # asked to stop. `capped` is `visit`'s own answer, so it is read instead.
-        _ = iterator.enumerate(visit)  # pyright: ignore[reportUnknownMemberType]
-        if capped or not iterator.current_page.odata_next_link:
-            return CollectedItems(items=items, capped=capped and _more_was_on_offer(iterator))
-        empty_pages_in_a_row = 0 if scanned > looked_at_before else empty_pages_in_a_row + 1
-        if empty_pages_in_a_row > MAX_EMPTY_PAGES:
-            raise GraphPagingUnending(
-                f"Microsoft Graph answered {empty_pages_in_a_row} pages in a row with nothing in "
-                + "them and still advertised more of this collection "
-                + f"({scanned} items looked at, {len(items)} kept)",
-                empty_pages=empty_pages_in_a_row,
-            )
-        page = await iterator.next()
-        assert page is not None, "Graph advertised a next link and then had no next page"
-        iterator.current_page = page
-        iterator.pause_index = 0
+    # The count is recorded on the way out however the walk ended: the walk worth seeing on a
+    # dashboard is the one that read fifty pages before giving up, and that one leaves by a raise.
+    try:
+        while True:
+            looked_at_before = scanned
+            # `enumerate`'s return value conflates two different stops: the page ran out, or `visit`
+            # asked to stop. `capped` is `visit`'s own answer, so it is read instead.
+            _ = iterator.enumerate(visit)  # pyright: ignore[reportUnknownMemberType]
+            if capped or not iterator.current_page.odata_next_link:
+                return CollectedItems(items=items, capped=capped and _more_was_on_offer(iterator))
+            empty_pages_in_a_row = 0 if scanned > looked_at_before else empty_pages_in_a_row + 1
+            if empty_pages_in_a_row > MAX_EMPTY_PAGES:
+                raise GraphPagingUnending(
+                    f"Microsoft Graph answered {empty_pages_in_a_row} pages in a row with nothing "
+                    + "in them and still advertised more of this collection "
+                    + f"({scanned} items looked at, {len(items)} kept)",
+                    empty_pages=empty_pages_in_a_row,
+                )
+            page = await iterator.next()
+            assert page is not None, "Graph advertised a next link and then had no next page"
+            iterator.current_page = page
+            iterator.pause_index = 0
+            pages += 1
+    finally:
+        record_pages_scanned(current_graph_operation(), pages)
 
 
 def _more_was_on_offer(iterator: PageIterator) -> bool:
