@@ -1,9 +1,11 @@
 """What a Graph request span is allowed to say about the resource it asked for.
 
-Kiota labels a Graph URL as EUII and puts it on its spans by default. In this service a Graph URL
-carries chat ids, message ids and meeting/transcript ids, so with tracing switched on those ids
-would be exported to a trace backend and kept there. `graph_client_for` turns that off; these tests
-are what says so, over a real SDK call rather than over the option object.
+Kiota labels a Graph URL as EUII and sets it as `url.full` by default, in two places: the request
+span the adapter opens, and the span `UrlReplaceHandler` opens for itself. In this service a Graph
+URL carries chat ids, message ids and meeting/transcript ids, so with tracing switched on those ids
+would be exported to a trace backend and kept there. `graph_client_for` closes the first,
+`_QuietUrlReplaceHandler` the second; these tests are what says so, over real SDK calls rather than
+over the option object.
 """
 
 from collections.abc import Iterator, Sequence
@@ -25,14 +27,12 @@ _RESOURCE_IDS = ("leak-detector", _MESSAGE_ID)
 
 _REQUEST_PATH = "/chats/19%3Aleak-detector%40thread.v2/messages/1770000000042"
 
-# The one span that still carries the URL, and the whole of why it is named here rather than fixed:
-# `UrlReplaceHandler` sets `url.full` on its own span without consulting `ObservabilityOptions` at
-# all (kiota_http/middleware/url_replace_handler.py:44), and that handler is what rewrites
-# `/users/me-token-to-replace` to `/me`, so it cannot be switched off without taking ownership of
-# the SDK's whole middleware pipeline. Removing it needs an upstream fix, or a span filter installed
-# where the tracer provider is built. Named as an exact set so that a *new* leak fails this test,
-# and so that the day the leak goes the test fails too and this paragraph goes with it.
-_SDK_MIDDLEWARE_SPAN_THAT_STILL_CARRIES_THE_URL = "UrlReplaceHandler_send"
+# The span the URL replacer opens for itself. It is named here because it is the one span this
+# service replaces a handler to clean: `UrlReplaceHandler.send` sets `url.full` on it without
+# consulting `ObservabilityOptions` at all (kiota_http/middleware/url_replace_handler.py:44), so the
+# option the adapter is given cannot reach it. The span itself is wanted and is asserted below —
+# the fix drops one attribute, not the telemetry.
+_URL_REPLACER_SPAN = "UrlReplaceHandler_send"
 
 
 @pytest.fixture
@@ -68,6 +68,11 @@ def _spans_naming_a_resource(spans: Sequence[ReadableSpan]) -> set[str]:
     }
 
 
+def _spans_carrying_the_url(spans: Sequence[ReadableSpan]) -> set[str]:
+    """The names of the spans that carry a `url.full` attribute, whatever its value."""
+    return {span.name for span in spans if "url.full" in (span.attributes or {})}
+
+
 class TestAGraphRequestSpanNamesTheTemplateAndNotTheResource:
     async def test_the_request_span_carries_the_template_it_called_and_no_id(
         self,
@@ -93,27 +98,57 @@ class TestAGraphRequestSpanNamesTheTemplateAndNotTheResource:
         for resource in _RESOURCE_IDS:
             assert resource not in str(attributes), f"{resource} reached {requests[0].name}"
 
-    async def test_the_url_survives_on_exactly_one_span_and_it_is_the_sdks_own(
+    async def test_no_span_at_all_carries_the_url_or_a_resource_id(
         self,
         client: GraphServiceClient,
         graph: respx.MockRouter,
         recorded_spans: InMemorySpanExporter,
     ) -> None:
-        """A pin on a known leak, and a tripwire for a new one.
+        """The claim over the whole trace, not over the one span this connector asked for.
 
-        The SDK opens a span per middleware as well as per request, so "no id in any span
-        attribute" is a claim about a dozen spans and not about the one this connector asked for.
-        Asserting the exact set is what makes both directions fail loudly: a second span starting to
-        carry the URL, and the named one stopping.
+        The SDK opens a span per middleware as well as per request, so a dozen spans reach the
+        exporter for one call. Asserting the empty set is what makes a new leak fail: a handler
+        added by a later SDK version that sets `url.full`, or this service losing
+        `_QuietUrlReplaceHandler` in a refactor, both land here.
         """
         await _read_one_message(client, graph)
 
         spans = recorded_spans.get_finished_spans()
         assert spans, "no span was recorded, so this test proves nothing"
-        assert _spans_naming_a_resource(spans) == {
-            _SDK_MIDDLEWARE_SPAN_THAT_STILL_CARRIES_THE_URL
-        }, (
-            "the set of spans carrying a Graph resource id changed. If it grew, an id is being "
-            + "exported to the trace backend. If it shrank to nothing, the SDK stopped setting "
-            + "`url.full` in its middleware and this test and the comment above it can go."
+        assert _spans_carrying_the_url(spans) == set(), (
+            "a span is exporting the Graph URL, which here is a chat and a message id"
         )
+        assert _spans_naming_a_resource(spans) == set(), (
+            "a span attribute is exporting a Graph resource id to the trace backend"
+        )
+
+
+class TestTheUrlReplacerIsQuietenedAndNotSwitchedOff:
+    async def test_it_still_opens_its_span_and_still_rewrites_me(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        recorded_spans: InMemorySpanExporter,
+    ) -> None:
+        """Both of the things a shortcut would have cost.
+
+        Dropping the handler, or disabling it, would also silence the leak — and would take the
+        `/users/me-token-to-replace` → `/me` rewrite with it, which every `client.me` call depends
+        on. Dropping its span instead of its one attribute would silence the leak by exporting
+        less telemetry. The route below is asserted called because it is mounted on `/me`: the SDK
+        asks for `/users/me-token-to-replace` and only the handler turns that into `/me`.
+        """
+        route = graph.get("/me").mock(return_value=httpx.Response(200, json={"id": "u-1"}))
+
+        _ = await client.me.get()
+
+        assert route.called, (
+            "the /me rewrite is gone, so the handler was disabled and not subclassed"
+        )
+        replacer = [
+            span for span in recorded_spans.get_finished_spans() if span.name == _URL_REPLACER_SPAN
+        ]
+        assert len(replacer) == 1, "the handler's own span is still wanted, minus the URL"
+        attributes = replacer[0].attributes or {}
+        assert attributes.get("com.microsoft.kiota.handler.url_replacer.enable") is True
+        assert "url.full" not in attributes

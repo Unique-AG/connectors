@@ -1,12 +1,31 @@
 import httpx
 import respx
+from kiota_abstractions.request_option import RequestOption
+from msgraph.graph_request_adapter import options as sdk_middleware_options
 from msgraph.graph_service_client import GraphServiceClient
+from msgraph_core import GraphClientFactory
 
+from office_mcp.graph_client import GraphSettings, create_graph_transport
 from office_mcp.graph_client.client import (
     _CallerTokenProvider,  # pyright: ignore[reportPrivateUsage]
 )
 
 from .conftest import CALLER_TOKEN, RecordedSleeps
+
+
+def _handler_chain(transport: httpx.AsyncClient) -> list[str]:
+    """The class names of the middleware a transport will run, in order.
+
+    Reaches through the SDK's private attributes because there is no public way to see an assembled
+    pipeline, and the assembled pipeline is the thing worth seeing here.
+    """
+    handler: object = transport._transport  # pyright: ignore[reportPrivateUsage]
+    handler = getattr(getattr(handler, "pipeline", None), "_first_middleware", None)
+    names: list[str] = []
+    while handler is not None:
+        names.append(type(handler).__name__)
+        handler = getattr(handler, "next", None)
+    return names
 
 
 class TestTheCallersTokenIsWhatCalls:
@@ -60,3 +79,31 @@ class TestThrottling:
 
         assert user is not None
         assert retry_sleeps.delays == [7], "the wait must be Graph's Retry-After, not a backoff"
+
+
+class TestTheTransportRunsTheSdksOwnPipeline:
+    async def test_it_is_the_sdks_default_chain_with_the_url_replacer_quietened(self) -> None:
+        """A tripwire for the one thing `_graph_middleware` cannot get from the SDK.
+
+        That function inlines `GraphClientFactory.create_with_default_middleware`, because the
+        factory builds the handler list and loads it onto the client in one step and leaves no seam
+        to swap a handler into. The cost is that a handler the SDK adds to its own list in a later
+        version would quietly not be installed, and nothing about a missing redirect or user-agent
+        handler announces itself. So the SDK's own client is built beside ours and the two chains
+        are compared.
+        """
+        options: dict[str, RequestOption] = {**sdk_middleware_options}
+        sdk = GraphClientFactory.create_with_default_middleware(
+            client=httpx.AsyncClient(), options=options
+        )
+        ours = create_graph_transport(GraphSettings())
+        try:
+            expected = [
+                "_QuietUrlReplaceHandler" if name == "UrlReplaceHandler" else name
+                for name in _handler_chain(sdk)
+            ]
+            assert expected, "the SDK's own chain came back empty, so this compares nothing"
+            assert _handler_chain(ours) == expected
+        finally:
+            await sdk.aclose()
+            await ours.aclose()
