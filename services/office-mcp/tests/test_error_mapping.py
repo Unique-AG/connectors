@@ -66,6 +66,7 @@ _REFUSED = {"error": {"code": "Authorization_RequestDenied", "message": "denied"
 # one spells it, because a tool that rejects its argument as not-a-handle never reaches Graph and
 # would pass this file while mapping nothing.
 _TEAM_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+_CHANNEL_ID = "19:general@thread.tacv2"
 _CHAT_ID = "19:release@thread.v2"
 _MESSAGE_ID = "1770000000000"
 _CHAT_MESSAGE_URI = f"teams:///chats/{quote(_CHAT_ID, safe='')}/messages/{_MESSAGE_ID}"
@@ -95,6 +96,9 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
     "read_message": _Refused({"uri": _CHAT_MESSAGE_URI}, ("Chat.Read",)),
     "list_teams": _Refused({}, ("Team.ReadBasic.All",)),
     "list_channels": _Refused({"team_id": _TEAM_ID}, ("Channel.ReadBasic.All",)),
+    "browse_channel": _Refused(
+        {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}, ("ChannelMessage.Read.All",)
+    ),
 }
 
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
