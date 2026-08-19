@@ -2236,17 +2236,12 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
         caplog: pytest.LogCaptureFixture,
+        recorded_spans: InMemorySpanExporter,
     ) -> None:
         """A meeting's subject is content — "Northwind acquisition: final terms" says most of what
         the meeting was about — and this tool returns one for a meeting nobody may even download. So
         the rule the rest of the surface is held to holds here too, over the whole call: it reaches
         the caller and no log line and no span attribute anywhere in the process."""
-        exporter = InMemorySpanExporter()
-        provider = trace.get_tracer_provider()
-        if not isinstance(provider, TracerProvider):
-            provider = TracerProvider()
-            trace.set_tracer_provider(provider)
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
         secret = "acquisition-of-northwind-traders"
         meeting = {"value": [{**_MEETING["value"][0], "subject": secret}]}
         graph.get(_MEETINGS_PATH).mock(return_value=httpx.Response(200, json=meeting))
@@ -2261,8 +2256,10 @@ class TestCallingThem:
         assert _structured(result)["subject"] == secret, "the subject has to have been returned"
         for record in caplog.records:
             assert secret not in _record_text(record), f"logged by {record.name}"
-        for span in exporter.get_finished_spans():
-            assert secret not in str(span.attributes)
+        spans = recorded_spans.get_finished_spans()
+        assert spans, "nothing was traced, so the span half of this test asserts over an empty list"
+        for span in spans:
+            assert secret not in str(span.attributes), f"on span {span.name}"
 
     @pytest.mark.usefixtures("obo")
     async def test_the_transcript_text_reaches_the_caller_and_no_log_or_span(
