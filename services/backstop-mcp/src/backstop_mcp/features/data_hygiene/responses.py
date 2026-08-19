@@ -5,10 +5,32 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
+from backstop_mcp.features.data_hygiene.api_responses import CleanStr
+from backstop_mcp.features.data_hygiene.internal_dto import (
+    DepartedEmploymentDto,
+    DepartureSignal,
+)
 from backstop_mcp.models import OmitNoneModel
 
 type EmploymentLinkStatus = Literal["current", "former"]
+
+
+class AsOfResponse(OmitNoneModel):
+    """Plain provenance from a Backstop record. No staleness verdict attached."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    modified_timestamp: CleanStr = Field(
+        default=None,
+        description=(
+            "When the record was last saved in Backstop. Omitted when unknown. Relay this; "
+            "do not treat age as a staleness verdict."
+        ),
+    )
+    modified_by: CleanStr = Field(
+        default=None,
+        description="Who last saved the record, as Backstop stores it. Omitted when unknown.",
+    )
 
 
 class DepartedContactResponse(BaseModel):
@@ -92,11 +114,13 @@ class EmploymentLinkResponse(OmitNoneModel):
     )
 
 
-def as_of_response(as_of: AsOf | None) -> AsOf | None:
+def as_of_response(as_of: AsOfResponse | None) -> AsOfResponse | None:
     return as_of
 
 
-def departed_response(departure: DepartedEmployment | None) -> DepartedContactResponse | None:
+def departed_response(
+    departure: DepartedEmploymentDto | None,
+) -> DepartedContactResponse | None:
     if departure is None:
         return None
     return DepartedContactResponse.model_validate(departure)

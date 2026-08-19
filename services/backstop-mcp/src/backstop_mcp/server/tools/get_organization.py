@@ -9,8 +9,8 @@ from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
-    AsOf,
-    ProvenanceFields,
+    AsOfResponse,
+    ProvenanceAttributes,
     as_of_response,
     extract_as_of,
 )
@@ -31,7 +31,7 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
 
 
-class OrganizationAttributes(OmitNoneModel, ProvenanceFields):
+class OrganizationAttributes(OmitNoneModel, ProvenanceAttributes):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
     `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
@@ -73,7 +73,7 @@ class OrganizationResolvedResponse(OmitNoneModel):
             "`party_id` later — never invent them."
         )
     )
-    as_of: AsOf | None = Field(
+    as_of: AsOfResponse | None = Field(
         default=None,
         description=(
             "When and by whom the organization record was last saved. Omitted when "

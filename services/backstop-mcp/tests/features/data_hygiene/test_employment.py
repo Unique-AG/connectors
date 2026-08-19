@@ -25,15 +25,17 @@ from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.data_hygiene import DepartureSignal, EmploymentRules, TypeVocabulary
+from backstop_mcp.features.data_hygiene.api_responses import (
+    EntityRelationshipAttributes,
+    RelationshipTypeAttributes,
+)
 from backstop_mcp.features.data_hygiene.employment import (
     EmploymentIndex,
     build_employment_index,
     classify_employment,
 )
-from backstop_mcp.features.data_hygiene.types import (
+from backstop_mcp.features.data_hygiene.internal_dto import (
     EmploymentStatus,
-    EntityRelationshipAttributes,
-    RelationshipTypeAttributes,
 )
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_MIRROR_TYPE,

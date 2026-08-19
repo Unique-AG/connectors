@@ -11,13 +11,12 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
-from backstop_mcp.features.entity_types import party_search_type
-from backstop_mcp.features.party_resolver.types import (
-    PartyAttributes,
+from backstop_mcp.features.entity_types import SearchType, party_search_type
+from backstop_mcp.features.party_resolver.api_responses import PartyAttributes
+from backstop_mcp.features.party_resolver.internal_dto import (
     PartyCandidate,
-    QuickSearchOptions,
-    ResolvedParty,
-    SearchType,
+    QuickSearchOptionsDto,
+    ResolvedPartyDto,
 )
 from backstop_mcp.features.resolution import Candidate
 
@@ -113,7 +112,7 @@ async def quick_search(
     *,
     search_type: SearchType,
     search: str,
-    options: QuickSearchOptions | None = None,
+    options: QuickSearchOptionsDto | None = None,
 ) -> tuple[PartyCandidate, ...]:
     """Fuzzy/name lookup via `GET /quick-search`, pinned to a single `search_type`.
 
@@ -121,7 +120,7 @@ async def quick_search(
     so `filter[name][eq]=Capstone` returns nothing when the stored record is
     "Capstone Investment Advisors LP".
     """
-    resolved_options = options if options is not None else QuickSearchOptions()
+    resolved_options = options if options is not None else QuickSearchOptionsDto()
     response = await client.get(
         "/quick-search",
         params=_quick_search_params(
@@ -155,7 +154,7 @@ def _quick_search_params(
     *,
     search_type: SearchType,
     search: str,
-    options: QuickSearchOptions,
+    options: QuickSearchOptionsDto,
 ) -> dict[str, object]:
     params: dict[str, object] = {
         "filter[searchText][eq]": search,
@@ -246,7 +245,7 @@ def _candidate_from_resource(
     return Candidate(
         key=f"{resolved_search_type}:{party_id}",
         label=_candidate_label(name=name, search_type=resolved_search_type, party_id=party_id),
-        value=ResolvedParty(id=party_id, search_type=resolved_search_type, name=name),
+        value=ResolvedPartyDto(id=party_id, search_type=resolved_search_type, name=name),
     )
 
 

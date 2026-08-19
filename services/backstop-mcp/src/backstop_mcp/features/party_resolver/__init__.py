@@ -1,3 +1,13 @@
+from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.party_resolver.api_responses import PartyAttributes
+from backstop_mcp.features.party_resolver.internal_dto import (
+    BatchPartyResolution,
+    PartyCandidate,
+    PartyResolution,
+    PartyResolveItemDto,
+    QuickSearchOptionsDto,
+    ResolvedPartyDto,
+)
 from backstop_mcp.features.party_resolver.resolve import resolve_parties, resolve_party
 from backstop_mcp.features.party_resolver.responses import (
     PartyAmbiguousResponse,
@@ -8,25 +18,21 @@ from backstop_mcp.features.party_resolver.responses import (
     unresolved_parties_response,
     unresolved_party_response,
 )
-from backstop_mcp.features.party_resolver.types import (
-    BatchPartyResolution,
-    PartyCandidate,
-    PartyResolution,
-    PartyResolveItem,
-    QuickSearchOptions,
-    ResolvedParty,
-    SearchType,
-)
+
+ResolvedParty = ResolvedPartyDto
+PartyResolveItem = PartyResolveItemDto
+QuickSearchOptions = QuickSearchOptionsDto
 
 __all__ = [
     "BatchPartyResolution",
     "PartyAmbiguousResponse",
     "PartyCandidate",
+    "PartyAttributes",
     "PartyCandidateResponse",
     "PartyResolution",
-    "PartyResolveItem",
-    "QuickSearchOptions",
-    "ResolvedParty",
+    "PartyResolveItemDto",
+    "QuickSearchOptionsDto",
+    "ResolvedPartyDto",
     "ResolvedPartyResponse",
     "SearchType",
     "party_candidate_response",

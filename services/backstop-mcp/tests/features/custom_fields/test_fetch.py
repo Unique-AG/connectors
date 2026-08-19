@@ -8,12 +8,12 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, BackstopClientFactory
+from backstop_mcp.features.custom_fields.api_responses import CustomFieldDefinitionAttributes
 from backstop_mcp.features.custom_fields.fetch import definition_from_resource
 from backstop_mcp.features.custom_fields.service import (
     CustomFieldsService,
     create_custom_fields_service,
 )
-from backstop_mcp.features.custom_fields.types import CustomFieldDefinitionAttributes
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]

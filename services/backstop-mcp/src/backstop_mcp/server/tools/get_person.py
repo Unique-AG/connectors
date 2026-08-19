@@ -9,10 +9,10 @@ from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
-    AsOf,
+    AsOfResponse,
     EmploymentLinkResponse,
     EntityRelationshipInclude,
-    ProvenanceFields,
+    ProvenanceAttributes,
     as_of_response,
     entity_relationships,
     extract_as_of,
@@ -34,7 +34,7 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
 
 
-class PersonAttributes(OmitNoneModel, ProvenanceFields):
+class PersonAttributes(OmitNoneModel, ProvenanceAttributes):
     """Person resource attributes; extras preserved for the tool payload."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
@@ -72,7 +72,7 @@ class PersonResolvedResponse(OmitNoneModel):
             "`party_id` later — never invent them."
         )
     )
-    as_of: AsOf | None = Field(
+    as_of: AsOfResponse | None = Field(
         default=None,
         description=(
             "When and by whom the person record was last saved. Omitted when unknown. "

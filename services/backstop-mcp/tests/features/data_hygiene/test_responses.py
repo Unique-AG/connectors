@@ -17,7 +17,7 @@ from backstop_mcp.features.data_hygiene import (
     departed_response,
 )
 from backstop_mcp.features.data_hygiene.employment import EmploymentIndex
-from backstop_mcp.features.data_hygiene.types import EmploymentEdge
+from backstop_mcp.features.data_hygiene.internal_dto import EmploymentEdgeDto as EmploymentEdge
 
 
 class TestAsOf:

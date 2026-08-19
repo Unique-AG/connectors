@@ -2,11 +2,9 @@ from collections.abc import Mapping
 from typing import cast
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.features.custom_fields.api_responses import CustomFieldDefinitionAttributes
 from backstop_mcp.features.custom_fields.entity_types import custom_field_entity_type_from_bean
-from backstop_mcp.features.custom_fields.types import (
-    CustomFieldDefinition,
-    CustomFieldDefinitionAttributes,
-)
+from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
 
 _DEFINITIONS_PATH = "/custom-field-definitions"
 _DEFINITIONS_PAGE_SIZE = 1000
@@ -37,7 +35,7 @@ def _select_options(value: object | None) -> list[object]:
     return []
 
 
-def definition_from_resource(resource: DefinitionResource) -> CustomFieldDefinition | None:
+def definition_from_resource(resource: DefinitionResource) -> CustomFieldDefinitionDto | None:
     """Map one CRM definition resource onto Backstop attributes.
 
     Returns None when `name` or `entityType` is missing, or `entityType` is not one of the
@@ -52,7 +50,7 @@ def definition_from_resource(resource: DefinitionResource) -> CustomFieldDefinit
     if not entity_type or custom_field_entity_type_from_bean(entity_type) is None:
         return None
 
-    return CustomFieldDefinition(
+    return CustomFieldDefinitionDto(
         id=resource.id,
         name=name,
         entity_type=entity_type,
@@ -71,7 +69,7 @@ def definition_from_resource(resource: DefinitionResource) -> CustomFieldDefinit
     )
 
 
-async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomFieldDefinition]:
+async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomFieldDefinitionDto]:
     """Fetch the instance's full custom-field schema in one paginated walk."""
     page = await client.paginate(
         _DEFINITIONS_PATH,
@@ -80,7 +78,7 @@ async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomF
         page_size=_DEFINITIONS_PAGE_SIZE,
     )
 
-    definitions: list[CustomFieldDefinition] = []
+    definitions: list[CustomFieldDefinitionDto] = []
     for resource in page.items:
         definition = definition_from_resource(resource)
         if definition is not None:

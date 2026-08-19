@@ -5,7 +5,10 @@ from typing import Literal
 from pydantic import Field
 
 from backstop_mcp.features.data_hygiene import EmploymentLinkResponse
-from backstop_mcp.features.org_people.types import OrgPeopleListing, PersonAtOrganization
+from backstop_mcp.features.org_people.internal_dto import (
+    OrgPeopleListingDto,
+    PersonAtOrganizationDto,
+)
 from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 from backstop_mcp.models import OmitNoneModel
 
@@ -93,7 +96,9 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
     )
 
 
-def person_at_organization_response(row: PersonAtOrganization) -> PersonAtOrganizationResponse:
+def person_at_organization_response(
+    row: PersonAtOrganizationDto,
+) -> PersonAtOrganizationResponse:
     card = row.card
     employment = row.employment
     return PersonAtOrganizationResponse(
@@ -109,7 +114,7 @@ def person_at_organization_response(row: PersonAtOrganization) -> PersonAtOrgani
 
 
 def org_people_response(
-    *, resolved: ResolvedPartyResponse, listing: OrgPeopleListing
+    *, resolved: ResolvedPartyResponse, listing: OrgPeopleListingDto
 ) -> OrgPeopleResolvedResponse:
     returned = len(listing.people)
     hint = None

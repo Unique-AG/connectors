@@ -7,10 +7,29 @@ index (person or organization side-loads), `EmploymentIndex.links` for the tool-
 tools are handed.
 """
 
+from backstop_mcp.features.data_hygiene.api_responses import (
+    EntityRefAttributes,
+    EntityRelationshipAttributes,
+    EntityRelationshipInclude,
+    EntityRelationshipRef,
+    ProvenanceAttributes,
+    RelationshipTypeAttributes,
+)
 from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
 from backstop_mcp.features.data_hygiene.entity_relationships import entity_relationships
+from backstop_mcp.features.data_hygiene.internal_dto import (
+    DepartedEmploymentDto,
+    DepartureSignal,
+    EmploymentEdgeDto,
+    EmploymentRecordDto,
+    EmploymentRulesDto,
+    EmploymentStatus,
+    EntityRelationshipsDto,
+    TypeVocabularyDto,
+)
 from backstop_mcp.features.data_hygiene.provenance import extract_as_of
 from backstop_mcp.features.data_hygiene.responses import (
+    AsOfResponse,
     DepartedContactResponse,
     EmploymentLinkResponse,
     as_of_response,
@@ -20,36 +39,33 @@ from backstop_mcp.features.data_hygiene.service import (
     EmploymentIndexFactory,
     create_employment_index_factory,
 )
-from backstop_mcp.features.data_hygiene.types import (
-    AsOf,
-    DepartedEmployment,
-    DepartureSignal,
-    EmploymentRules,
-    EmploymentStatus,
-    EntityRelationshipAttributes,
-    EntityRelationshipInclude,
-    EntityRelationshipRef,
-    ProvenanceFields,
-    RelationshipTypeAttributes,
-    TypeVocabulary,
-)
+
+AsOf = AsOfResponse
+ProvenanceFields = ProvenanceAttributes
+DepartedEmployment = DepartedEmploymentDto
+EmploymentRules = EmploymentRulesDto
+TypeVocabulary = TypeVocabularyDto
 
 __all__ = [
-    "AsOf",
+    "AsOfResponse",
     "DepartedContactResponse",
-    "DepartedEmployment",
+    "DepartedEmploymentDto",
     "DepartureSignal",
     "EmploymentIndex",
     "EmploymentIndexFactory",
     "EmploymentLinkResponse",
-    "EmploymentRules",
+    "EmploymentEdgeDto",
+    "EmploymentRecordDto",
+    "EmploymentRulesDto",
+    "EntityRefAttributes",
     "EmploymentStatus",
     "EntityRelationshipAttributes",
     "EntityRelationshipInclude",
     "EntityRelationshipRef",
-    "ProvenanceFields",
+    "EntityRelationshipsDto",
+    "ProvenanceAttributes",
     "RelationshipTypeAttributes",
-    "TypeVocabulary",
+    "TypeVocabularyDto",
     "as_of_response",
     "build_employment_index",
     "create_employment_index_factory",

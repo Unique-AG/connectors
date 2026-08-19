@@ -14,32 +14,39 @@ Backstop quirks this layer absorbs:
 """
 
 import logging
-from datetime import date, datetime
-from typing import ClassVar, Literal
+from datetime import date
+from typing import Literal
 from urllib.parse import quote
 
-from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
-
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.dates import LenientDate
+from backstop_mcp.features.activity_history.api_responses import (
+    ActivityAttributes,
+    EmailAttributes,
+)
+from backstop_mcp.features.activity_history.internal_dto import (
+    ActivityItemDto,
+    ActivityPageDto,
+    BackstopActivityType,
+    EmailItemDto,
+    EmailPageDto,
+)
 from backstop_mcp.features.entity_types import SearchType
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "ActivityItem",
-    "ActivityPage",
+    "ActivityItemDto",
+    "ActivityPageDto",
     "ActivityType",
     "BackstopActivityType",
-    "EmailItem",
-    "EmailPage",
+    "EmailItemDto",
+    "EmailPageDto",
     "Segment",
     "fetch_activity_page",
     "fetch_activities_page_by_type",
     "fetch_email_page",
 ]
 
-BackstopActivityType = Literal["meeting", "call", "note", "document"]
 ActivityType = BackstopActivityType | Literal["email"]
 # Same vocabulary as party resolve: person-scoped quick-search can return contacts/employees.
 Segment = SearchType
@@ -56,112 +63,8 @@ _ACTIVITY_FIELDS = (
 _EMAIL_FIELDS = "subject,sentTimestamp,fromEmail,toEmails,ccEmails,hasAttachments,contentUrl"
 
 
-class _SpecificResource(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    resource_type: str | None = Field(
-        default=None, validation_alias=AliasChoices("resourceType", "resource_type")
-    )
-    resource_id: str | None = Field(
-        default=None, validation_alias=AliasChoices("resourceId", "resource_id")
-    )
-
-
-class _ActivityAttributes(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    title: str | None = None
-    description: str | None = None
-    effective_date: LenientDate = Field(
-        default=None, validation_alias=AliasChoices("effectiveDate", "effective_date")
-    )
-    specific_resource: _SpecificResource | None = Field(
-        default=None, validation_alias=AliasChoices("specificResource", "specific_resource")
-    )
-    created_timestamp: datetime | None = Field(
-        default=None, validation_alias=AliasChoices("createdTimestamp", "created_timestamp")
-    )
-    modified_timestamp: datetime | None = Field(
-        default=None, validation_alias=AliasChoices("modifiedTimestamp", "modified_timestamp")
-    )
-
-
-class _EmailAttributes(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    subject: str | None = None
-    sent_timestamp: datetime | None = Field(
-        default=None, validation_alias=AliasChoices("sentTimestamp", "sent_timestamp")
-    )
-    from_email: str | None = Field(
-        default=None, validation_alias=AliasChoices("fromEmail", "from_email")
-    )
-    to_emails: list[str] = Field(
-        default_factory=list, validation_alias=AliasChoices("toEmails", "to_emails")
-    )
-    cc_emails: list[str] = Field(
-        default_factory=list, validation_alias=AliasChoices("ccEmails", "cc_emails")
-    )
-    has_attachments: bool | None = Field(
-        default=None, validation_alias=AliasChoices("hasAttachments", "has_attachments")
-    )
-    content_url: str | None = Field(
-        default=None, validation_alias=AliasChoices("contentUrl", "content_url")
-    )
-
-
-_ActivityResource = BackstopApiResource[_ActivityAttributes]
-_EmailResource = BackstopApiResource[_EmailAttributes]
-
-
-class ActivityItem(BaseModel):
-    """One activity; `stream` is the requested type (not parsed from the wire)."""
-
-    # `populate_by_name` so `resource_type`/`resource_id` — populated from the wire via a
-    # nested `AliasPath` — can also be set by their own Python name in a plain keyword
-    # constructor call (tests, `.model_copy(update=...)`), not just through `model_validate`.
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, populate_by_name=True)
-
-    id: str
-    stream: BackstopActivityType
-    title: str | None
-    description: str | None
-    effective_date: date | None
-    resource_type: str | None = Field(
-        default=None, validation_alias=AliasPath("specific_resource", "resource_type")
-    )
-    resource_id: str | None = Field(
-        default=None, validation_alias=AliasPath("specific_resource", "resource_id")
-    )
-    created_timestamp: datetime | None
-    modified_timestamp: datetime | None
-
-
-class EmailItem(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    id: str
-    subject: str | None
-    sent_timestamp: datetime | None
-    from_email: str | None
-    to_emails: tuple[str, ...]
-    cc_emails: tuple[str, ...]
-    has_attachments: bool | None
-    content_url: str | None
-
-
-class ActivityPage(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    items: tuple[ActivityItem, ...]
-    end_of_stream: bool
-
-
-class EmailPage(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    items: tuple[EmailItem, ...]
-    end_of_stream: bool
+_ActivityResource = BackstopApiResource[ActivityAttributes]
+_EmailResource = BackstopApiResource[EmailAttributes]
 
 
 def _activity_date_filter_params(*, since: date | None, until: date | None) -> dict[str, object]:
@@ -183,8 +86,8 @@ def _email_date_filter_params(*, since: date | None, until: date | None) -> dict
 
 
 def _truncate_since(
-    items: tuple[ActivityItem, ...], *, since: date
-) -> tuple[tuple[ActivityItem, ...], bool]:
+    items: tuple[ActivityItemDto, ...], *, since: date
+) -> tuple[tuple[ActivityItemDto, ...], bool]:
     """Drop the first item older than `since` and everything after (stream is `-effectiveDate`).
 
     Items with a missing `effective_date` never trip the cutoff — left intentional until we
@@ -223,7 +126,7 @@ async def fetch_activity_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityPage:
+) -> ActivityPageDto:
     """Fetch one page of one activity type. Future-dated items are kept."""
     logger.debug(
         "activity_history.activity_page.fetch",
@@ -251,7 +154,7 @@ async def fetch_activity_page(
     )
     raw_count = len(page.items)
     items = tuple(
-        ActivityItem.model_validate(
+        ActivityItemDto.model_validate(
             {**resource.attributes.model_dump(), "id": resource.id, "stream": stream}
         )
         for resource in page.items
@@ -273,7 +176,7 @@ async def fetch_activity_page(
             "offset": offset,
         },
     )
-    return ActivityPage(items=items, end_of_stream=end_of_stream)
+    return ActivityPageDto(items=items, end_of_stream=end_of_stream)
 
 
 async def fetch_email_page(
@@ -285,7 +188,7 @@ async def fetch_email_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> EmailPage:
+) -> EmailPageDto:
     """Fetch one page of emails. `since`/`until` map to startDate/endDate independently."""
     logger.debug(
         "activity_history.email_page.fetch",
@@ -310,7 +213,7 @@ async def fetch_email_page(
         offset=offset,
     )
     items = tuple(
-        EmailItem.model_validate({**resource.attributes.model_dump(), "id": resource.id})
+        EmailItemDto.model_validate({**resource.attributes.model_dump(), "id": resource.id})
         for resource in page.items
     )
     end_of_stream = len(page.items) < limit
@@ -324,7 +227,7 @@ async def fetch_email_page(
             "offset": offset,
         },
     )
-    return EmailPage(items=items, end_of_stream=end_of_stream)
+    return EmailPageDto(items=items, end_of_stream=end_of_stream)
 
 
 async def fetch_activities_page_by_type(
@@ -337,7 +240,7 @@ async def fetch_activities_page_by_type(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityPage | EmailPage:
+) -> ActivityPageDto | EmailPageDto:
     """Dispatch to the activity or email single-page fetcher for `activity_type`."""
     if activity_type == "email":
         return await fetch_email_page(
