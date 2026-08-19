@@ -147,15 +147,16 @@ def _error_text(result: CallToolResult) -> str:
 
 
 class TestTheToolsThisServerAdvertises:
-    async def test_every_tool_is_listed_and_none_asks_for_a_token(
+    async def test_every_tool_is_listed_and_none_asks_for_a_client(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """Graph token is a dependency, not a parameter."""
+        """The Graph client, and the On-Behalf-Of token inside it, are dependencies. A model that
+        was shown either one as an argument would be asked for a value only this server can make."""
         tools = _named(await mcp_client.list_tools())
 
         assert set(tools) == {"get_me"}
         for tool in tools.values():
-            assert "graph_token" not in _properties(tool.inputSchema)
+            assert "client" not in _properties(tool.inputSchema)
 
     async def test_get_me_takes_no_arguments(self, mcp_client: Client[FastMCPTransport]) -> None:
         tools = _named(await mcp_client.list_tools())

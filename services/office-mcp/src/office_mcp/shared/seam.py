@@ -1,4 +1,5 @@
-"""How a tool is attached to the outside: the token it calls under, and what a refusal becomes.
+"""How a tool is attached to the outside: the Graph client it calls with, the token in it,
+and what a refusal becomes.
 
 Everything else a tool needs is its own — its name, its arguments, its answer, its Graph request.
 These two things are not, and both for the same reason: a model on the other end reads this server
@@ -23,6 +24,15 @@ exchange asked for and is deliberately NOT a `FastMCPError`: `fastmcp.server.dep
 `FastMCPError` subclasses out of dependency resolution unwrapped and wraps everything else, and
 being wrapped is what lets the middleware below recognise it by type. That is what makes an
 unconsented permission as fixable before the Graph call as a 403 is after it.
+
+The Client A Tool Is Handed
+
+`graph_client_for_caller` is the whole of what a tool needs to reach Graph. It is built in
+`register`, where the process-wide transport is in scope, and it resolves per call to a client that
+already carries the caller's token. The token above is its own dependency, so the exchange still
+happens once per call, and still inside the resolution FastMCP wraps a failure from. A tool that
+read the transport out of ambient state instead could be registered against nothing at all, and
+nothing would say so until its first call.
 
 One Mapping, Not One Per Tool
 
@@ -88,12 +98,14 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import cast, override
 
-from fastmcp.dependencies import Dependency
+import httpx
+from fastmcp.dependencies import Dependency, Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.types import CallToolRequestParams
+from msgraph.graph_service_client import GraphServiceClient
 
 from office_mcp.graph_client import (
     GraphFailure,
@@ -101,6 +113,7 @@ from office_mcp.graph_client import (
     GraphNotFound,
     GraphThrottled,
     GraphUnavailable,
+    graph_client_for,
 )
 
 # A Graph delegated permission, as a scope the On-Behalf-Of exchange can ask for. Graph accepts a
@@ -214,6 +227,30 @@ def graph_token(*permissions: str) -> str:
     permissions.
     """
     return cast("str", cast("object", GraphToken(*permissions)))
+
+
+def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> GraphServiceClient:
+    """A Graph client that calls as this call's signed-in user. Build inside `register`.
+
+    The two lifetimes a tool would otherwise hold apart itself: `transport` is process-wide and is
+    passed once, at registration, which is the only place that holds it; the token is per call and
+    is a dependency of this dependency, so FastMCP exchanges one per call and the tool body receives
+    a client that is already the caller's.
+
+    Trap: the result goes in a parameter default by NAME — `client: GraphServiceClient = graph` —
+    never as the call itself. A call in a default is ruff's B008, and it would build a second
+    exchange on every registration.
+
+    No cast, unlike `graph_token` above: `Depends` is annotated to return the factory's own type, so
+    the value is already the client as far as a tool body is concerned, and a real one as far as the
+    resolution engine is.
+    """
+    token = graph_token(*permissions)
+
+    def client_for_this_call(access_token: str = token) -> GraphServiceClient:
+        return graph_client_for(transport, access_token)
+
+    return Depends(client_for_this_call)
 
 
 class Advised(ToolError):
