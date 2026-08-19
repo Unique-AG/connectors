@@ -173,8 +173,26 @@ class TestFetchLatestFigure:
     @respx.mock
     async def test_a_malformed_point_fails_the_page(self, client: BackstopClient) -> None:
         respx.get(_URL).mock(
-            return_value=_page(_point("bad", date="2026-07-31", value="not-a-number"))
+            return_value=_page(
+                {"type": "values", "attributes": {"date": "2026-07-31", "value": 1.0}}
+            )
         )
 
         with pytest.raises(BackstopResponseSchemaError):
             await fetch_latest_figure(client, _PATH)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_non_numeric_value_is_unvalued_not_a_failed_page(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_URL).mock(
+            return_value=_page(_point("1", date="2026-07-31", value="not-a-number"))
+        )
+
+        point = await fetch_latest_figure(client, _PATH)
+
+        assert point is not None
+        assert point.latest.date == date(2026, 7, 31)
+        assert point.latest.value is None
+        assert point.valued is None
