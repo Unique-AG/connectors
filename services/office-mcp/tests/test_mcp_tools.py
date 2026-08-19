@@ -152,6 +152,30 @@ def graph() -> Iterator[respx.MockRouter]:
         yield router
 
 
+@pytest.fixture
+def recorded_spans() -> Iterator[InMemorySpanExporter]:
+    """Every span this process finishes during a test, collected in memory.
+
+    Trap: this used to be written out inside the test that reads it, ending in a loop over
+    `get_finished_spans()` and nothing that said the list was not empty. That is a privacy assertion
+    that passes hardest when nothing is traced at all — and until tracing was switched on, nothing
+    was. The tests that use it therefore assert a span was recorded before they assert what is not
+    in it.
+
+    The tracer provider is process-wide and can be set only once, so the exporter is attached to
+    whichever one is already in play and the collection is emptied on the way in rather than torn
+    down: a span from an earlier test would otherwise read as one of this test's own.
+    """
+    exporter = InMemorySpanExporter()
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    exporter.clear()
+    yield exporter
+
+
 def _build_app() -> Starlette:
     """The app with every tool there is, which is the surface these tests are written against.
 
@@ -607,6 +631,7 @@ class TestCallingThem:
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
         caplog: pytest.LogCaptureFixture,
+        recorded_spans: InMemorySpanExporter,
     ) -> None:
         """What a user searched their own messages for is as sensitive as the messages: it names
         people, deals and diagnoses. `services/teams-mcp` had to go back and strip query terms out
@@ -614,16 +639,10 @@ class TestCallingThem:
         so, over the whole call, not over one function.
 
         Both destinations are checked. The log capture covers everything this process emits during
-        the call, ours and FastMCP's own. The span exporter is attached to whatever tracer provider
-        is in play: no span is created on this path today, so that half is a ratchet — the day one
-        is added carrying the query, it fails here.
+        the call, ours and FastMCP's own. The span half is no longer a ratchet against a path that
+        creates no spans: the Graph SDK opens a dozen per request, and `recorded_spans` refuses to
+        pass on an empty list.
         """
-        exporter = InMemorySpanExporter()
-        provider = trace.get_tracer_provider()
-        if not isinstance(provider, TracerProvider):
-            provider = TracerProvider()
-            trace.set_tracer_provider(provider)
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
         secret = "acquisition-of-northwind-traders"
         caplog.set_level(logging.DEBUG)
@@ -637,8 +656,10 @@ class TestCallingThem:
         )
         for record in caplog.records:
             assert secret not in _record_text(record), f"logged by {record.name}"
-        for span in exporter.get_finished_spans():
-            assert secret not in str(span.attributes)
+        spans = recorded_spans.get_finished_spans()
+        assert spans, "nothing was traced, so the span half of this test asserts over an empty list"
+        for span in spans:
+            assert secret not in str(span.attributes), f"on span {span.name}"
 
     async def test_an_argument_this_tool_does_not_have_is_refused(
         self,
