@@ -19,6 +19,7 @@ from office_mcp.logging import configure_logging
 from office_mcp.metrics import configure_metrics
 from office_mcp.server import ready_response, surface_manifest
 from office_mcp.tools import register_tools, resolve
+from office_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRestoreMiddleware
 
 __all__ = ["create_app"]
 
@@ -92,7 +93,7 @@ def create_app(
         "Office MCP",
         version=config.version,
         auth=auth,
-        middleware=[],
+        middleware=[TraceContextRestoreMiddleware()],
         lifespan=lifespan,
     )
     register_tools(mcp, graph_transport, selection)
@@ -113,6 +114,9 @@ def create_app(
         """
         return PlainTextResponse(await surface_manifest(mcp, selection, version=config.version))
 
+    # Order here is outside-in and load-bearing: OpenTelemetryMiddleware has to have made the
+    # request's server span current before TraceContextCaptureMiddleware records the context, or
+    # every MCP span is parented to the request's parent instead of the request. See tracing.py.
     return mcp.http_app(
         middleware=[
             # A no-op meter provider on purpose. Left to the global one, this middleware's own
@@ -123,6 +127,7 @@ def create_app(
             # what http_server_active_requests would have said, so the toolkit series stays the only
             # one. Spans are unaffected — the tracer provider is untouched.
             Middleware(OpenTelemetryMiddleware, meter_provider=NoOpMeterProvider()),
+            Middleware(TraceContextCaptureMiddleware),
             ops_middleware,
         ]
     )
