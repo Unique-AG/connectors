@@ -112,12 +112,20 @@ store creates its table on first use.
 - Probe: `GET /probe` (process-up via setup_ops)
 - Ready: `GET /ready` (503 when Postgres unreachable; asks the OAuth store, the only connection
   a sign-in depends on. A different connection could report ready while sign-in still fails.)
-- Metrics: `GET /metrics` (Prometheus via setup_ops)
+- Metrics: `GET /metrics` (Prometheus via setup_ops). Beside unique_toolkit's own HTTP series, four
+  say what this connector asked Microsoft Graph for: `graph_requests_total{operation,status}`,
+  `graph_request_duration_seconds{operation}`, `graph_throttled_total{operation,retried}` and
+  `graph_pages_scanned{operation}`. `operation` is the tool's own name and never a URL — a label
+  taken off a Graph URL would be one time series per chat. `status` is the remedy the failure needs
+  (`forbidden`, `not_found`, `throttled`, `unavailable`), not the HTTP code. `retried` says whether
+  the SDK spent its retries on a 429 or refused the wait Graph asked for.
 - Traces: off unless an `OTEL_*` variable says where to send them. `OTEL_TRACES_EXPORTER=console`
   prints spans to stderr; an `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends them to a collector and
   needs nothing else. `.env.example` lists the knobs, the chart wires them from
   `internalServices.dependencies.otelTraces.enabled`. Latency stays on `/metrics` only: the ASGI
-  instrumentation's own duration histogram is switched off so one series measures it.
+  instrumentation's own duration histogram is switched off so one series measures it. A Graph
+  request span carries the URL template and not the URL: the SDK sets the full URL by default, and
+  a Graph URL here is a chat, message or transcript id and almost nothing else.
 
 ## Tests
 
