@@ -27,6 +27,7 @@ import logging
 from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass
 from typing import cast
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -61,6 +62,13 @@ _OBO_TOKEN = "synthetic-obo-graph-token"
 _REQUEST_ID = "synthetic-request-id-every-tool"
 _REFUSED = {"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
 
+# Arguments, invented. Every id is obviously fake; the handle is spelled the way the tool that mints
+# one spells it, because a tool that rejects its argument as not-a-handle never reaches Graph and
+# would pass this file while mapping nothing.
+_CHAT_ID = "19:release@thread.v2"
+_MESSAGE_ID = "1770000000000"
+_CHAT_MESSAGE_URI = f"teams:///chats/{quote(_CHAT_ID, safe='')}/messages/{_MESSAGE_ID}"
+
 
 @dataclass(frozen=True)
 class _Refused:
@@ -75,11 +83,15 @@ class _Refused:
     permissions: tuple[str, ...]
 
 
-# One entry per tool, and this file grows one as each tool arrives.
+# One entry per tool, and this file grows one as each tool arrives. `read_message` is the one whose
+# permissions are not its declared tuple: a message read is per surface, so a chat handle's refusal
+# names `Chat.Read` alone, and naming the channel permission as well would send an administrator
+# after one that was never missing.
 _EVERY_TOOL: Mapping[str, _Refused] = {
     "get_me": _Refused({}, ("User.Read",)),
     "list_chats": _Refused({}, ("Chat.Read",)),
     "search_messages": _Refused({"query": "release"}, ("Chat.Read", "ChannelMessage.Read.All")),
+    "read_message": _Refused({"uri": _CHAT_MESSAGE_URI}, ("Chat.Read",)),
 }
 
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
