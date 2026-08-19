@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.2](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.1...backstop-mcp@0.0.2) (2026-08-19)
+
+
+### Features
+
+* **backstop-mcp,main:** pull contact details and opportunities, and describe what we return ([#809](https://github.com/Unique-AG/connectors/issues/809)) ([b1157f8](https://github.com/Unique-AG/connectors/commit/b1157f8b8d3378faf062d0aea556dccb68abafe5))
+* **backstop-mcp:** add `get_product_positions` and `get_accounts_for_party` ([#812](https://github.com/Unique-AG/connectors/issues/812)) ([fcd0e26](https://github.com/Unique-AG/connectors/commit/fcd0e26929a2075be750a2168cc16e6016339d08))
+* **backstop-mcp:** carry the resource id on every projected include ([#811](https://github.com/Unique-AG/connectors/issues/811)) ([b4bec0b](https://github.com/Unique-AG/connectors/commit/b4bec0b428fa86c5aec8ff21b1cc39c9e142515f))
+
 ## 0.0.1 (2026-08-17)
 
 

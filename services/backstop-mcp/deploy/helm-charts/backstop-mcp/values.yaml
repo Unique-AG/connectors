@@ -26,7 +26,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/backstop-mcp
-  tag: 0.0.1 # x-release-please-version
+  tag: 0.0.2 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
