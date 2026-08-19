@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, ClassVar, Literal, Self
 
@@ -214,9 +213,10 @@ class PartyRecordResponse(ProvenanceAttributes):
     )
 
 
-@dataclass(frozen=True, slots=True)
-class FetchArgs:
+class FetchArgs(BaseModel):
     """Mode-agnostic inputs for the concurrent party + activity-type fan-out."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     segment: Segment
     entity_id: str

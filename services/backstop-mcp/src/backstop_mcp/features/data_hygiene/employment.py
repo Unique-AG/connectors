@@ -8,9 +8,10 @@ person fetch returns the person with employment links rather than hiding the rec
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import date
-from typing import TypeGuard
+from typing import ClassVar, TypeGuard
+
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.data_hygiene.api_responses import (
@@ -36,17 +37,19 @@ type RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
 type RelationshipTypeResource = BackstopApiResource[RelationshipTypeAttributes]
 
 
-@dataclass(frozen=True)
-class _Employer:
+class _Employer(BaseModel):
     """The organization side of one person→org relationship, once it is known to have both."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     organization_id: str
     organization_type: str
 
 
-@dataclass(frozen=True)
-class _Person:
+class _Person(BaseModel):
     """The person side of one person→org relationship, once it is known to have both."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     person_id: str
     person_type: str

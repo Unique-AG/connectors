@@ -1,7 +1,8 @@
-from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import TypedDict
+from typing import ClassVar
+
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.data_hygiene.api_responses import (
@@ -45,14 +46,15 @@ class DepartureSignal(StrEnum):
     END_DATE = "end_date_passed"
 
 
-@dataclass(frozen=True)
-class DepartedEmploymentDto:
+class DepartedEmploymentDto(BaseModel):
     """A hard signal that the person is no longer employed at an organization.
 
     The organization is always identified: a relationship whose organization side carries no
     `resourceId` is skipped rather than reported, because a departure nobody can attribute to a
     company is not a usable answer — see `employment._employer_side`.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     signal: DepartureSignal
     organization_id: str
@@ -62,8 +64,7 @@ class DepartedEmploymentDto:
     relationship_type_name: str | None = None
 
 
-@dataclass(frozen=True)
-class TypeVocabularyDto:
+class TypeVocabularyDto(BaseModel):
     """Which entity-relationship types a deployment puts in one bucket.
 
     Two ways in, because a tenant can supply either. `type_ids` are exact but per-instance — an
@@ -72,6 +73,8 @@ class TypeVocabularyDto:
     them. Both fields are required: a match must be a function of what was injected, never of
     which default a call site happened to leave out.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     type_ids: frozenset[str]
     name_markers: frozenset[str]
@@ -90,8 +93,7 @@ class TypeVocabularyDto:
         return any(marker.casefold() in lowered for marker in self.name_markers)
 
 
-@dataclass(frozen=True)
-class EmploymentEdgeDto:
+class EmploymentEdgeDto(BaseModel):
     """One person→org relationship, normalised out of the raw Backstop payload.
 
     `status` comes from `classify_employment` (`CURRENT` / `FORMER`; `IRRELEVANT` edges never
@@ -101,6 +103,8 @@ class EmploymentEdgeDto:
     status is `FORMER`.
     """
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     person_id: str
     person_type: str
     organization_id: str
@@ -112,8 +116,7 @@ class EmploymentEdgeDto:
     departure: DepartedEmploymentDto | None
 
 
-@dataclass(frozen=True)
-class EmploymentRecordDto:
+class EmploymentRecordDto(BaseModel):
     """The resolved answer for one person/organization pair, after edges are reduced to one.
 
     Always carries both sides of the pair. `status` is only `CURRENT` or `FORMER` — unknown
@@ -121,6 +124,8 @@ class EmploymentRecordDto:
     set only when status is `FORMER`.
     """
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     person_id: str
     person_type: str
     organization_id: str
@@ -132,8 +137,7 @@ class EmploymentRecordDto:
     departure: DepartedEmploymentDto | None
 
 
-@dataclass(frozen=True)
-class EmploymentRulesDto:
+class EmploymentRulesDto(BaseModel):
     """Everything about reading a tenant's `entityRelationships` that a deployment can set.
 
     Both halves are tenant vocabulary rather than anything Backstop guarantees. `employment`
@@ -151,10 +155,14 @@ class EmploymentRulesDto:
     that `is a former employee of` had correctly raised.
     """
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     employment: TypeVocabularyDto
     former: TypeVocabularyDto
 
 
-class EntityRelationshipsDto(TypedDict):
+class EntityRelationshipsDto(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     relationships: list[BackstopApiResource[EntityRelationshipAttributes]]
     relationship_types: list[BackstopApiResource[RelationshipTypeAttributes]]

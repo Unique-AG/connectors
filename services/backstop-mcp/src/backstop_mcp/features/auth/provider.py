@@ -3,7 +3,6 @@ import logging
 import secrets
 import time
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal, override
 
@@ -18,7 +17,7 @@ from mcp.server.auth.provider import (
 from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
 from mcp.shared.auth import OAuthClientInformationFull
 from mcp.shared.auth import OAuthToken as OAuthTokenResponse
-from pydantic import AnyUrl, SecretStr
+from pydantic import AnyUrl, BaseModel, ConfigDict, SecretStr
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
@@ -73,18 +72,20 @@ def _source_ip(request: Request) -> str | None:
 # results as types rather than a set of booleans keeps every database branch a single `return`.
 
 
-@dataclass(frozen=True)
-class _RefreshRotated:
+class _RefreshRotated(BaseModel):
     """The token rotated successfully. `scopes` are the ones actually granted."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     access_token: str
     refresh_token: str
     scopes: list[str]
 
 
-@dataclass(frozen=True)
-class _RefreshRejected:
+class _RefreshRejected(BaseModel):
     """The rotation was refused, carrying the OAuth error the caller should raise."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     error: Literal["invalid_grant", "invalid_scope"]
     description: str
@@ -92,11 +93,13 @@ class _RefreshRejected:
 
 type _RefreshOutcome = _RefreshRotated | _RefreshRejected
 
-_UNKNOWN_TOKEN = _RefreshRejected("invalid_grant", "Unknown refresh token")
-_REUSED_TOKEN = _RefreshRejected("invalid_grant", "Refresh token has already been used")
-_EXPIRED_TOKEN = _RefreshRejected("invalid_grant", "Refresh token has expired")
+_UNKNOWN_TOKEN = _RefreshRejected(error="invalid_grant", description="Unknown refresh token")
+_REUSED_TOKEN = _RefreshRejected(
+    error="invalid_grant", description="Refresh token has already been used"
+)
+_EXPIRED_TOKEN = _RefreshRejected(error="invalid_grant", description="Refresh token has expired")
 _INVALID_SCOPE = _RefreshRejected(
-    "invalid_scope", "Requested scope exceeds originally granted scopes"
+    error="invalid_scope", description="Requested scope exceeds originally granted scopes"
 )
 
 # Applied to every login-endpoint response. `Referrer-Policy` is the load-bearing one: the
