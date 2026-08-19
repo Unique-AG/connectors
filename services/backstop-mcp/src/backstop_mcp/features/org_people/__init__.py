@@ -4,8 +4,10 @@
 paginated walk of `GET /organizations/{id}/employees` with
 `include=entityRelationships,entityRelationships.entityRelationshipType` and a sparse
 `fields[employees]` fieldset for the contact card. Status is the same `EmploymentIndex`
-`get_person` uses, built from those side-loads. `/employees` is current staff only — pass
-`include_former` to also walk the organization's `entityRelationships` for former people.
+`get_person` uses, built from those side-loads. `/employees` is current staff only, so the
+organization's `entityRelationships` are always walked as well — former people live there,
+and `former_omitted` needs that walk. `include_former` only controls whether they are
+returned.
 """
 
 from backstop_mcp.features.org_people.fetch import fetch_people_for_organization

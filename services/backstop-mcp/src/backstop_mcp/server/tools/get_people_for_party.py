@@ -3,9 +3,9 @@
 `numberOfEmployees` on the organization record is not a roster. Current staff come from
 `GET /organizations/{id}/employees` with a sparse employee fieldset and
 `include=entityRelationships,entityRelationships.entityRelationshipType`.
-Status is `EmploymentIndex` over those side-loads.
-Former people are not on `/employees` — pass `include_former` to scan the organization's
-`entityRelationships`.
+Status is `EmploymentIndex` over those side-loads and the organization's
+`entityRelationships`. Former people are not on `/employees`; when `include_former` is
+false they are counted on `former_omitted` rather than listed.
 """
 
 import logging
@@ -88,9 +88,11 @@ async def get_people_for_party(
 
     Each row is identity (`id` / `search_type` / name / email) plus `employment` from
     `EmploymentIndex` — `status` is `current` or `former` at this organization. Default is
-    current only. `/employees` does not list former staff; pass `include_former=true` to
-    scan the organization's `entityRelationships` for those links (contact fields may be
-    absent). Call `get_person` with that row's `id` and `search_type` for the full record.
+    current only. `/employees` does not list former staff; those links are on the
+    organization's `entityRelationships`. When they are omitted, `former_omitted` and
+    `include_former_hint` say so — pass `include_former=true` to include them (contact
+    fields may be absent). Call `get_person` with that row's `id` and `search_type` for
+    the full record.
     """
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")

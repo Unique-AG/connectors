@@ -10,7 +10,12 @@ from backstop_mcp.features.org_people import OrgPeopleResolvedResponse
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.server.tools.registry import TOOLS
-from tests.features.data_hygiene.helpers import EMPLOYEE_TYPE, person_org, relationship_types
+from tests.features.data_hygiene.helpers import (
+    EMPLOYEE_TYPE,
+    FORMER_MIRROR_TYPE,
+    person_org,
+    relationship_types,
+)
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import BASE_URL
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
@@ -19,6 +24,7 @@ type ConnectUser = Callable[..., object]
 
 _ORG = "341764767"
 _EMPLOYEES_URL = f"{BASE_URL}/organizations/{_ORG}/employees"
+_ER_URL = f"{BASE_URL}/organizations/{_ORG}/entityRelationships"
 
 
 class TestGetPeopleForParty:
@@ -57,6 +63,7 @@ class TestGetPeopleForParty:
                 },
             )
         )
+        respx.get(_ER_URL).mock(return_value=httpx.Response(200, json={"data": []}))
 
         result = tool_model(
             await get_people_for_party(ctx_never_elicit(), party_id=_ORG),
@@ -82,6 +89,7 @@ class TestGetPeopleForParty:
     async def test_empty_employees_is_not_former_omitted(self, connect_user: ConnectUser) -> None:
         await connect_user("user-orgp-2", "orgp-carol")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(200, json={"data": []}))
+        respx.get(_ER_URL).mock(return_value=httpx.Response(200, json={"data": []}))
 
         result = tool_model(
             await get_people_for_party(ctx_never_elicit(), party_id=_ORG),
@@ -91,6 +99,42 @@ class TestGetPeopleForParty:
         assert result.people == ()
         assert result.former_omitted == 0
         assert result.include_former_hint is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_former_only_org_sets_include_former_hint(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-orgp-4", "orgp-erin")  # pyright: ignore[reportGeneralTypeIssues]
+        respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(200, json={"data": []}))
+        respx.get(_ER_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        person_org(
+                            "er-former",
+                            source_type="organizations",
+                            source_id=_ORG,
+                            dest_type="people",
+                            dest_id="p2",
+                            type_id=FORMER_MIRROR_TYPE,
+                        )
+                    ],
+                    "included": relationship_types(FORMER_MIRROR_TYPE),
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_people_for_party(ctx_never_elicit(), party_id=_ORG),
+            OrgPeopleResolvedResponse,
+        )
+
+        assert result.people == ()
+        assert result.former_omitted == 1
+        assert result.include_former_hint is not None
+        assert "include_former=true" in result.include_former_hint
 
     @pytest.mark.asyncio
     @respx.mock

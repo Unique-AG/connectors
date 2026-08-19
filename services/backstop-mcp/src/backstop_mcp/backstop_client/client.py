@@ -147,7 +147,9 @@ class BackstopClient:
             )
         # Backstop requires the offset to be a multiple of the limit; 0 always satisfies that.
         # Later pages carry their own offset — from `links.next` serially, or from
-        # `offset_params` below, which strides by the page size the first page actually returned.
+        # `offset_params` below, which strides by the page size the first page actually
+        # returned and sends that size as the limit. Keeping the originally requested
+        # limit after a cap would make those offsets illegal.
         if offset_param not in first_page_params:
             first_page_params[offset_param] = 0
 
@@ -156,8 +158,8 @@ class BackstopClient:
         ) -> httpx.Response:
             return await self.raw_request("GET", page_path, params=page_params)
 
-        def offset_params(offset: int) -> dict[str, object]:
-            return {**first_page_params, offset_param: offset}
+        def offset_params(offset: int, page_size: int) -> dict[str, object]:
+            return {**first_page_params, limit_param: page_size, offset_param: offset}
 
         return await paginate_all(
             fetch_page=fetch_page,

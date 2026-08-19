@@ -509,6 +509,48 @@ class TestPaginate:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_parallel_rewrites_limit_to_the_capped_page_size(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        """A capped first page must not keep the originally requested limit on later offsets."""
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "1"}, {"id": "2"}],
+                        "meta": {"totalResourceCount": 5},
+                    },
+                ),
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "3"}, {"id": "4"}],
+                        "meta": {"totalResourceCount": 5},
+                    },
+                ),
+                httpx.Response(
+                    200, json={"data": [{"id": "5"}], "meta": {"totalResourceCount": 5}}
+                ),
+            ]
+        )
+
+        result = await factory.for_credential(_credential()).paginate(
+            "/records",
+            schema=_Record,
+            page_size=10,
+            max_records=None,
+            parallel=True,
+        )
+
+        assert [record.id for record in result.items] == ["1", "2", "3", "4", "5"]
+        requested = recorded_params(route)
+        assert requested[0]["page[limit]"] == "10"
+        assert sorted(params["page[offset]"] for params in requested) == ["0", "2", "4"]
+        assert {params["page[limit]"] for params in requested[1:]} == {"2"}
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_paginate_is_serial_by_default(self, factory: BackstopClientFactory) -> None:
         """A true total is not enough on its own — the fan-out has to be asked for."""
         route = respx.get(f"{_BASE_URL}/records").mock(

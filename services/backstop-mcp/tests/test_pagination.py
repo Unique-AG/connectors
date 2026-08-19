@@ -35,8 +35,8 @@ async def _fetch_page(path: str, params: dict[str, object] | None) -> httpx.Resp
         return await client.get(path, params=params)  # pyright: ignore[reportArgumentType]
 
 
-def _offset_params(offset: int) -> dict[str, object]:
-    return {"page[limit]": 2, "page[offset]": offset}
+def _offset_params(offset: int, page_size: int) -> dict[str, object]:
+    return {"page[limit]": page_size, "page[offset]": offset}
 
 
 def _requested_offsets(route: respx.Route) -> list[str]:
@@ -272,6 +272,35 @@ class TestPaginateOffsets:
         assert result.total_count == 5
         # Strided by the page size the first page actually returned, never by links.next.
         assert sorted(_requested_offsets(route)) == ["0", "2", "4"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_later_pages_use_the_served_page_size_not_the_requested_limit(self) -> None:
+        # Backstop caps some collections below the asked-for limit. Offsets must be
+        # multiples of the limit on the wire, so later pages have to send the size
+        # page one actually returned — not the 10 that was asked for.
+        route = respx.get(f"{_BASE_URL}/records").mock(
+            side_effect=[
+                httpx.Response(200, json=_page([{"id": "1"}, {"id": "2"}], total_count=5)),
+                httpx.Response(200, json=_page([{"id": "3"}, {"id": "4"}], total_count=5)),
+                httpx.Response(200, json=_page([{"id": "5"}], total_count=5)),
+            ]
+        )
+
+        result = await paginate_all(
+            fetch_page=_fetch_page,
+            first_path="/records",
+            schema=_Record,
+            max_records=None,
+            first_page_params={"page[limit]": 10, "page[offset]": 0},
+            offset_params=_offset_params,
+        )
+
+        assert [record.id for record in result.items] == ["1", "2", "3", "4", "5"]
+        requested = recorded_params(route)
+        assert requested[0]["page[limit]"] == "10"
+        assert sorted(params["page[offset]"] for params in requested) == ["0", "2", "4"]
+        assert [params["page[limit]"] for params in requested[1:]] == ["2", "2"]
 
     @pytest.mark.asyncio
     @respx.mock

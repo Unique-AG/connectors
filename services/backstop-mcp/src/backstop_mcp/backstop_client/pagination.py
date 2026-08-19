@@ -10,10 +10,14 @@ from typing_extensions import TypeVar
 from backstop_mcp.backstop_client.utils import deserialize
 
 FetchPage = Callable[[str, dict[str, object] | None], Awaitable[httpx.Response]]
-# Query params for the page at a given offset. Supplied by the caller that owns the
-# limit/offset parameter *names* (`BackstopClient.paginate`), so this module never has to know
-# them: it decides which offsets to ask for, not what they are called on the wire.
-OffsetPageParams = Callable[[int], dict[str, object]]
+# Query params for the page at a given offset, using the page size the first page actually
+# returned. Supplied by the caller that owns the limit/offset parameter *names*
+# (`BackstopClient.paginate`), so this module never has to know them: it decides which
+# offsets to ask for, not what they are called on the wire.
+# `(offset, page_size)` — `page_size` is what Backstop served on page one, which later
+# pages must send as the limit. Offsets are multiples of that size; keeping the originally
+# requested limit after a cap would make them illegal.
+OffsetPageParams = Callable[[int, int], dict[str, object]]
 
 T = TypeVar("T", default=dict[str, object])
 
@@ -151,6 +155,11 @@ async def paginate_all(
     would ask for the wrong number of pages and quietly return a short answer. Opt in only where
     the total is known to be a true total. A collection changing under a concurrent walk can also
     duplicate or skip a row across the offset boundary, exactly as it can under a serial one.
+
+    Each later call is `offset_params(offset, page_size)` where `page_size` is `len(first.items)`
+    — the limit Backstop actually served, which may be below what was asked. Offsets stride by
+    that size and the callback must send it as the limit; Backstop rejects an offset that is not
+    a multiple of the limit on the wire.
     """
     accumulator: _Accumulator[T] = _Accumulator(PageResult())
     first = parse_page(
@@ -166,13 +175,15 @@ async def paginate_all(
     # below what was asked for. An empty first page leaves nothing to stride by, so that case
     # falls through to `links.next`.
     if offset_params is not None and first.total_count is not None and first.items:
+        page_size = len(first.items)
         pages = await _fetch_offsets(
             fetch_page=fetch_page,
             path=first_path,
             schema=schema,
+            page_size=page_size,
             offsets=_offsets(
                 total_count=first.total_count,
-                page_size=len(first.items),
+                page_size=page_size,
                 max_records=max_records,
             ),
             offset_params=offset_params,
@@ -209,6 +220,7 @@ async def _fetch_offsets(
     fetch_page: FetchPage,
     path: str,
     schema: type[T],
+    page_size: int,
     offsets: range,
     offset_params: OffsetPageParams,
 ) -> list[SinglePage[T]]:
@@ -220,6 +232,6 @@ async def _fetch_offsets(
     handed a silently short list has no way to tell.
     """
     responses = await asyncio.gather(
-        *(fetch_page(path, offset_params(offset)) for offset in offsets)
+        *(fetch_page(path, offset_params(offset, page_size)) for offset in offsets)
     )
     return [parse_page(response.content, schema, path=path) for response in responses]
