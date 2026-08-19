@@ -10,14 +10,27 @@ caller must re-derive remedies from the status code. This module draws distincti
 
 Anything else (400, 409) raises base GraphFailure. Inventing categories per status code would
 guess at remedies that do not exist.
+
+`graph_errors` also counts and times the call it wraps. It is the seam every Graph call already
+goes through, and the categories above are exactly the `status` a counter wants — measuring
+anywhere else would mean re-deriving them. The instruments themselves live in
+`graph_client/observability.py`; this module supplies the taxonomy and nothing else about them.
 """
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from time import perf_counter
 
 import httpx
 from kiota_abstractions.api_error import APIError
+from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
+
+from office_mcp.graph_client.observability import (
+    graph_operation,
+    record_graph_call,
+    record_graph_throttled,
+)
 
 
 class GraphFailure(Exception):
@@ -91,26 +104,84 @@ class GraphUnavailable(GraphFailure):
     """
 
 
-@contextmanager
-def graph_errors() -> Generator[None]:
-    """Translate SDK failures into the four Graph error types for one block of calls.
+# The `status` label each failure is counted under. Named per class rather than derived from the
+# HTTP code, because the code is the thing this module exists to stop callers reading: 401 and 403
+# are one remedy, 500 and 503 are another, and a counter keyed on the code would have a series per
+# thing Graph can answer.
+_STATUS: dict[type[GraphFailure], str] = {
+    GraphThrottled: "throttled",
+    GraphForbidden: "forbidden",
+    GraphNotFound: "not_found",
+    GraphUnavailable: "unavailable",
+    GraphFailure: "failed",
+}
 
-    Wrap a tool's entire Graph work in one with statement, not each call. Classification is the
-    same everywhere; copying try/except into every tool wastes code.
+_OK = "ok"
+
+# What a call is counted as when something left this block that is not a Graph failure at all — an
+# `assert` in the caller's own code, a cancellation. Not "failed": a Graph status must mean Graph
+# said something.
+_UNCLASSIFIED = "error"
+
+
+@contextmanager
+def graph_errors(operation: str | None = None) -> Generator[None]:
+    """Translate SDK failures into Graph error types, and count what the call cost.
+
+    `operation` is the name this call is counted under — pass the tool's own `TOOL_NAME`. It must be
+    a name chosen in code and never anything off the URL; see `observability.py` for why that is a
+    hard rule rather than a preference. Left out, the call is not measured at all, which is what a
+    test driving the SDK directly wants and is a defect in a tool: the tool is then missing from
+    every Graph dashboard rather than showing up under a wrong name.
     """
+    started = perf_counter()
+    # Pessimistic on purpose: every path below replaces it, so this value surviving means an
+    # exception escaped that this seam does not know how to describe.
+    status = _UNCLASSIFIED
     try:
-        yield
+        with graph_operation(operation):
+            yield
+        status = _OK
     except APIError as error:
-        raise _classify(error) from error
+        failure = _classify(error)
+        status = _status_of(failure)
+        if isinstance(failure, GraphThrottled):
+            record_graph_throttled(operation, retried=_sdk_spent_its_retries(failure))
+        raise failure from error
     except httpx.TransportError as error:
-        # No HTTP response at all: DNS, connect, read timeout. Never reaches `APIError`, which
-        # the request adapter only raises once a response exists.
+        # DNS, connect, or read timeout: no HTTP response exists yet. The request adapter raises
+        # `APIError` only once a response exists, so this failure never reaches that clause.
+        status = _STATUS[GraphUnavailable]
         raise GraphUnavailable(
             f"Could not reach Microsoft Graph: {error}",
             status=None,
             code=None,
             request_id=None,
         ) from error
+    finally:
+        record_graph_call(operation, status=status, seconds=perf_counter() - started)
+
+
+def _status_of(failure: GraphFailure) -> str:
+    """The label for this failure. A subclass nobody has written yet counts as a plain failure."""
+    return _STATUS.get(type(failure), _STATUS[GraphFailure])
+
+
+def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
+    """Whether the SDK retried this 429 before giving up on it.
+
+    A 429 the SDK recovered from never reaches this module, so every throttling counted here is
+    throttling that survived — and it survives in two ways with opposite remedies. The retry
+    handler refuses to wait at all once the delay reaches its 180 s ceiling
+    (`kiota_http/middleware/retry_handler.py:97`), so a `Retry-After` that long means no attempt was
+    made and the answer is available later; anything shorter means `GraphSettings.max_retries`
+    attempts were spent and the quota is genuinely gone.
+
+    No header at all reads as retried, because that is what the SDK does with one: it falls back to
+    exponential backoff, which is always under the ceiling.
+    """
+    advice = failure.retry_after_seconds
+    return advice is None or advice < RetryHandlerOption.MAX_DELAY
 
 
 def _classify(error: APIError) -> GraphFailure:

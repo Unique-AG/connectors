@@ -13,6 +13,12 @@ from office_mcp.graph_client.errors import (
     GraphUnavailable,
     graph_errors,
 )
+from office_mcp.graph_client.observability import (
+    GRAPH_PAGES_SCANNED,
+    GRAPH_REQUEST_DURATION_SECONDS,
+    GRAPH_REQUESTS_TOTAL,
+    GRAPH_THROTTLED_TOTAL,
+)
 from office_mcp.graph_client.pagination import (
     MAX_SCANNED_ITEMS,
     CollectedItems,
@@ -21,6 +27,10 @@ from office_mcp.graph_client.pagination import (
 from office_mcp.graph_client.settings import GraphSettings
 
 __all__ = [
+    "GRAPH_PAGES_SCANNED",
+    "GRAPH_REQUESTS_TOTAL",
+    "GRAPH_REQUEST_DURATION_SECONDS",
+    "GRAPH_THROTTLED_TOTAL",
     "MAX_SCANNED_ITEMS",
     "CollectedItems",
     "GraphFailure",
