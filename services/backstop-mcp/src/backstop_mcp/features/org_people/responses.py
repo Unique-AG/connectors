@@ -1,16 +1,43 @@
-"""MCP-facing people-at-organization listing."""
+"""MCP-facing person and organization records, and the people-at-organization listing."""
 
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
-from backstop_mcp.features.data_hygiene import EmploymentLinkResponse
+from backstop_mcp.features.data_hygiene import EmploymentLinkResponse, ProvenanceAttributes
 from backstop_mcp.features.org_people.internal_dto import (
     OrgPeopleListingDto,
     PersonAtOrganizationDto,
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 from backstop_mcp.models import OmitNoneModel
+
+
+class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
+    """Person resource attributes; extras preserved for the tool payload."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str | None = Field(
+        default=None,
+        description="Display name as Backstop stores it, usually 'Last, First'.",
+    )
+
+
+class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
+    """Shape of an organization resource's `attributes` in `get_organization`'s response.
+
+    `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
+    `AsOfResponse.from_attributes` can read provenance from the model rather than string keys
+    on a dump.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str | None = Field(
+        default=None,
+        description="Organization name as Backstop stores it.",
+    )
 
 
 class PersonAtOrganizationResponse(OmitNoneModel):
