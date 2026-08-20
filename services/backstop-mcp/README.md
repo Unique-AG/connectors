@@ -18,6 +18,7 @@ instance, and an ambiguous match asks the user to pick one.
 src/backstop_mcp/
   app.py                 ASGI assembly: logging, metrics, FastMCP, TOOLS, routes, lifespan
   dependencies.py        cached providers for configs, engine, client factory, auth
+  teardown.py            close_singletons(): release the pools, drop every cached provider
   config.py              one BaseSettings class per concern; read by the config providers
   logging.py metrics.py  cross-cutting
   features/              what the connector does; each may own tools/ and dependencies.py
@@ -48,16 +49,17 @@ every tool file appears in `TOOLS`).
 1. Create `features/<name>/` with the model layers `api_responses` → `internal_dto` → `responses`.
 2. Put the fetch in a module named after the function it defines.
 3. Add `dependencies.py` with an `@lru_cache(maxsize=1)` provider only if the feature owns a
-   long-lived service, exported through `__init__`.
+   long-lived service, exported through `__init__` and listed in `teardown.PROVIDERS`.
 4. Add `tools/<tool_name>.py` defining exactly one `FunctionTool` bound to a symbol matching the
    filename.
 5. Declare collaborators as `Depends(...)` parameters, which stay out of the published schema.
 6. Write the test under `tests/features/<name>/tools/`, passing collaborators as kwargs rather
    than standing up a database.
 
-Two rules an agent will otherwise break, both enforced by `tests/test_layering.py`: a tool is
-registered by being added to `server/tools/registry.py` as well as written, and nothing under
-`features/` may import `server/`.
+Three rules an agent will otherwise break, each enforced by a test: a tool is registered by being
+added to `server/tools/registry.py` as well as written, and nothing under `features/` may import
+`server/` (both `tests/test_layering.py`); a cached provider is torn down by being listed in
+`teardown.PROVIDERS` as well as written (`tests/test_teardown.py`).
 
 ## Run locally
 

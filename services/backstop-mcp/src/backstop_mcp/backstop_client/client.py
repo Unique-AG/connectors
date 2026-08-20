@@ -58,9 +58,9 @@ class BackstopClient:
 
     Built by `BackstopClientFactory` — tool implementations never construct this themselves,
     and never construct settings either (the factory owns the one set translated from config by
-    `create_app`). All cross-cutting concerns — auth headers, the per-user concurrency gate,
-    endpoint-aware timeouts, 401/429/error mapping, rate-limit-aware retry, metrics — live in
-    `raw_request()`, which every public method funnels through.
+    `dependencies.transport_settings`). All cross-cutting concerns — auth headers, the per-user
+    concurrency gate, endpoint-aware timeouts, 401/429/error mapping, rate-limit-aware retry,
+    metrics — live in `raw_request()`, which every public method funnels through.
 
     Typed verbs always take a response `schema`. Prefer those for tool/feature code. Use
     `raw_request` only when the body is intentionally ignored (e.g. credential verification) —

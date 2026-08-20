@@ -9,7 +9,7 @@ from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
-from backstop_mcp.dependencies import close_singletons
+from backstop_mcp.teardown import close_singletons
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 

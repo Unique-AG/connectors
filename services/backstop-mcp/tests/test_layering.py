@@ -548,9 +548,7 @@ def _tool_module_definition_violations(source: str, path: pathlib.Path) -> list[
     if len(names) != 1:
         return [f"{display} defines {len(names)} @tool functions, expected 1"]
     if names[0] != path.stem:
-        return [
-            f"{display} @tool function {names[0]!r} does not match filename {path.stem!r}"
-        ]
+        return [f"{display} @tool function {names[0]!r} does not match filename {path.stem!r}"]
     return []
 
 
@@ -824,17 +822,13 @@ class TestTheDetectionItself:
         assert _tool_module_definition_violations(
             "async def get_person(): ...\n",
             _FEATURES / "org_people" / "tools" / "get_person.py",
-        ) == [
-            "features/org_people/tools/get_person.py defines 0 @tool functions, expected 1"
-        ]
+        ) == ["features/org_people/tools/get_person.py defines 0 @tool functions, expected 1"]
 
     def test_catches_a_tool_module_with_two_tools(self) -> None:
         assert _tool_module_definition_violations(
             "@tool\nasync def get_person(): ...\n@tool\nasync def other(): ...\n",
             _FEATURES / "org_people" / "tools" / "get_person.py",
-        ) == [
-            "features/org_people/tools/get_person.py defines 2 @tool functions, expected 1"
-        ]
+        ) == ["features/org_people/tools/get_person.py defines 2 @tool functions, expected 1"]
 
     def test_accepts_a_tool_module_with_one_matching_tool(self) -> None:
         assert not _tool_module_definition_violations(

@@ -110,9 +110,7 @@ class TestGetPeopleForParty:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_former_only_org_sets_include_former_hint(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_former_only_org_sets_include_former_hint(self, client: BackstopClient) -> None:
         respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(200, json={"data": []}))
         respx.get(_ER_URL).mock(
             return_value=httpx.Response(

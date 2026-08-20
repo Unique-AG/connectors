@@ -1,3 +1,9 @@
+"""The cached providers tools and `create_app` resolve their collaborators from.
+
+Releasing them is `teardown.close_singletons()`, which lives in its own module so it can import
+the feature-owned providers without this one importing `features/` back.
+"""
+
 from functools import lru_cache
 
 from fastmcp.dependencies import Depends
@@ -138,32 +144,3 @@ def retry_settings(config: BackstopConfig) -> RetrySettings:
     return RetrySettings(
         max_attempts=config.max_retry_attempts, max_wait_ms=config.max_retry_wait_ms
     )
-
-
-async def close_singletons() -> None:
-    try:
-        if get_backstop_client_factory.cache_info().currsize:
-            await get_backstop_client_factory().aclose()
-        if get_engine.cache_info().currsize:
-            await get_engine().dispose()
-    finally:
-        get_app_config.cache_clear()
-        get_backstop_config.cache_clear()
-        get_database_config.cache_clear()
-        get_encryption_config.cache_clear()
-        get_auth_config.cache_clear()
-        get_activity_history_config.cache_clear()
-        get_engine.cache_clear()
-        get_session_factory.cache_clear()
-        get_encryption_key.cache_clear()
-        get_backstop_client_factory.cache_clear()
-        get_auth_provider.cache_clear()
-        from backstop_mcp.features.activity_history import get_activity_history_settings
-        from backstop_mcp.features.custom_fields import get_custom_fields_service
-        from backstop_mcp.features.data_hygiene import get_employment_index_factory
-        from backstop_mcp.features.opportunities import get_opportunity_stages_service
-
-        get_activity_history_settings.cache_clear()
-        get_custom_fields_service.cache_clear()
-        get_employment_index_factory.cache_clear()
-        get_opportunity_stages_service.cache_clear()

@@ -82,7 +82,9 @@ class TestGetAccountsForParty:
 
         result = tool_model(
             await get_accounts_for_party(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
                 client=client,
             ),
             PartyAccountsResolvedResponse,
@@ -111,7 +113,9 @@ class TestGetAccountsForParty:
 
         result = tool_model(
             await get_accounts_for_party(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
                 client=client,
             ),
             PartyAccountsResolvedResponse,
@@ -131,7 +135,9 @@ class TestGetAccountsForParty:
 
         result = tool_model(
             await get_accounts_for_party(
-                ctx_never_elicit(), search_type="organizations", search="No Such Org",
+                ctx_never_elicit(),
+                search_type="organizations",
+                search="No Such Org",
                 client=client,
             ),
             NotFoundResponse,

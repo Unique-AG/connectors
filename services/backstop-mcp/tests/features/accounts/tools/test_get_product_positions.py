@@ -168,9 +168,7 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_zero_accounts_is_distinct_from_not_found(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_zero_accounts_is_distinct_from_not_found(self, client: BackstopClient) -> None:
         respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
         respx.get(_AUM_URL).mock(return_value=_series_page())
@@ -258,9 +256,7 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_gap_inside_the_tolerance_does_not_flag(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_a_gap_inside_the_tolerance_does_not_flag(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))

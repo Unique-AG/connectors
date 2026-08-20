@@ -103,9 +103,7 @@ def _record_keys(items: Sequence[TimelineRecord]) -> list[tuple[str, str]]:
 class TestFirstCallByTrustedPartyId:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_returns_default_streams_including_document(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_returns_default_streams_including_document(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
@@ -131,7 +129,8 @@ class TestFirstCallByTrustedPartyId:
 
         result = tool_model(
             await get_activity_history(
-                ctx_never_elicit(), _first(search_type="organizations", party_id="o42"),
+                ctx_never_elicit(),
+                _first(search_type="organizations", party_id="o42"),
                 client=client,
                 activity_history=_SETTINGS,
             ),
@@ -223,7 +222,8 @@ class TestFirstCallBySearch:
 
         result = tool_model(
             await get_activity_history(
-                ctx_decline(), _first(search_type="organizations", search="Capstone"),
+                ctx_decline(),
+                _first(search_type="organizations", search="Capstone"),
                 client=client,
                 activity_history=_SETTINGS,
             ),
@@ -254,9 +254,7 @@ class TestFirstCallBySearch:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_not_found_search_returns_the_query_it_used(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_not_found_search_returns_the_query_it_used(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
@@ -264,7 +262,8 @@ class TestFirstCallBySearch:
 
         result = tool_model_union(
             await get_activity_history(
-                ctx_never_elicit(), _first(search_type="people", search="Nope"),
+                ctx_never_elicit(),
+                _first(search_type="people", search="Nope"),
                 client=client,
                 activity_history=_SETTINGS,
             ),
@@ -510,7 +509,8 @@ class TestResumedCall:
         )
 
         first_result = await get_activity_history(
-            ctx_never_elicit(), _first(search_type="organizations", party_id="o42"),
+            ctx_never_elicit(),
+            _first(search_type="organizations", party_id="o42"),
             client=client,
             activity_history=_SETTINGS,
         )
@@ -677,9 +677,7 @@ class TestPartialFailurePropagates:
 class TestDocumentInclusion:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_document_appears_when_explicitly_requested(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_document_appears_when_explicitly_requested(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/organizations/o9").mock(
             return_value=httpx.Response(200, json=_org_document(org_id="o9"))

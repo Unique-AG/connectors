@@ -16,7 +16,9 @@ from tests.features.party_resolver.helpers import BASE_URL, resource
 from tests.helpers import custom_fields_service, tool_client
 from tests.server.tools.helpers import tool_model
 
-_INPUT = TypeAdapter(without_injected_parameters(list_custom_fields))
+# The published input schema: the tool's signature with the `Depends(...)` collaborators and
+# `Context` stripped, which is what FastMCP validates a call against.
+_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_custom_fields))
 
 
 def tenant(name: str) -> str:

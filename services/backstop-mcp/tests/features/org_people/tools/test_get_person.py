@@ -436,7 +436,9 @@ class TestGetPersonIncludes:
 
         result = tool_model(
             await get_person(
-                ctx_never_elicit(), party_id="p9", include=["email_addresses", "company"],
+                ctx_never_elicit(),
+                party_id="p9",
+                include=["email_addresses", "company"],
                 client=client,
                 employment_index_factory=_INDEX,
             ),
@@ -464,12 +466,14 @@ class TestGetPersonIncludes:
             return_value=httpx.Response(200, json=_person_document(EMPLOYEE_TYPE))
         )
 
-        payload = tool_payload(await get_person(
-            ctx_never_elicit(),
-            party_id="p9",
-            client=client,
-            employment_index_factory=_INDEX,
-        ))
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                client=client,
+                employment_index_factory=_INDEX,
+            )
+        )
 
         assert "included" not in payload
         assert person_get.calls.last.request.url.params["include"] == (
@@ -526,7 +530,9 @@ class TestGetPersonIncludes:
 
         result = tool_model(
             await get_person(
-                ctx_never_elicit(), party_id="p9", include=["locations", "representative"],
+                ctx_never_elicit(),
+                party_id="p9",
+                include=["locations", "representative"],
                 client=client,
                 employment_index_factory=_INDEX,
             ),
@@ -573,12 +579,14 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(
-            ctx_never_elicit(),
-            party_id="p9",
-            client=client,
-            employment_index_factory=_INDEX,
-        ))
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                client=client,
+                employment_index_factory=_INDEX,
+            )
+        )
 
         person = object_dict(payload["person"])
         assert "jobTitle" not in person
@@ -607,12 +615,14 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(
-            ctx_never_elicit(),
-            party_id="p9",
-            client=client,
-            employment_index_factory=_INDEX,
-        ))
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                client=client,
+                employment_index_factory=_INDEX,
+            )
+        )
 
         assert object_dict(payload["person"])["regularCustomFieldValues"] == custom_fields
 
@@ -628,12 +638,14 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(
-            ctx_never_elicit(),
-            party_id="p9",
-            client=client,
-            employment_index_factory=_INDEX,
-        ))
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                client=client,
+                employment_index_factory=_INDEX,
+            )
+        )
 
         assert "as_of" not in payload
 
@@ -656,12 +668,14 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(
-            ctx_never_elicit(),
-            party_id="p9",
-            client=client,
-            employment_index_factory=_INDEX,
-        ))
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                client=client,
+                employment_index_factory=_INDEX,
+            )
+        )
 
         resolved = object_dict(payload["resolved"])
         assert resolved["id"] == "p9"

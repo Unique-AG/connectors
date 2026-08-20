@@ -13,7 +13,6 @@ from starlette.responses import JSONResponse, Response
 from unique_mcp.monitoring import setup_ops
 
 from backstop_mcp.dependencies import (
-    close_singletons,
     get_app_config,
     get_auth_config,
     get_auth_provider,
@@ -25,6 +24,7 @@ from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.tools import TOOLS
+from backstop_mcp.teardown import close_singletons
 
 logger = logging.getLogger(__name__)
 

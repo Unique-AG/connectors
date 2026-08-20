@@ -1,13 +1,17 @@
 """Every field a tool returns to the model has a description FastMCP can publish."""
 
+import inspect
+from collections.abc import Awaitable, Callable
 from types import UnionType
 from typing import Annotated, TypeAliasType, cast, get_args, get_origin, get_type_hints
 
 from fastmcp.decorators import get_fastmcp_meta
+from fastmcp.dependencies import Depends
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
 from pydantic import BaseModel
 
 from backstop_mcp.server.tools import TOOLS
+from tests.server.tools.helpers import object_dict
 
 
 def _is_model(annotation: object) -> type[BaseModel] | None:
@@ -97,30 +101,37 @@ def test_every_tool_response_field_is_described() -> None:
     assert missing == []
 
 
-_DEPENDS_PARAM_NAMES = frozenset(
-    {
-        "client",
-        "employment_index_factory",
-        "custom_fields",
-        "opportunity_stages",
-        "activity_history",
-    }
-)
+# The marker `Depends(...)` leaves as a parameter default, taken from FastMCP's own export so a
+# rename on their side surfaces here rather than quietly matching nothing.
+_DEPENDS_MARKER = type(Depends(lambda: None))
+
+
+def test_the_tools_do_declare_depends_params() -> None:
+    """Guards the guard: with nothing to find, the leak test below passes vacuously."""
+    declared = {name for fn in TOOLS for name in _depends_params(fn)}
+
+    assert declared
 
 
 def test_depends_params_are_not_in_the_published_input_schema() -> None:
-    leaked = [
-        f"{fn.__name__}.{name}"
-        for fn in TOOLS
-        for name in _published_depends_params(fn)
-    ]
+    """Collaborators are resolved by FastMCP; the model must not see them as tool arguments."""
+    leaked = [f"{fn.__name__}.{name}" for fn in TOOLS for name in _published_depends_params(fn)]
+
     assert leaked == []
 
 
-def _published_depends_params(fn: object) -> list[str]:
+def _depends_params(fn: Callable[..., Awaitable[object]]) -> list[str]:
+    """The parameters this tool has FastMCP inject, read off the signature rather than listed."""
+    return [
+        name
+        for name, parameter in inspect.signature(fn).parameters.items()
+        if isinstance(cast("object", parameter.default), _DEPENDS_MARKER)
+    ]
+
+
+def _published_depends_params(fn: Callable[..., Awaitable[object]]) -> list[str]:
     meta = get_fastmcp_meta(fn)
     assert isinstance(meta, ToolMeta)
     tool = FunctionTool.from_function(fn, metadata=meta)
-    properties = tool.parameters.get("properties", {})
-    assert isinstance(properties, dict)
-    return [name for name in _DEPENDS_PARAM_NAMES if name in properties]
+    published = set(object_dict(cast("object", tool.parameters.get("properties", {}))))
+    return sorted(published.intersection(_depends_params(fn)))
