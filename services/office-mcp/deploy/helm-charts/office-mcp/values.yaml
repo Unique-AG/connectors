@@ -163,6 +163,23 @@ routes:
 # No migration hook: this service has no schema of its own. Its one table (`oauth_kv`) is created
 # by the OAuth state store on first use, so the app's database user needs CREATE on its schema.
 
+# The dashboard for the graph_* / mcp_* / python_http_* series this service exposes, shipped as a
+# ConfigMap the Grafana sidecar picks up (templates/grafana-dashboard.yaml, files/grafana-dashboard.json).
+# On by default: the ConfigMap is inert wherever no sidecar is watching, and a dashboard nobody
+# switched on is a dashboard nobody has during the first incident.
+#
+# The base chart has its own dashboard mechanism (`grafana.dashboards`, plural, reading
+# files/grafana/dashboards/*.json). It is not used here, and the template is not redundant: base
+# hardcodes `grafana_folder: apps`, and every MCP chart in this repo files its dashboard under
+# `mcp-servers` instead. Folder support in base would make this template deletable — until then,
+# deleting it moves the dashboard.
+grafana:
+  dashboard:
+    # -- Enable Grafana dashboard ConfigMap creation
+    enabled: true
+    # -- Grafana folder where the dashboard will be placed
+    folder: mcp-servers
+
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 networkPolicy:
   enabled: false
