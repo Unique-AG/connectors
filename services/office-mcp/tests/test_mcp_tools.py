@@ -2389,10 +2389,28 @@ class TestCallingThem:
 
 
 class TestTheTransportTheToolsShare:
-    async def test_it_is_closed_when_the_server_shuts_down(
+    """One transport for the whole process, and why nothing here asserts that it is closed.
+
+    This class used to assert `is_closed` after the lifespan exited, and it passed. It was
+    asserting a lie: `httpx.AsyncClient.aclose()` sets that flag on the client and then delegates to
+    `self._transport.aclose()`, and the transport a Graph client carries is `AsyncGraphTransport`,
+    which never overrides `aclose` and so inherits `httpx.AsyncBaseTransport.aclose` — a `pass`. The
+    connection pool underneath survived every shutdown; only the flag moved. Upstream bug, open and
+    unanswered: microsoft/kiota-python#494.
+
+    So the `aclose()` call is gone from the lifespan rather than reached around through the SDK's
+    private attributes, and with it the only thing that set the flag. What is left to assert is the
+    property the class is named for.
+    """
+
+    async def test_every_tool_is_handed_the_same_transport(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Transport closes when the server shuts down."""
+        """One transport, built once, for every tool in the process.
+
+        This is the claim worth holding: a transport per call means a cold TLS handshake per call
+        and a leaked connection pool per call, which is the cost the sharing exists to avoid.
+        """
         built: list[httpx.AsyncClient] = []
 
         def record(settings: GraphSettings) -> httpx.AsyncClient:
@@ -2402,10 +2420,11 @@ class TestTheTransportTheToolsShare:
 
         monkeypatch.setattr("office_mcp.app.create_graph_transport", record)
 
-        async with Client(FastMCPTransport(_server_of(_build_app()))):
-            assert built and not built[0].is_closed
+        async with Client(FastMCPTransport(_server_of(_build_app()))) as client:
+            tools = await client.list_tools()
 
-        assert built[0].is_closed
+        assert tools, "no tools registered, so sharing one transport asserts nothing"
+        assert len(built) == 1, f"{len(built)} transports built for one app"
 
 
 class TestWhatAModelIsToldWhenGraphRefuses:

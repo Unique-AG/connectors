@@ -51,6 +51,15 @@ env:
   #   TOOLS_PRESET: teams              # every tool there is
   #   TOOLS_ENABLED: get_me,list_chats # or name them; get_me is always on
   #
+  # How long one Microsoft Graph call may take, and how hard the SDK retries it. Optional and
+  # deliberately not set here: the defaults are sized for an interactive MCP client, and an overlay
+  # that raises them buys a slower failure rather than a better answer — what is really being turned
+  # is the worst case of one tool call, the request timeout times GRAPH_MAX_RETRIES + 1 attempts,
+  # before any Retry-After wait, per Graph call, and a paged walk makes several.
+  #   GRAPH_REQUEST_TIMEOUT_SECONDS: "30"   # must be > 0; httpx reads a timeout as a deadline
+  #   GRAPH_CONNECT_TIMEOUT_SECONDS: "10"   # must be > 0
+  #   GRAPH_MAX_RETRIES: "3"                # 0 is allowed: give up on the first 429
+  #
   # Those, the tool surface and the two secrets below are the whole of this service's configuration.
   # What the tools add is tenant-side onboarding, which no value here can carry (see README, "Auth"):
   #   - the delegated Graph permissions the selected tools ask for, on that app registration. Some

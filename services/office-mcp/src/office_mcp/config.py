@@ -4,6 +4,7 @@ from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, cast
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
+from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from pydantic import (
     Field,
     HttpUrl,
@@ -127,6 +128,31 @@ class AppConfig(BaseSettings):
     # Externally-reachable URL of this service, used as OAuth issuer URL. HttpUrl so host
     # and scheme are parsed once and reused downstream.
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
+
+    # The Graph timeout budget, which `create_app` translates into the frozen `GraphSettings` the
+    # transport is built from — `graph_client/` is told these and never reads them, so this is the
+    # only place they exist. The defaults are sized for an interactive MCP client rather than for a
+    # batch job; `GraphSettings` carries the reasoning for each one.
+    #
+    # What an operator is actually turning is the worst case of one tool call: a request timeout
+    # times `graph_max_retries + 1` attempts, before any Retry-After wait, per Graph call — and a
+    # paged walk makes several. Raising either past what the client on the other end will wait for
+    # buys a slower failure and nothing else.
+    #
+    # Zero retries is allowed, and is a real choice: it gives up on the first 429 instead of
+    # waiting out the Retry-After, which accrues quota without getting an answer. Zero timeouts are
+    # refused, because httpx reads a timeout as a deadline and not as "unbounded" — `0` would time
+    # every Graph call out before it left the process, which is not what anyone typing it means.
+    #
+    # TRAP: the retry ceiling is the SDK's, not a preference. `RetryHandlerOption.__init__` raises
+    # `ValueError: MaxLimitExceeded. MaxRetries should not be more than $10` above
+    # `MAX_MAX_RETRIES = 10` (kiota_http/middleware/options/retry_handler_option.py:12,38-41), and
+    # it raises inside `create_graph_transport`, which runs inside `create_app`. Bounded here so
+    # that `GRAPH_MAX_RETRIES=11` is a startup error naming the setting, rather than a crash-looping
+    # pod carrying an SDK message that names no setting an operator has ever heard of.
+    graph_request_timeout_seconds: float = Field(default=30.0, gt=0)
+    graph_connect_timeout_seconds: float = Field(default=10.0, gt=0)
+    graph_max_retries: int = Field(default=3, ge=0, le=RetryHandlerOption.MAX_MAX_RETRIES)
 
     @model_validator(mode="before")
     @classmethod

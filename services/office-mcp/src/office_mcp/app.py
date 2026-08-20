@@ -13,6 +13,7 @@ from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 
 from office_mcp.auth import build_auth, build_oauth_storage
+from office_mcp.cardinality import BoundedNameMiddleware
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
 from office_mcp.graph_client import GraphSettings, create_graph_transport
 from office_mcp.logging import (
@@ -32,8 +33,9 @@ logger = logging.getLogger(__name__)
 
 # `prometheus_client`'s own default layout, plus four boundaries above it. One inbound MCP request
 # contains a tool call and every Graph call that tool made, and the Graph timeout budget says how
-# long that is: 30 s per request (`GraphSettings.request_timeout_seconds`) times four attempts
-# (`max_retries=3`) is 120 s before any Retry-After wait, and a paged walk is several requests. Left
+# long that is: 30 s per request times four attempts is 120 s before any Retry-After wait, and a
+# paged walk is several requests. Both numbers are `AppConfig` defaults an operator may raise
+# (`graph_request_timeout_seconds`, `graph_max_retries`), which only lengthens that tail. Left
 # to the default, whose top finite bucket is 10 s, every one of those lands in `+Inf` and p95 and
 # p99 both read 10 — the slow tail this histogram exists to show becomes the one thing it cannot
 # say. This is also the only one of the three latency histograms whose buckets this service gets to
@@ -104,10 +106,18 @@ def create_app(
         client_storage=oauth_storage,
         graph_scopes=selection.graph_scopes,
     )
-    # Architectural rationale: GraphSettings() is built in the composition root, not inside
-    # graph_client. The composition root is the place to map a knob from AppConfig. An
-    # operator may need a different value some day.
-    graph_transport = create_graph_transport(GraphSettings())
+    # Architectural rationale: GraphSettings is built here, not inside graph_client, because the
+    # composition root is the one place allowed to read config — `graph_client/` may be told its
+    # timeout budget but never configured (see rule 2 in tests/test_layering.py). This is the
+    # translation that makes that seam real: the three values are `AppConfig` fields an operator
+    # sets, and the field names on both sides are the same so the mapping cannot be misread.
+    graph_transport = create_graph_transport(
+        GraphSettings(
+            request_timeout_seconds=config.graph_request_timeout_seconds,
+            connect_timeout_seconds=config.graph_connect_timeout_seconds,
+            max_retries=config.graph_max_retries,
+        )
+    )
 
     # Architectural constraint: Nothing downstream re-reads the environment. Configuration is
     # captured at startup and injected. This makes behavior deterministic and testable.
@@ -121,22 +131,35 @@ def create_app(
         try:
             yield
         finally:
-            await graph_transport.aclose()
             await auth.close_obo_credentials()
-            # This does not close oauth_storage. Reaching through its encryption wrapper is
-            # not worth it when the process ends anyway. Its connection pool ends with the
-            # process.
+            # This closes neither graph_transport nor oauth_storage, for one reason each and the
+            # same conclusion. `graph_transport.aclose()` is a no-op: the SDK wraps the pool in
+            # `AsyncGraphTransport`, which defines no `aclose` and so inherits httpx's, whose body
+            # is `pass` (microsoft/kiota-python#494, open and unfixed) — calling it only looks like
+            # cleanup. Reaching through oauth_storage's encryption wrapper is real but not worth
+            # it. Both connection pools end when the process does, which is the whole of what
+            # either call would have bought.
 
     mcp = FastMCP(
         "Office MCP",
         version=config.version,
         auth=auth,
         # A middleware passed here ends up outermost, ahead of FastMCP's own and of the
-        # operations layer `setup_ops` appends below, and that is where the advice one belongs: a
-        # client reads the polished refusal while the operations layer still logs the untranslated
-        # failure and the cause chain under it. The table comes from the same resolution that
-        # registers the tools, so it cannot name a tool this deployment does not expose.
+        # operations layer `setup_ops` appends below — `add_middleware` appends and the chain is
+        # built over `reversed(middleware)`, so earlier in this list is further out. The first two
+        # below are here for that and not for tidiness.
+        #
+        # The name one is first, so nothing in this process — ours or upstream's — ever reads a
+        # tool name the server cannot resolve. What makes it load-bearing is `setup_ops`' metrics
+        # middleware, which labels a Prometheus counter with the name the *client* sent before
+        # anything has resolved it. See `cardinality.py`.
+        #
+        # Then the advice one: a client reads the polished refusal while the operations layer still
+        # logs the untranslated failure and the cause chain under it. Its table comes from the same
+        # resolution that registers the tools, so it cannot name a tool this deployment does not
+        # expose.
         middleware=[
+            BoundedNameMiddleware(),
             GraphAdviceMiddleware(graph_advice(selection)),
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, which is what makes its line carry the trace of the

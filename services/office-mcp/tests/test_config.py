@@ -5,6 +5,7 @@ import asyncpg
 import certifi
 import pytest
 from asyncpg import connect_utils
+from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from pydantic import ValidationError
 from testcontainers.community.postgres import PostgresContainer
 
@@ -16,6 +17,7 @@ from office_mcp.config import (
     LogLevel,
     asyncpg_dsn,
 )
+from office_mcp.graph_client import GraphSettings, create_graph_transport
 
 _TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
@@ -349,6 +351,91 @@ class TestPublicBaseUrl:
 
         with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
             AppConfig()
+
+
+class TestTheGraphTimeoutBudget:
+    """The three values `create_app` turns into the `GraphSettings` the transport is built from.
+
+    They live on `AppConfig` because `graph_client/` may not read config, and their defaults are
+    the values this service shipped with before they were settable — so a deployment that sets
+    none of them behaves exactly as it did. `tests/test_app.py` is where the translation itself is
+    asserted; this is only about what the config accepts.
+    """
+
+    def test_the_defaults_are_the_interactive_budget_the_transport_was_built_with(self) -> None:
+        config = AppConfig(app_env=AppEnv.DEVELOPMENT)
+
+        assert config.graph_request_timeout_seconds == 30.0
+        assert config.graph_connect_timeout_seconds == 10.0
+        assert config.graph_max_retries == 3
+
+    def test_an_operator_sets_all_three_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.setenv("GRAPH_REQUEST_TIMEOUT_SECONDS", "45.5")
+        monkeypatch.setenv("GRAPH_CONNECT_TIMEOUT_SECONDS", "5")
+        monkeypatch.setenv("GRAPH_MAX_RETRIES", "1")
+
+        config = AppConfig()
+
+        assert config.graph_request_timeout_seconds == 45.5
+        assert config.graph_connect_timeout_seconds == 5.0
+        assert config.graph_max_retries == 1
+
+    @pytest.mark.parametrize(
+        "field", ["graph_request_timeout_seconds", "graph_connect_timeout_seconds"]
+    )
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_a_timeout_is_a_deadline_and_so_is_positive(self, field: str, value: float) -> None:
+        """`0` is not "unbounded" to httpx — it is a deadline already passed, which would time
+        every Graph call out before it left the process."""
+        with pytest.raises(ValidationError, match=field):
+            AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, field: value})
+
+    def test_giving_up_on_the_first_throttle_is_allowed(self) -> None:
+        """Zero retries is a real choice, unlike a zero timeout: it answers the caller instead of
+        waiting out a Retry-After."""
+        config = AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, "graph_max_retries": 0})
+
+        assert config.graph_max_retries == 0
+
+    def test_a_negative_retry_count_is_not_one(self) -> None:
+        with pytest.raises(ValidationError, match="graph_max_retries"):
+            AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, "graph_max_retries": -1})
+
+    def test_the_sdks_own_retry_ceiling_is_refused_here_rather_than_at_startup(self) -> None:
+        """The upper bound belongs to the SDK, and without it here the pod crash-loops.
+
+        `RetryHandlerOption.__init__` raises `MaxLimitExceeded. MaxRetries should not be more than
+        $10` above its own ceiling, and it raises inside `create_graph_transport`, which runs inside
+        `create_app`. An operator who sets `GRAPH_MAX_RETRIES=11` would get a crash-looping pod
+        carrying an SDK message that names no setting they have ever heard of; this makes it a
+        startup error that names the setting.
+        """
+        with pytest.raises(ValidationError, match="graph_max_retries"):
+            AppConfig.model_validate(
+                {
+                    "app_env": AppEnv.DEVELOPMENT,
+                    "graph_max_retries": RetryHandlerOption.MAX_MAX_RETRIES + 1,
+                }
+            )
+
+    def test_the_ceiling_itself_is_accepted_and_the_transport_takes_it(self) -> None:
+        """Guards the guard: a bound one below the SDK's would pass the test above and still be
+        wrong. This is the value that must survive all the way into a built transport."""
+        config = AppConfig.model_validate(
+            {
+                "app_env": AppEnv.DEVELOPMENT,
+                "graph_max_retries": RetryHandlerOption.MAX_MAX_RETRIES,
+            }
+        )
+
+        assert config.graph_max_retries == RetryHandlerOption.MAX_MAX_RETRIES
+        transport = create_graph_transport(
+            GraphSettings(max_retries=config.graph_max_retries),
+        )
+        assert transport is not None
 
 
 class TestCaseInsensitiveEnumFields:

@@ -13,6 +13,7 @@ import importlib
 import logging
 import os
 import pathlib
+import re
 from collections.abc import Callable, Iterator, Sequence
 from types import ModuleType
 from typing import Protocol, cast, final, override
@@ -20,24 +21,35 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
+from fastmcp.client.client import CallToolResult
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.server.auth.providers.azure import AzureProvider
 from key_value.aio.protocols import AsyncKeyValue
 from key_value.aio.stores.postgresql import PostgreSQLStore
 from key_value.aio.wrappers.base import BaseWrapper
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
+from mcp.types import TextContent
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
+from unique_mcp.monitoring import _McpMetrics  # pyright: ignore[reportPrivateUsage]
+from unique_toolkit.monitoring import get_metrics
 
 import office_mcp.app as app_module
 from office_mcp.app import create_app
 from office_mcp.auth import build_auth, build_oauth_storage
+from office_mcp.cardinality import UNRESOLVED_NAME, BoundedNameMiddleware
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
+from office_mcp.graph_client import GraphSettings, create_graph_transport
 from office_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
 from office_mcp.tools import ALWAYS_ON, Selection, register_tools, resolve
 
 _PUBLIC_BASE_URL = "https://office-mcp.example"
+
+# A database nothing can reach, for the tests that compose the real app but never make a request
+# that touches one. The connection is opened on first use, so the app itself starts fine.
+_UNREACHABLE_DSN = "postgresql://user:pass@127.0.0.1:1/nope"
 
 
 class _ToolModule(Protocol):
@@ -108,6 +120,45 @@ class _HttpResponse(Protocol):
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
     return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+
+
+def _app(config: AppConfig | None = None) -> Starlette:
+    """The real app on a database nothing reaches, for the tests that never make a stateful call."""
+    return create_app(
+        config=config or AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
+        database_config=DatabaseConfig.model_validate({"url": _UNREACHABLE_DSN}),
+        entra_config=_entra_config(),
+        surface_config=_surface_config(),
+    )
+
+
+def _server_of(app: Starlette) -> FastMCP[None]:
+    """The FastMCP server `create_app` composed, which is what an MCP client talks to."""
+    return cast("FastMCP[None]", app.state.fastmcp_server)
+
+
+def _error_text(result: CallToolResult) -> str:
+    """Everything the model would read of a failed call."""
+    return "\n".join(block.text for block in result.content if isinstance(block, TextContent))
+
+
+_NAME_LABEL = re.compile(r'name="([^"]*)"')
+
+
+def _call_label_values(kind: str) -> set[str]:
+    """Every `name` label `mcp_calls_total` carries for one kind of call, from a live scrape.
+
+    Read out of the process-wide Prometheus registry rather than over `/metrics`, because that
+    route serves the same registry and going through HTTP would need a signed-in caller too. The
+    registry is process-wide and never reset, so assert on values this test produced itself.
+    """
+    return {
+        match.group(1)
+        for line in get_metrics().decode().splitlines()
+        if line.startswith("mcp_calls_total{") and f'kind="{kind}"' in line
+        for match in [_NAME_LABEL.search(line)]
+        if match is not None
+    }
 
 
 def _checks(body: dict[str, object]) -> dict[str, object]:
@@ -442,8 +493,8 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
                 entra_config=_entra_config(),
                 surface_config=_surface_config(),
             )
-            # Run the lifespan so the Graph transport this builds is closed again; nothing here
-            # reaches Postgres, which is only touched by a request.
+            # Run the lifespan, so what this composes is started and shut down as it is in
+            # production; nothing here reaches Postgres, which is only touched by a request.
             with TestClient(app):
                 pass
 
@@ -663,3 +714,159 @@ class TestMainEntrypoint:
         # Reaching into the module's private `_config` is the point of this white-box test: it
         # proves `main()` served the *same* config object `app` was already built from.
         assert run.call_args.kwargs["port"] == main_module._config.port  # pyright: ignore[reportPrivateUsage]
+
+
+class TestTheGraphTimeoutBudgetIsInjected:
+    """`graph_client/` may not read config (rule 2), so the composition root translates it.
+
+    The seam existed before these tests and carried nothing through it: every construction in the
+    repo was a bare `GraphSettings()`, which made the three values operators most want to turn —
+    the request timeout, the connect timeout and the retry count — unreachable without a code
+    change, while three files said the opposite.
+    """
+
+    def test_the_composition_root_hands_the_transport_what_an_operator_configured(self) -> None:
+        built: list[GraphSettings] = []
+
+        def _record(settings: GraphSettings) -> httpx.AsyncClient:
+            built.append(settings)
+            return create_graph_transport(settings)
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(app_module, "create_graph_transport", _record)
+            _app(
+                AppConfig.model_validate(
+                    {
+                        "public_base_url": _PUBLIC_BASE_URL,
+                        "graph_request_timeout_seconds": 12.5,
+                        "graph_connect_timeout_seconds": 2.5,
+                        "graph_max_retries": 0,
+                    }
+                )
+            )
+
+        assert built == [
+            GraphSettings(request_timeout_seconds=12.5, connect_timeout_seconds=2.5, max_retries=0)
+        ]
+
+    def test_an_unconfigured_deployment_gets_the_budget_it_had_before(self) -> None:
+        """The defaults on both sides are the same three numbers, so making them settable moved
+        nothing. Asserted against `GraphSettings()` rather than against literals: the two sets of
+        defaults are only allowed to drift together."""
+        built: list[GraphSettings] = []
+
+        def _record(settings: GraphSettings) -> httpx.AsyncClient:
+            built.append(settings)
+            return create_graph_transport(settings)
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(app_module, "create_graph_transport", _record)
+            _app()
+
+        assert built == [GraphSettings()]
+
+
+class TestTheNameLabelIsBoundedByWhatIsRegistered:
+    """`mcp_calls_total{name=…}` is labelled with what the client sent, so this server bounds it.
+
+    `unique_mcp`'s metrics middleware reads `context.message.name` before FastMCP has resolved
+    anything, and the dashboard groups by that label — so one authenticated caller looping over
+    `tools/call {"name": "aaa1"}` mints a time series per name, permanently. `BoundedNameMiddleware`
+    renames a call the server cannot resolve before that middleware sees it; see `cardinality.py`
+    for why the fix belongs upstream instead.
+    """
+
+    def test_the_sentinel_is_not_a_tool_this_server_registers(self) -> None:
+        """Otherwise a bogus call would not just be counted as a real tool — it would run one."""
+        assert UNRESOLVED_NAME not in resolve(preset=ToolsPreset.TEAMS, enabled=None).tools
+
+    async def test_this_server_registers_no_resource_and_no_prompt_to_resolve(self) -> None:
+        """Guards the decision, not the code: `on_read_resource` and `on_get_prompt` pin their
+        label instead of resolving it, which is only correct while there is nothing to resolve.
+
+        The day either surface gains a member this fails, and the middleware needs the tool path's
+        shape — resolve first, rename only what would have been refused — plus the caller's own
+        string back in the refusal, which upstream builds from the exception on those two paths.
+        """
+        async with Client(FastMCPTransport(_server_of(_app()))) as client:
+            assert await client.list_resources() == []
+            assert await client.list_resource_templates() == []
+            assert await client.list_prompts() == []
+
+    async def test_every_registered_tool_still_dispatches_under_its_own_name(self) -> None:
+        """The renaming is only allowed to touch a call that was going to be refused anyway.
+
+        Every tool is called with no arguments, so each fails — on its arguments, or on the
+        On-Behalf-Of exchange an unauthenticated in-process client cannot make. What matters is
+        that none of them fails as *unknown*, which is what a renamed call would have become.
+        """
+        async with Client(FastMCPTransport(_server_of(_app()))) as client:
+            registered = [tool.name for tool in await client.list_tools()]
+            refused = {
+                name: _error_text(await client.call_tool(name, {}, raise_on_error=False))
+                for name in registered
+            }
+
+        assert registered, "the guard for everything below: a surface with no tools proves nothing"
+        for name, message in refused.items():
+            assert "Unknown tool" not in message, f"{name} stopped dispatching: {message}"
+            assert UNRESOLVED_NAME not in message, f"{name} was renamed: {message}"
+        assert set(registered) <= _call_label_values("tool"), (
+            "and each was counted under its own name"
+        )
+
+    async def test_an_unknown_tool_is_still_refused_by_the_name_the_caller_sent(self) -> None:
+        """What the caller reads is unchanged, because it is not built here: `_call_tool_mcp`
+        wraps the failure with `Unknown tool: {key!r}` from the original request params, outside
+        the middleware chain entirely. The renaming reaches the label and stops there."""
+        async with Client(FastMCPTransport(_server_of(_app()))) as client:
+            result = await client.call_tool("no_such_tool", {}, raise_on_error=False)
+
+        assert result.is_error
+        assert _error_text(result) == "Unknown tool: 'no_such_tool'"
+
+    async def test_the_refusal_is_word_for_word_the_one_an_unguarded_server_gives(self) -> None:
+        """The same claim, asserted against a server that does not carry this middleware rather
+        than against a literal — so an upstream rewording moves both sides or fails here."""
+        texts: list[str] = []
+        for middleware in ([], [BoundedNameMiddleware()]):
+            server: FastMCP[None] = FastMCP("Office MCP", middleware=middleware)
+
+            @server.tool
+            def registered() -> str:
+                return "reached"
+
+            async with Client(FastMCPTransport(server)) as client:
+                texts.append(
+                    _error_text(await client.call_tool("no_such_tool", {}, raise_on_error=False))
+                )
+
+        assert texts[0] == texts[1], "the middleware changed what an unknown tool call answers"
+
+    async def test_an_unresolvable_name_is_counted_as_one_value(self) -> None:
+        """The whole point, and the only assertion that proves the mounting order: the label is
+        read by a middleware `setup_ops` *appends*, so this passes only while the renaming one is
+        still outside it. A reordering fails here rather than in a dashboard."""
+        async with Client(FastMCPTransport(_server_of(_app()))) as client:
+            for attempt in range(3):
+                await client.call_tool(f"zz_probe_{attempt}", {}, raise_on_error=False)
+
+        counted = _call_label_values("tool")
+        assert UNRESOLVED_NAME in counted
+        assert not [name for name in counted if name.startswith("zz_probe_")], (
+            "three made-up names became three permanent time series"
+        )
+
+    def test_it_is_mounted_outside_the_middleware_that_reads_the_label(self) -> None:
+        """The structural half of the test above. FastMCP builds its chain over
+        `reversed(self.middleware)`, so earlier in the list is further out: the constructor's
+        middlewares wrap everything `add_middleware` appends, and `setup_ops` appends."""
+        installed = _server_of(_app()).middleware
+        ours = [i for i, mw in enumerate(installed) if isinstance(mw, BoundedNameMiddleware)]
+        metrics = [i for i, mw in enumerate(installed) if isinstance(mw, _McpMetrics)]
+
+        assert len(ours) == 1 and len(metrics) == 1, f"expected one of each: {installed}"
+        assert ours[0] < metrics[0], (
+            "BoundedNameMiddleware has to run outside unique_mcp's metrics middleware, which reads "
+            + "the tool name the client sent as a Prometheus label before anything resolves it"
+        )
