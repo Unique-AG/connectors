@@ -1,4 +1,4 @@
-"""Structured logging: `unique_mcp`'s pino-json contract, and what it carries that it must not.
+"""Structured logging: `unique_mcp`'s pino-json contract, and the four things it lacks.
 
 `unique_mcp.logging.configure_logging` owns the format — one `StreamHandler` on stderr whose
 formatter renders a pino-json object, which is what the chart's `logging.unique.app/format:
@@ -19,14 +19,19 @@ produced the record, so no logger name and no `propagate = False` can slip past 
 *logger* would have both holes: it would see only that logger's own records, and none from its
 children.
 
-Design decision: the filters here mutate the record they are given, which the house rule against
+Design decision: these filters mutate the record they are given, which the house rule against
 mutating arguments would otherwise forbid. A `logging.Filter` has no return path other than the
 record — the stdlib documents "modify the record in-place" as what a filter is for — and the record
 is a per-emit object the caller does not keep. What is *not* mutated is anything the caller still
 owns: a dict passed as `extra=` is rebuilt rather than edited in place, so redaction never reaches
 back into the header map the caller is still using. See `_redact`.
 
-Three filters, each for one defect:
+Four filters, each for one defect, installed in this order:
+
+`StaleMessageLineFilter` drops the MCP SDK's own per-message INFO line. See its docstring: that line
+is emitted before any middleware of ours can run, so it is the one line in a tool call that carries
+the wrong trace id, and `MessageLogMiddleware` below emits a strictly more informative replacement
+in the right one.
 
 `ColorMessageFilter` drops uvicorn's `color_message` extra. uvicorn's own lifecycle lines carry the
 message a second time with ANSI escapes in it, for a formatter this service does not use.
@@ -46,6 +51,7 @@ from contextvars import ContextVar
 from typing import cast, override
 
 from fastmcp.server.dependencies import get_context, get_http_request
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from opentelemetry import trace
 from unique_mcp.logging import configure_logging as configure_pino_logging
 
@@ -57,7 +63,9 @@ __all__ = [
     "ColorMessageFilter",
     "CorrelationFilter",
     "HttpRequestIdMiddleware",
+    "MessageLogMiddleware",
     "RedactionFilter",
+    "StaleMessageLineFilter",
     "configure_logging",
     "install_filters",
 ]
@@ -70,6 +78,8 @@ type ASGIMessage = MutableMapping[str, object]
 type ASGIReceive = Callable[[], Awaitable[ASGIMessage]]
 type ASGISend = Callable[[ASGIMessage], Awaitable[None]]
 type ASGIApp = Callable[[ASGIScope, ASGIReceive, ASGISend], Awaitable[None]]
+
+logger = logging.getLogger(__name__)
 
 # What replaces a secret, spelled exactly as `packages/logger/src/options.ts` spells it, so one
 # grep over a mixed Node-and-Python deployment's logs finds every redaction in both.
@@ -431,6 +441,63 @@ def _forwarded_request_id(scope: ASGIScope) -> str | None:
 
 
 # --------------------------------------------------------------------------------------------
+# The MCP SDK's own per-message line
+# --------------------------------------------------------------------------------------------
+
+# The line, and the logger that writes it: `mcp/server/lowlevel/server.py`, in `_handle_request`,
+# immediately before the request handler — which is where FastMCP's whole middleware chain lives.
+# Matched on the *template* rather than on the rendered text, because the template is a literal in
+# that file and the rendered text is not: a ratchet in `tests/test_logging.py` reads it back out of
+# the SDK and fails if it changed, so an SDK upgrade that renames the line is a failing test rather
+# than a silently un-quieted one.
+_SDK_MESSAGE_LOGGER = "mcp.server.lowlevel.server"
+_SDK_PER_MESSAGE_LINE = "Processing request of type %s"
+
+
+class StaleMessageLineFilter(logging.Filter):
+    """Drop the SDK's per-message line, which is the one line that cannot carry the right trace id.
+
+    The line is emitted inside the session task, before the request handler and therefore before
+    any middleware of ours, so the ambient OpenTelemetry context it is formatted under is still the
+    one the session task snapshotted at `initialize` — for the whole life of the session. See
+    `tracing.py` for why that snapshot cannot be corrected from inside the task. At the chart's
+    default `LOG_LEVEL=info` it is emitted for every message, so every tool call has exactly one
+    line claiming the `initialize` request's trace.
+
+    It carries nothing that is not in `MessageLogMiddleware`'s replacement: the SDK says the request
+    *type* (`CallToolRequest`), the replacement says the JSON-RPC method (`tools/call`), the request
+    id and the session id, under the trace of the request that actually carried the message.
+    """
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not (record.name == _SDK_MESSAGE_LOGGER and record.msg == _SDK_PER_MESSAGE_LINE)
+
+
+class MessageLogMiddleware(Middleware):
+    """One line per MCP message, in the trace of the request that carried it.
+
+    Mount inside `TraceContextRestoreMiddleware`, which is what makes that true — outside it, this
+    line would be the defect it replaces.
+    """
+
+    @override
+    async def on_message(
+        self,
+        context: MiddlewareContext[object],
+        call_next: CallNext[object, object],
+    ) -> object:
+        method = context.method or "unknown"
+        logger.info(
+            "processing %s %s",
+            context.type,
+            method,
+            extra={"mcp_method": method, "mcp_type": context.type},
+        )
+        return await call_next(context)
+
+
+# --------------------------------------------------------------------------------------------
 # uvicorn's second copy of its own message
 # --------------------------------------------------------------------------------------------
 
@@ -475,8 +542,10 @@ def _reclaim(name: str) -> None:
     reclaimed.propagate = True
 
 
-# Order is the order they run in.
+# Order is the order they run in, and it is the cheap-and-decisive one first: a dropped record is
+# not worth identifying or redacting.
 _FILTERS: tuple[type[logging.Filter], ...] = (
+    StaleMessageLineFilter,
     ColorMessageFilter,
     CorrelationFilter,
     RedactionFilter,

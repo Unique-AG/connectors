@@ -15,7 +15,11 @@ from unique_toolkit.monitoring import configure_tracing
 from office_mcp.auth import build_auth, build_oauth_storage
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
 from office_mcp.graph_client import GraphSettings, create_graph_transport
-from office_mcp.logging import HttpRequestIdMiddleware, configure_logging
+from office_mcp.logging import (
+    HttpRequestIdMiddleware,
+    MessageLogMiddleware,
+    configure_logging,
+)
 from office_mcp.metrics import configure_metrics
 from office_mcp.server import ready_response, surface_manifest
 from office_mcp.shared.seam import GraphAdviceMiddleware
@@ -135,6 +139,9 @@ def create_app(
         middleware=[
             GraphAdviceMiddleware(graph_advice(selection)),
             TraceContextRestoreMiddleware(),
+            # Inside the restore middleware, which is what makes its line carry the trace of the
+            # request that carried the message rather than the one the session task snapshotted.
+            MessageLogMiddleware(),
         ],
         lifespan=lifespan,
     )
