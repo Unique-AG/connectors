@@ -77,9 +77,13 @@ that name.
 Two failures are only distinguishable with information Graph does not send. `GraphForbidden`
 covers both 401 and 403 and carries `status` for exactly this reason: 401 means the token was
 rejected (sign in again), 403 means the token was fine and the permission is missing (ask an
-administrator) — opposite remedies behind one exception class. And a 403 is only actionable if
-the message says *which* permission, which Graph never does; the tool does, so every mapping
-here is scoped to the permissions the failing call was made under.
+administrator) — opposite remedies behind one exception class. `GraphThrottled` reads its own
+`status` for a milder version of the same thing: a 429 is this connector's quota, while a 5xx that
+carried `Retry-After` may be that or a service shedding load, and only the first can be named as
+rate limiting. The remedy — wait exactly as long as Graph asked — is what makes them one class.
+
+And a 403 is only actionable if the message says *which* permission, which Graph never does; the
+tool does, so every mapping here is scoped to the permissions the failing call was made under.
 
 The same missing permission also has an earlier, uglier shape: if it was never consented to,
 Entra refuses the On-Behalf-Of exchange (AADSTS65001) and Graph is never reached at all. That
@@ -432,6 +436,11 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
     )
 
 
+# The one throttling status that is only ever rate limiting. `GraphThrottled` also covers a 5xx that
+# carried `Retry-After`, which reaches a caller with the same remedy and cannot claim the same cause
+# — see `_remedy`.
+_TOO_MANY_REQUESTS = 429
+
 # Graph's inner error code for the tenant switch, and the advice for it. Branched on rather than the
 # message, as Microsoft's transcript reference instructs twice.
 _TRANSCRIPT_ACCESS_DISABLED = "GraphAccessToTranscriptsDisabled"
@@ -457,15 +466,26 @@ def _advice(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
 
 def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str | None) -> str:
     if isinstance(failure, GraphThrottled):
-        if failure.retry_after_seconds is None:
+        advice = failure.retry_after_seconds
+        if advice is None:
             return (
                 "Microsoft 365 is rate-limiting this connector. Wait before retrying, and do not "
                 + "repeat the call in a loop — throttling is per tenant and retrying makes it "
                 + "last longer."
             )
+        if failure.status == _TOO_MANY_REQUESTS:
+            return (
+                "Microsoft 365 is rate-limiting this connector and asked to be left alone for "
+                + f"{advice:g} seconds. Retry after that, not sooner."
+            )
+        # A 5xx that named a delay. `errors.py` reads that as throttling rather than as an outage
+        # because the delay is the remedy either way, but which of the two it is — quota spent, or
+        # a service shedding load — is not knowable from here. So the sentence claims only what
+        # Graph actually said, and the wait is the same advice a 429 gets.
         return (
-            "Microsoft 365 is rate-limiting this connector and asked to be left alone for "
-            + f"{failure.retry_after_seconds:g} seconds. Retry after that, not sooner."
+            "Microsoft 365 declined to serve this request now and asked to be left alone for "
+            + f"{advice:g} seconds — it is either rate-limiting this connector or too busy to "
+            + "answer. Retry after that, not sooner, and do not repeat the call in a loop."
         )
     if isinstance(failure, GraphForbidden):
         if failure.status == 401:

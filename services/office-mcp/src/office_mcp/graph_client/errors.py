@@ -3,10 +3,11 @@
 The SDK reports all failures as APIError with a status code. This module categorizes them once so
 each caller does not re-derive remedies:
 
-- GraphThrottled (429): Retriable. Graph supplies Retry-After.
+- GraphThrottled (429, or a retriable 5xx that named a delay): Retriable. Graph supplies
+  Retry-After.
 - GraphForbidden (401/403): Token lacks permission.
 - GraphNotFound (404): Resource not found or not visible.
-- GraphUnavailable (5xx or no response): Service down or unreachable.
+- GraphUnavailable (a 5xx with nothing to wait for, or no response): Service down or unreachable.
 
 Anything else (400, 409) raises GraphFailure. Other status codes do not suggest remedies.
 
@@ -41,6 +42,7 @@ from typing import cast
 import httpx
 from kiota_abstractions.api_error import APIError
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
+from kiota_http.middleware.retry_handler import RetryHandler
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 
 from office_mcp.graph_client.observability import (
@@ -78,7 +80,12 @@ class GraphThrottled(GraphFailure):
     recovery: usage keeps accruing while throttled, so an early retry only extends the wait. This
     means the SDK already retried `GraphSettings.max_retries` times, or Retry-After asked for more
     than the SDK's 180 s wait ceiling and it gave up. None means Graph sent no header—choose your
-    own backoff."""
+    own backoff.
+
+    TRAP: this is not only 429. Graph also holds a caller off with a 5xx that carries Retry-After,
+    and `status` is what tells the two apart where that matters — a 429 is quota, a 503 with a
+    delay may be quota or load shedding. Either way the delay is the remedy, which is why they are
+    one class; see `_is_throttling`."""
 
     def __init__(
         self,
@@ -107,8 +114,10 @@ class GraphNotFound(GraphFailure):
 
 
 class GraphUnavailable(GraphFailure):
-    """Graph returned 5xx, timeout, or connection failure. Usually transient. TRAP: Some 500s are
-    permanent for certain content (Loop components, certain cards). Endless retries spin."""
+    """Graph returned a 5xx with nothing to wait for, timed out, or could not be reached. Usually
+    transient. TRAP: Some 500s are permanent for certain content (Loop components, certain cards).
+    Endless retries spin. A 5xx that did name a delay is `GraphThrottled`, not this: the remedy
+    there is the delay, and counting it here would read on a dashboard as an outage."""
 
 
 class GraphPagingUnending(GraphFailure):
@@ -132,8 +141,8 @@ class GraphPagingUnending(GraphFailure):
 
 # The `status` label each failure is counted under. Named per class rather than derived from the
 # HTTP code, because the code is the thing this module exists to stop callers reading: 401 and 403
-# are one remedy, 500 and 503 are another, and a counter keyed on the code would have a series per
-# thing Graph can answer.
+# are one remedy, a 500 and a 503 nobody was asked to wait for are another, and a counter keyed on
+# the code would have a series per thing Graph can answer.
 _STATUS: dict[type[GraphFailure], str] = {
     GraphThrottled: "throttled",
     GraphForbidden: "forbidden",
@@ -200,9 +209,9 @@ def _status_of(failure: GraphFailure) -> str:
 
 
 def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
-    """Whether the SDK retried this 429 before giving up on it.
+    """Whether the SDK retried this throttling before giving up on it.
 
-    A 429 the SDK recovered from never reaches this module, so every throttling counted here is
+    Throttling the SDK recovered from never reaches this module, so every throttling counted here is
     throttling that survived — and it survives in two ways with opposite remedies. The retry
     handler refuses to wait at all once the delay reaches its 180 s ceiling
     (`kiota_http/middleware/retry_handler.py:97`), so a `Retry-After` that long means no attempt was
@@ -216,6 +225,36 @@ def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
     return advice is None or advice < RetryHandlerOption.MAX_DELAY
 
 
+# The statuses the SDK's retry handler acts on, borrowed rather than restated so that the two
+# cannot disagree: `_is_throttling` below is only true of a status the handler really did wait
+# `Retry-After` out on (kiota_http/middleware/retry_handler.py:52,167).
+_RETRIED_BY_THE_SDK: set[int] = RetryHandler.DEFAULT_RETRY_STATUS_CODES
+
+_TOO_MANY_REQUESTS = 429
+
+
+def _is_throttling(status: int | None, retry_after_seconds: float | None) -> bool:
+    """Whether Graph held this caller off, rather than failing to serve it.
+
+    A 429 always is, header or no header. Above that the two are told apart by the header alone:
+    Graph rate limits with a 503 as well as with a 429, and a service that names the second it will
+    answer again is one holding a caller off, not one that has fallen over. So precedence runs in
+    that order — a 503 carrying `Retry-After` is throttling, a 503 without it is unavailability —
+    and it matters because the remedies are opposite. Throttling is answered by waiting exactly as
+    long as Graph asked and then by quota; an outage is answered by one retry and then by a report.
+    Counted as an outage, throttling sends an operator after the wrong one of those, which is what
+    `status="unavailable"` on a rate-limited connector used to do.
+
+    Restricted to the statuses the SDK retries, which is what keeps `_sdk_spent_its_retries` true
+    of the result: the handler takes its delay from `Retry-After` on exactly those, so a
+    `Retry-After` on any other status was never waited out and `retried` would claim a retry that
+    never happened. The Kiota handler reads a 503 with `Retry-After` the same way this does.
+    """
+    if status == _TOO_MANY_REQUESTS:
+        return True
+    return status in _RETRIED_BY_THE_SDK and retry_after_seconds is not None
+
+
 def _classify(error: APIError) -> GraphFailure:
     status = error.response_status_code
     headers = _lowercase_headers(error)
@@ -223,15 +262,16 @@ def _classify(error: APIError) -> GraphFailure:
     inner_code = _inner_code(error)
     request_id = headers.get("request-id")
     message = f"Microsoft Graph returned {status}" + (f" ({code})" if code else "")
+    retry_after_seconds = _retry_after_seconds(headers)
 
-    if status == 429:
+    if _is_throttling(status, retry_after_seconds):
         return GraphThrottled(
             message,
             status=status,
             code=code,
             request_id=request_id,
             inner_code=inner_code,
-            retry_after_seconds=_retry_after_seconds(headers),
+            retry_after_seconds=retry_after_seconds,
         )
     if status in (401, 403):
         return GraphForbidden(
