@@ -80,10 +80,15 @@ _NAMES_SEVERAL: tuple[str, ...] = tuple(
     tool for tool, example in _EVERY_TOOL.items() if len(example.permissions) > 1
 )
 
-# The MCP middleware chain the composed app ends up with, outside-in. Two of the five belong to
+# The MCP middleware chain the composed app ends up with, outside-in. Two of the six belong to
 # other packages, so the assertion is on names: what is load-bearing is which side of the operations
 # layer the advice sits on rather than the types themselves.
+#
+# `BoundedNameMiddleware` is outermost of all, and that position is its whole point rather than a
+# preference — it has to normalise an unresolvable tool name before `_McpMetrics` reads it. See
+# `tests/test_app.py` for the rule that pins the two relative to each other.
 _CHAIN = (
+    "BoundedNameMiddleware",
     "GraphAdviceMiddleware",
     "TraceContextRestoreMiddleware",
     "MessageLogMiddleware",

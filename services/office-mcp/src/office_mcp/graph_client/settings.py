@@ -1,8 +1,7 @@
 """Configuration for the Graph transport, injected not read from environment.
 
 graph_client/ cannot import office_mcp.config. A transport that reads the environment can
-diverge from the app's config. create_app will translate app config into this type and
-inject it.
+diverge from the app's config. create_app translates app config into this type and injects it.
 """
 
 from dataclasses import dataclass
@@ -19,6 +18,10 @@ class GraphSettings:
     max_retries keeps the SDK's 3 by design. Waiting out Retry-After and retrying is Graph's
     documented throttling contract. A client giving up on the first 429 accrues quota without
     getting an answer.
+
+    The defaults below are the values the service ships with, not the values it runs with: the
+    matching `AppConfig` fields are what an operator sets, and `create_app` passes all three. They
+    are kept here as well so that a `GraphSettings()` written in a test is the deployed shape.
     """
 
     request_timeout_seconds: float = 30.0

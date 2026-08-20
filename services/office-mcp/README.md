@@ -116,7 +116,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `get_me` |
+| `User.Read` | Delegated | No | `get_me`, `list_meeting_recordings` (the organiser-only check) |
 | `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
@@ -198,27 +198,10 @@ enough for Graph to *accept* a `chatMessage` search, but Microsoft documents tha
 returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
 `ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
 missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
-than serve half an answer per query. It is also what `read_message` needs for a channel message. It
-is the first permission here that needs an administrator, and the first row where one tool needs
-two: neither Graph's 403 nor Entra's AADSTS65001 says which of the two was missing, so
-`search_messages` names both in every refusal — handed one name, an administrator may grant the
-permission that was never missing and watch the identical failure. A search has no choice about
-that, because a search happens before anything knows which surface a hit will be on; a *read* does,
-which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
-`REQUESTABLE_PERMISSIONS`: every other check compares the tool files against a list derived from
-those same files, so a misspelling is on both sides of the comparison and holds — and Entra rejects
-an authorize request carrying a scope it does not know, which fails every sign-in for every user.
-Adding a name there is the deliberate act this table records.
-
-`ChannelMessage.Read.All` is the broad one, and it is requested deliberately. `Chat.Read` alone is
-enough for Graph to *accept* a `chatMessage` search, but Microsoft documents that a search never
-returns more than the equivalent GET would, and every channel-message GET in v1.0 requires
-`ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
-missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
 than serve half an answer per query. It is also what `browse_channel` spends on its one request, and
 what `read_message` needs for a channel message. It is the first permission here that needs an
-administrator, and the first row where one tool needs
-two: neither Graph's 403 nor Entra's AADSTS65001 says which of the two was missing, so
+administrator, and the first row where one tool needs two: neither Graph's 403 nor Entra's
+AADSTS65001 says which of the two was missing, so
 `search_messages` names both in every refusal — handed one name, an administrator may grant the
 permission that was never missing and watch the identical failure. A search has no choice about
 that, because a search happens before anything knows which surface a hit will be on; a *read* does,
@@ -340,9 +323,25 @@ exchange hands the caller's Graph token as a string; this package sends it.
   header is GraphThrottled and the same status without it is GraphUnavailable. Counted as an
   outage, throttling sends an operator after an incident when the remedy is quota.
 
+- **How long a call may take** is `GRAPH_REQUEST_TIMEOUT_SECONDS` (30), `GRAPH_CONNECT_TIMEOUT_SECONDS`
+  (10) and `GRAPH_MAX_RETRIES` (3), translated into `GraphSettings` at the composition root — nothing
+  under `graph_client/` reads the environment. What an operator is turning is the worst case of one
+  tool call: the request timeout times `GRAPH_MAX_RETRIES + 1` attempts, before any Retry-After wait,
+  per Graph call, and a paged walk makes several.
+
 - **Errors are four types (four remedies):** `GraphThrottled` (429, or a retriable 5xx that named a
   delay), `GraphForbidden` (401/403), `GraphNotFound` (404), `GraphUnavailable` (a 5xx with nothing
-  to wait for, or unreachable). Wrap Graph work with `with graph_errors():`.
+  to wait for, unreachable, or an SDK failure carrying no response at all). Wrap a tool's Graph work
+  with `with graph_errors(TOOL_NAME):`, and each Graph call inside it with `with graph_step(STEP):`.
+
+- **Two levels of measurement, and why both.** `graph_operations_total` and
+  `graph_operation_duration_seconds` count one *tool call*; `graph_steps_total` and
+  `graph_step_duration_seconds` count one *Graph call inside it*. The operation says a tool got
+  slower, the step says which of its Graph calls did — `list_meeting_recordings` makes three. Both
+  labels are names chosen in code and never read off a URL, which is a hard rule rather than a
+  preference: a Graph URL here is made of almost nothing but chat, message and meeting ids, and a
+  label taken off one is a time series per id. `tests/test_graph_metrics.py` enforces that over every
+  module and pins the step vocabulary to an exact set, so adding a step is a deliberate act.
 
 - **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. A channel's
   messages are the exception and are not walked at all: Graph allows about one request a second on
@@ -350,18 +349,29 @@ exchange hands the caller's Graph token as a string; this package sends it.
   `$top` is its window. Search uses from/size offsets.
 
 
-- **An empty page carrying a next link means keep going, and the walk is ours because of it.** The
-  SDK's `PageIterator.enumerate` returns `False` for a page whose `value` is empty and its `iterate`
-  reads that as the end of the collection — so a collection Graph answers `[1 item + nextLink]`,
-  `[nothing + nextLink]`, `[3 more]` came back as one item. Every list-shaped tool here says "that
-  is all of it" by coming back short of `limit`, so believing an empty page does not merely lose
-  items: it turns a window with more behind it into a claim that there is not. `collect_pages` walks
-  through them, bounds a *run* of them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap:
-  an empty page spends no scan budget, so a shared budget is no bound on empty pages at all), and
-  raises `GraphPagingUnending` rather than answering short — because a short answer means a cap.
+- **An empty page carrying a next link means keep going, and the walk is ours because of it.**
+  Microsoft documents both halves: "A page of results might contain zero or more results", and read
+  on "until the `@odata.nextLink` property is no longer returned"
+  ([paging](https://learn.microsoft.com/en-us/graph/paging)). The stop condition is the absence of
+  the link, never an empty `value`. The SDK's `PageIterator.enumerate` returns `False` for a page
+  whose `value` is empty and its `iterate` reads that as the end of the collection — so a collection
+  Graph answers `[1 item + nextLink]`, `[nothing + nextLink]`, `[3 more]` came back as one item.
+  This is not hypothetical on this service's own endpoints: a
+  [known issue](https://learn.microsoft.com/en-us/graph/known-issues) has `getAllRecordings` and
+  `getAllTranscripts` returning "a `200 OK` response with an empty collection and an
+  `@odata.nextLink`", with the published workaround "Continue following `@odata.nextLink` even when
+  the collection is empty." Every list-shaped tool here says "that is all of it" by coming back short
+  of `limit`, so believing an empty page does not merely lose items: it turns a window with more
+  behind it into a claim that there is not. `collect_pages` walks through them, bounds a *run* of
+  them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap: an empty page spends no scan
+  budget, so a shared budget is no bound on empty pages at all), and raises `GraphPagingUnending`
+  rather than answering short — because a short answer means a cap.
 
-- **Trap:** The SDK bearer provider does not validate allowed-hosts. Redirects to off-Graph URLs send
-  the caller's delegated credential. Restrict to `graph.microsoft.com` only.
+- **Trap:** The SDK bearer provider does not consult the allowed-hosts validator, so the host and
+  scheme checks live in `_CallerTokenProvider` itself. The live exposure is `@odata.nextLink`: a next
+  link re-enters `send_async` and therefore re-authenticates, so a link pointing off Graph would be
+  handed the caller's delegated token. Redirects cannot reach it — the auth provider is consulted
+  once per logical request, before the middleware pipeline the redirect handler loops inside.
 
 ## Logs
 
