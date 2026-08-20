@@ -14,9 +14,9 @@ import httpx
 import respx
 from pydantic import SecretStr
 
-from backstop_mcp.app import retry_settings, transport_settings
 from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig
+from backstop_mcp.dependencies import retry_settings, transport_settings
 from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.auth import BackstopAuthContext
 from backstop_mcp.features.custom_fields import CustomFieldsService
@@ -57,9 +57,9 @@ def client_factory(
 ) -> BackstopClientFactory:
     """Build a factory the way `create_app` does: config in, transport settings out.
 
-    Goes through the same `app.transport_settings` / `app.retry_settings` translation as
-    production rather than constructing settings directly, so a knob that stops being propagated
-    at the composition root fails these tests too.
+    Goes through the same `dependencies.transport_settings` / `dependencies.retry_settings`
+    translation as production rather than constructing settings directly, so a knob that stops
+    being propagated at the composition root fails these tests too.
     """
     config = backstop_config(base_url, **overrides)
     return BackstopClientFactory(transport_settings(config), retry_settings(config), auth=auth)
