@@ -122,12 +122,13 @@ _EVERY_TOOL: Mapping[str, _Refused] = {
 # list rather than a second copy of it.
 _SELECTION: Selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
 
-# The MCP middleware chain the composed app ends up with, outside-in. Two of the four belong to
+# The MCP middleware chain the composed app ends up with, outside-in. Two of the five belong to
 # other packages, so the assertion is on names: what is load-bearing is which side of the operations
 # layer the advice sits on rather than the types themselves.
 _CHAIN = (
     "GraphAdviceMiddleware",
     "TraceContextRestoreMiddleware",
+    "MessageLogMiddleware",
     "DereferenceRefsMiddleware",
     "_McpMetrics",
 )

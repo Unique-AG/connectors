@@ -2,12 +2,20 @@
 
 Asserted through the **real** handler: `configure_logging` installs it, `unique_mcp`'s own pino
 formatter renders it, and the only thing these tests change is where its stream points. That is
-deliberate. The defects here are properties of a formatter this service does not own — it copies
-every `extra=` into the payload, serialises whole exception stacks, and says nothing at all about a
-line emitted with no span — so a test that formatted the records itself would assert against the
-wrong opponent.
+deliberate. The defects here are all properties of a formatter this service does not own — it copies
+every `extra=` into the payload and serialises whole exception stacks — so a test that formatted the
+records itself would assert against the wrong opponent.
+
+Four subjects, one per defect:
+
+* nothing secret reaches the log, by field name or by value shape;
+* every line carries something that groups it with the rest of its request;
+* one line per MCP message, in the trace of the request that carried it;
+* every line of a really booted server is pino-json on stderr, and nothing is on stdout.
 """
 
+import ast
+import inspect
 import io
 import json
 import logging
@@ -17,12 +25,16 @@ import socket
 import subprocess
 import sys
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import IO, Protocol, cast
 
 import httpx
+import mcp.server.lowlevel.server as sdk_server
 import pytest
+from azure.core.exceptions import ClientAuthenticationError
+from fastmcp.server.auth.providers.azure import AzureProvider
+from fastmcp.server.dependencies import AccessToken
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from starlette.applications import Starlette
@@ -31,7 +43,13 @@ from unique_mcp.logging import _PinoJson  # pyright: ignore[reportPrivateUsage]
 
 from office_mcp.app import create_app
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
-from office_mcp.logging import CENSORED, TRUNCATED, RedactionFilter, configure_logging
+from office_mcp.logging import (
+    CENSORED,
+    TRUNCATED,
+    RedactionFilter,
+    StaleMessageLineFilter,
+    configure_logging,
+)
 
 _PUBLIC_BASE_URL = "https://office-mcp.example"
 _TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
@@ -40,6 +58,18 @@ _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 # A token-shaped string that is not a token: three base64url segments beginning `eyJ`, which is
 # what every Entra and Graph JWT looks like on the wire.
 _JWT = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub2JvZHkifQ.c2lnbmF0dXJl"
+
+# The two traces the session below runs under, one per request. Different on purpose: that is the
+# whole experiment, exactly as in `test_tracing.py`.
+_INITIALIZE_TRACE = "cc3333333333333333333333333333cc"
+_TOOL_CALL_TRACE = "dd4444444444444444444444444444dd"
+_INITIALIZE_TRACEPARENT = f"00-{_INITIALIZE_TRACE}-3333333333333333-01"
+_TOOL_CALL_TRACEPARENT = f"00-{_TOOL_CALL_TRACE}-4444444444444444-01"
+
+# The SDK line this service quiets, and the module that writes it. Spelled here rather than imported
+# from `office_mcp.logging`, so a rename there is a failing test and not a test that renames itself.
+_SDK_LOGGER = "mcp.server.lowlevel.server"
+_SDK_LINE = "Processing request of type %s"
 
 
 class _HttpResponse(Protocol):
@@ -373,6 +403,125 @@ class TestEveryLineIsJoinable:
         assert forwarded, [line.get("http_request_id") for line in sink.lines()]
 
 
+class TestTheSdkLineThisServiceQuiets:
+    """The one line in a tool call that cannot carry the right trace id, plus its ratchet."""
+
+    def test_the_sdk_still_writes_the_line_this_service_matches(self) -> None:
+        """A drift guard, not a style check. Quieting is matched on the SDK's own message template,
+        so an SDK that renames it would leave this service quieting nothing and emitting a stale
+        trace id again — silently, because both halves keep working.
+
+        Re-read `mcp/server/lowlevel/server.py` and `src/office_mcp/logging.py` together when this
+        fails: either the template moved, or the line no longer runs before the request handler.
+        """
+        source = pathlib.Path(inspect.getfile(sdk_server)).read_text(encoding="utf-8")
+
+        assert source.count(_SDK_LINE) == 1, (
+            f"{_SDK_LINE!r} is no longer written exactly once in {inspect.getfile(sdk_server)}; "
+            + "StaleMessageLineFilter in src/office_mcp/logging.py matches it by template"
+        )
+
+        handler = _sdk_handle_request(source)
+        logged = [
+            index for index, statement in enumerate(handler.body) if _is_the_sdk_line(statement)
+        ]
+        assert logged == [0], (
+            "the SDK's per-message line is no longer the first statement of _handle_request, so "
+            + "what runs before it may now be correctable from inside the session task. Re-read "
+            + "mcp/server/lowlevel/server.py and src/office_mcp/logging.py"
+        )
+
+    def test_only_that_line_is_dropped(self, sink: _Sink) -> None:
+        """The other lines that logger writes carry operational value and are not touched."""
+        sdk = logging.getLogger(_SDK_LOGGER)
+
+        sdk.info(_SDK_LINE, "CallToolRequest")
+        sdk.info("Request %s cancelled - duplicate response suppressed", 7)
+
+        assert [line["msg"] for line in sink.lines()] == [
+            "Request 7 cancelled - duplicate response suppressed"
+        ]
+
+
+class TestOneLinePerMessageInTheRightTrace:
+    """The before and the after, over the transport the defect lives in.
+
+    A tool call driven over real HTTP, because the wrong trace id is a property of the per-session
+    asyncio task the streamable-HTTP transport starts during `initialize`: an in-process client has
+    no session task and would show nothing. See `src/office_mcp/tracing.py`.
+    """
+
+    def test_the_sdk_line_carries_the_initialize_requests_trace(
+        self, unquieted_lines: Sequence[Mapping[str, object]]
+    ) -> None:
+        """The defect itself, with the filter removed. This is what the pod logged before."""
+        stale = [
+            line
+            for line in unquieted_lines
+            if line["context"] == _SDK_LOGGER
+            and line["msg"] == "Processing request of type CallToolRequest"
+        ]
+
+        assert stale, "the SDK no longer logs a per-message line, so this proves nothing"
+        assert {line["trace_id"] for line in stale} == {_INITIALIZE_TRACE}, (
+            "the SDK's line for the tool call was expected in the initialize request's trace — "
+            + f"got {[line.get('trace_id') for line in stale]}"
+        )
+
+    def test_that_line_is_gone(self, lines: Sequence[Mapping[str, object]]) -> None:
+        assert not [line for line in lines if line["context"] == _SDK_LOGGER], (
+            "the SDK's per-message line is back in the log"
+        )
+
+    def test_the_replacement_line_is_in_the_trace_of_its_own_request(
+        self, lines: Sequence[Mapping[str, object]]
+    ) -> None:
+        replacements = [line for line in lines if line.get("mcp_method") == "tools/call"]
+
+        assert replacements, "no line names the tool call at all"
+        assert {line["trace_id"] for line in replacements} == {_TOOL_CALL_TRACE}
+        assert {line["correlation_id"] for line in replacements} == {_TOOL_CALL_TRACE}
+
+    def test_the_replacement_says_more_than_the_line_it_replaces(
+        self, lines: Sequence[Mapping[str, object]]
+    ) -> None:
+        """Quieting is only allowed because nothing is lost: the SDK said the request *type*, this
+        says the JSON-RPC method, the MCP request id and the transport's session id."""
+        replacement = next(line for line in lines if line.get("mcp_method") == "tools/call")
+
+        assert replacement["mcp_method"] == "tools/call"
+        assert replacement["request_id"] is not None
+        assert replacement["session_id"] is not None
+
+    def test_no_line_about_the_tool_call_is_in_the_initialize_trace(
+        self, lines: Sequence[Mapping[str, object]]
+    ) -> None:
+        """The whole point, stated over every line rather than over the one that used to be wrong.
+
+        The first assertion guards the second: `initialize` really did run under its own
+        traceparent, so this is the trace lines used to be swept into and not an id nothing
+        mentioned.
+        """
+        assert any(line.get("trace_id") == _INITIALIZE_TRACE for line in lines), (
+            "initialize's traceparent never reached a log line, so this test proves nothing"
+        )
+        during_the_call = [
+            line
+            for line in lines
+            if line.get("mcp_method") == "tools/call" or line.get("operation") == "get_me"
+        ]
+        assert during_the_call, "the tool call logged nothing"
+        assert all(line.get("trace_id") == _TOOL_CALL_TRACE for line in during_the_call), [
+            (line.get("msg"), line.get("trace_id")) for line in during_the_call
+        ]
+
+    def test_the_tool_call_really_ran(self, lines: Sequence[Mapping[str, object]]) -> None:
+        """Guards every assertion above: a session that never called the tool would pass them."""
+        assert any(line.get("operation") == "get_me" for line in lines), (
+            "the operations layer logged no get_me call"
+        )
+
+
 class TestABootedServerHonoursTheLogContract:
     """A real process, both streams captured. Nothing here is stubbed.
 
@@ -439,6 +588,58 @@ def _install_tracer_provider() -> None:
         trace.set_tracer_provider(TracerProvider())
 
 
+def _sdk_handle_request(source: str) -> ast.FunctionDef:
+    for node in ast.walk(ast.parse(source)):
+        if (
+            isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef)
+            and node.name == "_handle_request"
+        ):
+            return ast.FunctionDef(
+                name=node.name,
+                args=node.args,
+                body=node.body,
+                decorator_list=node.decorator_list,
+                returns=node.returns,
+                type_comment=None,
+                type_params=[],
+            )
+    raise AssertionError(
+        f"the MCP SDK no longer defines _handle_request in {inspect.getfile(sdk_server)}"
+    )
+
+
+def _is_the_sdk_line(statement: ast.stmt) -> bool:
+    if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Call):
+        return False
+    first = next(iter(statement.value.args), None)
+    return isinstance(first, ast.Constant) and first.value == _SDK_LINE
+
+
+@pytest.fixture(autouse=True)
+def entra(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Accept any bearer token and refuse the On-Behalf-Of exchange.
+
+    Autouse because a fixture that only patches is nothing a test would otherwise name, and every
+    request in this file that reaches `/mcp` is authenticated.
+
+    The token check is stubbed so the transport can be driven without an Entra round trip — and
+    reusing one session across two requests is the condition the defect lives in. The exchange is
+    refused rather than stubbed because a tool call must not reach the network: what this file is
+    about is the log lines a real `tools/call` produces, and a refused exchange produces the whole
+    set — the message line, the operations layer's failure line, and the cause chain under it.
+    """
+
+    async def verify_token(_self: AzureProvider, token: str) -> AccessToken:
+        return AccessToken(token=token, client_id=_CLIENT_ID, scopes=["access_as_user"])
+
+    async def get_obo_credential(_self: AzureProvider, *, user_assertion: str) -> object:
+        assert user_assertion, "the exchange was attempted without the caller's token"
+        raise ClientAuthenticationError("AADSTS65001: the user has not consented")
+
+    monkeypatch.setattr(AzureProvider, "verify_token", verify_token)
+    monkeypatch.setattr(AzureProvider, "get_obo_credential", get_obo_credential)
+
+
 @pytest.fixture
 def app() -> Starlette:
     """The real app. Nothing here reaches Postgres, so the URL only has to parse."""
@@ -452,6 +653,83 @@ def app() -> Starlette:
         ),
         surface_config=SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
     )
+
+
+def _headers(traceparent: str, session: str | None = None) -> dict[str, str]:
+    headers = {
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "authorization": "Bearer synthetic-entra-access-token",
+        "traceparent": traceparent,
+    }
+    if session is not None:
+        headers["mcp-session-id"] = session
+    return headers
+
+
+def _drive_a_tool_call(app: Starlette, sink: _Sink) -> list[Mapping[str, object]]:
+    """One MCP session over HTTP: initialize, then `tools/call` under a *different* trace."""
+    _install_tracer_provider()
+    with TestClient(app) as client:
+        # Cleared after the lifespan, so the startup manifest is not read as one of these lines.
+        _ = sink.stream.truncate(0)
+        _ = sink.stream.seek(0)
+
+        initialize = cast(
+            "_HttpResponse",
+            client.post(  # pyright: ignore[reportUnknownMemberType]
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "1"},
+                    },
+                },
+                headers=_headers(_INITIALIZE_TRACEPARENT),
+            ),
+        )
+        assert initialize.status_code == 200, "initialize was refused"
+        session = initialize.headers["mcp-session-id"]
+
+        # Trap: post to "/mcp" and not to "/mcp/". The trailing slash redirects.
+        called = cast(
+            "_HttpResponse",
+            client.post(  # pyright: ignore[reportUnknownMemberType]
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "get_me", "arguments": {}},
+                },
+                headers=_headers(_TOOL_CALL_TRACEPARENT, session),
+            ),
+        )
+        assert called.status_code == 200, "the tool call was refused by the transport"
+
+    return sink.lines()
+
+
+@pytest.fixture
+def lines(app: Starlette, sink: _Sink) -> list[Mapping[str, object]]:
+    return _drive_a_tool_call(app, sink)
+
+
+@pytest.fixture
+def unquieted_lines(app: Starlette, sink: _Sink) -> Iterator[list[Mapping[str, object]]]:
+    """The same session with `StaleMessageLineFilter` taken off the handler: the before."""
+    installed = list(sink.handler.filters)
+    sink.handler.filters = [
+        existing for existing in installed if not isinstance(existing, StaleMessageLineFilter)
+    ]
+    try:
+        yield _drive_a_tool_call(app, sink)
+    finally:
+        sink.handler.filters = installed
 
 
 @dataclass(frozen=True)
