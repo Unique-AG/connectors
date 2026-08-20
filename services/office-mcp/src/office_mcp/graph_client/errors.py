@@ -28,16 +28,24 @@ Messages are subject to change" (https://learn.microsoft.com/en-us/graph/api/cal
 It is data like `status` is, not a category: a subclass per inner code would be a subclass per
 Graph feature.
 
-Two failures reach a caller that Graph never described at all, and both used to escape this module
-entirely — unworded to the caller and counted under the `error` sentinel that means "an exception
-this seam cannot describe". `KiotaHTTPXError` is the SDK's own family, and two of its members are
-reachable from a Graph call: `RedirectError` when the redirect handler gives up
-(`kiota_http/middleware/redirect_handler.py:94`) and `ResponseError` when the adapter gets no
-response to read (`kiota_http/httpx_request_adapter.py:602`). Neither carries a status, a code or a
-request id, and both mean the same thing to a caller, so both are `GraphUnavailable`. Caught as the
-base class rather than as the two, because the family is what the SDK promises and a third member
-becoming reachable should not need this line edited to stay classified.
-`CancelledError` is the other, and it is not a failure of anything: the caller went away. It keeps
+Some failures reach a caller that Graph never described with a status code at all, and they used to
+escape this module entirely — unworded to the caller and counted under the `error` sentinel that
+means "an exception this seam cannot describe".
+
+Three of them are the SDK failing rather than Graph refusing, and all three are `GraphUnavailable`,
+because none carries a status, a code or a request id and all three mean one thing to a caller: no
+answer arrived that this connector could use. `RedirectError` is the redirect handler giving up and
+`ResponseError` is the adapter getting no response to read, both from the SDK's own
+`KiotaHTTPXError` family. The third is a bare `Exception`, which the SDK really does raise — the
+parse-node registry raises the base class for a content type it has no parser for, which is what a
+gateway answering `text/html` on a 500 in front of Graph produces.
+
+An `Exception` *subclass* is deliberately not translated. This service raises none, so a subclass
+arriving there is a bug of this connector's own, and reporting one as Graph being unavailable would
+tell an operator to retry and blame Microsoft for it. Those keep travelling untranslated and stay
+`error`, which is what that label is for.
+
+`CancelledError` is the last, and it is not a failure of anything: the caller went away. It keeps
 its own status so that an MCP client hanging up stops reading on a dashboard as this connector
 failing, and it is re-raised untranslated so the task group that sent it learns it was obeyed.
 
@@ -268,14 +276,31 @@ def _measured(
         # keep propagating as itself or the task group that sent it never learns it was obeyed.
         status = _CANCELLED
         raise
-    except KiotaHTTPXError as error:
-        # The SDK's own failures that are not `APIError`: too many redirects (`RedirectError`) and
-        # no response to read (`ResponseError`) are the two reachable from a Graph call. Both are
-        # raised outside the request/response cycle `_classify` describes, so neither carries a
-        # status, a code or a request id — and without this clause both reached a caller as an
-        # unworded `ToolError` and were counted as `_UNCLASSIFIED`. Unavailable is the honest
-        # remedy: Graph did not give an answer this connector could use, and one retry then a
-        # report is what to do about it.
+    except Exception as error:
+        # Two SDK failures that are not `APIError`, carry no response to classify, and both used to
+        # reach a caller as an unworded `ToolError` counted under `_UNCLASSIFIED`.
+        #
+        # `KiotaHTTPXError` is the SDK's own family. `RedirectError` when the redirect handler gives
+        # up (`kiota_http/middleware/redirect_handler.py:94`) and `ResponseError` when the adapter
+        # gets no response to read (`kiota_http/httpx_request_adapter.py:602`) are the two reachable
+        # from a Graph call.
+        #
+        # A bare `Exception` is the SDK failing to read what Graph sent. The parse-node registry
+        # raises the base class for a content type it has no parser for
+        # (`kiota_abstractions/serialization/parse_node_factory_registry.py:48`), which is what a
+        # gateway answering `text/html` on a 500 in front of Graph produces — a real shape, and one
+        # no `error_map` can describe because the body never became a model.
+        #
+        # TRAP: the *exact* base class is the discriminator, and `isinstance` here would be a bug.
+        # Nothing in this service raises `Exception` itself — an internal invariant is an `assert`
+        # and a boundary is a typed raise — so any subclass reaching here is this connector's own
+        # fault, not Graph's. Those must keep travelling untranslated and stay `_UNCLASSIFIED`,
+        # because a bug of ours reported as `GraphUnavailable` tells an operator to retry and blames
+        # Microsoft for it.
+        if not isinstance(error, KiotaHTTPXError) and type(error) is not Exception:
+            raise
+        # Unavailable is the honest remedy for both: Graph did not give an answer this connector
+        # could use, and one retry then a report is what to do about it.
         status = _STATUS[GraphUnavailable]
         raise GraphUnavailable(
             f"Microsoft Graph gave an answer this connector could not read: {error}",

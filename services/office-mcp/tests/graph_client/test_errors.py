@@ -256,3 +256,37 @@ def test_a_cancelled_call_stays_cancelled_and_is_not_reported_as_a_graph_failure
     """
     with pytest.raises(CancelledError), graph_errors("a_test"):
         raise CancelledError("the client hung up")
+
+
+async def test_a_body_the_sdk_cannot_read_is_worded_rather_than_escaping_unworded(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    """A gateway in front of Graph answering `text/html` on a 500 is the shape this covers.
+
+    The parse-node registry raises a bare `Exception` for a content type it has no parser for, so no
+    `error_map` can describe it — the body never became a model. Before this was classified, it
+    reached a caller as an unworded `ToolError` and was counted under the `error` sentinel.
+    """
+    graph.get("/me").mock(
+        return_value=httpx.Response(
+            500, text="<html>502 Bad Gateway</html>", headers={"content-type": "text/html"}
+        )
+    )
+
+    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+        _ = await client.me.get()
+
+    assert raised.value.status is None
+    assert "could not read" in str(raised.value)
+
+
+def test_a_bug_of_our_own_is_not_reported_as_graph_being_unavailable() -> None:
+    """The other side of that clause, and the reason it tests the exact base class.
+
+    An `Exception` subclass raised inside the block is this connector's own fault. Translated to
+    `GraphUnavailable` it would tell an operator to retry, and blame Microsoft for a defect that is
+    ours — so a subclass travels untranslated and stays under the unclassified label.
+    """
+    for ours in (AssertionError("an invariant of ours"), TypeError("a bug of ours")):
+        with pytest.raises(type(ours)), graph_errors("a_test"):
+            raise ours
