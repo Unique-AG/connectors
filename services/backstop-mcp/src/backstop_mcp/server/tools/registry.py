@@ -14,13 +14,11 @@ from backstop_mcp.server.tools.get_organization import get_organization
 from backstop_mcp.server.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.server.tools.get_person import get_person
 from backstop_mcp.server.tools.get_product_positions import get_product_positions
-from backstop_mcp.server.tools.get_system_info import get_system_info
 from backstop_mcp.server.tools.list_custom_fields import list_custom_fields
 
 type ToolFunction = Callable[..., Awaitable[object]]
 
 TOOLS: tuple[ToolFunction, ...] = (
-    get_system_info,
     get_organization,
     get_person,
     list_custom_fields,
