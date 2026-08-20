@@ -13,6 +13,7 @@ here. See `opportunity_stages_service.py`.
 """
 
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.dependencies import get_opportunity_stages_service
 from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityStatus,
     fetch_opportunities,
@@ -34,4 +35,5 @@ __all__ = [
     "OpportunityStatus",
     "StageChangeResponse",
     "fetch_opportunities",
+    "get_opportunity_stages_service",
 ]

@@ -18,6 +18,7 @@ from backstop_mcp.features.data_hygiene.api_responses import (
     ProvenanceAttributes,
     RelationshipTypeAttributes,
 )
+from backstop_mcp.features.data_hygiene.dependencies import get_employment_index_factory
 from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex
 from backstop_mcp.features.data_hygiene.employment_index_factory import EmploymentIndexFactory
 from backstop_mcp.features.data_hygiene.internal_dto import (
@@ -59,5 +60,6 @@ __all__ = [
     "ProvenanceAttributes",
     "RelationshipTypeAttributes",
     "TypeVocabularyDto",
+    "get_employment_index_factory",
     "project_entity_relationships",
 ]

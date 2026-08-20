@@ -14,20 +14,18 @@ from unique_mcp.monitoring import setup_ops
 
 from backstop_mcp.dependencies import (
     close_singletons,
-    get_activity_history_config,
     get_app_config,
     get_auth_config,
     get_auth_provider,
     get_backstop_client_factory,
-    get_backstop_config,
     get_engine,
     get_session_factory,
 )
-from backstop_mcp.features.activity_history import ActivityHistorySettings
+from backstop_mcp.features.activity_history import get_activity_history_settings
 from backstop_mcp.features.auth import cleanup_lifespan
-from backstop_mcp.features.custom_fields import CustomFieldsService
-from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
-from backstop_mcp.features.opportunities import OpportunityStagesService
+from backstop_mcp.features.custom_fields import get_custom_fields_service
+from backstop_mcp.features.data_hygiene import get_employment_index_factory
+from backstop_mcp.features.opportunities import get_opportunity_stages_service
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
@@ -46,9 +44,7 @@ def create_app() -> Starlette:
     working.
     """
     config = get_app_config()
-    backstop_config = get_backstop_config()
     auth_config = get_auth_config()
-    activity_history_config = get_activity_history_config()
 
     configure_logging(config)
     configure_metrics(config)
@@ -58,28 +54,13 @@ def create_app() -> Starlette:
     backstop_clients = get_backstop_client_factory()
     auth_provider = get_auth_provider()
 
-    custom_fields_service = CustomFieldsService.with_ttl_minutes(
-        ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
-    )
-    opportunity_stages_service = OpportunityStagesService.with_ttl_minutes(
-        ttl_minutes=backstop_config.opportunity_stage_ttl_minutes,
-    )
-    employment_index_factory = EmploymentIndexFactory.from_vocabulary(
-        employment_type_ids=backstop_config.employment_relationship_type_ids,
-        employment_type_markers=backstop_config.employment_relationship_type_markers,
-        former_type_ids=backstop_config.former_employment_relationship_type_ids,
-        former_type_markers=backstop_config.former_employment_relationship_type_markers,
-    )
     configure_services(
         Services(
             backstop=backstop_clients,
-            custom_fields=custom_fields_service,
-            employment_index_factory=employment_index_factory,
-            activity_history=ActivityHistorySettings(
-                page_size=activity_history_config.page_size,
-                gist_max_chars=activity_history_config.gist_chars,
-            ),
-            opportunity_stages=opportunity_stages_service,
+            custom_fields=get_custom_fields_service(),
+            employment_index_factory=get_employment_index_factory(),
+            activity_history=get_activity_history_settings(),
+            opportunity_stages=get_opportunity_stages_service(),
         )
     )
 
