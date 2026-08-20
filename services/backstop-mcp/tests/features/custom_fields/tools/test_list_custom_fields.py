@@ -8,7 +8,7 @@ from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.custom_fields import CustomFieldEntityType
-from backstop_mcp.server.tools.list_custom_fields import (
+from backstop_mcp.features.custom_fields.tools.list_custom_fields import (
     ListCustomFieldsResponse,
     list_custom_fields,
 )

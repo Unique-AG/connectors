@@ -7,6 +7,11 @@
    avoided a circular import because `custom_fields/__init__.py` happened not to import it.
    That middleware is gone; the rule remains.
 
+   Tool modules under `features/<feature>/tools/` are a transitional exemption: they still
+   reach collaborators through `server.runtime` until they take `Depends(...)` parameters.
+   `_page_input.py` sits under `tools/` so it is exempt too. The rest of the feature package
+   is not.
+
 2. **`backstop_client/` must not import `features/`.** The HTTP client is infrastructure that
    features consume; it importing one back is the same inversion, and it had the same near-miss.
    `client.py`/`factory.py` imported `features.auth` for the credential type and the auth
@@ -43,12 +48,14 @@
    (`features/auth/` was left out of the rename) but still enter `db` and
    `backstop_client` through those packages' `__init__`.
 
-   Tool tests (`tests/server/tools/`) are the tool-level layer. They import the tool under test
-   from its module (`from backstop_mcp.server.tools.get_person import get_person`) because
-   `server.tools`'s `__init__` only exports `TOOLS` and individual tool modules are not a
-   public import surface — a tool is reached by being registered. `TOOLS` itself is imported
-   from the package. Those files still cannot import `server.tools.registry` or
-   `server.tools.utils`, and cannot reach past a feature package's `__init__`.
+   Tool tests (`tests/features/<feature>/tools/` and leftover `tests/server/tools/`) are the
+   tool-level layer. They import the tool under test from its module
+   (`from backstop_mcp.features.org_people.tools.get_person import get_person`) because
+   individual tool modules are not a public import surface — a tool is reached by being
+   registered. `TOOLS` itself is imported from `server.tools`. Those files still cannot
+   import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
+   and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
+   may import `features.<feature>.tools.get_*` / `list_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -59,8 +66,9 @@
    three modules run one way only (`responses` → `internal_dto` → `api_responses`) within a
    feature. No model declares `extra="forbid"`. `*Attributes` declare `extra="ignore"`;
    `extra="allow"` is only where passthrough is the point (`PersonRecordResponse`,
-   `OrganizationRecordResponse`, `SystemInfoResponse`). `features/includes/` is exempt from
-   the layer filenames: its
+   `OrganizationRecordResponse`). `features/<feature>/tools/` declare their own models — a
+   tool's wire contract lives beside it — and are exempt from the layer filenames and
+   class-suffix rules. `features/includes/` is exempt from the layer filenames: its
    projection models intentionally combine camelCase aliases with FastMCP descriptions, so the
    response class *is* the wire shape. `features/resolution.py` is cross-cutting rather than
    per-feature and keeps its filename.
@@ -75,8 +83,15 @@
    `_`-prefixed modules are private shared utilities. `features/auth/` is out of
    scope; `features/resolution.py` is already exempt by name in rule 5.
 
-All six are asserted by walking the AST rather than importing anything, so a violation is
+7. **Every tool module is registered.** A non-private module under `features/<feature>/tools/`
+   defines exactly one `@tool`-decorated function named after the file, and that name appears
+   on `TOOLS`. A file that is never registered fails the suite rather than shipping an
+   unreachable tool. `_`-prefixed modules (`_page_input.py`) and `tools/__init__.py` are not
+   tools.
+
+Rules 1–6 are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
+Rule 7 uses AST for the `@tool` shape and imports `TOOLS` for the registry check.
 """
 
 import ast
@@ -84,15 +99,18 @@ import pathlib
 
 import pytest
 
+from backstop_mcp.server.tools import TOOLS
+
 _SRC = pathlib.Path(__file__).parent.parent / "src" / "backstop_mcp"
 _TESTS = pathlib.Path(__file__).parent
 _TESTS_AUTH = _TESTS / "features" / "auth"
+_TESTS_FEATURES = _TESTS / "features"
 _TESTS_SERVER_TOOLS = _TESTS / "server" / "tools"
+_SRC_SERVER_TOOLS = _SRC / "server" / "tools"
 
 _FEATURES = _SRC / "features"
 _BACKSTOP_CLIENT = _SRC / "backstop_client"
 _SERVER_PREFIX = "backstop_mcp.server"
-_SERVER_TOOLS_PACKAGE = "backstop_mcp.server.tools"
 _FEATURES_AUTH_PACKAGE = "backstop_mcp.features.auth"
 _FEATURES_PREFIX = "backstop_mcp.features"
 _CONFIG_MODULE = "backstop_mcp.config"
@@ -188,21 +206,37 @@ def _is_inside(directory: pathlib.Path, package: str) -> bool:
     )
 
 
+def _is_under_feature_tools(source: pathlib.Path) -> bool:
+    """True when `source` is under `features/<feature>/tools/` (including `_page_input.py`)."""
+    relative = _feature_relative(source)
+    return relative is not None and len(relative.parts) >= 2 and relative.parts[1] == "tools"
+
+
 def _is_tool_test(directory: pathlib.Path) -> bool:
-    return directory == _TESTS_SERVER_TOOLS or directory.is_relative_to(_TESTS_SERVER_TOOLS)
+    if directory == _TESTS_SERVER_TOOLS or directory.is_relative_to(_TESTS_SERVER_TOOLS):
+        return True
+    try:
+        relative = directory.relative_to(_TESTS_FEATURES)
+    except ValueError:
+        return False
+    return len(relative.parts) >= 2 and relative.parts[1] == "tools"
 
 
 def _is_auth_test(directory: pathlib.Path) -> bool:
     return directory == _TESTS_AUTH or directory.is_relative_to(_TESTS_AUTH)
 
 
-def _is_tool_module_import(module: str) -> bool:
-    """`get_*` / `list_*` under `server.tools` — the tool under test, not `.registry` / `.utils`."""
-    prefix = f"{_SERVER_TOOLS_PACKAGE}."
+def _is_server_tools_directory(directory: pathlib.Path) -> bool:
+    return directory == _SRC_SERVER_TOOLS or directory.is_relative_to(_SRC_SERVER_TOOLS)
+
+
+def _is_feature_tool_module_import(module: str) -> bool:
+    """`backstop_mcp.features.<pkg>.tools.get_*` / `list_*`, not `_page_input`."""
+    prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
-    first = module[len(prefix) :].split(".", 1)[0]
-    return first.startswith(("get_", "list_"))
+    parts = module[len(prefix) :].split(".")
+    return len(parts) >= 3 and parts[1] == "tools" and parts[2].startswith(("get_", "list_"))
 
 
 def _skip_internal_import(module: str, directory: pathlib.Path) -> bool:
@@ -210,7 +244,9 @@ def _skip_internal_import(module: str, directory: pathlib.Path) -> bool:
         module == _FEATURES_AUTH_PACKAGE or module.startswith(f"{_FEATURES_AUTH_PACKAGE}.")
     ):
         return True
-    return _is_tool_test(directory) and _is_tool_module_import(module)
+    if not _is_feature_tool_module_import(module):
+        return False
+    return _is_tool_test(directory) or _is_server_tools_directory(directory)
 
 
 def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, int]]:
@@ -222,9 +258,10 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     Auth tests may import `backstop_mcp.features.auth.*`; they still enter `db` and
     `backstop_client` through those packages' `__init__`.
 
-    Tool tests may import the tool module under test (`server.tools.get_*` / `list_*`); they
-    still cannot import `server.tools.registry` or `server.tools.utils`, and cannot reach past
-    a feature package's `__init__`.
+    Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*`);
+    they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
+    feature package's `__init__`. `registry.py` under `server/tools` may import those feature
+    tool modules.
     """
     return [
         (module, line)
@@ -262,6 +299,8 @@ def _feature_relative(source: pathlib.Path) -> pathlib.Path | None:
 def _is_governed_model_source(source: pathlib.Path) -> bool:
     relative = _feature_relative(source)
     if relative is None or not relative.parts:
+        return False
+    if _is_under_feature_tools(source):
         return False
     return (
         relative.parts[0] not in _MODEL_LAYER_EXEMPT_FEATURES
@@ -308,6 +347,8 @@ def _expected_model_layer(class_name: str) -> str | None:
 
 
 def _class_layer_violations(source: str, path: pathlib.Path) -> list[str]:
+    if _is_under_feature_tools(path):
+        return []
     tree = ast.parse(source, filename=str(path))
     actual = _model_layer_for_path(path)
     return [
@@ -474,6 +515,60 @@ def _logic_module_name_violations(source: str, path: pathlib.Path) -> list[str]:
     return [f"{path.relative_to(_SRC)} defines no symbol matching {matching}"]
 
 
+def _feature_sources_outside_tools() -> list[pathlib.Path]:
+    return sorted(
+        source for source in _FEATURES.rglob("*.py") if not _is_under_feature_tools(source)
+    )
+
+
+def _feature_tool_modules() -> list[pathlib.Path]:
+    """Non-private `*.py` under `features/<feature>/tools/` — not `__init__.py` or `_*.py`."""
+    found: list[pathlib.Path] = []
+    for source in _FEATURES.rglob("*.py"):
+        relative = _feature_relative(source)
+        if relative is None or len(relative.parts) < 3:
+            continue
+        if relative.parts[1] != "tools":
+            continue
+        if source.name == "__init__.py" or source.name.startswith("_"):
+            continue
+        found.append(source)
+    return sorted(found)
+
+
+def _is_tool_decorator(node: ast.expr) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == "tool"
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tool"
+
+
+def _tool_decorated_function_names(tree: ast.AST) -> list[str]:
+    return [
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and any(_is_tool_decorator(decorator) for decorator in node.decorator_list)
+    ]
+
+
+def _tool_module_definition_violations(source: str, path: pathlib.Path) -> list[str]:
+    names = _tool_decorated_function_names(ast.parse(source, filename=str(path)))
+    display = path.relative_to(_SRC)
+    if len(names) != 1:
+        return [f"{display} defines {len(names)} @tool functions, expected 1"]
+    if names[0] != path.stem:
+        return [
+            f"{display} @tool function {names[0]!r} does not match filename {path.stem!r}"
+        ]
+    return []
+
+
+def _unregistered_tool_violations(stem: str, registered: set[str]) -> list[str]:
+    if stem in registered:
+        return []
+    return [f"{stem} is not in TOOLS"]
+
+
 class TestTheDetectionItself:
     """The rules are only worth having if they fail on the things they're meant to catch."""
 
@@ -552,26 +647,39 @@ class TestTheDetectionItself:
 
     def test_tool_tests_may_import_the_tool_under_test(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.server.tools.get_person import get_person\n"
-            + "from backstop_mcp.server.tools.list_custom_fields import list_custom_fields\n",
-            _TESTS / "server" / "tools",
+            "from backstop_mcp.features.org_people.tools.get_person import get_person\n"
+            + "from backstop_mcp.features.custom_fields.tools.list_custom_fields import (\n"
+            + "    list_custom_fields,\n)",
+            _TESTS / "features" / "org_people" / "tools",
         )
+
+    def test_non_tool_tests_cannot_import_a_feature_tool_module(self) -> None:
+        assert _internal_imports(
+            "from backstop_mcp.features.org_people.tools.get_person import get_person",
+            _TESTS / "features" / "accounts",
+        ) == [("backstop_mcp.features.org_people.tools.get_person", 1)]
 
     def test_tool_tests_cannot_import_registry_or_utils(self) -> None:
         assert _internal_imports(
             "from backstop_mcp.server.tools.registry import TOOLS\n"
-            + "from backstop_mcp.server.tools.utils.activity_history import something\n",
-            _TESTS / "server" / "tools",
+            + "from backstop_mcp.features.activity_history.tools._page_input import something\n",
+            _TESTS / "features" / "org_people" / "tools",
         ) == [
+            ("backstop_mcp.features.activity_history.tools._page_input", 2),
             ("backstop_mcp.server.tools.registry", 1),
-            ("backstop_mcp.server.tools.utils.activity_history", 2),
         ]
 
     def test_tool_tests_still_cannot_reach_past_a_feature_init(self) -> None:
         assert _internal_imports(
             "from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex",
-            _TESTS / "server" / "tools",
+            _TESTS / "features" / "org_people" / "tools",
         ) == [("backstop_mcp.features.data_hygiene.employment_index", 1)]
+
+    def test_registry_may_import_feature_tool_modules(self) -> None:
+        assert not _internal_imports(
+            "from backstop_mcp.features.org_people.tools.get_person import get_person\n",
+            _SRC / "server" / "tools",
+        )
 
     def test_auth_tests_may_import_auth_internals(self) -> None:
         assert not _internal_imports(
@@ -716,6 +824,66 @@ class TestTheDetectionItself:
         assert not _is_governed_logic_source(path)
         assert not _logic_module_name_violations("EMAIL_FIELDS = {}\n", path)
 
+    def test_feature_tools_modules_are_exempt_from_the_server_import_rule(self) -> None:
+        tools_path = _FEATURES / "org_people" / "tools" / "get_person.py"
+        fetch_path = _FEATURES / "org_people" / "fetch_person.py"
+        outside_tools = _feature_sources_outside_tools()
+        assert tools_path not in outside_tools
+        assert fetch_path in outside_tools
+        assert _is_under_feature_tools(tools_path)
+        assert _is_under_feature_tools(
+            _FEATURES / "activity_history" / "tools" / "_page_input.py"
+        )
+        assert not _is_under_feature_tools(fetch_path)
+        assert not _is_under_feature_tools(_FEATURES / "org_people" / "not_tools" / "x.py")
+
+    def test_feature_tools_are_exempt_from_model_layers(self) -> None:
+        path = _FEATURES / "org_people" / "tools" / "get_person.py"
+        assert not _is_governed_model_source(path)
+        assert not _class_layer_violations("class PersonResolvedResponse: ...\n", path)
+
+    def test_catches_a_tool_module_with_no_tool(self) -> None:
+        assert _tool_module_definition_violations(
+            "async def get_person(): ...\n",
+            _FEATURES / "org_people" / "tools" / "get_person.py",
+        ) == [
+            "features/org_people/tools/get_person.py defines 0 @tool functions, expected 1"
+        ]
+
+    def test_catches_a_tool_module_with_two_tools(self) -> None:
+        assert _tool_module_definition_violations(
+            "@tool\nasync def get_person(): ...\n@tool\nasync def other(): ...\n",
+            _FEATURES / "org_people" / "tools" / "get_person.py",
+        ) == [
+            "features/org_people/tools/get_person.py defines 2 @tool functions, expected 1"
+        ]
+
+    def test_accepts_a_tool_module_with_one_matching_tool(self) -> None:
+        assert not _tool_module_definition_violations(
+            "@tool\nasync def get_person(): ...\n",
+            _FEATURES / "org_people" / "tools" / "get_person.py",
+        )
+        assert not _tool_module_definition_violations(
+            "@tool(annotations=None)\nasync def get_person(): ...\n",
+            _FEATURES / "org_people" / "tools" / "get_person.py",
+        )
+
+    def test_catches_a_tool_module_whose_function_name_does_not_match(self) -> None:
+        assert _tool_module_definition_violations(
+            "@tool\nasync def get_organization(): ...\n",
+            _FEATURES / "org_people" / "tools" / "get_person.py",
+        ) == [
+            "features/org_people/tools/get_person.py @tool function 'get_organization' "
+            + "does not match filename 'get_person'"
+        ]
+
+    def test_catches_an_unregistered_tool_stem(self) -> None:
+        registered = {fn.__name__ for fn in TOOLS}
+        assert _unregistered_tool_violations("not_a_real_tool", registered) == [
+            "not_a_real_tool is not in TOOLS"
+        ]
+        assert not _unregistered_tool_violations("get_person", registered)
+
 
 class TestFeaturesDoNotImportServer:
     def test_the_feature_tree_is_actually_there(self) -> None:
@@ -725,7 +893,7 @@ class TestFeaturesDoNotImportServer:
         packages = {p.relative_to(_FEATURES).parts[0] for p in sources if p.name != "__init__.py"}
         assert {"auth", "custom_fields", "party_resolver"} <= packages
 
-    @pytest.mark.parametrize("source", sorted(_FEATURES.rglob("*.py")), ids=_source_id)
+    @pytest.mark.parametrize("source", _feature_sources_outside_tools(), ids=_source_id)
     def test_no_feature_module_imports_from_server(self, source: pathlib.Path) -> None:
         violations = _violations(source, _SERVER_PREFIX)
         assert not violations, (
@@ -878,4 +1046,29 @@ class TestLogicModuleNames:
             "a logic module is named after the function (or class) it exposes, not after a "
             + "mechanism:\n  "
             + "\n  ".join(violations)
+        )
+
+
+class TestToolModulesAreRegistered:
+    def test_the_tool_modules_are_actually_there(self) -> None:
+        """Guards the guard: a vacated tools/ tree must not silently skip the assertions below."""
+        sources = _feature_tool_modules()
+        assert sources, "no tool modules found under features/*/tools/"
+
+    @pytest.mark.parametrize("source", _feature_tool_modules(), ids=_source_id)
+    def test_tool_module_defines_one_matching_tool(self, source: pathlib.Path) -> None:
+        violations = _tool_module_definition_violations(source.read_text(), source)
+        assert not violations, (
+            "a tool module under features/<feature>/tools/ defines exactly one @tool "
+            + "function named after the file:\n  "
+            + "\n  ".join(violations)
+        )
+
+    @pytest.mark.parametrize("source", _feature_tool_modules(), ids=_source_id)
+    def test_tool_module_appears_in_tools(self, source: pathlib.Path) -> None:
+        registered = {fn.__name__ for fn in TOOLS}
+        violations = _unregistered_tool_violations(source.stem, registered)
+        assert not violations, (
+            f"{source.relative_to(_SRC)} defines {source.stem} but it is not in TOOLS — "
+            + "add it to server/tools/registry.py"
         )

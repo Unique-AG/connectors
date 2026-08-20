@@ -24,15 +24,15 @@ from backstop_mcp.features.activity_history import (
     ResolvedPartyAsOfResponse,
     TimelineRecord,
 )
-from backstop_mcp.features.data_hygiene import AsOfResponse
-from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, PartyCandidateResponse
-from backstop_mcp.features.resolution import NotFoundResponse
-from backstop_mcp.server.tools.get_activity_history import (
+from backstop_mcp.features.activity_history.tools.get_activity_history import (
     ActivityHistoryFirstPageInput,
     ActivityHistoryNextPageInput,
     get_activity_history,
 )
+from backstop_mcp.features.data_hygiene import AsOfResponse
+from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, PartyCandidateResponse
+from backstop_mcp.features.resolution import NotFoundResponse
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,

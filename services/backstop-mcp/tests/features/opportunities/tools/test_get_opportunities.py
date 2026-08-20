@@ -10,13 +10,13 @@ from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
 from backstop_mcp.backstop_client import BackstopApiError
-from backstop_mcp.features.resolution import NotFoundResponse
-from backstop_mcp.server.tools import TOOLS
-from backstop_mcp.server.tools.get_opportunities import (
+from backstop_mcp.features.opportunities.tools.get_opportunities import (
     GetOpportunitiesResponse,
     OpportunitiesResolvedResponse,
     get_opportunities,
 )
+from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.server.tools import TOOLS
 from tests.features.opportunities.test_fetch_opportunities import VOCABULARY
 from tests.features.party_resolver.helpers import (
     BASE_URL,

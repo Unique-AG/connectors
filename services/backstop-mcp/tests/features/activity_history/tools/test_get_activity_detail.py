@@ -20,7 +20,7 @@ from fastmcp.exceptions import ToolError
 
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_history import ActivityDetailResponse
-from backstop_mcp.server.tools.get_activity_detail import get_activity_detail
+from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
 from tests.features.party_resolver.helpers import BASE_URL, collection, ctx_never_elicit
 from tests.helpers import resource
 from tests.server.tools.helpers import tool_model

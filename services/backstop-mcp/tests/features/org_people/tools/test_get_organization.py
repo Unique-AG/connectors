@@ -8,17 +8,17 @@ from backstop_mcp.backstop_client import BackstopResponseSchemaError
 from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import InternalOwnerResponse
 from backstop_mcp.features.org_people import OrganizationRecordResponse
+from backstop_mcp.features.org_people.tools.get_organization import (
+    GetOrganizationResponse,
+    OrganizationResolvedResponse,
+    get_organization,
+)
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,
     ResolvedPartyResponse,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
-from backstop_mcp.server.tools.get_organization import (
-    GetOrganizationResponse,
-    OrganizationResolvedResponse,
-    get_organization,
-)
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,
