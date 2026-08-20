@@ -123,7 +123,8 @@ class TestPrimaryPath:
         result = await fetch_holdings(client, owner_id=_ORG)
 
         assert not walk.called
-        assert result.fallback_note is None
+        assert result.source == "table"
+        assert result.omitted_fields == ()
         assert result.rows[0].balance is not None
         assert result.rows[0].balance.formatted == "$42.00"
 
@@ -140,7 +141,7 @@ class TestPrimaryPath:
 
         assert not walk.called
         assert result.rows == ()
-        assert result.fallback_note is None
+        assert result.source == "table"
 
 
 class TestFallbackTriggers:
@@ -155,7 +156,7 @@ class TestFallbackTriggers:
         result = await fetch_holdings(client, owner_id=_ORG)
 
         assert walk.called
-        assert result.fallback_note is not None
+        assert result.source == "documented"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -167,7 +168,7 @@ class TestFallbackTriggers:
         result = await fetch_holdings(client, owner_id=_ORG)
 
         assert walk.called
-        assert result.fallback_note is not None
+        assert result.source == "documented"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -181,7 +182,7 @@ class TestFallbackTriggers:
         result = await fetch_holdings(client, owner_id=_ORG)
 
         assert walk.called
-        assert result.fallback_note is not None
+        assert result.source == "documented"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -229,9 +230,8 @@ class TestFallbackContent:
 
         result = await fetch_holdings(client, owner_id=_ORG)
 
-        assert result.fallback_note is not None
-        for field in FALLBACK_OMITTED_FIELDS:
-            assert field in result.fallback_note
+        assert result.source == "documented"
+        assert result.omitted_fields == FALLBACK_OMITTED_FIELDS
         row = result.rows[0]
         assert row.commitment is None
         assert row.unfunded_commitment is None

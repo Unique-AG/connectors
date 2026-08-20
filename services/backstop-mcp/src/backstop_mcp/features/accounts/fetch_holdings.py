@@ -17,9 +17,9 @@ Deliberately *not*:
 **What the fallback cannot produce.** The documented `/accounts` walk has no commitment, no
 share-of-master, no account-term reference, and no `otherId` in the listing fieldset; the series
 endpoints give a number with no currency rendering. Those fields are **omitted, never zeroed**,
-and `fallback_note` names them so the answer cannot be read as "this party has no commitment".
+and are named in `omitted_fields` so the answer cannot be read as "this party has no commitment".
 `funded_date` falls back to `accountStartDate`, which is a near neighbour of table-data's
-`fundedDate` rather than the same field — also named in the note.
+`fundedDate` rather than the same field.
 
 **Cost.** Table-data is 1 request. The fallback is ~9 parallel pages (measured: 9.1s/4.3 MiB for
 this instance's 815 accounts) plus 2 series requests per *owned* account — which is affordable
@@ -47,24 +47,19 @@ logger = logging.getLogger(__name__)
 _BALANCE_SERIES = "values"
 _SHARE_SERIES = "percentageOfFundHistory"
 
-# Named on every fallback answer, so a missing figure reads as "not available on this path"
-# rather than as "zero". `funded_date` is listed because it changes meaning, not because it is
-# absent.
+# Carried on every fallback answer so a missing figure reads as "not available on this path"
+# rather than as "zero". These are field names, not prose: the response layer turns them into the
+# caveat the model is shown, which keeps the wording out of the domain layer.
+#
+# `funded_date` is deliberately absent from this list. It is populated on the fallback path, but
+# from `accountStartDate` rather than the table endpoint's `fundedDate` — a change of meaning, not
+# an omission, and the response layer says so separately.
 FALLBACK_OMITTED_FIELDS: tuple[str, ...] = (
     "commitment",
     "unfunded_commitment",
     "percentage_of_master",
     "account_term_id",
     "other_id",
-)
-
-_FALLBACK_NOTE = (
-    "Backstop's account-table endpoint was unavailable, so this came from the documented "
-    "/accounts walk plus per-account series. Not available on this path and omitted rather "
-    f"than zeroed: {', '.join(FALLBACK_OMITTED_FIELDS)}. Do not answer questions about those "
-    "fields from this payload. `funded_date` is the account's accountStartDate here, which is a "
-    "near neighbour of the table endpoint's fundedDate rather than the same field. Money figures "
-    "carry an amount but no formatted rendering."
 )
 
 
@@ -90,10 +85,12 @@ async def fetch_holdings(
             "accounts.holdings.table_unavailable_using_documented_walk",
             extra={"owner_id": owner_id, "error": f"{type(exc).__name__}: {exc}"},
         )
-    return await _documented_holdings(client, owner_id=owner_id, include_closed=include_closed)
+    return await _fetch_documented_holdings(
+        client, owner_id=owner_id, include_closed=include_closed
+    )
 
 
-async def _documented_holdings(
+async def _fetch_documented_holdings(
     client: BackstopClient,
     *,
     owner_id: str,
@@ -111,7 +108,8 @@ async def _documented_holdings(
         open_count=sum(1 for account in listing.accounts if account.is_open),
         all_count=len(listing.accounts) + listing.closed_omitted,
         closed_count=_closed_count(listing.accounts, closed_omitted=listing.closed_omitted),
-        fallback_note=_FALLBACK_NOTE,
+        source="documented",
+        omitted_fields=FALLBACK_OMITTED_FIELDS,
     )
 
 
