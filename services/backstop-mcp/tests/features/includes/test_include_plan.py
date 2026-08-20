@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.includes import (
+    ActivityIncludesResponse,
     ContactCardResponse,
     OrganizationInclude,
     OrganizationIncludesResponse,
@@ -90,6 +91,13 @@ class TestTheQueryParam:
         plan = include_plan(PersonIncludesResponse, requested=["company", "locations"])
 
         assert plan.param == "company,contactLocations"
+
+    def test_activity_history_always_asks_for_tags_and_attendees(self) -> None:
+        plan = include_plan(
+            ActivityIncludesResponse, requested=["activity_tags", "attendees"]
+        )
+
+        assert plan.param == "activityTags,attendees"
 
     def test_a_name_the_model_does_not_declare_is_an_internal_invariant(self) -> None:
         """Unreachable through the overloads — the cast is what a type error looks like at runtime.

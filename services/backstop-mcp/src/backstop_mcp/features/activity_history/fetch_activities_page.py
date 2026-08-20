@@ -11,14 +11,20 @@ Backstop quirks this layer absorbs:
 - `filter[effectiveDate][ge]`+`[le]` together return zero rows; both-bounds sends `le` only and
   truncates `since` client-side. Emails use `filter[startDate]`/`filter[endDate]` as a real range.
 - Never send `filter[sentTimestamp][ge]` — Backstop accepts it and silently ignores it.
+- Emails have no `activityTags` / `attendees` includes and no `filter[activityTagIds]`.
 """
 
 import logging
+from collections.abc import Sequence
 from datetime import date
 from typing import Literal
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiResource,
+    BackstopApiResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityAttributes,
     EmailAttributes,
@@ -26,11 +32,19 @@ from backstop_mcp.features.activity_history.api_responses import (
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityItemDto,
     ActivityPageDto,
+    ActivityTagChipDto,
+    AttendeeChipDto,
     BackstopActivityType,
     EmailItemDto,
     EmailPageDto,
 )
 from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.includes import (
+    ActivityAttendeeResponse,
+    ActivityIncludesResponse,
+    ActivityTagChipResponse,
+    include_plan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +72,15 @@ _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "document": "documents",
 }
 _ACTIVITY_FIELDS = (
-    "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp"
+    "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp,"
+    "regarding"
 )
+_ACTIVITY_TAG_FIELDS = "name"
+_ATTENDEE_FIELDS = "name,firstName,lastName"
 _EMAIL_FIELDS = "subject,sentTimestamp,fromEmail,toEmails,ccEmails,hasAttachments,contentUrl"
-
+_ACTIVITY_SIDE_LOADS = include_plan(
+    ActivityIncludesResponse, requested=("activity_tags", "attendees")
+)
 
 _ActivityResource = BackstopApiResource[ActivityAttributes]
 _EmailResource = BackstopApiResource[EmailAttributes]
@@ -83,6 +102,12 @@ def _email_date_filter_params(*, since: date | None, until: date | None) -> dict
     if until is not None:
         params["filter[endDate]"] = until.isoformat()
     return params
+
+
+def _tag_filter_params(activity_tag_ids: Sequence[str]) -> dict[str, object]:
+    if not activity_tag_ids:
+        return {}
+    return {"filter[activityTagIds]": ",".join(activity_tag_ids)}
 
 
 def _truncate_since(
@@ -116,6 +141,46 @@ def _truncate_since(
     return items, False
 
 
+def _tag_chips(tags: list[ActivityTagChipResponse] | None) -> tuple[ActivityTagChipDto, ...]:
+    chips: list[ActivityTagChipDto] = []
+    for tag in tags or ():
+        tag_id = tag.id
+        name = tag.name
+        if not tag_id or not name:
+            continue
+        chips.append(ActivityTagChipDto(id=tag_id, name=name))
+    return tuple(chips)
+
+
+def _attendee_chips(
+    attendees: list[ActivityAttendeeResponse] | None,
+) -> tuple[AttendeeChipDto, ...]:
+    return tuple(
+        AttendeeChipDto(id=attendee.id, name=attendee.name) for attendee in attendees or ()
+    )
+
+
+def _item_from_resource(
+    resource: BackstopApiResource[ActivityAttributes],
+    *,
+    stream: BackstopActivityType,
+    included: list[dict[str, object]],
+) -> ActivityItemDto:
+    projected = _ACTIVITY_SIDE_LOADS.project(
+        document=BackstopApiResourceDocument[ActivityAttributes].model_construct(
+            data=resource,
+            included=included,
+        )
+    )
+    return ActivityItemDto.from_attributes(
+        resource.id,
+        stream,
+        resource.attributes,
+        tags=_tag_chips(projected.activity_tags),
+        attendees=_attendee_chips(projected.attendees),
+    )
+
+
 async def fetch_activity_page(
     client: BackstopClient,
     *,
@@ -126,6 +191,7 @@ async def fetch_activity_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
+    activity_tag_ids: Sequence[str] = (),
 ) -> ActivityPageDto:
     """Fetch one page of one activity type. Future-dated items are kept."""
     logger.debug(
@@ -138,6 +204,7 @@ async def fetch_activity_page(
             "offset": offset,
             "since": since.isoformat() if since is not None else None,
             "until": until.isoformat() if until is not None else None,
+            "activity_tag_ids": list(activity_tag_ids),
         },
     )
     page = await client.fetch_page(
@@ -145,16 +212,20 @@ async def fetch_activity_page(
         schema=_ActivityResource,
         params={
             "fields": _ACTIVITY_FIELDS,
+            "fields[activity-tags]": _ACTIVITY_TAG_FIELDS,
+            "fields[people]": _ATTENDEE_FIELDS,
+            "include": _ACTIVITY_SIDE_LOADS.param,
             "sort": "-effectiveDate",
             "filter[activityType][eq]": _ACTIVITY_TYPE_FILTER[stream],
             **_activity_date_filter_params(since=since, until=until),
+            **_tag_filter_params(activity_tag_ids),
         },
         page_size=limit,
         offset=offset,
     )
     raw_count = len(page.items)
     items = tuple(
-        ActivityItemDto.from_attributes(resource.id, stream, resource.attributes)
+        _item_from_resource(resource, stream=stream, included=page.included)
         for resource in page.items
     )
     if since is not None and until is not None:
@@ -237,6 +308,7 @@ async def fetch_activities_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
+    activity_tag_ids: Sequence[str] = (),
 ) -> ActivityPageDto | EmailPageDto:
     """Dispatch to the activity or email single-page fetcher for `activity_type`."""
     if activity_type == "email":
@@ -258,4 +330,5 @@ async def fetch_activities_page(
         offset=offset,
         since=since,
         until=until,
+        activity_tag_ids=activity_tag_ids,
     )

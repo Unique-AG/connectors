@@ -9,6 +9,10 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.features.includes import (
+    ActivityAttendeeResponse,
+    ActivityInclude,
+    ActivityIncludesResponse,
+    ActivityTagChipResponse,
     CompanyRefResponse,
     ContactCardResponse,
     ContactEmailResponse,
@@ -313,6 +317,18 @@ class TestTheIncludesModelsAreTheAllowlist:
     def test_the_person_literal_lists_exactly_the_model_fields(self) -> None:
         assert _literal_names(PersonInclude) == tuple(PersonIncludesResponse.model_fields)
 
+    def test_the_activity_literal_lists_exactly_the_model_fields(self) -> None:
+        assert _literal_names(ActivityInclude) == tuple(ActivityIncludesResponse.model_fields)
+
+    def test_every_activity_field_asks_backstop_for_one_named_relationship(self) -> None:
+        assert {
+            name: (include.relationship, include.resource_type)
+            for name, include in _includes(ActivityIncludesResponse).items()
+        } == {
+            "activity_tags": ("activityTags", "activity-tags"),
+            "attendees": ("attendees", "people"),
+        }
+
     def test_every_organization_field_asks_backstop_for_one_named_relationship(self) -> None:
         assert {
             name: (include.relationship, include.resource_type)
@@ -339,7 +355,11 @@ class TestTheIncludesModelsAreTheAllowlist:
         """`activities` is unreachable by construction, which is the point of the allowlist."""
         relationships = {
             include.relationship
-            for model in (OrganizationIncludesResponse, PersonIncludesResponse)
+            for model in (
+                OrganizationIncludesResponse,
+                PersonIncludesResponse,
+                ActivityIncludesResponse,
+            )
             for include in _includes(model).values()
         }
 
@@ -361,11 +381,15 @@ class TestTheIncludesModelsAreTheAllowlist:
         """
         empty_org = OrganizationIncludesResponse()
         empty_person = PersonIncludesResponse()
+        empty_activity = ActivityIncludesResponse()
         assert all(
             getattr(empty_org, name) is None for name in OrganizationIncludesResponse.model_fields
         )
         assert all(
             getattr(empty_person, name) is None for name in PersonIncludesResponse.model_fields
+        )
+        assert all(
+            getattr(empty_activity, name) is None for name in ActivityIncludesResponse.model_fields
         )
         assert empty_org.model_dump() == {}
         assert empty_person.model_dump() == {}
@@ -399,7 +423,10 @@ class TestTheIncludeMetadataStaysOutOfThePublishedSchema:
 
         assert company["anyOf"] == [{"$ref": "#/$defs/CompanyRefResponse"}, {"type": "null"}]
 
-    @pytest.mark.parametrize("model", [OrganizationIncludesResponse, PersonIncludesResponse])
+    @pytest.mark.parametrize(
+        "model",
+        [OrganizationIncludesResponse, PersonIncludesResponse, ActivityIncludesResponse],
+    )
     def test_the_metadata_itself_is_not_a_published_definition(
         self, model: type[BaseModel]
     ) -> None:

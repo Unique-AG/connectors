@@ -339,3 +339,70 @@ class PersonIncludesResponse(OmitNoneModel):
             + "include was not asked for and equally when it was and nobody is assigned."
         ),
     )
+
+
+class ActivityTagChipResponse(OmitNoneModel):
+    """One activity tag side-loaded onto an activity row."""
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    id: _CleanStr = Field(
+        default=None,
+        description=(
+            "Backstop id of this activity tag. Echo it into activity_tag_ids; never invent one."
+        ),
+    )
+    name: _CleanStr = Field(
+        default=None, description="Tag name as Backstop publishes it."
+    )
+
+
+class ActivityAttendeeResponse(OmitNoneModel):
+    """A person listed on a meeting or call, side-loaded from `include=attendees`."""
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    id: _CleanStr = Field(
+        default=None,
+        description=(
+            "Backstop people id. Pass it as party_id to get_person for the full record. "
+            "Omitted when the side-load has no id."
+        ),
+    )
+    name: _CleanStr = Field(
+        default=None, description="Display name as Backstop stores it."
+    )
+
+
+type ActivityInclude = Literal["activity_tags", "attendees"]
+
+
+class ActivityIncludesResponse(OmitNoneModel):
+    """Related records side-loaded with an activity row, one field per include.
+
+    Always requested on get_activity_history's meeting/call/note/document pages. Notes and
+    documents have no attendees relationship; that field is then `[]`. Emails do not support
+    includes and are not projected through this model.
+    """
+
+    activity_tags: Annotated[
+        list[ActivityTagChipResponse] | None,
+        Include(relationship="activityTags", resource_type="activity-tags"),
+    ] = Field(
+        default=None,
+        description=(
+            "Tags on this activity, from include=activityTags. Omitted when that include was "
+            "not asked for; [] when it was and the activity has no tags."
+        ),
+    )
+    attendees: Annotated[
+        list[ActivityAttendeeResponse] | None,
+        Include(relationship="attendees", resource_type="people"),
+    ] = Field(
+        default=None,
+        description=(
+            "People listed on a meeting or call, from include=attendees. Omitted when that "
+            "include was not asked for; [] when it was and there are none, including on notes "
+            "and documents which have no attendees relationship."
+        ),
+    )

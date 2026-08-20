@@ -51,6 +51,7 @@ def group_activity_page(
     offset: int,
     since: date | None = None,
     until: date | None = None,
+    activity_tag_ids: tuple[str, ...] | None = None,
 ) -> ActivityGroupResponse[ActivityItemDto | EmailItemDto]:
     """Pass items through in fetch order; attach this page's date_range and next."""
     grouped = tuple(items)
@@ -66,6 +67,7 @@ def group_activity_page(
                 offset=offset + len(grouped),
                 since=since,
                 until=until,
+                activity_tag_ids=activity_tag_ids,
             )
         ),
     )
