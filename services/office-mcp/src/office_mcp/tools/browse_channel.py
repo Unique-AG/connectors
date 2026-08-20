@@ -56,6 +56,9 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "browse_channel"
 
+# The one Graph call this tool makes, as the step instruments count it.
+STEP = "channel_messages"
+
 # Import CHANNEL_PERMISSION to avoid misspelling — handle vocabulary owns surface permissions.
 # Several tools declare one permission; deduplication is the registry's job.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
@@ -184,7 +187,7 @@ async def browse_channel(
             expand=["replies"], top=limit
         )
     )
-    with graph_errors(TOOL_NAME):
+    with graph_errors(TOOL_NAME, step=STEP):
         page = await (
             client.teams.by_team_id(team_id)
             .channels.by_channel_id(channel_id)

@@ -96,7 +96,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(graph_requests_total{job=~\"$job\"}[5m])) * 60",
+          "expr": "sum(rate(graph_operations_total{job=~\"$job\"}[5m])) * 60",
           "range": true,
           "refId": "A"
         }
@@ -166,7 +166,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(graph_requests_total{job=~\"$job\", status!~\"ok|not_found\"}[5m])) / sum(rate(graph_requests_total{job=~\"$job\"}[5m])) * 100",
+          "expr": "sum(rate(graph_operations_total{job=~\"$job\", status!~\"ok|not_found|cancelled\"}[5m])) / sum(rate(graph_operations_total{job=~\"$job\"}[5m])) * 100",
           "range": true,
           "refId": "A"
         }
@@ -236,7 +236,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(graph_request_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(graph_operation_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "range": true,
           "refId": "A"
         }
@@ -855,7 +855,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (operation) (rate(graph_requests_total{job=~\"$job\"}[$__rate_interval]))",
+          "expr": "sum by (operation) (rate(graph_operations_total{job=~\"$job\"}[$__rate_interval]))",
           "legendFormat": "{{operation}}",
           "range": true,
           "refId": "A"
@@ -949,7 +949,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (operation, status) (rate(graph_requests_total{job=~\"$job\", status!~\"ok|not_found\"}[$__rate_interval]))",
+          "expr": "sum by (operation, status) (rate(graph_operations_total{job=~\"$job\", status!~\"ok|not_found|cancelled\"}[$__rate_interval]))",
           "legendFormat": "{{operation}} \u2014 {{status}}",
           "range": true,
           "refId": "A"
@@ -1043,7 +1043,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(graph_request_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(graph_operation_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
           "refId": "A"
@@ -1053,7 +1053,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(graph_request_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(graph_operation_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "refId": "B"
@@ -1063,7 +1063,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(graph_request_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(graph_operation_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "range": true,
           "refId": "C"
@@ -1157,7 +1157,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(graph_request_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(graph_operation_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
           "legendFormat": "{{operation}}",
           "range": true,
           "refId": "A"
@@ -1379,12 +1379,200 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Which Graph call inside a tool is slow. `operation` is the tool, `step` is the call it made \u2014 the panel above says a tool got slower, this one says which of its Graph calls did.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, operation, step) (rate(graph_step_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "legendFormat": "{{operation}} \u00b7 {{step}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Graph p95 duration by step",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Which Graph call inside a tool is failing, and how. A step counted `forbidden` while its operation is counted `ok` is a tool recovering \u2014 read_transcript falling back to an unattributed transcript is the one that does this by design.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (operation, step, status) (rate(graph_steps_total{job=~\"$job\", status!~\"ok|not_found|cancelled\"}[$__rate_interval]))",
+          "legendFormat": "{{operation}} \u00b7 {{step}} \u00b7 {{status}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Graph failures by step and status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "description": "Buckets are spelled out one page at a time at the low end (office_mcp/metrics.py), because nearly every walk reads exactly one. Mass moving off the bottom row is the signal; a walk that gives up on an unending collection lands just past 10.",
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 39
       },
       "id": 19,
       "options": {
@@ -1446,7 +1634,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 47
       },
       "id": 20,
       "panels": [],
@@ -1513,7 +1701,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 48
       },
       "id": 21,
       "options": {
@@ -1607,7 +1795,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 40
+        "y": 48
       },
       "id": 22,
       "options": {
@@ -1721,7 +1909,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 40
+        "y": 48
       },
       "id": 23,
       "options": {

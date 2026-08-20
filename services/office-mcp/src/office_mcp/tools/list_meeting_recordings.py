@@ -52,7 +52,7 @@ from msgraph.generated.models.call_recording import CallRecording
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import graph_errors
+from office_mcp.graph_client import graph_errors, graph_step
 from office_mcp.shared import identity
 from office_mcp.shared.handles import MeetingHandle, meeting_handle
 from office_mcp.shared.meetings import (
@@ -67,6 +67,11 @@ from office_mcp.shared.meetings import (
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_meeting_recordings"
+
+# This tool's own listing request and the walk that continues it. The meeting resolve
+# before it is counted under `shared/meetings.py`'s own step, and the identity check under
+# `shared/identity.py`'s — each Graph call is named by the module that owns it.
+STEP_RECORDINGS = "recordings"
 
 # Three permissions: meeting resolve, recordings read, and identity check (to answer the
 # organiser-only rule). Entra redeems all under one token or none. Permission names are in
@@ -305,11 +310,12 @@ async def list_meeting_recordings(
                 recordings=[],
                 scan_incomplete=False if include_scan_completeness else None,
             )
-        first_page = await client.me.online_meetings.by_online_meeting_id(
-            meeting.id
-        ).recordings.get()
-        assert first_page is not None, "Graph answered a recording listing with no collection"
-        collected = await newest_in_window(first_page, client, window=window, limit=limit)
+        with graph_step(STEP_RECORDINGS):
+            first_page = await client.me.online_meetings.by_online_meeting_id(
+                meeting.id
+            ).recordings.get()
+            assert first_page is not None, "Graph answered a recording listing with no collection"
+            collected = await newest_in_window(first_page, client, window=window, limit=limit)
         found = collected.items
         # Asked for last and only when it changes an answer: with nothing to report there is no
         # organiser to compare anybody with, and the request would be spent on every empty listing.
