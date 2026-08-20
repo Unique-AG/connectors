@@ -15,7 +15,7 @@ from unique_toolkit.monitoring import configure_tracing
 from office_mcp.auth import build_auth, build_oauth_storage
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
 from office_mcp.graph_client import GraphSettings, create_graph_transport
-from office_mcp.logging import configure_logging
+from office_mcp.logging import HttpRequestIdMiddleware, configure_logging
 from office_mcp.metrics import configure_metrics
 from office_mcp.server import ready_response, surface_manifest
 from office_mcp.shared.seam import GraphAdviceMiddleware
@@ -161,6 +161,9 @@ def create_app(
     # every MCP span is parented to the request's parent instead of the request. See tracing.py.
     return mcp.http_app(
         middleware=[
+            # Outermost, so a request that never reaches the app is still one identifiable request
+            # in the logs. See `logging.py`.
+            Middleware(HttpRequestIdMiddleware),
             # A no-op meter provider on purpose. Left to the global one, this middleware's own
             # instruments resolve against the provider metrics.py aims at the toolkit registry, and
             # /metrics then serves two histograms for one latency: http_server_duration_milliseconds

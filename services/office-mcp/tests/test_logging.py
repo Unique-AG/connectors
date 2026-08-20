@@ -1,10 +1,11 @@
-"""What every log line this service writes must not carry.
+"""What every log line this service writes must and must not carry.
 
 Asserted through the **real** handler: `configure_logging` installs it, `unique_mcp`'s own pino
 formatter renders it, and the only thing these tests change is where its stream points. That is
-deliberate. The defect here is a property of a formatter this service does not own — it copies
-every `extra=` into the payload and serialises whole exception stacks — so a test that formatted the
-records itself would assert against the wrong opponent.
+deliberate. The defects here are properties of a formatter this service does not own — it copies
+every `extra=` into the payload, serialises whole exception stacks, and says nothing at all about a
+line emitted with no span — so a test that formatted the records itself would assert against the
+wrong opponent.
 """
 
 import io
@@ -12,19 +13,35 @@ import json
 import logging
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import IO, cast
+from typing import IO, Protocol, cast
 
 import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from starlette.applications import Starlette
+from starlette.testclient import TestClient
 from unique_mcp.logging import _PinoJson  # pyright: ignore[reportPrivateUsage]
 
-from office_mcp.config import AppConfig
+from office_mcp.app import create_app
+from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.logging import CENSORED, TRUNCATED, RedactionFilter, configure_logging
 
 _PUBLIC_BASE_URL = "https://office-mcp.example"
+_TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
 # A token-shaped string that is not a token: three base64url segments beginning `eyJ`, which is
 # what every Entra and Graph JWT looks like on the wire.
 _JWT = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub2JvZHkifQ.c2lnbmF0dXJl"
+
+
+class _HttpResponse(Protocol):
+    """`starlette.testclient` returns httpx responses this repo's type checking sees as partial."""
+
+    @property
+    def status_code(self) -> int: ...
+    @property
+    def headers(self) -> Mapping[str, str]: ...
 
 
 @dataclass(frozen=True)
@@ -252,3 +269,100 @@ class TestNoHandlerLeavesByAnotherDoor:
         for handler in logging.getLogger().handlers:
             installed = {type(existing) for existing in handler.filters}
             assert RedactionFilter in installed, f"{handler} has no redaction filter"
+
+
+class TestEveryLineIsJoinable:
+    """A line nothing can group is a line nobody reads. `teams-mcp` generates an id when there is
+    no span for the same reason (`services/teams-mcp/src/app.module.ts:73-79`)."""
+
+    def test_a_line_with_no_span_and_no_request_still_carries_an_id(self, sink: _Sink) -> None:
+        """Startup, the tool-surface manifest, a readiness warning: no span, no request. The id is
+        this process's boot, which is what makes one pod's startup a group instead of a pile."""
+        _log("starting")
+
+        correlation = cast("str", sink.one()["correlation_id"])
+        assert correlation.startswith("boot-"), correlation
+
+    def test_every_line_of_one_boot_carries_the_same_id(self, sink: _Sink) -> None:
+        _log("first")
+        _log("second")
+
+        assert len({line["correlation_id"] for line in sink.lines()}) == 1
+
+    def test_a_line_inside_a_span_carries_its_trace(self, sink: _Sink) -> None:
+        _install_tracer_provider()
+
+        with trace.get_tracer(__name__).start_as_current_span("unit"):
+            _log("inside")
+
+        line = sink.one()
+        assert line["correlation_id"] == line["trace_id"], line
+        assert line["correlation_id"] != f"boot-{line['correlation_id']}"
+
+    def test_a_caller_that_supplies_its_own_id_keeps_it(self, sink: _Sink) -> None:
+        _log("imported", correlation_id="from-upstream")
+
+        assert sink.one()["correlation_id"] == "from-upstream"
+
+    def test_a_readiness_line_joins_the_request_that_asked(
+        self, sink: _Sink, app: Starlette
+    ) -> None:
+        """The mechanism has to work outside any MCP call. `/ready` is a plain HTTP route, and with
+        tracing off there is no span on it either — so the id comes from the ASGI middleware."""
+        with TestClient(app) as client:
+            sink.stream.truncate(0)
+            _ = sink.stream.seek(0)
+            response = cast("_HttpResponse", client.get("/ready"))  # pyright: ignore[reportUnknownMemberType]
+
+        assert response.status_code in (200, 503), "the probe answered neither way"
+        warnings = [
+            line for line in sink.lines() if line["context"] == "office_mcp.server.readiness"
+        ]
+        assert warnings, "the probe against an unreachable database logged nothing"
+        for line in warnings:
+            assert line["correlation_id"] is not None
+            assert cast("str", line["correlation_id"]).startswith(("req-", "boot-")) or line.get(
+                "trace_id"
+            ), line
+
+    def test_a_forwarded_request_id_is_preferred_over_a_new_one(
+        self, sink: _Sink, app: Starlette
+    ) -> None:
+        """A gateway that already minted an id is the identity that joins both systems' logs."""
+        with TestClient(app) as client:
+            sink.stream.truncate(0)
+            _ = sink.stream.seek(0)
+            _ = cast(
+                "_HttpResponse",
+                client.get("/ready", headers={"x-request-id": "gateway-42"}),  # pyright: ignore[reportUnknownMemberType]
+            )
+
+        forwarded = [line for line in sink.lines() if line.get("http_request_id") == "gateway-42"]
+        assert forwarded, [line.get("http_request_id") for line in sink.lines()]
+
+
+# ------------------------------------------------------------------------------------------------
+# Fixtures and helpers
+# ------------------------------------------------------------------------------------------------
+
+
+def _install_tracer_provider() -> None:
+    """Make span contexts valid. A provider can only be installed once per process, so this reuses
+    whichever one is already in play — the same shape `test_tracing.py` uses."""
+    if not isinstance(trace.get_tracer_provider(), TracerProvider):
+        trace.set_tracer_provider(TracerProvider())
+
+
+@pytest.fixture
+def app() -> Starlette:
+    """The real app. Nothing here reaches Postgres, so the URL only has to parse."""
+    return create_app(
+        config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
+        database_config=DatabaseConfig.model_validate(
+            {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
+        ),
+        entra_config=EntraConfig.model_validate(
+            {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        ),
+        surface_config=SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
+    )
