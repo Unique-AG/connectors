@@ -23,7 +23,7 @@ hydrates `short_name`.
 Walking it whole rather than reading page one is what lets `not_found` mean *absent* instead of
 *not on this page*. The catalog is small enough for that: this instance returns 72 in one page,
 all with a `productShortName`, three of them duplicated (`PKAP`, `BLUC`, `CPOL`). Past
-`LARGE_CATALOG` the assumption is no longer safe — re-reading the whole catalog per search starts
+`_LARGE_CATALOG` the assumption is no longer safe — re-reading the whole catalog per search starts
 costing real requests, and a TTL cache like the opportunity-stage vocabulary would be the answer.
 So that case warns rather than passing silently.
 """
@@ -59,7 +59,7 @@ _PRODUCT_INDEX_PAGE_SIZE = 200
 
 # Two full pages. This instance returns 72, so anything past this is a different kind of tenant
 # and the "re-read the catalog every call" trade stops paying for itself.
-LARGE_CATALOG = 400
+_LARGE_CATALOG = 400
 
 _SCOPE = "products"
 
@@ -68,7 +68,7 @@ _ProductResource = BackstopApiResource[ProductAttributes]
 _ProductDocument = BackstopApiResourceDocument[ProductAttributes]
 
 
-def product_label(product: ResolvedProductDto) -> str:
+def _product_label(product: ResolvedProductDto) -> str:
     if product.name is not None and product.short_name is not None:
         return f"{product.name} ({product.short_name})"
     if product.name is not None:
@@ -81,7 +81,7 @@ def product_label(product: ResolvedProductDto) -> str:
 def _resolution(hits: Sequence[ResolvedProductDto], *, query: str) -> ProductResolution:
     return from_candidates(
         tuple(
-            Candidate(key=product.id, label=product_label(product), value=product)
+            Candidate(key=product.id, label=_product_label(product), value=product)
             for product in hits
         ),
         query=query,
@@ -89,7 +89,7 @@ def _resolution(hits: Sequence[ResolvedProductDto], *, query: str) -> ProductRes
     )
 
 
-def match_product(products: Sequence[ResolvedProductDto], query: str) -> ProductResolution:
+def _match_product(products: Sequence[ResolvedProductDto], query: str) -> ProductResolution:
     """Match `query` against a parsed product index.
 
     Order: exact id, exact short name, exact name, name substring. A caller can type an id into
@@ -188,17 +188,17 @@ async def resolve_product(
         ResolvedProductDto.from_attributes(resource.id, resource.attributes)
         for resource in page.items
     )
-    if len(products) > LARGE_CATALOG:
+    if len(products) > _LARGE_CATALOG:
         logger.warning(
             "accounts.products.index_large",
             extra={
                 "returned": len(products),
                 "total_count": page.total_count,
-                "threshold": LARGE_CATALOG,
+                "threshold": _LARGE_CATALOG,
             },
         )
 
-    outcome = match_product(products, product)
+    outcome = _match_product(products, product)
     if isinstance(outcome, Ambiguous):
         return await elicit_choice(
             ctx,

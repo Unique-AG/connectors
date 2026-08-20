@@ -1,9 +1,6 @@
 import asyncio
 from collections.abc import Sequence
 
-from pydantic import validate_email
-from pydantic_core import PydanticCustomError
-
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver._party_search_types import (
@@ -12,24 +9,6 @@ from backstop_mcp.features.party_resolver._party_search_types import (
     candidates_from_document,
 )
 from backstop_mcp.features.party_resolver.internal_dto import PartyCandidate
-
-
-def normalized_email(value: str) -> str | None:
-    """Return pydantic's normalized address, or `None` when `value` is not an email.
-
-    Accepts display-name forms (`"Bob" <bob@example.com>`) and surrounding whitespace; the
-    returned string is what Backstop's exact `email` / `email2` / `email3` filters expect.
-    """
-    try:
-        _name, email = validate_email(value)
-    except PydanticCustomError:
-        return None
-    return email
-
-
-def looks_like_email(value: str) -> bool:
-    """Return True when `value` is a valid email (pydantic / email-validator)."""
-    return normalized_email(value) is not None
 
 
 async def search_by_email(

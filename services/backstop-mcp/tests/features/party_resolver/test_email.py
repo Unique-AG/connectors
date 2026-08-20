@@ -3,11 +3,11 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
-from backstop_mcp.features.party_resolver.search_by_email import (
+from backstop_mcp.features.party_resolver._party_search_types import (
     looks_like_email,
     normalized_email,
-    search_by_email,
 )
+from backstop_mcp.features.party_resolver.search_by_email import search_by_email
 from tests.features.party_resolver.helpers import BASE_URL
 
 

@@ -4,9 +4,9 @@ from backstop_mcp.features.party_resolver._party_search_types import (
     BACKSTOP_SEARCH_TYPES,
     PartyCollectionDocument,
     candidates_from_document,
+    looks_like_email,
 )
 from backstop_mcp.features.party_resolver.internal_dto import PartyCandidate, QuickSearchOptionsDto
-from backstop_mcp.features.party_resolver.search_by_email import looks_like_email
 
 
 async def quick_search(

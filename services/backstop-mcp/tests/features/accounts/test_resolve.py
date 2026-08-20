@@ -6,7 +6,6 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.accounts import resolve_product
-from backstop_mcp.features.accounts.resolve_product import LARGE_CATALOG
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, collection, resource
@@ -158,9 +157,10 @@ class TestTheRequest:
         self, client: BackstopClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         oversized = _index(
+            # 401 exceeds the internal large-catalog warning threshold (400).
             *(
                 _product(str(index), name=f"Fund {index}", short_name=f"F{index}")
-                for index in range(LARGE_CATALOG + 1)
+                for index in range(401)
             )
         )
         respx.get(_PRODUCTS_URL).mock(return_value=oversized)
