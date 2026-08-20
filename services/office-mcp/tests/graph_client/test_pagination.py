@@ -7,11 +7,12 @@ from pathlib import Path
 import httpx
 import pytest
 import respx
+from kiota_abstractions.api_error import APIError
 from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.chat import Chat
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_mcp.graph_client import GraphPagingUnending, collect_pages
+from office_mcp.graph_client import GraphPagingUnending, collect_pages, pagination
 from office_mcp.graph_client.pagination import MAX_EMPTY_PAGES, MAX_SCANNED_ITEMS
 
 from .conftest import GRAPH_V1
@@ -22,6 +23,28 @@ THIRD_PAGE = f"{GRAPH_V1}/me/chats?$skiptoken=synthetic-page-3"
 
 def chat(number: int, topic: str) -> dict[str, object]:
     return {"id": f"19:{number:032x}@thread.v2", "topic": topic, "chatType": "group"}
+
+
+class RecordedPages:
+    """Stands in for `record_pages_scanned` so the count one walk hands it can be read back.
+
+    The histogram itself is asserted on in `tests/test_graph_metrics.py`, from inside a
+    `graph_errors` block: `observability` drops a count taken outside one, and every walk here is
+    outside one. What is worth pinning in this file is the number this module arrives at.
+    """
+
+    def __init__(self) -> None:
+        self.counts: list[int] = []
+
+    def record(self, _operation: str | None, pages: int) -> None:
+        self.counts.append(pages)
+
+
+@pytest.fixture
+def recorded_pages(monkeypatch: pytest.MonkeyPatch) -> RecordedPages:
+    recorded = RecordedPages()
+    monkeypatch.setattr(pagination, "record_pages_scanned", recorded.record)
+    return recorded
 
 
 def mock_two_pages(graph: respx.MockRouter) -> None:
@@ -108,6 +131,67 @@ class TestFollowingNextLink:
 
         assert topics(collected.items) == ["one", "two", "three", "newest"]
         assert not collected.capped, "nothing stopped this walk but the end of the collection"
+
+
+class TestAFirstPageCarryingNoValueAtAll:
+    """A `200 OK` whose body has no `value`, which is where the SDK disagrees with itself.
+
+    `PageIterator.enumerate` reads that body as an empty page on every request but the first, and
+    `PageIterator.__init__` raises a bare `ValueError` on it (page_iterator.py:180-181). A
+    `ValueError` is none of the three things `graph_errors` classifies, so it would reach a tool
+    with no remedy attached and be counted under the status that means the seam could not describe
+    it. The fix is that page one behaves as page two already does.
+    """
+
+    async def test_a_first_page_with_no_value_and_no_next_link_collects_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json={"@odata.context": f"{GRAPH_V1}/$metadata#chats"})
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        collected = await collect_pages(first, client, limit=10)
+
+        assert collected.items == []
+        assert not collected.capped, "an empty collection is the whole of it, not a cap"
+
+    async def test_a_first_page_with_no_value_but_a_next_link_is_walked_through(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The shape the known issue on `getAllRecordings`/`getAllTranscripts` produces: a token
+        reset answers 200 with nothing in it and a `@odata.nextLink` still set. Landing on the
+        first request rather than a later one must not change what the walk does with it."""
+        graph.get("/me/chats", params={"$skiptoken": "synthetic-page-2"}).mock(
+            return_value=httpx.Response(200, json={"value": [chat(1, "keep")]})
+        )
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json={"@odata.nextLink": SECOND_PAGE})
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        collected = await collect_pages(first, client, limit=10)
+
+        assert topics(collected.items) == ["keep"]
+        assert not collected.capped
+        assert str(graph.calls.last.request.url) == SECOND_PAGE
+
+    async def test_the_response_the_caller_passed_in_is_left_as_it_was(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The walk reads page one as empty by standing in a copy for it, not by writing an empty
+        list over what the caller handed it — the caller keeps whatever Graph actually sent."""
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(200, json={"@odata.context": f"{GRAPH_V1}/$metadata#chats"})
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        _ = await collect_pages(first, client, limit=10)
+
+        assert first.value is None
 
 
 class TestTheHeadersItCarries:
@@ -318,6 +402,40 @@ class TestTheCaps:
 
         assert len(collected.items) == pages, "every item page was reached"
         assert not collected.capped, "nothing stopped this walk but the end of the collection"
+
+
+class TestWhatOneWalkCost:
+    async def test_the_request_that_failed_is_counted_among_the_pages(
+        self, client: GraphServiceClient, graph: respx.MockRouter, recorded_pages: RecordedPages
+    ) -> None:
+        """The walk worth seeing on the histogram is the one that read a long way before giving up,
+        and that one leaves by a raise. Counting a page only once its fetch came back drops exactly
+        the request that made the walk worth looking at: the one that failed."""
+        graph.get("/me/chats", params={"$skiptoken": "synthetic-page-3"}).mock(
+            return_value=httpx.Response(
+                500, json={"error": {"code": "generalException", "message": "unexpected"}}
+            )
+        )
+        graph.get("/me/chats", params={"$skiptoken": "synthetic-page-2"}).mock(
+            return_value=httpx.Response(
+                200, json={"value": [chat(2, "two")], "@odata.nextLink": THIRD_PAGE}
+            )
+        )
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200, json={"value": [chat(1, "one")], "@odata.nextLink": SECOND_PAGE}
+            )
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+
+        with pytest.raises(APIError):
+            _ = await collect_pages(first, client, limit=10)
+
+        assert recorded_pages.counts == [3], (
+            "three requests were made and the third is the one that failed — a walk that reports "
+            "two has hidden the page an operator is looking for"
+        )
 
 
 # The one test the run below re-runs under `-O`. Named once, here, so that renaming the test cannot
