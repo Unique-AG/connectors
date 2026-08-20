@@ -12,28 +12,19 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from unique_mcp.monitoring import setup_ops
 
-from backstop_mcp.backstop_client import (
-    BackstopClientFactory,
-    BackstopTransportSettings,
-    RetrySettings,
+from backstop_mcp.dependencies import (
+    close_singletons,
+    get_activity_history_config,
+    get_app_config,
+    get_auth_config,
+    get_auth_provider,
+    get_backstop_client_factory,
+    get_backstop_config,
+    get_engine,
+    get_session_factory,
 )
-from backstop_mcp.config import (
-    ActivityHistoryConfig,
-    AppConfig,
-    AuthConfig,
-    BackstopConfig,
-    DatabaseConfig,
-    EncryptionConfig,
-)
-from backstop_mcp.db import create_engine, create_session_factory
 from backstop_mcp.features.activity_history import ActivityHistorySettings
-from backstop_mcp.features.auth import (
-    BackstopAuthContext,
-    BackstopOAuthProvider,
-    ThrottleConfig,
-    cleanup_lifespan,
-    load_key,
-)
+from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
 from backstop_mcp.features.opportunities import OpportunityStagesService
@@ -46,61 +37,26 @@ from backstop_mcp.server.tools import TOOLS
 logger = logging.getLogger(__name__)
 
 
-def create_app(
-    config: AppConfig | None = None,
-    backstop_config: BackstopConfig | None = None,
-    database_config: DatabaseConfig | None = None,
-    encryption_config: EncryptionConfig | None = None,
-    auth_config: AuthConfig | None = None,
-    activity_history_config: ActivityHistoryConfig | None = None,
-) -> Starlette:
+def create_app() -> Starlette:
     """The composition root.
 
-    Every config object and every long-lived collaborator is built exactly once here and then
-    injected. Nothing downstream re-reads the environment, and no layer below this one sees a
-    `config` type at all: each env-parsed shape is translated into the owning layer's own domain
-    type here (`BackstopTransportSettings`, `RetrySettings`,
-    `ActivityHistorySettings`), so the tuning knobs a deployment sets are the ones every request
-    actually uses.
+    Config and long-lived collaborators are resolved from the cached providers in
+    `dependencies.py` — nothing here re-reads the environment. Feature services that still
+    live on `runtime.Services` are built here and installed so tools via `runtime.py` keep
+    working.
     """
-    config = config or AppConfig()
-    backstop_config = backstop_config or BackstopConfig()
-    database_config = database_config or DatabaseConfig()
-    encryption_config = encryption_config or EncryptionConfig()
-    auth_config = auth_config or AuthConfig()
-    activity_history_config = activity_history_config or ActivityHistoryConfig()
+    config = get_app_config()
+    backstop_config = get_backstop_config()
+    auth_config = get_auth_config()
+    activity_history_config = get_activity_history_config()
 
     configure_logging(config)
     configure_metrics(config)
 
-    engine = create_engine(database_config)
-    session_factory = create_session_factory(engine)
-    encryption_key = load_key(encryption_config)
-
-    # One factory, therefore one connection pool. The provider needs it (to verify credentials
-    # at login) and it needs the provider (for the token-revocation hook inside the auth
-    # context), so the cycle is closed with a single `attach_auth` step.
-    backstop_clients = BackstopClientFactory(
-        transport_settings(backstop_config), retry_settings(backstop_config)
-    )
-    auth_provider = BackstopOAuthProvider(
-        base_url=config.issuer,
-        secure_cookies=config.public_base_url.scheme == "https",
-        session_factory=session_factory,
-        encryption_key=encryption_key,
-        backstop_clients=backstop_clients,
-        throttle=ThrottleConfig(
-            max_attempts=auth_config.login_max_attempts,
-            window=auth_config.login_attempt_window,
-        ),
-    )
-    backstop_clients.attach_auth(
-        BackstopAuthContext(
-            session_factory=session_factory,
-            encryption_key=encryption_key,
-            revoke_tokens_for_subject=auth_provider.revoke_all_tokens_for_subject,
-        )
-    )
+    engine = get_engine()
+    session_factory = get_session_factory()
+    backstop_clients = get_backstop_client_factory()
+    auth_provider = get_auth_provider()
 
     custom_fields_service = CustomFieldsService.with_ttl_minutes(
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
@@ -135,8 +91,8 @@ def create_app(
             async with cleanup_lifespan(session_factory, auth_config):
                 yield
         finally:
+            await close_singletons()
             await reset_services()
-            await engine.dispose()
 
     mcp = FastMCP(
         "Backstop MCP",
@@ -169,31 +125,6 @@ def create_app(
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
         ]
-    )
-
-
-def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
-    """Translate the env-parsed Backstop config into the transport's own settings type.
-
-    Field-for-field, and deliberately explicit rather than derived by reflection: adding a knob
-    to `BackstopConfig` that the transport should see is then a visible edit here, and one it
-    should *not* see (schema TTL) simply never appears.
-    """
-    return BackstopTransportSettings(
-        base_url=config.base_url,
-        default_timeout_seconds=config.default_timeout_seconds,
-        reports_timeout_seconds=config.reports_timeout_seconds,
-        max_concurrent_requests_per_user=config.max_concurrent_requests_per_user,
-        default_page_size=config.default_page_size,
-        report_page_size=config.report_page_size,
-        page_limit_param=config.page_limit_param,
-        page_offset_param=config.page_offset_param,
-    )
-
-
-def retry_settings(config: BackstopConfig) -> RetrySettings:
-    return RetrySettings(
-        max_attempts=config.max_retry_attempts, max_wait_ms=config.max_retry_wait_ms
     )
 
 
