@@ -32,10 +32,14 @@ from backstop_mcp.features.activity_history.fetch_activities_page import (
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     ActivityItemDto,
+    ActivityRegardingDto,
+    ActivityTagChipDto,
+    AttendeeChipDto,
     AttendeeDto,
     EmailItemDto,
     MeetingSpecificsDto,
 )
+from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
@@ -55,6 +59,8 @@ __all__ = [
     "ActivityGroupResponse",
     "ActivityHistoryResolvedResponse",
     "ActivityDetailResponse",
+    "ActivityRegardingResponse",
+    "ActivityTagChipResponse",
     "AttendeeResponse",
     "ActivityRecordResponse",
     "DateRangeResponse",
@@ -109,6 +115,16 @@ class ActivityContinuationResponse(OmitNoneModel):
             description=(
                 "Upper date bound for this stream, copied from the prior group's `next`. "
                 "Omitted (or null) when this stream has no upper bound — do not invent one."
+            ),
+        ),
+    ] = None
+    activity_tag_ids: Annotated[
+        tuple[str, ...] | None,
+        Field(
+            default=None,
+            description=(
+                "Tag ids this stream is filtered to, copied from the prior group's `next`. "
+                "Omitted (or null) when the stream is unfiltered. Echo them; never invent."
             ),
         ),
     ] = None
@@ -174,6 +190,75 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
     ] = None
 
 
+class ActivityRegardingResponse(OmitNoneModel):
+    """The party or resource an activity is about, from Backstop's inline `regarding` value."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(description="Backstop id of the referenced record. Echo it; never invent one.")
+    resource_type: str | None = Field(
+        default=None,
+        description="JSON:API type of the referenced record, as Backstop stored it.",
+    )
+    resource_link: str | None = Field(
+        default=None,
+        description="Backstop API URL of the referenced record, when published.",
+    )
+    search_type: SearchType | None = Field(
+        default=None,
+        description=(
+            "Party collection to echo into get_person or get_organization when resource_type "
+            "is organizations, people, contacts, or employees. Omitted for other resource "
+            "types — do not guess a party type."
+        ),
+    )
+
+    @classmethod
+    def from_dto(cls, regarding: ActivityRegardingDto) -> Self:
+        return cls(
+            id=regarding.id,
+            resource_type=regarding.resource_type,
+            resource_link=regarding.resource_link,
+            search_type=regarding.search_type,
+        )
+
+
+class ActivityTagChipResponse(OmitNoneModel):
+    """One tag currently on a timeline activity."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(
+        description=(
+            "Backstop id of this activity tag. Echo it into activity_tag_ids; never invent one."
+        )
+    )
+    name: str = Field(description="Tag name as Backstop publishes it.")
+
+    @classmethod
+    def from_dto(cls, tag: ActivityTagChipDto) -> Self:
+        return cls(id=tag.id, name=tag.name)
+
+
+class AttendeeResponse(OmitNoneModel):
+    """One person listed on a meeting or call."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
+
+    id: str | None = Field(
+        default=None,
+        description=(
+            "Backstop people id when side-loaded on the timeline. Pass it as party_id to "
+            "get_person. Omitted on get_activity_detail, which does not receive people ids."
+        ),
+    )
+    name: str | None = Field(default=None, description="Display name of the attendee.")
+
+    @classmethod
+    def from_chip(cls, attendee: AttendeeChipDto) -> Self:
+        return cls(id=attendee.id, name=attendee.name)
+
+
 class ActivityRecordResponse(OmitNoneModel):
     """One meeting/call/note/document record on the timeline."""
 
@@ -225,6 +310,27 @@ class ActivityRecordResponse(OmitNoneModel):
             "`gist_truncated` is true."
         ),
     )
+    regarding: ActivityRegardingResponse | None = Field(
+        default=None,
+        description=(
+            "The party or resource this activity is about. Echo `id` and `search_type` into "
+            "get_person or get_organization. Omitted when Backstop does not publish one."
+        ),
+    )
+    tags: tuple[ActivityTagChipResponse, ...] = Field(
+        default=(),
+        description=(
+            "Tags currently on this activity. Empty when there are none. Echo a tag's id "
+            "into activity_tag_ids; never invent one. Look up names with list_activity_tags."
+        ),
+    )
+    attendees: tuple[AttendeeResponse, ...] = Field(
+        default=(),
+        description=(
+            "People listed on a meeting or call. Empty for a note or document, and when a "
+            "meeting has no attendees."
+        ),
+    )
 
     @classmethod
     def from_item(cls, item: ActivityItemDto, *, gist_max_chars: int) -> Self:
@@ -238,6 +344,13 @@ class ActivityRecordResponse(OmitNoneModel):
             gist=gist.text,
             gist_truncated=gist.truncated,
             description_length=gist.full_length if gist.truncated else None,
+            regarding=(
+                None
+                if item.regarding is None
+                else ActivityRegardingResponse.from_dto(item.regarding)
+            ),
+            tags=tuple(ActivityTagChipResponse.from_dto(tag) for tag in item.tags),
+            attendees=tuple(AttendeeResponse.from_chip(attendee) for attendee in item.attendees),
         )
 
 
@@ -394,14 +507,6 @@ class ActivityHistoryResolvedResponse(OmitNoneModel):
 type GetActivityHistoryResponse = (
     PartyAmbiguousResponse | NotFoundResponse | ActivityHistoryResolvedResponse
 )
-
-
-class AttendeeResponse(OmitNoneModel):
-    """One trimmed attendee: a single display name (see `AttendeeAttributes.display_name`)."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
-
-    name: str | None = Field(default=None, description="Display name of the attendee.")
 
 
 class ActivityDetailResponse(OmitNoneModel):

@@ -43,6 +43,7 @@ class ActivityAttributes(BaseModel):
     modified_timestamp: LenientDatetime = Field(
         default=None, validation_alias=AliasChoices("modifiedTimestamp", "modified_timestamp")
     )
+    regarding: object | None = None
 
 
 class EmailAttributes(BaseModel):

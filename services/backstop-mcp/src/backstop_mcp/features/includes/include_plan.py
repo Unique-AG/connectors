@@ -19,6 +19,8 @@ from pydantic.fields import FieldInfo
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument, follow_included
 from backstop_mcp.features.includes.responses import (
+    ActivityInclude,
+    ActivityIncludesResponse,
     OrganizationInclude,
     OrganizationIncludesResponse,
     PersonInclude,
@@ -80,12 +82,12 @@ class IncludePlan[ResponseT: BaseModel]:
         return self.into.model_validate(projected)
 
 
-# One overload per segment, so the include names are checked against the model they are being
-# projected into. A single generic signature cannot express this: `requested: Sequence[NameT]`
+# One overload per includes model, so the include names are checked against the model they are
+# being projected into. A single generic signature cannot express this: `requested: Sequence[NameT]`
 # with `NameT` tied to the model is either illegal (a PEP 695 bound may not reference another
 # type parameter) or silently widened — basedpyright solves the mismatched call as
 # `Sequence[str]`, or unions the two models, instead of reporting it. Overloads also give the
-# call site completion on the four valid names.
+# call site completion on the valid names.
 @overload
 def include_plan(
     into: type[OrganizationIncludesResponse], *, requested: Sequence[OrganizationInclude]
@@ -94,6 +96,10 @@ def include_plan(
 def include_plan(
     into: type[PersonIncludesResponse], *, requested: Sequence[PersonInclude]
 ) -> IncludePlan[PersonIncludesResponse]: ...
+@overload
+def include_plan(
+    into: type[ActivityIncludesResponse], *, requested: Sequence[ActivityInclude]
+) -> IncludePlan[ActivityIncludesResponse]: ...
 def include_plan[ResponseT: BaseModel](
     into: type[ResponseT], *, requested: Sequence[str]
 ) -> IncludePlan[ResponseT]:

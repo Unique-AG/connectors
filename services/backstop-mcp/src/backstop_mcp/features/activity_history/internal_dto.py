@@ -3,12 +3,14 @@ from datetime import date, datetime
 from typing import ClassVar, Literal, Self
 
 from fastmcp.exceptions import ToolError
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
+from backstop_mcp.backstop_client import ResourceRef
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityAttributes,
     EmailAttributes,
 )
+from backstop_mcp.features.entity_types import SearchType, party_search_type
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,9 @@ __all__ = [
     "ActivityDetailDto",
     "ActivityItemDto",
     "ActivityPageDto",
+    "ActivityRegardingDto",
+    "ActivityTagChipDto",
+    "AttendeeChipDto",
     "AttendeeDto",
     "BackstopActivityType",
     "EmailItemDto",
@@ -27,6 +32,47 @@ __all__ = [
 _MEETING_OR_CALL_RESOURCE_TYPE = "meeting-or-calls"
 
 BackstopActivityType = Literal["meeting", "call", "note", "document"]
+
+
+class ActivityRegardingDto(BaseModel):
+    """The party or resource an activity row is about, from the inline `regarding` attribute."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    resource_type: str | None = None
+    resource_link: str | None = None
+    search_type: SearchType | None = None
+
+    @classmethod
+    def from_stored(cls, value: object) -> Self | None:
+        if value is None:
+            return None
+        try:
+            ref = ResourceRef.model_validate(value)
+        except ValidationError:
+            return None
+        resource_type = ref.resource_type
+        return cls(
+            id=ref.resource_id,
+            resource_type=resource_type,
+            resource_link=ref.resource_link,
+            search_type=party_search_type(resource_type) if resource_type else None,
+        )
+
+
+class ActivityTagChipDto(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    name: str
+
+
+class AttendeeChipDto(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str | None = None
+    name: str | None = None
 
 
 class ActivityItemDto(BaseModel):
@@ -43,6 +89,9 @@ class ActivityItemDto(BaseModel):
     resource_id: str | None = None
     created_timestamp: datetime | None = None
     modified_timestamp: datetime | None = None
+    regarding: ActivityRegardingDto | None = None
+    tags: tuple[ActivityTagChipDto, ...] = ()
+    attendees: tuple[AttendeeChipDto, ...] = ()
 
     @classmethod
     def from_attributes(
@@ -50,6 +99,9 @@ class ActivityItemDto(BaseModel):
         item_id: str,
         stream: BackstopActivityType,
         attributes: ActivityAttributes,
+        *,
+        tags: tuple[ActivityTagChipDto, ...] = (),
+        attendees: tuple[AttendeeChipDto, ...] = (),
     ) -> Self:
         specific = attributes.specific_resource
         return cls(
@@ -62,6 +114,9 @@ class ActivityItemDto(BaseModel):
             resource_id=None if specific is None else specific.resource_id,
             created_timestamp=attributes.created_timestamp,
             modified_timestamp=attributes.modified_timestamp,
+            regarding=ActivityRegardingDto.from_stored(attributes.regarding),
+            tags=tags,
+            attendees=attendees,
         )
 
 

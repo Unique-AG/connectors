@@ -96,6 +96,11 @@ async def get_activity_history(
     each requested stream regardless of age, which may be old — activity history in this CRM is
     often sparse.
 
+    Each meeting, call, note, and document row includes `tags`, `attendees` (meetings and calls),
+    and `regarding` when Backstop publishes them. Pass `activity_tag_ids` from list_activity_tags
+    to keep only rows that carry all of those tags. Emails have no tags and no includes; they are
+    omitted when `activity_tag_ids` is set.
+
     `resolved.as_of` is plain provenance from the party's own record; relay it, do not treat
     record age as a staleness verdict.
     """
@@ -119,7 +124,7 @@ async def get_activity_history(
         schema=BackstopApiResourceDocument[PartyRecordResponse],
     )
     page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
-        activity_type: fetch_activities_page(
+        activity_type:         fetch_activities_page(
             client,
             activity_type=activity_type,
             segment=args.segment,
@@ -128,6 +133,7 @@ async def get_activity_history(
             offset=continuation.offset,
             since=continuation.since,
             until=continuation.until,
+            activity_tag_ids=continuation.activity_tag_ids or (),
         )
         for activity_type, continuation in args.continuations.items()
     }
@@ -148,6 +154,7 @@ async def get_activity_history(
             offset=continuation.offset,
             since=continuation.since,
             until=continuation.until,
+            activity_tag_ids=continuation.activity_tag_ids,
         )
         wire_items = tuple(
             to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items

@@ -36,8 +36,12 @@ class TestActivityRequestShape:
 
         params = route.calls.last.request.url.params
         assert params["fields"] == (
-            "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp"
+            "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp,"
+            "regarding"
         )
+        assert params["include"] == "activityTags,attendees"
+        assert params["fields[activity-tags]"] == "name"
+        assert params["fields[people]"] == "name,firstName,lastName"
         assert params["sort"] == "-effectiveDate"
         assert params["filter[activityType][eq]"] == "meetings"
         assert params["page[limit]"] == "10"
@@ -448,6 +452,8 @@ class TestEmailRequestShape:
         assert params["sort"] == "-sentTimestamp"
         assert params["page[limit]"] == "10"
         assert params["page[offset]"] == "0"
+        assert "include" not in params
+        assert "filter[activityTagIds]" not in params
 
     @pytest.mark.asyncio
     @respx.mock
@@ -681,3 +687,100 @@ class TestEmailParsing:
         assert len(page.items) == 1
         assert not hasattr(page, "total_count")
         assert not hasattr(page, "next_path")
+
+
+class TestActivityTagFilterAndIncludes:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_sends_comma_separated_tag_ids_without_an_operator(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(f"{BASE_URL}/organizations/42/activities").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await fetch_activity_page(
+            client,
+            segment="organizations",
+            entity_id="42",
+            stream="meeting",
+            limit=10,
+            offset=0,
+            activity_tag_ids=("474963", "88"),
+        )
+
+        params = route.calls.last.request.url.params
+        assert params["filter[activityTagIds]"] == "474963,88"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_omits_the_tag_filter_when_no_ids_are_given(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(f"{BASE_URL}/organizations/42/activities").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await fetch_activity_page(
+            client, segment="organizations", entity_id="42", stream="note", limit=10, offset=0
+        )
+
+        assert "filter[activityTagIds]" not in route.calls.last.request.url.params
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_projects_regarding_tags_and_attendees_from_one_page(
+        self, client: BackstopClient
+    ) -> None:
+        tag_by_id = respx.get(f"{BASE_URL}/activity-tags/474963").mock(
+            return_value=httpx.Response(500)
+        )
+        attendees = respx.get(f"{BASE_URL}/meeting-or-calls/1/attendees").mock(
+            return_value=httpx.Response(500)
+        )
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "type": "activities",
+                            "id": "meeting-or-calls_1",
+                            "attributes": {
+                                "title": "Quarterly Review",
+                                "effectiveDate": "2026-01-15",
+                                "regarding": {
+                                    "resourceId": "o42",
+                                    "resourceType": "organizations",
+                                },
+                            },
+                            "relationships": {
+                                "activityTags": {
+                                    "data": [{"type": "activity-tags", "id": "474963"}]
+                                },
+                                "attendees": {"data": [{"type": "people", "id": "p1"}]},
+                            },
+                        }
+                    ],
+                    "included": [
+                        resource("474963", "activity-tags", name="Quarterly Review"),
+                        resource("p1", "people", name="Pat Lee"),
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        page = await fetch_activity_page(
+            client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
+        )
+
+        assert tag_by_id.call_count == 0
+        assert attendees.call_count == 0
+        item = page.items[0]
+        assert item.regarding is not None
+        assert item.regarding.id == "o42"
+        assert item.regarding.resource_type == "organizations"
+        assert item.regarding.search_type == "organizations"
+        assert [(tag.id, tag.name) for tag in item.tags] == [("474963", "Quarterly Review")]
+        assert [(attendee.id, attendee.name) for attendee in item.attendees] == [("p1", "Pat Lee")]
