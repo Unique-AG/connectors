@@ -359,3 +359,177 @@ class TestInvalidArgs:
     async def test_rejects_neither_product_id_nor_product(self, client: BackstopClient) -> None:
         with pytest.raises(AssertionError, match="Exactly one of product_id or product"):
             await resolve_product(ctx_never_elicit(), client)
+
+
+def _match_catalog() -> httpx.Response:
+    """Wire page covering the match cases that a `/products` document can actually produce."""
+    return _index(
+        _product(
+            "1292283",
+            name="Capstone Global Unconstrained Portfolio",
+            short_name="CGUP",
+        ),
+        _product("100", name="Blue Capital I", short_name="BLUC"),
+        _product("101", name="Blue Capital II", short_name="BLUC"),
+        _product("200", name="Alpha Growth Fund", short_name="AGRW"),
+        _product("201", name="Alpha Value Fund", short_name="AVAL"),
+        _product("600", name="No Short Name Fund"),
+        _product("700", short_name="NONM"),
+        _product("AbC", name="Other", short_name="OTHR"),
+        _product("CGUP", name="Something Else", short_name="OTHER"),
+        _product("801", name="Quiet Growth Vehicle"),
+        _product("802", name="Quiet Value Vehicle"),
+    )
+
+
+class TestExactId:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exact_id_resolves(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="1292283")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "1292283"
+        assert result.value.short_name == "CGUP"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_id_match_is_case_sensitive(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="abc")
+
+        assert isinstance(result, NotFound)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_id_is_matched_before_short_name(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="CGUP")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "CGUP"
+        assert result.value.name == "Something Else"
+
+
+class TestExactShortName:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_short_name_match_is_case_insensitive(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="cgup")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "1292283"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_nameless_product_resolves_by_short_name(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="NONM")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "700"
+        assert result.value.name is None
+        assert result.value.short_name == "NONM"
+
+
+class TestExactName:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exact_name_resolves(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(
+            ctx_never_elicit(),
+            client,
+            product="Capstone Global Unconstrained Portfolio",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "1292283"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_name_match_is_case_insensitive(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(
+            ctx_never_elicit(),
+            client,
+            product="capstone global unconstrained portfolio",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "1292283"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exact_name_is_matched_before_substring(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="Blue Capital I")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "100"
+
+
+class TestSubstringName:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_shared_substring_is_ambiguous(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_decline(), client, product="Alpha")
+
+        assert isinstance(result, Ambiguous)
+        assert [candidate.value.id for candidate in result.candidates] == ["200", "201"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_substring_is_case_insensitive(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="unconstrained")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "1292283"
+
+
+class TestProductLabel:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ambiguous_candidates_include_short_name_when_present(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_sample_index())
+
+        result = await resolve_product(ctx_decline(), client, product="BLUC")
+
+        assert isinstance(result, Ambiguous)
+        assert [candidate.key for candidate in result.candidates] == ["100", "101"]
+        assert [candidate.label for candidate in result.candidates] == [
+            "Blue Capital I (BLUC)",
+            "Blue Capital II (BLUC)",
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ambiguous_candidates_use_name_alone_when_there_is_no_short_name(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_match_catalog())
+
+        result = await resolve_product(ctx_decline(), client, product="Quiet")
+
+        assert isinstance(result, Ambiguous)
+        assert [candidate.label for candidate in result.candidates] == [
+            "Quiet Growth Vehicle",
+            "Quiet Value Vehicle",
+        ]
+

@@ -1,20 +1,7 @@
-"""`EmploymentIndex` and its builders: one winner per `(person, organization)` pair, plus the
-type classification (`_classify_employment`) and edge-parsing machinery (`_employment_edges` and
-its helpers) they rest on.
+"""`EmploymentIndex`: one winner per `(person, organization)` pair, plus lookups.
 
-Each test below is meant to read as a mini walkthrough:
-
-1. **Configure the checks** — which relationship types count as employment / former
-   employment (`EmploymentRulesDto` / `TypeVocabularyDto`).
-2. **Prepare the side-loaded record** — `entityRelationships` plus their types, via
-   `helpers.person_org` / `helpers.relationship_types`.
-3. **Run verification** — `EmploymentIndexFactory.index`, then
-   query `status` / `departure` / `pairs` — or `_classify_employment` directly for a single type.
-
-Numbered classes below cover the nine behavioural cases for `EmploymentIndex`. The remaining
-classes cover the parsing/gate/malformed-input edge cases of `_employment_edges` and
-`_classify_employment` that predate `EmploymentIndex` and are unaffected by its
-single-winner-per-pair fold.
+Each test configures the vocabulary, prepares side-loaded `entityRelationships`, runs
+`EmploymentIndexFactory.index`, then queries `status` / `departure` / `pairs`.
 """
 
 from datetime import date
@@ -25,17 +12,13 @@ from pydantic import ValidationError
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.data_hygiene import (
     DepartureSignal,
+    EmploymentIndex,
+    EmploymentIndexFactory,
     EmploymentRulesDto,
-    TypeVocabularyDto,
-)
-from backstop_mcp.features.data_hygiene.api_responses import (
+    EmploymentStatus,
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
-)
-from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex
-from backstop_mcp.features.data_hygiene.employment_index_factory import EmploymentIndexFactory
-from backstop_mcp.features.data_hygiene.internal_dto import (
-    EmploymentStatus,
+    TypeVocabularyDto,
 )
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_MIRROR_TYPE,
@@ -49,8 +32,6 @@ from tests.features.data_hygiene.helpers import (
     person_org,
     relationship_types,
 )
-
-_classify_employment = EmploymentIndexFactory.classify_employment
 
 TODAY = date(2026, 8, 5)
 
@@ -823,14 +804,35 @@ class TestUnidentifiableOrganization:
 
 
 class TestClassifyEmployment:
-    """Single-type classification the scan calls for each person→org relationship."""
+    """Classification through `EmploymentIndexFactory.index`: former-first, IRRELEVANT drop."""
+
+    def _index(
+        self,
+        *,
+        type_id: str | None,
+        type_name: str | None,
+        checks: EmploymentRulesDto,
+    ) -> EmploymentIndex:
+        types: list[dict[str, object]] = []
+        if type_id is not None and type_name is not None:
+            types = [
+                {
+                    "type": "entity-relationship-types",
+                    "id": type_id,
+                    "attributes": {"name": type_name},
+                }
+            ]
+        return person_index(
+            [person_org("er1", type_id=type_id)],
+            checks=checks,
+            types=types,
+        )
 
     @pytest.mark.parametrize(
         ("name", "expected"),
         [
             ("is employee of", EmploymentStatus.CURRENT),
             ("is a former employee of", EmploymentStatus.FORMER),
-            ("has portal access to", EmploymentStatus.IRRELEVANT),
         ],
     )
     def test_the_vocabulary_a_real_instance_uses(
@@ -841,9 +843,19 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = _classify_employment(type_id="9", type_name=name, rules=checks)
+        index = self._index(type_id="9", type_name=name, checks=checks)
 
-        assert status is expected
+        assert index.status(person_id="p1", organization_id="o1") is expected
+
+    def test_portal_access_is_dropped_as_irrelevant(self) -> None:
+        checks = configure_checks(
+            employment_markers=frozenset({"employ"}),
+            former_markers=frozenset({"former"}),
+        )
+
+        index = self._index(type_id="9", type_name="has portal access to", checks=checks)
+
+        assert index.status(person_id="p1", organization_id="o1") is None
 
     def test_former_is_tested_before_employment(self) -> None:
         """Both markers match `is a former employee of`; the departure one has to win."""
@@ -852,11 +864,9 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = _classify_employment(
-            type_id="9", type_name="is a former employee of", rules=checks
-        )
+        index = self._index(type_id="9", type_name="is a former employee of", checks=checks)
 
-        assert status is EmploymentStatus.FORMER
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.FORMER
 
     def test_configured_ids_decide_without_a_name(self) -> None:
         checks = configure_checks(
@@ -865,9 +875,13 @@ class TestClassifyEmployment:
             former_markers=frozenset(),
         )
 
-        status = _classify_employment(type_id="459795", type_name=None, rules=checks)
+        index = person_index(
+            [person_org("er1", type_id="459795")],
+            checks=checks,
+            types=[],
+        )
 
-        assert status is EmploymentStatus.FORMER
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.FORMER
 
     def test_no_type_signal_falls_back_to_current(self) -> None:
         """With nothing to judge, the person→org gate is the only evidence — never invent a
@@ -877,11 +891,11 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = _classify_employment(type_id=None, type_name=None, rules=checks)
+        index = self._index(type_id=None, type_name=None, checks=checks)
 
-        assert status is EmploymentStatus.CURRENT
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.CURRENT
 
-    def test_an_id_whose_type_did_not_side_load_is_irrelevant(self) -> None:
+    def test_an_id_whose_type_did_not_side_load_is_dropped(self) -> None:
         """Id known but name missing: not employment evidence when vocabulary is configured.
 
         A portal-style edge must not classify as CURRENT and clear a real FORMER winner.
@@ -892,9 +906,13 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = _classify_employment(type_id="9", type_name=None, rules=checks)
+        index = person_index(
+            [person_org("er1", type_id="9")],
+            checks=checks,
+            types=[],
+        )
 
-        assert status is EmploymentStatus.IRRELEVANT
+        assert index.status(person_id="p1", organization_id="o1") is None
 
     def test_empty_employment_vocabulary_admits_every_person_to_org_type(self) -> None:
         checks = configure_checks(
@@ -902,9 +920,9 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = _classify_employment(type_id="9", type_name="has portal access to", rules=checks)
+        index = self._index(type_id="9", type_name="has portal access to", checks=checks)
 
-        assert status is EmploymentStatus.CURRENT
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.CURRENT
 
     def test_markers_are_case_insensitive(self) -> None:
         checks = configure_checks(
@@ -912,8 +930,6 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = _classify_employment(
-            type_id="9", type_name="Is A Former Employee Of", rules=checks
-        )
+        index = self._index(type_id="9", type_name="Is A Former Employee Of", checks=checks)
 
-        assert status is EmploymentStatus.FORMER
+        assert index.status(person_id="p1", organization_id="o1") is EmploymentStatus.FORMER

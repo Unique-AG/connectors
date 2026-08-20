@@ -28,6 +28,7 @@ from backstop_mcp.features.accounts.responses import (
     ProductAmbiguousResponse,
     ProductPositionsResolvedResponse,
 )
+from backstop_mcp.features.accounts.split_open import split_open
 
 __all__ = [
     "AccountListingDto",
@@ -46,4 +47,5 @@ __all__ = [
     "fetch_accounts_for_product",
     "fetch_product_positions",
     "resolve_product",
+    "split_open",
 ]

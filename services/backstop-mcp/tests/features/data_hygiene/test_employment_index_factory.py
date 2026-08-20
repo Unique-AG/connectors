@@ -1,7 +1,8 @@
 """`EmploymentIndexFactory`: what the composition root hands it, and what `index` no
 longer needs to be passed.
 
-The scan and classifier it delegates to are covered in `test_employment.py`.
+Classification, former-first ranking, and IRRELEVANT drop are covered through `index()` in
+`test_employment_index.py`.
 """
 
 from collections.abc import Sequence
@@ -10,8 +11,9 @@ from datetime import date, timedelta
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.data_hygiene import DepartureSignal, EmploymentIndexFactory
-from backstop_mcp.features.data_hygiene.api_responses import (
+from backstop_mcp.features.data_hygiene import (
+    DepartureSignal,
+    EmploymentIndexFactory,
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
 )
