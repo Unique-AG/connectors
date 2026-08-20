@@ -26,6 +26,39 @@ __all__ = ["create_app"]
 
 logger = logging.getLogger(__name__)
 
+# `prometheus_client`'s own default layout, plus four boundaries above it. One inbound MCP request
+# contains a tool call and every Graph call that tool made, and the Graph timeout budget says how
+# long that is: 30 s per request (`GraphSettings.request_timeout_seconds`) times four attempts
+# (`max_retries=3`) is 120 s before any Retry-After wait, and a paged walk is several requests. Left
+# to the default, whose top finite bucket is 10 s, every one of those lands in `+Inf` and p95 and
+# p99 both read 10 — the slow tail this histogram exists to show becomes the one thing it cannot
+# say. This is also the only one of the three latency histograms whose buckets this service gets to
+# choose: the Graph one is a view in `metrics.py`, and `unique_mcp`'s tool-call one is fixed
+# upstream.
+#
+# Trap: the histogram is registered once per process and the first middleware to declare it wins its
+# buckets, so this has to travel on the `setup_ops` call and cannot be corrected later.
+_HTTP_DURATION_BUCKETS = (
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    2.5,
+    5.0,
+    7.5,
+    10.0,
+    30.0,
+    60.0,
+    120.0,
+    300.0,
+)
+
 
 def create_app(
     config: AppConfig | None = None,
@@ -107,7 +140,7 @@ def create_app(
     )
     register_tools(mcp, graph_transport, selection)
 
-    ops_middleware = setup_ops(mcp)
+    ops_middleware = setup_ops(mcp, duration_buckets=_HTTP_DURATION_BUCKETS)
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:

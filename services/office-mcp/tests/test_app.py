@@ -184,6 +184,35 @@ class TestRoutes:
             f"expected one HTTP request-latency family, got {sorted(latency)}"
         )
 
+    def test_the_request_latency_histogram_reaches_past_ten_seconds(
+        self, app_client: TestClient
+    ) -> None:
+        """The buckets are the whole of what this histogram can say about a slow request.
+
+        `prometheus_client`'s default layout stops at 10 s. One inbound MCP request contains a tool
+        call and every Graph call that tool made — four 30 s attempts before any Retry-After wait,
+        several requests for a paged walk — so at the default every slow request falls into `+Inf`
+        and p95 and p99 both read 10, which is the one number the panel must not invent. Asserted on
+        the scrape rather than on the argument, because a histogram is registered once per process
+        and the first middleware to declare it wins: the argument is only correct if it arrived
+        first, and only the scrape says whether it did.
+
+        `/manifest` and not `/health`, which `setup_ops` excludes from these metrics along with the
+        other probe routes — a scrape after a health check finds the family declared and empty, and
+        a histogram with no observations has no buckets to read.
+        """
+        assert _get(app_client, "/manifest").status_code == 200
+
+        boundaries = {
+            line.partition('le="')[2].partition('"')[0]
+            for line in _get(app_client, "/metrics").text.splitlines()
+            if line.startswith("python_http_request_duration_seconds_bucket")
+        }
+
+        assert {"30.0", "60.0", "120.0", "300.0"} <= boundaries, (
+            f"the slow buckets are missing from the scrape, which has {sorted(boundaries)}"
+        )
+
     def test_the_resolved_surface_is_served(self, app_client: TestClient) -> None:
         """`/manifest` is where an operator reads the exact permission list without a pod's logs.
 
