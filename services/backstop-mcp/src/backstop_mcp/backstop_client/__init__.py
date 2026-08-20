@@ -4,8 +4,8 @@ Infrastructure, so nothing here imports from `features/` — see `features/__ini
 rule and `credential.py` for how the types both layers need are shared without a cycle.
 
 Nothing here imports `config` either: the tuning knobs arrive as the frozen types in
-`settings.py`, which `create_app` translates `BackstopConfig` into. Both rules are enforced by
-`tests/test_layering.py`.
+`settings.py`, which `dependencies.transport_settings` / `retry_settings` translate
+`BackstopConfig` into. Both rules are enforced by `tests/test_layering.py`.
 """
 
 from backstop_mcp.backstop_client.client import (

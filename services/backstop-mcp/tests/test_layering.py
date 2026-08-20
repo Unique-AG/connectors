@@ -18,9 +18,9 @@
 
 3. **`backstop_client/` must not import `config`.** The transport takes
    `BackstopTransportSettings`/`RetrySettings` — its own frozen types, translated from
-   `BackstopConfig` by `create_app`. It used to take the `pydantic-settings` model directly, which
-   coupled the layer to the env-parsing shape and to every knob on it, including the ones it has
-   no business seeing (the custom-field schema TTL). `features/` is
+   `BackstopConfig` by `dependencies.transport_settings`. It used to take the `pydantic-settings`
+   model directly, which coupled the layer to the env-parsing shape and to every knob on it,
+   including the ones it has no business seeing (the custom-field schema TTL). `features/` is
    deliberately *not* subject to this rule: it may read config freely (see `features/__init__.py`),
    because a feature is allowed to be configured — a transport is only allowed to be told.
 
@@ -56,7 +56,7 @@
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
-   and `server.runtime` are themselves the unit being imported.
+   and `server.tools` are themselves the unit being imported.
 
 5. **Feature model layers flow downward.** A `*Attributes` class lives in `api_responses*`, a
    `*Dto` class in `internal_dto*`, and a `*Response` class in `responses*`. Imports among those
@@ -579,8 +579,8 @@ class TestTheDetectionItself:
         ) == ["backstop_mcp.features.auth.crypto", "backstop_mcp.features.auth.context"]
 
     def test_catches_a_plain_import_too(self) -> None:
-        assert _imports_under("import backstop_mcp.server.runtime", _SERVER_PREFIX) == [
-            "backstop_mcp.server.runtime"
+        assert _imports_under("import backstop_mcp.server.instructions", _SERVER_PREFIX) == [
+            "backstop_mcp.server.instructions"
         ]
 
     def test_does_not_fire_on_permitted_imports(self) -> None:
@@ -598,8 +598,8 @@ class TestTheDetectionItself:
         ]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
-        # The shape `get_person.py` would carry if it reached past the package front door
-        # instead of importing `features.data_hygiene` itself.
+        # The shape a module under `features/org_people/tools` would carry if it reached past
+        # the package front door instead of importing `features.data_hygiene` itself.
         assert _internal_imports(
             "from backstop_mcp.features.data_hygiene.employment_index_factory import (\n"
             + "    EmploymentIndexFactory,\n)",
@@ -624,7 +624,7 @@ class TestTheDetectionItself:
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
             "from backstop_mcp.features.data_hygiene import EmploymentIndexFactory\n"
-            + "from backstop_mcp.server.runtime import get_services\n"
+            + "from backstop_mcp.server.tools import TOOLS\n"
             + "from backstop_mcp.features.resolution import Resolved\n",
             _SRC / "server" / "tools",
         )
@@ -911,9 +911,9 @@ class TestBackstopClientDoesNotImportConfig:
         violations = _violations(source, _CONFIG_MODULE)
         assert not violations, (
             "backstop_client/ must not import config — it takes its own frozen settings types "
-            + "from backstop_client/settings.py, which create_app translates BackstopConfig "
-            + "into. Add the field to BackstopTransportSettings (or RetrySettings) and map it "
-            + "in app.transport_settings instead:\n  "
+            + "from backstop_client/settings.py, which dependencies.transport_settings "
+            + "translates BackstopConfig into. Add the field to BackstopTransportSettings "
+            + "(or RetrySettings) and map it in dependencies.transport_settings instead:\n  "
             + "\n  ".join(violations)
         )
 
