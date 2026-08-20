@@ -11,8 +11,8 @@ from backstop_mcp.features.accounts import (
     ProductPositionsResolvedResponse,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.server.tools.get_product_positions import get_product_positions
-from backstop_mcp.server.tools.registry import TOOLS
 from tests.features.party_resolver.helpers import ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload

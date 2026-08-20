@@ -15,11 +15,10 @@ import respx
 from pydantic import SecretStr
 
 from backstop_mcp.app import retry_settings, transport_settings
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
-from backstop_mcp.backstop_client.factory import BackstopClientFactory
+from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.features.activity_history import ActivityHistorySettings
-from backstop_mcp.features.auth.context import BackstopAuthContext
+from backstop_mcp.features.auth import BackstopAuthContext
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,

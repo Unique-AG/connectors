@@ -80,7 +80,7 @@ async def db(postgres_container: PostgresContainer) -> AsyncGenerator[DatabaseFi
     the whole test suite (a prefix per test file, or a random uuid), not just within one file.
     """
     from backstop_mcp.config import DatabaseConfig
-    from backstop_mcp.db.engine import create_engine, create_session_factory
+    from backstop_mcp.db import create_engine, create_session_factory
 
     url = postgres_container.get_connection_url().replace("+psycopg2", "")
     config = DatabaseConfig.model_validate({"url": url})

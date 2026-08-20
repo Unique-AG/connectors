@@ -11,8 +11,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.db.engine import transaction
-from backstop_mcp.db.models import LoginAttempt
+from backstop_mcp.db import LoginAttempt, transaction
 from backstop_mcp.features.auth.throttle import (
     MAX_USERNAME_LENGTH,
     ThrottleConfig,
