@@ -13,6 +13,7 @@ from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopAuthError,
     BackstopClientFactory,
+    BackstopCredentialSecret,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
     BackstopUnreachableError,
@@ -20,7 +21,6 @@ from backstop_mcp.backstop_client import (
     PageResult,
     SinglePage,
 )
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig
 from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential, recorded_params

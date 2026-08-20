@@ -10,7 +10,7 @@ type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 class TestOAuthClient:
     @pytest.mark.asyncio
     async def test_insert_and_fetch(self, db: DatabaseFixture) -> None:
-        from backstop_mcp.db.models import OAuthClient
+        from backstop_mcp.db import OAuthClient
 
         _, factory = db
         async with factory() as session:
@@ -31,7 +31,7 @@ class TestOAuthClient:
 class TestPendingAuthorization:
     @pytest.mark.asyncio
     async def test_insert_and_fetch(self, db: DatabaseFixture) -> None:
-        from backstop_mcp.db.models import OAuthClient, PendingAuthorization
+        from backstop_mcp.db import OAuthClient, PendingAuthorization
 
         _, factory = db
         now = datetime.now(UTC)
@@ -65,7 +65,7 @@ class TestPendingAuthorization:
 class TestAuthorizationCode:
     @pytest.mark.asyncio
     async def test_insert_and_fetch(self, db: DatabaseFixture) -> None:
-        from backstop_mcp.db.models import AuthorizationCode, OAuthClient
+        from backstop_mcp.db import AuthorizationCode, OAuthClient
 
         _, factory = db
         now = datetime.now(UTC)
@@ -101,7 +101,7 @@ class TestOAuthTokenRotation:
     async def test_rotated_from_links_token_family(self, db: DatabaseFixture) -> None:
         import uuid
 
-        from backstop_mcp.db.models import OAuthClient, OAuthToken
+        from backstop_mcp.db import OAuthClient, OAuthToken
 
         _, factory = db
         now = datetime.now(UTC)
@@ -154,7 +154,7 @@ class TestOAuthTokenRotation:
 class TestBackstopCredential:
     @pytest.mark.asyncio
     async def test_upsert_by_user_id(self, db: DatabaseFixture) -> None:
-        from backstop_mcp.db.models import BackstopCredential
+        from backstop_mcp.db import BackstopCredential
 
         _, factory = db
         async with factory() as session:
@@ -177,7 +177,7 @@ class TestBackstopCredential:
     async def test_backstop_username_is_unique(self, db: DatabaseFixture) -> None:
         from sqlalchemy.exc import IntegrityError
 
-        from backstop_mcp.db.models import BackstopCredential
+        from backstop_mcp.db import BackstopCredential
 
         _, factory = db
         async with factory() as session:

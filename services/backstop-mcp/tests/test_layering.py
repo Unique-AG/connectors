@@ -35,6 +35,21 @@
    with `BackstopConfig()`, so whatever `create_app` had been given was silently ignored.
    `__all__` alone is only a convention; this rule is what makes it hold.
 
+   Tests walk the same rule. The suite used to be exempt so internals stayed testable; that
+   carve-out made 14 functions public purely to be tested. Feature tests now enter each package
+   through `__init__`, the same way production does. The rule is enforced rather than agreed.
+
+   Auth tests (`tests/features/auth/`) are walked. They may import `features.auth.*`
+   (`features/auth/` was left out of the rename) but still enter `db` and
+   `backstop_client` through those packages' `__init__`.
+
+   Tool tests (`tests/server/tools/`) are the tool-level layer. They import the tool under test
+   from its module (`from backstop_mcp.server.tools.get_person import get_person`) because
+   `server.tools`'s `__init__` only exports `TOOLS` and individual tool modules are not a
+   public import surface — a tool is reached by being registered. `TOOLS` itself is imported
+   from the package. Those files still cannot import `server.tools.registry` or
+   `server.tools.utils`, and cannot reach past a feature package's `__init__`.
+
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
    and `server.runtime` are themselves the unit being imported.
@@ -70,17 +85,21 @@ import pathlib
 import pytest
 
 _SRC = pathlib.Path(__file__).parent.parent / "src" / "backstop_mcp"
+_TESTS = pathlib.Path(__file__).parent
+_TESTS_AUTH = _TESTS / "features" / "auth"
+_TESTS_SERVER_TOOLS = _TESTS / "server" / "tools"
 
 _FEATURES = _SRC / "features"
 _BACKSTOP_CLIENT = _SRC / "backstop_client"
 _SERVER_PREFIX = "backstop_mcp.server"
+_SERVER_TOOLS_PACKAGE = "backstop_mcp.server.tools"
+_FEATURES_AUTH_PACKAGE = "backstop_mcp.features.auth"
 _FEATURES_PREFIX = "backstop_mcp.features"
 _CONFIG_MODULE = "backstop_mcp.config"
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
-# Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
-# directly testable without being callable from production code that should go through the front
-# door. A new package belongs here as soon as its `__init__` exports anything.
+# Tests walk the same rule (auth internals and tool-module imports excepted; see rule 4).
+# A new package belongs here as soon as its `__init__` exports anything.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.backstop_client",
     "backstop_mcp.db",
@@ -109,9 +128,21 @@ def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
     return found
 
 
+def _display_path(source: pathlib.Path) -> str:
+    """A path relative to `src/` or `tests/`, so failures stay readable."""
+    try:
+        return str(source.relative_to(_SRC))
+    except ValueError:
+        pass
+    try:
+        return str(pathlib.Path("tests") / source.relative_to(_TESTS))
+    except ValueError:
+        return source.name
+
+
 def _source_id(source: pathlib.Path) -> str:
     """Test id for one module: `features/custom_fields/service.py`, not an absolute path."""
-    return str(source.relative_to(_SRC))
+    return _display_path(source)
 
 
 def _imports_under(source: str, prefix: str) -> list[str]:
@@ -157,26 +188,62 @@ def _is_inside(directory: pathlib.Path, package: str) -> bool:
     )
 
 
+def _is_tool_test(directory: pathlib.Path) -> bool:
+    return directory == _TESTS_SERVER_TOOLS or directory.is_relative_to(_TESTS_SERVER_TOOLS)
+
+
+def _is_auth_test(directory: pathlib.Path) -> bool:
+    return directory == _TESTS_AUTH or directory.is_relative_to(_TESTS_AUTH)
+
+
+def _is_tool_module_import(module: str) -> bool:
+    """`get_*` / `list_*` under `server.tools` — the tool under test, not `.registry` / `.utils`."""
+    prefix = f"{_SERVER_TOOLS_PACKAGE}."
+    if not module.startswith(prefix):
+        return False
+    first = module[len(prefix) :].split(".", 1)[0]
+    return first.startswith(("get_", "list_"))
+
+
+def _skip_internal_import(module: str, directory: pathlib.Path) -> bool:
+    if _is_auth_test(directory) and (
+        module == _FEATURES_AUTH_PACKAGE or module.startswith(f"{_FEATURES_AUTH_PACKAGE}.")
+    ):
+        return True
+    return _is_tool_test(directory) and _is_tool_module_import(module)
+
+
 def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, int]]:
     """Modules of a public-surface package that `source` reaches past the `__init__` for.
 
     A file inside a package may import its own package's modules freely — that is the package
     composing itself — so the directory the file lives in, not its name, decides.
+
+    Auth tests may import `backstop_mcp.features.auth.*`; they still enter `db` and
+    `backstop_client` through those packages' `__init__`.
+
+    Tool tests may import the tool module under test (`server.tools.get_*` / `list_*`); they
+    still cannot import `server.tools.registry` or `server.tools.utils`, and cannot reach past
+    a feature package's `__init__`.
     """
     return [
         (module, line)
         for package in _PUBLIC_SURFACE_PACKAGES
         if not _is_inside(directory, package)
         for module, line in _imported_modules(ast.parse(source))
-        if module.startswith(f"{package}.")
+        if module.startswith(f"{package}.") and not _skip_internal_import(module, directory)
     ]
 
 
 def _internal_module_violations(source: pathlib.Path) -> list[str]:
     return [
-        f"{source.relative_to(_SRC)}:{line} imports {module}"
+        f"{_display_path(source)}:{line} imports {module}"
         for module, line in _internal_imports(source.read_text(), source.parent)
     ]
+
+
+def _rule4_sources() -> list[pathlib.Path]:
+    return sorted((*_SRC.rglob("*.py"), *_TESTS.rglob("*.py")))
 
 
 _MODEL_LAYERS: tuple[str, ...] = ("api_responses", "internal_dto", "responses")
@@ -471,6 +538,55 @@ class TestTheDetectionItself:
             _SRC / "server" / "tools",
         )
 
+    def test_catches_a_test_file_reaching_past_a_feature_init(self) -> None:
+        # The carve-out used to walk `src` only, so this import was invisible.
+        assert _internal_imports(
+            "from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex",
+            _TESTS / "features" / "accounts",
+        ) == [("backstop_mcp.features.data_hygiene.employment_index", 1)]
+
+    def test_tool_tests_may_import_the_tool_under_test(self) -> None:
+        assert not _internal_imports(
+            "from backstop_mcp.server.tools.get_person import get_person\n"
+            + "from backstop_mcp.server.tools.list_custom_fields import list_custom_fields\n",
+            _TESTS / "server" / "tools",
+        )
+
+    def test_tool_tests_cannot_import_registry_or_utils(self) -> None:
+        assert _internal_imports(
+            "from backstop_mcp.server.tools.registry import TOOLS\n"
+            + "from backstop_mcp.server.tools.utils.activity_history import something\n",
+            _TESTS / "server" / "tools",
+        ) == [
+            ("backstop_mcp.server.tools.registry", 1),
+            ("backstop_mcp.server.tools.utils.activity_history", 2),
+        ]
+
+    def test_tool_tests_still_cannot_reach_past_a_feature_init(self) -> None:
+        assert _internal_imports(
+            "from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex",
+            _TESTS / "server" / "tools",
+        ) == [("backstop_mcp.features.data_hygiene.employment_index", 1)]
+
+    def test_auth_tests_may_import_auth_internals(self) -> None:
+        assert not _internal_imports(
+            "from backstop_mcp.features.auth.throttle import is_throttled\n"
+            + "from backstop_mcp.features.auth.credential_store import save_credential\n",
+            _TESTS / "features" / "auth",
+        )
+
+    def test_auth_tests_still_enter_db_and_client_through_init(self) -> None:
+        assert _internal_imports(
+            "from backstop_mcp.db.engine import transaction\n"
+            + "from backstop_mcp.db.models import LoginAttempt\n"
+            + "from backstop_mcp.backstop_client.credential import BackstopCredentialSecret\n",
+            _TESTS / "features" / "auth",
+        ) == [
+            ("backstop_mcp.backstop_client.credential", 3),
+            ("backstop_mcp.db.engine", 1),
+            ("backstop_mcp.db.models", 2),
+        ]
+
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
         assert not _imports_under("from backstop_mcp.serverless import thing", _SERVER_PREFIX)
         assert not _imports_under("from backstop_mcp.featureset import thing", _FEATURES_PREFIX)
@@ -647,6 +763,20 @@ class TestBackstopClientDoesNotImportConfig:
 
 
 class TestPackagesAreEnteredThroughTheirInit:
+    def test_the_walk_includes_tests_and_src(self) -> None:
+        """Guards the guard: dropping tests/ would silently vacate the rule below."""
+        sources = _rule4_sources()
+        assert sources, "no python sources found for the internals rule"
+        test_sources = [source for source in sources if source.is_relative_to(_TESTS)]
+        src_sources = [source for source in sources if source.is_relative_to(_SRC)]
+        assert src_sources, "the walk must still include src/"
+        assert test_sources, "the walk must include tests/"
+        assert (_TESTS / "features" / "accounts" / "test_resolve_product.py") in sources
+        auth_tests = [source for source in test_sources if source.is_relative_to(_TESTS_AUTH)]
+        assert auth_tests, (
+            "auth tests must be walked so they enter db/backstop_client through __init__"
+        )
+
     def test_every_listed_package_actually_publishes_something(self) -> None:
         """Guards the guard: a package with no `__all__` has no front door to insist on."""
         for package in _PUBLIC_SURFACE_PACKAGES:
@@ -666,7 +796,7 @@ class TestPackagesAreEnteredThroughTheirInit:
 
         assert "backstop_mcp.features.data_hygiene.employment_index" in imported
 
-    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
+    @pytest.mark.parametrize("source", _rule4_sources(), ids=_source_id)
     def test_no_module_reaches_past_another_packages_init(self, source: pathlib.Path) -> None:
         violations = _internal_module_violations(source)
         assert not violations, (

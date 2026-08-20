@@ -5,7 +5,8 @@ production, so these fixtures install a real `Services` — one `BackstopClientF
 auth context pointed at the test database) plus one `CustomFieldsService`.
 """
 
-from collections.abc import AsyncGenerator, Callable
+import json
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass
 
 import pytest
@@ -14,10 +15,9 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.backstop_client import BackstopClientFactory
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
-from backstop_mcp.features.auth.context import BackstopAuthContext
-from backstop_mcp.features.auth.credential_store import save_credential
+from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
+from backstop_mcp.db import BackstopCredential
+from backstop_mcp.features.auth import BackstopAuthContext
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from tests.helpers import BASE_URL, client_factory, custom_fields_service, install_services
 
@@ -36,6 +36,28 @@ class ConnectedUser:
 type ConnectUser = Callable[..., "AsyncGenerator[ConnectedUser] | object"]
 
 
+def _store_credential(
+    session: AsyncSession,
+    subject: str,
+    credential: BackstopCredentialSecret,
+    key: bytes,
+) -> None:
+    """Persist a credential the way `save_credential` does, without importing auth internals."""
+    payload = json.dumps(
+        {
+            "username": credential.username,
+            "api_token": credential.api_token.get_secret_value(),
+        }
+    )
+    session.add(
+        BackstopCredential(
+            user_id=subject,
+            backstop_username=credential.username,
+            encrypted_blob=Fernet(key).encrypt(payload.encode()),
+        )
+    )
+
+
 @pytest.fixture
 async def connect_user(
     db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
@@ -50,6 +72,7 @@ async def connect_user(
         api_token: str = "token",
         *,
         base_url: str = BASE_URL,
+        revoke_tokens_for_subject: Callable[[str], Awaitable[None]] | None = None,
     ) -> ConnectedUser:
         key = Fernet.generate_key()
 
@@ -57,7 +80,7 @@ async def connect_user(
             return None
 
         async with session_factory() as session:
-            await save_credential(
+            _store_credential(
                 session,
                 subject,
                 BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
@@ -77,7 +100,7 @@ async def connect_user(
             auth=BackstopAuthContext(
                 session_factory=session_factory,
                 encryption_key=key,
-                revoke_tokens_for_subject=_noop_revoke,
+                revoke_tokens_for_subject=revoke_tokens_for_subject or _noop_revoke,
             ),
         )
         built.append(factory)

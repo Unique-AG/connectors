@@ -37,7 +37,13 @@ from backstop_mcp.backstop_client.json_api import (
     included_by_type,
     included_resource,
 )
-from backstop_mcp.backstop_client.pagination import PageResult, SinglePage
+from backstop_mcp.backstop_client.pagination import (
+    PageResult,
+    SinglePage,
+    paginate_all,
+    parse_page,
+)
+from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
 __all__ = [
@@ -59,9 +65,12 @@ __all__ = [
     "IncludedResource",
     "PageResult",
     "ResourceRef",
+    "RetryPolicy",
     "RetrySettings",
     "SinglePage",
     "follow_included",
     "included_by_type",
     "included_resource",
+    "paginate_all",
+    "parse_page",
 ]

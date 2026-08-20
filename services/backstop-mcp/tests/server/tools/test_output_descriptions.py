@@ -5,7 +5,7 @@ from typing import Annotated, TypeAliasType, cast, get_args, get_origin, get_typ
 
 from pydantic import BaseModel
 
-from backstop_mcp.server.tools.registry import TOOLS
+from backstop_mcp.server.tools import TOOLS
 
 
 def _is_model(annotation: object) -> type[BaseModel] | None:

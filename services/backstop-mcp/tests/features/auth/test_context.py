@@ -4,7 +4,7 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
+from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.features.auth.context import BackstopAuthContext, NotConnectedError
 from backstop_mcp.features.auth.credential_store import save_credential
 

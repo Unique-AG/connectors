@@ -29,9 +29,9 @@ from backstop_mcp.config import (
     DatabaseConfig,
     EncryptionConfig,
 )
-from backstop_mcp.features.auth.context import NotConnectedError
+from backstop_mcp.features.auth import NotConnectedError
 from backstop_mcp.server.runtime import get_services
-from backstop_mcp.server.tools.registry import TOOLS
+from backstop_mcp.server.tools import TOOLS
 
 _BASE_URL = "https://api.backstopsolutions.com"
 
