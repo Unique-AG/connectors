@@ -25,14 +25,25 @@ record — the stdlib documents "modify the record in-place" as what a filter is
 is a per-emit object the caller does not keep. What is *not* mutated is anything the caller still
 owns: a dict passed as `extra=` is rebuilt rather than edited in place, so redaction never reaches
 back into the header map the caller is still using. See `_redact`.
+
+Two filters, each for one defect:
+
+`CorrelationFilter` gives every line something joinable — a trace id, an MCP request id, an HTTP
+request id, or failing all three the id of this process's boot. See its docstring.
+
+`RedactionFilter` is the redaction, by field name and by value shape. See its docstring.
 """
 
 import logging
 import re
 import traceback
-from collections.abc import Iterable, Mapping, Sequence
+import uuid
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Sequence
+from contextvars import ContextVar
 from typing import cast, override
 
+from fastmcp.server.dependencies import get_context, get_http_request
+from opentelemetry import trace
 from unique_mcp.logging import configure_logging as configure_pino_logging
 
 from office_mcp.config import AppConfig
@@ -40,10 +51,21 @@ from office_mcp.config import AppConfig
 __all__ = [
     "CENSORED",
     "TRUNCATED",
+    "CorrelationFilter",
+    "HttpRequestIdMiddleware",
     "RedactionFilter",
     "configure_logging",
     "install_filters",
 ]
+
+# Local ASGI aliases rather than Starlette's, for the reason `tracing.py` gives at the same place:
+# Starlette spells `Scope` as `MutableMapping[str, Any]`, and every read off it is then an `Any`
+# this service's type checking rejects.
+type ASGIScope = MutableMapping[str, object]
+type ASGIMessage = MutableMapping[str, object]
+type ASGIReceive = Callable[[], Awaitable[ASGIMessage]]
+type ASGISend = Callable[[ASGIMessage], Awaitable[None]]
+type ASGIApp = Callable[[ASGIScope, ASGIReceive, ASGISend], Awaitable[None]]
 
 # What replaces a secret, spelled exactly as `packages/logger/src/options.ts` spells it, so one
 # grep over a mixed Node-and-Python deployment's logs finds every redaction in both.
@@ -263,10 +285,153 @@ class RedactionFilter(logging.Filter):
 
 
 # --------------------------------------------------------------------------------------------
+# Correlation
+# --------------------------------------------------------------------------------------------
+
+_CORRELATION_FIELD = "correlation_id"
+_REQUEST_FIELD = "request_id"
+_SESSION_FIELD = "session_id"
+_HTTP_REQUEST_FIELD = "http_request_id"
+
+# The last resort, and the only id available to a line emitted before anything is serving a
+# request: startup, the tool-surface manifest, a lifespan failure. Every line of one pod's boot
+# shares it, which is what makes those lines a group instead of a pile.
+_BOOT_ID = f"boot-{uuid.uuid4().hex}"
+
+# Set per HTTP request by `HttpRequestIdMiddleware`, read by `CorrelationFilter`.
+_http_request_id: ContextVar[str | None] = ContextVar("office_mcp_http_request_id", default=None)
+
+# An id a gateway already minted for this request, preferred over one of ours so the two systems'
+# logs join. Capped, because it is a header and therefore attacker-controlled.
+_FORWARDED_REQUEST_ID_HEADER = b"x-request-id"
+_MAX_FORWARDED_REQUEST_ID = 128
+
+
+def _mcp_request_id() -> str | None:
+    """The MCP request id of the message being handled, or `None` outside one.
+
+    This is FastMCP's own per-message identity and not a parallel scheme, which also makes it the
+    one identity that is correct inside the streamable-HTTP session task: it is set per message,
+    where anything set per HTTP request is stale there. See `tracing.py`.
+    """
+    try:
+        return get_context().request_id
+    except Exception:
+        # Broad on purpose: there is no exception a log filter may propagate. FastMCP raises
+        # `RuntimeError` for "no context" and `ValueError` for "no session yet", and a third
+        # spelling in a later version must not turn one log line into a crash.
+        return None
+
+
+def _mcp_session_id() -> str | None:
+    """The transport's own session id, read off the request being served.
+
+    Read from the header rather than from `Context.session_id`, which mints and memoises a uuid of
+    its own when a session has none — and the `initialize` message has none. That id would then be
+    the one this service's logs report for a session the transport knows by a different one.
+    """
+    try:
+        return get_http_request().headers.get("mcp-session-id")
+    except Exception:
+        return None
+
+
+def _correlation_id(request_id: str | None) -> str:
+    """Something joinable, whatever is running.
+
+    The order is what each id is worth. A trace id spans this service and everything it called, so
+    it wins whenever tracing is on. An MCP request id groups one message. An HTTP request id groups
+    one request, including the lines uvicorn writes after the response. The boot id groups a
+    process.
+    """
+    span = trace.get_current_span().get_span_context()
+    if span.is_valid:
+        return format(span.trace_id, "032x")
+    if request_id is not None:
+        return f"mcp-{request_id}"
+    forwarded = _http_request_id.get()
+    return forwarded if forwarded is not None else _BOOT_ID
+
+
+class CorrelationFilter(logging.Filter):
+    """Give every line an id that groups it with the rest of its request.
+
+    The formatter adds `trace_id` when a span is recording and nothing at all when one is not, so
+    without this a line emitted with tracing disabled — or before any request exists — cannot be
+    grouped at all. `teams-mcp` has the same fallback for the same reason
+    (`services/teams-mcp/src/app.module.ts:73-79`: the active span's trace id, or a generated id).
+
+    An id a caller supplied is left alone, so a call that knows better than this filter can say so.
+    """
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        request_id = _mcp_request_id()
+        if request_id is not None and _REQUEST_FIELD not in record.__dict__:
+            setattr(record, _REQUEST_FIELD, request_id)
+        session_id = _mcp_session_id()
+        if session_id is not None and _SESSION_FIELD not in record.__dict__:
+            setattr(record, _SESSION_FIELD, session_id)
+        # Carried in its own field as well as being a candidate for `correlation_id`, because a
+        # trace id outranks it: with tracing on it would otherwise never be visible, and it is the
+        # only id shared with whatever gateway minted it.
+        http_request_id = _http_request_id.get()
+        if http_request_id is not None and _HTTP_REQUEST_FIELD not in record.__dict__:
+            setattr(record, _HTTP_REQUEST_FIELD, http_request_id)
+        if _CORRELATION_FIELD not in record.__dict__:
+            setattr(record, _CORRELATION_FIELD, _correlation_id(request_id))
+        return True
+
+
+class HttpRequestIdMiddleware:
+    """Mint an id for every HTTP request, for the lines that have no span and no MCP message.
+
+    Mount outermost, so a request that fails before the app has it covered too.
+
+    Trap: the contextvar is set and never reset. That is what puts the id on uvicorn's access line,
+    which is written after the app has returned but inside the same per-request task — and a task's
+    context dies with it, so nothing leaks into the next request. What it does reach is the
+    streamable-HTTP session task, which snapshots the context of the `initialize` request that
+    created it; `_correlation_id` therefore prefers the MCP request id, which is per message.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app: ASGIApp = app
+
+    async def __call__(self, scope: ASGIScope, receive: ASGIReceive, send: ASGISend) -> None:
+        if scope.get("type") == "http":
+            _ = _http_request_id.set(_request_id(scope))
+        await self._app(scope, receive, send)
+
+
+def _request_id(scope: ASGIScope) -> str:
+    forwarded = _forwarded_request_id(scope)
+    return forwarded if forwarded is not None else f"req-{uuid.uuid4().hex}"
+
+
+def _forwarded_request_id(scope: ASGIScope) -> str | None:
+    raw = scope.get("headers")
+    if not isinstance(raw, Iterable):
+        return None
+    headers: Iterable[object] = raw
+    for header in headers:
+        if not isinstance(header, list | tuple):
+            continue
+        pair = cast("Sequence[object]", header)
+        if len(pair) != 2 or pair[0] != _FORWARDED_REQUEST_ID_HEADER:
+            continue
+        value = _as_text(pair[1]).strip()
+        if value:
+            return value[:_MAX_FORWARDED_REQUEST_ID]
+    return None
+
+
+# --------------------------------------------------------------------------------------------
 # Installation
 # --------------------------------------------------------------------------------------------
 
-_FILTERS: tuple[type[logging.Filter], ...] = (RedactionFilter,)
+# Order is the order they run in.
+_FILTERS: tuple[type[logging.Filter], ...] = (CorrelationFilter, RedactionFilter)
 
 
 def install_filters(handler: logging.Handler) -> None:
