@@ -79,6 +79,53 @@ async def test_the_status_decides_the_error(
     assert raised.value.request_id == REQUEST_ID
 
 
+@pytest.mark.parametrize(
+    ("status", "headers", "expected"),
+    [
+        (429, {"Retry-After": "10"}, GraphThrottled),
+        (503, {"Retry-After": "10"}, GraphThrottled),
+        (503, {}, GraphUnavailable),
+        (504, {}, GraphUnavailable),
+        (500, {}, GraphUnavailable),
+    ],
+    ids=["429-with-delay", "503-with-delay", "503-alone", "504", "500"],
+)
+@pytest.mark.usefixtures("retry_sleeps")
+async def test_a_5xx_is_throttling_when_it_named_a_delay_and_an_outage_when_it_did_not(
+    client: GraphServiceClient,
+    graph: respx.MockRouter,
+    status: int,
+    headers: dict[str, str],
+    expected: type[GraphFailure],
+) -> None:
+    """The one place a status alone is not enough to sort a failure by remedy.
+
+    Graph rate limits with a 503 as well as with a 429, and the only thing that says which it did is
+    `Retry-After`: a service naming the second it will answer again is holding a caller off, not
+    falling over. The remedies are opposite — wait exactly that long and then look at quota, versus
+    retry once and then report an outage — so a 503 with the header has to land on the throttling
+    side of that split and a 503 without it on the outage side. The SDK's own retry handler reads
+    the header on a 503 the same way, which is what makes the `retried` label on
+    `graph_throttled_total` true of the result.
+
+    A 500 is here as the control: it is not a status the SDK retries at all, so nothing about it
+    changes.
+    """
+    graph.get("/me").mock(
+        side_effect=always(status, headers, error_body("serviceError", "synthesised failure"))
+    )
+
+    with pytest.raises(expected) as raised, graph_errors():
+        _ = await client.me.get()
+
+    assert type(raised.value) is expected
+    assert raised.value.status == status
+    if isinstance(raised.value, GraphThrottled):
+        assert raised.value.retry_after_seconds == 10.0, (
+            "the delay is the remedy, so it has to survive the classification"
+        )
+
+
 async def test_a_429_that_outlasts_the_retries_carries_graphs_own_retry_after(
     client: GraphServiceClient,
     graph: respx.MockRouter,

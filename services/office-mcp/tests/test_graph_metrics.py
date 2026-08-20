@@ -225,6 +225,28 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true") == before + 1
 
     @pytest.mark.usefixtures("no_retry_waiting")
+    async def test_a_503_that_named_a_delay_is_counted_as_throttling_and_not_as_an_outage(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The two the operator answers with different money: quota, or an incident.
+
+        Graph rate limits with a 503 carrying `Retry-After` as well as with a 429. Counted under
+        `status="unavailable"`, that reads as Microsoft being down while the fix is quota — and
+        `graph_throttled_total`, the panel an operator would check next, misses it entirely.
+        """
+        graph.get("/me").mock(return_value=httpx.Response(503, headers={"Retry-After": "7"}))
+        throttled = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true")
+        counted = _value(GRAPH_REQUESTS_TOTAL, operation="get_me", status="throttled")
+        outages = _value(GRAPH_REQUESTS_TOTAL, operation="get_me", status="unavailable")
+
+        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+            _ = await client.me.get()
+
+        assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true") == throttled + 1
+        assert _value(GRAPH_REQUESTS_TOTAL, operation="get_me", status="throttled") == counted + 1
+        assert _value(GRAPH_REQUESTS_TOTAL, operation="get_me", status="unavailable") == outages
+
+    @pytest.mark.usefixtures("no_retry_waiting")
     async def test_no_retry_attempted_when_graph_asked_for_a_wait_past_the_ceiling(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

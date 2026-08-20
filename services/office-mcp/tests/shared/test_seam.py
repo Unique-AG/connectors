@@ -170,6 +170,22 @@ class TestRetryAdvice:
 
         assert "42 seconds" in message
 
+    def test_a_5xx_that_named_a_delay_passes_it_on_without_naming_a_cause(self) -> None:
+        """`GraphThrottled` is not only 429: Graph holds a caller off with a 503 carrying
+        `Retry-After` too, and that one may equally be a service too busy to answer. The delay is
+        the remedy for both, which is why they share a class — but only the 429 can be called rate
+        limiting, and a message that called the other one that would send an operator looking for a
+        quota that was never spent.
+        """
+        message = _message(
+            GraphThrottled("busy", status=503, code=None, request_id=None, retry_after_seconds=7.0)
+        )
+
+        assert "7 seconds" in message
+        assert "Retry after that, not sooner" in message
+        assert "Microsoft 365 is rate-limiting this connector" not in message
+        assert "Retry once" not in message, "not an outage: Graph said when to come back"
+
     def test_throttling_without_a_delay_still_says_not_to_spin(self) -> None:
         message = _message(
             GraphThrottled(
