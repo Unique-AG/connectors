@@ -96,7 +96,7 @@ class TypeVocabularyDto(BaseModel):
 class EmploymentEdgeDto(BaseModel):
     """One person→org relationship, normalised out of the raw Backstop payload.
 
-    `status` comes from `classify_employment` (`CURRENT` / `FORMER`; `IRRELEVANT` edges never
+    `status` comes from `_classify_employment` (`CURRENT` / `FORMER`; `IRRELEVANT` edges never
     reach this shape at all). `effective_date` is whichever date on the relationship is
     comparable across edges — a `None` here means the edge has no usable date and must sort
     last rather than being mistaken for the oldest or newest edge. `departure` is set only when
