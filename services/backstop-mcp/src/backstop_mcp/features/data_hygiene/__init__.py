@@ -3,8 +3,8 @@
 The public surface is deliberately small: `EmploymentIndexFactory.index` for the employment
 index (person or organization side-loads), `EmploymentLinkResponse` for the tool-facing list,
 `entity_relationships` to pull those includes, and `AsOfResponse.from_attributes` for provenance.
-`employment.py` is the pure scan the factory composes — importable for tests, not part of what
-tools are handed.
+`employment_index.py` is the winner-per-pair fold the factory composes — importable for tests, not
+part of what tools are handed.
 """
 
 from backstop_mcp.features.data_hygiene.api_responses import (
@@ -15,7 +15,8 @@ from backstop_mcp.features.data_hygiene.api_responses import (
     ProvenanceAttributes,
     RelationshipTypeAttributes,
 )
-from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
+from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex
+from backstop_mcp.features.data_hygiene.employment_index_factory import EmploymentIndexFactory
 from backstop_mcp.features.data_hygiene.entity_relationships import entity_relationships
 from backstop_mcp.features.data_hygiene.internal_dto import (
     DepartedEmploymentDto,
@@ -32,7 +33,6 @@ from backstop_mcp.features.data_hygiene.responses import (
     DepartedContactResponse,
     EmploymentLinkResponse,
 )
-from backstop_mcp.features.data_hygiene.service import EmploymentIndexFactory
 
 __all__ = [
     "AsOfResponse",
@@ -54,6 +54,5 @@ __all__ = [
     "ProvenanceAttributes",
     "RelationshipTypeAttributes",
     "TypeVocabularyDto",
-    "build_employment_index",
     "entity_relationships",
 ]

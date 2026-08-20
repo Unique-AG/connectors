@@ -1,5 +1,5 @@
 """`EmploymentIndex` and its builders: one winner per `(person, organization)` pair, plus the
-type classification (`classify_employment`) and edge-parsing machinery (`_employment_edges` and
+type classification (`_classify_employment`) and edge-parsing machinery (`_employment_edges` and
 its helpers) they rest on.
 
 Each test below is meant to read as a mini walkthrough:
@@ -8,13 +8,12 @@ Each test below is meant to read as a mini walkthrough:
    employment (`EmploymentRulesDto` / `TypeVocabularyDto`).
 2. **Prepare the side-loaded record** — `entityRelationships` plus their types, via
    `helpers.person_org` / `helpers.relationship_types`.
-3. **Run verification** — `build_employment_index`
-   (what `EmploymentIndexFactory.index` delegates to), then
-   query `status` / `departure` / `pairs` — or `classify_employment` directly for a single type.
+3. **Run verification** — `EmploymentIndexFactory.index`, then
+   query `status` / `departure` / `pairs` — or `_classify_employment` directly for a single type.
 
 Numbered classes below cover the nine behavioural cases for `EmploymentIndex`. The remaining
 classes cover the parsing/gate/malformed-input edge cases of `_employment_edges` and
-`classify_employment` that predate `EmploymentIndex` and are unaffected by its
+`_classify_employment` that predate `EmploymentIndex` and are unaffected by its
 single-winner-per-pair fold.
 """
 
@@ -33,11 +32,8 @@ from backstop_mcp.features.data_hygiene.api_responses import (
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
 )
-from backstop_mcp.features.data_hygiene.employment import (
-    EmploymentIndex,
-    build_employment_index,
-    classify_employment,
-)
+from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex
+from backstop_mcp.features.data_hygiene.employment_index_factory import EmploymentIndexFactory
 from backstop_mcp.features.data_hygiene.internal_dto import (
     EmploymentStatus,
 )
@@ -53,6 +49,8 @@ from tests.features.data_hygiene.helpers import (
     person_org,
     relationship_types,
 )
+
+_classify_employment = EmploymentIndexFactory._classify_employment
 
 TODAY = date(2026, 8, 5)
 
@@ -106,13 +104,11 @@ def person_index(
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> EmploymentIndex:
-    return build_employment_index(
+    return EmploymentIndexFactory(rules=checks, clock=lambda: today).index(
         relationships=_typed_relationships(relationships),
         relationship_types=_typed_types(
             types if types is not None else relationship_types(*TYPE_NAMES)
         ),
-        rules=checks,
-        today=today,
     )
 
 
@@ -123,13 +119,11 @@ def organization_index(
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> EmploymentIndex:
-    return build_employment_index(
+    return EmploymentIndexFactory(rules=checks, clock=lambda: today).index(
         relationships=_typed_relationships(relationships),
         relationship_types=_typed_types(
             types if types is not None else relationship_types(*TYPE_NAMES)
         ),
-        rules=checks,
-        today=today,
     )
 
 
@@ -847,7 +841,7 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = classify_employment(type_id="9", type_name=name, rules=checks)
+        status = _classify_employment(type_id="9", type_name=name, rules=checks)
 
         assert status is expected
 
@@ -858,7 +852,9 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = classify_employment(type_id="9", type_name="is a former employee of", rules=checks)
+        status = _classify_employment(
+            type_id="9", type_name="is a former employee of", rules=checks
+        )
 
         assert status is EmploymentStatus.FORMER
 
@@ -869,7 +865,7 @@ class TestClassifyEmployment:
             former_markers=frozenset(),
         )
 
-        status = classify_employment(type_id="459795", type_name=None, rules=checks)
+        status = _classify_employment(type_id="459795", type_name=None, rules=checks)
 
         assert status is EmploymentStatus.FORMER
 
@@ -881,7 +877,7 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = classify_employment(type_id=None, type_name=None, rules=checks)
+        status = _classify_employment(type_id=None, type_name=None, rules=checks)
 
         assert status is EmploymentStatus.CURRENT
 
@@ -896,7 +892,7 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = classify_employment(type_id="9", type_name=None, rules=checks)
+        status = _classify_employment(type_id="9", type_name=None, rules=checks)
 
         assert status is EmploymentStatus.IRRELEVANT
 
@@ -906,7 +902,7 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = classify_employment(type_id="9", type_name="has portal access to", rules=checks)
+        status = _classify_employment(type_id="9", type_name="has portal access to", rules=checks)
 
         assert status is EmploymentStatus.CURRENT
 
@@ -916,6 +912,8 @@ class TestClassifyEmployment:
             former_markers=frozenset({"former"}),
         )
 
-        status = classify_employment(type_id="9", type_name="Is A Former Employee Of", rules=checks)
+        status = _classify_employment(
+            type_id="9", type_name="Is A Former Employee Of", rules=checks
+        )
 
         assert status is EmploymentStatus.FORMER
