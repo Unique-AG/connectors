@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import timedelta
-from typing import Literal
+from typing import Literal, Self
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
@@ -27,6 +27,10 @@ class CustomFieldsService:
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._lock: asyncio.Lock = asyncio.Lock()
         self._in_flight: asyncio.Future[CatalogResult] | None = None
+
+    @classmethod
+    def with_ttl_minutes(cls, *, ttl_minutes: int) -> Self:
+        return cls(ttl=timedelta(minutes=ttl_minutes))
 
     async def get(
         self, client: BackstopClient, *, refresh: bool = False
@@ -108,7 +112,3 @@ class CustomFieldsService:
         result = (list(definitions), "ok")
         in_flight.set_result(result)
         return result
-
-
-def create_custom_fields_service(*, ttl_minutes: int) -> CustomFieldsService:
-    return CustomFieldsService(ttl=timedelta(minutes=ttl_minutes))

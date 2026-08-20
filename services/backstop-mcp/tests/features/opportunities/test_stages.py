@@ -7,10 +7,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
-from backstop_mcp.features.opportunities.stages import (
-    OpportunityStagesService,
-    create_opportunity_stages_service,
-)
+from backstop_mcp.features.opportunities.stages import OpportunityStagesService
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
@@ -59,7 +56,7 @@ async def clients() -> AsyncGenerator[ClientBuilder]:
 
 
 def _service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
-    return create_opportunity_stages_service(ttl_minutes=ttl_minutes)
+    return OpportunityStagesService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def _stage_resource(row: dict[str, object]) -> dict[str, object]:

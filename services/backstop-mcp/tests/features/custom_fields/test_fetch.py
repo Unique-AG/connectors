@@ -10,10 +10,7 @@ import respx
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, BackstopClientFactory
 from backstop_mcp.features.custom_fields.api_responses import CustomFieldDefinitionAttributes
 from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
-from backstop_mcp.features.custom_fields.service import (
-    CustomFieldsService,
-    create_custom_fields_service,
-)
+from backstop_mcp.features.custom_fields.service import CustomFieldsService
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
@@ -45,7 +42,7 @@ async def clients() -> AsyncGenerator[ClientBuilder]:
 
 
 def _service(*, ttl_minutes: int = 60) -> CustomFieldsService:
-    return create_custom_fields_service(ttl_minutes=ttl_minutes)
+    return CustomFieldsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def _definition_resource(
