@@ -9,7 +9,7 @@ middleware pipeline. Building one per call causes a cold TLS handshake per call 
 `create_graph_transport` builds it once; `graph_client_for` wraps it per caller.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Mapping
 from typing import override
 from urllib.parse import urlparse
 
@@ -31,7 +31,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from msgraph_core import APIVersion, GraphClientFactory, NationalClouds
 from msgraph_core.middleware import GraphTelemetryHandler
 from msgraph_core.middleware.options import GraphTelemetryHandlerOption
-from opentelemetry.trace import Span
+from opentelemetry.semconv.attributes.url_attributes import URL_FULL
+from opentelemetry.trace import Span, SpanContext, Status, StatusCode
+from opentelemetry.util.types import AttributeValue
 
 from office_mcp.graph_client.settings import GraphSettings
 
@@ -64,13 +66,22 @@ _NO_EUII_SPAN_ATTRIBUTES = ObservabilityOptions(include_euii_attributes=False)
 class _CallerTokenProvider(AccessTokenProvider):
     """Kiota token provider holding a single delegated token.
 
-    TRAP: Do not pass an `azure-identity` credential to `GraphServiceClient`. The SDK calls
-    `await credentials.close()` after every token acquisition. This closes FastMCP's cached
-    `OnBehalfOfCredential` transport. The closed transport breaks the user permanently, at the
-    next cache miss, about an hour later. The user must sign in again to recover. That same
-    path also returns an empty bearer token for anything that isn't exactly an
-    `azure.core.credentials.AccessToken`, which surfaces as an unexplained 401. This provider is
-    two methods and has neither hazard.
+    Hand-written on purpose: `kiota_abstractions` ships no static-token provider, and pairing a
+    custom `AccessTokenProvider` with `BaseBearerTokenAuthenticationProvider` is the construction
+    Microsoft documents for a bearer token — "Use a custom access token provider with the Base
+    bearer token authentication provider", at
+    https://learn.microsoft.com/en-us/openapi/kiota/authentication.
+    microsoftgraph/msgraph-sdk-python#501 is the open, maintainer-acknowledged issue tracking the
+    missing documentation for this scenario.
+
+    TRAP: Do not pass an `azure-identity` credential to `GraphServiceClient` instead. For an async
+    credential the SDK calls `await credentials.close()` after every token acquisition — the call
+    sits inside `if inspect.isawaitable(result):`
+    (kiota_authentication_azure/azure_identity_access_token_provider.py:113-115), so a sync
+    credential never reaches it, but FastMCP's cached `OnBehalfOfCredential` is async and does.
+    That closes the credential's transport. The closed transport breaks the user permanently, at
+    the next cache miss, about an hour later, and only a fresh sign-in recovers it. This provider
+    owns a string, so there is nothing to close.
     """
 
     def __init__(self, access_token: str) -> None:
@@ -82,17 +93,32 @@ class _CallerTokenProvider(AccessTokenProvider):
         uri: str,
         additional_authentication_context: dict[str, object] | None = None,
     ) -> str:
-        """The caller's delegated token for Graph only.
+        """The caller's delegated token for Graph over https only.
 
-        TRAP: The host check must happen here. `BaseBearerTokenAuthenticationProvider` does not
-        consult the allowed-hosts validator, so redirects and @odata.nextLink URLs pointing off
-        Graph would receive the user's delegated token. Returning an empty string is how this
-        contract declines — the bearer header is then omitted rather than forged.
+        TRAP: The check must happen here. `BaseBearerTokenAuthenticationProvider` does not consult
+        the allowed-hosts validator at all. The URL reaching this method is not always one this
+        service composed: an `@odata.nextLink` comes back inside a response body and re-enters
+        `send_async`, which authenticates the follow-up page afresh — so a nextLink pointing off
+        Graph is what the host check is live against. Redirects are not: the auth provider is
+        consulted once per logical request (kiota_http/httpx_request_adapter.py:593 and :708),
+        before the request enters the middleware pipeline at :600, and `RedirectHandler` loops
+        entirely inside that pipeline without re-entering authentication.
+
+        The scheme check is separate and equally load-bearing, because `AllowedHostsValidator`
+        compares the hostname alone (kiota_abstractions/authentication/allowed_hosts_validator.py):
+        without it, `http://graph.microsoft.com/...` matches the allowed host and the delegated
+        token goes out in cleartext. The SDK's own `AzureIdentityAccessTokenProvider` refuses the
+        same case by raising `HTTPError("Only https is supported")`
+        (kiota_authentication_azure/azure_identity_access_token_provider.py:80-84); this provider
+        declines instead, because `""` is already how its contract says "no token" and
+        `BaseBearerTokenAuthenticationProvider` responds to `""` by omitting the header — one
+        refusal shape rather than two. Its localhost exemption is moot here: the host check
+        rejects localhost first. Neither this check nor the host validator looks at the port.
 
         Continuous Access Evaluation context is ignored. Satisfying claims challenges requires
         acquiring a new token, which is the auth provider's job, not this type's.
         """
-        if not _GRAPH_HOSTS.is_url_host_valid(uri):
+        if urlparse(uri).scheme != "https" or not _GRAPH_HOSTS.is_url_host_valid(uri):
             return ""
         return self._access_token
 
@@ -101,15 +127,72 @@ class _CallerTokenProvider(AccessTokenProvider):
         return _GRAPH_HOSTS
 
 
-# `BaseMiddleware.send` hands the request to the next handler in the pipeline, or to the transport
-# when there is none. It carries no annotations, so it is named once here with the signature the SDK
-# implements — the alternative is an ignore comment at each call.
-#
-# Reached this way rather than as `super().send` from the handler below, because `super()` there is
-# the very method being replaced.
-_pass_to_the_next_handler: Callable[  # pyright: ignore[reportUnknownVariableType]
-    [BaseMiddleware, httpx.Request, httpx.AsyncBaseTransport], Awaitable[httpx.Response]
-] = BaseMiddleware.send  # pyright: ignore[reportUnknownMemberType]
+class _SpanWithoutTheUrl(Span):
+    """A span that forwards everything to the real one except a `url.full` attribute.
+
+    Every method here delegates. Only the two attribute setters filter, and they filter on one
+    key. `Span` is an ABC with nine abstract methods plus `add_link`, which is why the delegation
+    is spelled out rather than inherited from something.
+    """
+
+    def __init__(self, span: Span) -> None:
+        self._span: Span = span
+
+    @override
+    def set_attribute(self, key: str, value: AttributeValue) -> None:
+        if key != URL_FULL:
+            self._span.set_attribute(key, value)
+
+    @override
+    def set_attributes(self, attributes: Mapping[str, AttributeValue]) -> None:
+        self._span.set_attributes({k: v for k, v in attributes.items() if k != URL_FULL})
+
+    @override
+    def end(self, end_time: int | None = None) -> None:
+        self._span.end(end_time)
+
+    @override
+    def get_span_context(self) -> SpanContext:
+        return self._span.get_span_context()
+
+    @override
+    def is_recording(self) -> bool:
+        return self._span.is_recording()
+
+    @override
+    def update_name(self, name: str) -> None:
+        self._span.update_name(name)
+
+    @override
+    def set_status(self, status: Status | StatusCode, description: str | None = None) -> None:
+        self._span.set_status(status, description)
+
+    @override
+    def add_event(
+        self,
+        name: str,
+        attributes: Mapping[str, AttributeValue] | None = None,
+        timestamp: int | None = None,
+    ) -> None:
+        self._span.add_event(name, attributes, timestamp)
+
+    @override
+    def add_link(
+        self,
+        context: SpanContext,
+        attributes: Mapping[str, AttributeValue] | None = None,
+    ) -> None:
+        self._span.add_link(context, attributes)
+
+    @override
+    def record_exception(
+        self,
+        exception: BaseException,
+        attributes: Mapping[str, AttributeValue] | None = None,
+        timestamp: int | None = None,
+        escaped: bool = False,
+    ) -> None:
+        self._span.record_exception(exception, attributes, timestamp, escaped)
 
 
 class _QuietUrlReplaceHandler(UrlReplaceHandler):
@@ -122,37 +205,32 @@ class _QuietUrlReplaceHandler(UrlReplaceHandler):
     `/users/me-token-to-replace` → `/me` rewrite every `client.me` call depends on, so switching
     it off is not an option — hence a subclass rather than a removal.
 
-    Trap: `send` below mirrors `UrlReplaceHandler.send` (url_replace_handler.py:35-47) minus that
-    one `set_attribute` line. On an SDK bump, re-read that method: whatever it gains has to be
-    gained here too, or this handler silently stops doing it. `tests/graph_client/test_spans.py`
-    reads that method's own source and fails when its shape changes, so the bump says so rather
-    than the copy going quietly stale.
+    No documented switch turns that one line off. `URL_FULL` is written in exactly two places in
+    the whole SDK, and only the request adapter's (kiota_http/httpx_request_adapter.py:673-674)
+    honours `ObservabilityOptions.include_euii_attributes`; url_replace_handler.py:44 writes it
+    unconditionally, and `ObservabilityOptions` is never plumbed into the middleware chain at all.
+
+    So the span the handler writes to is intercepted, rather than the method that writes to it.
+    The trade is honest: `_create_observability_span` is itself an underscore-prefixed method on
+    `BaseMiddleware` (kiota_http/middleware/middleware.py:66), so this swaps one private-SDK
+    dependency for another. It is the better one, because the SDK's own `send` then runs
+    unmodified — whatever an msgraph or kiota bump adds to it is inherited instead of silently
+    lost, which is what a hand-copy of `send` could not promise. The residual risk moves to the
+    wrapper's surface: it covers both `set_attribute` and `set_attributes`, and a third spelling
+    upstream would have to be covered too. `tests/graph_client/test_spans.py` asserts the property
+    — that no span carries `url.full` or a resource id — over real SDK calls, so a new spelling
+    fails there.
     """
 
     @override
-    async def send(
-        self,
-        request: httpx.Request,
-        transport: httpx.AsyncBaseTransport,
-    ) -> httpx.Response:
-        # The ignore below is for an unannotated `request` parameter on
-        # `BaseMiddleware._create_observability_span`, which makes the call partially unknown. Its
-        # return type is annotated, hence the `Span` here.
-        span: Span = self._create_observability_span(  # pyright: ignore[reportUnknownMemberType]
-            request, "UrlReplaceHandler_send"
-        )
-        if self.options and self.options.is_enabled:
-            span.set_attribute("com.microsoft.kiota.handler.url_replacer.enable", True)
-            # Design decision: the request is mutated, which the house rule against mutating
-            # arguments would otherwise forbid. A kiota middleware has no return path for a
-            # replacement request — the pipeline hands the one object down the chain — so the
-            # rewrite is only expressible in place, and in place is where the SDK does it.
-            request.url = httpx.URL(
-                self.replace_url_segment(str(request.url), self._get_current_options(request))
+    def _create_observability_span(self, request: httpx.Request, span_name: str) -> Span:
+        # The ignore is for the unannotated `request` parameter on the base method, which makes
+        # the call partially unknown. Its return type is annotated, hence the `Span` above.
+        return _SpanWithoutTheUrl(
+            super()._create_observability_span(  # pyright: ignore[reportUnknownMemberType]
+                request, span_name
             )
-        response = await _pass_to_the_next_handler(self, request, transport)
-        span.end()
-        return response
+        )
 
 
 def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]:
@@ -177,17 +255,24 @@ def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]
 
 
 def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:
-    """Shared HTTP transport for all Graph calls. Close on shutdown.
+    """Shared HTTP transport for all Graph calls.
 
     Built via `GraphClientFactory` to preserve the SDK's middleware pipeline: redirects, retries
     (honouring Retry-After on 429/503/504, on asyncio.sleep, so a wait never blocks the event
     loop), parameter decoding, `/me` URL rewrite, and telemetry. Only the two things
-    GraphSettings controls are overridden, plus the one handler `_graph_middleware` quietens. The
-    factory does not set base_url when given a client, so base_url above is ours to set too.
+    GraphSettings controls are overridden, plus the one handler `_graph_middleware` quietens.
+
+    No base_url here on purpose — `graph_client_for` sets the one that is used. See the note there.
 
     `sdk_middleware_options` carries the `/users/me-token-to-replace` → `/me` rewrite that
     `client.me` calls depend on, plus the telemetry handler's SDK version. Carry it over rather
     than rebuild it.
+
+    Note that `await client.aclose()` does not close the underlying connection pool. The SDK wraps
+    it in `AsyncGraphTransport`, which defines no `aclose` of its own and so
+    inherits `httpx.AsyncBaseTransport.aclose`, whose body is `pass`
+    (msgraph_core/middleware/async_graph_transport.py, httpx/_transports/base.py:85-86). Upstream
+    bug, open: microsoft/kiota-python#494. The pool goes when the process does.
     """
     middleware_options: dict[str, RequestOption] = {
         **sdk_middleware_options,
@@ -196,7 +281,6 @@ def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:
     return GraphClientFactory.create_with_custom_middleware(
         middleware=_graph_middleware(middleware_options),
         client=httpx.AsyncClient(
-            base_url=_GRAPH_BASE_URL,
             timeout=httpx.Timeout(
                 settings.request_timeout_seconds,
                 connect=settings.connect_timeout_seconds,
@@ -212,16 +296,20 @@ def graph_client_for(transport: httpx.AsyncClient, access_token: str) -> GraphSe
         auth_provider=BaseBearerTokenAuthenticationProvider(_CallerTokenProvider(access_token)),
         client=transport,
     )
-    # TRAP: without this line, the adapter takes base_url from the transport instead. httpx
-    # normalises base_url to end with a slash. The SDK's URL templates then join onto it,
-    # causing `/v1.0//users/...`. Graph tolerates the empty path segment; nothing else on the
-    # way there is promised to.
+    # TRAP: this is the only place the Graph base URL is set, and it has to stay that way.
+    # `HttpxRequestAdapter.__init__` copies the transport's base_url verbatim
+    # (kiota_http/httpx_request_adapter.py:90), and httpx normalises a base_url it is given to end
+    # with a slash — so giving the transport one puts `https://graph.microsoft.com/v1.0//chats/...`
+    # on the wire, an empty path segment Graph tolerates and nothing else on the way there
+    # promises to. `create_graph_transport` therefore leaves the transport's base_url empty; the
+    # adapter then emits an absolute URL and httpx never consults its own. Nothing fills the gap
+    # behind us either: `create_with_custom_middleware` sets a base_url only when it builds the
+    # client itself, which it does not when handed one (msgraph_core/graph_client_factory.py:83-85).
     adapter.base_url = _GRAPH_BASE_URL
     # Assigned rather than passed: `GraphRequestAdapter.__init__` takes only an auth provider and a
     # client, and drops its base class's `observability_options` parameter on the floor
     # (msgraph/graph_request_adapter.py:22-26). The attribute is public and is read once per
-    # request, well after construction, so setting it here is the same kind of correction as the
-    # base_url above.
+    # request, well after construction, so setting it here is as good as passing it.
     #
     # This closes the request span only. The other place the SDK sets `url.full` never reads these
     # options; `_QuietUrlReplaceHandler`, installed on the transport, is what closes that one. See

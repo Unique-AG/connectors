@@ -7,21 +7,18 @@ would be exported to a trace backend and kept there. `graph_client_for` closes t
 `_QuietUrlReplaceHandler` the second; these tests are what says so, over real SDK calls rather than
 over the option object.
 
-The last class here asserts nothing about a span. `_QuietUrlReplaceHandler` is a copy of an SDK
-method, and a copy needs something watching the original: that class reads the upstream source and
-fails when it changes shape, which is the only way an msgraph or kiota bump can announce that the
-copy has fallen behind.
+Asserted as a property of the whole trace rather than of the two mechanisms, because the mechanisms
+are the part an SDK bump can move. A handler added upstream that exports a URL, a spelling of the
+attribute the quiet handler's span wrapper does not intercept, or this service losing that handler
+in a refactor all land on the same assertion: no span carries `url.full`, and no span attribute
+carries a resource id.
 """
 
-import ast
-import inspect
-import textwrap
 from collections.abc import Iterator, Sequence
 
 import httpx
 import pytest
 import respx
-from kiota_http.middleware.url_replace_handler import UrlReplaceHandler
 from msgraph.graph_service_client import GraphServiceClient
 from opentelemetry import trace
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -161,99 +158,3 @@ class TestTheUrlReplacerIsQuietenedAndNotSwitchedOff:
         attributes = replacer[0].attributes or {}
         assert attributes.get("com.microsoft.kiota.handler.url_replacer.enable") is True
         assert "url.full" not in attributes
-
-
-# `UrlReplaceHandler.send` as the installed SDK writes it, printed back from its own AST so that a
-# reformat or a docstring edit upstream does not fail the test below and every change of substance
-# does. `_QuietUrlReplaceHandler.send` is these statements minus the one that sets `url.full`.
-_UPSTREAM_SEND_BODY = """\
-response = None
-_enable_span = self._create_observability_span(request, 'UrlReplaceHandler_send')
-if self.options and self.options.is_enabled:
-    _enable_span.set_attribute('com.microsoft.kiota.handler.url_replacer.enable', True)
-    current_options = self._get_current_options(request)
-    url_string: str = str(request.url)
-    url_string = self.replace_url_segment(url_string, current_options)
-    request.url = httpx.URL(url_string)
-    _enable_span.set_attribute(URL_FULL, str(request.url))
-response = await super().send(request, transport)
-_enable_span.end()
-return response"""
-
-# Where a reader has to go when one of the three assertions below fails. Spelled once, because all
-# three send them to the same two places and the point of the failure is to be actionable.
-_WHAT_TO_REREAD = (
-    "Re-read kiota_http/middleware/url_replace_handler.py's UrlReplaceHandler.send and then "
-    "_QuietUrlReplaceHandler.send in src/office_mcp/graph_client/client.py, which is a copy of it "
-    "minus the one line that puts the Graph URL on a span. Whatever the SDK gained has to be "
-    "gained in the copy, or this service silently stops doing it; whatever it lost may make the "
-    "copy unnecessary. Then update _UPSTREAM_SEND_BODY here to the new shape."
-)
-
-
-def _upstream_send() -> ast.AsyncFunctionDef:
-    """The SDK's own `send`, parsed from the source of the installed package."""
-    parsed = ast.parse(textwrap.dedent(inspect.getsource(UrlReplaceHandler.send))).body[0]
-    assert isinstance(parsed, ast.AsyncFunctionDef), (
-        f"kiota's UrlReplaceHandler.send is no longer an async def. {_WHAT_TO_REREAD}"
-    )
-    return parsed
-
-
-def _statements(method: ast.AsyncFunctionDef) -> str:
-    """The method's body without its docstring, normalised through the AST."""
-    body = method.body[1:] if ast.get_docstring(method) is not None else method.body
-    return ast.unparse(ast.Module(body=body, type_ignores=[]))
-
-
-def _url_attribute_sets(method: ast.AsyncFunctionDef) -> list[str]:
-    """Every line of `method` that puts the request URL on a span, however it is spelled."""
-    return [
-        ast.unparse(call)
-        for call in ast.walk(method)
-        if isinstance(call, ast.Call)
-        and ast.unparse(call.func).endswith(".set_attribute")
-        and call.args
-        and ast.unparse(call.args[0]) in ("URL_FULL", "'url.full'")
-    ]
-
-
-class TestTheSdkMethodThisServiceCopiedIsStillTheMethodItCopied:
-    """The one thing neither the spans above nor the assembled chain in `test_client.py` can see.
-
-    That chain comparison fails when the SDK *adds* a handler. These spans fail when a handler
-    exports a URL. Between them sits the case that fails nothing: `UrlReplaceHandler.send` gaining a
-    line, losing one, or delegating differently. `_QuietUrlReplaceHandler` mirrors that method minus
-    one `set_attribute`, so an msgraph or kiota bump can leave the copy quietly behind — still
-    correct about the leak, no longer doing whatever the original started doing. Reading the
-    upstream source is the only way to notice, so that is what these three do.
-    """
-
-    def test_exactly_one_line_puts_the_url_on_a_span_and_it_is_the_one_removed(self) -> None:
-        """The whole reason the copy exists. Two such lines and the copy drops one and keeps the
-        other; none, and the copy is dead weight that should go back to the SDK's own handler."""
-        sets = _url_attribute_sets(_upstream_send())
-
-        assert len(sets) == 1, (
-            f"UrlReplaceHandler.send now sets the URL on its span {len(sets)} time(s), not once: "
-            + f"{sets}. {_WHAT_TO_REREAD}"
-        )
-
-    def test_the_me_rewrite_the_copy_carries_is_still_there(self) -> None:
-        """The behaviour the copy exists to keep. Every `client.me` call depends on it: the SDK
-        asks for `/users/me-token-to-replace` and only this handler turns that into `/me`, which is
-        why the leak is fixed by subclassing rather than by dropping the handler."""
-        body = _statements(_upstream_send())
-
-        assert "self.replace_url_segment(" in body, (
-            f"UrlReplaceHandler.send no longer rewrites the URL segment. {_WHAT_TO_REREAD}"
-        )
-        assert "request.url = httpx.URL(" in body, (
-            f"UrlReplaceHandler.send no longer assigns the rewritten URL. {_WHAT_TO_REREAD}"
-        )
-
-    def test_nothing_else_about_the_method_has_changed(self) -> None:
-        """The catch-all under the two above, which name only what this service already knows to
-        care about. A new attribute, a second rewrite, a changed delegation or a swallowed
-        exception all arrive as a diff here."""
-        assert _statements(_upstream_send()) == _UPSTREAM_SEND_BODY, _WHAT_TO_REREAD
