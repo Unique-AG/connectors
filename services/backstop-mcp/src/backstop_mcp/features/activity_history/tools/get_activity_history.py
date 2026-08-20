@@ -76,6 +76,12 @@ async def get_activity_history(
 ) -> GetActivityHistoryResponse:
     """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
 
+    Documented fallback when `search_activities` is unavailable (that primary is an undocumented
+    UI search and may 404 on another tenant). Party-scoped only — there is no documented
+    firm-wide activity collection. Not the recommended way to read note text: prefer
+    `search_activities` with `include_description`. REST `activity_tag_ids` are AND;
+    `search_activities` tag filters are OR.
+
     Pass `request.type="first"` with `search_type` plus a trusted `party_id` (from a prior resolve
     echo — never invent or guess one) or `search` to start. When retrying with `party_id`, pass
     that resolve's `search_type` — a contact or employee id is not a people id. Default
@@ -124,7 +130,7 @@ async def get_activity_history(
         schema=BackstopApiResourceDocument[PartyRecordResponse],
     )
     page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
-        activity_type:         fetch_activities_page(
+        activity_type: fetch_activities_page(
             client,
             activity_type=activity_type,
             segment=args.segment,

@@ -14,8 +14,11 @@ not a way to reach the investor. Retired email addresses are flagged — do not 
 People at an organization, with employment status there: get_people_for_party. \
 `numberOfEmployees` on the organization record is not a roster.
 
-Meetings, calls, notes, emails, documents: get_activity_history, then get_activity_detail \
-for a full body. Do not look for those on get_person / get_organization.
+Meetings, calls, notes, emails, documents: search_activities first. That primary is an \
+undocumented UI search and may 404 — that is not "no activity exists". Fall back to \
+get_activity_history (party-scoped only), then get_activity_detail for the full \
+untruncated body. Prefer search_activities with include_description for note text \
+while the primary answers. Do not look for those on get_person / get_organization.
 
 Pipeline stage and timing: get_opportunities. `previous_stage` is the stage the deal just \
 left, not where it is now. There is no cursor; the whole party's pipeline is returned. \

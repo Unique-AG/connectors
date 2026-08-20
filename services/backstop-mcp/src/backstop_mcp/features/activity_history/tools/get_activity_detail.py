@@ -59,8 +59,9 @@ async def get_activity_detail(
         Field(
             description=(
                 "The `activity_id` of one meeting, call, note, or document from a prior "
-                "get_activity_history response. Never invent or guess one — an unknown id "
-                "raises rather than returning a not-found response."
+                "get_activity_history response. Not a search_activities row `id` — those are "
+                "a different identifier and will not work here. Never invent or guess one — "
+                "an unknown id raises rather than returning a not-found response."
             ),
         ),
     ],
@@ -68,11 +69,16 @@ async def get_activity_detail(
 ) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, and attendees by `activity_id`.
 
-    `activity_id` must come from a prior `get_activity_history` response — never invent or
-    guess one. Unlike the timeline's `gist` (truncated to a token budget), `body` here is the
-    FULL converted text — use this specifically when the timeline record's `gist_truncated`
-    flag indicated more content exists. `start`/`stop`/`location`/`time_zone` and `attendees`
-    are only populated for a meeting/call record; a note or document leaves them `None`/empty.
+    Documented fallback, with `get_activity_history`, when `search_activities` is unavailable.
+    While the primary is up, prefer `search_activities` with `include_description` for note
+    text. When it 404s, `get_activity_history` yields a truncated gist and this tool is how
+    you read the full body.
+
+    `activity_id` must come from a prior `get_activity_history` response — never invent one,
+    and never pass a `search_activities` row `id` (a different identifier). Unlike the
+    timeline's `gist` (truncated to a token budget), `body` here is the FULL converted text.
+    `start`/`stop`/`location`/`time_zone` and `attendees` are only populated for a
+    meeting/call record; a note or document leaves them `None`/empty.
     """
     _ = ctx
     handle = ResourceIdentifierDto.from_activity_id(activity_id)
