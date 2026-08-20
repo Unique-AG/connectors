@@ -4,8 +4,10 @@ The public surface is deliberately small: `EmploymentIndexFactory.index` for the
 index (person or organization side-loads), `EmploymentLinkResponse` for the tool-facing list,
 `project_entity_relationships` to pull those includes, and `AsOfResponse.from_attributes` for
 provenance.
-`employment_index.py` is the winner-per-pair fold the factory composes — importable for tests, not
-part of what tools are handed.
+`EmploymentIndex` is the winner-per-pair fold the factory composes. It is exported because it is
+what `EmploymentIndexFactory.index` hands back — a package that publishes a method has to publish
+the type on its signature — not so that callers build one. `EmploymentIndexFactory` owns the
+vocabulary and the clock; construct the index through it.
 """
 
 from backstop_mcp.features.data_hygiene.api_responses import (

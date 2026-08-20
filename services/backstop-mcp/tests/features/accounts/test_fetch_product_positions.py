@@ -9,6 +9,7 @@ from backstop_mcp.features.accounts import (
     MAX_POSITION_ACCOUNTS,
     AccountListingDto,
     AccountRecordDto,
+    ProductPositionsDto,
     ResolvedProductDto,
     fetch_product_positions,
 )
@@ -24,9 +25,7 @@ def _record(account_id: str, *, name: str = "Row") -> AccountRecordDto:
     return AccountRecordDto(id=account_id, name=name, is_open=True)
 
 
-def _listing(
-    *accounts: AccountRecordDto, closed_omitted: int = 0
-) -> AccountListingDto:
+def _listing(*accounts: AccountRecordDto, closed_omitted: int = 0) -> AccountListingDto:
     return AccountListingDto(accounts=accounts, closed_omitted=closed_omitted)
 
 
@@ -52,7 +51,7 @@ async def _positions(
     client: BackstopClient,
     *accounts: AccountRecordDto,
     closed_omitted: int = 0,
-) -> object:
+) -> ProductPositionsDto:
     return await fetch_product_positions(
         client,
         _listing(*accounts, closed_omitted=closed_omitted),
@@ -234,9 +233,7 @@ class TestSeriesLatestFigure:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_malformed_point_is_an_error_on_that_row(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_a_malformed_point_is_an_error_on_that_row(self, client: BackstopClient) -> None:
         respx.get(_series_url(_ACCOUNT_A, "values")).mock(
             return_value=_page(
                 {"type": "values", "attributes": {"date": "2026-07-31", "value": 1.0}}
@@ -378,9 +375,7 @@ class TestFetchPositions:
     async def test_no_accounts_makes_no_account_series_requests(
         self, client: BackstopClient
     ) -> None:
-        values = respx.get(url__regex=rf"{BASE_URL}/accounts/\d+/values").mock(
-            return_value=_page()
-        )
+        values = respx.get(url__regex=rf"{BASE_URL}/accounts/\d+/values").mock(return_value=_page())
         respx.get(_AUM_URL).mock(return_value=_page())
 
         result = await fetch_product_positions(client, _listing(), product=_PRODUCT)

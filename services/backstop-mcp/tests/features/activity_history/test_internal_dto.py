@@ -1,9 +1,11 @@
 import pytest
 from pydantic import ValidationError
 
-from backstop_mcp.features.activity_history import ActivityItemDto, ActivityPageDto
-
-_Attributes = ActivityItemDto.from_attributes.__annotations__["attributes"]
+from backstop_mcp.features.activity_history import (
+    ActivityAttributes,
+    ActivityItemDto,
+    ActivityPageDto,
+)
 
 
 class TestActivityItemFromAttributes:
@@ -11,7 +13,9 @@ class TestActivityItemFromAttributes:
         item = ActivityItemDto.from_attributes(
             "meeting-or-calls_1",
             "meeting",
-            _Attributes.model_validate({"title": "Q1", "tenantExtra": "dropped", "another": 1}),
+            ActivityAttributes.model_validate(
+                {"title": "Q1", "tenantExtra": "dropped", "another": 1}
+            ),
         )
 
         assert item.title == "Q1"
@@ -21,7 +25,7 @@ class TestActivityItemFromAttributes:
         item = ActivityItemDto.from_attributes(
             "meeting-or-calls_1",
             "meeting",
-            _Attributes.model_validate({}),
+            ActivityAttributes.model_validate({}),
         )
 
         assert item.title is None
@@ -30,7 +34,7 @@ class TestActivityItemFromAttributes:
         item = ActivityItemDto.from_attributes(
             "meeting-or-calls_1",
             "meeting",
-            _Attributes.model_validate({"createdTimestamp": "not-a-datetime"}),
+            ActivityAttributes.model_validate({"createdTimestamp": "not-a-datetime"}),
         )
 
         assert item.created_timestamp is None

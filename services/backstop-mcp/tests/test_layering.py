@@ -498,7 +498,7 @@ class TestTheDetectionItself:
     def test_does_not_fire_on_permitted_imports(self) -> None:
         assert not _imports_under(
             "from backstop_mcp.backstop_client.client import BackstopClient\n"
-            + "from backstop_mcp.features.custom_fields.service import CustomFieldsService\n"
+            + "from backstop_mcp.features.custom_fields import CustomFieldsService\n"
             + "from backstop_mcp.logging import configure_logging\n",
             _SERVER_PREFIX,
         )
@@ -513,22 +513,25 @@ class TestTheDetectionItself:
         # The shape `get_person.py` would carry if it reached past the package front door
         # instead of importing `features.data_hygiene` itself.
         assert _internal_imports(
-            "from backstop_mcp.features.data_hygiene.service import DataHygieneService",
+            "from backstop_mcp.features.data_hygiene.employment_index_factory import (\n"
+            + "    EmploymentIndexFactory,\n)",
             _SRC / "server" / "tools",
-        ) == [("backstop_mcp.features.data_hygiene.service", 1)]
+        ) == [("backstop_mcp.features.data_hygiene.employment_index_factory", 1)]
 
     def test_the_same_import_is_fine_inside_the_feature(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.data_hygiene.service import DataHygieneService",
+            "from backstop_mcp.features.data_hygiene.employment_index_factory import (\n"
+            + "    EmploymentIndexFactory,\n)",
             _package_directory("backstop_mcp.features.data_hygiene"),
         )
 
     def test_catches_reaching_past_the_init_for_a_service_too(self) -> None:
-        """Not only the pure pieces: `service` is behind the front door as well."""
+        """Not only the pure pieces: a service is behind the front door as well."""
         assert _internal_imports(
-            "from backstop_mcp.features.custom_fields.service import CustomFieldsService",
+            "from backstop_mcp.features.custom_fields.custom_fields_service import (\n"
+            + "    CustomFieldsService,\n)",
             _SRC / "server",
-        ) == [("backstop_mcp.features.custom_fields.service", 1)]
+        ) == [("backstop_mcp.features.custom_fields.custom_fields_service", 1)]
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(

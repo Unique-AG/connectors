@@ -532,4 +532,3 @@ class TestProductLabel:
             "Quiet Growth Vehicle",
             "Quiet Value Vehicle",
         ]
-

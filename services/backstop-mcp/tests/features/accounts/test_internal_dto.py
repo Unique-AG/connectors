@@ -1,6 +1,7 @@
 from datetime import date
 
 from backstop_mcp.features.accounts import (
+    AccountApiResponse,
     AccountOwnerDto,
     AccountRecordDto,
     AccountRowResponse,
@@ -53,11 +54,8 @@ def _from_resource(
     *,
     included: list[dict[str, object]] | None = None,
 ) -> AccountRecordDto:
-    # `from_resource` takes the wire resource type; construct it from the classmethod's own
-    # annotation so this suite does not import `accounts.api_responses`.
-    schema = AccountRecordDto.from_resource.__annotations__["resource"]
     return AccountRecordDto.from_resource(
-        schema.model_validate(body),
+        AccountApiResponse.model_validate(body),
         included=[] if included is None else included,
     )
 

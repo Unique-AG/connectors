@@ -60,11 +60,6 @@ def normalized_email(value: str) -> str | None:
     return email
 
 
-def looks_like_email(value: str) -> bool:
-    """Return True when `value` is a valid email (pydantic / email-validator)."""
-    return normalized_email(value) is not None
-
-
 def candidates_from_document(
     document: PartyCollectionDocument, *, search_type: SearchType
 ) -> tuple[PartyCandidate, ...]:

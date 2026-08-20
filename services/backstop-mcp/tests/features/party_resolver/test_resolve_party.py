@@ -276,7 +276,6 @@ class TestEmailSearch:
         assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"
 
 
-
 class TestQuickSearch:
     @pytest.mark.asyncio
     @respx.mock
@@ -1285,4 +1284,3 @@ class TestElicitChoice:
         )
 
         assert result is ambiguous
-
