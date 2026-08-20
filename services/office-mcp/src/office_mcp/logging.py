@@ -26,7 +26,10 @@ is a per-emit object the caller does not keep. What is *not* mutated is anything
 owns: a dict passed as `extra=` is rebuilt rather than edited in place, so redaction never reaches
 back into the header map the caller is still using. See `_redact`.
 
-Two filters, each for one defect:
+Three filters, each for one defect:
+
+`ColorMessageFilter` drops uvicorn's `color_message` extra. uvicorn's own lifecycle lines carry the
+message a second time with ANSI escapes in it, for a formatter this service does not use.
 
 `CorrelationFilter` gives every line something joinable — a trace id, an MCP request id, an HTTP
 request id, or failing all three the id of this process's boot. See its docstring.
@@ -51,6 +54,7 @@ from office_mcp.config import AppConfig
 __all__ = [
     "CENSORED",
     "TRUNCATED",
+    "ColorMessageFilter",
     "CorrelationFilter",
     "HttpRequestIdMiddleware",
     "RedactionFilter",
@@ -427,11 +431,56 @@ def _forwarded_request_id(scope: ASGIScope) -> str | None:
 
 
 # --------------------------------------------------------------------------------------------
+# uvicorn's second copy of its own message
+# --------------------------------------------------------------------------------------------
+
+# uvicorn puts an ANSI-coloured copy of the line in `extra` for its own coloured formatter. This
+# service routes uvicorn through the pino formatter instead (see `main.py`), which copies every
+# extra — so every uvicorn lifecycle line would carry its own message twice, once with escape codes
+# in it.
+_COLOR_MESSAGE_FIELD = "color_message"
+
+
+class ColorMessageFilter(logging.Filter):
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        if _COLOR_MESSAGE_FIELD in record.__dict__:
+            delattr(record, _COLOR_MESSAGE_FIELD)
+        return True
+
+
+# --------------------------------------------------------------------------------------------
 # Installation
 # --------------------------------------------------------------------------------------------
 
+# Loggers a dependency has taken out of the root handler's reach, and which this service takes back.
+#
+# `fastmcp/__init__.py:22-26` configures its own logger at **import** time — two `RichHandler`s on
+# stderr and `propagate = False` — so every `fastmcp.*` line is ANSI-decorated plain text that never
+# meets the pino formatter and never meets the filters above. That is not a formatting nit twice
+# over: it is a line the log pipeline cannot parse *and* a line no redaction ran on, and one of
+# those lines is the OAuth proxy warning about non-secure cookies.
+#
+# Reclaimed by removing the handlers and letting the records propagate, rather than by asking
+# FastMCP not to configure itself: `FASTMCP_LOG_ENABLED` is read when `fastmcp` is imported, which
+# has already happened by the time any function here runs.
+_RECLAIMED_LOGGERS: tuple[str, ...] = ("fastmcp",)
+
+
+def _reclaim(name: str) -> None:
+    """Put one logger's records back on the path to the root handler."""
+    reclaimed = logging.getLogger(name)
+    for handler in list(reclaimed.handlers):
+        reclaimed.removeHandler(handler)
+    reclaimed.propagate = True
+
+
 # Order is the order they run in.
-_FILTERS: tuple[type[logging.Filter], ...] = (CorrelationFilter, RedactionFilter)
+_FILTERS: tuple[type[logging.Filter], ...] = (
+    ColorMessageFilter,
+    CorrelationFilter,
+    RedactionFilter,
+)
 
 
 def install_filters(handler: logging.Handler) -> None:
@@ -443,6 +492,15 @@ def install_filters(handler: logging.Handler) -> None:
 
 def configure_logging(config: AppConfig) -> None:
     configure_pino_logging(level=config.log_level.value.upper())
+    # A Python warning is written to stderr by `warnings.showwarning`, as plain text, which is one
+    # more way a line lands on the pino stream that the log pipeline cannot parse — and dependencies
+    # of this service emit them (a store stability warning on every boot, deprecations from the
+    # Graph SDK). This routes them through the `py.warnings` logger instead, so they arrive as
+    # pino-json like everything else. Global, and belongs here for the same reason the handler
+    # does: the contract is a property of the process, not of a call site.
+    logging.captureWarnings(True)
+    for name in _RECLAIMED_LOGGERS:
+        _reclaim(name)
     # Every root handler, not only the one upstream just added: a second handler would be a second
     # way out of the process, and redaction that covers one of two is redaction that does not hold.
     for handler in logging.getLogger().handlers:

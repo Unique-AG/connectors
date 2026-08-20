@@ -11,10 +11,17 @@ wrong opponent.
 import io
 import json
 import logging
+import os
+import pathlib
+import socket
+import subprocess
+import sys
+import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import IO, Protocol, cast
 
+import httpx
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -259,8 +266,8 @@ class TestNothingSecretReachesTheLog:
         assert _JWT not in sink.stream.getvalue()
 
 
-class TestNoHandlerLeavesByAnotherDoor:
-    """Redaction on the handler only holds while every handler carries it."""
+class TestNoLineLeavesByAnotherDoor:
+    """Redaction on the handler only holds while the handler is the only way out of the process."""
 
     @pytest.mark.usefixtures("sink")
     def test_no_handler_escapes_the_filters(self) -> None:
@@ -269,6 +276,31 @@ class TestNoHandlerLeavesByAnotherDoor:
         for handler in logging.getLogger().handlers:
             installed = {type(existing) for existing in handler.filters}
             assert RedactionFilter in installed, f"{handler} has no redaction filter"
+
+    @pytest.mark.usefixtures("sink")
+    def test_no_logger_keeps_its_own_way_out(self) -> None:
+        """A logger with handlers of its own and `propagate = False` bypasses both the formatter and
+        the filters. FastMCP configures itself exactly that way at import time, which is why
+        `configure_logging` takes its logger back — and this is the ratchet for the next dependency
+        that does the same. If it fails, add the logger to `_RECLAIMED_LOGGERS` after reading why it
+        wanted its own handler.
+        """
+        registry = cast("Mapping[str, object]", logging.Logger.manager.loggerDict)
+        escaping = [
+            name
+            for name, logger in registry.items()
+            if isinstance(logger, logging.Logger) and logger.handlers and not logger.propagate
+        ]
+
+        assert not escaping, f"these loggers bypass the pino handler entirely: {escaping}"
+
+    def test_a_fastmcp_line_arrives_as_pino_json(self, sink: _Sink) -> None:
+        """The line that used to be rich-formatted text: unparseable *and* unredacted."""
+        logging.getLogger("fastmcp.server.auth").warning("using %s", "Bearer aaaaaaaaaaaaaaaaaaaa")
+
+        line = sink.one()
+        assert line["context"] == "fastmcp.server.auth"
+        assert line["msg"] == f"using Bearer {CENSORED}"
 
 
 class TestEveryLineIsJoinable:
@@ -341,6 +373,60 @@ class TestEveryLineIsJoinable:
         assert forwarded, [line.get("http_request_id") for line in sink.lines()]
 
 
+class TestABootedServerHonoursTheLogContract:
+    """A real process, both streams captured. Nothing here is stubbed.
+
+    The chart labels the pod `logging.unique.app/format: pino-json` and the pipeline reads stderr,
+    so a plain-text line, or any line at all on stdout, is a line that is lost. Left to its default,
+    uvicorn applies its own `dictConfig` after this service configured logging and writes its access
+    lines to stdout in plain text; `main.py` passes `log_config=None` to stop that.
+    """
+
+    def test_nothing_is_written_to_stdout(self, booted: "_BootedServer") -> None:
+        assert booted.stdout == "", f"uvicorn wrote to stdout: {booted.stdout!r}"
+
+    def test_every_line_is_pino_json(self, booted: "_BootedServer") -> None:
+        for line in booted.stderr.splitlines():
+            fields = cast("Mapping[str, object]", json.loads(line))
+            assert isinstance(fields, dict), line
+            assert {"level", "time", "msg", "context"} <= set(fields), line
+
+    def test_uvicorns_own_lifecycle_lines_are_in_it(self, booted: "_BootedServer") -> None:
+        contexts = {line["context"] for line in booted.lines}
+
+        assert "uvicorn.error" in contexts, sorted(cast("set[str]", contexts))
+
+    def test_the_access_line_is_in_it(self, booted: "_BootedServer") -> None:
+        """The line that used to be plain text on stdout."""
+        access = [line for line in booted.lines if line["context"] == "uvicorn.access"]
+
+        assert access, "no access line was logged as pino-json"
+        assert any("/nope" in cast("str", line["msg"]) for line in access), [
+            line["msg"] for line in access
+        ]
+
+    def test_the_access_line_carries_no_credential(self, booted: "_BootedServer") -> None:
+        """uvicorn quotes the path with its query string, and this service asked for one with a
+        secret in it. End to end: the filter is on the handler uvicorn now propagates to."""
+        assert "opaque-query-secret" not in booted.stderr
+        assert any(f"api-key={CENSORED}" in cast("str", line["msg"]) for line in booted.lines), [
+            line["msg"] for line in booted.lines
+        ]
+
+    def test_the_probes_own_access_line_is_still_quiet(self, booted: "_BootedServer") -> None:
+        """`unique_mcp` drops access lines for the ops routes, and routing uvicorn through the root
+        handler is what keeps that filter in the path."""
+        assert not [
+            line
+            for line in booted.lines
+            if line["context"] == "uvicorn.access" and "/probe" in cast("str", line["msg"])
+        ]
+
+    def test_every_line_is_joinable(self, booted: "_BootedServer") -> None:
+        for line in booted.lines:
+            assert line.get("correlation_id"), line
+
+
 # ------------------------------------------------------------------------------------------------
 # Fixtures and helpers
 # ------------------------------------------------------------------------------------------------
@@ -366,3 +452,82 @@ def app() -> Starlette:
         ),
         surface_config=SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
     )
+
+
+@dataclass(frozen=True)
+class _BootedServer:
+    stdout: str
+    stderr: str
+
+    @property
+    def lines(self) -> list[Mapping[str, object]]:
+        return [
+            cast("Mapping[str, object]", json.loads(line))
+            for line in self.stderr.splitlines()
+            if line.strip()
+        ]
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return cast("tuple[str, int]", probe.getsockname())[1]
+
+
+@pytest.fixture(scope="module")
+def booted(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_BootedServer]:
+    """`python -m office_mcp.main`, really booted, with both streams captured.
+
+    Run from an empty directory, because `main.py` calls `load_dotenv()` and a developer's `.env`
+    would otherwise decide this test's configuration. Postgres is never reached: the ops routes and
+    a 404 need no database.
+    """
+    port = _free_port()
+    source_root = pathlib.Path(__file__).parent.parent / "src"
+    environment = {
+        **os.environ,
+        "PYTHONPATH": str(source_root),
+        "PYTHONUNBUFFERED": "1",
+        "APP_ENV": "development",
+        "PORT": str(port),
+        "PUBLIC_BASE_URL": f"http://127.0.0.1:{port}",
+        "LOG_LEVEL": "info",
+        "DB_URL": "postgresql://office:hunter2@127.0.0.1:1/nope",
+        "ENTRA_TENANT_ID": _TENANT_ID,
+        "ENTRA_CLIENT_ID": _CLIENT_ID,
+        "ENTRA_CLIENT_SECRET": "s3cr3t",
+        "TOOLS_PRESET": ToolsPreset.TEAMS.value,
+    }
+    server = subprocess.Popen(  # noqa: S603
+        [sys.executable, "-m", "office_mcp.main"],
+        cwd=tmp_path_factory.mktemp("booted"),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        base = f"http://127.0.0.1:{port}"
+        _wait_until_up(server, f"{base}/probe")
+        # One quieted ops route, one route that answers 404, and a credential in a query string.
+        _ = httpx.get(f"{base}/probe", timeout=5)
+        _ = httpx.get(f"{base}/nope?api-key=opaque-query-secret", timeout=5)
+    finally:
+        server.terminate()
+        stdout, stderr = server.communicate(timeout=30)
+
+    yield _BootedServer(stdout=stdout, stderr=stderr)
+
+
+def _wait_until_up(server: subprocess.Popen[str], probe: str, timeout: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if server.poll() is not None:
+            stdout, stderr = server.communicate()
+            raise AssertionError(f"the server exited before it served:\n{stderr}\n{stdout}")
+        try:
+            if httpx.get(probe, timeout=1).status_code == 200:
+                return
+        except httpx.HTTPError:
+            time.sleep(0.2)
+    raise AssertionError(f"{probe} never answered")
