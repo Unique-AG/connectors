@@ -82,3 +82,30 @@ main
   `route.call_count` survives only in the TTL-cache suites where it is the sole observable.
 - Deletes cases that only reach states unreachable from the wire rather than contorting them into
   HTTP fixtures.
+
+---
+
+## Implementation notes
+
+All three scopes landed on `backstop-mcp/feat/UN-23684-refactor-file-names` (base: PR #813)
+rather than the stacked branches above.
+
+Deviations from the design that are intentional:
+
+- `split_open` is exported from `features.accounts` so `test_split_open.py` can drive it as a
+  public utility. Tools still go through `fetch_accounts_for_*`.
+- Mapping-table files that would have tested unexported functions were not created.
+  `fetch_series` coverage lives on `test_fetch_product_positions.py`; email / quick-search
+  coverage on `test_resolve_party.py`; custom-field fetch and opportunity-stage fetch coverage
+  on their service suites. `fetch_opportunity_stages` stayed public — it has its own module
+  after the stages split.
+- `looks_like_email` / `normalized_email` live unprefixed in `_party_search_types.py` so sibling
+  modules can import them without private-name ignores; they are not in `party_resolver.__all__`.
+- Dead `is_party_search_type` was deleted rather than underscore-prefixed.
+  `client_supports_elicitation` was left public — it lives in out-of-scope `resolution.py`.
+- `LARGE_CATALOG` is `_LARGE_CATALOG`. `RetryPolicy`, `paginate_all`, and `parse_page` were
+  added to `backstop_client.__all__` so client tests enter that package through its front door.
+- Rule 4 walks `tests/` as well as `src/`. Auth tests may still import `features.auth.*`
+  internals (auth was out of scope) but must enter `db` / `backstop_client` through `__init__`.
+  Tool tests import the tool module under test (`get_*` / `list_*`) and `TOOLS` from
+  `server.tools`.
