@@ -9,6 +9,7 @@ Figures are `sort=-date` (first 10 rows) then `max(date)` — not a `filter[date
 from backstop_mcp.features.accounts.api_responses import AccountApiResponse
 from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
 from backstop_mcp.features.accounts.fetch_accounts_for_product import fetch_accounts_for_product
+from backstop_mcp.features.accounts.fetch_holdings_table import fetch_holdings_table
 from backstop_mcp.features.accounts.fetch_product_positions import (
     MAX_POSITION_ACCOUNTS,
     fetch_product_positions,
@@ -17,11 +18,15 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
+    HoldingListingDto,
+    HoldingRowDto,
     InvestorTypeDto,
+    MoneyDto,
     ProductCandidate,
     ProductPositionsDto,
     ProductResolution,
     ResolvedProductDto,
+    ShareDto,
 )
 from backstop_mcp.features.accounts.resolve_product import resolve_product
 from backstop_mcp.features.accounts.responses import (
@@ -38,8 +43,11 @@ __all__ = [
     "AccountOwnerDto",
     "AccountRecordDto",
     "AccountRowResponse",
+    "HoldingListingDto",
+    "HoldingRowDto",
     "InvestorTypeDto",
     "MAX_POSITION_ACCOUNTS",
+    "MoneyDto",
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
@@ -47,8 +55,10 @@ __all__ = [
     "ProductPositionsResolvedResponse",
     "ProductResolution",
     "ResolvedProductDto",
+    "ShareDto",
     "fetch_accounts_for_party",
     "fetch_accounts_for_product",
+    "fetch_holdings_table",
     "fetch_product_positions",
     "resolve_product",
     "split_open",
