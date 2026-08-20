@@ -5,7 +5,7 @@ a runtime holder. Tests that need a client go through the factory exactly as pro
 so the concurrency gate and config injection under test are the real ones.
 """
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import date
 from typing import Protocol, cast
@@ -21,7 +21,6 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
-from backstop_mcp.features.auth import BackstopAuthContext
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
@@ -54,7 +53,7 @@ def backstop_config(base_url: str = BASE_URL, **overrides: object) -> BackstopCo
 @asynccontextmanager
 async def tool_client(
     base_url: str = BASE_URL, **overrides: object
-) -> AsyncIterator[BackstopClient]:
+) -> AsyncGenerator[BackstopClient]:
     """A Backstop client for calling a tool with collaborators passed in as kwargs."""
     factory = client_factory(base_url, **overrides)
     try:
@@ -63,12 +62,7 @@ async def tool_client(
         await factory.aclose()
 
 
-def client_factory(
-    base_url: str = BASE_URL,
-    *,
-    auth: BackstopAuthContext | None = None,
-    **overrides: object,
-) -> BackstopClientFactory:
+def client_factory(base_url: str = BASE_URL, **overrides: object) -> BackstopClientFactory:
     """Build a factory the way `create_app` does: config in, transport settings out.
 
     Goes through the same `dependencies.transport_settings` / `dependencies.retry_settings`
@@ -76,7 +70,7 @@ def client_factory(
     being propagated at the composition root fails these tests too.
     """
     config = backstop_config(base_url, **overrides)
-    return BackstopClientFactory(transport_settings(config), retry_settings(config), auth=auth)
+    return BackstopClientFactory(transport_settings(config), retry_settings(config))
 
 
 def build_employment_index_factory(

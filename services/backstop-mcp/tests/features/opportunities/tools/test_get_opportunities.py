@@ -124,7 +124,9 @@ class TestGetOpportunities:
 
         result = tool_model(
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
                 client=client,
                 opportunity_stages=opportunity_stages_service(),
             ),
@@ -222,9 +224,7 @@ class TestGetOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_status_open_still_reports_the_closed_count(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_status_open_still_reports_the_closed_count(self, client: BackstopClient) -> None:
 
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(_OPPORTUNITIES_URL).mock(
@@ -274,7 +274,9 @@ class TestGetOpportunities:
 
         payload = tool_payload(
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
                 client=client,
                 opportunity_stages=opportunity_stages_service(),
             )
@@ -297,7 +299,9 @@ class TestGetOpportunities:
 
         result = tool_model_union(
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", search="NoSuchOrg",
+                ctx_never_elicit(),
+                search_type="organizations",
+                search="NoSuchOrg",
                 client=client,
                 opportunity_stages=opportunity_stages_service(),
             ),
@@ -349,7 +353,9 @@ class TestGetOpportunities:
 
         with pytest.raises(BackstopApiError):
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
                 client=client,
                 opportunity_stages=opportunity_stages_service(),
             )
@@ -365,7 +371,9 @@ class TestGetOpportunities:
 
         with pytest.raises(BackstopApiError):
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
                 client=client,
                 opportunity_stages=opportunity_stages_service(),
             )

@@ -273,9 +273,7 @@ class TestGetOrganization:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_not_found_search_returns_the_query_it_used(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_not_found_search_returns_the_query_it_used(self, client: BackstopClient) -> None:
         """Policy step 5: name the exact term searched for, so a typo is correctable."""
 
         respx.get(f"{BASE_URL}/quick-search").mock(
@@ -552,11 +550,13 @@ class TestGetOrganizationIncludes:
             return_value=httpx.Response(200, json=_organization_document())
         )
 
-        payload = tool_payload(await get_organization(
-            ctx_never_elicit(),
-            party_id="o42",
-            client=client,
-        ))
+        payload = tool_payload(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                client=client,
+            )
+        )
 
         assert "included" not in payload
         assert "include" not in org_get.calls.last.request.url.params
@@ -640,11 +640,13 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(
-            ctx_never_elicit(),
-            party_id="o42",
-            client=client,
-        ))
+        payload = tool_payload(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                client=client,
+            )
+        )
 
         organization = object_dict(payload["organization"])
         assert "website" not in organization
@@ -672,11 +674,13 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(
-            ctx_never_elicit(),
-            party_id="o42",
-            client=client,
-        ))
+        payload = tool_payload(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                client=client,
+            )
+        )
 
         assert object_dict(payload["organization"])["regularCustomFieldValues"] == custom_fields
 
@@ -693,11 +697,13 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(
-            ctx_never_elicit(),
-            party_id="o42",
-            client=client,
-        ))
+        payload = tool_payload(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                client=client,
+            )
+        )
 
         assert "as_of" not in payload
 
@@ -714,11 +720,13 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(
-            ctx_never_elicit(),
-            party_id="o42",
-            client=client,
-        ))
+        payload = tool_payload(
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                client=client,
+            )
+        )
 
         resolved = object_dict(payload["resolved"])
         assert resolved["id"] == "o42"

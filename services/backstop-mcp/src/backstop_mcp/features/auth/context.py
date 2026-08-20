@@ -30,7 +30,8 @@ class BackstopAuthContext(BaseModel):
 
     The concrete implementation of `backstop_client.credential.CallerAuthContext` — satisfied
     structurally, so the transport layer never imports this module. Constructed once in
-    `create_app()` and handed to `BackstopClientFactory`; there is no module-level instance.
+    `dependencies.get_backstop_client_factory()` and attached to the factory it caches; there is
+    no module-level instance.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
