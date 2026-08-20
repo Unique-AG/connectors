@@ -1,6 +1,7 @@
 """List Backstop accounts for one product.
 
-By-product listing uses `filter[product.id][eq]`. Open means the `closedDate` key is absent.
+No shipped tool calls this yet; `get_product_investors` is the consumer. By-product listing
+uses `filter[product.id][eq]`. Open means the `closedDate` key is absent.
 
 The listing asks for `fields=` and pages in parallel. `fields=` drops the whole `relationships`
 block — except for the relationships named in `include=`, which keep their `data` linkage.

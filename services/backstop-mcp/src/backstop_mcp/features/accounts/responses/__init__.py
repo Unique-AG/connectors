@@ -1,9 +1,8 @@
-"""MCP-facing account and product shapes for the two positions tools.
+"""MCP-facing account and product shapes.
 
-Split across three modules but re-exported as one surface: `shared` holds the account row, the
-closed-account hint, and the figure shape both tools read from; `product_positions` and
-`party_accounts` hold each tool's own resolved-response shape. A caller comparing
-`get_product_positions` to `get_accounts_for_party` is reading one vocabulary.
+Split across modules but re-exported as one surface: `shared` holds the account row (the
+`get_product_investors` listing, no figures), product resolution, and the closed-account
+hint; `party_accounts` and `time_series` hold each shipped tool's resolved-response shape.
 """
 
 from backstop_mcp.features.accounts.responses.party_accounts import (
@@ -13,27 +12,23 @@ from backstop_mcp.features.accounts.responses.party_accounts import (
     PartyAccountsResolvedResponse,
     ShareResponse,
 )
-from backstop_mcp.features.accounts.responses.product_positions import (
-    ProductAmbiguousResponse,
-    ProductCandidateResponse,
-    ProductPositionsResolvedResponse,
-)
 from backstop_mcp.features.accounts.responses.shared import (
     AccountRowResponse,
-    FigureResponse,
     InvestorQualificationResponse,
     InvestorTypeResponse,
     OwnerResponse,
-    PositionRowResponse,
+    ProductAmbiguousResponse,
+    ProductCandidateResponse,
     ProductRefResponse,
-    SeriesErrorResponse,
-    UnvaluedPointResponse,
     closed_hint,
+)
+from backstop_mcp.features.accounts.responses.time_series import (
+    TimeSeriesPointResponse,
+    TimeSeriesResolvedResponse,
 )
 
 __all__ = [
     "AccountRowResponse",
-    "FigureResponse",
     "HoldingFigureErrorResponse",
     "HoldingRowResponse",
     "InvestorQualificationResponse",
@@ -41,13 +36,11 @@ __all__ = [
     "MoneyResponse",
     "OwnerResponse",
     "PartyAccountsResolvedResponse",
-    "PositionRowResponse",
     "ProductAmbiguousResponse",
     "ProductCandidateResponse",
-    "ProductPositionsResolvedResponse",
     "ProductRefResponse",
-    "SeriesErrorResponse",
     "ShareResponse",
-    "UnvaluedPointResponse",
+    "TimeSeriesPointResponse",
+    "TimeSeriesResolvedResponse",
     "closed_hint",
 ]

@@ -135,13 +135,18 @@ class InvestorTypeAttributes(BaseModel):
 
 
 class SeriesPointAttributes(BaseModel):
-    """Wire shape of one dated point on `values` / `totalInvested` / `totalRedemptions` / `aums`."""
+    """Wire shape of one dated point on an account or product time series.
+
+    `valueStatus` is an account extra (`ESTIMATE` / `ACTUAL` on `values`); `source` is a product
+    `aums` extra (`"AUM from Accounts"` here). Other series omit both.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     date: LenientDate = None
     value: LenientFloat = None
     value_status: _CleanStr = Field(default=None, alias="valueStatus")
+    source: _CleanStr = None
 
 
 def _scalar_str(value: object) -> str | None:

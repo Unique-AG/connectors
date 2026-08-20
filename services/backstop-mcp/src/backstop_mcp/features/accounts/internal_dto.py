@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import date
-from typing import ClassVar, Literal, Self
+from typing import ClassVar, Literal, Self, cast, get_args
 
 from pydantic import BaseModel, ConfigDict
 
@@ -24,31 +24,83 @@ from backstop_mcp.features.accounts.api_responses import (
 from backstop_mcp.features.resolution import Candidate, Resolution
 
 __all__ = [
+    "ACCOUNT_SERIES",
     "AccountListingDto",
     "AccountOwnerDto",
-    "AccountPositionDto",
     "AccountRecordDto",
-    "AumReconciliationDto",
+    "AccountSeries",
     "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
     "HoldingsSource",
     "InvestorTypeDto",
     "MoneyDto",
+    "PRODUCT_SERIES",
     "ProductCandidate",
-    "ProductPositionsDto",
     "ProductResolution",
+    "ProductSeries",
     "ResolvedProductDto",
-    "SeriesErrorDto",
     "SeriesFigureDto",
-    "SeriesName",
     "SeriesPointDto",
     "ShareDto",
+    "TimeSeriesEntityType",
+    "TimeSeriesName",
 ]
 
 _OWNER = "owner"
 _INVESTOR_TYPE = "investorType"
 _PRODUCT = "product"
+
+# Swagger enums for `GET /{accounts|products}/{id}/{timeSeries}`. Keep Backstop's
+# `currentMonthNetAssests` spelling. Membership sets are derived from the Literals so a
+# typo cannot accept a path segment pydantic would reject, or the other way around.
+type TimeSeriesEntityType = Literal["accounts", "products"]
+type AccountSeries = Literal[
+    "currentMonthIrrs",
+    "currentMonthNetAssests",
+    "earnings",
+    "grossValues",
+    "highwaterMarks",
+    "incentiveFees",
+    "incentiveFeesCharged",
+    "irrs",
+    "managementFees",
+    "newIssueIncomes",
+    "percentageOfFundHistory",
+    "performanceFeeAccrued",
+    "returns",
+    "startingValues",
+    "totalInvested",
+    "totalRedemptions",
+    "values",
+]
+type ProductSeries = Literal[
+    "aums",
+    "benchmarkAReturns",
+    "benchmarkBReturns",
+    "benchmarkCReturns",
+    "benchmarkDReturns",
+    "benchmarkEReturns",
+    "benchmarkFReturns",
+    "benchmarkGReturns",
+    "benchmarkHReturns",
+    "expenseDataPoints",
+    "incomeDataPoints",
+]
+type TimeSeriesName = AccountSeries | ProductSeries
+
+
+def _literal_strings(alias: object) -> frozenset[str]:
+    """String members of a PEP 695 `Literal` alias."""
+    value: object = getattr(alias, "__value__", alias)
+    members = cast("tuple[object, ...]", get_args(value))
+    names = tuple(member for member in members if isinstance(member, str))
+    assert names and len(names) == len(members), f"{alias} is not a non-empty string Literal"
+    return frozenset(names)
+
+
+ACCOUNT_SERIES: frozenset[str] = _literal_strings(AccountSeries)
+PRODUCT_SERIES: frozenset[str] = _literal_strings(ProductSeries)
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _OwnerInclude = IncludedResource[OwnerAttributes]
@@ -227,7 +279,7 @@ class AccountRecordDto(BaseModel):
         utility, and does not fit. It plans a caller-selected set of include *names* (the three
         here are fixed and unconditional), it projects a by-id document (this is a collection walk
         over one shared `included` array), and it keeps `attributes` only — while the ids are part
-        of the answer here, `product.id` being what `get_product_positions` takes back. What the
+        of the answer here, `product.id` being what `get_time_series` takes back. What the
         two do share is the layer below: `follow_included` and `IncludedResource`.
         """
         return cls.from_attributes(
@@ -318,8 +370,7 @@ class HoldingFigureErrorDto(BaseModel):
     """A figure that could not be fetched, and why.
 
     Without this, "we asked and the request failed" and "Backstop publishes no number" are the
-    same `None`. `AccountPositionDto.errors` already established the pattern for the same reason;
-    this is it applied per figure rather than per series name.
+    same `None`. The fallback holdings walk uses it per figure rather than dropping the row.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -415,10 +466,11 @@ class HoldingListingDto(BaseModel):
 
 
 class SeriesPointDto(BaseModel):
-    """The latest usable point in a series: `max(date)`, never 'last of month'.
+    """One dated point on a series. A missing `value` is "not in yet", never a silent skip.
 
     `value_status` is whatever Backstop sent (`ESTIMATE` on recent `values`, often absent on
-    `totalInvested` / `aums`). It is not defaulted to `ACTUAL`.
+    `totalInvested` / `aums`). It is not defaulted to `ACTUAL`. `source` is the product-`aums`
+    extra and is omitted on every other series.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -426,13 +478,19 @@ class SeriesPointDto(BaseModel):
     date: date
     value: float | None = None
     value_status: str | None = None
+    source: str | None = None
 
     @classmethod
     def from_attributes(cls, attributes: SeriesPointAttributes) -> Self | None:
         point_date = attributes.date
         if point_date is None:
             return None
-        return cls(date=point_date, value=attributes.value, value_status=attributes.value_status)
+        return cls(
+            date=point_date,
+            value=attributes.value,
+            value_status=attributes.value_status,
+            source=attributes.source,
+        )
 
 
 class SeriesFigureDto(BaseModel):
@@ -450,65 +508,3 @@ class SeriesFigureDto(BaseModel):
 
     latest: SeriesPointDto
     valued: SeriesPointDto | None = None
-
-
-type SeriesName = Literal["values", "totalInvested", "totalRedemptions"]
-
-
-class SeriesErrorDto(BaseModel):
-    """One series that failed for an account — siblings on the same row still stand."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    series: SeriesName
-    message: str
-
-
-class AccountPositionDto(BaseModel):
-    """One listed account with the three series attached.
-
-    A missing figure is `None` (empty series), never `0.0`. A `0.0` that Backstop published is
-    kept. Failures go in `errors` so one 500 does not drop the row or its siblings.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    account: AccountRecordDto
-    balance: SeriesFigureDto | None = None
-    invested: SeriesFigureDto | None = None
-    redemptions: SeriesFigureDto | None = None
-    errors: tuple[SeriesErrorDto, ...] = ()
-
-
-class AumReconciliationDto(BaseModel):
-    """Latest assets under management (AUM) against the sum of returned account balances.
-
-    The two are never expected to agree to the cent: they are as-of different dates, the open
-    default excludes closed-but-still-valued accounts, and balances are summed without currency
-    conversion. So `diverges` is a *tolerance* verdict, not an equality test, and `difference`
-    is published so the caller can judge the magnitude itself rather than trust a bare flag.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    balance_total: float | None = None
-    difference: float | None = None
-    diverges: bool = False
-
-
-class ProductPositionsDto(BaseModel):
-    """Listed accounts with figures, plus product assets under management (AUM).
-
-    AUM is the product's total reported value, not one investor's balance. `accounts_omitted`
-    is how many listed open accounts were dropped before the series fan-out because the product
-    exceeded the per-call cap.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    product: ResolvedProductDto
-    accounts: tuple[AccountPositionDto, ...]
-    closed_omitted: int = 0
-    accounts_omitted: int = 0
-    aum: SeriesFigureDto | None = None
-    reconciliation: AumReconciliationDto = AumReconciliationDto()
