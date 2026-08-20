@@ -13,7 +13,6 @@ from backstop_mcp.features.custom_fields import (
     CustomFieldsService,
     ResolvedCustomFieldValueResponse,
     get_custom_fields_service,
-    without_regular_custom_field_values,
 )
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
@@ -252,13 +251,13 @@ async def get_person(
         party_id=party.id,
         include=include,
     )
-    stripped, raw_values = without_regular_custom_field_values(
+    record, stored_values = custom_fields.take_stored_values(
         fetched.person.model_dump(by_alias=True)
     )
-    person = PersonRecordResponse.model_validate(stripped)
+    person = PersonRecordResponse.model_validate(record)
     custom_field_values = await custom_fields.resolve_values(
         client,
-        raw_values,
+        stored_values,
         tabs=custom_field_tabs,
         groups=custom_field_groups,
         group_ids=custom_field_group_ids,
