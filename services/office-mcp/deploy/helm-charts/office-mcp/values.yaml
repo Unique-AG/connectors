@@ -171,8 +171,15 @@ networkPolicy:
     ingress: true
     egress: true
   baseline:
+    # Scrapes reach this pod from Prometheus in `system`, not from the base chart's `monitoring`
+    # default — so the namespace is named, exactly as teams-mcp names it. What is not an option is
+    # switching the rule off: `enabled: false` emits no Prometheus ingress rule at all
+    # (base/templates/_networkPolicy.cilium.tpl, `$hasPrometheus`), so the moment the Unique QA
+    # overlay sets `networkPolicy.enabled: true` every scrape is dropped. /metrics stays up, the
+    # probes stay green and the pod logs nothing — the only symptom is a dashboard that goes blank,
+    # which is the failure this chart is least likely to notice.
     prometheus:
-      enabled: false
+      namespace: system
     ephemeralPorts:
       enabled: false
     # Entra sign-in and Graph both run server-side over 443. Without this rule DNS still
