@@ -694,3 +694,66 @@ class TestWhatGraphRefusalsLookLikeHere:
             _ = await _listing(client)
 
         assert raised.value.inner_code is None, "an ordinary refusal carries no inner code"
+
+
+class TestTheRepeatsGraphIsDocumentedToSend:
+    """Microsoft's paging reset on this collection, and the half of the workaround that dedupes.
+
+    The known-issues page (Teamwork and communications) says a paginated request to
+    `getAllRecordings` or `getAllTranscripts` "may experience an automatic pagination token reset. A
+    request can return a `200 OK` response with an empty collection and an `@odata.nextLink`.
+    Pagination then restarts and can return recording or transcript items that were returned
+    previously." The remedy it publishes is two things: keep following the link, and "de-duplicate
+    subsequent items by tracking the **id** property of each recording or transcript."
+
+    `graph_client/pagination.py` does the following. `shared/meetings.py` does the de-duplicating,
+    and these are the tests for the second half.
+    """
+
+    async def test_a_recording_graph_sent_twice_is_reported_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _me(graph)
+        _resolved(graph)
+        _pages(
+            graph,
+            [
+                recording_payload(recording_id="a", created_at="2026-02-03T14:00:00Z"),
+                recording_payload(recording_id="b", created_at="2026-02-04T14:00:00Z"),
+            ],
+            # The reset: page two starts the collection again and repeats what page one held.
+            [
+                recording_payload(recording_id="a", created_at="2026-02-03T14:00:00Z"),
+                recording_payload(recording_id="c", created_at="2026-02-05T14:00:00Z"),
+            ],
+        )
+
+        found = await _listing(client)
+
+        assert [recording.recording_id for recording in found.recordings] == ["c", "b", "a"], (
+            "one entry per id, still newest first"
+        )
+
+    async def test_a_repeat_does_not_take_the_place_of_an_artifact_the_caller_asked_for(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Why the de-duplication happens before the cut to `limit` and not after it.
+
+        A repeat that survived into the sort takes one of the `limit` places a distinct recording
+        was owed. A caller asking for the newest two would be handed the same recording twice and
+        never learn a second one existed.
+        """
+        _me(graph)
+        _resolved(graph)
+        _pages(
+            graph,
+            [recording_payload(recording_id="newest", created_at="2026-02-05T14:00:00Z")],
+            [
+                recording_payload(recording_id="newest", created_at="2026-02-05T14:00:00Z"),
+                recording_payload(recording_id="older", created_at="2026-02-04T14:00:00Z"),
+            ],
+        )
+
+        found = await _listing(client, limit=2)
+
+        assert [recording.recording_id for recording in found.recordings] == ["newest", "older"]
