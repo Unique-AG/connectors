@@ -1,11 +1,20 @@
+from collections.abc import Sequence
 from datetime import date
 from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
+from backstop_mcp.backstop_client import (
+    IncludedResource,
+    follow_included,
+    included_resource,
+)
 from backstop_mcp.features.accounts.api_responses import (
+    AccountApiResponse,
     AccountAttributes,
     InvestorQualificationAttributes,
+    InvestorTypeAttributes,
+    OwnerAttributes,
     ProductAttributes,
     SeriesPointAttributes,
 )
@@ -27,6 +36,29 @@ __all__ = [
     "SeriesName",
     "SeriesPointDto",
 ]
+
+_OWNER = "owner"
+_INVESTOR_TYPE = "investorType"
+_PRODUCT = "product"
+
+# Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
+_OwnerInclude = IncludedResource[OwnerAttributes]
+_InvestorTypeInclude = IncludedResource[InvestorTypeAttributes]
+_ProductInclude = IncludedResource[ProductAttributes]
+
+
+def _account_is_open(attributes: AccountAttributes) -> bool:
+    """Open means the `closedDate` key was absent on the wire — a present null is still closed."""
+    return "closed_date" not in attributes.model_fields_set
+
+
+def _first_included(
+    included: Sequence[dict[str, object]],
+    resource: AccountApiResponse,
+    relationship: str,
+) -> dict[str, object] | None:
+    related = follow_included(included, resource, relationship)
+    return related[0] if related else None
 
 
 class ResolvedProductDto(BaseModel):
@@ -55,6 +87,13 @@ class ResolvedProductDto(BaseModel):
             short_name=None if configuration is None else configuration.product_short_name,
         )
 
+    @classmethod
+    def from_included(cls, raw: dict[str, object] | None) -> "ResolvedProductDto | None":
+        product = included_resource(raw, schema=_ProductInclude)
+        if product is None:
+            return None
+        return cls.from_attributes(product.id, product.attributes)
+
 
 type ProductCandidate = Candidate[ResolvedProductDto]
 type ProductResolution = Resolution[ResolvedProductDto]
@@ -69,6 +108,29 @@ class AccountOwnerDto(BaseModel):
     name: str | None = None
     resource_type: str | None = None
 
+    @classmethod
+    def from_included(cls, raw: dict[str, object] | None) -> Self | None:
+        """The `owner` side-load as an identity.
+
+        `specificResource` wins over the JSON:API envelope: an organization owner arrives as a
+        `contacts` resource, and `organizations` is the answer a caller can act on. The id is taken
+        from the *same* reference as the type, never mixed — `resourceId` is what exists in the
+        collection `resourceType` names, and every description tells the model to echo this id back
+        as a `party_id`. On this instance the two happen to be equal; a projection that assumed so
+        would hand back an unusable id the day they are not.
+        """
+        owner = included_resource(raw, schema=_OwnerInclude)
+        if owner is None:
+            return None
+        specific = owner.attributes.specific_resource
+        if specific is not None and specific.resource_type is not None:
+            return cls(
+                id=specific.resource_id,
+                name=owner.attributes.name,
+                resource_type=specific.resource_type,
+            )
+        return cls(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
+
 
 class InvestorTypeDto(BaseModel):
     """The side-loaded `investorType` include, identity only."""
@@ -77,6 +139,13 @@ class InvestorTypeDto(BaseModel):
 
     id: str
     name: str | None = None
+
+    @classmethod
+    def from_included(cls, raw: dict[str, object] | None) -> Self | None:
+        investor_type = included_resource(raw, schema=_InvestorTypeInclude)
+        if investor_type is None:
+            return None
+        return cls(id=investor_type.id, name=investor_type.attributes.name)
 
 
 class AccountRecordDto(BaseModel):
@@ -130,6 +199,49 @@ class AccountRecordDto(BaseModel):
             us_domiciled=attributes.us_domiciled,
             is_open=is_open,
         )
+
+    @classmethod
+    def from_resource(
+        cls,
+        resource: AccountApiResponse,
+        *,
+        included: Sequence[dict[str, object]],
+    ) -> Self:
+        """Project one `/accounts` resource and its `owner` / `investorType` / `product` includes.
+
+        The account body is already `BackstopApiResource[AccountAttributes]` from the client.
+        Side-loads are not: `paginate` keeps `included` as mixed JSON:API dicts (owners, investor
+        types, and products in one array), so each is read as an `IncludedResource[...]` — one
+        validation per side-load, identity kept.
+
+        `features.includes` is the person/organization MCP include allowlist, not a projection
+        utility, and does not fit. It plans a caller-selected set of include *names* (the three
+        here are fixed and unconditional), it projects a by-id document (this is a collection walk
+        over one shared `included` array), and it keeps `attributes` only — while the ids are part
+        of the answer here, `product.id` being what `get_product_positions` takes back. What the
+        two do share is the layer below: `follow_included` and `IncludedResource`.
+        """
+        return cls.from_attributes(
+            resource.id,
+            resource.attributes,
+            owner=AccountOwnerDto.from_included(_first_included(included, resource, _OWNER)),
+            investor_type=InvestorTypeDto.from_included(
+                _first_included(included, resource, _INVESTOR_TYPE)
+            ),
+            product=ResolvedProductDto.from_included(
+                _first_included(included, resource, _PRODUCT)
+            ),
+            is_open=_account_is_open(resource.attributes),
+        )
+
+    @classmethod
+    def from_resources(
+        cls,
+        resources: Sequence[AccountApiResponse],
+        *,
+        included: Sequence[dict[str, object]],
+    ) -> tuple[Self, ...]:
+        return tuple(cls.from_resource(resource, included=included) for resource in resources)
 
 
 class AccountListingDto(BaseModel):
