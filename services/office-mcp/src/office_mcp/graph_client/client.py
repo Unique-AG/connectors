@@ -124,7 +124,9 @@ class _QuietUrlReplaceHandler(UrlReplaceHandler):
 
     Trap: `send` below mirrors `UrlReplaceHandler.send` (url_replace_handler.py:35-47) minus that
     one `set_attribute` line. On an SDK bump, re-read that method: whatever it gains has to be
-    gained here too, or this handler silently stops doing it.
+    gained here too, or this handler silently stops doing it. `tests/graph_client/test_spans.py`
+    reads that method's own source and fails when its shape changes, so the bump says so rather
+    than the copy going quietly stale.
     """
 
     @override
