@@ -1,9 +1,12 @@
-"""The account-row and figure vocabulary shared by both positions tools.
+"""Account-row vocabulary and product-resolution shapes shared by the holdings tools.
 
-A caller comparing `get_product_positions` to `get_accounts_for_party` is reading one
-vocabulary: the account row, the closed-account hint, and the figure shape live here rather
-than being duplicated per tool. `OmitNoneModel` drops nulls: a missing figure is absent, never
-`0.0`. A `0.0` Backstop published is a real point and is kept.
+`get_accounts_for_party` publishes `HoldingRowResponse`, not `AccountRowResponse`. The
+account-row tree (`AccountRowResponse` and its nested owner / investor-type / product
+refs) is the listing shape `get_product_investors` will publish — identity and owner,
+no figures. Keep it here rather than inventing a second row model for that tool.
+
+`OmitNoneModel` drops nulls: a missing figure is absent, never `0.0`. A `0.0` Backstop
+published is a real point and is kept.
 """
 
 from datetime import date as Date
@@ -14,13 +17,17 @@ from pydantic import Field
 from backstop_mcp.features.accounts.api_responses import InvestorQualificationAttributes
 from backstop_mcp.features.accounts.internal_dto import (
     AccountOwnerDto,
-    AccountPositionDto,
     AccountRecordDto,
     InvestorTypeDto,
     ResolvedProductDto,
-    SeriesErrorDto,
-    SeriesFigureDto,
-    SeriesName,
+)
+from backstop_mcp.features.resolution import (
+    AmbiguousResponse,
+    Candidate,
+    CandidateResponse,
+    NotFoundResponse,
+    Unresolved,
+    unresolved_response,
 )
 from backstop_mcp.models import OmitNoneModel
 
@@ -30,8 +37,8 @@ class ProductRefResponse(OmitNoneModel):
 
     id: str = Field(
         description=(
-            "Backstop product id. Echo it as `product_id` on `get_product_positions` — never "
-            "invent one."
+            "Backstop product id. Echo it as `entity_id` on `get_time_series` with "
+            "`entity_type='products'` — never invent one."
         )
     )
     name: str | None = Field(default=None, description="Product name as Backstop stores it.")
@@ -109,81 +116,6 @@ class InvestorQualificationResponse(OmitNoneModel):
         return cls(status=qualification.status, option=qualification.option)
 
 
-class UnvaluedPointResponse(OmitNoneModel):
-    """A dated point Backstop has published without a number yet (its UI shows `-`)."""
-
-    date: Date = Field(description="The day Backstop has a point for but no value on.")
-    value_status: str | None = Field(
-        default=None,
-        description="Backstop's `valueStatus` on that point when it sent one.",
-    )
-
-
-class FigureResponse(OmitNoneModel):
-    """One series figure: the number, the day it is as-of, and status when Backstop sent it.
-
-    This is the latest point on the series that carries a value — not blindly the latest point.
-    Backstop publishes a dated row before the number lands, and reporting that row would turn a
-    live position into "no data". When the newest row is one of those, it is reported separately
-    as `newer_point_without_value` and this figure stays the last real number.
-
-    `value_status` is omitted when Backstop omitted it — do not read that as `ACTUAL`. Recent
-    `values` points are often `ESTIMATE`.
-    """
-
-    value: float | None = Field(
-        default=None,
-        description=(
-            "The point's amount, in the account's `currency`. `0.0` is a real published zero, "
-            "not a missing series. Absent means no point in the fetched page carries a number "
-            "yet — `date` is then the newest dated point, not an amount you can report."
-        ),
-    )
-    date: Date = Field(description="The day this point is as-of. Each figure has its own date.")
-    value_status: str | None = Field(
-        default=None,
-        description=(
-            "Backstop's `valueStatus` when present (`ESTIMATE` / `ACTUAL`). Omitted when "
-            "Backstop did not send one — not defaulted to `ACTUAL`."
-        ),
-    )
-    newer_point_without_value: UnvaluedPointResponse | None = Field(
-        default=None,
-        description=(
-            "Set when Backstop has a *newer* dated point on this series with no number on it "
-            "yet. `value` and `date` above are the latest point that does carry a number, so "
-            "the figure is real but stale — say so rather than reporting it as current."
-        ),
-    )
-
-    @classmethod
-    def from_figure(cls, figure: SeriesFigureDto | None) -> Self | None:
-        """Report the latest valued point, naming the newer valueless one when there is one."""
-        if figure is None:
-            return None
-        reported = figure.valued if figure.valued is not None else figure.latest
-        newer = (
-            UnvaluedPointResponse(date=figure.latest.date, value_status=figure.latest.value_status)
-            if figure.valued is not None and figure.latest.value is None
-            else None
-        )
-        return cls(
-            value=reported.value,
-            date=reported.date,
-            value_status=reported.value_status,
-            newer_point_without_value=newer,
-        )
-
-
-class SeriesErrorResponse(OmitNoneModel):
-    """One series that failed for this account. Other figures on the row may still be present."""
-
-    series: SeriesName = Field(
-        description="Which series failed: `values`, `totalInvested`, or `totalRedemptions`."
-    )
-    message: str = Field(description="Why that series could not be read.")
-
-
 class AccountRowResponse(OmitNoneModel):
     """One account: identity, owner, status, and the product when it was side-loaded."""
 
@@ -203,8 +135,7 @@ class AccountRowResponse(OmitNoneModel):
     product: ProductRefResponse | None = Field(
         default=None,
         description=(
-            "The product this account is a position in. Present on `get_accounts_for_party`; "
-            "omitted on `get_product_positions` (that call already named the product)."
+            "The product this account is a position in. Omitted when it was not side-loaded."
         ),
     )
     currency: str | None = Field(
@@ -290,59 +221,72 @@ class AccountRowResponse(OmitNoneModel):
         )
 
 
-class PositionRowResponse(AccountRowResponse):
-    """An account row plus current balance, lifetime invested, and lifetime redemptions."""
+class ProductCandidateResponse(CandidateResponse):
+    """One ambiguous product match. Echo `id` as `entity_id` — never invent one."""
 
-    balance: FigureResponse | None = Field(
-        default=None,
+    key: str = Field(
         description=(
-            "Latest `values` point (current balance). Omitted when the series has no points — "
-            "never replaced with `0.0`."
-        ),
+            "Stable identity for this candidate. Echo it only as part of picking this option "
+            "— it is not a Backstop product id."
+        )
     )
-    invested: FigureResponse | None = Field(
-        default=None,
+    label: str = Field(
         description=(
-            "Latest `totalInvested` point (lifetime cumulative). Omitted when the series has "
-            "no points — never replaced with `0.0`."
-        ),
+            "What to show the user when asking which product they meant, usually "
+            "'Name (SHORT)' — e.g. 'Capstone Global Unconstrained Portfolio (CGUP)'."
+        )
     )
-    redemptions: FigureResponse | None = Field(
-        default=None,
+    id: str = Field(
         description=(
-            "Latest `totalRedemptions` point (lifetime cumulative). Omitted when the series "
-            "has no points — never replaced with `0.0`."
-        ),
+            "Backstop product id. Echo it as `entity_id` with `entity_type='products'` — "
+            "never invent one."
+        )
     )
-    errors: tuple[SeriesErrorResponse, ...] | None = Field(
+    name: str | None = Field(
         default=None,
+        description="Product name as Backstop stores it. Omitted when the index had none.",
+    )
+    short_name: str | None = Field(
+        default=None,
+        description="`productShortName` (e.g. 'CGUP'). Omitted when the product has none.",
+    )
+
+    @classmethod
+    def from_candidate(cls, candidate: Candidate[ResolvedProductDto]) -> Self:
+        product = candidate.value
+        return cls(
+            key=candidate.key,
+            label=candidate.label,
+            id=product.id,
+            name=product.name,
+            short_name=product.short_name,
+        )
+
+
+class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
+    """Returned when more than one product matched and none was chosen.
+
+    Show each candidate's `label` to the user, then retry with that `id` as `entity_id`.
+    """
+
+    scope: str = Field(
+        description="Collection the query was resolved against. Always 'products' for this tool."
+    )
+    candidates: list[ProductCandidateResponse] = Field(
+        default_factory=list,
         description=(
-            "Series that failed for this account. Other figures on the row may still be present. "
-            "Omitted when every requested series succeeded or was empty."
+            "The matching products. Show `label` to the user, then retry with that "
+            "candidate's `id` as `entity_id` — never invent one."
         ),
     )
 
     @classmethod
-    def from_position(cls, position: AccountPositionDto) -> Self:
-        row = AccountRowResponse.from_record(position.account)
-        # Dump every AccountRowResponse field so a new row field cannot be dropped here.
-        return cls.model_validate(
-            {
-                **row.model_dump(),
-                "balance": FigureResponse.from_figure(position.balance),
-                "invested": FigureResponse.from_figure(position.invested),
-                "redemptions": FigureResponse.from_figure(position.redemptions),
-                "errors": _series_errors(position.errors),
-            }
+    def from_unresolved(cls, result: Unresolved[ResolvedProductDto]) -> Self | NotFoundResponse:
+        return unresolved_response(
+            result,
+            ambiguous_model=cls,
+            to_candidate=ProductCandidateResponse.from_candidate,
         )
-
-
-def _series_errors(errors: tuple[SeriesErrorDto, ...]) -> tuple[SeriesErrorResponse, ...] | None:
-    if not errors:
-        return None
-    return tuple(
-        SeriesErrorResponse(series=error.series, message=error.message) for error in errors
-    )
 
 
 def closed_hint(*, closed_omitted: int, returned: int, subject: str) -> str | None:

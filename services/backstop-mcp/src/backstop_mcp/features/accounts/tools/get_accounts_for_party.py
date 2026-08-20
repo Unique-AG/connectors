@@ -114,7 +114,8 @@ async def get_accounts_for_party(
     **Read `data_caveat` before quoting a figure.** Two endpoints can answer this, and they differ
     in what they know: the fast one publishes a balance with no as-of date and no
     ACTUAL/ESTIMATE label, the fallback publishes fewer fields but dates its figures. `source`
-    says which one answered.
+    says which one answered. A dated, labelled NAV is `get_time_series` on that account's
+    `values`, not this listing.
 
     A missing figure is omitted, never zeroed. `figure_errors` on a row distinguishes "the request
     failed" from "Backstop publishes no number".

@@ -25,7 +25,7 @@ _TABLE_CAVEAT = (
     "Figures came from Backstop's account-table endpoint, which is one request for the whole "
     "table. `balance` there is the account's latest value with no as-of date and no "
     "ACTUAL/ESTIMATE label — it can be a mid-month estimate and this payload cannot say. When "
-    "the date or the status matters, read the account's `values` series instead."
+    "the date or the status matters, call `get_time_series` on that account's `values`."
 )
 
 
