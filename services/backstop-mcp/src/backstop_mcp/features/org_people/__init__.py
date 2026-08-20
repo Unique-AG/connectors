@@ -10,7 +10,9 @@ and `former_omitted` needs that walk. `include_former` only controls whether the
 returned.
 """
 
-from backstop_mcp.features.org_people.fetch import fetch_people_for_organization
+from backstop_mcp.features.org_people.fetch_people_for_organization import (
+    fetch_people_for_organization,
+)
 from backstop_mcp.features.org_people.internal_dto import (
     OrgPeopleListingDto,
     PersonAtOrganizationDto,

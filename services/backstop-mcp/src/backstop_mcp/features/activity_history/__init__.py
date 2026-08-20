@@ -4,10 +4,10 @@
 artifacts (synthetic empty-header table rows, blank-line runs), and truncate at a word boundary
 to a caller-supplied budget.
 
-`fetch_activity_page`/`fetch_email_page`/`fetch_activities_page_by_type`: the per-stream single-page
+`fetch_activity_page`/`fetch_email_page`/`fetch_activities_page`: the per-stream single-page
 fetch primitive behind activity history — one HTTP call per (activity type, entity, page),
 returning typed items (`ActivityItemDto`/`EmailItemDto`) plus whether that type is now exhausted.
-`fetch_activities_page_by_type` dispatches email vs activity. See `fetch_activities.py`'s module
+`fetch_activities_page` dispatches email vs activity. See `fetch_activities_page.py`'s module
 docstring for the Backstop quirks this layer absorbs.
 
 `group_page`: computes one stream page's `date_range` (min/max `occurred_at` among this page's
@@ -33,11 +33,11 @@ and the pure conversion into it. See `responses.py`.
 The MCP tool surface itself lives in a later `activity_history` module.
 """
 
-from backstop_mcp.features.activity_history.fetch_activities import (
+from backstop_mcp.features.activity_history.fetch_activities_page import (
     ActivityType,
     BackstopActivityType,
     Segment,
-    fetch_activities_page_by_type,
+    fetch_activities_page,
     fetch_activity_page,
     fetch_email_page,
 )
@@ -101,7 +101,7 @@ __all__ = [
     "TimelineRecord",
     "fetch_activity_detail",
     "fetch_activity_page",
-    "fetch_activities_page_by_type",
+    "fetch_activities_page",
     "fetch_attendees",
     "fetch_email_page",
     "fetch_meeting_specifics",

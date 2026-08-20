@@ -15,7 +15,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.opportunities.fetch import (
+from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityStatus,
     date_entered_order_key,
     fetch_opportunities,

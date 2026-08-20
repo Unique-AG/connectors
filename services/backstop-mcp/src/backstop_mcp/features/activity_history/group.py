@@ -9,7 +9,7 @@ that stream's next page, or `None` once the stream is exhausted.
 from collections.abc import Sequence
 from datetime import UTC, date
 
-from backstop_mcp.features.activity_history.fetch_activities import (
+from backstop_mcp.features.activity_history.fetch_activities_page import (
     ActivityType,
 )
 from backstop_mcp.features.activity_history.internal_dto import (

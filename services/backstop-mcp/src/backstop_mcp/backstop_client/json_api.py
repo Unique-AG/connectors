@@ -52,7 +52,7 @@ class BackstopApiResource[AttrT](BaseModel):
     # `min_length=1` (checked post-strip) rejects a present-but-blank id as a schema
     # validation failure — same failure mode as a missing id, since neither is a usable
     # resource identifier. `type` is only stripped: a blank type is a caller-side display
-    # concern (see party_resolver.search), not a structural defect worth failing on here.
+    # concern (see party_resolver.quick_search), not a structural defect worth failing on here.
     id: _NonEmptyStr
     type: _StrippedStr
     attributes: AttrT

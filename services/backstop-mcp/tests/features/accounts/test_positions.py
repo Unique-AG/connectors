@@ -5,6 +5,13 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.features.accounts.fetch_product_positions import (
+    MAX_POSITION_ACCOUNTS,
+    fetch_positions,
+    fetch_product_aum,
+    fetch_product_positions,
+    reconcile,
+)
 from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountPositionDto,
@@ -12,13 +19,6 @@ from backstop_mcp.features.accounts.internal_dto import (
     ResolvedProductDto,
     SeriesFigureDto,
     SeriesPointDto,
-)
-from backstop_mcp.features.accounts.positions import (
-    MAX_POSITION_ACCOUNTS,
-    fetch_positions,
-    fetch_product_aum,
-    fetch_product_positions,
-    reconcile,
 )
 from tests.helpers import BASE_URL
 

@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.features.accounts.fetch_series import fetch_series
 from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountPositionDto,
@@ -27,7 +28,6 @@ from backstop_mcp.features.accounts.internal_dto import (
     SeriesFigureDto,
     SeriesName,
 )
-from backstop_mcp.features.accounts.latest import fetch_latest_figure
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ async def fetch_product_positions(
 
 async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFigureDto | None:
     try:
-        return await fetch_latest_figure(client, f"/products/{product_id}/aums")
+        return await fetch_series(client, f"/products/{product_id}/aums")
     except BackstopAuthError:
         raise
     except Exception as exc:
@@ -175,4 +175,4 @@ async def _series_point(
     account_id: str,
     series: SeriesName,
 ) -> SeriesFigureDto | None:
-    return await fetch_latest_figure(client, f"/accounts/{account_id}/{series}")
+    return await fetch_series(client, f"/accounts/{account_id}/{series}")

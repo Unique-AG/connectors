@@ -3,7 +3,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
-from backstop_mcp.features.party_resolver.search import (
+from backstop_mcp.features.party_resolver.search_by_email import (
     looks_like_email,
     normalized_email,
     search_by_email,
