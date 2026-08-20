@@ -117,6 +117,14 @@ types.
 `activity_history.get_activity_history_settings` (which performs the `Config → Settings`
 translation `create_app` does today).
 
+**Teardown — `backstop_mcp/teardown.py`** (amended during implementation; the design had
+`close_singletons()` in `dependencies.py`). Clearing the feature-owned caches means naming those
+features, and `features/<f>/dependencies.py` imports `backstop_mcp.dependencies` — so putting the
+teardown there is an import cycle, function-local imports or not, and `basedpyright` reports it
+as one. A separate module imports both sides at the top level and nothing imports it back. Its
+`PROVIDERS` tuple is the whole of what a teardown clears, and `tests/test_teardown.py` fails when
+a cached provider is missing from it — the same two-edit gap rule 7 closes for tools.
+
 **Nothing in `backstop_client/` changes.** No edits to `client.py`, `factory.py`,
 `credential.py`. `for_current_caller()` already resolves the in-flight caller's credential
 through the injected `CallerAuthContext` and wires the 401→revoke hook; it is kept verbatim.

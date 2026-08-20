@@ -14,6 +14,11 @@
   become `@lru_cache(maxsize=1)` providers (the `q-bridge-mcp` pattern from #747, since FastMCP's
   `Shared` resolves per-request without `pydocket`), and tools receive them as `Depends(...)`
   parameters, which stay out of the published tool schema.
+- Release those providers from `teardown.close_singletons()`, in its own module so it can name
+  the feature-owned providers without `dependencies.py` importing `features/` back. Its
+  `PROVIDERS` tuple is the whole of what a teardown clears, and `tests/test_teardown.py` fails
+  when a cached provider is missing from it — the same two-edit gap the registry rule closes for
+  tools.
 - No changes to `backstop_client/`: `BackstopClientFactory.for_current_caller()` is kept
   verbatim, and the `attach_auth` cycle is broken by deferring the token-revocation hook rather
   than by restructuring the client.
