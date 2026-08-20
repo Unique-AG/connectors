@@ -263,9 +263,10 @@ class AccountListingDto(BaseModel):
     closed_omitted: int = 0
 
 
-# Which path produced a holdings listing. The undocumented table endpoint or the documented
-# `/accounts` walk — the two answer the same question with different completeness.
-type HoldingsSource = Literal["table", "documented"]
+# Which endpoint produced a holdings listing: the undocumented `bsg-account-table-data` or the
+# documented `/accounts` walk plus series. They answer the same question with different
+# completeness, and the name says which endpoint rather than passing judgement on it.
+type HoldingsSource = Literal["table-api", "accounts-api"]
 
 
 class MoneyDto(BaseModel):
@@ -381,7 +382,7 @@ class HoldingListingDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     rows: tuple[HoldingRowDto, ...]
-    source: HoldingsSource = "table"
+    source: HoldingsSource = "table-api"
     omitted_fields: tuple[str, ...] = ()
     closed_omitted: int = 0
     rows_dropped: int = 0
