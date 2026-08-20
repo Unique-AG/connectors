@@ -1624,7 +1624,7 @@
     },
     "grafana": {
       "type": "object",
-      "description": "Grafana dashboard ConfigMap provisioning. Place dashboard JSON files under files/grafana/dashboards/ in the consuming chart.",
+      "description": "Grafana dashboard configuration",
       "properties": {
         "dashboards": {
           "type": "object",
@@ -1649,8 +1649,23 @@
               ]
             }
           }
+        },
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "global": {
       "type": "object",
