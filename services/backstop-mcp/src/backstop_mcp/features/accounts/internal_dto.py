@@ -29,6 +29,7 @@ __all__ = [
     "AccountPositionDto",
     "AccountRecordDto",
     "AumReconciliationDto",
+    "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
     "HoldingsSource",
@@ -313,12 +314,31 @@ class ShareDto(BaseModel):
         return cls(fraction=attrs.value, formatted=attrs.formatted_value)
 
 
+class HoldingFigureErrorDto(BaseModel):
+    """A figure that could not be fetched, and why.
+
+    Without this, "we asked and the request failed" and "Backstop publishes no number" are the
+    same `None`. `AccountPositionDto.errors` already established the pattern for the same reason;
+    this is it applied per figure rather than per series name.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    figure: str
+    message: str
+
+
 class HoldingRowDto(BaseModel):
     """One account a party holds, with the snapshot figures from the UI table endpoint.
 
-    `balance` has **no as-of date and no `valueStatus`** — it matched the newest
-    `/accounts/{id}/values` point exactly on a measured account, including when that point was an
-    `ESTIMATE`, and the endpoint does not say which. A dated, labelled figure is `get_time_series`.
+    `balance_as_of` and `balance_status` are the difference between the two source endpoints, and
+    the reason they are published rather than smoothed over. On `table-api` both are `None`: the
+    balance matched the **newest** `/accounts/{id}/values` point exactly on a measured account,
+    including when that point was an `ESTIMATE`, and the endpoint does not say which. On
+    `accounts-api` the balance is the newest point that carries a **number**, which can be months
+    older than the newest point — so the same field means "current" on one path and "last known"
+    on the other, and only the date says which. `figure_errors` separates "the request failed"
+    from "Backstop publishes no number", which are otherwise the same `None`.
 
     `account_id` is the id every follow-up call needs, so a row without one is not projected at
     all: it cannot be used for anything a caller would do next.
@@ -337,10 +357,13 @@ class HoldingRowDto(BaseModel):
     closed_date: date | None = None
     closed: bool = False
     balance: MoneyDto | None = None
+    balance_as_of: date | None = None
+    balance_status: str | None = None
     commitment: MoneyDto | None = None
     unfunded_commitment: MoneyDto | None = None
     percentage_of_product: ShareDto | None = None
     percentage_of_master: ShareDto | None = None
+    figure_errors: tuple[HoldingFigureErrorDto, ...] = ()
 
     @classmethod
     def from_attributes(cls, attrs: AccountTableRowAttributes) -> Self | None:

@@ -144,20 +144,55 @@ class SeriesPointAttributes(BaseModel):
     value_status: _CleanStr = Field(default=None, alias="valueStatus")
 
 
-def _drop_unresolvable_ref(value: object) -> object:
-    """A reference with no `resourceId` cannot be resolved, so read it as absent.
+def _scalar_str(value: object) -> str | None:
+    """A scalar as a non-empty string, or `None`.
 
-    `ResourceRef` requires `resource_id`, which is right everywhere it is used against a
-    documented endpoint. Here it would fail the whole document over one unusable reference on
-    one row of an undocumented one, so the field degrades to `None` instead.
+    An id or label that arrives as `90007828` rather than `"90007828"` is the same id, so it is
+    coerced instead of failing the row. `bool` is excluded deliberately — `True` is not a label.
+    """
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return str(value)
+    return None
+
+
+def _readable_ref(value: object) -> object:
+    """A reference we can resolve, or `None`.
+
+    `ResourceRef` requires a non-blank `resource_id`, which is right against a documented
+    endpoint. Here anything unusable — a scalar where an object belongs, a missing id, a blank or
+    whitespace id, a numeric id — would fail the whole document over one field on one row of an
+    undocumented one. Each of those degrades to `None` instead, and a numeric id is coerced.
     """
     if not isinstance(value, Mapping):
-        return value
-    reference = cast("Mapping[str, object]", value)
-    return None if not reference.get("resourceId") else reference
+        return None
+    reference = dict(cast("Mapping[str, object]", value))
+    resource_id = _scalar_str(reference.get("resourceId"))
+    if resource_id is None:
+        return None
+    return reference | {"resourceId": resource_id}
 
 
-_OptionalRef = Annotated[ResourceRef | None, BeforeValidator(_drop_unresolvable_ref)]
+def _object_or_none(value: object) -> object:
+    """A nested object that arrived as a scalar is unreadable, so read it as absent.
+
+    A figure published as `"$1.00"` or `1.0` instead of `{amount, currency, ...}` must cost that
+    figure, not the whole holdings answer.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        return None
+    return cast("Mapping[str, object]", value)
+
+
+# Lenient scalars and objects, used only by the undocumented table-data models below. The
+# documented endpoints keep the strict types: there, an off-type value is a bug worth seeing.
+_TableDataStr = Annotated[str | None, BeforeValidator(_scalar_str)]
+_OptionalRef = Annotated[ResourceRef | None, BeforeValidator(_readable_ref)]
 
 
 class TableDataMoneyAttributes(BaseModel):
@@ -171,9 +206,9 @@ class TableDataMoneyAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     amount: LenientFloat = None
-    currency: _CleanStr = None
-    currency_symbol: _CleanStr = Field(default=None, alias="currencySymbol")
-    formatted_value: _CleanStr = Field(default=None, alias="formattedValue")
+    currency: _TableDataStr = None
+    currency_symbol: _TableDataStr = Field(default=None, alias="currencySymbol")
+    formatted_value: _TableDataStr = Field(default=None, alias="formattedValue")
 
 
 class TableDataShareAttributes(BaseModel):
@@ -186,7 +221,7 @@ class TableDataShareAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     value: LenientFloat = None
-    formatted_value: _CleanStr = Field(default=None, alias="formattedValue")
+    formatted_value: _TableDataStr = Field(default=None, alias="formattedValue")
 
 
 class TableDataProductAttributes(BaseModel):
@@ -198,9 +233,14 @@ class TableDataProductAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    resource_id: _CleanStr = Field(default=None, alias="resourceId")
-    resource_type: _CleanStr = Field(default=None, alias="resourceType")
-    short_name: _CleanStr = Field(default=None, alias="shortName")
+    resource_id: _TableDataStr = Field(default=None, alias="resourceId")
+    resource_type: _TableDataStr = Field(default=None, alias="resourceType")
+    short_name: _TableDataStr = Field(default=None, alias="shortName")
+
+
+_OptionalMoney = Annotated[TableDataMoneyAttributes | None, BeforeValidator(_object_or_none)]
+_OptionalShare = Annotated[TableDataShareAttributes | None, BeforeValidator(_object_or_none)]
+_OptionalProduct = Annotated[TableDataProductAttributes | None, BeforeValidator(_object_or_none)]
 
 
 class AccountTableRowAttributes(BaseModel):
@@ -217,23 +257,17 @@ class AccountTableRowAttributes(BaseModel):
     account: _OptionalRef = None
     organization: _OptionalRef = None
     account_term: _OptionalRef = Field(default=None, alias="accountTerm")
-    product: TableDataProductAttributes | None = None
-    association_type: _CleanStr = Field(default=None, alias="associationType")
-    other_id: _CleanStr = Field(default=None, alias="otherId")
+    product: _OptionalProduct = None
+    association_type: _TableDataStr = Field(default=None, alias="associationType")
+    other_id: _TableDataStr = Field(default=None, alias="otherId")
     funded_date: LenientDate = Field(default=None, alias="fundedDate")
     closed_date: LenientDate = Field(default=None, alias="closedDate")
     closed: LenientBool = None
-    balance: TableDataMoneyAttributes | None = None
-    commitment: TableDataMoneyAttributes | None = None
-    unfunded_commitment: TableDataMoneyAttributes | None = Field(
-        default=None, alias="unfundedCommitment"
-    )
-    percentage_of_product: TableDataShareAttributes | None = Field(
-        default=None, alias="percentageOfProduct"
-    )
-    percentage_of_master: TableDataShareAttributes | None = Field(
-        default=None, alias="percentageOfMaster"
-    )
+    balance: _OptionalMoney = None
+    commitment: _OptionalMoney = None
+    unfunded_commitment: _OptionalMoney = Field(default=None, alias="unfundedCommitment")
+    percentage_of_product: _OptionalShare = Field(default=None, alias="percentageOfProduct")
+    percentage_of_master: _OptionalShare = Field(default=None, alias="percentageOfMaster")
 
 
 class AccountTableDataAttributes(BaseModel):
@@ -252,11 +286,16 @@ class AccountTableDataAttributes(BaseModel):
 
 
 class AccountTableDataEntry(BaseModel):
-    """One element of the top-level `data` list. Its `id` is `null`, so this is not a resource."""
+    """One element of the top-level `data` list. Its `id` is `null`, so this is not a resource.
+
+    `attributes` is **required**, unlike the row fields. A row losing a field costs that field; the
+    envelope losing a key means we are not reading the table at all, and defaulting it would report
+    "this party owns nothing" instead. Every recorded response carries it, including the empty ones.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    attributes: AccountTableDataAttributes = AccountTableDataAttributes()
+    attributes: AccountTableDataAttributes
 
 
 class AccountTableDataDocument(BaseModel):
@@ -265,16 +304,22 @@ class AccountTableDataDocument(BaseModel):
     Deliberately not `BackstopApiResourceDocument`: `data` is a **list** whose single element has
     a `null` id, `links` is `null`, `included` is always `[]`, and `meta.totalResourceCount` is
     `0` regardless of how many rows came back. None of the JSON:API envelope means anything here.
+
+    `data` is **required and non-empty** for the same reason `attributes` is. All four recorded
+    responses carry exactly one element — including the two empty fail-open bodies — so an absent
+    or renamed `data` is the endpoint having changed, not a party with no accounts. Failing here
+    routes the caller to the documented walk; defaulting to `()` would have it answer "owns
+    nothing" with total confidence.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    data: tuple[AccountTableDataEntry, ...] = ()
+    data: tuple[AccountTableDataEntry, ...] = Field(min_length=1)
 
     @property
     def table(self) -> AccountTableDataAttributes:
-        """The single table, or an empty one when Backstop returned no `data` element at all."""
-        return self.data[0].attributes if self.data else AccountTableDataAttributes()
+        """The single table. `data` is validated non-empty, so this cannot be a silent default."""
+        return self.data[0].attributes
 
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.

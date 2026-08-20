@@ -11,9 +11,26 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.features.accounts import HoldingListingDto, fetch_holdings_table
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopClient,
+    BackstopResponseSchemaError,
+)
+from backstop_mcp.features.accounts import (
+    HoldingListingDto,
+    HoldingsTableShapeError,
+    fetch_holdings_table,
+)
 from tests.helpers import BASE_URL
+
+# Envelope shapes that must fail rather than read as "this party owns nothing".
+_BROKEN_ENVELOPES: tuple[dict[str, object], ...] = (
+    {"data": [], "meta": {}},
+    {"accounts": []},
+    {"data": [{"attrs": {"accounts": []}}]},
+    {"data": [{"attributes": None}]},
+)
+_BROKEN_ENVELOPE_IDS = ("empty-data", "renamed-data", "renamed-attributes", "null-attributes")
 
 _ORG = "341764767"
 _URL = f"{BASE_URL}/bsg-account-table-data"
@@ -38,15 +55,19 @@ def _money(amount: float | None, formatted: str) -> dict[str, object]:
     }
 
 
+_UNSET: object = object()
+
+
 def _row(
     account_id: str,
     *,
     product_id: str = "1653647",
     short_name: str = "CIO2",
     closed: bool = False,
-    balance: dict[str, object] | None = None,
+    balance: object = _UNSET,
     **overrides: object,
 ) -> dict[str, object]:
+    """A recorded row. `balance=None` means "absent"; omitting it means "the usual $0.00"."""
     row: dict[str, object] = {
         "investor": _ref(_ORG, "organizations"),
         "account": _ref(account_id, "hedge-fund-accounts"),
@@ -58,7 +79,7 @@ def _row(
         "fundedDate": "2017-01-01T00:00:00.000-0500",
         "closedDate": "2022-02-01T00:00:00.000-0500" if closed else None,
         "closed": closed,
-        "balance": balance if balance is not None else _money(0.0, "$0.00"),
+        "balance": _money(0.0, "$0.00") if balance is _UNSET else balance,
         "commitment": _money(0.0, "-"),
         "unfundedCommitment": _money(0.0, "-"),
         "percentageOfProduct": {"value": 0.0, "formattedValue": "0.00%"},
@@ -190,14 +211,23 @@ class TestProjection:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_publishes_backstops_own_counts(self, client: BackstopClient) -> None:
+    async def test_relays_backstops_own_counts_rather_than_recomputing_them(
+        self, client: BackstopClient
+    ) -> None:
+        """`openCount` is relayed verbatim. Deriving it from the rows would give 1, not 7."""
         respx.get(_URL).mock(
-            return_value=_table(_row("1"), _row("2", closed=True), _row("3", closed=True))
+            return_value=_table(
+                _row("1"),
+                _row("2", closed=True),
+                _row("3", closed=True),
+                openCount=7,
+            )
         )
 
         result = await _fetch(client, include_closed=True)
 
-        assert (result.open_count, result.all_count, result.closed_count) == (1, 3, 2)
+        assert result.open_count == 7
+        assert (result.all_count, result.closed_count) == (3, 2)
 
 
 class TestClosedFiltering:
@@ -274,22 +304,90 @@ class TestDegradation:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_body_with_no_data_element_is_an_empty_table(
+    @pytest.mark.parametrize("body", _BROKEN_ENVELOPES, ids=_BROKEN_ENVELOPE_IDS)
+    async def test_a_broken_envelope_raises_rather_than_reporting_owns_nothing(
+        self, client: BackstopClient, body: dict[str, object]
+    ) -> None:
+        """A row losing a field costs the field. The envelope losing a key costs the answer,
+        so it must fail into the documented fallback instead of returning zero rows."""
+        respx.get(_URL).mock(return_value=httpx.Response(200, json=body))
+
+        with pytest.raises(BackstopResponseSchemaError):
+            await _fetch(client)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_counts_contradicting_the_rows_is_rejected(self, client: BackstopClient) -> None:
+        """A renamed `accounts` key still ships the counts, which is what catches it."""
+        respx.get(_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": None,
+                            "type": "bsg-account-table-data",
+                            "attributes": {"rowz": [], "allCount": 12, "closedCount": 11},
+                        }
+                    ]
+                },
+            )
+        )
+
+        with pytest.raises(HoldingsTableShapeError):
+            await _fetch(client)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_lost_closed_flag_is_rejected_rather_than_reported_as_all_open(
         self, client: BackstopClient
     ) -> None:
-        respx.get(_URL).mock(return_value=httpx.Response(200, json={"data": [], "meta": {}}))
+        """Without this, 9 closed accounts would be published as 12 open holdings."""
+        rows = [_row(str(n)) | {"closed": None} for n in range(3)]
+        respx.get(_URL).mock(return_value=_table(*rows, closedCount=2))
 
-        result = await _fetch(client)
+        with pytest.raises(HoldingsTableShapeError):
+            await _fetch(client)
 
-        assert result.rows == ()
-        assert result.all_count is None
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        "balance", ["$1.00", 1.0, [], True], ids=["string", "number", "list", "bool"]
+    )
+    async def test_an_off_type_figure_costs_that_figure_not_the_table(
+        self, client: BackstopClient, balance: object
+    ) -> None:
+        respx.get(_URL).mock(return_value=_table(_row("28435967", balance=balance)))
+
+        row = (await _fetch(client)).rows[0]
+
+        assert row.balance is None
+        assert row.account_id == "28435967"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_numeric_id_is_read_as_the_same_id(self, client: BackstopClient) -> None:
+        respx.get(_URL).mock(
+            return_value=_table(_row("1", otherId=90007828, account={"resourceId": 28435967}))
+        )
+
+        row = (await _fetch(client)).rows[0]
+
+        assert row.account_id == "28435967"
+        assert row.other_id == "90007828"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_whitespace_reference_id_degrades(self, client: BackstopClient) -> None:
+        respx.get(_URL).mock(return_value=_table(_row("28435967", product={"resourceId": "   "})))
+
+        assert (await _fetch(client)).rows[0].product_id is None
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_missing_figures_are_omitted_never_zeroed(self, client: BackstopClient) -> None:
-        # Via a dict update, not the `balance=` kwarg, whose default fills a `None` back in.
         respx.get(_URL).mock(
-            return_value=_table(_row("28435967") | {"balance": None, "commitment": None})
+            return_value=_table(_row("28435967", balance=None) | {"commitment": None})
         )
 
         row = (await _fetch(client)).rows[0]

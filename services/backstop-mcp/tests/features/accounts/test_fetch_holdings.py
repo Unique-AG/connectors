@@ -11,7 +11,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopAuthError,
+    BackstopClient,
+    BackstopRateLimitError,
+)
 from backstop_mcp.features.accounts import FALLBACK_OMITTED_FIELDS, fetch_holdings
 from tests.helpers import BASE_URL
 
@@ -196,6 +200,37 @@ class TestFallbackTriggers:
 
         assert not walk.called
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_rate_limit_does_not_fall_back(self, client: BackstopClient) -> None:
+        """Answering "slow down" with ~9 pages plus two requests per account makes it worse."""
+        respx.get(_TABLE_URL).mock(
+            return_value=httpx.Response(429, json={"errors": []}, headers={"Retry-After": "1"})
+        )
+        walk = respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
+
+        with pytest.raises(BackstopRateLimitError):
+            await fetch_holdings(client, owner_id=_ORG)
+
+        assert not walk.called
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_counts_contradicting_the_rows_falls_back(self, client: BackstopClient) -> None:
+        respx.get(_TABLE_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": [{"attributes": {"rowz": [], "allCount": 12, "closedCount": 11}}]},
+            )
+        )
+        walk = respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
+        _mock_fallback_series()
+
+        result = await fetch_holdings(client, owner_id=_ORG)
+
+        assert walk.called
+        assert result.source == "accounts-api"
+
 
 class TestFallbackContent:
     @pytest.mark.asyncio
@@ -256,6 +291,9 @@ class TestFallbackContent:
         assert row.balance is not None
         assert row.balance.amount == 100.0
         assert row.percentage_of_product is None
+        # "the request failed" must not read the same as "Backstop publishes no number".
+        assert [error.figure for error in row.figure_errors] == ["percentage_of_product"]
+        assert "500" in row.figure_errors[0].message
 
     @pytest.mark.asyncio
     @respx.mock
@@ -270,6 +308,7 @@ class TestFallbackContent:
 
         assert row.balance is None
         assert row.percentage_of_product is None
+        assert row.figure_errors == ()  # nothing failed; there is simply no number
 
     @pytest.mark.asyncio
     @respx.mock
@@ -329,3 +368,50 @@ class TestFallbackContent:
         assert [row.account_id for row in result.rows] == [_ACCOUNT]
         assert result.rows[0].closed is True
         assert (result.open_count, result.all_count, result.closed_count) == (0, 1, 1)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_publishes_the_as_of_date_because_the_valued_point_can_be_stale(
+        self, client: BackstopClient
+    ) -> None:
+        """The newest point may carry no number yet, so the balance can be months old.
+
+        On the table endpoint the balance is the newest point and there is no date at all. Here
+        it is the newest *valued* point, so only the date distinguishes "current" from "last
+        known" — publishing it is what stops the two paths silently meaning different things.
+        """
+        respx.get(_TABLE_URL).mock(return_value=httpx.Response(500, json={"errors": []}))
+        respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
+        respx.get(f"{BASE_URL}/accounts/{_ACCOUNT}/values").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "newest",
+                            "type": "time-series",
+                            "attributes": {"date": "2026-08-31", "value": None},
+                        },
+                        {
+                            "id": "valued",
+                            "type": "time-series",
+                            "attributes": {
+                                "date": "2026-02-28",
+                                "value": 7.0,
+                                "valueStatus": "ACTUAL",
+                            },
+                        },
+                    ]
+                },
+            )
+        )
+        respx.get(f"{BASE_URL}/accounts/{_ACCOUNT}/percentageOfFundHistory").mock(
+            return_value=_series(0.25)
+        )
+
+        row = (await fetch_holdings(client, owner_id=_ORG)).rows[0]
+
+        assert row.balance is not None
+        assert row.balance.amount == 7.0
+        assert row.balance_as_of == date(2026, 2, 28)
+        assert row.balance_status == "ACTUAL"

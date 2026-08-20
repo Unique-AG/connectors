@@ -9,8 +9,8 @@ Deliberately *not*:
 
 - **An empty table.** `accounts: []` is a successful "owns nothing" and walking 815 accounts to
   confirm it would be pure cost. The catch is that table-data **fails open** — a nonexistent id
-  and a wrong-typed id return the same empty `200` — which is why `owner_id` must be a resolved
-  party id and never a caller-supplied string.
+  and a wrong-typed id return the same empty `200`. `owner_id` should therefore be a resolved
+  party id, but nothing here can verify that; see the fail-open note in `fetch_holdings_table`.
 - **`BackstopAuthError`.** The credential is dead; the documented walk would fail the same way,
   slower.
 
@@ -30,15 +30,21 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
-from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopAuthError,
+    BackstopClient,
+    BackstopRateLimitError,
+)
 from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
 from backstop_mcp.features.accounts.fetch_holdings_table import fetch_holdings_table
 from backstop_mcp.features.accounts.fetch_series import fetch_series
 from backstop_mcp.features.accounts.internal_dto import (
     AccountRecordDto,
+    HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
     MoneyDto,
+    SeriesFigureDto,
     ShareDto,
 )
 
@@ -46,6 +52,10 @@ logger = logging.getLogger(__name__)
 
 _BALANCE_SERIES = "values"
 _SHARE_SERIES = "percentageOfFundHistory"
+
+# The row field each fallback series fills, used for both the request and the error label so a
+# failure names what the caller is missing rather than the upstream series.
+_FALLBACK_FIGURES: tuple[str, ...] = ("balance", "percentage_of_product")
 
 # Carried on every fallback answer so a missing figure reads as "not available on this path"
 # rather than as "zero". These are field names, not prose: the response layer turns them into the
@@ -71,16 +81,21 @@ async def fetch_holdings(
 ) -> HoldingListingDto:
     """A party's holdings with figures, from whichever path is available.
 
-    `owner_id` must be a resolved party id — see the fail-open note in the module docstring.
+    `owner_id` should be a resolved party id; an unresolved one returns "owns nothing" rather
+    than an error, and neither path can tell the difference. See the module docstring.
     """
     try:
         return await fetch_holdings_table(client, entity_id=owner_id, include_closed=include_closed)
-    except BackstopAuthError:
+    except (BackstopAuthError, BackstopRateLimitError):
+        # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
+        # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
+        # account, so falling back would answer a "slow down" with an order of magnitude more
+        # load — and a rate limit is the likeliest transient failure of an unbounded payload.
         raise
     except Exception as exc:
-        # Broad on purpose: HTTP status, transport timeout and schema-validation failures all
-        # mean the same thing here — the unsupported endpoint did not answer, so use the
-        # documented one. Auth is re-raised above because retrying it cannot help.
+        # Broad on purpose: HTTP status, transport timeout, schema-validation failure and a
+        # counts-versus-rows contradiction all mean the same thing here — the unsupported
+        # endpoint did not answer usably, so use the documented one.
         logger.warning(
             "accounts.holdings.table_unavailable_using_documented_walk",
             extra={"owner_id": owner_id, "error": f"{type(exc).__name__}: {exc}"},
@@ -99,9 +114,17 @@ async def _fetch_documented_holdings(
     listing = await fetch_accounts_for_party(
         client, owner_id=owner_id, include_closed=include_closed
     )
-    rows = await asyncio.gather(
-        *(_row_with_figures(client, account) for account in listing.accounts)
+    # `return_exceptions` so one row raising does not leave its siblings unawaited; the first
+    # failure is then re-raised deliberately.
+    settled = await asyncio.gather(
+        *(_row_with_figures(client, account) for account in listing.accounts),
+        return_exceptions=True,
     )
+    rows: list[HoldingRowDto] = []
+    for result in settled:
+        if isinstance(result, BaseException):
+            raise result
+        rows.append(result)
     return HoldingListingDto(
         rows=tuple(rows),
         closed_omitted=listing.closed_omitted,
@@ -130,21 +153,21 @@ async def _row_with_figures(client: BackstopClient, account: AccountRecordDto) -
         _series_figure(client, account.id, _SHARE_SERIES),
         return_exceptions=True,
     )
-    figures: list[float | None] = []
-    for series, result in zip((_BALANCE_SERIES, _SHARE_SERIES), results, strict=True):
+    figures: list[SeriesFigureDto | None] = []
+    errors: list[HoldingFigureErrorDto] = []
+    for figure_name, result in zip(_FALLBACK_FIGURES, results, strict=True):
         if isinstance(result, BackstopAuthError):
             raise result
         if isinstance(result, BaseException):
             # One series failing costs that figure, not the row: an account with a balance and no
-            # share-of-fund is still the answer to "what do they hold".
+            # share-of-fund is still the answer to "what do they hold". The reason is carried so
+            # the omission does not read as "Backstop publishes no number".
+            message = f"{type(result).__name__}: {result}"
             logger.warning(
                 "accounts.holdings.fallback_series_failed",
-                extra={
-                    "account_id": account.id,
-                    "series": series,
-                    "error": f"{type(result).__name__}: {result}",
-                },
+                extra={"account_id": account.id, "figure": figure_name, "error": message},
             )
+            errors.append(HoldingFigureErrorDto(figure=figure_name, message=message))
             figures.append(None)
             continue
         figures.append(result)
@@ -158,18 +181,34 @@ async def _row_with_figures(client: BackstopClient, account: AccountRecordDto) -
         funded_date=account.account_start_date,
         closed_date=account.closed_date,
         closed=not account.is_open,
-        balance=None if balance is None else MoneyDto(amount=balance, currency=account.currency),
-        percentage_of_product=None if share is None else ShareDto(fraction=share),
+        balance=_money(balance, currency=account.currency),
+        balance_as_of=balance.valued.date if balance and balance.valued else None,
+        balance_status=balance.valued.value_status if balance and balance.valued else None,
+        percentage_of_product=_share(share),
+        figure_errors=tuple(errors),
     )
 
 
-async def _series_figure(client: BackstopClient, account_id: str, series: str) -> float | None:
-    """The latest *valued* point on one series, or `None` when nothing is published yet.
-
-    A published `0.0` comes back as `0.0`, not `None` — a real zero balance is an answer, and
-    collapsing it to "no figure" would read as "we could not find out".
-    """
-    figure = await fetch_series(client, f"/accounts/{account_id}/{series}")
-    if figure is None or figure.valued is None:
+def _money(figure: SeriesFigureDto | None, *, currency: str | None) -> MoneyDto | None:
+    """A published number, or `None`. A real `0.0` is kept; "no number yet" is not zeroed."""
+    if figure is None or figure.valued is None or figure.valued.value is None:
         return None
-    return figure.valued.value
+    return MoneyDto(amount=figure.valued.value, currency=currency)
+
+
+def _share(figure: SeriesFigureDto | None) -> ShareDto | None:
+    """`percentageOfFundHistory` is a fraction (`0.796` = 79.6%), verified against a live series."""
+    if figure is None or figure.valued is None or figure.valued.value is None:
+        return None
+    return ShareDto(fraction=figure.valued.value)
+
+
+async def _series_figure(
+    client: BackstopClient, account_id: str, series: str
+) -> SeriesFigureDto | None:
+    """The whole figure, not just its number, so the as-of date and status survive.
+
+    `fetch_series` already separates the newest row from the newest row carrying a value; both
+    matter here, because the valued one can be months older than the newest one.
+    """
+    return await fetch_series(client, f"/accounts/{account_id}/{series}")
