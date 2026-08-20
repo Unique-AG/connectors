@@ -1,18 +1,13 @@
 from datetime import date
 
 from backstop_mcp.features.accounts.api_responses import (
+    AccountApiResponse,
     AccountAttributes,
     InvestorQualificationAttributes,
 )
 from backstop_mcp.features.accounts.internal_dto import AccountOwnerDto, AccountRecordDto
-from backstop_mcp.features.accounts.project import (
-    AccountApiResponse,
-    account_is_open,
-    project_account,
-    project_owner,
-    split_open,
-)
 from backstop_mcp.features.accounts.responses import AccountRowResponse
+from backstop_mcp.features.accounts.split_open import split_open
 from tests.helpers import resource
 
 _AccountResource = AccountApiResponse
@@ -85,28 +80,30 @@ class TestAccountAttributesWire:
 
 class TestAccountIsOpen:
     def test_absent_closed_date_is_open(self) -> None:
-        assert account_is_open(AccountAttributes.model_validate({"name": "Open Account"})) is True
+        record = AccountRecordDto.from_resource(
+            _AccountResource.model_validate(_account("1", name="Open Account")),
+            included=[],
+        )
+        assert record.is_open is True
 
     def test_present_closed_date_is_closed(self) -> None:
-        assert (
-            account_is_open(
-                AccountAttributes.model_validate({"name": "Closed", "closedDate": "2020-01-15"})
-            )
-            is False
+        record = AccountRecordDto.from_resource(
+            _AccountResource.model_validate(_account("1", name="Closed", closedDate="2020-01-15")),
+            included=[],
         )
+        assert record.is_open is False
 
     def test_null_closed_date_is_closed(self) -> None:
-        assert (
-            account_is_open(
-                AccountAttributes.model_validate({"name": "Closed", "closedDate": None})
-            )
-            is False
+        record = AccountRecordDto.from_resource(
+            _AccountResource.model_validate(_account("1", name="Closed", closedDate=None)),
+            included=[],
         )
+        assert record.is_open is False
 
 
 class TestProjectOwner:
     def test_org_owner_uses_specific_resource_type(self) -> None:
-        owner = project_owner(
+        owner = AccountOwnerDto.from_included(
             _owner("341688185", name="PSP Investments", resource_type="organizations")
         )
 
@@ -117,7 +114,7 @@ class TestProjectOwner:
         )
 
     def test_specific_resource_supplies_the_id_that_goes_with_its_type(self) -> None:
-        owner = project_owner(
+        owner = AccountOwnerDto.from_included(
             _owner(
                 "contact-1",
                 name="PSP Investments",
@@ -133,7 +130,7 @@ class TestProjectOwner:
         )
 
     def test_a_specific_resource_without_a_type_leaves_the_envelope_identity(self) -> None:
-        owner = project_owner(
+        owner = AccountOwnerDto.from_included(
             resource(
                 "contact-1",
                 "contacts",
@@ -147,12 +144,15 @@ class TestProjectOwner:
         )
 
     def test_person_owner_keeps_json_api_type(self) -> None:
-        owner = project_owner(resource("99", "people", name="Ada Lovelace"))
+        owner = AccountOwnerDto.from_included(resource("99", "people", name="Ada Lovelace"))
 
         assert owner == AccountOwnerDto(id="99", name="Ada Lovelace", resource_type="people")
 
     def test_blank_id_is_dropped(self) -> None:
-        assert project_owner({"id": "  ", "type": "contacts", "attributes": {}}) is None
+        assert (
+            AccountOwnerDto.from_included({"id": "  ", "type": "contacts", "attributes": {}})
+            is None
+        )
 
 
 class TestProjectAccount:
@@ -184,7 +184,7 @@ class TestProjectAccount:
             usDomiciled=False,
         )
 
-        record = project_account(
+        record = AccountRecordDto.from_resource(
             _AccountResource.model_validate(resource_body),
             included=included,
         )
@@ -210,7 +210,7 @@ class TestProjectAccount:
         assert record.new_issue_eligible == "ELIGIBLE"
 
     def test_missing_includes_leave_fields_unset(self) -> None:
-        record = project_account(
+        record = AccountRecordDto.from_resource(
             _AccountResource.model_validate(_account("1", name="Solo")),
             included=[],
         )
@@ -232,7 +232,7 @@ class TestProjectAccount:
                 "relationships": None,
             }
         ]
-        record = project_account(
+        record = AccountRecordDto.from_resource(
             _AccountResource.model_validate(_account("1", product_id="1292283", name="Row")),
             included=included,
         )
