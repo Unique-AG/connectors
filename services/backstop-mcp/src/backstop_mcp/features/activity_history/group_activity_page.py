@@ -1,9 +1,9 @@
 """Per-stream grouping: one fetched page's date_range and next continuation.
 
-`group_page` is a pure helper over already-fetched items. It does not re-sort — Backstop
-already returns each stream newest-first (`-effectiveDate` / `-sentTimestamp`). `date_range`
-is this page's min/max `occurred_at`, not a cumulative span. `next` is the params to fetch
-that stream's next page, or `None` once the stream is exhausted.
+`group_activity_page` is a pure helper over already-fetched items. It does not re-sort —
+Backstop already returns each stream newest-first (`-effectiveDate` / `-sentTimestamp`).
+`date_range` is this page's min/max `occurred_at`, not a cumulative span. `next` is the params
+to fetch that stream's next page, or `None` once the stream is exhausted.
 """
 
 from collections.abc import Sequence
@@ -22,7 +22,7 @@ from backstop_mcp.features.activity_history.responses import (
     DateRangeResponse,
 )
 
-__all__ = ["group_page"]
+__all__ = ["group_activity_page"]
 
 
 def _occurred_date(item: ActivityItemDto | EmailItemDto) -> date | None:
@@ -42,7 +42,7 @@ def _date_range(items: Sequence[ActivityItemDto | EmailItemDto]) -> DateRangeRes
     return DateRangeResponse(start=min(dates), end=max(dates))
 
 
-def group_page(
+def group_activity_page(
     items: Sequence[ActivityItemDto | EmailItemDto],
     *,
     activity_type: ActivityType,
