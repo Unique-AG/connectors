@@ -1,9 +1,9 @@
 """Account-row vocabulary and product-resolution shapes shared by the holdings tools.
 
 `get_accounts_for_party` publishes `HoldingRowResponse`, not `AccountRowResponse`. The
-account-row tree (`AccountRowResponse` and its nested owner / investor-type / product
-refs) is the listing shape `get_product_investors` will publish — identity and owner,
-no figures. Keep it here rather than inventing a second row model for that tool.
+account-row tree (`AccountRowResponse` and its nested owner / investor-type refs) is the
+listing `get_product_investors` publishes — identity and owner, no figures. The product
+itself sits once on that tool's resolved response, not on every row.
 
 `OmitNoneModel` drops nulls: a missing figure is absent, never `0.0`. A `0.0` Backstop
 published is a real point and is kept.
@@ -119,7 +119,12 @@ class InvestorQualificationResponse(OmitNoneModel):
 class AccountRowResponse(OmitNoneModel):
     """One account: identity, owner, status, and the product when it was side-loaded."""
 
-    id: str = Field(description="Backstop account id. Distinct from the owner's party id.")
+    id: str = Field(
+        description=(
+            "Backstop account id. Distinct from the owner's party id. Echo it as `entity_id` "
+            "with `entity_type='accounts'` on `get_time_series` — never invent one."
+        )
+    )
     name: str | None = Field(default=None, description="Account name as Backstop stores it.")
     owner: OwnerResponse | None = Field(
         default=None,
@@ -130,12 +135,6 @@ class AccountRowResponse(OmitNoneModel):
         description=(
             "How Backstop classifies this investor (e.g. 'Fund of Funds'). Omitted when that "
             "include was missing."
-        ),
-    )
-    product: ProductRefResponse | None = Field(
-        default=None,
-        description=(
-            "The product this account is a position in. Omitted when it was not side-loaded."
         ),
     )
     currency: str | None = Field(
@@ -204,7 +203,6 @@ class AccountRowResponse(OmitNoneModel):
             name=account.name,
             owner=OwnerResponse.from_owner(account.owner),
             investor_type=InvestorTypeResponse.from_investor_type(account.investor_type),
-            product=ProductRefResponse.from_product(account.product) if account.product else None,
             currency=account.currency,
             account_start_date=account.account_start_date,
             closed_date=account.closed_date,
@@ -238,8 +236,8 @@ class ProductCandidateResponse(CandidateResponse):
     )
     id: str = Field(
         description=(
-            "Backstop product id. Echo it as `entity_id` with `entity_type='products'` — "
-            "never invent one."
+            "Backstop product id. Echo it as `product_id` on `get_product_investors`, or as "
+            "`entity_id` with `entity_type='products'` on `get_time_series` — never invent one."
         )
     )
     name: str | None = Field(
@@ -266,17 +264,18 @@ class ProductCandidateResponse(CandidateResponse):
 class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
 
-    Show each candidate's `label` to the user, then retry with that `id` as `entity_id`.
+    Show each candidate's `label` to the user, then retry with that `id` as `product_id`
+    on `get_product_investors`, or as `entity_id` with `entity_type='products'` on
+    `get_time_series`. Never invent one.
     """
 
-    scope: str = Field(
-        description="Collection the query was resolved against. Always 'products' for this tool."
-    )
+    scope: str = Field(description="Collection the query was resolved against. Always 'products'.")
     candidates: list[ProductCandidateResponse] = Field(
         default_factory=list,
         description=(
             "The matching products. Show `label` to the user, then retry with that "
-            "candidate's `id` as `entity_id` — never invent one."
+            "candidate's `id` as `product_id` on `get_product_investors`, or as `entity_id` "
+            "with `entity_type='products'` on `get_time_series` — never invent one."
         ),
     )
 

@@ -21,15 +21,14 @@ from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.accounts import (
     ProductAmbiguousResponse,
-    ProductResolution,
     TimeSeriesEntityType,
     TimeSeriesName,
     TimeSeriesResolvedResponse,
     fetch_time_series,
     require_series_for_entity,
-    resolve_product,
+    resolve_product_query,
 )
-from backstop_mcp.features.resolution import NotFound, NotFoundResponse, Resolved
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -151,7 +150,7 @@ async def get_time_series(
 
     resolved_id = entity_id
     if entity_type == "products":
-        outcome = await _resolve_product_entity(ctx, client, entity_id)
+        outcome = await resolve_product_query(ctx, client, query=entity_id)
         if not isinstance(outcome, Resolved):
             return ProductAmbiguousResponse.from_unresolved(outcome)
         resolved_id = outcome.value.id
@@ -195,20 +194,3 @@ async def get_time_series(
         series=series,
         points=points,
     )
-
-
-async def _resolve_product_entity(
-    ctx: Context, client: BackstopClient, entity_id: str
-) -> ProductResolution:
-    """Digits are a by-id GET (catalog only if that id is missing). Anything else is the catalog.
-
-    Backstop answers `GET /products/{non-digit}` with 400, not 404, so a short name or
-    display name must never be sent as a path segment. A numeric short name (`9001`) 404s
-    the by-id path and then matches in the catalog.
-    """
-    if not entity_id.isdigit():
-        return await resolve_product(ctx, client, product=entity_id)
-    by_id = await resolve_product(ctx, client, product_id=entity_id)
-    if not isinstance(by_id, NotFound):
-        return by_id
-    return await resolve_product(ctx, client, product=entity_id)

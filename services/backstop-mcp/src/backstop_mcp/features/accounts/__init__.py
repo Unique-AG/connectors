@@ -41,7 +41,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     TimeSeriesEntityType,
     TimeSeriesName,
 )
-from backstop_mcp.features.accounts.resolve_product import resolve_product
+from backstop_mcp.features.accounts.resolve_product import resolve_product, resolve_product_query
 from backstop_mcp.features.accounts.responses import (
     AccountRowResponse,
     HoldingFigureErrorResponse,
@@ -49,6 +49,7 @@ from backstop_mcp.features.accounts.responses import (
     MoneyResponse,
     PartyAccountsResolvedResponse,
     ProductAmbiguousResponse,
+    ProductInvestorsResolvedResponse,
     ShareResponse,
     TimeSeriesResolvedResponse,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
+    "ProductInvestorsResolvedResponse",
     "ProductResolution",
     "ResolvedProductDto",
     "ShareDto",
@@ -90,5 +92,6 @@ __all__ = [
     "fetch_time_series",
     "require_series_for_entity",
     "resolve_product",
+    "resolve_product_query",
     "split_open",
 ]

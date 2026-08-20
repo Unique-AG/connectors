@@ -91,6 +91,8 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "PersonResolvedResponse",
         "HoldingRowResponse",
         "MoneyResponse",
+        "AccountRowResponse",
+        "ProductInvestorsResolvedResponse",
         "TimeSeriesPointResponse",
         "TimeSeriesResolvedResponse",
         "ResolvedCustomFieldValueResponse",
