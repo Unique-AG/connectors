@@ -10,7 +10,7 @@ from office_mcp.graph_client.client import (
     _CallerTokenProvider,  # pyright: ignore[reportPrivateUsage]
 )
 
-from .conftest import CALLER_TOKEN, RecordedSleeps
+from .conftest import CALLER_TOKEN, GRAPH_V1, RecordedSleeps
 
 
 def _handler_chain(transport: httpx.AsyncClient) -> list[str]:
@@ -43,15 +43,65 @@ class TestTheCallersTokenIsWhatCalls:
         assert route.calls.last.request.headers["authorization"] == f"Bearer {CALLER_TOKEN}"
 
     async def test_nothing_else_is_given_the_token(self) -> None:
-        """A `@odata.nextLink` or a redirect pointing off Graph must not be handed the token.
+        """A `@odata.nextLink` pointing off Graph must not be handed the token.
 
         The SDK's bearer provider never consults the allowed-hosts validator itself, so this is
-        the only thing standing between a redirected request and a user's delegated credential.
+        the only thing standing between a follow-up page URL that arrived inside a response body
+        and a user's delegated credential.
         """
         provider = _CallerTokenProvider(CALLER_TOKEN)
 
         assert await provider.get_authorization_token("https://graph.microsoft.com/v1.0/me")
         assert await provider.get_authorization_token("https://example.invalid/v1.0/me") == ""
+
+    async def test_the_right_host_over_the_wrong_scheme_is_given_nothing_either(self) -> None:
+        """`AllowedHostsValidator` compares the hostname and nothing else.
+
+        So the host check on its own hands the delegated token to `http://graph.microsoft.com/...`
+        — in cleartext — and to anything else spelling that same host. Each of these passes the
+        validator, which is why each is asserted.
+        """
+        provider = _CallerTokenProvider(CALLER_TOKEN)
+
+        assert await provider.get_authorization_token("http://graph.microsoft.com/v1.0/me") == ""
+        assert await provider.get_authorization_token("ftp://graph.microsoft.com/v1.0/me") == ""
+        assert await provider.get_authorization_token("//graph.microsoft.com/v1.0/me") == ""
+
+
+class TestTheGraphBaseUrlIsSetInOnePlace:
+    async def test_no_empty_path_segment_reaches_the_wire(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`https://graph.microsoft.com/v1.0//me` is what a second base_url produces.
+
+        httpx normalises a base_url it is given to end with a slash, `HttpxRequestAdapter` copies
+        the transport's verbatim, and the SDK's URL templates then join their own leading slash
+        onto it. Graph tolerates the empty segment, so nothing here would fail loudly — respx
+        happens to refuse to match the malformed URL, which is incidental and not something to
+        rest on. Asserted on the built URL directly instead.
+        """
+        route = graph.get("/me").mock(return_value=httpx.Response(200, json={"id": "u-1"}))
+
+        _ = await client.me.get()
+
+        assert str(route.calls.last.request.url) == f"{GRAPH_V1}/me"
+
+    async def test_the_adapter_holds_it_and_the_transport_does_not(
+        self, transport: httpx.AsyncClient, client: GraphServiceClient
+    ) -> None:
+        """The invariant behind the test above, at the two places the value can live.
+
+        Both halves are the assertion: an unset transport base_url is what lets the adapter emit
+        an absolute URL that httpx never joins anything onto, and an adapter base_url without a
+        trailing slash is what keeps the join clean if it ever does.
+        """
+        # The ignore is for the SDK leaving `request_adapter`'s generic parameter unbound on the
+        # client; `base_url` on it is annotated `str`.
+        base_url: str = client.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+
+        assert str(transport.base_url) == ""
+        assert base_url == GRAPH_V1
+        assert not base_url.endswith("/")
 
 
 class TestThrottling:
