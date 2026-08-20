@@ -3,7 +3,7 @@
 `activity_id` alone is a complete, self-sufficient handle — no party resolution needed. It is the
 composite `{resourceType}_{resourceId}` a timeline record carries, so decoding it yields both the
 bare resource id every detail endpoint wants and the resource type that says which endpoints
-apply (see `activity_handle.py`).
+apply (see `ResourceIdentifierDto`).
 
 For a meeting/call all three fetches — the detail record, the meeting specifics, and the
 attendees — run CONCURRENTLY via `asyncio.gather`, mirroring `get_activity_history`'s stream
@@ -30,10 +30,10 @@ from pydantic import Field
 
 from backstop_mcp.features.activity_history import (
     ActivityDetailResponse,
+    ResourceIdentifierDto,
     fetch_activity_detail,
     fetch_attendees,
     fetch_meeting_specifics,
-    parse_activity_handle,
 )
 from backstop_mcp.models import published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
@@ -73,7 +73,7 @@ async def get_activity_detail(
     """
     _ = ctx
     client = await get_backstop_client()
-    handle = parse_activity_handle(activity_id)
+    handle = ResourceIdentifierDto.from_activity_id(activity_id)
     resource_id = handle.resource_id
     logger.info(
         "activity_history.detail.get.start",
