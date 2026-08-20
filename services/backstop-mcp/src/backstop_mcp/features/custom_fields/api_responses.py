@@ -2,7 +2,7 @@ from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from backstop_mcp.lenient import LenientBool
+from backstop_mcp.lenient import LenientBool, LenientInt
 
 __all__ = ["CustomFieldDefinitionAttributes"]
 
@@ -22,6 +22,7 @@ class CustomFieldDefinitionAttributes(BaseModel):
     select_options: object | None = Field(default=None, alias="selectOptions")
     tab_name: _StrippedStr | None = Field(default=None, alias="tabName")
     group_name: _StrippedStr | None = Field(default=None, alias="groupName")
+    group_id: LenientInt = Field(default=None, alias="groupId")
     layout_name: _StrippedStr | None = Field(default=None, alias="layoutName")
     resource_type: _StrippedStr | None = Field(default=None, alias="resourceType")
     description: _StrippedStr | None = None

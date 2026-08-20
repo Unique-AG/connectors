@@ -8,10 +8,12 @@ from backstop_mcp.features.custom_fields.entity_types import (
     custom_field_entity_type_from_bean,
 )
 from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
+from backstop_mcp.features.custom_fields.responses import CustomFieldDefinitionResponse
 
 __all__ = [
     "CUSTOM_FIELD_BEANS",
     "CustomFieldDefinitionDto",
+    "CustomFieldDefinitionResponse",
     "CustomFieldDefinitionAttributes",
     "CustomFieldEntityType",
     "CustomFieldsService",

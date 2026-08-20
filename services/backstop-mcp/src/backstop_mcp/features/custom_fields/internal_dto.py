@@ -21,8 +21,9 @@ class CustomFieldDefinitionDto(BaseModel):
     name: str = Field(description="Field name as it appears on a record.")
     entity_type: str = Field(
         description=(
-            "Backstop bean this field belongs to (e.g. 'Organization', 'Person'). The "
-            "response groups definitions under the MCP entity-type key instead."
+            "Standard Backstop Bean identifying the entity this field belongs to, such as a "
+            "party or concrete entity resource. The response groups definitions under the MCP "
+            "entity-type key instead."
         )
     )
     field_type: str | None = Field(
@@ -44,6 +45,13 @@ class CustomFieldDefinitionDto(BaseModel):
     group_name: str | None = Field(
         default=None, description="Backstop layout group this field sits in, when published."
     )
+    group_id: int | None = Field(
+        default=None,
+        description=(
+            "Backstop id of the layout group this field sits in, when published. "
+            "Use it as the stable group identifier within this catalog."
+        ),
+    )
     layout_name: str | None = Field(
         default=None, description="Backstop layout this field belongs to, when published."
     )
@@ -54,11 +62,11 @@ class CustomFieldDefinitionDto(BaseModel):
         default=None, description="Whether Backstop marks this field as required."
     )
     client_required: bool | None = Field(
-        default=None, description="Whether this instance marks this field as client-required."
+        default=None, description="Whether Backstop marks this field as client-required."
     )
     system_defined: bool | None = Field(
         default=None,
-        description="True when this is a Backstop-defined field, not tenant-defined.",
+        description="True when Backstop marks this field as system-defined.",
     )
     description: str | None = Field(
         default=None, description="Help text on the definition, when Backstop publishes one."
@@ -92,6 +100,7 @@ class CustomFieldDefinitionDto(BaseModel):
             select_options=_select_options(attrs.select_options),
             tab_name=attrs.tab_name,
             group_name=attrs.group_name,
+            group_id=attrs.group_id,
             layout_name=attrs.layout_name,
             resource_type=attrs.resource_type,
             required=attrs.required,
