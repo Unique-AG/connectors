@@ -1,11 +1,10 @@
-from collections.abc import Callable
-
 import httpx
 import pytest
 import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.accounts import PartyAccountsResolvedResponse
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -13,8 +12,6 @@ from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import BASE_URL, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
-
-type ConnectUser = Callable[..., object]
 
 _ORG_ID = "341688185"
 _OTHER_ID = "999"
@@ -70,8 +67,7 @@ def _product() -> dict[str, object]:
 class TestGetAccountsForParty:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_keeps_rows_by_owner_id_not_account_name(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-acct-1", "acct-bob")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_keeps_rows_by_owner_id_not_account_name(self, client: BackstopClient) -> None:
         route = respx.get(_ACCOUNTS_URL).mock(
             return_value=_page(
                 _account("1", owner_id=_ORG_ID, name="Vehicle A"),
@@ -86,7 +82,8 @@ class TestGetAccountsForParty:
 
         result = tool_model(
             await get_accounts_for_party(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID
+                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                client=client,
             ),
             PartyAccountsResolvedResponse,
         )
@@ -104,8 +101,7 @@ class TestGetAccountsForParty:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_all_closed_mentions_include_closed(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-acct-2", "acct-carol")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_all_closed_mentions_include_closed(self, client: BackstopClient) -> None:
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_page(
                 _account("1", owner_id=_ORG_ID, name="Gone", closedDate="2020-01-15"),
@@ -115,7 +111,8 @@ class TestGetAccountsForParty:
 
         result = tool_model(
             await get_accounts_for_party(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID
+                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                client=client,
             ),
             PartyAccountsResolvedResponse,
         )
@@ -127,15 +124,15 @@ class TestGetAccountsForParty:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unknown_party_is_not_found(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-acct-3", "acct-dave")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_unknown_party_is_not_found(self, client: BackstopClient) -> None:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json={"data": []})
         )
 
         result = tool_model(
             await get_accounts_for_party(
-                ctx_never_elicit(), search_type="organizations", search="No Such Org"
+                ctx_never_elicit(), search_type="organizations", search="No Such Org",
+                client=client,
             ),
             NotFoundResponse,
         )
@@ -144,8 +141,7 @@ class TestGetAccountsForParty:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_include_closed_keeps_owned_closed_rows(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-acct-4", "acct-erin")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_include_closed_keeps_owned_closed_rows(self, client: BackstopClient) -> None:
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_page(
                 _account("1", owner_id=_ORG_ID, name="Live"),
@@ -160,6 +156,7 @@ class TestGetAccountsForParty:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 include_closed=True,
+                client=client,
             ),
             PartyAccountsResolvedResponse,
         )

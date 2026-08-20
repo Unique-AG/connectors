@@ -1,15 +1,19 @@
 from typing import Annotated, Literal
 
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.custom_fields import (
     CustomFieldDefinitionDto,
     CustomFieldEntityType,
+    CustomFieldsService,
     custom_field_entity_type_from_bean,
+    get_custom_fields_service,
 )
-from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
 
 
 class ListCustomFieldsResponse(BaseModel):
@@ -63,6 +67,8 @@ async def list_custom_fields(
         bool,
         Field(description="Do not pass true unless the user reports a missing field."),
     ] = False,
+    client: BackstopClient = Depends(get_backstop_client),
+    custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> ListCustomFieldsResponse:
     """List custom-field definitions for the requested Backstop entity types.
 
@@ -70,9 +76,7 @@ async def list_custom_fields(
     for one or more of organizations, people, accounts, opportunities, products, or party.
     Pass refresh=true only when the user reports a missing field.
     """
-    client = await get_backstop_client()
-    service = get_custom_fields_service()
-    catalog, cache = await service.get(client, refresh=refresh)
+    catalog, cache = await custom_fields.get(client, refresh=refresh)
     return ListCustomFieldsResponse(
         cache=cache,
         definitions_by_entity={

@@ -9,10 +9,13 @@ import logging
 from typing import Annotated
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.accounts import (
     ProductAmbiguousResponse,
     ProductPositionsResolvedResponse,
@@ -22,7 +25,6 @@ from backstop_mcp.features.accounts import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,7 @@ async def get_product_positions(
             ),
         ),
     ] = False,
+    client: BackstopClient = Depends(get_backstop_client),
 ) -> GetProductPositionsResponse:
     """Current balances, lifetime invested/redeemed, and account status for a Backstop product.
 
@@ -101,7 +104,6 @@ async def get_product_positions(
     if (product_id is None) == (product is None):
         raise ValueError("Exactly one of product_id or product must be provided")
 
-    client = await get_backstop_client()
     outcome = await resolve_product(ctx, client, product_id=product_id, product=product)
     if not isinstance(outcome, Resolved):
         return ProductAmbiguousResponse.from_unresolved(outcome)

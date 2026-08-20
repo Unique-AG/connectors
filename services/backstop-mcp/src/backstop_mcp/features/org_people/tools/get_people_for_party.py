@@ -12,10 +12,17 @@ import logging
 from typing import Annotated
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.features.data_hygiene import (
+    EmploymentIndexFactory,
+    get_employment_index_factory,
+)
 from backstop_mcp.features.org_people import (
     OrgPeopleResolvedResponse,
     fetch_people_for_organization,
@@ -28,7 +35,6 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +83,8 @@ async def get_people_for_party(
             ),
         ),
     ] = False,
+    client: BackstopClient = Depends(get_backstop_client),
+    employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
 ) -> GetPeopleForPartyResponse:
     """List the people Backstop links to an organization, with employment status at that org.
 
@@ -96,7 +104,6 @@ async def get_people_for_party(
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")
 
-    client = await get_backstop_client()
     result = await resolve_party(
         ctx,
         client,
@@ -114,7 +121,7 @@ async def get_people_for_party(
     )
     listing = await fetch_people_for_organization(
         client,
-        get_employment_index_factory(),
+        employment_index_factory,
         organization_id=party.id,
         include_former=include_former,
     )

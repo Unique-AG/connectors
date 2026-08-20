@@ -6,7 +6,8 @@ need a client go through the factory exactly as production does, so the concurre
 config injection under test are the real ones.
 """
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from datetime import date
 from typing import Protocol, cast
 
@@ -14,7 +15,11 @@ import httpx
 import respx
 from pydantic import SecretStr
 
-from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
+from backstop_mcp.backstop_client import (
+    BackstopClient,
+    BackstopClientFactory,
+    BackstopCredentialSecret,
+)
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
 from backstop_mcp.features.activity_history import ActivityHistorySettings
@@ -47,6 +52,18 @@ def backstop_config(base_url: str = BASE_URL, **overrides: object) -> BackstopCo
     surrendering the constructor's own parameter types to `object`.
     """
     return BackstopConfig(base_url=base_url).model_copy(update=overrides)
+
+
+@asynccontextmanager
+async def tool_client(
+    base_url: str = BASE_URL, **overrides: object
+) -> AsyncIterator[BackstopClient]:
+    """A Backstop client for calling a tool with collaborators passed in as kwargs."""
+    factory = client_factory(base_url, **overrides)
+    try:
+        yield factory.for_credential(credential())
+    finally:
+        await factory.aclose()
 
 
 def client_factory(

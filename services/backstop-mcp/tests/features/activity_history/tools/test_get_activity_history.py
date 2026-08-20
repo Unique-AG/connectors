@@ -6,7 +6,7 @@ streams present in `next`, that invalid `next` inputs raise pydantic `Validation
 one failing stream fails the whole call.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import date
 
 import httpx
@@ -14,10 +14,11 @@ import pytest
 import respx
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopApiError
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityHistoryResolvedResponse,
+    ActivityHistorySettings,
     ActivityRecordResponse,
     ActivityType,
     EmailRecordResponse,
@@ -42,7 +43,7 @@ from tests.features.party_resolver.helpers import (
 )
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
 
-type ConnectUser = Callable[..., object]
+_SETTINGS = ActivityHistorySettings(page_size=10, gist_max_chars=300)
 
 
 def _org_document(
@@ -103,9 +104,8 @@ class TestFirstCallByTrustedPartyId:
     @pytest.mark.asyncio
     @respx.mock
     async def test_returns_default_streams_including_document(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-1", "org-bob")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
@@ -131,7 +131,9 @@ class TestFirstCallByTrustedPartyId:
 
         result = tool_model(
             await get_activity_history(
-                ctx_never_elicit(), _first(search_type="organizations", party_id="o42")
+                ctx_never_elicit(), _first(search_type="organizations", party_id="o42"),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -163,9 +165,8 @@ class TestFirstCallBySearch:
     @pytest.mark.asyncio
     @respx.mock
     async def test_resolves_uniquely_and_returns_the_requested_stream(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-2", "org-carol")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -187,6 +188,8 @@ class TestFirstCallBySearch:
                     search="Capstone",
                     activity_types=["meeting"],
                 ),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -202,9 +205,8 @@ class TestFirstCallBySearch:
     @pytest.mark.asyncio
     @respx.mock
     async def test_ambiguous_search_returns_candidates_without_fetching_timeline(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-3", "org-dave")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -221,7 +223,9 @@ class TestFirstCallBySearch:
 
         result = tool_model(
             await get_activity_history(
-                ctx_decline(), _first(search_type="organizations", search="Capstone")
+                ctx_decline(), _first(search_type="organizations", search="Capstone"),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             PartyAmbiguousResponse,
         )
@@ -251,9 +255,8 @@ class TestFirstCallBySearch:
     @pytest.mark.asyncio
     @respx.mock
     async def test_not_found_search_returns_the_query_it_used(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-4", "person-erin")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
@@ -261,7 +264,9 @@ class TestFirstCallBySearch:
 
         result = tool_model_union(
             await get_activity_history(
-                ctx_never_elicit(), _first(search_type="people", search="Nope")
+                ctx_never_elicit(), _first(search_type="people", search="Nope"),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse | PartyAmbiguousResponse | NotFoundResponse,
         )
@@ -273,10 +278,9 @@ class TestFirstCallBySearch:
     @pytest.mark.asyncio
     @respx.mock
     async def test_fetches_resolved_collection_when_person_hit_is_a_contact(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """Person quick-search can return contacts; timeline paths must follow search_type."""
-        await connect_user("user-ah-contact", "person-contact-hit")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -314,6 +318,8 @@ class TestFirstCallBySearch:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(search_type="people", search="Jane Contact", activity_types=["meeting"]),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -328,9 +334,8 @@ class TestFirstCallBySearch:
     @pytest.mark.asyncio
     @respx.mock
     async def test_trusted_contact_party_id_fetches_contacts_collection(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-trusted-contact", "person-trusted-contact")  # pyright: ignore[reportGeneralTypeIssues]
 
         contact_get = respx.get(f"{BASE_URL}/contacts/c9").mock(
             return_value=httpx.Response(
@@ -366,6 +371,8 @@ class TestFirstCallBySearch:
                     search_type="contacts",
                     activity_types=["meeting"],
                 ),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -382,9 +389,8 @@ class TestResumedCall:
     @pytest.mark.asyncio
     @respx.mock
     async def test_skips_resolution_and_only_refetches_open_streams(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-5", "org-frank")  # pyright: ignore[reportGeneralTypeIssues]
 
         quick = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
@@ -407,6 +413,8 @@ class TestResumedCall:
                     entity_id="o42",
                     next={"meeting": ActivityContinuationResponse(limit=10, offset=3)},
                 ),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -423,10 +431,9 @@ class TestResumedCall:
     @pytest.mark.asyncio
     @respx.mock
     async def test_rebuilds_person_name_from_first_and_last_on_next_page(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """Next pages omit ResolvedPartyDto.name; the party GET often has first/last name only."""
-        await connect_user("user-ah-5c", "person-gina")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -457,6 +464,8 @@ class TestResumedCall:
                     entity_id="p9",
                     next={"meeting": ActivityContinuationResponse(limit=10, offset=3)},
                 ),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -471,9 +480,8 @@ class TestResumedCall:
     @pytest.mark.asyncio
     @respx.mock
     async def test_first_page_email_next_resumes_only_the_email_stream(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-5b", "org-frank2")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
@@ -502,7 +510,9 @@ class TestResumedCall:
         )
 
         first_result = await get_activity_history(
-            ctx_never_elicit(), _first(search_type="organizations", party_id="o42")
+            ctx_never_elicit(), _first(search_type="organizations", party_id="o42"),
+            client=client,
+            activity_history=_SETTINGS,
         )
         first_payload = tool_payload(first_result)
 
@@ -526,6 +536,8 @@ class TestResumedCall:
                     "next": {"email": raw_email_next},
                 }
             ),
+            client=client,
+            activity_history=_SETTINGS,
         )
         second_payload = tool_payload(second_result)
         second = tool_model(second_result, ActivityHistoryResolvedResponse)
@@ -637,8 +649,7 @@ class TestRequestShape:
 class TestPartialFailurePropagates:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_one_failing_stream_fails_the_whole_call(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ah-10", "org-kelly")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_one_failing_stream_fails_the_whole_call(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/organizations/o5").mock(
             return_value=httpx.Response(200, json=_org_document(org_id="o5"))
@@ -658,6 +669,8 @@ class TestPartialFailurePropagates:
                     party_id="o5",
                     activity_types=["meeting", "note"],
                 ),
+                client=client,
+                activity_history=_SETTINGS,
             )
 
 
@@ -665,9 +678,8 @@ class TestDocumentInclusion:
     @pytest.mark.asyncio
     @respx.mock
     async def test_document_appears_when_explicitly_requested(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ah-11", "org-liam")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o9").mock(
             return_value=httpx.Response(200, json=_org_document(org_id="o9"))
@@ -684,6 +696,8 @@ class TestDocumentInclusion:
                     party_id="o9",
                     activity_types=["document"],
                 ),
+                client=client,
+                activity_history=_SETTINGS,
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -698,8 +712,7 @@ class TestDocumentInclusion:
 class TestWireOmitsNone:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_empty_page_omits_date_range(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ah-wire-omit", "org-wire-omit")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_empty_page_omits_date_range(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
@@ -712,6 +725,8 @@ class TestWireOmitsNone:
             await get_activity_history(
                 ctx_never_elicit(),
                 _first(search_type="organizations", party_id="o42", activity_types=["meeting"]),
+                client=client,
+                activity_history=_SETTINGS,
             )
         )
 

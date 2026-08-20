@@ -2,10 +2,13 @@ from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import OrganizationInclude, OrganizationIncludesResponse
 from backstop_mcp.features.org_people import OrganizationRecordResponse, fetch_organization
@@ -17,7 +20,6 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import OmitNoneModel, published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client
 
 
 class OrganizationResolvedResponse(OmitNoneModel):
@@ -112,6 +114,7 @@ async def get_organization(
             ),
         ),
     ] = (),
+    client: BackstopClient = Depends(get_backstop_client),
 ) -> GetOrganizationResponse:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
@@ -133,7 +136,6 @@ async def get_organization(
     entity_types including organizations. `numberOfEmployees` is not a roster — use
     `get_people_for_party` for the people Backstop actually links to this organization.
     """
-    client = await get_backstop_client()
     result = await resolve_party(
         ctx,
         client,

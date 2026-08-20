@@ -17,13 +17,16 @@ from collections.abc import Coroutine
 from urllib.parse import quote
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument
+from backstop_mcp.backstop_client import BackstopApiResourceDocument, BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
     ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
+    ActivityHistorySettings,
     ActivityPageDto,
     ActivityType,
     EmailPageDto,
@@ -31,11 +34,11 @@ from backstop_mcp.features.activity_history import (
     ResolvedPartyAsOfResponse,
     TimelineRecord,
     fetch_activities_page,
+    get_activity_history_settings,
     group_activity_page,
     to_timeline_record,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.server.runtime import get_activity_history_settings, get_backstop_client
 
 from ._page_input import (
     ActivityHistoryFirstPageInput,
@@ -68,6 +71,8 @@ __all__ = [
 async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
+    client: BackstopClient = Depends(get_backstop_client),
+    activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
 ) -> GetActivityHistoryResponse:
     """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
 
@@ -94,8 +99,9 @@ async def get_activity_history(
     `resolved.as_of` is plain provenance from the party's own record; relay it, do not treat
     record age as a staleness verdict.
     """
-    client = await get_backstop_client()
-    args = await extract_fetch_activity_history_args(ctx, client, request)
+    args = await extract_fetch_activity_history_args(
+        ctx, client, request, page_size=activity_history.page_size
+    )
     if not isinstance(args, FetchArgs):
         return args
 
@@ -130,7 +136,7 @@ async def get_activity_history(
         zip(page_calls.keys(), activities, strict=True)
     )
 
-    gist_max_chars = get_activity_history_settings().gist_max_chars
+    gist_max_chars = activity_history.gist_max_chars
     groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
     for activity_type, continuation in args.continuations.items():
         page = pages[activity_type]

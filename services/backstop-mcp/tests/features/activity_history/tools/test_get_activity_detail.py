@@ -10,7 +10,6 @@ none of this tool's upstream field names were byte-verified, see
 `fetch_activity_detail.py`'s module docstring).
 """
 
-from collections.abc import Callable
 from datetime import datetime
 
 import httpx
@@ -18,14 +17,12 @@ import pytest
 import respx
 from fastmcp.exceptions import ToolError
 
-from backstop_mcp.backstop_client import BackstopApiError
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_history import ActivityDetailResponse
 from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
 from tests.features.party_resolver.helpers import BASE_URL, collection, ctx_never_elicit
 from tests.helpers import resource
 from tests.server.tools.helpers import tool_model
-
-type ConnectUser = Callable[..., object]
 
 
 def _detail_document(
@@ -56,8 +53,7 @@ def _specifics_document(resource_id: str, **attributes: object) -> dict[str, obj
 class TestMeetingOrCall:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_returns_full_detail_with_attendees(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ad-1", "org-anna")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_returns_full_detail_with_attendees(self, client: BackstopClient) -> None:
 
         activity_id = "meeting-or-calls_76280387"
         _details_route("76280387").mock(
@@ -95,7 +91,7 @@ class TestMeetingOrCall:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
             ActivityDetailResponse,
         )
 
@@ -122,9 +118,8 @@ class TestMeetingOrCall:
     @pytest.mark.asyncio
     @respx.mock
     async def test_full_body_is_untruncated_even_for_long_html(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ad-2", "org-bea")  # pyright: ignore[reportGeneralTypeIssues]
 
         activity_id = "meeting-or-calls_99999"
         # Comfortably longer than the activity-history gist budget (a few hundred chars) used
@@ -140,7 +135,7 @@ class TestMeetingOrCall:
         _attendees_route("99999").mock(return_value=httpx.Response(200, json=collection()))
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
             ActivityDetailResponse,
         )
 
@@ -154,9 +149,8 @@ class TestNoteOrDocument:
     @pytest.mark.asyncio
     @respx.mock
     async def test_leaves_meeting_specifics_empty_and_skips_attendees(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ad-3", "org-cara")  # pyright: ignore[reportGeneralTypeIssues]
 
         activity_id = "activities_555"
         _details_route("555").mock(
@@ -178,7 +172,7 @@ class TestNoteOrDocument:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
             ActivityDetailResponse,
         )
 
@@ -201,8 +195,7 @@ class TestNoteOrDocument:
 class TestErrorPropagation:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_404_propagates_as_backstop_api_error(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ad-4", "org-dina")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_404_propagates_as_backstop_api_error(self, client: BackstopClient) -> None:
 
         activity_id = "meeting-or-calls_missing"
         _details_route("missing").mock(
@@ -216,37 +209,35 @@ class TestErrorPropagation:
         _attendees_route("missing").mock(return_value=httpx.Response(200, json=collection()))
 
         with pytest.raises(BackstopApiError):
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id)
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client)
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_null_primary_data_is_a_404_not_a_schema_error(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """`/entity-activity-details` answers `200 {"data": null}` for an id it cannot resolve."""
-        await connect_user("user-ad-8", "org-dina-null")  # pyright: ignore[reportGeneralTypeIssues]
 
         _details_route("404404").mock(return_value=httpx.Response(200, json={"data": None}))
 
         with pytest.raises(BackstopApiError) as exc_info:
-            await get_activity_detail(ctx_never_elicit(), activity_id="notes_404404")
+            await get_activity_detail(ctx_never_elicit(), activity_id="notes_404404", client=client)
 
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_bare_id_is_rejected_without_reaching_backstop(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """The composite handle is the only accepted form, and it is checked locally.
 
         A bare id has no resource type, so there is no collection to send it to — failing here
         beats guessing `/entity-activity-details` and reporting whatever that returns.
         """
-        await connect_user("user-ad-9", "org-dina-bare")  # pyright: ignore[reportGeneralTypeIssues]
 
         with pytest.raises(ToolError, match="not a valid activity_id"):
-            await get_activity_detail(ctx_never_elicit(), activity_id="76280387")
+            await get_activity_detail(ctx_never_elicit(), activity_id="76280387", client=client)
 
         assert len(respx.calls) == 0
 
@@ -255,9 +246,8 @@ class TestDefensiveParsing:
     @pytest.mark.asyncio
     @respx.mock
     async def test_unexpected_field_names_degrade_to_none_rather_than_crash(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ad-5", "org-elle")  # pyright: ignore[reportGeneralTypeIssues]
 
         activity_id = "meeting-or-calls_777"
         _details_route("777").mock(
@@ -295,7 +285,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
             ActivityDetailResponse,
         )
 
@@ -313,8 +303,7 @@ class TestDefensiveParsing:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_walks_attendee_pages(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-ad-7", "org-gina-ad")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_walks_attendee_pages(self, client: BackstopClient) -> None:
 
         activity_id = "meeting-or-calls_888"
         _details_route("888").mock(
@@ -340,7 +329,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
             ActivityDetailResponse,
         )
 
@@ -349,9 +338,8 @@ class TestDefensiveParsing:
     @pytest.mark.asyncio
     @respx.mock
     async def test_activity_id_path_segment_is_percent_encoded(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-ad-6", "org-frank-ad")  # pyright: ignore[reportGeneralTypeIssues]
 
         # `notes_1/../2` splits on the LAST underscore, so the bare id is `1/../2`.
         activity_id = "notes_1/../2"
@@ -366,7 +354,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id),
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
             ActivityDetailResponse,
         )
 

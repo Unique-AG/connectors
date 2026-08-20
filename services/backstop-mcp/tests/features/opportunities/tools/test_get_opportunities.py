@@ -1,6 +1,5 @@
 """`get_opportunities`: party resolution, concurrent fetch, status filter, no cursor."""
 
-from collections.abc import Callable
 from typing import cast
 
 import httpx
@@ -9,7 +8,7 @@ import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
-from backstop_mcp.backstop_client import BackstopApiError
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.opportunities.tools.get_opportunities import (
     GetOpportunitiesResponse,
     OpportunitiesResolvedResponse,
@@ -25,9 +24,8 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
+from tests.helpers import opportunity_stages_service
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
-
-type ConnectUser = Callable[..., object]
 
 _ORG_ID = "341764767"
 _OPPORTUNITIES_URL = f"{BASE_URL}/organizations/{_ORG_ID}/opportunities"
@@ -117,8 +115,7 @@ def _closed_deal() -> dict[str, object]:
 class TestGetOpportunities:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_trusted_party_id_returns_the_pipeline(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-opp-1", "opp-bob")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_trusted_party_id_returns_the_pipeline(self, client: BackstopClient) -> None:
 
         stages = respx.get(_STAGES_URL).mock(return_value=_stages_response())
         opportunities = respx.get(_OPPORTUNITIES_URL).mock(
@@ -127,7 +124,9 @@ class TestGetOpportunities:
 
         result = tool_model(
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID
+                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -144,8 +143,7 @@ class TestGetOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unique_search_resolves_then_fetches(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-opp-2", "opp-carol")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_unique_search_resolves_then_fetches(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -159,7 +157,13 @@ class TestGetOpportunities:
         )
 
         result = tool_model(
-            await get_opportunities(ctx_never_elicit(), search_type="organizations", search="Koch"),
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="organizations",
+                search="Koch",
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
+            ),
             OpportunitiesResolvedResponse,
         )
 
@@ -169,9 +173,8 @@ class TestGetOpportunities:
     @pytest.mark.asyncio
     @respx.mock
     async def test_person_party_hits_the_people_sub_collection(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-opp-3", "opp-dave")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         people_opps = respx.get(_PEOPLE_OPPORTUNITIES_URL).mock(
@@ -179,7 +182,13 @@ class TestGetOpportunities:
         )
 
         result = tool_model(
-            await get_opportunities(ctx_never_elicit(), search_type="people", party_id="p9"),
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="people",
+                party_id="p9",
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
+            ),
             OpportunitiesResolvedResponse,
         )
 
@@ -189,9 +198,8 @@ class TestGetOpportunities:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_contact_echo_hits_the_contacts_sub_collection(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-opp-3b", "opp-dana")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         contact_opps = respx.get(_CONTACTS_OPPORTUNITIES_URL).mock(
@@ -199,7 +207,13 @@ class TestGetOpportunities:
         )
 
         result = tool_model(
-            await get_opportunities(ctx_never_elicit(), search_type="contacts", party_id="c7"),
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="contacts",
+                party_id="c7",
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
+            ),
             OpportunitiesResolvedResponse,
         )
 
@@ -209,9 +223,8 @@ class TestGetOpportunities:
     @pytest.mark.asyncio
     @respx.mock
     async def test_status_open_still_reports_the_closed_count(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-opp-4", "opp-erin")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(_OPPORTUNITIES_URL).mock(
@@ -228,6 +241,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 status="open",
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -240,9 +255,8 @@ class TestGetOpportunities:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_deal_that_has_never_moved_omits_previous_stage(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-opp-5", "opp-frank")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(_OPPORTUNITIES_URL).mock(
@@ -260,7 +274,9 @@ class TestGetOpportunities:
 
         payload = tool_payload(
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID
+                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
             )
         )
 
@@ -273,8 +289,7 @@ class TestGetOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_not_found_search_returns_the_query(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-opp-6", "opp-gina")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_not_found_search_returns_the_query(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
@@ -282,7 +297,9 @@ class TestGetOpportunities:
 
         result = tool_model_union(
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", search="NoSuchOrg"
+                ctx_never_elicit(), search_type="organizations", search="NoSuchOrg",
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
             ),
             GetOpportunitiesResponse,
         )
@@ -292,8 +309,7 @@ class TestGetOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_ambiguous_search_returns_candidates(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-opp-7", "opp-hank")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_ambiguous_search_returns_candidates(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -306,7 +322,13 @@ class TestGetOpportunities:
         )
 
         result = tool_model_union(
-            await get_opportunities(ctx_decline(), search_type="organizations", search="Koch"),
+            await get_opportunities(
+                ctx_decline(),
+                search_type="organizations",
+                search="Koch",
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
+            ),
             GetOpportunitiesResponse,
         )
 
@@ -318,8 +340,7 @@ class TestGetOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_failed_stages_fetch_fails_the_call(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-opp-8", "opp-ivy")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_a_failed_stages_fetch_fails_the_call(self, client: BackstopClient) -> None:
 
         respx.get(_STAGES_URL).mock(return_value=httpx.Response(500, json={"errors": []}))
         respx.get(_OPPORTUNITIES_URL).mock(
@@ -328,22 +349,25 @@ class TestGetOpportunities:
 
         with pytest.raises(BackstopApiError):
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID
+                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
             )
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_failed_opportunities_fetch_fails_the_call(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-opp-9", "opp-jade")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(_OPPORTUNITIES_URL).mock(return_value=httpx.Response(500, json={"errors": []}))
 
         with pytest.raises(BackstopApiError):
             await get_opportunities(
-                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID
+                ctx_never_elicit(), search_type="organizations", party_id=_ORG_ID,
+                client=client,
+                opportunity_stages=opportunity_stages_service(),
             )
 
     def test_docstring_says_there_is_no_cursor_and_names_previous_stage(self) -> None:
