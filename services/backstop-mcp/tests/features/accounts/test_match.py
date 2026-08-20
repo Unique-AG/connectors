@@ -1,8 +1,8 @@
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
 from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto
 from backstop_mcp.features.accounts.resolve_product import (
-    match_product,
-    product_label,
+    _match_product,
+    _product_label,
 )
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 
@@ -23,7 +23,7 @@ CATALOG = (CGUP, BLUC_I, BLUC_II, ALPHA_GROWTH, ALPHA_VALUE, NO_SHORT, NAMELESS)
 
 class TestExactId:
     def test_exact_id_resolves(self) -> None:
-        result = match_product(CATALOG, "1292283")
+        result = _match_product(CATALOG, "1292283")
 
         assert isinstance(result, Resolved)
         assert result.value == CGUP
@@ -31,7 +31,7 @@ class TestExactId:
     def test_id_match_is_case_sensitive(self) -> None:
         products = (ResolvedProductDto(id="AbC", name="Other", short_name="OTHR"),)
 
-        result = match_product(products, "abc")
+        result = _match_product(products, "abc")
 
         assert isinstance(result, NotFound)
 
@@ -41,7 +41,7 @@ class TestExactId:
             CGUP,
         )
 
-        result = match_product(colliding, "CGUP")
+        result = _match_product(colliding, "CGUP")
 
         assert isinstance(result, Resolved)
         assert result.value.id == "CGUP"
@@ -49,19 +49,19 @@ class TestExactId:
 
 class TestExactShortName:
     def test_exact_short_name_resolves(self) -> None:
-        result = match_product(CATALOG, "CGUP")
+        result = _match_product(CATALOG, "CGUP")
 
         assert isinstance(result, Resolved)
         assert result.value == CGUP
 
     def test_short_name_match_is_case_insensitive(self) -> None:
-        result = match_product(CATALOG, "cgup")
+        result = _match_product(CATALOG, "cgup")
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1292283"
 
     def test_duplicate_short_name_is_ambiguous(self) -> None:
-        result = match_product(CATALOG, "BLUC")
+        result = _match_product(CATALOG, "BLUC")
 
         assert isinstance(result, Ambiguous)
         assert result.query == "BLUC"
@@ -69,7 +69,7 @@ class TestExactShortName:
         assert [candidate.value.id for candidate in result.candidates] == ["100", "101"]
 
     def test_nameless_product_resolves_by_short_name(self) -> None:
-        result = match_product(CATALOG, "NONM")
+        result = _match_product(CATALOG, "NONM")
 
         assert isinstance(result, Resolved)
         assert result.value == NAMELESS
@@ -77,19 +77,19 @@ class TestExactShortName:
 
 class TestExactName:
     def test_exact_name_resolves(self) -> None:
-        result = match_product(CATALOG, "Capstone Global Unconstrained Portfolio")
+        result = _match_product(CATALOG, "Capstone Global Unconstrained Portfolio")
 
         assert isinstance(result, Resolved)
         assert result.value == CGUP
 
     def test_name_match_is_case_insensitive(self) -> None:
-        result = match_product(CATALOG, "capstone global unconstrained portfolio")
+        result = _match_product(CATALOG, "capstone global unconstrained portfolio")
 
         assert isinstance(result, Resolved)
         assert result.value == CGUP
 
     def test_exact_name_is_matched_before_substring(self) -> None:
-        result = match_product(CATALOG, "Blue Capital I")
+        result = _match_product(CATALOG, "Blue Capital I")
 
         assert isinstance(result, Resolved)
         assert result.value == BLUC_I
@@ -97,19 +97,19 @@ class TestExactName:
 
 class TestSubstringName:
     def test_unique_substring_resolves(self) -> None:
-        result = match_product(CATALOG, "Unconstrained")
+        result = _match_product(CATALOG, "Unconstrained")
 
         assert isinstance(result, Resolved)
         assert result.value == CGUP
 
     def test_shared_substring_is_ambiguous(self) -> None:
-        result = match_product(CATALOG, "Alpha")
+        result = _match_product(CATALOG, "Alpha")
 
         assert isinstance(result, Ambiguous)
         assert [candidate.value.id for candidate in result.candidates] == ["200", "201"]
 
     def test_substring_is_case_insensitive(self) -> None:
-        result = match_product(CATALOG, "unconstrained")
+        result = _match_product(CATALOG, "unconstrained")
 
         assert isinstance(result, Resolved)
         assert result.value == CGUP
@@ -117,21 +117,21 @@ class TestSubstringName:
 
 class TestNoMatch:
     def test_no_match_is_not_found(self) -> None:
-        result = match_product(CATALOG, "Does Not Exist")
+        result = _match_product(CATALOG, "Does Not Exist")
 
         assert isinstance(result, NotFound)
         assert result.query == "Does Not Exist"
         assert result.scope == "products"
 
     def test_empty_query_is_not_found(self) -> None:
-        result = match_product(CATALOG, "")
+        result = _match_product(CATALOG, "")
 
         assert isinstance(result, NotFound)
         assert result.query == ""
         assert result.scope == "products"
 
     def test_whitespace_only_query_is_not_found(self) -> None:
-        result = match_product(CATALOG, "   ")
+        result = _match_product(CATALOG, "   ")
 
         assert isinstance(result, NotFound)
         assert result.query == ""
@@ -140,13 +140,13 @@ class TestNoMatch:
 
 class TestLabel:
     def test_label_includes_short_name_when_present(self) -> None:
-        assert product_label(CGUP) == "Capstone Global Unconstrained Portfolio (CGUP)"
+        assert _product_label(CGUP) == "Capstone Global Unconstrained Portfolio (CGUP)"
 
     def test_label_is_name_alone_when_there_is_no_short_name(self) -> None:
-        assert product_label(NO_SHORT) == "No Short Name Fund"
+        assert _product_label(NO_SHORT) == "No Short Name Fund"
 
     def test_candidate_key_is_the_product_id(self) -> None:
-        result = match_product(CATALOG, "BLUC")
+        result = _match_product(CATALOG, "BLUC")
 
         assert isinstance(result, Ambiguous)
         assert [candidate.key for candidate in result.candidates] == ["100", "101"]

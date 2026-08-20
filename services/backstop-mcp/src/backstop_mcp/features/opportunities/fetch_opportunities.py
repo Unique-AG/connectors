@@ -75,7 +75,7 @@ type OpportunityStatus = Literal["open", "closed", "all"]
 type OpportunityResource = BackstopApiResource[dict[str, object]]
 
 
-def stage_ref_id(value: object) -> str | None:
+def _stage_ref_id(value: object) -> str | None:
     """The stage id a history entry's inline pointer carries, or None when it carries none.
 
     `ResourceRef.resource_id` is required, correctly — a reference nobody can resolve is not a
@@ -89,7 +89,7 @@ def stage_ref_id(value: object) -> str | None:
         return None
 
 
-def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
+def _stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
     """Stage id to name for every `opportunity-stages` resource side-loaded with the response.
 
     Selected by JSON:API `type` rather than followed from linkage, because the stages a history
@@ -116,7 +116,7 @@ def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str
     return names
 
 
-def resolve_stage_name(
+def _resolve_stage_name(
     stage_id: str | None,
     *,
     side_loaded: Mapping[str, str],
@@ -137,10 +137,10 @@ def resolve_stage_name(
     return known.name if known is not None else None
 
 
-def current_stage_id(resource: OpportunityResource) -> str | None:
+def _current_stage_id(resource: OpportunityResource) -> str | None:
     """The deal's current stage id, stripped to match how both stage indexes are keyed.
 
-    `BackstopRelationshipRef.id` carries no `StringConstraints`, while `stage_names_from_included`
+    `BackstopRelationshipRef.id` carries no `StringConstraints`, while `_stage_names_from_included`
     keys on a stripped id and the vocabulary's come from `BackstopApiResource`, which strips its
     own. A padded linkage id would otherwise miss both and report a resolvable stage as unnamed.
     """
@@ -154,7 +154,7 @@ def current_stage_id(resource: OpportunityResource) -> str | None:
     )
 
 
-def matches_status(opportunity: OpportunityResponse, status: OpportunityStatus) -> bool:
+def _matches_status(opportunity: OpportunityResponse, status: OpportunityStatus) -> bool:
     """Whether one deal belongs in an answer asked for `status`.
 
     A deal whose `isOpen` did not arrive matches neither `open` nor `closed` — it is as wrong to
@@ -167,7 +167,7 @@ def matches_status(opportunity: OpportunityResponse, status: OpportunityStatus) 
     return opportunity.is_open is (status == "open")
 
 
-def date_entered_order_key(opportunity: OpportunityResponse) -> tuple[bool, date]:
+def _date_entered_order_key(opportunity: OpportunityResponse) -> tuple[bool, date]:
     """Sort key placing the most recent stage move first under `reverse=True`.
 
     The leading flag keeps a deal with no `date_entered_current_stage` last rather than letting
@@ -177,11 +177,11 @@ def date_entered_order_key(opportunity: OpportunityResponse) -> tuple[bool, date
     return (entered is not None, entered or date.min)
 
 
-def order_by_date_entered(
+def _order_by_date_entered(
     opportunities: Iterable[OpportunityResponse],
 ) -> tuple[OpportunityResponse, ...]:
     """Deals newest-first by the day they entered their current stage."""
-    return tuple(sorted(opportunities, key=date_entered_order_key, reverse=True))
+    return tuple(sorted(opportunities, key=_date_entered_order_key, reverse=True))
 
 
 def stage_history(
@@ -211,12 +211,12 @@ def stage_history(
                 exc_info=exc,
             )
             continue
-        stage_id = stage_ref_id(attributes.get(_STAGE))
+        stage_id = _stage_ref_id(attributes.get(_STAGE))
         changes.append(
             StageChangeResponse.model_validate(
                 {
                     **attributes,
-                    "stage": resolve_stage_name(
+                    "stage": _resolve_stage_name(
                         stage_id, side_loaded=side_loaded, vocabulary=vocabulary
                     ),
                     "stage_id": stage_id,
@@ -226,7 +226,7 @@ def stage_history(
     return tuple(changes)
 
 
-def project_opportunities(
+def _project_opportunities(
     resources: Sequence[OpportunityResource],
     *,
     included: Sequence[dict[str, object]],
@@ -241,15 +241,15 @@ def project_opportunities(
     other deals are still an answer, and this is the whole reason the fetch does not hand the
     page a typed schema.
     """
-    side_loaded = stage_names_from_included(included)
+    side_loaded = _stage_names_from_included(included)
     projected: list[OpportunityResponse] = []
     for resource in resources:
         try:
-            stage_id = current_stage_id(resource)
+            stage_id = _current_stage_id(resource)
             projected.append(
                 OpportunityResponse.from_resource(
                     resource,
-                    stage=resolve_stage_name(
+                    stage=_resolve_stage_name(
                         stage_id, side_loaded=side_loaded, vocabulary=vocabulary
                     ),
                     stage_id=stage_id,
@@ -317,11 +317,11 @@ async def fetch_opportunities(
         ),
         _resolved_vocabulary(vocabulary),
     )
-    fetched = project_opportunities(
+    fetched = _project_opportunities(
         page.items, included=page.included, vocabulary=resolved_vocabulary
     )
-    selected = order_by_date_entered(
-        opportunity for opportunity in fetched if matches_status(opportunity, status)
+    selected = _order_by_date_entered(
+        opportunity for opportunity in fetched if _matches_status(opportunity, status)
     )
     result = OpportunityFetchResponse(
         opportunities=selected,

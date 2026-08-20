@@ -5,7 +5,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
-from backstop_mcp.features.org_people.fetch_people_for_organization import (
+from backstop_mcp.features.org_people import (
     MAX_ORG_PEOPLE,
     fetch_people_for_organization,
 )

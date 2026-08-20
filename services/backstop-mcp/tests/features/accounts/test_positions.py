@@ -5,12 +5,12 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.features.accounts import MAX_POSITION_ACCOUNTS
 from backstop_mcp.features.accounts.fetch_product_positions import (
-    MAX_POSITION_ACCOUNTS,
-    fetch_positions,
-    fetch_product_aum,
+    _fetch_positions,
+    _fetch_product_aum,
+    _reconcile,
     fetch_product_positions,
-    reconcile,
 )
 from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
@@ -59,7 +59,7 @@ class TestFetchPositions:
             return_value=_page(_point("4", date="2026-07-31", value=5.0))
         )
 
-        (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),))
+        (position,) = await _fetch_positions(client, (_record(_ACCOUNT_A),))
 
         assert position.account.id == _ACCOUNT_A
         assert position.balance is not None
@@ -84,7 +84,7 @@ class TestFetchPositions:
         respx.get(_series_url(_ACCOUNT_A, "totalInvested")).mock(return_value=_page())
         respx.get(_series_url(_ACCOUNT_A, "totalRedemptions")).mock(return_value=_page())
 
-        (position,) = await fetch_positions(client, (_record(_ACCOUNT_A),))
+        (position,) = await _fetch_positions(client, (_record(_ACCOUNT_A),))
 
         assert position.balance is None
         assert position.invested is None
@@ -109,7 +109,7 @@ class TestFetchPositions:
         respx.get(_series_url(_ACCOUNT_B, "totalInvested")).mock(return_value=_page())
         respx.get(_series_url(_ACCOUNT_B, "totalRedemptions")).mock(return_value=_page())
 
-        first, second = await fetch_positions(
+        first, second = await _fetch_positions(
             client,
             (_record(_ACCOUNT_A, name="A"), _record(_ACCOUNT_B, name="B")),
         )
@@ -136,11 +136,11 @@ class TestFetchPositions:
         respx.get(_series_url(_ACCOUNT_A, "totalRedemptions")).mock(return_value=_page())
 
         with pytest.raises(BackstopAuthError):
-            await fetch_positions(client, (_record(_ACCOUNT_A),))
+            await _fetch_positions(client, (_record(_ACCOUNT_A),))
 
     @pytest.mark.asyncio
     async def test_no_accounts_makes_no_requests(self, client: BackstopClient) -> None:
-        assert await fetch_positions(client, ()) == ()
+        assert await _fetch_positions(client, ()) == ()
 
 
 _PRODUCT = ResolvedProductDto(id="1292283", name="CGUP", short_name="CGUP")
@@ -162,7 +162,7 @@ def _position(
 
 class TestReconcile:
     def test_flags_when_summed_balances_differ_beyond_tolerance(self) -> None:
-        result = reconcile(
+        result = _reconcile(
             (_position("1", balance=_figure(10.0)), _position("2", balance=_figure(20.0))),
             _figure(40.0),
         )
@@ -172,24 +172,24 @@ class TestReconcile:
         assert result.diverges is True
 
     def test_matches_when_the_sum_equals_aum(self) -> None:
-        result = reconcile((_position("1", balance=_figure(30.0)),), _figure(30.0))
+        result = _reconcile((_position("1", balance=_figure(30.0)),), _figure(30.0))
 
         assert result.difference == 0.0
         assert result.diverges is False
 
     def test_a_gap_inside_the_tolerance_is_not_divergence(self) -> None:
-        result = reconcile((_position("1", balance=_figure(1_000_000.0)),), _figure(1_002_000.0))
+        result = _reconcile((_position("1", balance=_figure(1_000_000.0)),), _figure(1_002_000.0))
 
         assert result.diverges is False
         assert result.difference == -2000.0
 
     def test_a_gap_past_the_tolerance_is_divergence(self) -> None:
-        result = reconcile((_position("1", balance=_figure(1_000_000.0)),), _figure(1_010_000.0))
+        result = _reconcile((_position("1", balance=_figure(1_000_000.0)),), _figure(1_010_000.0))
 
         assert result.diverges is True
 
     def test_omitted_balances_are_not_treated_as_zero(self) -> None:
-        result = reconcile(
+        result = _reconcile(
             (_position("1", balance=_figure(10.0)), _position("2")),
             _figure(30.0),
         )
@@ -198,20 +198,20 @@ class TestReconcile:
         assert result.diverges is True
 
     def test_a_balance_still_awaiting_its_value_is_left_out_of_the_sum(self) -> None:
-        result = reconcile((_position("1", balance=_figure(None)),), _figure(30.0))
+        result = _reconcile((_position("1", balance=_figure(None)),), _figure(30.0))
 
         assert result.balance_total is None
         assert result.diverges is False
 
     def test_no_aum_cannot_diverge(self) -> None:
-        result = reconcile((_position("1", balance=_figure(10.0)),), None)
+        result = _reconcile((_position("1", balance=_figure(10.0)),), None)
 
         assert result.balance_total == 10.0
         assert result.difference is None
         assert result.diverges is False
 
     def test_no_balances_cannot_diverge(self) -> None:
-        result = reconcile((_position("1"),), _figure(30.0))
+        result = _reconcile((_position("1"),), _figure(30.0))
 
         assert result.balance_total is None
         assert result.diverges is False
@@ -225,7 +225,7 @@ class TestFetchProductAum:
     ) -> None:
         respx.get(_AUM_URL).mock(return_value=_page(_point("1", date="2026-07-31", value=1000.0)))
 
-        aum = await fetch_product_aum(client, "1292283")
+        aum = await _fetch_product_aum(client, "1292283")
 
         assert aum is not None
         assert aum.valued == SeriesPointDto(date=date(2026, 7, 31), value=1000.0, value_status=None)
@@ -239,7 +239,7 @@ class TestFetchProductAum:
             return_value=httpx.Response(500, json={"errors": [{"detail": "aum boom"}]})
         )
 
-        assert await fetch_product_aum(client, "1292283") is None
+        assert await _fetch_product_aum(client, "1292283") is None
 
 
 class TestFetchProductPositions:

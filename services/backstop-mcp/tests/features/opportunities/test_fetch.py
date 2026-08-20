@@ -17,12 +17,12 @@ import respx
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityStatus,
-    date_entered_order_key,
+    _date_entered_order_key,
+    _matches_status,
+    _order_by_date_entered,
+    _resolve_stage_name,
+    _stage_names_from_included,
     fetch_opportunities,
-    matches_status,
-    order_by_date_entered,
-    resolve_stage_name,
-    stage_names_from_included,
 )
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.responses import (
@@ -734,27 +734,27 @@ class TestMalformedRecords:
 
 class TestMatchesStatus:
     def test_all_matches_every_deal(self) -> None:
-        assert matches_status(_response(is_open=True), "all")
-        assert matches_status(_response(is_open=False), "all")
-        assert matches_status(_response(is_open=None), "all")
+        assert _matches_status(_response(is_open=True), "all")
+        assert _matches_status(_response(is_open=False), "all")
+        assert _matches_status(_response(is_open=None), "all")
 
     def test_open_matches_only_open_deals(self) -> None:
-        assert matches_status(_response(is_open=True), "open")
-        assert not matches_status(_response(is_open=False), "open")
+        assert _matches_status(_response(is_open=True), "open")
+        assert not _matches_status(_response(is_open=False), "open")
 
     def test_closed_matches_only_closed_deals(self) -> None:
-        assert matches_status(_response(is_open=False), "closed")
-        assert not matches_status(_response(is_open=True), "closed")
+        assert _matches_status(_response(is_open=False), "closed")
+        assert not _matches_status(_response(is_open=True), "closed")
 
     def test_an_unknown_state_matches_neither_open_nor_closed(self) -> None:
         """Filing it under either would be a guess; `all` still returns it."""
-        assert not matches_status(_response(is_open=None), "open")
-        assert not matches_status(_response(is_open=None), "closed")
+        assert not _matches_status(_response(is_open=None), "open")
+        assert not _matches_status(_response(is_open=None), "closed")
 
 
 class TestOrderingKey:
     def test_dated_deals_come_back_newest_first(self) -> None:
-        ordered = order_by_date_entered(
+        ordered = _order_by_date_entered(
             [
                 _response("old", entered=date(2020, 1, 1)),
                 _response("new", entered=date(2026, 1, 1)),
@@ -765,7 +765,7 @@ class TestOrderingKey:
         assert [deal.id for deal in ordered] == ["new", "mid", "old"]
 
     def test_a_missing_date_sorts_after_every_dated_deal(self) -> None:
-        ordered = order_by_date_entered(
+        ordered = _order_by_date_entered(
             [_response("undated"), _response("ancient", entered=date.min)]
         )
 
@@ -773,43 +773,45 @@ class TestOrderingKey:
 
     def test_deals_sharing_a_date_keep_their_fetch_order(self) -> None:
         same_day = date(2025, 3, 3)
-        ordered = order_by_date_entered(
+        ordered = _order_by_date_entered(
             [_response("first", entered=same_day), _response("second", entered=same_day)]
         )
 
         assert [deal.id for deal in ordered] == ["first", "second"]
 
     def test_the_key_flags_whether_a_date_is_present(self) -> None:
-        assert date_entered_order_key(_response(entered=date(2025, 1, 1))) == (
+        assert _date_entered_order_key(_response(entered=date(2025, 1, 1))) == (
             True,
             date(2025, 1, 1),
         )
-        assert date_entered_order_key(_response()) == (False, date.min)
+        assert _date_entered_order_key(_response()) == (False, date.min)
 
 
 class TestResolveStageName:
     def test_a_side_loaded_stage_wins_over_the_vocabulary(self) -> None:
         """The response describes this instance now; the cache may be up to a TTL behind."""
         assert (
-            resolve_stage_name("42482", side_loaded={"42482": "Renamed"}, vocabulary=VOCABULARY)
+            _resolve_stage_name("42482", side_loaded={"42482": "Renamed"}, vocabulary=VOCABULARY)
             == "Renamed"
         )
 
     def test_the_vocabulary_names_a_stage_the_response_did_not_side_load(self) -> None:
-        assert resolve_stage_name("42478", side_loaded={}, vocabulary=VOCABULARY) == "Prospect"
+        assert _resolve_stage_name("42478", side_loaded={}, vocabulary=VOCABULARY) == "Prospect"
 
     def test_a_stage_in_neither_has_no_name(self) -> None:
-        assert resolve_stage_name("70707", side_loaded={}, vocabulary=VOCABULARY) is None
+        assert _resolve_stage_name("70707", side_loaded={}, vocabulary=VOCABULARY) is None
 
     def test_no_stage_id_has_no_name(self) -> None:
-        assert resolve_stage_name(None, side_loaded={"42482": "IDD"}, vocabulary=VOCABULARY) is None
+        assert (
+            _resolve_stage_name(None, side_loaded={"42482": "IDD"}, vocabulary=VOCABULARY) is None
+        )
 
 
 class TestStageNamesFromIncluded:
     def test_every_side_loaded_stage_is_indexed_by_id(self) -> None:
         included = [_side_loaded_stage("42482"), _side_loaded_stage("96016")]
 
-        assert stage_names_from_included(included) == {"42482": "IDD", "96016": "Invested"}
+        assert _stage_names_from_included(included) == {"42482": "IDD", "96016": "Invested"}
 
     def test_resources_of_another_type_are_not_indexed(self) -> None:
         """History entries sit in the same `included` array and carry no name at all."""
@@ -818,9 +820,9 @@ class TestStageNamesFromIncluded:
             _side_loaded_stage("42482"),
         ]
 
-        assert stage_names_from_included(included) == {"42482": "IDD"}
+        assert _stage_names_from_included(included) == {"42482": "IDD"}
 
     def test_a_stage_without_a_name_is_skipped(self) -> None:
         unnamed = resource("42482", "opportunity-stages", sortOrder=3)
 
-        assert stage_names_from_included([unnamed]) == {}
+        assert _stage_names_from_included([unnamed]) == {}

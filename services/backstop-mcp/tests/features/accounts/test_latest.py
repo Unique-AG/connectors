@@ -7,8 +7,8 @@ import respx
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.accounts.fetch_series import (
     SeriesPointResource,
+    _latest_figure,
     fetch_series,
-    latest_figure,
 )
 from backstop_mcp.features.accounts.internal_dto import SeriesFigureDto, SeriesPointDto
 from tests.helpers import BASE_URL
@@ -31,7 +31,7 @@ def _page(*points: dict[str, object]) -> httpx.Response:
 
 class TestLatestFigure:
     def test_picks_the_greatest_date(self) -> None:
-        point = latest_figure(
+        point = _latest_figure(
             (
                 _resource("1", date="2026-05-31", value=10.0, valueStatus="ACTUAL"),
                 _resource("2", date="2026-06-15", value=11.0, valueStatus="ESTIMATE"),
@@ -43,7 +43,7 @@ class TestLatestFigure:
         assert point == SeriesFigureDto(latest=latest, valued=latest)
 
     def test_a_mid_month_point_after_month_end_wins(self) -> None:
-        point = latest_figure(
+        point = _latest_figure(
             (
                 _resource("1", date="2026-06-30", value=100.0, valueStatus="ACTUAL"),
                 _resource("2", date="2026-07-15", value=101.5, valueStatus="ESTIMATE"),
@@ -57,13 +57,13 @@ class TestLatestFigure:
         assert point.valued.value_status == "ESTIMATE"
 
     def test_omits_value_status_when_backstop_omits_it(self) -> None:
-        point = latest_figure((_resource("1", date="2026-06-30", value=50.0),))
+        point = _latest_figure((_resource("1", date="2026-06-30", value=50.0),))
 
         latest = SeriesPointDto(date=date(2026, 6, 30), value=50.0, value_status=None)
         assert point == SeriesFigureDto(latest=latest, valued=latest)
 
     def test_skips_points_without_a_date(self) -> None:
-        point = latest_figure(
+        point = _latest_figure(
             (
                 _resource("1", value=1.0),
                 _resource("2", date="2026-01-31", value=2.0),
@@ -76,13 +76,13 @@ class TestLatestFigure:
         assert point.valued.value == 2.0
 
     def test_empty_page_is_none(self) -> None:
-        assert latest_figure(()) is None
+        assert _latest_figure(()) is None
 
     def test_all_undated_points_are_none(self) -> None:
-        assert latest_figure((_resource("1", value=1.0),)) is None
+        assert _latest_figure((_resource("1", value=1.0),)) is None
 
     def test_a_dated_point_without_a_value_does_not_shadow_the_last_number(self) -> None:
-        figure = latest_figure(
+        figure = _latest_figure(
             (
                 _resource("1", date="2026-06-30", value=1_000_000.0, valueStatus="ACTUAL"),
                 _resource("2", date="2026-07-31", valueStatus="ESTIMATE"),
@@ -97,7 +97,7 @@ class TestLatestFigure:
         assert figure.valued.value == 1_000_000.0
 
     def test_a_series_of_valueless_points_has_no_valued_point(self) -> None:
-        figure = latest_figure(
+        figure = _latest_figure(
             (
                 _resource("1", date="2026-06-30"),
                 _resource("2", date="2026-07-31"),

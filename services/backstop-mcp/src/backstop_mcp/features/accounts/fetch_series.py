@@ -25,7 +25,7 @@ _SORT = "sort"
 SeriesPointResource = BackstopApiResource[SeriesPointAttributes]
 
 
-def latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigureDto | None:
+def _latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigureDto | None:
     """The greatest-`date` point and the greatest-`date` point with a value, or `None`.
 
     `valued` is the same object as `latest` whenever the newest row carries a number, and `None`
@@ -42,14 +42,14 @@ def latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigureDto |
 
 
 async def fetch_series(client: BackstopClient, path: str) -> SeriesFigureDto | None:
-    """Latest figure on `path`: first 10 rows of `sort=-date`, then `latest_figure`."""
+    """Latest figure on `path`: first 10 rows of `sort=-date`, then `_latest_figure`."""
     page = await client.fetch_page(
         path,
         schema=SeriesPointResource,
         params={_SORT: "-date"},
         page_size=_PAGE_SIZE,
     )
-    return latest_figure(page.items)
+    return _latest_figure(page.items)
 
 
 def _by_date(point: SeriesPointDto) -> date:
