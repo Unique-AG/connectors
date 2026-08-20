@@ -136,11 +136,14 @@ type _MeetingsQuery = OnlineMeetingsRequestBuilder.OnlineMeetingsRequestBuilderG
 
 
 class MeetingArtifact(Protocol):
-    """The one property a window needs: when artifact began.
+    """The two properties this module needs: when an artifact began, and which artifact it is.
 
-    Structural not nominal: callTranscript and callRecording are unrelated generated classes both
-    carrying createdDateTime.
+    Structural not nominal: callTranscript and callRecording are unrelated generated classes, both
+    carrying createdDateTime and both entities, so both carry an id.
     """
+
+    @property
+    def id(self) -> str | None: ...
 
     @property
     def created_date_time(self) -> datetime | None: ...
@@ -249,8 +252,40 @@ async def newest_in_window[T: MeetingArtifact](
         matches=window.holds,
         max_scanned=MAX_ARTIFACT_SCAN,
     )
-    newest = sorted(collected.items, key=_began_at, reverse=True)
+    newest = sorted(_told_apart(collected.items), key=_began_at, reverse=True)
     return CollectedItems(items=newest[:limit], capped=collected.capped)
+
+
+def _told_apart[T: MeetingArtifact](artifacts: list[T]) -> list[T]:
+    """One entry per artifact id, in the order Graph first sent it.
+
+    The other half of Microsoft's own workaround for the paging reset these two collections are
+    documented to do (https://learn.microsoft.com/en-us/graph/known-issues, Teamwork and
+    communications): "Continue following `@odata.nextLink` even when the collection is empty.
+    De-duplicate subsequent items by tracking the **id** property of each recording or transcript."
+    `graph_client/pagination.py` does the following; this does the de-duplicating.
+
+    Here rather than in `collect_pages`, because it is not a property of paging. It is a property of
+    these two Graph collections, which is also the scope Microsoft gives it — a general walk has no
+    business assuming its items have an id or that two with the same one are the same thing.
+
+    Before the sort, not after the cut. A repeat that survived into the sort would take one of the
+    `limit` places a distinct artifact was owed, so a caller asking for the newest three could be
+    handed the same recording twice and never learn there was a third.
+
+    An artifact Graph sent with no id at all is kept. It cannot be told apart from anything, so the
+    choice is between a possible repeat and a certain loss, and a lost recording is worse.
+    """
+    seen: set[str] = set()
+    kept: list[T] = []
+    for artifact in artifacts:
+        identifier = artifact.id
+        if identifier is not None:
+            if identifier in seen:
+                continue
+            seen.add(identifier)
+        kept.append(artifact)
+    return kept
 
 
 def _first_instant(bound: date | datetime | None) -> datetime | None:
