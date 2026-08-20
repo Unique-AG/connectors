@@ -26,7 +26,9 @@ get_time_series on one account or one product, one series per call. A missing va
 on a dated point is "not in yet", not zero. `aums` is the product's total assets \
 under management, not one investor's balance. Party holdings with snapshot balances: \
 get_accounts_for_party. Prefer that for "how much does X have"; use get_time_series \
-when the as-of date or ACTUAL/ESTIMATE status matters.
+when the as-of date or ACTUAL/ESTIMATE status matters. Who is in a product, owners \
+only, no figures: get_product_investors. Do not loop get_time_series over every \
+account in a fund — fund-level AUM is get_time_series on the product's `aums`.
 
 Custom-field names and types: list_custom_fields.
 """

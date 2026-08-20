@@ -1,8 +1,8 @@
 """MCP-facing account and product shapes.
 
-Split across modules but re-exported as one surface: `shared` holds the account row (the
-`get_product_investors` listing, no figures), product resolution, and the closed-account
-hint; `party_accounts` and `time_series` hold each shipped tool's resolved-response shape.
+Split across modules but re-exported as one surface: `shared` holds the account row, product
+resolution, and the closed-account hint; `party_accounts`, `product_investors`, and
+`time_series` hold each shipped tool's resolved-response shape.
 """
 
 from backstop_mcp.features.accounts.responses.party_accounts import (
@@ -11,6 +11,9 @@ from backstop_mcp.features.accounts.responses.party_accounts import (
     MoneyResponse,
     PartyAccountsResolvedResponse,
     ShareResponse,
+)
+from backstop_mcp.features.accounts.responses.product_investors import (
+    ProductInvestorsResolvedResponse,
 )
 from backstop_mcp.features.accounts.responses.shared import (
     AccountRowResponse,
@@ -38,6 +41,7 @@ __all__ = [
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidateResponse",
+    "ProductInvestorsResolvedResponse",
     "ProductRefResponse",
     "ShareResponse",
     "TimeSeriesPointResponse",

@@ -206,3 +206,23 @@ async def resolve_product(
             prompt=(f'Multiple {outcome.scope} matched "{outcome.query}". Which one did you mean?'),
         )
     return outcome
+
+
+async def resolve_product_query(
+    ctx: Context, client: BackstopClient, *, query: str
+) -> ProductResolution:
+    """Resolve a product from one string that may be an id, a short name, or a display name.
+
+    Digits are a by-id GET, then the catalog if that id is missing. Anything else is the
+    catalog only — Backstop answers `GET /products/{non-digit}` with 400, not 404, so a
+    short name must never be sent as a path segment.
+    """
+    query = query.strip()
+    if not query:
+        return NotFound(query=query, scope=_SCOPE)
+    if not query.isdigit():
+        return await resolve_product(ctx, client, product=query)
+    by_id = await resolve_product(ctx, client, product_id=query)
+    if not isinstance(by_id, NotFound):
+        return by_id
+    return await resolve_product(ctx, client, product=query)

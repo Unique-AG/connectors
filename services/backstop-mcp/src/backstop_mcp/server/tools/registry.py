@@ -7,6 +7,7 @@ Each entry is a `@tool`-decorated function (annotations live on the function).
 from collections.abc import Awaitable, Callable
 
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
+from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.accounts.tools.get_time_series import get_time_series
 from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.features.activity_history.tools.get_activity_history import get_activity_history
@@ -32,6 +33,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_activity_detail,
     get_opportunities,
     get_time_series,
+    get_product_investors,
     get_accounts_for_party,
     get_people_for_party,
 )
