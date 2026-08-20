@@ -74,6 +74,12 @@ _SELECTION: Selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
 # one surface, so a chat handle's refusal names `Chat.Read` alone.
 _EVERY_TOOL: Mapping[str, GraphCallExample] = graph_call_examples(_SELECTION)
 
+# The selected tools whose refusal names more than one permission, which are the only ones that can
+# name them in the wrong order.
+_NAMES_SEVERAL: tuple[str, ...] = tuple(
+    tool for tool, example in _EVERY_TOOL.items() if len(example.permissions) > 1
+)
+
 # The MCP middleware chain the composed app ends up with, outside-in. Two of the five belong to
 # other packages, so the assertion is on names: what is load-bearing is which side of the operations
 # layer the advice sits on rather than the types themselves.
@@ -359,3 +365,48 @@ class TestMappingTwiceChangesNothing:
 
         assert str(doubly.value) == str(once.value)
         assert str(doubly.value) == _advice_for((_PERMISSION,))
+
+
+class TestTheOrderThePermissionsAreNamed:
+    """A refusal names the permissions in the order the tool declares them, and that order is prose.
+
+    This is the stated reason `GraphAdviceMiddleware` is handed a table instead of reading a tool's
+    own `tags`: a tag set loses the order, and the order is the sentence — "OnlineMeetings.Read and
+    OnlineMeetingTranscript.Read.All" reads as resolve-the-meeting-then-read-its-transcript, which
+    is the order the two calls actually happen in and the order an administrator grants them in.
+    Sorted, the same message asks for the transcript first and names a dependency backwards.
+
+    Nothing pinned it. Both routes to a message pass the permissions through the same `_named`, so
+    sorting *there* left every byte-equality assertion in this file agreeing with itself, and
+    `tests/shared/test_seam.py` asserts of its two-permission case only that both names appear.
+    What is compared here is therefore the message against the tuple the tool module declares,
+    which is the one statement of the intended order that is not downstream of the wording.
+    """
+
+    def test_a_sort_would_be_visible_in_at_least_one_of_them(self) -> None:
+        """Guards the guard. Every tool below whose permissions happen to be in sorted order already
+        asserts nothing about ordering, and if that were true of all of them this class would pass
+        against a sorted message and read as coverage."""
+        assert any(
+            _EVERY_TOOL[tool].permissions != tuple(sorted(_EVERY_TOOL[tool].permissions))
+            for tool in _NAMES_SEVERAL
+        ), "no selected tool declares its permissions in an order a sort would change"
+
+    @pytest.mark.usefixtures("obo", "graph")
+    @pytest.mark.parametrize("tool", _NAMES_SEVERAL)
+    async def test_a_refusal_names_them_in_the_order_the_tool_declares_them(
+        self, mcp_client: Client[FastMCPTransport], tool: str
+    ) -> None:
+        """Asserted on where each name appears rather than on the whole sentence, so this stays a
+        statement about order alone and the wording remains `tests/shared/test_seam.py`'s."""
+        declared = _EVERY_TOOL[tool].permissions
+
+        with pytest.raises(ToolError) as raised:
+            _ = await mcp_client.call_tool(tool, dict(_EVERY_TOOL[tool].arguments))
+
+        message = str(raised.value)
+        appearances = [message.index(permission) for permission in declared]
+
+        assert appearances == sorted(appearances), (
+            f"{tool} declares {declared} and its refusal names them in another order: {message}"
+        )
