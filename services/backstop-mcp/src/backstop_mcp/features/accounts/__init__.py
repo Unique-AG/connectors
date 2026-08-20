@@ -9,6 +9,10 @@ Figures are `sort=-date` (first 10 rows) then `max(date)` — not a `filter[date
 from backstop_mcp.features.accounts.api_responses import AccountApiResponse
 from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
 from backstop_mcp.features.accounts.fetch_accounts_for_product import fetch_accounts_for_product
+from backstop_mcp.features.accounts.fetch_holdings import (
+    FALLBACK_OMITTED_FIELDS,
+    fetch_holdings,
+)
 from backstop_mcp.features.accounts.fetch_holdings_table import fetch_holdings_table
 from backstop_mcp.features.accounts.fetch_product_positions import (
     MAX_POSITION_ACCOUNTS,
@@ -43,6 +47,7 @@ __all__ = [
     "AccountOwnerDto",
     "AccountRecordDto",
     "AccountRowResponse",
+    "FALLBACK_OMITTED_FIELDS",
     "HoldingListingDto",
     "HoldingRowDto",
     "InvestorTypeDto",
@@ -58,6 +63,7 @@ __all__ = [
     "ShareDto",
     "fetch_accounts_for_party",
     "fetch_accounts_for_product",
+    "fetch_holdings",
     "fetch_holdings_table",
     "fetch_product_positions",
     "resolve_product",
