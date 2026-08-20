@@ -21,6 +21,7 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
+from backstop_mcp.features.activity_tags import ActivityTagsService
 from backstop_mcp.features.custom_fields import CustomFieldGroupsService, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
@@ -108,6 +109,10 @@ def build_employment_index_factory(
         ),
         clock=lambda: today,
     )
+
+
+def activity_tags_service(*, ttl_minutes: int = 60) -> ActivityTagsService:
+    return ActivityTagsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
