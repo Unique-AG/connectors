@@ -120,6 +120,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.db",
     "backstop_mcp.features.accounts",
     "backstop_mcp.features.activity_history",
+    "backstop_mcp.features.activity_tags",
     "backstop_mcp.features.auth",
     "backstop_mcp.features.custom_fields",
     "backstop_mcp.features.data_hygiene",

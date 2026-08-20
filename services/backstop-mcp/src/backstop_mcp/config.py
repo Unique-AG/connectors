@@ -245,6 +245,13 @@ class BackstopConfig(BaseSettings):
     # one-hour default and 24-hour cap apply.
     opportunity_stage_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
+    # How long a fetched activity-tag catalog stays usable before it is re-fetched. Tags change
+    # rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit for days
+    # after a CRM admin adds a tag. `list_activity_tags(refresh=true)` forces a refetch when a
+    # tag is missing. Distinct from `custom_field_schema_ttl_minutes`: tags are a different
+    # collection.
+    activity_tag_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
+
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
     # exactly; markers match case-insensitively as substrings of the type's name.

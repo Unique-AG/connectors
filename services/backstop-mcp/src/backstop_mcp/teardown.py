@@ -26,6 +26,7 @@ from backstop_mcp.dependencies import (
     get_session_factory,
 )
 from backstop_mcp.features.activity_history import get_activity_history_settings
+from backstop_mcp.features.activity_tags import get_activity_tags_service
 from backstop_mcp.features.custom_fields import (
     get_custom_field_groups_service,
     get_custom_fields_service,
@@ -53,6 +54,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_backstop_client_factory,
     get_auth_provider,
     get_activity_history_settings,
+    get_activity_tags_service,
     get_custom_fields_service,
     get_custom_field_groups_service,
     get_employment_index_factory,
