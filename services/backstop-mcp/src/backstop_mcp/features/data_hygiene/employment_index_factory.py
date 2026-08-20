@@ -160,7 +160,7 @@ class EmploymentIndexFactory:
                 continue
 
             type_name = type_names.get(type_id) if type_id is not None else None
-            status = self._classify_employment(type_id=type_id, type_name=type_name, rules=rules)
+            status = self.classify_employment(type_id=type_id, type_name=type_name, rules=rules)
             if status is EmploymentStatus.IRRELEVANT:
                 continue
 
@@ -212,7 +212,7 @@ class EmploymentIndexFactory:
         return edges
 
     @staticmethod
-    def _classify_employment(
+    def classify_employment(
         *,
         type_id: str | None,
         type_name: str | None,

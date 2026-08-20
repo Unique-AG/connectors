@@ -50,7 +50,7 @@ from tests.features.data_hygiene.helpers import (
     relationship_types,
 )
 
-_classify_employment = EmploymentIndexFactory._classify_employment
+_classify_employment = EmploymentIndexFactory.classify_employment
 
 TODAY = date(2026, 8, 5)
 
