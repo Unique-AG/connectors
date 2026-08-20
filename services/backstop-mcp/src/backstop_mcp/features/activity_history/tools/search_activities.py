@@ -194,7 +194,7 @@ async def search_activities(
             description=(
                 "Opt in to full note text (~25× row size). Capped at 50 rows, refused with "
                 "`mode=aggregate`, and refused on a wide sweep (no party, no tags, no "
-                "authors). Attachments stay on get_activity_detail."
+                "authors)."
             ),
         ),
     ] = False,
@@ -262,7 +262,7 @@ async def search_activities(
 
     `mode=aggregate` with `group_by` answers a counting question without row bodies.
     `include_description` is opt-in, capped, refused in aggregate mode, and refused on a wide
-    sweep. Attachments are still get_activity_detail.
+    sweep. `attachments_count` is a count only — no tool lists the files.
     """
     if start_date > end_date:
         raise ValueError("start_date must not be after end_date")

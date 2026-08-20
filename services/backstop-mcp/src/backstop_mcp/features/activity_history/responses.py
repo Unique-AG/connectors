@@ -708,14 +708,14 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Plain-text body from formattedDescription. Only present when include_description "
-            "was true. Attachments are not listed here — that remains get_activity_detail."
+            "was true. `attachments_count` is a count only — no tool lists the files."
         ),
     )
     attachments_count: int | None = Field(
         default=None,
         description=(
-            "How many files are attached. The list of those files is get_activity_detail, "
-            "not this tool."
+            "How many files are attached. A count only — neither this tool nor "
+            "get_activity_detail lists the files."
         ),
     )
     author: AttendeeResponse | None = Field(

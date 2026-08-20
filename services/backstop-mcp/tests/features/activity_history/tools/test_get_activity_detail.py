@@ -50,6 +50,15 @@ def _specifics_document(resource_id: str, **attributes: object) -> dict[str, obj
     return {"data": {"type": "meeting-or-calls", "id": resource_id, "attributes": attributes}}
 
 
+class TestGetActivityDetailDocstring:
+    def test_names_itself_the_documented_fallback_for_full_body(self) -> None:
+        doc = get_activity_detail.__doc__ or ""
+        assert "search_activities" in doc
+        assert "fallback" in doc
+        assert "include_description" in doc
+        assert "attachment list" not in doc
+
+
 class TestMeetingOrCall:
     @pytest.mark.asyncio
     @respx.mock

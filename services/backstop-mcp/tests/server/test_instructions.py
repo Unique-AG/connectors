@@ -11,7 +11,12 @@ class TestInstructions:
         assert "assets under management" in INSTRUCTIONS
         assert "get_people_for_party" in INSTRUCTIONS
         assert "numberOfEmployees" in INSTRUCTIONS
+        assert "search_activities" in INSTRUCTIONS
         assert "get_activity_history" in INSTRUCTIONS
+        assert "get_activity_detail" in INSTRUCTIONS
+        history = INSTRUCTIONS.index("get_activity_history")
+        assert INSTRUCTIONS.index("search_activities") < history
+        assert history < INSTRUCTIONS.index("get_activity_detail")
         assert "representative" in INSTRUCTIONS
         assert "list_custom_fields" in INSTRUCTIONS
         assert "describe_data_model" not in INSTRUCTIONS
