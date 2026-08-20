@@ -28,7 +28,6 @@ from backstop_mcp.features.auth import NotConnectedError
 from backstop_mcp.features.custom_fields import get_custom_fields_service
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
 from backstop_mcp.features.opportunities import get_opportunity_stages_service
-from backstop_mcp.server.runtime import get_services
 from backstop_mcp.server.tools import TOOLS
 
 _BASE_URL = "https://api.backstopsolutions.com"
@@ -184,7 +183,7 @@ class TestWiring:
     def test_lifespan_teardown_releases_the_services(
         self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """`configure_services` asserts on a second install, so teardown must actually reset.
+        """Teardown must cache_clear: two sequential `create_app()` + `TestClient` must succeed.
 
         Two apps in sequence is what the test suite itself does, and what a reload does.
         """
@@ -192,7 +191,7 @@ class TestWiring:
         for _ in range(2):
             app = create_app()
             with TestClient(app):
-                assert get_services().backstop is not None
+                assert get_backstop_client_factory() is not None
 
 
 class TestRoutes:

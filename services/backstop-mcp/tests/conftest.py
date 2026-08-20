@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.dependencies import close_singletons
-from backstop_mcp.server.runtime import reset_services
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
@@ -32,10 +31,10 @@ def _undo_logger_disabling() -> None:
 
 
 @pytest.fixture(autouse=True)
-async def _reset_runtime() -> AsyncGenerator[None]:
-    """Drop process-wide services and cached providers between tests.
+async def _close_singletons() -> AsyncGenerator[None]:
+    """Drop cached providers between tests.
 
-    Necessary because each test function runs on its own event loop
+    Each test function runs on its own event loop
     (`asyncio_default_fixture_loop_scope = "function"`) and httpx binds its connection pool to
     whichever loop first touches it — a pool left over from a previous test would raise
     "bound to a different event loop". Cached providers would otherwise leak a closed factory
@@ -43,7 +42,6 @@ async def _reset_runtime() -> AsyncGenerator[None]:
     """
     yield
     await close_singletons()
-    await reset_services()
 
 
 @pytest.fixture(scope="session")
