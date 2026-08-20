@@ -196,7 +196,7 @@ class CustomFieldEntityReferenceDto(BaseModel):
 
 
 class ResolvedCustomFieldValueDto(BaseModel):
-    """One record value joined to its catalog definition."""
+    """One stored value with catalog metadata copied on, so a caller does not join again."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -210,6 +210,27 @@ class ResolvedCustomFieldValueDto(BaseModel):
     entity_type: str | None = None
     value: object = None
     outside_current_options: bool = False
+
+    @classmethod
+    def from_definition(
+        cls,
+        definition: CustomFieldDefinitionDto,
+        *,
+        value: object,
+        outside_current_options: bool,
+    ) -> Self:
+        return cls(
+            definition_id=definition.id,
+            name=definition.name,
+            layout_name=definition.layout_name,
+            group_name=definition.group_name,
+            field_type=definition.field_type,
+            tab_name=definition.tab_name,
+            group_id=definition.group_id,
+            entity_type=definition.entity_type,
+            value=value,
+            outside_current_options=outside_current_options,
+        )
 
 
 def _path_segments(value: list[object] | None) -> list[str]:

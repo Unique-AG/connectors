@@ -25,36 +25,20 @@ logger = logging.getLogger(__name__)
 
 type CatalogResult = tuple[dict[str, CustomFieldDefinitionDto], Literal["ok", "stale"]]
 
-_RAW_VALUE_KEYS = frozenset({"regularCustomFieldValues", "regular_custom_field_values"})
-_ENTITY_FIELD_TYPE = "entity"
-_OPTION_TOKEN_KEYS = ("label", "value", "name", "id")
-
-
-def without_regular_custom_field_values(
-    attributes: Mapping[str, object],
-) -> tuple[dict[str, object], object]:
-    """Copy `attributes` with the raw custom-field dump removed.
-
-    Returns the stripped mapping and the dump (or None when the key was absent).
-    """
-    raw: object = None
-    stripped: dict[str, object] = {}
-    for key, value in attributes.items():
-        if key in _RAW_VALUE_KEYS:
-            if raw is None:
-                raw = value
-            continue
-        stripped[key] = value
-    return stripped, raw
-
 
 class CustomFieldsService:
     """Process-wide custom-field schema catalog, and the join of record values onto it.
 
-    Definitions live in one in-memory dict keyed by definition id. Until a fetch succeeds
-    this service has nothing to serve. Constructed by `get_custom_fields_service` in this
-    feature's `dependencies.py`.
+    A party GET only embeds `{definitionId, value}`. Names, types, tabs, groups and picklist
+    options live on the definition catalog. Until a fetch succeeds this service has nothing to
+    serve. Constructed by `get_custom_fields_service` in this feature's `dependencies.py`.
     """
+
+    _STORED_VALUE_KEYS: frozenset[str] = frozenset(
+        {"regularCustomFieldValues", "regular_custom_field_values"}
+    )
+    _ENTITY_FIELD_TYPE: str = "entity"
+    _OPTION_TEXT_KEYS: tuple[str, ...] = ("label", "value", "name", "id")
 
     def __init__(self, *, ttl: timedelta) -> None:
         self._definitions: dict[str, CustomFieldDefinitionDto] | None = None
@@ -105,10 +89,28 @@ class CustomFieldsService:
             # get()s joining a finished future until process restart.
             await asyncio.shield(self._unpin_in_flight(in_flight))
 
+    def take_stored_values(
+        self, attributes: Mapping[str, object]
+    ) -> tuple[dict[str, object], object]:
+        """Pull Backstop's `regularCustomFieldValues` dump off a party record.
+
+        Returns the record without that key, and the dump (or None). The dump is
+        `{definitionId, value}` rows — names and types come from `resolve_values`.
+        """
+        stored: object = None
+        record: dict[str, object] = {}
+        for key, value in attributes.items():
+            if key in self._STORED_VALUE_KEYS:
+                if stored is None:
+                    stored = value
+                continue
+            record[key] = value
+        return record, stored
+
     async def resolve_values(
         self,
         client: BackstopClient,
-        raw_values: object,
+        stored_values: object,
         *,
         tabs: Sequence[str] = (),
         groups: Sequence[str] = (),
@@ -116,11 +118,12 @@ class CustomFieldsService:
         definition_ids: Sequence[str] = (),
         names: Sequence[str] = (),
     ) -> list[ResolvedCustomFieldValueResponse]:
-        """Join stored values to the cached catalog and optionally slice the result.
+        """Look up each stored `{definitionId, value}` in the catalog.
 
-        Looks up each value by definition id in the unfiltered catalog — party and
-        entity-specific definitions both appear on one record. A cold-cache fetch failure
-        returns an empty list rather than raising, so the party lookup still succeeds.
+        Party and entity-specific definitions both appear on one record, so this uses the
+        full catalog. ENTITY values become party references; picklist values that left the
+        current option list are kept and flagged. A cold-cache fetch failure returns an empty
+        list rather than raising, so the party lookup still succeeds.
         """
         try:
             catalog, _status = await self.get(client)
@@ -128,13 +131,13 @@ class CustomFieldsService:
             logger.warning("custom_fields.values.catalog_unavailable", exc_info=True)
             return []
 
-        resolved: list[ResolvedCustomFieldValueResponse] = []
-        for value in _parse_values(raw_values):
-            joined = _join_one(value, catalog)
-            if joined is None:
+        published: list[ResolvedCustomFieldValueResponse] = []
+        for stored in self._stored_rows(stored_values):
+            resolved = self._with_catalog_definition(stored, catalog)
+            if resolved is None:
                 continue
-            if not _matches_selection(
-                joined,
+            if not self._included_by_filters(
+                resolved,
                 tabs=tabs,
                 groups=groups,
                 group_ids=group_ids,
@@ -142,8 +145,8 @@ class CustomFieldsService:
                 names=names,
             ):
                 continue
-            resolved.append(ResolvedCustomFieldValueResponse.from_dto(joined))
-        return resolved
+            published.append(ResolvedCustomFieldValueResponse.from_dto(resolved))
+        return published
 
     async def _unpin_in_flight(self, in_flight: asyncio.Future[CatalogResult]) -> None:
         async with self._lock:
@@ -187,120 +190,113 @@ class CustomFieldsService:
         in_flight.set_result(result)
         return result
 
+    def _stored_rows(self, stored_values: object) -> list[CustomFieldValueAttributes]:
+        if not isinstance(stored_values, list):
+            return []
+        rows: list[CustomFieldValueAttributes] = []
+        for item in cast(list[object], stored_values):
+            if not isinstance(item, Mapping):
+                continue
+            try:
+                rows.append(CustomFieldValueAttributes.model_validate(item))
+            except ValidationError:
+                logger.warning("custom_fields.values.unreadable", exc_info=True)
+        return rows
 
-def _parse_values(raw_values: object) -> list[CustomFieldValueAttributes]:
-    if not isinstance(raw_values, list):
-        return []
-    parsed: list[CustomFieldValueAttributes] = []
-    for item in cast(list[object], raw_values):
-        if not isinstance(item, Mapping):
-            continue
+    def _with_catalog_definition(
+        self,
+        stored: CustomFieldValueAttributes,
+        catalog: Mapping[str, CustomFieldDefinitionDto],
+    ) -> ResolvedCustomFieldValueDto | None:
+        definition_id = stored.definition_id
+        if not definition_id:
+            return None
+        definition = catalog.get(definition_id)
+        if definition is None:
+            return None
+        return ResolvedCustomFieldValueDto.from_definition(
+            definition,
+            value=self._as_published_value(stored.value, definition.field_type),
+            outside_current_options=self._not_in_current_options(
+                stored.value, definition.select_options
+            ),
+        )
+
+    def _as_published_value(self, value: object, field_type: str | None) -> object:
+        if field_type is None or field_type.casefold() != self._ENTITY_FIELD_TYPE:
+            return value
         try:
-            parsed.append(CustomFieldValueAttributes.model_validate(item))
+            ref = ResourceRef.model_validate(value)
         except ValidationError:
-            logger.warning("custom_fields.values.unreadable", exc_info=True)
-    return parsed
+            return value
+        resource_type = ref.resource_type
+        return CustomFieldEntityReferenceDto(
+            id=ref.resource_id,
+            resource_type=resource_type,
+            resource_link=ref.resource_link,
+            search_type=party_search_type(resource_type) if resource_type else None,
+        )
 
+    def _not_in_current_options(self, value: object, select_options: Sequence[object]) -> bool:
+        if not select_options or value is None:
+            return False
+        current = self._current_option_texts(select_options)
+        stored: list[object] = (
+            list(cast(list[object], value)) if isinstance(value, list) else [value]
+        )
+        for item in stored:
+            text = self._option_text(item)
+            if text is None or text not in current:
+                return True
+        return False
 
-def _join_one(
-    value: CustomFieldValueAttributes,
-    definitions: Mapping[str, CustomFieldDefinitionDto],
-) -> ResolvedCustomFieldValueDto | None:
-    definition_id = value.definition_id
-    if not definition_id:
+    def _current_option_texts(self, select_options: Sequence[object]) -> set[str]:
+        current: set[str] = set()
+        for option in select_options:
+            if isinstance(option, str):
+                current.add(option)
+                continue
+            if isinstance(option, Mapping):
+                payload = cast(Mapping[str, object], option)
+                for key in self._OPTION_TEXT_KEYS:
+                    text = self._option_text(payload.get(key))
+                    if text is not None:
+                        current.add(text)
+        return current
+
+    def _option_text(self, value: object) -> str | None:
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bool) or value is None:
+            return None
+        if isinstance(value, int):
+            return str(value)
         return None
-    definition = definitions.get(definition_id)
-    if definition is None:
-        return None
-    return ResolvedCustomFieldValueDto(
-        definition_id=definition.id,
-        name=definition.name,
-        layout_name=definition.layout_name,
-        group_name=definition.group_name,
-        field_type=definition.field_type,
-        tab_name=definition.tab_name,
-        group_id=definition.group_id,
-        entity_type=definition.entity_type,
-        value=_resolved_value(value.value, definition.field_type),
-        outside_current_options=_outside_current_options(value.value, definition.select_options),
-    )
 
+    def _included_by_filters(
+        self,
+        resolved: ResolvedCustomFieldValueDto,
+        *,
+        tabs: Sequence[str],
+        groups: Sequence[str],
+        group_ids: Sequence[int],
+        definition_ids: Sequence[str],
+        names: Sequence[str],
+    ) -> bool:
+        if tabs and not self._equals_ignore_case(resolved.tab_name, tabs):
+            return False
+        if groups and not self._equals_ignore_case(resolved.group_name, groups):
+            return False
+        if group_ids and resolved.group_id not in set(group_ids):
+            return False
+        if definition_ids and resolved.definition_id not in {
+            entry.strip() for entry in definition_ids
+        }:
+            return False
+        return not names or self._equals_ignore_case(resolved.name, names)
 
-def _resolved_value(value: object, field_type: str | None) -> object:
-    if field_type is None or field_type.casefold() != _ENTITY_FIELD_TYPE:
-        return value
-    try:
-        ref = ResourceRef.model_validate(value)
-    except ValidationError:
-        return value
-    resource_type = ref.resource_type
-    return CustomFieldEntityReferenceDto(
-        id=ref.resource_id,
-        resource_type=resource_type,
-        resource_link=ref.resource_link,
-        search_type=party_search_type(resource_type) if resource_type else None,
-    )
-
-
-def _outside_current_options(value: object, select_options: Sequence[object]) -> bool:
-    if not select_options or value is None:
-        return False
-    allowed = _option_membership(select_options)
-    items: list[object] = list(cast(list[object], value)) if isinstance(value, list) else [value]
-    for item in items:
-        token = _stored_token(item)
-        if token is None or token not in allowed:
-            return True
-    return False
-
-
-def _option_membership(select_options: Sequence[object]) -> set[str]:
-    allowed: set[str] = set()
-    for option in select_options:
-        if isinstance(option, str):
-            allowed.add(option)
-            continue
-        if isinstance(option, Mapping):
-            payload = cast(Mapping[str, object], option)
-            for key in _OPTION_TOKEN_KEYS:
-                token = _stored_token(payload.get(key))
-                if token is not None:
-                    allowed.add(token)
-    return allowed
-
-
-def _stored_token(value: object) -> str | None:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, int):
-        return str(value)
-    return None
-
-
-def _matches_selection(
-    item: ResolvedCustomFieldValueDto,
-    *,
-    tabs: Sequence[str],
-    groups: Sequence[str],
-    group_ids: Sequence[int],
-    definition_ids: Sequence[str],
-    names: Sequence[str],
-) -> bool:
-    if tabs and not _casefold_in(item.tab_name, tabs):
-        return False
-    if groups and not _casefold_in(item.group_name, groups):
-        return False
-    if group_ids and item.group_id not in set(group_ids):
-        return False
-    if definition_ids and item.definition_id not in {entry.strip() for entry in definition_ids}:
-        return False
-    return not names or _casefold_in(item.name, names)
-
-
-def _casefold_in(actual: str | None, wanted: Sequence[str]) -> bool:
-    if actual is None:
-        return False
-    folded = actual.casefold()
-    return any(entry.casefold() == folded for entry in wanted)
+    def _equals_ignore_case(self, actual: str | None, wanted: Sequence[str]) -> bool:
+        if actual is None:
+            return False
+        folded = actual.casefold()
+        return any(entry.casefold() == folded for entry in wanted)

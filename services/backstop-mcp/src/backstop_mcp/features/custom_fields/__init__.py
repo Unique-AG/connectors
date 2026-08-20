@@ -3,10 +3,7 @@ from backstop_mcp.features.custom_fields.api_responses import (
     CustomFieldGroupAttributes,
 )
 from backstop_mcp.features.custom_fields.custom_field_groups_service import CustomFieldGroupsService
-from backstop_mcp.features.custom_fields.custom_fields_service import (
-    CustomFieldsService,
-    without_regular_custom_field_values,
-)
+from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
 from backstop_mcp.features.custom_fields.dependencies import (
     get_custom_field_groups_service,
     get_custom_fields_service,
@@ -49,5 +46,4 @@ __all__ = [
     "custom_field_entity_type_from_bean",
     "get_custom_field_groups_service",
     "get_custom_fields_service",
-    "without_regular_custom_field_values",
 ]
