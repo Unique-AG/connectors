@@ -1,11 +1,10 @@
-from collections.abc import Callable
-
 import httpx
 import pytest
 import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.org_people import OrgPeopleResolvedResponse
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -17,10 +16,11 @@ from tests.features.data_hygiene.helpers import (
     relationship_types,
 )
 from tests.features.party_resolver.helpers import ctx_never_elicit
-from tests.helpers import BASE_URL
+from tests.helpers import BASE_URL, build_employment_index_factory
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
-type ConnectUser = Callable[..., object]
+_INDEX = build_employment_index_factory()
+
 
 _ORG = "341764767"
 _EMPLOYEES_URL = f"{BASE_URL}/organizations/{_ORG}/employees"
@@ -31,9 +31,8 @@ class TestGetPeopleForParty:
     @pytest.mark.asyncio
     @respx.mock
     async def test_lists_current_people_with_employment_at_the_org(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-orgp-1", "orgp-bob")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_EMPLOYEES_URL).mock(
             return_value=httpx.Response(
                 200,
@@ -66,7 +65,12 @@ class TestGetPeopleForParty:
         respx.get(_ER_URL).mock(return_value=httpx.Response(200, json={"data": []}))
 
         result = tool_model(
-            await get_people_for_party(ctx_never_elicit(), party_id=_ORG),
+            await get_people_for_party(
+                ctx_never_elicit(),
+                party_id=_ORG,
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             OrgPeopleResolvedResponse,
         )
 
@@ -86,13 +90,17 @@ class TestGetPeopleForParty:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_empty_employees_is_not_former_omitted(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-orgp-2", "orgp-carol")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_empty_employees_is_not_former_omitted(self, client: BackstopClient) -> None:
         respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(200, json={"data": []}))
         respx.get(_ER_URL).mock(return_value=httpx.Response(200, json={"data": []}))
 
         result = tool_model(
-            await get_people_for_party(ctx_never_elicit(), party_id=_ORG),
+            await get_people_for_party(
+                ctx_never_elicit(),
+                party_id=_ORG,
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             OrgPeopleResolvedResponse,
         )
 
@@ -103,9 +111,8 @@ class TestGetPeopleForParty:
     @pytest.mark.asyncio
     @respx.mock
     async def test_former_only_org_sets_include_former_hint(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-orgp-4", "orgp-erin")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(200, json={"data": []}))
         respx.get(_ER_URL).mock(
             return_value=httpx.Response(
@@ -127,7 +134,12 @@ class TestGetPeopleForParty:
         )
 
         result = tool_model(
-            await get_people_for_party(ctx_never_elicit(), party_id=_ORG),
+            await get_people_for_party(
+                ctx_never_elicit(),
+                party_id=_ORG,
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             OrgPeopleResolvedResponse,
         )
 
@@ -138,14 +150,18 @@ class TestGetPeopleForParty:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unknown_party_is_not_found(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-orgp-3", "orgp-dave")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_unknown_party_is_not_found(self, client: BackstopClient) -> None:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json={"data": []})
         )
 
         result = tool_model(
-            await get_people_for_party(ctx_never_elicit(), search="No Such Org"),
+            await get_people_for_party(
+                ctx_never_elicit(),
+                search="No Such Org",
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             NotFoundResponse,
         )
 

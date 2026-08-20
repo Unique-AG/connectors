@@ -3,6 +3,8 @@
 from types import UnionType
 from typing import Annotated, TypeAliasType, cast, get_args, get_origin, get_type_hints
 
+from fastmcp.decorators import get_fastmcp_meta
+from fastmcp.tools.function_tool import FunctionTool, ToolMeta
 from pydantic import BaseModel
 
 from backstop_mcp.server.tools import TOOLS
@@ -93,3 +95,32 @@ def test_every_tool_response_field_is_described() -> None:
         if not field.description
     ]
     assert missing == []
+
+
+_DEPENDS_PARAM_NAMES = frozenset(
+    {
+        "client",
+        "employment_index_factory",
+        "custom_fields",
+        "opportunity_stages",
+        "activity_history",
+    }
+)
+
+
+def test_depends_params_are_not_in_the_published_input_schema() -> None:
+    leaked = [
+        f"{fn.__name__}.{name}"
+        for fn in TOOLS
+        for name in _published_depends_params(fn)
+    ]
+    assert leaked == []
+
+
+def _published_depends_params(fn: object) -> list[str]:
+    meta = get_fastmcp_meta(fn)
+    assert isinstance(meta, ToolMeta)
+    tool = FunctionTool.from_function(fn, metadata=meta)
+    properties = tool.parameters.get("properties", {})
+    assert isinstance(properties, dict)
+    return [name for name in _DEPENDS_PARAM_NAMES if name in properties]

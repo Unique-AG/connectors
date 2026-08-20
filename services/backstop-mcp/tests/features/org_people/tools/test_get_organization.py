@@ -1,10 +1,8 @@
-from collections.abc import Callable
-
 import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopResponseSchemaError
+from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import InternalOwnerResponse
 from backstop_mcp.features.org_people import OrganizationRecordResponse
@@ -27,8 +25,6 @@ from tests.features.party_resolver.helpers import (
     resource,
 )
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
-
-type ConnectUser = Callable[..., object]
 
 
 def _organization_document(
@@ -84,9 +80,8 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_unique_search_fetches_organization_and_echoes_resolved(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-1", "org-bob.smith")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -113,7 +108,7 @@ class TestGetOrganization:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), search="Capstone"),
+            await get_organization(ctx_never_elicit(), search="Capstone", client=client),
             OrganizationResolvedResponse,
         )
 
@@ -139,9 +134,8 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_ambiguous_search_returns_candidates_without_org_get(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-2", "org-carol.diaz")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -157,7 +151,7 @@ class TestGetOrganization:
         )
 
         result = tool_model(
-            await get_organization(ctx_decline(), search="Capstone"),
+            await get_organization(ctx_decline(), search="Capstone", client=client),
             PartyAmbiguousResponse,
         )
 
@@ -185,8 +179,7 @@ class TestGetOrganization:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_trusted_party_id_fetches_organization(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-org-3", "org-dave.lee")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_trusted_party_id_fetches_organization(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
             return_value=httpx.Response(
@@ -205,7 +198,7 @@ class TestGetOrganization:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), party_id="trusted-9"),
+            await get_organization(ctx_never_elicit(), party_id="trusted-9", client=client),
             OrganizationResolvedResponse,
         )
 
@@ -219,12 +212,11 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_trusted_party_id_is_percent_encoded_in_request_path(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         # Defense in depth alongside the '/' rejection in resolve_party.py: any character that
         # could otherwise change the request's structure (here, a space) must be encoded
         # rather than interpolated raw into the path.
-        await connect_user("user-org-5", "org-frank.oz")  # pyright: ignore[reportGeneralTypeIssues]
 
         org_get = respx.get(f"{BASE_URL}/organizations/trusted%209").mock(
             return_value=httpx.Response(
@@ -240,7 +232,7 @@ class TestGetOrganization:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), party_id="trusted 9"),
+            await get_organization(ctx_never_elicit(), party_id="trusted 9", client=client),
             OrganizationResolvedResponse,
         )
 
@@ -250,19 +242,17 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_trusted_party_id_containing_slash_is_rejected(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-6", "org-grace.hopper")  # pyright: ignore[reportGeneralTypeIssues]
 
         with pytest.raises(ValueError, match="must not contain '/'"):
-            await get_organization(ctx_never_elicit(), party_id="../admin")
+            await get_organization(ctx_never_elicit(), party_id="../admin", client=client)
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_malformed_organization_body_raises_schema_error(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-4", "org-erin.ng")  # pyright: ignore[reportGeneralTypeIssues]
 
         # `id` is entirely absent from the organization resource — fails
         # `BackstopApiResourceDocument[OrganizationRecordResponse]` schema validation outright.
@@ -274,7 +264,7 @@ class TestGetOrganization:
         )
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
-            await get_organization(ctx_never_elicit(), party_id="trusted-9")
+            await get_organization(ctx_never_elicit(), party_id="trusted-9", client=client)
 
         assert exc_info.value.path == "/organizations/trusted-9"
         assert exc_info.value.schema_name == (
@@ -284,17 +274,16 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_not_found_search_returns_the_query_it_used(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """Policy step 5: name the exact term searched for, so a typo is correctable."""
-        await connect_user("user-org-7", "org-hank.p")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
 
         result = tool_model_union(
-            await get_organization(ctx_never_elicit(), search="Capstoen"),
+            await get_organization(ctx_never_elicit(), search="Capstoen", client=client),
             GetOrganizationResponse,
         )
 
@@ -305,8 +294,7 @@ class TestGetOrganization:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_does_not_declare_glossary_meta(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-org-glossary", "org-glossary")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_does_not_declare_glossary_meta(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -333,7 +321,7 @@ class TestGetOrganization:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), search="Capstone"),
+            await get_organization(ctx_never_elicit(), search="Capstone", client=client),
             OrganizationResolvedResponse,
         )
 
@@ -346,10 +334,9 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_locations_carry_their_title_and_primary_flag(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """And Backstop's duplicate source fields collapse to one projected field each."""
-        await connect_user("user-org-includes-1", "org-includes-locations")  # pyright: ignore[reportGeneralTypeIssues]
 
         org_get = respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -372,7 +359,12 @@ class TestGetOrganizationIncludes:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), party_id="o42", include=["locations"]),
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                include=["locations"],
+                client=client,
+            ),
             OrganizationResolvedResponse,
         )
 
@@ -400,10 +392,9 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_an_address_book_with_nothing_in_it_is_empty_not_absent(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """`[]` is "we looked, there are none"; the names not asked for are absent entirely."""
-        await connect_user("user-org-includes-2", "org-includes-no-emails")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -412,7 +403,12 @@ class TestGetOrganizationIncludes:
         )
 
         payload = tool_payload(
-            await get_organization(ctx_never_elicit(), party_id="o42", include=["email_addresses"])
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                include=["email_addresses"],
+                client=client,
+            )
         )
 
         assert object_dict(payload["included"]) == {"email_addresses": []}
@@ -420,9 +416,8 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_the_primary_contact_is_trimmed_to_a_contact_card(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-includes-3", "org-includes-primary-contact")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -463,7 +458,12 @@ class TestGetOrganizationIncludes:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), party_id="o42", include=["primary_contact"]),
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                include=["primary_contact"],
+                client=client,
+            ),
             OrganizationResolvedResponse,
         )
 
@@ -483,9 +483,8 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_the_representative_is_documented_as_our_own_colleague(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-includes-4", "org-includes-representative")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -520,7 +519,12 @@ class TestGetOrganizationIncludes:
         )
 
         result = tool_model(
-            await get_organization(ctx_never_elicit(), party_id="o42", include=["representative"]),
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                include=["representative"],
+                client=client,
+            ),
             OrganizationResolvedResponse,
         )
 
@@ -541,15 +545,18 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_omitting_include_leaves_no_included_key_and_no_include_param(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-includes-5", "org-includes-none")  # pyright: ignore[reportGeneralTypeIssues]
 
         org_get = respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_organization_document())
         )
 
-        payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
+        payload = tool_payload(await get_organization(
+            ctx_never_elicit(),
+            party_id="o42",
+            client=client,
+        ))
 
         assert "included" not in payload
         assert "include" not in org_get.calls.last.request.url.params
@@ -557,10 +564,9 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_all_four_includes_travel_as_one_query_value(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """Measured live: Backstop takes the whole set on one GET, comma-separated."""
-        await connect_user("user-org-includes-6", "org-includes-all")  # pyright: ignore[reportGeneralTypeIssues]
 
         org_get = respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_organization_document())
@@ -571,6 +577,7 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 include=["locations", "email_addresses", "primary_contact", "representative"],
+                client=client,
             )
         )
 
@@ -583,10 +590,9 @@ class TestGetOrganizationIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_lone_to_one_that_resolves_to_nothing_leaves_included_empty(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """`included: {}` is the answer, not an absent key: we did look, nobody is assigned."""
-        await connect_user("user-org-includes-7", "org-includes-empty-to-one")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -596,7 +602,12 @@ class TestGetOrganizationIncludes:
         )
 
         payload = tool_payload(
-            await get_organization(ctx_never_elicit(), party_id="o42", include=["primary_contact"])
+            await get_organization(
+                ctx_never_elicit(),
+                party_id="o42",
+                include=["primary_contact"],
+                client=client,
+            )
         )
 
         assert object_dict(payload["included"]) == {}
@@ -612,9 +623,8 @@ class TestGetOrganizationOmitsNullsFromTheWire:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_null_backstop_attribute_is_not_a_key_but_a_filled_one_is(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-nulls-1", "org-null-attribute")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -630,7 +640,11 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
+        payload = tool_payload(await get_organization(
+            ctx_never_elicit(),
+            party_id="o42",
+            client=client,
+        ))
 
         organization = object_dict(payload["organization"])
         assert "website" not in organization
@@ -638,9 +652,8 @@ class TestGetOrganizationOmitsNullsFromTheWire:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_custom_field_values_survive_intact(self, connect_user: ConnectUser) -> None:
+    async def test_custom_field_values_survive_intact(self, client: BackstopClient) -> None:
         """A plain dict, not a model, so nothing prunes it — write-back still round-trips."""
-        await connect_user("user-org-nulls-2", "org-custom-fields")  # pyright: ignore[reportGeneralTypeIssues]
 
         custom_fields = [
             {"definitionId": 343439, "name": "Status", "value": "Attended - Web & Adio"}
@@ -659,16 +672,19 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
+        payload = tool_payload(await get_organization(
+            ctx_never_elicit(),
+            party_id="o42",
+            client=client,
+        ))
 
         assert object_dict(payload["organization"])["regularCustomFieldValues"] == custom_fields
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_as_of_is_absent_when_backstop_records_no_provenance(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-nulls-3", "org-no-provenance")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -677,16 +693,19 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
+        payload = tool_payload(await get_organization(
+            ctx_never_elicit(),
+            party_id="o42",
+            client=client,
+        ))
 
         assert "as_of" not in payload
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_resolved_omits_name_when_the_record_has_none(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-org-nulls-4", "org-no-name")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
@@ -695,7 +714,11 @@ class TestGetOrganizationOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_organization(ctx_never_elicit(), party_id="o42"))
+        payload = tool_payload(await get_organization(
+            ctx_never_elicit(),
+            party_id="o42",
+            client=client,
+        ))
 
         resolved = object_dict(payload["resolved"])
         assert resolved["id"] == "o42"

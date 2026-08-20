@@ -24,10 +24,13 @@ import logging
 from typing import Annotated
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
     ActivityDetailResponse,
     ResourceIdentifierDto,
@@ -36,7 +39,6 @@ from backstop_mcp.features.activity_history import (
     fetch_meeting_specifics,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,7 @@ async def get_activity_detail(
             ),
         ),
     ],
+    client: BackstopClient = Depends(get_backstop_client),
 ) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, and attendees by `activity_id`.
 
@@ -72,7 +75,6 @@ async def get_activity_detail(
     are only populated for a meeting/call record; a note or document leaves them `None`/empty.
     """
     _ = ctx
-    client = await get_backstop_client()
     handle = ResourceIdentifierDto.from_activity_id(activity_id)
     resource_id = handle.resource_id
     logger.info(

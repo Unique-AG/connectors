@@ -9,10 +9,13 @@ import logging
 from typing import Annotated
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.accounts import (
     PartyAccountsResolvedResponse,
     fetch_accounts_for_party,
@@ -26,7 +29,6 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +88,7 @@ async def get_accounts_for_party(
             ),
         ),
     ] = False,
+    client: BackstopClient = Depends(get_backstop_client),
 ) -> GetAccountsForPartyResponse:
     """List the accounts a person or organization owns, across products.
 
@@ -100,7 +103,6 @@ async def get_accounts_for_party(
     `product`. An empty list with `closed_omitted>0` means every owned account is closed —
     pass `include_closed=true` rather than reading that as "owns nothing".
     """
-    client = await get_backstop_client()
     result = await resolve_party(
         ctx,
         client,

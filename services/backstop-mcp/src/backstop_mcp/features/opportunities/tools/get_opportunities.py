@@ -15,16 +15,21 @@ import logging
 from typing import Annotated, Literal
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
     OpportunityFetchResponse,
     OpportunityResponse,
+    OpportunityStagesService,
     OpportunityStatus,
     fetch_opportunities,
+    get_opportunity_stages_service,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -34,7 +39,6 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import OmitNoneModel, published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client, get_opportunity_stages_service
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +152,8 @@ async def get_opportunities(
             ),
         ),
     ] = "all",
+    client: BackstopClient = Depends(get_backstop_client),
+    opportunity_stages: OpportunityStagesService = Depends(get_opportunity_stages_service),
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
 
@@ -164,7 +170,6 @@ async def get_opportunities(
     is omitted until the deal has moved at all — do not read it as the current stage. Stage
     names are this instance's vocabulary, returned on each deal.
     """
-    client = await get_backstop_client()
     result = await resolve_party(
         ctx,
         client,
@@ -185,7 +190,7 @@ async def get_opportunities(
         segment=party.search_type,
         entity_id=party.id,
         status=status,
-        vocabulary=get_opportunity_stages_service().get(client),
+        vocabulary=opportunity_stages.get(client),
     )
     logger.info(
         "opportunities.get.completed",

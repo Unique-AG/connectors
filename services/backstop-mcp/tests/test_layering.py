@@ -7,10 +7,7 @@
    avoided a circular import because `custom_fields/__init__.py` happened not to import it.
    That middleware is gone; the rule remains.
 
-   Tool modules under `features/<feature>/tools/` are a transitional exemption: they still
-   reach collaborators through `server.runtime` until they take `Depends(...)` parameters.
-   `_page_input.py` sits under `tools/` so it is exempt too. The rest of the feature package
-   is not.
+   Tools declare collaborators as `Depends(...)` parameters rather than importing `server/`.
 
 2. **`backstop_client/` must not import `features/`.** The HTTP client is infrastructure that
    features consume; it importing one back is the same inversion, and it had the same near-miss.
@@ -515,12 +512,6 @@ def _logic_module_name_violations(source: str, path: pathlib.Path) -> list[str]:
     return [f"{path.relative_to(_SRC)} defines no symbol matching {matching}"]
 
 
-def _feature_sources_outside_tools() -> list[pathlib.Path]:
-    return sorted(
-        source for source in _FEATURES.rglob("*.py") if not _is_under_feature_tools(source)
-    )
-
-
 def _feature_tool_modules() -> list[pathlib.Path]:
     """Non-private `*.py` under `features/<feature>/tools/` — not `__init__.py` or `_*.py`."""
     found: list[pathlib.Path] = []
@@ -824,19 +815,6 @@ class TestTheDetectionItself:
         assert not _is_governed_logic_source(path)
         assert not _logic_module_name_violations("EMAIL_FIELDS = {}\n", path)
 
-    def test_feature_tools_modules_are_exempt_from_the_server_import_rule(self) -> None:
-        tools_path = _FEATURES / "org_people" / "tools" / "get_person.py"
-        fetch_path = _FEATURES / "org_people" / "fetch_person.py"
-        outside_tools = _feature_sources_outside_tools()
-        assert tools_path not in outside_tools
-        assert fetch_path in outside_tools
-        assert _is_under_feature_tools(tools_path)
-        assert _is_under_feature_tools(
-            _FEATURES / "activity_history" / "tools" / "_page_input.py"
-        )
-        assert not _is_under_feature_tools(fetch_path)
-        assert not _is_under_feature_tools(_FEATURES / "org_people" / "not_tools" / "x.py")
-
     def test_feature_tools_are_exempt_from_model_layers(self) -> None:
         path = _FEATURES / "org_people" / "tools" / "get_person.py"
         assert not _is_governed_model_source(path)
@@ -893,12 +871,12 @@ class TestFeaturesDoNotImportServer:
         packages = {p.relative_to(_FEATURES).parts[0] for p in sources if p.name != "__init__.py"}
         assert {"auth", "custom_fields", "party_resolver"} <= packages
 
-    @pytest.mark.parametrize("source", _feature_sources_outside_tools(), ids=_source_id)
+    @pytest.mark.parametrize("source", sorted(_FEATURES.rglob("*.py")), ids=_source_id)
     def test_no_feature_module_imports_from_server(self, source: pathlib.Path) -> None:
         violations = _violations(source, _SERVER_PREFIX)
         assert not violations, (
             "features/ must not import from server/ — the server wires features together, "
-            + "not the reverse. Inject the collaborator from create_app() instead:\n  "
+            + "not the reverse. Declare collaborators as Depends(...) parameters instead:\n  "
             + "\n  ".join(violations)
         )
 

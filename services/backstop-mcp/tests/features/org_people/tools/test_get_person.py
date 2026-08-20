@@ -1,9 +1,8 @@
-from collections.abc import Callable
-
 import httpx
 import pytest
 import respx
 
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     DepartureSignal,
@@ -28,9 +27,11 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
+from tests.helpers import build_employment_index_factory
 from tests.server.tools.helpers import object_dict, tool_model, tool_payload
 
-type ConnectUser = Callable[..., object]
+_INDEX = build_employment_index_factory()
+
 
 # The measured trio on one live person: two retired addresses from previous firms alongside the
 # current one.
@@ -98,9 +99,8 @@ class TestGetPerson:
     @pytest.mark.asyncio
     @respx.mock
     async def test_unique_search_fetches_person_and_employment_links(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-1", "person-bob")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -116,7 +116,12 @@ class TestGetPerson:
         )
 
         result = tool_model(
-            await get_person(ctx_never_elicit(), search="Jane Doe"),
+            await get_person(
+                ctx_never_elicit(),
+                search="Jane Doe",
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             PersonResolvedResponse,
         )
 
@@ -148,12 +153,11 @@ class TestGetPerson:
     @pytest.mark.asyncio
     @respx.mock
     async def test_undated_tie_at_the_same_org_breaks_toward_departed(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """A person carrying both `is a former employee of` and `is employee of` against one
         organization, neither dated: `EmploymentIndex`'s winner-per-pair fold breaks an undated
         tie toward `FORMER` — under-reporting a departure is the costlier error."""
-        await connect_user("user-person-3", "person-dave")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -166,7 +170,12 @@ class TestGetPerson:
         )
 
         result = tool_model(
-            await get_person(ctx_never_elicit(), search="Jane Doe"),
+            await get_person(
+                ctx_never_elicit(),
+                search="Jane Doe",
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             PersonResolvedResponse,
         )
 
@@ -177,10 +186,9 @@ class TestGetPerson:
     @pytest.mark.asyncio
     @respx.mock
     async def test_fetches_resolved_collection_when_hit_is_not_people(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """Name search uses shared PERSON_* types; a contact hit must GET /contacts/{id}."""
-        await connect_user("user-person-4", "person-erin-contact")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -207,7 +215,12 @@ class TestGetPerson:
         )
 
         result = tool_model(
-            await get_person(ctx_never_elicit(), search="Jane Contact"),
+            await get_person(
+                ctx_never_elicit(),
+                search="Jane Contact",
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             PersonResolvedResponse,
         )
 
@@ -220,9 +233,8 @@ class TestGetPerson:
     @pytest.mark.asyncio
     @respx.mock
     async def test_trusted_contact_party_id_fetches_contacts_collection(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-5", "person-frank")  # pyright: ignore[reportGeneralTypeIssues]
 
         contact_get = respx.get(f"{BASE_URL}/contacts/c9").mock(
             return_value=httpx.Response(
@@ -247,6 +259,8 @@ class TestGetPerson:
                 ctx_never_elicit(),
                 party_id="c9",
                 search_type="contacts",
+                client=client,
+                employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
         )
@@ -259,8 +273,7 @@ class TestGetPerson:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_ambiguous_search_skips_person_get(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-person-2", "person-carol")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_ambiguous_search_skips_person_get(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -276,7 +289,12 @@ class TestGetPerson:
         )
 
         result = tool_model(
-            await get_person(ctx_decline(), search="Jane"),
+            await get_person(
+                ctx_decline(),
+                search="Jane",
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             PartyAmbiguousResponse,
         )
 
@@ -309,8 +327,7 @@ class TestGetPerson:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_does_not_declare_glossary_meta(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-person-glossary", "person-glossary")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_does_not_declare_glossary_meta(self, client: BackstopClient) -> None:
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -323,7 +340,12 @@ class TestGetPerson:
         )
 
         result = tool_model(
-            await get_person(ctx_never_elicit(), search="Jane Doe"),
+            await get_person(
+                ctx_never_elicit(),
+                search="Jane Doe",
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             PersonResolvedResponse,
         )
 
@@ -336,9 +358,8 @@ class TestGetPersonIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_retired_addresses_arrive_flagged_beside_the_live_one(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-includes-1", "person-emails")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -359,7 +380,13 @@ class TestGetPersonIncludes:
         )
 
         result = tool_model(
-            await get_person(ctx_never_elicit(), party_id="p9", include=["email_addresses"]),
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                include=["email_addresses"],
+                client=client,
+                employment_index_factory=_INDEX,
+            ),
             PersonResolvedResponse,
         )
 
@@ -375,10 +402,9 @@ class TestGetPersonIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_requested_includes_ride_along_with_the_employment_side_load(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """One GET carries both, and the empty plan must not leave a comma behind."""
-        await connect_user("user-person-includes-2", "person-composed-include")  # pyright: ignore[reportGeneralTypeIssues]
 
         person_get = respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -410,7 +436,9 @@ class TestGetPersonIncludes:
 
         result = tool_model(
             await get_person(
-                ctx_never_elicit(), party_id="p9", include=["email_addresses", "company"]
+                ctx_never_elicit(), party_id="p9", include=["email_addresses", "company"],
+                client=client,
+                employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
         )
@@ -429,15 +457,19 @@ class TestGetPersonIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_omitting_include_leaves_no_included_key_and_no_trailing_comma(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-includes-3", "person-no-include")  # pyright: ignore[reportGeneralTypeIssues]
 
         person_get = respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(200, json=_person_document(EMPLOYEE_TYPE))
         )
 
-        payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
+        payload = tool_payload(await get_person(
+            ctx_never_elicit(),
+            party_id="p9",
+            client=client,
+            employment_index_factory=_INDEX,
+        ))
 
         assert "included" not in payload
         assert person_get.calls.last.request.url.params["include"] == (
@@ -447,10 +479,9 @@ class TestGetPersonIncludes:
     @pytest.mark.asyncio
     @respx.mock
     async def test_the_person_tool_wires_locations_and_the_representative_too(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
         """The person table maps the same two relationship names the organization table does."""
-        await connect_user("user-person-includes-4", "person-locations-rep")  # pyright: ignore[reportGeneralTypeIssues]
 
         person_get = respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -495,7 +526,9 @@ class TestGetPersonIncludes:
 
         result = tool_model(
             await get_person(
-                ctx_never_elicit(), party_id="p9", include=["locations", "representative"]
+                ctx_never_elicit(), party_id="p9", include=["locations", "representative"],
+                client=client,
+                employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
         )
@@ -522,9 +555,8 @@ class TestGetPersonOmitsNullsFromTheWire:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_null_backstop_attribute_is_not_a_key_but_a_filled_one_is(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-nulls-1", "person-null-attribute")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -541,7 +573,12 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
+        payload = tool_payload(await get_person(
+            ctx_never_elicit(),
+            party_id="p9",
+            client=client,
+            employment_index_factory=_INDEX,
+        ))
 
         person = object_dict(payload["person"])
         assert "jobTitle" not in person
@@ -549,9 +586,8 @@ class TestGetPersonOmitsNullsFromTheWire:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_custom_field_values_survive_intact(self, connect_user: ConnectUser) -> None:
+    async def test_custom_field_values_survive_intact(self, client: BackstopClient) -> None:
         """A plain dict, not a model, so nothing prunes it — write-back still round-trips."""
-        await connect_user("user-person-nulls-2", "person-custom-fields")  # pyright: ignore[reportGeneralTypeIssues]
 
         custom_fields = [
             {"definitionId": 343439, "name": "Status", "value": "Attended - Web & Adio"}
@@ -571,16 +607,20 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
+        payload = tool_payload(await get_person(
+            ctx_never_elicit(),
+            party_id="p9",
+            client=client,
+            employment_index_factory=_INDEX,
+        ))
 
         assert object_dict(payload["person"])["regularCustomFieldValues"] == custom_fields
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_as_of_is_absent_when_backstop_records_no_provenance(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-nulls-3", "person-no-provenance")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -588,16 +628,20 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
+        payload = tool_payload(await get_person(
+            ctx_never_elicit(),
+            party_id="p9",
+            client=client,
+            employment_index_factory=_INDEX,
+        ))
 
         assert "as_of" not in payload
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_resolved_omits_name_when_the_record_has_none(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-person-nulls-4", "person-no-name")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
@@ -612,7 +656,12 @@ class TestGetPersonOmitsNullsFromTheWire:
             )
         )
 
-        payload = tool_payload(await get_person(ctx_never_elicit(), party_id="p9"))
+        payload = tool_payload(await get_person(
+            ctx_never_elicit(),
+            party_id="p9",
+            client=client,
+            employment_index_factory=_INDEX,
+        ))
 
         resolved = object_dict(payload["resolved"])
         assert resolved["id"] == "p9"

@@ -1,11 +1,10 @@
-from collections.abc import Callable
-
 import httpx
 import pytest
 import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.accounts import (
     ProductAmbiguousResponse,
     ProductPositionsResolvedResponse,
@@ -16,8 +15,6 @@ from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
-
-type ConnectUser = Callable[..., object]
 
 _PRODUCT_ID = "1292283"
 _ACCOUNT_ID = "27871657"
@@ -102,8 +99,7 @@ def _mock_series(
 class TestGetProductPositions:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_short_name_returns_open_positions(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-pos-1", "pos-bob")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_short_name_returns_open_positions(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(
@@ -134,7 +130,7 @@ class TestGetProductPositions:
         )
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            await get_product_positions(ctx_never_elicit(), product="CGUP", client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -159,12 +155,11 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_unknown_product_is_not_found(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-pos-2", "pos-carol")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_unknown_product_is_not_found(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="NOPE"),
+            await get_product_positions(ctx_never_elicit(), product="NOPE", client=client),
             NotFoundResponse,
         )
 
@@ -174,15 +169,14 @@ class TestGetProductPositions:
     @pytest.mark.asyncio
     @respx.mock
     async def test_zero_accounts_is_distinct_from_not_found(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-pos-3", "pos-dave")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_PRODUCT_URL).mock(return_value=_product_document(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
         respx.get(_AUM_URL).mock(return_value=_series_page())
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product_id=_PRODUCT_ID),
+            await get_product_positions(ctx_never_elicit(), product_id=_PRODUCT_ID, client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -192,8 +186,7 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_all_closed_mentions_include_closed(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-pos-4", "pos-erin")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_all_closed_mentions_include_closed(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(
@@ -203,7 +196,7 @@ class TestGetProductPositions:
         respx.get(_AUM_URL).mock(return_value=_series_page())
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            await get_product_positions(ctx_never_elicit(), product="CGUP", client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -214,8 +207,7 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_one_series_500_stays_on_the_row(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-pos-5", "pos-frank")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_one_series_500_stays_on_the_row(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))
@@ -228,7 +220,7 @@ class TestGetProductPositions:
         respx.get(_AUM_URL).mock(return_value=_series_page())
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            await get_product_positions(ctx_never_elicit(), product="CGUP", client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -240,8 +232,7 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_aum_divergence_is_a_flag(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-pos-6", "pos-gina")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_aum_divergence_is_a_flag(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))
@@ -255,7 +246,7 @@ class TestGetProductPositions:
         )
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            await get_product_positions(ctx_never_elicit(), product="CGUP", client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -268,9 +259,8 @@ class TestGetProductPositions:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_gap_inside_the_tolerance_does_not_flag(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-pos-9", "pos-jack")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))
@@ -284,7 +274,7 @@ class TestGetProductPositions:
         )
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            await get_product_positions(ctx_never_elicit(), product="CGUP", client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -294,9 +284,8 @@ class TestGetProductPositions:
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_newer_valueless_point_does_not_hide_the_last_number(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-pos-10", "pos-kate")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(_account(_ACCOUNT_ID, name="PSP CGUP"))
@@ -311,7 +300,7 @@ class TestGetProductPositions:
         respx.get(_AUM_URL).mock(return_value=_series_page())
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP"),
+            await get_product_positions(ctx_never_elicit(), product="CGUP", client=client),
             ProductPositionsResolvedResponse,
         )
 
@@ -326,9 +315,8 @@ class TestGetProductPositions:
     @pytest.mark.asyncio
     @respx.mock
     async def test_include_closed_keeps_a_zero_actual_closed_account(
-        self, connect_user: ConnectUser
+        self, client: BackstopClient
     ) -> None:
-        await connect_user("user-pos-7", "pos-hank")  # pyright: ignore[reportGeneralTypeIssues]
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_cgup()))
         respx.get(_ACCOUNTS_URL).mock(
             return_value=_accounts_page(
@@ -342,7 +330,12 @@ class TestGetProductPositions:
         respx.get(_AUM_URL).mock(return_value=_series_page())
 
         result = tool_model(
-            await get_product_positions(ctx_never_elicit(), product="CGUP", include_closed=True),
+            await get_product_positions(
+                ctx_never_elicit(),
+                product="CGUP",
+                include_closed=True,
+                client=client,
+            ),
             ProductPositionsResolvedResponse,
         )
 
@@ -354,8 +347,7 @@ class TestGetProductPositions:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_duplicate_short_name_is_ambiguous(self, connect_user: ConnectUser) -> None:
-        await connect_user("user-pos-8", "pos-ivy")  # pyright: ignore[reportGeneralTypeIssues]
+    async def test_duplicate_short_name_is_ambiguous(self, client: BackstopClient) -> None:
         respx.get(_PRODUCTS_URL).mock(
             return_value=_product_page(
                 {
@@ -378,7 +370,7 @@ class TestGetProductPositions:
         )
 
         result = tool_model(
-            await get_product_positions(ctx_decline(), product="BLUC"),
+            await get_product_positions(ctx_decline(), product="BLUC", client=client),
             ProductAmbiguousResponse,
         )
 

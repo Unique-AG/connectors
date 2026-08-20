@@ -1,9 +1,9 @@
-from collections.abc import Callable
 from typing import cast, get_args
 
 import httpx
 import pytest
 import respx
+from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
@@ -13,9 +13,10 @@ from backstop_mcp.features.custom_fields.tools.list_custom_fields import (
     list_custom_fields,
 )
 from tests.features.party_resolver.helpers import BASE_URL, resource
+from tests.helpers import custom_fields_service, tool_client
 from tests.server.tools.helpers import tool_model
 
-type ConnectUser = Callable[..., object]
+_INPUT = TypeAdapter(without_injected_parameters(list_custom_fields))
 
 
 def tenant(name: str) -> str:
@@ -73,18 +74,23 @@ def _account_name(**extra: object) -> dict[str, object]:
 class TestListCustomFieldsTool:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_lists_definitions_for_requested_types(self, connect_user: ConnectUser) -> None:
+    async def test_lists_definitions_for_requested_types(self) -> None:
         base_url = tenant("cf-list")
-        await connect_user("user-cf-list-1", "cf-list-bob", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
         _definitions_route(base_url, _investor_status(), _person_grade(), _account_name())
 
-        result = tool_model(
-            await list_custom_fields(
-                entity_types=[CustomFieldEntityType.ORGANIZATIONS, CustomFieldEntityType.PEOPLE],
-                refresh=True,
-            ),
-            ListCustomFieldsResponse,
-        )
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await list_custom_fields(
+                    entity_types=[
+                        CustomFieldEntityType.ORGANIZATIONS,
+                        CustomFieldEntityType.PEOPLE,
+                    ],
+                    refresh=True,
+                    client=client,
+                    custom_fields=custom_fields_service(),
+                ),
+                ListCustomFieldsResponse,
+            )
 
         assert result.status == "ok"
         assert result.cache == "ok"
@@ -106,18 +112,23 @@ class TestListCustomFieldsTool:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_preserves_request_order(self, connect_user: ConnectUser) -> None:
+    async def test_preserves_request_order(self) -> None:
         base_url = tenant("cf-list-order")
-        await connect_user("user-cf-list-order", "cf-list-order", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
         _definitions_route(base_url, _investor_status(), _person_grade())
 
-        result = tool_model(
-            await list_custom_fields(
-                entity_types=[CustomFieldEntityType.PEOPLE, CustomFieldEntityType.ORGANIZATIONS],
-                refresh=True,
-            ),
-            ListCustomFieldsResponse,
-        )
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await list_custom_fields(
+                    entity_types=[
+                        CustomFieldEntityType.PEOPLE,
+                        CustomFieldEntityType.ORGANIZATIONS,
+                    ],
+                    refresh=True,
+                    client=client,
+                    custom_fields=custom_fields_service(),
+                ),
+                ListCustomFieldsResponse,
+            )
         assert list(result.definitions_by_entity) == [
             CustomFieldEntityType.PEOPLE,
             CustomFieldEntityType.ORGANIZATIONS,
@@ -125,47 +136,54 @@ class TestListCustomFieldsTool:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_empty_requested_type_is_present(self, connect_user: ConnectUser) -> None:
+    async def test_empty_requested_type_is_present(self) -> None:
         base_url = tenant("cf-list-empty")
-        await connect_user("user-cf-list-2", "cf-list-carol", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
         _definitions_route(base_url, _investor_status())
 
-        result = tool_model(
-            await list_custom_fields(
-                entity_types=[CustomFieldEntityType.PEOPLE],
-                refresh=True,
-            ),
-            ListCustomFieldsResponse,
-        )
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await list_custom_fields(
+                    entity_types=[CustomFieldEntityType.PEOPLE],
+                    refresh=True,
+                    client=client,
+                    custom_fields=custom_fields_service(),
+                ),
+                ListCustomFieldsResponse,
+            )
 
         assert list(result.definitions_by_entity) == [CustomFieldEntityType.PEOPLE]
         assert result.definitions_by_entity[CustomFieldEntityType.PEOPLE] == []
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_surfaces_stale_cache(self, connect_user: ConnectUser) -> None:
+    async def test_surfaces_stale_cache(self) -> None:
         base_url = tenant("cf-list-stale")
-        await connect_user("user-cf-list-stale", "cf-list-stale", base_url=base_url)  # pyright: ignore[reportGeneralTypeIssues]
         route = _definitions_route(base_url, _investor_status())
+        service = custom_fields_service()
 
-        first = tool_model(
-            await list_custom_fields(
-                entity_types=[CustomFieldEntityType.ORGANIZATIONS],
-                refresh=True,
-            ),
-            ListCustomFieldsResponse,
-        )
-        assert first.cache == "ok"
+        async with tool_client(base_url) as client:
+            first = tool_model(
+                await list_custom_fields(
+                    entity_types=[CustomFieldEntityType.ORGANIZATIONS],
+                    refresh=True,
+                    client=client,
+                    custom_fields=service,
+                ),
+                ListCustomFieldsResponse,
+            )
+            assert first.cache == "ok"
 
-        route.mock(side_effect=httpx.ConnectError("backstop down"))
+            route.mock(side_effect=httpx.ConnectError("backstop down"))
 
-        result = tool_model(
-            await list_custom_fields(
-                entity_types=[CustomFieldEntityType.ORGANIZATIONS],
-                refresh=True,
-            ),
-            ListCustomFieldsResponse,
-        )
+            result = tool_model(
+                await list_custom_fields(
+                    entity_types=[CustomFieldEntityType.ORGANIZATIONS],
+                    refresh=True,
+                    client=client,
+                    custom_fields=service,
+                ),
+                ListCustomFieldsResponse,
+            )
         assert result.cache == "stale"
         assert result.definitions_by_entity[CustomFieldEntityType.ORGANIZATIONS][0].id == "99"
 
@@ -173,13 +191,13 @@ class TestListCustomFieldsTool:
 class TestListCustomFieldsInput:
     def test_rejects_contacts_and_employees(self) -> None:
         with pytest.raises(ValidationError):
-            TypeAdapter(list_custom_fields).validate_python({"entity_types": ["contacts"]})
+            _INPUT.validate_python({"entity_types": ["contacts"]})
         with pytest.raises(ValidationError):
-            TypeAdapter(list_custom_fields).validate_python({"entity_types": ["employees"]})
+            _INPUT.validate_python({"entity_types": ["employees"]})
 
     def test_rejects_empty_entity_types(self) -> None:
         with pytest.raises(ValidationError):
-            TypeAdapter(list_custom_fields).validate_python({"entity_types": []})
+            _INPUT.validate_python({"entity_types": []})
 
     def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
         doc = list_custom_fields.__doc__ or ""

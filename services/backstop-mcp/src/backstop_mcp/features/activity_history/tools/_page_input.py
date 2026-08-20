@@ -31,7 +31,6 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.server.runtime import get_activity_history_settings
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +235,8 @@ async def extract_fetch_activity_history_args(
     ctx: Context,
     client: BackstopClient,
     request: ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
+    *,
+    page_size: int,
 ) -> FetchArgs | PartyAmbiguousResponse | NotFoundResponse:
     """Turn a first/next page input into shared fetch inputs, or an unresolved party response.
 
@@ -291,7 +292,7 @@ async def extract_fetch_activity_history_args(
                 return unresolved_party_response(result)
             party = result.value
             effective_types = effective_activity_types(activity_types)
-            page_size = limit if limit is not None else get_activity_history_settings().page_size
+            effective_page_size = limit if limit is not None else page_size
             # Person quick-search uses shared PERSON_* types, so a hit may be contacts/
             # employees — follow `party.search_type` like `get_person`, not the requested one.
             args = FetchArgs(
@@ -300,7 +301,7 @@ async def extract_fetch_activity_history_args(
                 party=party,
                 continuations={
                     activity_type: ActivityContinuationResponse(
-                        limit=page_size,
+                        limit=effective_page_size,
                         offset=0,
                         since=since,
                         until=until,

@@ -2,11 +2,19 @@ from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp import Context
+from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.features.data_hygiene import AsOfResponse, EmploymentLinkResponse
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.features.data_hygiene import (
+    AsOfResponse,
+    EmploymentIndexFactory,
+    EmploymentLinkResponse,
+    get_employment_index_factory,
+)
 from backstop_mcp.features.includes import PersonInclude, PersonIncludesResponse
 from backstop_mcp.features.org_people import PersonRecordResponse, fetch_person
 from backstop_mcp.features.party_resolver import (
@@ -17,7 +25,6 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import OmitNoneModel, published_output_schema
-from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
 
 
 class PersonResolvedResponse(OmitNoneModel):
@@ -128,6 +135,8 @@ async def get_person(
             ),
         ),
     ] = (),
+    client: BackstopClient = Depends(get_backstop_client),
+    employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
 ) -> GetPersonResponse:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
@@ -154,7 +163,6 @@ async def get_person(
     When you need custom field names for this person, call `list_custom_fields` with
     entity_types including people.
     """
-    client = await get_backstop_client()
     result = await resolve_party(
         ctx,
         client,
@@ -168,7 +176,7 @@ async def get_person(
     party = result.value
     fetched = await fetch_person(
         client,
-        get_employment_index_factory(),
+        employment_index_factory,
         search_type=party.search_type,
         party_id=party.id,
         include=include,
