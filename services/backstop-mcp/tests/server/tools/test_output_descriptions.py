@@ -79,7 +79,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "AsOfResponse",
         "AccountRowResponse",
         "ContactEmailResponse",
-        "CustomFieldDefinitionDto",
+        "CustomFieldDefinitionResponse",
         "EmailRecordResponse",
         "EmploymentLinkResponse",
         "OpportunityResponse",

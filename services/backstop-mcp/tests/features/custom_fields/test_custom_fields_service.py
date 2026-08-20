@@ -92,6 +92,7 @@ class TestDefinitionFromResource:
                 fieldTypeDisplay="Picklist",
                 isTimeSeries=False,
                 selectOptions=[{"id": "1", "label": "Active"}],
+                groupId="321",
                 tabName="Overview",
                 groupName="Status",
                 layoutName="Organization",
@@ -111,6 +112,7 @@ class TestDefinitionFromResource:
         assert definition.field_type_display == "Picklist"
         assert definition.is_time_series is False
         assert definition.select_options == [{"id": "1", "label": "Active"}]
+        assert definition.group_id == 321
         assert definition.tab_name == "Overview"
         assert definition.group_name == "Status"
         assert definition.layout_name == "Organization"
@@ -153,6 +155,15 @@ class TestDefinitionFromResource:
         assert definition is not None
         assert definition.select_options == [{"id": "1", "label": "Active"}]
 
+    @pytest.mark.parametrize("group_id", ["", "  ", "not-an-integer"])
+    def test_malformed_group_id_becomes_none(self, group_id: object) -> None:
+        definition = CustomFieldDefinitionDto.from_resource(
+            _definition_resource("1", groupId=group_id)
+        )
+
+        assert definition is not None
+        assert definition.group_id is None
+
 
 class TestCatalogGet:
     @pytest.mark.asyncio
@@ -174,6 +185,7 @@ class TestCatalogGet:
                             fieldType="picklist",
                             isTimeSeries=False,
                             selectOptions=[{"id": "1", "label": "Active"}],
+                            groupId="not-an-integer",
                             tabName="Overview",
                             groupName="Status",
                             layoutName="Organization",
@@ -211,6 +223,7 @@ class TestCatalogGet:
         assert definitions[0].name == "is1"
         assert definitions[0].entity_type == "OrganizationBean"
         assert definitions[0].select_options == [{"id": "1", "label": "Active"}]
+        assert definitions[0].group_id is None
         assert definitions[0].tab_name == "Overview"
         assert definitions[0].group_name == "Status"
         assert definitions[0].layout_name == "Organization"
