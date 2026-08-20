@@ -16,6 +16,7 @@ access it.
 Token exchange and error wording belong to `shared/seam.py`; the tool owns the request, window,
 answer shape, fields, permission, and description."""
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated
 
@@ -38,6 +39,12 @@ TOOL_NAME = "list_channels"
 # is the broad `ChannelMessage.Read.All` and is `browse_channel`'s to declare; a tenant commonly
 # grants this one and withholds that one, which is why the two are named separately.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"}
 
 # Window size and limit cap. Graph accepts no `$top` here; this bounds requests per call.
 MAX_CHANNELS = 200

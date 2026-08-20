@@ -17,6 +17,7 @@ A system event ("Ada joined") has no author and no text in Graph — Teams write
 Report the event, not the emptiness.
 """
 
+from collections.abc import Mapping
 from typing import Annotated
 
 import httpx
@@ -52,6 +53,20 @@ TOOL_NAME = "read_message"
 # Token exchange requests both because the handle is parsed after the exchange happens.
 # Read uses `Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
+}
+
+# What the call above is refused for, which is not the tuple this tool holds: a message is read on
+# one surface, so a chat handle's refusal names the chat permission alone and naming the channel one
+# as well would send an administrator after a permission that was never missing. `narrowed_to`
+# below is this same statement made per call, from the argument, at run time.
+GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
 Read one Microsoft Teams message in full, from the `uri` handle search_messages produces: the \

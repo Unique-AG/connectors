@@ -1,7 +1,7 @@
 """The registry of all tools, the selection an operator makes, and the permissions it implies.
 
-Each tool is one file that publishes `TOOL_NAME`, `GRAPH_PERMISSIONS` and `register`. Add a tool:
-one file plus one line here.
+Each tool is one file that publishes `TOOL_NAME`, `GRAPH_PERMISSIONS`, `GRAPH_CALL_EXAMPLE` and
+`register`. Add a tool: one file plus one line here.
 
 TRAP: Derive the scope list from the modules, never hand-write it. `create_app` passes the selected
 tools' permissions to the auth provider at startup. A permission not consented at sign-in cannot be
@@ -52,8 +52,10 @@ __all__ = [
     "ALWAYS_ON",
     "PRESETS",
     "TOOL_NAMES",
+    "GraphCallExample",
     "Selection",
     "graph_advice",
+    "graph_call_examples",
     "register_tools",
     "resolve",
 ]
@@ -72,6 +74,12 @@ class ToolModule(Protocol):
 
     GRAPH_PERMISSIONS: tuple[str, ...]
 
+    # Read-only for the same reason `TOOL_NAME` is: a tool file writes a dict literal, and a
+    # mutable protocol attribute would demand `Mapping[str, object]` exactly, on every tool file,
+    # to satisfy a type checker. Read-only, the annotation is the tool file's choice.
+    @property
+    def GRAPH_CALL_EXAMPLE(self) -> Mapping[str, object]: ...
+
     @staticmethod
     def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None: ...
 
@@ -88,6 +96,22 @@ class _NarrowsItsNotFound(Protocol):
 
     @property
     def GRAPH_NOT_FOUND(self) -> str: ...
+
+
+@runtime_checkable
+class _NarrowsItsCall(Protocol):
+    """A tool whose `GRAPH_CALL_EXAMPLE` reaches Graph under fewer permissions than it declares.
+
+    True of one tool out of ten, so it is checked at runtime and kept off `ToolModule` for the same
+    reason `_NarrowsItsNotFound` is: on the protocol every module has to satisfy, the other nine
+    would carry it empty to satisfy a type checker. `read_message` is exchanged for two permissions
+    and reads one surface per call, and its example call names a chat, so the refusal that example
+    earns names `Chat.Read` and must not name the channel permission — see `narrowed_to` in
+    `shared/seam.py`, which is the same statement made per call at run time.
+    """
+
+    @property
+    def GRAPH_CALL_NARROWS_TO(self) -> tuple[str, ...]: ...
 
 
 # Every tool this server has, in the order they are registered and the order their permissions are
@@ -261,6 +285,51 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
 def _not_found_advice(module: ToolModule) -> str | None:
     """The sentence this tool's 404 needs, or `None` to leave the default one in place."""
     return module.GRAPH_NOT_FOUND if isinstance(module, _NarrowsItsNotFound) else None
+
+
+@dataclass(frozen=True, slots=True)
+class GraphCallExample:
+    """One call through one tool that gets as far as a Graph request, and what its refusal says.
+
+    `arguments` is a call the tool accepts — arguments it rejects never reach Graph at all.
+    `permissions` is what a refusal of that call has to name: the tool's declared tuple, or the
+    fewer permissions it says this particular call is made under.
+    """
+
+    arguments: Mapping[str, object]
+    permissions: tuple[str, ...]
+
+
+def graph_call_examples(selection: Selection) -> Mapping[str, GraphCallExample]:
+    """One refusable call per selected tool, derived from the modules exactly as the table above is.
+
+    Design decision: this is on the front door although nothing in `src/` calls it. It is the
+    coverage contract for `tests/test_error_mapping.py`, which refuses every registered tool one by
+    one and asserts each reads back as the advice for its own permissions. Hand-written there, that
+    table was a second list of the tools — a tool registered before its row existed left the file
+    one tool short, which is the failure the file exists to prevent, and it made a tool's arrival
+    and its coverage two commits that had to agree. Published here, the row travels in the tool's
+    own file, `ToolModule` makes a tool without one a type error rather than a red test, and the
+    coverage of the registered surface is this mapping's keys by construction.
+
+    A test reaching `_TOOL_MODULES` instead would be a second place every tool module is named,
+    which is the one thing this module exists to be.
+    """
+    return {
+        module.TOOL_NAME: GraphCallExample(
+            arguments=module.GRAPH_CALL_EXAMPLE,
+            permissions=_call_permissions(module),
+        )
+        for module in _TOOL_MODULES
+        if module.TOOL_NAME in selection.tools
+    }
+
+
+def _call_permissions(module: ToolModule) -> tuple[str, ...]:
+    """The permissions this tool's example call is made under, which is not always what it holds."""
+    if isinstance(module, _NarrowsItsCall):
+        return module.GRAPH_CALL_NARROWS_TO
+    return module.GRAPH_PERMISSIONS
 
 
 def register_tools(mcp: FastMCP, transport: httpx.AsyncClient, selection: Selection) -> None:

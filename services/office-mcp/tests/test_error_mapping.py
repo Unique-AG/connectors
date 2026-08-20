@@ -14,8 +14,13 @@ dependency resolution, middleware, and the tool body. The assertion is byte equa
 routes to one message are the property, and the prose those messages contain is
 `tests/shared/test_seam.py`'s subject rather than this file's.
 
-The table is parametrised over the resolved `Selection` and checked against it, so a tool added to
-the registry fails here until it is covered.
+Every case is derived from the registered surface: `graph_call_examples` reads one refusable call
+off each selected tool module — the arguments it accepts, and the permissions a refusal of that call
+has to name — so the cases are the deployment's own tool list and cannot be one tool short of it. A
+tool file that publishes no such call fails the type checker, not this file (`ToolModule` in
+`tools/__init__.py`). The hand-written table this replaced was the second list of the tools in the
+repository, and a tool registered before its row existed left this file silently one tool short —
+which is the failure the file exists to prevent, one level up.
 
 The three stubs (Entra's exchange, a mocked Graph, the in-process client) are this file's own, as
 they are `test_mcp_tools.py`'s own: a fixture shared between the two would make either file's
@@ -25,9 +30,7 @@ answering it.
 
 import logging
 from collections.abc import AsyncIterator, Iterator, Mapping
-from dataclasses import dataclass
 from typing import cast
-from urllib.parse import quote
 
 import httpx
 import pytest
@@ -48,7 +51,7 @@ from office_mcp.shared.seam import (
     ToolAdvice,
     graph_tool_errors,
 )
-from office_mcp.tools import Selection, resolve
+from office_mcp.tools import GraphCallExample, Selection, graph_call_examples, resolve
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -62,65 +65,14 @@ _OBO_TOKEN = "synthetic-obo-graph-token"
 _REQUEST_ID = "synthetic-request-id-every-tool"
 _REFUSED = {"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
 
-# Arguments, invented. Every id is obviously fake; the handle is spelled the way the tool that mints
-# one spells it, because a tool that rejects its argument as not-a-handle never reaches Graph and
-# would pass this file while mapping nothing.
-_TEAM_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
-_CHANNEL_ID = "19:general@thread.tacv2"
-_CHAT_ID = "19:release@thread.v2"
-_MESSAGE_ID = "1770000000000"
-_MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
-_TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0002"
-_JOIN_WEB_URL = (
-    "https://teams.microsoft.invalid/l/meetup-join/"
-    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0?context=%7b%22Tid%22%3a%22x%22%7d"
-)
-_CHAT_MESSAGE_URI = f"teams:///chats/{quote(_CHAT_ID, safe='')}/messages/{_MESSAGE_ID}"
-_MEETING_URI = f"teams:///meetings/{quote(_JOIN_WEB_URL, safe='')}"
-_TRANSCRIPT_URI = f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"
-
-
-@dataclass(frozen=True)
-class _Refused:
-    """One tool call that reaches Graph, and the permissions its refusal has to name.
-
-    `permissions` is written out rather than read off the tool module. Read off the module it would
-    assert that the tool agrees with itself, and the failure to catch is a message worded from
-    somewhere else entirely — the registry's union, or another tool's tuple.
-    """
-
-    arguments: Mapping[str, object]
-    permissions: tuple[str, ...]
-
-
-# One entry per tool, and this file grows one as each tool arrives. `read_message` is the one whose
-# permissions are not its declared tuple: a message read is per surface, so a chat handle's refusal
-# names `Chat.Read` alone, and naming the channel permission as well would send an administrator
-# after one that was never missing.
-_EVERY_TOOL: Mapping[str, _Refused] = {
-    "get_me": _Refused({}, ("User.Read",)),
-    "list_chats": _Refused({}, ("Chat.Read",)),
-    "search_messages": _Refused({"query": "release"}, ("Chat.Read", "ChannelMessage.Read.All")),
-    "read_message": _Refused({"uri": _CHAT_MESSAGE_URI}, ("Chat.Read",)),
-    "list_teams": _Refused({}, ("Team.ReadBasic.All",)),
-    "list_channels": _Refused({"team_id": _TEAM_ID}, ("Channel.ReadBasic.All",)),
-    "browse_channel": _Refused(
-        {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}, ("ChannelMessage.Read.All",)
-    ),
-    "list_meeting_transcripts": _Refused(
-        {"meeting_uri": _MEETING_URI},
-        ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
-    ),
-    "read_transcript": _Refused({"uri": _TRANSCRIPT_URI}, ("OnlineMeetingTranscript.Read.All",)),
-    "list_meeting_recordings": _Refused(
-        {"meeting_uri": _MEETING_URI},
-        ("OnlineMeetings.Read", "OnlineMeetingRecording.Read.All", "User.Read"),
-    ),
-}
-
 # The surface under test, resolved once so the parametrisation below is the deployment's own tool
 # list rather than a second copy of it.
 _SELECTION: Selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+
+# One refused call per registered tool, off the tool modules themselves. `read_message` is the one
+# whose permissions are not its declared tuple, and it says so in its own file: a message is read on
+# one surface, so a chat handle's refusal names `Chat.Read` alone.
+_EVERY_TOOL: Mapping[str, GraphCallExample] = graph_call_examples(_SELECTION)
 
 # The MCP middleware chain the composed app ends up with, outside-in. Two of the five belong to
 # other packages, so the assertion is on names: what is load-bearing is which side of the operations
@@ -269,29 +221,41 @@ def _chain(error: BaseException) -> list[BaseException]:
 
 
 class TestEveryToolTranslatesItsOwnRefusal:
-    def test_every_registered_tool_is_covered_here(self) -> None:
-        """The guard on the guard. A tool added to the registry and not to the table above would
-        leave this file one tool short and silent about it — the same failure the file exists to
-        prevent, one level up."""
-        assert set(_EVERY_TOOL) == set(_SELECTION.tools), (
-            "every tool this deployment registers needs one refused call here"
-        )
+    def test_every_registered_tool_brings_its_own_refusable_call(self) -> None:
+        """The guard on the guard, which is now the derivation rather than a table here.
 
-    @pytest.mark.usefixtures("obo", "graph")
+        Coverage is no longer something this file can be short of: the cases are the registered
+        surface, keyed by it, and a tool file that publishes no call for itself is a type error
+        rather than a red test. What is left to check is that the derivation produced anything at
+        all — against an empty mapping every parametrised test below is silently uncollected, and a
+        file that runs no cases passes.
+        """
+        assert set(_EVERY_TOOL) == set(_SELECTION.tools), (
+            "the derived cases are the registered surface — they cannot be a subset of it"
+        )
+        assert _EVERY_TOOL, "the widest preset derived no refusable call at all"
+
+    @pytest.mark.usefixtures("obo")
     @pytest.mark.parametrize("tool", _SELECTION.tools)
     async def test_a_refused_call_reaches_the_client_as_advice(
-        self, mcp_client: Client[FastMCPTransport], tool: str
+        self, mcp_client: Client[FastMCPTransport], graph: respx.MockRouter, tool: str
     ) -> None:
         """The message a model reads is the advice, exactly — not FastMCP's report of an exception.
 
         Byte equality rather than a keyword: "administrator" appearing somewhere in a message that
         also carries a stack-shaped prefix is what an un-mapped tool looks like.
+
+        That Graph was reached is asserted rather than assumed. A tool whose example arguments it
+        refuses itself — a handle of the wrong shape, a query it will not run — never makes a Graph
+        request, so nothing about its Graph refusals would be under test and the case would be
+        worth nothing while looking like coverage.
         """
         refused = _EVERY_TOOL[tool]
 
         with pytest.raises(ToolError) as raised:
             _ = await mcp_client.call_tool(tool, dict(refused.arguments))
 
+        assert graph.calls, f"{tool} refused its own example arguments before reaching Graph"
         assert str(raised.value) == _advice_for(refused.permissions)
 
     @pytest.mark.usefixtures("obo", "graph")

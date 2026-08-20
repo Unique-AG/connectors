@@ -45,6 +45,7 @@ the request, the query builder, the injection guard and every refusal below — 
 """
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import date, datetime
 from typing import Annotated
@@ -81,6 +82,12 @@ TOOL_NAME = "search_messages"
 # are `shared/handles.py`'s, because which of them a *read* is made under is decided by the surface
 # a handle addresses; a search is made under both, having no handle yet.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
 # Graph documents a general `size` maximum of 1000. No chatMessage-specific ceiling is published;
 # Graph caps the `message` and `event` entities at 25. This tool uses 50 on undocumented ground,

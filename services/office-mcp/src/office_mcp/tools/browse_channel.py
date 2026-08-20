@@ -30,6 +30,7 @@ live in `shared/messages.py` (so a post browsed and a message read are the same 
 error text live in `shared/seam.py`.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -58,6 +59,15 @@ TOOL_NAME = "browse_channel"
 # Import CHANNEL_PERMISSION to avoid misspelling — handle vocabulary owns surface permissions.
 # Several tools declare one permission; deduplication is the registry's job.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "channel_id": "19:general@thread.tacv2",
+}
 
 # Graph's documented ceiling on `$top` for a channel's messages — the whole of one request.
 MAX_POSTS = 50

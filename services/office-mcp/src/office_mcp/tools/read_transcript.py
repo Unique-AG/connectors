@@ -14,6 +14,7 @@ prevent empty pages: inverted time bounds and blank speaker filter.
 
 import html
 import re
+from collections.abc import Mapping
 from typing import Annotated
 
 import httpx
@@ -35,6 +36,15 @@ TOOL_NAME = "read_transcript"
 # permissions. `list_meeting_transcripts` also declares it; both tools read the same resource.
 # Named in `shared/meetings.py` to avoid duplication across tool files (rule 4 keeps them apart).
 GRAPH_PERMISSIONS: tuple[str, ...] = (TRANSCRIPT_PERMISSION,)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "uri": "teams:///transcripts/MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
+    + "/MSMjMCMjSYNTHETIC0002"
+}
 
 # Max turns per call. Bounds context size; whole transcript fetches either way.
 MAX_TURNS = 500

@@ -10,6 +10,7 @@ configuration.
 Only five properties populate: `id`, `displayName`, `description`, `isArchived`, `tenantId`.
 """
 
+from collections.abc import Mapping
 from typing import Annotated
 
 import httpx
@@ -24,6 +25,11 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 TOOL_NAME = "list_teams"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
+# there is exactly one call to make.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 # A safety valve on Graph request count, not a Graph-imposed page size. Graph accepts no page
 # size on this collection.

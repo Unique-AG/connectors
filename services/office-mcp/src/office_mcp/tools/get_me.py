@@ -9,6 +9,8 @@ sender and recipient addresses. Use user_principal_name only when email is null 
 accounts). Compare user_id only against another user_id—it is the immutable Entra object id.
 """
 
+from collections.abc import Mapping
+
 import httpx
 from fastmcp import FastMCP
 from msgraph.generated.models.user import User
@@ -22,6 +24,11 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 TOOL_NAME = "get_me"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
+# there is exactly one call to make.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
 Return the signed-in user's profile: user_id, display_name, email, user_principal_name, job_title.
