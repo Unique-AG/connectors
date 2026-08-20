@@ -13,6 +13,7 @@ operation names.
 import ast
 import pathlib
 from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
+from typing import TypeGuard
 
 import httpx
 import pytest
@@ -308,27 +309,49 @@ class TestAPagedWalkReportsWhatItRead:
         )
 
 
-_TOOLS = pathlib.Path(__file__).resolve().parents[1] / "src" / "office_mcp" / "tools"
+_SOURCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "src" / "office_mcp"
+_TOOLS = _SOURCE_ROOT / "tools"
 
 
 def _tool_sources() -> list[pathlib.Path]:
     return sorted(path for path in _TOOLS.glob("*.py") if path.name != "__init__.py")
 
 
+def _source_modules() -> list[pathlib.Path]:
+    """Every module this service ships, the ones that are not tools included.
+
+    `__init__.py` is kept, unlike in `_tool_sources` above, where it is dropped because it is the
+    tool registry rather than a tool. The rule this feeds is about any module that can reach
+    `graph_errors` at all, and a registry can.
+    """
+    return sorted(_SOURCE_ROOT.rglob("*.py"))
+
+
 def _source_id(source: pathlib.Path) -> str:
-    """Test id for one module: `list_chats.py`, not an absolute path."""
-    return source.name
+    """Test id for one module: `shared/identity.py`, not an absolute path."""
+    return source.relative_to(_SOURCE_ROOT).as_posix()
 
 
-def _graph_errors_calls(source: pathlib.Path) -> list[ast.Call]:
-    """Every `graph_errors(...)` in one module, however it was spelled."""
-    return [
-        node
-        for node in ast.walk(ast.parse(source.read_text()))
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "graph_errors"
-    ]
+def _parsed(source: pathlib.Path) -> ast.Module:
+    return ast.parse(source.read_text())
+
+
+def _graph_errors_calls(module: ast.Module) -> list[ast.Call]:
+    """Every `graph_errors(...)` in one module, however it was spelled.
+
+    A bare name or a call through the module it lives in, because both compile and only the first
+    was looked for while this read nine files that all import it the same way.
+    """
+    return [node for node in ast.walk(module) if _is_graph_errors(node)]
+
+
+def _is_graph_errors(node: ast.AST) -> TypeGuard[ast.Call]:
+    if not isinstance(node, ast.Call):
+        return False
+    called = node.func
+    if isinstance(called, ast.Name):
+        return called.id == "graph_errors"
+    return isinstance(called, ast.Attribute) and called.attr == "graph_errors"
 
 
 class TestEveryToolNamesItselfWhenItCallsGraph:
@@ -347,7 +370,7 @@ class TestEveryToolNamesItselfWhenItCallsGraph:
         """Guards the guard: no tool files means every assertion below passes over nothing."""
         sources = _tool_sources()
         assert len(sources) > 1, f"no tool modules found under {_TOOLS}"
-        assert any(_graph_errors_calls(source) for source in sources)
+        assert any(_graph_errors_calls(_parsed(source)) for source in sources)
 
     @pytest.mark.parametrize("source", _tool_sources(), ids=_source_id)
     def test_every_graph_call_is_named_after_the_tool_that_makes_it(
@@ -355,7 +378,7 @@ class TestEveryToolNamesItselfWhenItCallsGraph:
     ) -> None:
         unnamed = [
             call.lineno
-            for call in _graph_errors_calls(source)
+            for call in _graph_errors_calls(_parsed(source))
             if [argument for argument in call.args if _names_the_tool(argument)] == []
             and [keyword for keyword in call.keywords if _names_the_tool(keyword.value)] == []
         ]
@@ -370,3 +393,110 @@ class TestEveryToolNamesItselfWhenItCallsGraph:
 def _names_the_tool(argument: ast.expr) -> bool:
     """Whether this argument is the module's own `TOOL_NAME`, and not a literal spelled again."""
     return isinstance(argument, ast.Name) and argument.id == "TOOL_NAME"
+
+
+class TestNoOperationNameIsTakenFromData:
+    """The same label, over every module rather than over `tools/`, and about what the name is.
+
+    Two different failures, which is why this is a second rule and not a wider glob on the one
+    above. A tool that names nothing goes missing from a dashboard, and only a tool can be held to
+    naming itself: `shared/identity.py` names nothing on purpose, so that a nested call is counted
+    under the tool one level up. Passing *data* as the name is the other failure, it is not
+    survivable, and any module under `src/` can do it — `graph_errors(url)` or
+    `graph_errors(f"chat_{chat_id}")` is one time series per chat, per message and per meeting, and
+    an unbounded label set takes a Prometheus down rather than showing up as a bad dashboard.
+
+    So what is checked is the shape of the argument: a string literal, or a name this module binds
+    to one at module level. An f-string, a subscript, an attribute, a call, a splat, or a name that
+    is a parameter or a local — anything whose value this file cannot see — fails. Weaker than
+    reading the value, and stronger than anything a test of the recorded samples could say: the
+    label only leaks on the day a caller passes it a live id, and no test drives that day.
+    """
+
+    def test_the_rule_reaches_past_the_tools_directory(self) -> None:
+        """Guards the guard twice: that there are modules to read, and that widening the glob was
+        load-bearing. `shared/identity.py` is the caller outside `tools/` today. If it stops being
+        one, this rule needs another witness rather than a narrower glob."""
+        modules = _source_modules()
+        assert len(modules) > len(_tool_sources()), f"no modules found under {_SOURCE_ROOT}"
+        calling = {_source_id(module) for module in modules if _graph_errors_calls(_parsed(module))}
+        assert calling - {_source_id(source) for source in _tool_sources()}, (
+            "every graph_errors call is under tools/, so this asserts nothing the tools-only rule "
+            + "did not — find the caller that moved before narrowing the glob back"
+        )
+
+    @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)
+    def test_the_operation_is_a_name_this_code_chose(self, source: pathlib.Path) -> None:
+        module = _parsed(source)
+        chosen = _module_level_strings(module)
+        derived = [
+            (call.lineno, ast.unparse(named))
+            for call in _graph_errors_calls(module)
+            if (named := _operation_named(call)) is not None
+            and not _is_chosen_in_code(named, chosen)
+        ]
+        assert not derived, (
+            f"{_source_id(source)} passes graph_errors an operation it did not choose in code, at "
+            + f"(line, expression) {derived}. `operation` is a Prometheus label: a URL, a path, or "
+            + "anything read off an argument is a new time series per chat, per message and per "
+            + f"meeting, and an unbounded label set on {GRAPH_REQUESTS_TOTAL} takes the Prometheus "
+            + "down rather than showing up as a bad dashboard. Pass a constant this module binds "
+            + "at its top level, the way every tool passes its own TOOL_NAME."
+        )
+
+
+def _operation_named(call: ast.Call) -> ast.expr | None:
+    """What this call names its operation, or `None` when it names none.
+
+    A call that names none is allowed and records nothing; that is `TestEveryToolNamesItself...`'s
+    subject, not this one's.
+    """
+    if call.args:
+        return call.args[0]
+    for keyword in call.keywords:
+        if keyword.arg == "operation":
+            return keyword.value
+        if keyword.arg is None:
+            # `graph_errors(**named)`: the operation may be in there and this file cannot see it.
+            # Reported as the mapping rather than as nothing, so the message names the expression.
+            return keyword.value
+    return None
+
+
+def _module_level_strings(module: ast.Module) -> frozenset[str]:
+    """The names this module binds to a string literal at its top level, `TOOL_NAME` among them.
+
+    Top level only, and a literal only. A module-level name is a decision taken in this file and
+    readable in it, which is the whole property `operation` needs; a local or a parameter of the
+    same name could hold anything a caller passed.
+    """
+    return frozenset(
+        target.id
+        for statement in module.body
+        for target in _assigned_names(statement)
+        if isinstance(target, ast.Name)
+    )
+
+
+def _assigned_names(statement: ast.stmt) -> list[ast.expr]:
+    """The targets of `statement`, when it assigns a string literal, and nothing otherwise."""
+    if isinstance(statement, ast.Assign) and _is_string(statement.value):
+        return statement.targets
+    if (
+        isinstance(statement, ast.AnnAssign)
+        and statement.value is not None
+        and _is_string(statement.value)
+    ):
+        return [statement.target]
+    return []
+
+
+def _is_string(node: ast.expr) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+
+def _is_chosen_in_code(named: ast.expr, chosen: frozenset[str]) -> bool:
+    """Whether `named` is a value this file decided, rather than one it was handed."""
+    if _is_string(named):
+        return True
+    return isinstance(named, ast.Name) and named.id in chosen
