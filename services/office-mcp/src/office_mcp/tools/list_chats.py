@@ -15,6 +15,7 @@ carry `meeting_uri`, the only route from conversation to meeting. Chat.Read is r
 Chat.ReadBasic) for recency sort.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated
 
@@ -34,6 +35,11 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 TOOL_NAME = "list_chats"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
+# there is exactly one call to make.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 MAX_CHATS = 50
 

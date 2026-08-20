@@ -41,6 +41,7 @@ stays organiser-only. `content_access` says which side the signed-in user is on
 from SharePoint and OneDrive.
 """
 
+from collections.abc import Mapping
 from datetime import date, datetime
 from typing import Annotated
 
@@ -75,6 +76,15 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
     RECORDING_PERMISSION,
     identity.GRAPH_PERMISSION,
 )
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "meeting_uri": "teams:///meetings/https%3A%2F%2Fteams.microsoft.invalid%2Fl%2Fmeetup-join"
+    + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
+}
 
 # Max recordings per call. A one-off meeting has 1–2; a series has 1 per recorded occurrence.
 # Graph sets no ceiling on `$top`; this limit is ours.

@@ -35,6 +35,7 @@ Tests page a meeting that exact way and assert every transcript still comes back
 blur two different fixes: raise `limit`, or accept that nothing more can be known.
 """
 
+from collections.abc import Mapping
 from datetime import date, datetime
 from typing import Annotated
 
@@ -63,6 +64,15 @@ TOOL_NAME = "list_meeting_transcripts"
 # Transcript permission is shared with read_transcript. It lives in shared/meetings.py because
 # tests/test_layering.py rule 4 forbids one tool file from importing another.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
+
+# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
+# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
+# and never reaches Graph, which would leave its Graph refusals unchecked.
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
+    "meeting_uri": "teams:///meetings/https%3A%2F%2Fteams.microsoft.invalid%2Fl%2Fmeetup-join"
+    + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
+}
 
 # Maximum transcripts to return. Graph documents `$top` but publishes no ceiling, so this is ours.
 MAX_TRANSCRIPTS = 50
