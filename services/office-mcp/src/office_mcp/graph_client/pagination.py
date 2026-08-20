@@ -7,10 +7,27 @@ item cap), empty page handling, and empty page run bounds.
 Scan cap: If filtered after fetch (e.g., messages are mostly joins), "give me 20 items" can walk
 entire channel history one page at a time. Cap must bound what was looked at, not only what kept.
 
-Empty pages: `PageIterator.iterate` stops at empty pages, but Graph sends them with
-`@odata.nextLink` still set. The SDK stops early, losing items. A short window comes back as
-"that's all" instead of truthfully saying "window stopped at cap". This module's loop handles
-empty pages: if it carries nextLink, keep going.
+Empty pages: Graph's paging contract is that "a page of results might contain zero or more results"
+and that a caller keeps calling with the `@odata.nextLink` of each response "until the
+`@odata.nextLink` property is no longer returned"
+(https://learn.microsoft.com/en-us/graph/paging). The SDK breaks that contract in one line —
+`page_iterator.py:232-233`, where a page with no items makes `enumerate` return False, which
+`iterate` reads as the end of the collection — so a short window comes back as "that's all" instead
+of truthfully saying "window stopped at cap". Grep that line on the next SDK bump; this module's
+loop follows the link instead.
+
+Not hypothetical here. A live known issue has `getAllRecordings` and `getAllTranscripts` — the
+endpoints behind `list_meeting_recordings` and `list_meeting_transcripts` — reset their pagination
+token mid-walk and answer "a `200 OK` response with an empty collection and an `@odata.nextLink`",
+with Microsoft's own workaround being to "continue following `@odata.nextLink` even when the
+collection is empty" (https://learn.microsoft.com/en-us/graph/known-issues, "Teamwork and
+communications"). Its expected end date of 2026-08-31 dates that incident, not this guard: the
+paging contract above carries no end date.
+
+The same body on the *first* page takes a different SDK path and needs its own answer.
+`PageIterator.__init__` runs the caller's response through `convert_to_page`, which raises a bare
+`ValueError` for `value: null` (`page_iterator.py:180-181`) rather than reading it as the empty page
+it is — see `_readable_first_page`.
 
 Empty run bound: Following empty pages needs its own bound separate from item cap. `MAX_EMPTY_PAGES`
 is that bound, counted per run on its own—never pooled with item budget.
@@ -31,6 +48,7 @@ Search paging not handled: POST /search/query uses from/size offsets, not cursor
 """
 
 from collections.abc import Callable
+from copy import copy
 from dataclasses import dataclass
 from typing import Protocol, cast
 
@@ -53,6 +71,13 @@ class GraphCollection[T](Protocol):
 
     @property
     def odata_next_link(self) -> str | None: ...
+
+
+class _WritableCollection[T](Protocol):
+    """A collection response seen as writable. Used on this module's own shallow copy of one, and
+    never on anything a caller passed in — which is why `GraphCollection` above stays read-only."""
+
+    value: list[T] | None
 
 
 # How many items may be looked at to satisfy one request, however few of them are kept. A
@@ -157,7 +182,7 @@ async def collect_pages[T](
     # reads as unknown-typed. Taking `client` here confines that to this one line instead of
     # every call site.
     iterator = PageIterator(
-        first_page,
+        _readable_first_page(first_page),
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         error_mapping={"XXX": ODataError},
     )
@@ -185,13 +210,43 @@ async def collect_pages[T](
                     + f"({scanned} items looked at, {len(items)} kept)",
                     empty_pages=empty_pages_in_a_row,
                 )
-            page = await iterator.next()
-            assert page is not None, "Graph advertised a next link and then had no next page"
-            iterator.current_page = page
-            iterator.pause_index = 0
+            # Counted before the request rather than after it: a walk that gave up on its Nth page
+            # spent N requests, and the one that failed is the page a dashboard came here to see.
             pages += 1
+            page = await iterator.next()
+            # Unreachable, and kept for what it narrows: `next()` answers None only for a page with
+            # no next link, which the check above already returned on. Every other path builds a
+            # `PageResult`, and this is what says so to the SDK's `Optional` return.
+            assert page is not None, "Graph advertised a next link and then had no next page"
+            # `iterate` also resets `pause_index` here; this walk can never need that.
+            # `enumerate` sets it only where `visit` asked to stop, which is `capped`, and `capped`
+            # returned above.
+            iterator.current_page = page
     finally:
         record_pages_scanned(current_graph_operation(), pages)
+
+
+def _readable_first_page[T](page: GraphCollection[T]) -> GraphCollection[T]:
+    """`page`, or a stand-in for it carrying an empty list where its `value` was null.
+
+    `PageIterator.__init__` runs the response through `convert_to_page`, which raises a bare
+    `ValueError` for `value: null` (`page_iterator.py:180-181`). Nothing classifies that:
+    `graph_errors` knows `APIError`, `httpx.TransportError` and `GraphFailure`, so it would reach a
+    tool with no remedy and be counted under the status meaning "an exception this seam cannot
+    describe". Every *later* page with the same body is read as an empty page and walked through
+    correctly, so page one is made to look like the rest of them.
+
+    The copy is shallow and the caller's own response is left as it was. `PageIterator` deserialises
+    every successor with `type()` of what it is handed, which the copy preserves.
+    """
+    if page.value is not None:
+        return page
+    stand_in: GraphCollection[T] = copy(page)
+    # Through `object` because the two protocols deliberately do not overlap: one of them is what a
+    # caller hands over, and the other is only ever this module's own copy of it.
+    writable = cast(_WritableCollection[T], cast(object, stand_in))
+    writable.value = []
+    return stand_in
 
 
 def _more_was_on_offer(iterator: PageIterator) -> bool:
