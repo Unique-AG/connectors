@@ -74,6 +74,9 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "search_messages"
 
+# The one Graph call this tool makes, as the step instruments count it.
+STEP = "search_query"
+
 # `Chat.Read` is what `/search/query` accepts for the `chatMessage` entity; Graph's own search
 # overview promises a search never returns more than the equivalent GET would, and every
 # channel-message GET in v1.0 requires `ChannelMessage.Read.All` — so without it a search silently
@@ -419,7 +422,7 @@ async def search_messages(
             )
         ]
     )
-    with graph_errors(TOOL_NAME):
+    with graph_errors(TOOL_NAME, step=STEP):
         response = await client.search.query.post(body)
 
     assert response is not None, "Graph answered POST /search/query with no response"

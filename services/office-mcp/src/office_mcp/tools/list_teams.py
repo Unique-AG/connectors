@@ -24,6 +24,9 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_teams"
 
+# The one Graph call this tool makes, as the step instruments count it.
+STEP = "joined_teams"
+
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
@@ -82,7 +85,7 @@ async def list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
     """Return up to `limit` teams."""
     assert 1 <= limit <= MAX_TEAMS, f"limit must be within 1..{MAX_TEAMS}, got {limit}"
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors(TOOL_NAME, step=STEP):
         first_page = await client.me.joined_teams.get()
         assert first_page is not None, "Graph answered GET /me/joinedTeams with no collection"
         collected = await collect_pages(first_page, client, limit=limit)

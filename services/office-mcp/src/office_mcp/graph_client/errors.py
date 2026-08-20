@@ -28,12 +28,27 @@ Messages are subject to change" (https://learn.microsoft.com/en-us/graph/api/cal
 It is data like `status` is, not a category: a subclass per inner code would be a subclass per
 Graph feature.
 
-`graph_errors` also counts and times the call it wraps. It is the seam every Graph call already
-goes through, and the categories above are exactly the `status` a counter wants — measuring
-anywhere else would mean re-deriving them. The instruments themselves live in
-`graph_client/observability.py`; this module supplies the taxonomy and nothing else about them.
+Two failures reach a caller that Graph never described at all, and both used to escape this module
+entirely — unworded to the caller and counted under the `error` sentinel that means "an exception
+this seam cannot describe". `KiotaHTTPXError` is the SDK's own family, and two of its members are
+reachable from a Graph call: `RedirectError` when the redirect handler gives up
+(`kiota_http/middleware/redirect_handler.py:94`) and `ResponseError` when the adapter gets no
+response to read (`kiota_http/httpx_request_adapter.py:602`). Neither carries a status, a code or a
+request id, and both mean the same thing to a caller, so both are `GraphUnavailable`. Caught as the
+base class rather than as the two, because the family is what the SDK promises and a third member
+becoming reachable should not need this line edited to stay classified.
+`CancelledError` is the other, and it is not a failure of anything: the caller went away. It keeps
+its own status so that an MCP client hanging up stops reading on a dashboard as this connector
+failing, and it is re-raised untranslated so the task group that sent it learns it was obeyed.
+
+`graph_errors` also counts and times the operation it wraps, and `graph_step` counts one Graph call
+inside it. They are the seam every Graph call already goes through, and the categories above are
+exactly the `status` a counter wants — measuring anywhere else would mean re-deriving them. The
+instruments themselves live in `graph_client/observability.py`; this module supplies the taxonomy
+and nothing else about them.
 """
 
+from asyncio import CancelledError
 from collections.abc import Generator
 from contextlib import contextmanager
 from time import perf_counter
@@ -41,13 +56,16 @@ from typing import cast
 
 import httpx
 from kiota_abstractions.api_error import APIError
+from kiota_http._exceptions import KiotaHTTPXError
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from kiota_http.middleware.retry_handler import RetryHandler
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 
 from office_mcp.graph_client.observability import (
+    current_graph_operation,
     graph_operation,
     record_graph_call,
+    record_graph_step,
     record_graph_throttled,
 )
 
@@ -155,20 +173,66 @@ _STATUS: dict[type[GraphFailure], str] = {
 _OK = "ok"
 
 # What a call is counted as when something left this block that is not a Graph failure at all — an
-# `assert` in the caller's own code, a cancellation. Not "failed": a Graph status must mean Graph
-# said something.
+# `assert` in the caller's own code, a bug in a tool body. Not "failed": a Graph status must mean
+# Graph said something.
 _UNCLASSIFIED = "error"
+
+# The caller went away — an MCP client disconnected, or the request task was cancelled — while a
+# Graph call was in flight. Its own label rather than `_UNCLASSIFIED`, because cancellation is the
+# one non-Graph exception that happens routinely in production, and counted as `error` it reads on
+# a dashboard as this connector failing.
+_CANCELLED = "cancelled"
+
+# Every value the `status` label can take, so that the bound is a thing a reader can see and a test
+# can assert rather than a claim. Public because a dashboard has to decide, for each one, whether it
+# counts as a failure — `cancelled` is the one that answers differently from every other non-`ok`
+# value, and the way that decision gets forgotten is nobody being able to enumerate the options.
+GRAPH_STATUSES: frozenset[str] = frozenset({*_STATUS.values(), _OK, _UNCLASSIFIED, _CANCELLED})
 
 
 @contextmanager
-def graph_errors(operation: str | None = None) -> Generator[None]:
-    """Translate SDK failures into Graph error types, and count what the call cost.
+def graph_errors(operation: str, *, step: str | None = None) -> Generator[None]:
+    """Translate SDK failures into Graph error types, and count what the operation cost.
 
     `operation` is the name this call is counted under — pass the tool's own `TOOL_NAME`. It must be
     a name chosen in code and never anything off the URL; see `observability.py` for why that is a
-    hard rule rather than a preference. Left out, the call is not measured at all, which is what a
-    test driving the SDK directly wants and is a defect in a tool: the tool is then missing from
-    every Graph dashboard rather than showing up under a wrong name.
+    hard rule rather than a preference. It is required: a tool that could leave it out would be
+    missing from every Graph dashboard, and nothing at the call site would say so. A test driving
+    the SDK directly names itself like anything else does.
+
+    `step` names one Graph call inside this block for the finer-grained instruments, for the tool
+    that makes exactly one. A tool that makes several uses `graph_step` around each instead.
+    """
+    with _measured(operation, step=step):
+        yield
+
+
+@contextmanager
+def graph_step(step: str) -> Generator[None]:
+    """Measure one Graph call inside the `graph_errors` block already in scope.
+
+    This is what restores per-call visibility inside a tool that makes several Graph calls: the
+    operation-level instruments still answer "what did this tool call cost", and the step-level ones
+    answer "which Graph call inside it was slow". The operation comes from the block above rather
+    than from an argument, because it is already in scope and a second argument would be a second
+    thing to keep in agreement with the first.
+
+    Outside any `graph_errors` block there is no operation to attribute a step to, so nothing is
+    recorded — the same rule `record_graph_call` keeps, and for the same reason.
+    """
+    with _measured(current_graph_operation(), step=step, operation_level=False):
+        yield
+
+
+@contextmanager
+def _measured(
+    operation: str | None, *, step: str | None, operation_level: bool = True
+) -> Generator[None]:
+    """The one translation-and-measurement block both entry points above are.
+
+    `operation_level` is False for a step inside an operation: the outer block is already timing and
+    counting the whole thing, and counting it twice would make `graph_operations_total` a count of
+    blocks entered rather than of operations served.
     """
     started = perf_counter()
     # Pessimistic on purpose: every path below replaces it, so this value surviving means an
@@ -199,8 +263,34 @@ def graph_errors(operation: str | None = None) -> Generator[None]:
         # Graph will not end is the one that happens.
         status = _status_of(failure)
         raise
+    except CancelledError:
+        # Not a failure of anything, and deliberately re-raised untranslated: cancellation has to
+        # keep propagating as itself or the task group that sent it never learns it was obeyed.
+        status = _CANCELLED
+        raise
+    except KiotaHTTPXError as error:
+        # The SDK's own failures that are not `APIError`: too many redirects (`RedirectError`) and
+        # no response to read (`ResponseError`) are the two reachable from a Graph call. Both are
+        # raised outside the request/response cycle `_classify` describes, so neither carries a
+        # status, a code or a request id — and without this clause both reached a caller as an
+        # unworded `ToolError` and were counted as `_UNCLASSIFIED`. Unavailable is the honest
+        # remedy: Graph did not give an answer this connector could use, and one retry then a
+        # report is what to do about it.
+        status = _STATUS[GraphUnavailable]
+        raise GraphUnavailable(
+            f"Microsoft Graph gave an answer this connector could not read: {error}",
+            status=None,
+            code=None,
+            request_id=None,
+        ) from error
     finally:
-        record_graph_call(operation, status=status, seconds=perf_counter() - started)
+        # One reading of the clock for both instruments. Two calls would put two slightly different
+        # durations on one call, and the difference would sit in the low end of the histograms —
+        # exactly where a Graph call that answered from a warm pool lands.
+        elapsed = perf_counter() - started
+        if operation_level:
+            record_graph_call(operation, status=status, seconds=elapsed)
+        record_graph_step(operation, step=step, status=status, seconds=elapsed)
 
 
 def _status_of(failure: GraphFailure) -> str:
@@ -220,6 +310,11 @@ def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
 
     No header at all reads as retried, because that is what the SDK does with one: it falls back to
     exponential backoff, which is always under the ceiling.
+
+    TRAP for whoever tunes `GraphSettings.max_retries`: that 180 s ceiling is per attempt, not
+    cumulative. The SDK's `RetryHandlerOption` documents a `retry_time_limit` that would bound the
+    total and never implements one, so three retries of a `Retry-After: 179` is about nine minutes
+    of sleeping inside one MCP tool call, which is far past what an interactive client waits for.
     """
     advice = failure.retry_after_seconds
     return advice is None or advice < RetryHandlerOption.MAX_DELAY
@@ -227,8 +322,15 @@ def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
 
 # The statuses the SDK's retry handler acts on, borrowed rather than restated so that the two
 # cannot disagree: `_is_throttling` below is only true of a status the handler really did wait
-# `Retry-After` out on (kiota_http/middleware/retry_handler.py:52,167).
-_RETRIED_BY_THE_SDK: set[int] = RetryHandler.DEFAULT_RETRY_STATUS_CODES
+# `Retry-After` out on (`kiota_http/middleware/retry_handler.py:54` declares the set, `:140`
+# consults it).
+#
+# Copied into a frozenset rather than aliased. `DEFAULT_RETRY_STATUS_CODES` is a mutable class
+# attribute and `RetryHandler.__init__` hands that same object to every instance
+# (`retry_handler.py:67`), so an alias here is a live write path into SDK state: one handler
+# mutating `retry_on_status_codes` would silently change how this module classifies throttling
+# service-wide. The frozenset keeps the borrow and drops the write path.
+_RETRIED_BY_THE_SDK: frozenset[int] = frozenset(RetryHandler.DEFAULT_RETRY_STATUS_CODES)
 
 _TOO_MANY_REQUESTS = 429
 
@@ -322,6 +424,13 @@ def _retry_after_seconds(headers: dict[str, str]) -> float | None:
     Graph documents this header as delay-seconds and never sends the legal HTTP-date form here.
     This parser does not guess at that form: a wrong guess about the caller's clock is worse than
     reporting no advice.
+
+    The SDK does not make the same choice — its own `_parse_retry_after` handles the date form — so
+    the two disagree in exactly one case worth writing down. On a 503 carrying a date-form
+    `Retry-After`, the SDK would wait it out and this module would read no delay, which makes
+    `_is_throttling` false and files a rate limit under `unavailable`. Graph does not send that
+    shape, which is why guessing is still the worse trade; if it ever starts, this is where it
+    shows up.
     """
     value = headers.get("retry-after")
     if value is None:

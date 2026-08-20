@@ -1,18 +1,29 @@
-"""What each Graph call cost, counted per operation.
+"""What each Graph call cost, counted per operation and per step.
 
-Four series, and the one label that decides whether they are readable:
+Six series, and the two labels that decide whether they are readable:
 
-* `graph_requests_total{operation, status}` — every Graph call this connector made, by outcome.
-* `graph_request_duration_seconds{operation}` — how long one took, end to end, retries included.
+* `graph_operations_total{operation, status}` — every Graph operation this connector served.
+* `graph_operation_duration_seconds{operation}` — how long one took, end to end, retries included.
 * `graph_throttled_total{operation, retried}` — the 429s that outlived the SDK's own retrying.
 * `graph_pages_scanned{operation}` — how many pages one paged walk read.
+* `graph_steps_total{operation, step, status}` — one Graph call inside an operation, by outcome.
+* `graph_step_duration_seconds{operation, step}` — how long that one call took.
 
-`operation` is a name this code chose — one per tool, `list_chats`, `search_messages` — and never a
-URL or a path. That is the whole rule and it is not a style preference: a label taken off a Graph
-URL is a new time series per chat, per message and per meeting, and an unbounded label set takes a
-Prometheus down rather than showing up as a bad dashboard. Graph URLs here are made of almost
-nothing else, so the name has to come from the caller, which is why `graph_errors` takes it and
-this module never derives it.
+An **operation** is one tool call. A **step** is one Graph call inside it. The distinction is the
+whole point of having both: `list_meeting_recordings` resolves a meeting, reads recordings and
+checks who is signed in, and an operation-level latency spike says only that the tool got slower.
+The step says which of the three did. The operation families are named for what they count —
+`graph_operations_total` counts operations served, not HTTP requests, and a name that said
+`requests` would be read as a request rate on every dashboard it appears in.
+
+Both labels are names this code chose — `list_chats`, `search_messages`, `resolve_meeting` — and
+never a URL or a path. That is the whole rule and it is not a style preference: a label taken off a
+Graph URL is a new time series per chat, per message and per meeting, and an unbounded label set
+takes a Prometheus down rather than showing up as a bad dashboard. Graph URLs here are made of
+almost nothing else, so the names have to come from the caller, which is why `graph_errors` and
+`graph_step` take them and this module never derives them. `tests/test_graph_metrics.py` enforces
+that over every module in `src/`, and pins the step vocabulary to an exact set so that adding one is
+a deliberate act with a reviewer attached.
 
 Architectural rationale: the instruments live here rather than beside the rest of this service's
 domain instruments in `office_mcp/metrics.py`, because `graph_client/` imports nothing of this
@@ -31,23 +42,28 @@ from contextvars import ContextVar
 from opentelemetry import metrics
 
 __all__ = [
+    "GRAPH_OPERATIONS_TOTAL",
+    "GRAPH_OPERATION_DURATION_SECONDS",
     "GRAPH_PAGES_SCANNED",
-    "GRAPH_REQUESTS_TOTAL",
-    "GRAPH_REQUEST_DURATION_SECONDS",
+    "GRAPH_STEPS_TOTAL",
+    "GRAPH_STEP_DURATION_SECONDS",
     "GRAPH_THROTTLED_TOTAL",
     "current_graph_operation",
     "graph_operation",
     "record_graph_call",
+    "record_graph_step",
     "record_graph_throttled",
     "record_pages_scanned",
 ]
 
 # The names, as constants, because two readers need to agree on them: the instruments below and the
 # test that scrapes for them. A test that spelled them again would pass over a typo.
-GRAPH_REQUESTS_TOTAL = "graph_requests_total"
-GRAPH_REQUEST_DURATION_SECONDS = "graph_request_duration_seconds"
+GRAPH_OPERATIONS_TOTAL = "graph_operations_total"
+GRAPH_OPERATION_DURATION_SECONDS = "graph_operation_duration_seconds"
 GRAPH_THROTTLED_TOTAL = "graph_throttled_total"
 GRAPH_PAGES_SCANNED = "graph_pages_scanned"
+GRAPH_STEPS_TOTAL = "graph_steps_total"
+GRAPH_STEP_DURATION_SECONDS = "graph_step_duration_seconds"
 
 # Deliberately the meter name `office_mcp/metrics.py` uses, not one of this package's own. The
 # Prometheus exporter puts the meter name on every sample as `otel_scope_name`, so a second scope
@@ -56,21 +72,40 @@ _METER_NAME = "office_mcp"
 
 _meter = metrics.get_meter(_METER_NAME)
 
-_requests = _meter.create_counter(
-    GRAPH_REQUESTS_TOTAL,
+_operations = _meter.create_counter(
+    GRAPH_OPERATIONS_TOTAL,
     description=(
-        "Microsoft Graph calls made on a caller's behalf, by operation and by outcome. `status` is "
-        "the remedy class from graph_client/errors.py, not the HTTP code: the codes Graph can "
-        "answer with are open-ended and sorting them into remedies is what that module is for."
+        "Microsoft Graph operations served on a caller's behalf, by operation and by outcome. One "
+        "observation per tool call, not per HTTP request — a tool that makes three Graph calls "
+        "counts once here and three times in graph_steps_total. `status` is the remedy class from "
+        "graph_client/errors.py, not the HTTP code: the codes Graph can answer with are open-ended "
+        "and sorting them into remedies is what that module is for."
     ),
 )
-_duration = _meter.create_histogram(
-    GRAPH_REQUEST_DURATION_SECONDS,
+_operation_duration = _meter.create_histogram(
+    GRAPH_OPERATION_DURATION_SECONDS,
     unit="s",
     description=(
         "Wall-clock time one Graph operation took, including the SDK's Retry-After waits and every "
         "page a paged walk read. This is what an MCP client waited for, not what one HTTP request "
         "took."
+    ),
+)
+_steps = _meter.create_counter(
+    GRAPH_STEPS_TOTAL,
+    description=(
+        "One Graph call inside an operation, by outcome. `step` is a name chosen in code for the "
+        "call rather than for the tool, so a tool that reads three different Graph surfaces can be "
+        "told apart by which of them answered badly."
+    ),
+)
+_step_duration = _meter.create_histogram(
+    GRAPH_STEP_DURATION_SECONDS,
+    unit="s",
+    description=(
+        "Wall-clock time one Graph call inside an operation took. This is the axis that says which "
+        "call in a slow tool was the slow one; the operation histogram says only that the tool was "
+        "slow."
     ),
 )
 _throttled = _meter.create_counter(
@@ -101,9 +136,10 @@ _OPERATION: ContextVar[str | None] = ContextVar("office_mcp_graph_operation", de
 def graph_operation(operation: str | None) -> Generator[None]:
     """Name the operation every Graph call inside this block is counted under.
 
-    No name leaves the one already in scope alone rather than clearing it: `graph_errors` blocks do
-    nest — `tools/get_me.py` opens a named one around the unnamed one in `shared/identity.py` — and
-    an inner block saying nothing about the operation must not make a walk inside it uncountable.
+    No name leaves the one already in scope alone rather than clearing it. `graph_errors` requires
+    its operation, so the nameless case is `graph_step` — which is every step block, because a step
+    names the call and never the tool. Clearing here would make the operation unreadable to
+    `collect_pages` for the whole of a walk that runs inside one.
     """
     if operation is None:
         yield
@@ -129,8 +165,24 @@ def record_graph_call(operation: str | None, *, status: str, seconds: float) -> 
     """
     if operation is None:
         return
-    _requests.add(1, {"operation": operation, "status": status})
-    _duration.record(seconds, {"operation": operation})
+    _operations.add(1, {"operation": operation, "status": status})
+    _operation_duration.record(seconds, {"operation": operation})
+
+
+def record_graph_step(
+    operation: str | None, *, step: str | None, status: str, seconds: float
+) -> None:
+    """Count one Graph call inside an operation and how long it took.
+
+    Both names are required for the same reason `record_graph_call` requires one: a step with no
+    operation cannot be attributed to the tool that spent it, and an operation with no step is
+    already counted by the operation instruments. Either one missing means this observation would
+    land in a bucket that reads like a real measurement and is not one, so nothing is recorded.
+    """
+    if operation is None or step is None:
+        return
+    _steps.add(1, {"operation": operation, "step": step, "status": status})
+    _step_duration.record(seconds, {"operation": operation, "step": step})
 
 
 def record_graph_throttled(operation: str | None, *, retried: bool) -> None:

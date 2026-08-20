@@ -6,11 +6,42 @@ from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from unique_toolkit.monitoring import REGISTRY as _TOOLKIT_REGISTRY
 
 from office_mcp.config import AppConfig
-from office_mcp.graph_client import GRAPH_PAGES_SCANNED, GRAPH_REQUEST_DURATION_SECONDS
+from office_mcp.graph_client import (
+    GRAPH_OPERATION_DURATION_SECONDS,
+    GRAPH_PAGES_SCANNED,
+    GRAPH_STEP_DURATION_SECONDS,
+)
 
 _provider: MeterProvider | None = None
 
-# Two histograms whose default buckets would answer the wrong question, corrected here rather than
+# `prometheus_client`'s own defaults, which is what unique_toolkit's
+# `python_http_request_duration_seconds` uses, plus two above them. A dashboard that puts inbound
+# MCP latency beside outbound Graph latency can then read one against the other, and the two extra
+# buckets are where a Retry-After wait and a timed-out call land — the slow tail is the whole reason
+# to look.
+#
+# One tuple for both Graph latency histograms, so an operation and the steps inside it are read on
+# the same scale. Two literals would drift, and a step quantile that could not be compared with the
+# operation quantile above it would answer half a question.
+_GRAPH_LATENCY_BUCKETS = (
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    2.5,
+    5.0,
+    7.5,
+    10.0,
+    30.0,
+)
+
+# Three histograms whose default buckets would answer the wrong question, corrected here rather than
 # where they are declared: a bucket layout is an aggregation, an aggregation is the provider's, and
 # a view matches on the instrument's name — so this needs nothing from the module that records it.
 #
@@ -19,15 +50,12 @@ _provider: MeterProvider | None = None
 # the first bucket and every quantile would read the same.
 _VIEWS = (
     View(
-        instrument_name=GRAPH_REQUEST_DURATION_SECONDS,
-        # `prometheus_client`'s own defaults, which is what unique_toolkit's
-        # `python_http_request_duration_seconds` uses, plus two above them. A dashboard that puts
-        # inbound MCP latency beside outbound Graph latency can then read one against the other,
-        # and the two extra buckets are where a Retry-After wait and a timed-out call land — the
-        # slow tail is the whole reason to look.
-        aggregation=ExplicitBucketHistogramAggregation(
-            (0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, 30.0)
-        ),
+        instrument_name=GRAPH_OPERATION_DURATION_SECONDS,
+        aggregation=ExplicitBucketHistogramAggregation(_GRAPH_LATENCY_BUCKETS),
+    ),
+    View(
+        instrument_name=GRAPH_STEP_DURATION_SECONDS,
+        aggregation=ExplicitBucketHistogramAggregation(_GRAPH_LATENCY_BUCKETS),
     ),
     View(
         instrument_name=GRAPH_PAGES_SCANNED,
@@ -62,6 +90,7 @@ def configure_metrics(config: AppConfig) -> MeterProvider:
 # The `graph_*` family is the exception and cannot move here: it is recorded inside
 # `graph_client/`, which imports nothing of this application, so its instruments are declared in
 # `graph_client/observability.py` — on this same meter name, so they share this scope. What stays
-# here is their aggregation, in `_VIEWS` above. Look there for `graph_requests_total`,
-# `graph_request_duration_seconds`, `graph_throttled_total` and `graph_pages_scanned`.
+# here is their aggregation, in `_VIEWS` above. Look there for `graph_operations_total`,
+# `graph_operation_duration_seconds`, `graph_throttled_total`, `graph_pages_scanned`,
+# `graph_steps_total` and `graph_step_duration_seconds`.
 _meter = metrics.get_meter("office_mcp")

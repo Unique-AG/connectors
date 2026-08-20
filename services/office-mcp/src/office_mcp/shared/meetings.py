@@ -100,12 +100,18 @@ from msgraph.generated.users.item.online_meetings.online_meetings_request_builde
 )
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_mcp.graph_client import CollectedItems, GraphCollection, collect_pages
+from office_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
 from office_mcp.shared.handles import MeetingHandle
 
 # Resolving join URL to meeting: OnlineMeetings.Read, least privilege for filter, no admin consent.
 # Lives with resolve, not tool file, because resolve_meeting pays it regardless of artifact type.
 MEETING_PERMISSION = "OnlineMeetings.Read"
+
+# What the resolve request is counted as, declared here for the same reason the permission above is:
+# both meeting tools pay it, and a step named by each of them would be one request under two names.
+# `newest_in_window` deliberately declares none — it is the walk of a collection the *tool* named,
+# so it is counted under that tool's own step rather than splitting one listing in two.
+STEP_RESOLVE_MEETING = "resolve_meeting"
 
 # Reading a transcript resource: admin-consented, independent from resolve. Spelled here because
 # it is resource cost, not request cost, and two tools read it. Rule 4 forbids tool files sharing
@@ -212,7 +218,8 @@ async def resolve_meeting(
             filter=f"JoinWebUrl eq '{escaped}'"
         )
     )
-    matched = await client.me.online_meetings.get(request_configuration=configuration)
+    with graph_step(STEP_RESOLVE_MEETING):
+        matched = await client.me.online_meetings.get(request_configuration=configuration)
     assert matched is not None, "Graph answered GET /me/onlineMeetings with no collection"
     meetings = matched.value or []
     return meetings[0] if meetings else None

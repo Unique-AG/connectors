@@ -34,6 +34,9 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_chats"
 
+# The one Graph call this tool makes, as the step instruments count it.
+STEP = "chats"
+
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
@@ -168,7 +171,7 @@ async def list_recent_chats(
             top=limit,
         )
     )
-    with graph_errors(TOOL_NAME):
+    with graph_errors(TOOL_NAME, step=STEP):
         first_page = await client.me.chats.get(request_configuration=configuration)
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
         collected = await collect_pages(first_page, client, limit=limit)

@@ -3,6 +3,7 @@
 The bodies are synthesised copies of the shapes Graph documents, not captures from a tenant.
 """
 
+from asyncio import CancelledError
 from collections.abc import Callable
 
 import httpx
@@ -19,7 +20,7 @@ from office_mcp.graph_client import (
     graph_errors,
 )
 
-from .conftest import RecordedSleeps
+from .conftest import GRAPH_V1, RecordedSleeps
 
 REQUEST_ID = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0"
 
@@ -70,7 +71,7 @@ async def test_the_status_decides_the_error(
         )
     )
 
-    with pytest.raises(expected) as raised, graph_errors():
+    with pytest.raises(expected) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert type(raised.value) is expected
@@ -115,7 +116,7 @@ async def test_a_5xx_is_throttling_when_it_named_a_delay_and_an_outage_when_it_d
         side_effect=always(status, headers, error_body("serviceError", "synthesised failure"))
     )
 
-    with pytest.raises(expected) as raised, graph_errors():
+    with pytest.raises(expected) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert type(raised.value) is expected
@@ -144,7 +145,7 @@ async def test_a_429_that_outlasts_the_retries_carries_graphs_own_retry_after(
         )
     )
 
-    with pytest.raises(GraphThrottled) as raised, graph_errors():
+    with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert raised.value.retry_after_seconds == 10.0
@@ -161,7 +162,7 @@ async def test_a_throttle_without_a_retry_after_says_so_rather_than_guessing(
         side_effect=always(429, {}, error_body("TooManyRequests", "Please retry again later."))
     )
 
-    with pytest.raises(GraphThrottled) as raised, graph_errors():
+    with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert raised.value.retry_after_seconds is None
@@ -189,7 +190,7 @@ async def test_the_inner_code_is_carried_because_it_is_the_only_thing_that_diffe
         )
     )
 
-    with pytest.raises(GraphForbidden) as raised, graph_errors():
+    with pytest.raises(GraphForbidden) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert raised.value.code == "Forbidden", "the outer code says nothing actionable"
@@ -203,7 +204,7 @@ async def test_an_error_without_an_inner_code_reports_none_rather_than_the_outer
         return_value=httpx.Response(403, json={"error": {"code": "accessDenied", "message": "no"}})
     )
 
-    with pytest.raises(GraphForbidden) as raised, graph_errors():
+    with pytest.raises(GraphForbidden) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert raised.value.inner_code is None
@@ -215,8 +216,43 @@ async def test_never_reaching_graph_is_reported_as_upstream_not_as_a_bad_request
     """A connection failure never becomes an `APIError` — there is no response to build one from."""
     graph.get("/me").mock(side_effect=httpx.ConnectError("name resolution failed"))
 
-    with pytest.raises(GraphUnavailable) as raised, graph_errors():
+    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
         _ = await client.me.get()
 
     assert raised.value.status is None
     assert "name resolution failed" in str(raised.value)
+
+
+async def test_a_redirect_the_sdk_gave_up_on_is_worded_rather_than_escaping_unworded(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    """The SDK raises its own exceptions that are not `APIError`, and they used to escape.
+
+    `kiota_http` has a family for the failures that happen outside the request/response cycle
+    `_classify` describes — too many redirects, a response it could not read, a body it could not
+    deserialize. None carries a status, a code or a request id, so none can be classified from a
+    response; without a clause for them a caller got an unworded `ToolError` and the call was
+    counted under the `error` sentinel that means "an exception this seam cannot describe".
+    """
+    graph.get("/me").mock(return_value=httpx.Response(302, headers={"location": f"{GRAPH_V1}/me"}))
+
+    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+        _ = await client.me.get()
+
+    assert raised.value.status is None
+    assert "could not read" in str(raised.value)
+
+
+def test_a_cancelled_call_stays_cancelled_and_is_not_reported_as_a_graph_failure() -> None:
+    """The caller went away; Graph did nothing wrong.
+
+    Re-raised untranslated, because the task group that cancelled this has to learn it was obeyed —
+    a `CancelledError` swallowed into a `GraphUnavailable` is a task that reports success to a
+    cancellation. It also stops being counted as a Graph failure, which is what an MCP client
+    hanging up used to look like on a dashboard.
+
+    Raised in the block rather than off the wire: `CancelledError` is a `BaseException`, and respx
+    will only stand in for an `Exception`.
+    """
+    with pytest.raises(CancelledError), graph_errors("a_test"):
+        raise CancelledError("the client hung up")

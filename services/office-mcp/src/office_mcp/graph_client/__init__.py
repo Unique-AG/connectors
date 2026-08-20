@@ -1,11 +1,12 @@
 """Microsoft Graph transport using the official SDK for one caller's delegated token.
 
 This package knows nothing about Teams, mail, calendars, or the service config. create_app
-will translate app config into GraphSettings and inject it.
+translates app config into GraphSettings and injects it.
 """
 
 from office_mcp.graph_client.client import create_graph_transport, graph_client_for
 from office_mcp.graph_client.errors import (
+    GRAPH_STATUSES,
     GraphFailure,
     GraphForbidden,
     GraphNotFound,
@@ -13,11 +14,14 @@ from office_mcp.graph_client.errors import (
     GraphThrottled,
     GraphUnavailable,
     graph_errors,
+    graph_step,
 )
 from office_mcp.graph_client.observability import (
+    GRAPH_OPERATION_DURATION_SECONDS,
+    GRAPH_OPERATIONS_TOTAL,
     GRAPH_PAGES_SCANNED,
-    GRAPH_REQUEST_DURATION_SECONDS,
-    GRAPH_REQUESTS_TOTAL,
+    GRAPH_STEP_DURATION_SECONDS,
+    GRAPH_STEPS_TOTAL,
     GRAPH_THROTTLED_TOTAL,
 )
 from office_mcp.graph_client.pagination import (
@@ -29,9 +33,12 @@ from office_mcp.graph_client.pagination import (
 from office_mcp.graph_client.settings import GraphSettings
 
 __all__ = [
+    "GRAPH_OPERATIONS_TOTAL",
+    "GRAPH_OPERATION_DURATION_SECONDS",
     "GRAPH_PAGES_SCANNED",
-    "GRAPH_REQUESTS_TOTAL",
-    "GRAPH_REQUEST_DURATION_SECONDS",
+    "GRAPH_STATUSES",
+    "GRAPH_STEPS_TOTAL",
+    "GRAPH_STEP_DURATION_SECONDS",
     "GRAPH_THROTTLED_TOTAL",
     "MAX_SCANNED_ITEMS",
     "CollectedItems",
@@ -47,4 +54,5 @@ __all__ = [
     "create_graph_transport",
     "graph_client_for",
     "graph_errors",
+    "graph_step",
 ]

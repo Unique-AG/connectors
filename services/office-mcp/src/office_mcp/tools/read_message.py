@@ -38,7 +38,7 @@ from msgraph.generated.teams.item.channels.item.messages.item.replies.item.chat_
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_mcp.graph_client import graph_errors
+from office_mcp.graph_client import graph_errors, graph_step
 from office_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     CHAT_PERMISSION,
@@ -49,6 +49,15 @@ from office_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage, messa
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
 
 TOOL_NAME = "read_message"
+
+# The surfaces this tool reads, as the step instruments count them. Three rather than one, for the
+# same reason `GRAPH_CALL_NARROWS_TO` below names one permission rather than two: a chat message, a
+# channel post and a channel reply are three different Graph requests with three different failure
+# modes, and a single step would report a tenant that refuses channel messages as a tool that is
+# simply slow. The name is chosen from the handle's shape, which is code, never from the handle.
+STEP_CHAT_MESSAGE = "chat_message"
+STEP_CHANNEL_MESSAGE = "channel_message"
+STEP_CHANNEL_REPLY = "channel_reply"
 
 # Token exchange requests both because the handle is parsed after the exchange happens.
 # Read uses `Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel.
@@ -163,11 +172,16 @@ async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> 
 
 async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:
     if handle.chat_id is not None:
-        return await (
-            client.chats.by_chat_id(handle.chat_id)
-            .messages.by_chat_message_id(handle.message_id)
-            .get(request_configuration=RequestConfiguration[_ChatMessageQuery](headers=_headers()))
-        )
+        with graph_step(STEP_CHAT_MESSAGE):
+            return await (
+                client.chats.by_chat_id(handle.chat_id)
+                .messages.by_chat_message_id(handle.message_id)
+                .get(
+                    request_configuration=RequestConfiguration[_ChatMessageQuery](
+                        headers=_headers()
+                    )
+                )
+            )
     assert handle.team_id is not None and handle.channel_id is not None, (
         "a handle addresses either a chat or a team channel"
     )
@@ -178,14 +192,20 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
         # A reply is addressed under the post it replies to, never beside it — the reply id alone
         # is a 404. `by_chat_message_id1` is the generated name for the second message id in that
         # path, the first being the parent post's.
-        return await (
-            messages.by_chat_message_id(handle.reply_to_id)
-            .replies.by_chat_message_id1(handle.message_id)
-            .get(request_configuration=RequestConfiguration[_ChannelReplyQuery](headers=_headers()))
+        with graph_step(STEP_CHANNEL_REPLY):
+            return await (
+                messages.by_chat_message_id(handle.reply_to_id)
+                .replies.by_chat_message_id1(handle.message_id)
+                .get(
+                    request_configuration=RequestConfiguration[_ChannelReplyQuery](
+                        headers=_headers()
+                    )
+                )
+            )
+    with graph_step(STEP_CHANNEL_MESSAGE):
+        return await messages.by_chat_message_id(handle.message_id).get(
+            request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers())
         )
-    return await messages.by_chat_message_id(handle.message_id).get(
-        request_configuration=RequestConfiguration[_ChannelMessageQuery](headers=_headers())
-    )
 
 
 def _headers() -> HeadersCollection:

@@ -25,12 +25,19 @@ from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_mcp.graph_client import GraphForbidden, graph_errors
+from office_mcp.graph_client import GraphForbidden, graph_errors, graph_step
 from office_mcp.shared.handles import TranscriptHandle, transcript_handle
 from office_mcp.shared.meetings import TRANSCRIPT_PERMISSION
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "read_transcript"
+
+# The two attempts this tool can make, counted apart. A tenant that will not give speaker names
+# refuses the first and answers the second, and telling them apart is the point: the rate of
+# `transcript_unattributed` is how often that tenant setting costs a caller the speaker names,
+# which no operation-level series can show.
+STEP_ATTRIBUTED = "transcript_attributed"
+STEP_UNATTRIBUTED = "transcript_unattributed"
 
 # One permission this tool's one request needs. Admin-consented and independent from recording
 # permissions. `list_meeting_transcripts` also declares it; both tools read the same resource.
@@ -228,29 +235,40 @@ async def _content(client: GraphServiceClient, handle: TranscriptHandle) -> tupl
     that blocks transcripts answers with the same `403`. It has no retry that fixes it. Retrying
     that case would waste a call and report the wrong remedy.
 
-    Each attempt uses its own `graph_errors(TOOL_NAME)` block. The raw SDK error carries no inner
-    code before translation. One block around both attempts would let the first failure pass the
-    `except` clause untranslated.
+    Each attempt is its own `graph_step` block, inside one `graph_errors` block for the whole tool
+    call. The step blocks are what translate: the raw SDK error carries no inner code before
+    translation, so the `except` clause below needs an attempt-sized block to have already run.
+
+    The nesting is also what stops a working tenant looking like a broken one. Two `graph_errors`
+    blocks made the refused first attempt an *operation* counted as `forbidden` — on a tool call
+    that went on to succeed — so any alert on refusals fired on a tenant behaving exactly as
+    designed. Now the refusal is counted where it is true, against `transcript_attributed`, and the
+    operation is counted as what it was: an answer.
     """
     endpoint = (
         client.me.online_meetings.by_online_meeting_id(handle.meeting_id)
         .transcripts.by_call_transcript_id(handle.transcript_id)
         .content
     )
-    try:
-        with graph_errors(TOOL_NAME):
-            attributed = await endpoint.get(
-                request_configuration=RequestConfiguration(headers=_accepting(_ATTRIBUTED_FORMAT))
-            )
-    except GraphForbidden as refusal:
-        if refusal.inner_code != _SPEAKER_ATTRIBUTION_REFUSED:
-            raise
-        with graph_errors(TOOL_NAME):
-            unattributed = await endpoint.get(
-                request_configuration=RequestConfiguration(headers=_accepting(_UNATTRIBUTED_FORMAT))
-            )
-        return (unattributed or b"", False)
-    return (attributed or b"", True)
+    with graph_errors(TOOL_NAME):
+        try:
+            with graph_step(STEP_ATTRIBUTED):
+                attributed = await endpoint.get(
+                    request_configuration=RequestConfiguration(
+                        headers=_accepting(_ATTRIBUTED_FORMAT)
+                    )
+                )
+        except GraphForbidden as refusal:
+            if refusal.inner_code != _SPEAKER_ATTRIBUTION_REFUSED:
+                raise
+            with graph_step(STEP_UNATTRIBUTED):
+                unattributed = await endpoint.get(
+                    request_configuration=RequestConfiguration(
+                        headers=_accepting(_UNATTRIBUTED_FORMAT)
+                    )
+                )
+            return (unattributed or b"", False)
+        return (attributed or b"", True)
 
 
 def _accepting(media_type: str) -> HeadersCollection:

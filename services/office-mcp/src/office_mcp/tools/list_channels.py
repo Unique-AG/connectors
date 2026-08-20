@@ -34,6 +34,9 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_channels"
 
+# The one Graph call this tool makes, as the step instruments count it.
+STEP = "channels"
+
 # The delegated Graph permission this tool's one request needs — the cheap "basic" scope over a
 # channel's identity, which is all this collection returns. Reading what was *posted* in a channel
 # is the broad `ChannelMessage.Read.All` and is `browse_channel`'s to declare; a tenant commonly
@@ -129,7 +132,7 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
         ),
         headers=headers,
     )
-    with graph_errors(TOOL_NAME):
+    with graph_errors(TOOL_NAME, step=STEP):
         first_page = await client.teams.by_team_id(team_id).channels.get(
             request_configuration=configuration
         )
