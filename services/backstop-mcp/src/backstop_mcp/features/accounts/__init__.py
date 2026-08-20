@@ -13,7 +13,10 @@ from backstop_mcp.features.accounts.fetch_holdings import (
     FALLBACK_OMITTED_FIELDS,
     fetch_holdings,
 )
-from backstop_mcp.features.accounts.fetch_holdings_table import fetch_holdings_table
+from backstop_mcp.features.accounts.fetch_holdings_table import (
+    HoldingsTableShapeError,
+    fetch_holdings_table,
+)
 from backstop_mcp.features.accounts.fetch_product_positions import (
     MAX_POSITION_ACCOUNTS,
     fetch_product_positions,
@@ -22,8 +25,10 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
+    HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
+    HoldingsSource,
     InvestorTypeDto,
     MoneyDto,
     ProductCandidate,
@@ -48,8 +53,11 @@ __all__ = [
     "AccountRecordDto",
     "AccountRowResponse",
     "FALLBACK_OMITTED_FIELDS",
+    "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
+    "HoldingsSource",
+    "HoldingsTableShapeError",
     "InvestorTypeDto",
     "MAX_POSITION_ACCOUNTS",
     "MoneyDto",
