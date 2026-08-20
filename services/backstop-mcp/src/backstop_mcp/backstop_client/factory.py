@@ -1,9 +1,9 @@
 """Ownership of every process-wide Backstop HTTP resource.
 
-One `BackstopClientFactory` is built in `create_app()` and reached through
-`runtime.get_services().backstop`. It holds the shared connection pool, the per-user
+One `BackstopClientFactory` is built by `get_backstop_client_factory` in
+`backstop_mcp.dependencies`. It holds the shared connection pool, the per-user
 concurrency gates, the one set of transport settings, and the one retry policy — nothing here
-re-reads the environment, so what `create_app` was handed is what every request uses.
+re-reads the environment, so what the provider was handed is what every request uses.
 """
 
 import asyncio
@@ -127,7 +127,8 @@ class BackstopClientFactory:
         Needed because the wiring is circular: the auth context's token-revocation hook belongs
         to the OAuth provider, and the provider needs this factory to verify credentials at
         login. Building the factory twice would mean two connection pools, so the cycle is
-        broken here instead — one explicit step in `create_app`, rather than a second pool.
+        broken here instead — one explicit step in `get_backstop_client_factory`
+        (`backstop_mcp.dependencies`), rather than a second pool.
         """
         assert self._auth is None, "attach_auth() must be called at most once"
         self._auth = auth

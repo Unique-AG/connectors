@@ -28,9 +28,9 @@ the timeline `activity_id` into `{resource_type, resource_id}`;
 and the pure conversion into it. See `responses.py`.
 
 `ActivityHistorySettings`: the per-stream page size and gist truncation budget, translated from
-`config.ActivityHistoryConfig` by `create_app`. See `settings.py`.
+`config.ActivityHistoryConfig` by `get_activity_history_settings`. See `settings.py`.
 
-The MCP tool surface itself lives in a later `activity_history` module.
+The MCP tools live in `features/activity_history/tools/`.
 """
 
 from backstop_mcp.features.activity_history.api_responses import ActivityAttributes

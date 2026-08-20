@@ -62,8 +62,8 @@ class EmploymentIndexFactory:
     side-loaded on the caller's own GET, so building an index needs no client, no cache and no
     lock: it is synchronous, and every caller gets the same index for the same record.
 
-    Built via `from_vocabulary` in `create_app()` and reached via
-    `runtime.get_employment_index_factory()`.
+    Built via `from_vocabulary` by `get_employment_index_factory` in this feature's
+    `dependencies.py`.
     """
 
     def __init__(

@@ -1,9 +1,8 @@
 """What the activity-history feature needs to know, as its own type.
 
-`config.ActivityHistoryConfig` is the env-parsing shape; this is the domain type `create_app`
-translates it into, so nothing under `features/activity_history/` imports `config` (same rule,
-same reason as `backstop_client.settings.BackstopTransportSettings` vs
-`config.BackstopConfig` — see that module's docstring).
+`config.ActivityHistoryConfig` is the env-parsing shape; this is the domain type
+`get_activity_history_settings` translates it into, so the feature takes a domain
+type rather than the env-parsing shape.
 
 Frozen, so a tool can't accidentally end up tuning its own page size or gist budget mid-request.
 """
