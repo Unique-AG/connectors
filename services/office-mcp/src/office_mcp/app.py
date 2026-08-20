@@ -13,7 +13,7 @@ from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 
 from office_mcp.auth import build_auth, build_oauth_storage
-from office_mcp.cardinality import BoundedNameMiddleware
+from office_mcp.cardinality import BoundedNameMiddleware, BoundedRequestMiddleware
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
 from office_mcp.graph_client import GraphSettings, create_graph_transport
 from office_mcp.logging import (
@@ -194,6 +194,12 @@ def create_app(
             # Outermost, so a request that never reaches the app is still one identifiable request
             # in the logs. See `logging.py`.
             Middleware(HttpRequestIdMiddleware),
+            # Second, so the log line above it keeps the path the client really asked for while
+            # nothing below it can turn one into a metric label or a span attribute. See
+            # `cardinality.py`: `unique_toolkit`'s metrics middleware labels two families with the
+            # raw path and the raw verb, and this service's OAuth endpoints are on the public
+            # internet, so both are reachable without a credential.
+            Middleware(BoundedRequestMiddleware),
             # A no-op meter provider on purpose. Left to the global one, this middleware's own
             # instruments resolve against the provider metrics.py aims at the toolkit registry, and
             # /metrics then serves two histograms for one latency: http_server_duration_milliseconds

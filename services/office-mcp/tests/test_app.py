@@ -39,7 +39,12 @@ from unique_toolkit.monitoring import get_metrics
 import office_mcp.app as app_module
 from office_mcp.app import create_app
 from office_mcp.auth import build_auth, build_oauth_storage
-from office_mcp.cardinality import UNRESOLVED_NAME, BoundedNameMiddleware
+from office_mcp.cardinality import (
+    UNMATCHED_METHOD,
+    UNMATCHED_PATH,
+    UNRESOLVED_NAME,
+    BoundedNameMiddleware,
+)
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.graph_client import GraphSettings, create_graph_transport
 from office_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
@@ -120,6 +125,18 @@ class _HttpResponse(Protocol):
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
     return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+
+
+def _request(client: TestClient, method: str, path: str) -> _HttpResponse:
+    """The same narrowing as `_get`, for a verb `TestClient` has no method for.
+
+    Which is the point of the one caller: a method this service does not serve is a label value a
+    client chose, so the test has to be able to send one.
+    """
+    return cast(
+        "_HttpResponse",
+        client.request(method, path),  # pyright: ignore[reportUnknownMemberType]
+    )
 
 
 def _app(config: AppConfig | None = None) -> Starlette:
@@ -780,18 +797,46 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
         """Otherwise a bogus call would not just be counted as a real tool — it would run one."""
         assert UNRESOLVED_NAME not in resolve(preset=ToolsPreset.TEAMS, enabled=None).tools
 
-    async def test_this_server_registers_no_resource_and_no_prompt_to_resolve(self) -> None:
-        """Guards the decision, not the code: `on_read_resource` and `on_get_prompt` pin their
-        label instead of resolving it, which is only correct while there is nothing to resolve.
+    async def test_this_server_registers_no_resource_and_no_prompt_today(self) -> None:
+        """Records the state the resource and prompt paths are exercised against, not a decision.
 
-        The day either surface gains a member this fails, and the middleware needs the tool path's
-        shape — resolve first, rename only what would have been refused — plus the caller's own
-        string back in the refusal, which upstream builds from the exception on those two paths.
+        All three paths now resolve before renaming, so nothing here depends on the registries being
+        empty. What being empty does mean is that the resolve-first branch on those two is never the
+        one taken in this deployment — so when the Outlook or SharePoint surfaces add a member, this
+        fails and says to go and cover the branch that starts running.
         """
         async with Client(FastMCPTransport(_server_of(_app()))) as client:
             assert await client.list_resources() == []
             assert await client.list_resource_templates() == []
             assert await client.list_prompts() == []
+
+    async def test_a_resource_and_a_prompt_that_do_resolve_keep_their_own_name(self) -> None:
+        """The resolve-first branch on the two paths this deployment cannot reach yet.
+
+        Asserted on a server built here rather than on the composed app, because the composed app
+        registers neither — which is the whole reason this branch would otherwise go untested until
+        the day something depended on it.
+        """
+        server: FastMCP[None] = FastMCP("Office MCP", middleware=[BoundedNameMiddleware()])
+
+        @server.resource("resource://kept")
+        def kept_resource() -> str:
+            return "resource reached"
+
+        @server.prompt
+        def kept_prompt() -> str:
+            return "prompt reached"
+
+        async with Client(FastMCPTransport(server)) as client:
+            read = await client.read_resource("resource://kept")
+            got = await client.get_prompt("kept_prompt")
+
+        assert [getattr(content, "text", None) for content in read] == ["resource reached"]
+        assert [
+            block.text
+            for message in got.messages
+            if isinstance(block := message.content, TextContent)
+        ] == ["prompt reached"]
 
     async def test_every_registered_tool_still_dispatches_under_its_own_name(self) -> None:
         """The renaming is only allowed to touch a call that was going to be refused anyway.
@@ -870,3 +915,118 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
             "BoundedNameMiddleware has to run outside unique_mcp's metrics middleware, which reads "
             + "the tool name the client sent as a Prometheus label before anything resolves it"
         )
+
+
+def _http_label_values(label: str) -> set[str]:
+    """Every value one label of `python_http_requests_total` carries, from a live scrape.
+
+    Same registry and same caveat as `_call_label_values`: process-wide and never reset, so assert
+    on values this test produced itself.
+    """
+    pattern = re.compile(rf'{label}="([^"]*)"')
+    return {
+        match.group(1)
+        for line in get_metrics().decode().splitlines()
+        if line.startswith("python_http_requests_total{")
+        for match in [pattern.search(line)]
+        if match is not None
+    }
+
+
+class TestThePathAndMethodLabelsAreBoundedByTheRouter:
+    """`python_http_requests_total{path,method}` is labelled with what the client sent.
+
+    Both labels come from `unique_toolkit`'s metrics middleware, which reads `scope["path"]` and
+    `scope["method"]` verbatim. This service publishes its OAuth endpoints on the public internet,
+    so unlike the MCP `name` label these need no credential at all: one `GET /wp-login.php` from a
+    scanner mints a counter series and a whole histogram that live until the process dies.
+    `BoundedRequestMiddleware` collapses an unrouted path and an unserved verb before that
+    middleware sees either. See `cardinality.py` for why the fix belongs upstream instead.
+    """
+
+    def test_the_sentinels_are_not_routes_or_methods_this_service_serves(self) -> None:
+        """Otherwise the bucket would collide with real traffic and hide it."""
+        paths = {getattr(route, "path", None) for route in _app().routes}
+
+        assert UNMATCHED_PATH not in paths
+        assert UNMATCHED_METHOD not in {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+
+    def test_many_unrouted_paths_become_one_label_value(self, app_client: TestClient) -> None:
+        """The whole point. Three shapes a scanner sends, one of them carrying a Teams id."""
+        for path in ("/wp-login.php", "/.env", "/chats/19:meeting_abc@thread.v2/messages"):
+            assert _get(app_client, path).status_code == 404
+
+        counted = _http_label_values("path")
+        assert UNMATCHED_PATH in counted
+        assert not [path for path in counted if "wp-login" in path or "thread.v2" in path], (
+            "an unauthenticated request minted a permanent time series per path"
+        )
+
+    def test_a_verb_nobody_serves_becomes_one_label_value(self, app_client: TestClient) -> None:
+        """`method` is as client-chosen as `path` is — h11 accepts any RFC 7230 token — and it
+        multiplies against it. A bogus verb on a *real* path is the case the path rule cannot
+        catch: the router answers `Match.PARTIAL` there, so the path is genuine and only the verb
+        is invented.
+
+        `/manifest` rather than `/health`, because the toolkit middleware excludes the health and
+        metrics paths from its own metrics, so nothing would be recorded to assert on."""
+        assert _request(app_client, "BANANA", "/manifest").status_code in {404, 405}
+
+        assert UNMATCHED_METHOD in _http_label_values("method")
+        assert "BANANA" not in _http_label_values("method")
+
+    def test_a_real_route_keeps_its_own_path_and_still_answers(
+        self, app_client: TestClient
+    ) -> None:
+        """The renaming may only touch a request that was going to be refused.
+
+        `/manifest` rather than `/health`, because the toolkit middleware excludes the health and
+        metrics paths from its own metrics, so they could not show a surviving label either way.
+        """
+        assert _get(app_client, "/manifest").status_code == 200
+
+        assert "/manifest" in _http_label_values("path")
+
+    def test_an_unrouted_path_still_gets_starlettes_own_404(self, app_client: TestClient) -> None:
+        """This middleware rewrites and passes through; it refuses nothing.
+
+        So a route somebody forgets to register still answers 404 exactly as before, rather than a
+        missing registration becoming an outage — which is what a known-paths gate in front of the
+        router would have made it.
+        """
+        answered = _get(app_client, "/not-a-route-at-all")
+
+        assert answered.status_code == 404
+        assert answered.text == "Not Found", "Starlette's own 404, not one this middleware wrote"
+
+    def test_it_is_mounted_inside_the_request_id_line_and_outside_everything_else(self) -> None:
+        """Ordering, both directions, and each side is load-bearing.
+
+        Starlette applies `user_middleware` outside-in, so earlier in the list is further out.
+        Outside the toolkit's metrics middleware, or the label has already been read. Inside the
+        request-id one, so an operator reading a flood of 404s still sees the real paths — a log
+        line is where that truth belongs, and a metric label is the one place it must not
+        accumulate.
+        """
+        # `Middleware.cls` is typed as a factory protocol rather than a class, so the name comes
+        # off it through `type[object]`. Names rather than identities because three of the readers
+        # being ordered against belong to other packages.
+        installed = [
+            cast("type[object]", middleware.cls).__name__ for middleware in _app().user_middleware
+        ]
+
+        def position(name: str) -> int:
+            found = [i for i, installed_name in enumerate(installed) if installed_name == name]
+            assert len(found) == 1, f"expected exactly one {name}, got {installed}"
+            return found[0]
+
+        ours = position("BoundedRequestMiddleware")
+
+        assert position("HttpRequestIdMiddleware") < ours, (
+            "the request-id line has to see the real path, or a 404 flood is unreadable in the logs"
+        )
+        for reader in ("OpenTelemetryMiddleware", "MetricsMiddleware"):
+            assert ours < position(reader), (
+                f"{reader} turns the path into a label or a span attribute, so the bounding has to "
+                + f"happen outside it. Got {installed}"
+            )
