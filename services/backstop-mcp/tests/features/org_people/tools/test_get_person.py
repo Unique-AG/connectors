@@ -9,12 +9,12 @@ from backstop_mcp.features.data_hygiene import (
     DepartureSignal,
     EmploymentLinkResponse,
 )
+from backstop_mcp.features.org_people.tools.get_person import PersonResolvedResponse, get_person
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,
     ResolvedPartyResponse,
 )
-from backstop_mcp.server.tools.get_person import PersonResolvedResponse, get_person
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
     FORMER_TYPE,
