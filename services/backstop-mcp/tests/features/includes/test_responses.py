@@ -9,10 +9,8 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.features.includes import (
-    ActivityAttendeeResponse,
     ActivityInclude,
     ActivityIncludesResponse,
-    ActivityTagChipResponse,
     CompanyRefResponse,
     ContactCardResponse,
     ContactEmailResponse,
