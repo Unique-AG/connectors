@@ -79,7 +79,7 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 30_000
         assert config.default_page_size == 100
         assert config.report_page_size == 500
-        assert config.custom_field_schema_ttl_minutes == 60
+        assert config.custom_field_schema_ttl_minutes == 24 * 60
         assert config.opportunity_stage_ttl_minutes == 60
         assert config.employment_relationship_type_ids == ()
         assert config.employment_relationship_type_markers == ("employ",)

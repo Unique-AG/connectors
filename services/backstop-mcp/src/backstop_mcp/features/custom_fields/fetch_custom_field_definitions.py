@@ -13,8 +13,10 @@ _DUPLICATE_DEFINITION_WARNING = (
 )
 
 
-async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomFieldDefinitionDto]:
-    """Fetch Backstop's full custom-field schema in one paginated walk."""
+async def fetch_custom_field_definitions(
+    client: BackstopClient,
+) -> dict[str, CustomFieldDefinitionDto]:
+    """Fetch Backstop's full custom-field schema in one paginated walk, keyed by definition id."""
     page = await client.paginate(
         _DEFINITIONS_PATH,
         schema=BackstopApiResource[CustomFieldDefinitionAttributes],
@@ -32,4 +34,4 @@ async def fetch_custom_field_definitions(client: BackstopClient) -> list[CustomF
             definitions_by_id[definition.id] = definition
         elif existing != definition:
             logger.warning(_DUPLICATE_DEFINITION_WARNING, definition.id)
-    return list(definitions_by_id.values())
+    return definitions_by_id

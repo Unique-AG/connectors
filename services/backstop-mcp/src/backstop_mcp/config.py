@@ -228,12 +228,17 @@ class BackstopConfig(BaseSettings):
     page_offset_param: str = Field(default="page[offset]", min_length=1)
 
     # How long a fetched custom-field catalog stays usable before it is re-fetched. Definitions
-    # change rarely; the default is one hour. Capped at 24 hours so a stale catalog cannot sit
-    # for days after a CRM admin adds a field. Values above the cap (including the previous
+    # change rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit
+    # for days after a CRM admin adds a field. `list_custom_fields(refresh=true)` (and the groups
+    # list) force a refetch when a field is missing. Values above the cap (including the previous
     # documented example of 10080) are clamped so existing deploys still boot.
     custom_field_schema_ttl_minutes: Annotated[
         int, BeforeValidator(_cap_custom_field_schema_ttl_minutes)
-    ] = Field(default=60, ge=1, le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES)
+    ] = Field(
+        default=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES,
+        ge=1,
+        le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES,
+    )
 
     # How long a fetched opportunity-stage vocabulary stays usable. Seven rows on the instance
     # this was built against, and a stage is added about as often as a custom field, so the same

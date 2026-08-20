@@ -219,15 +219,16 @@ class TestCatalogGet:
         assert not any("/lov-entries" in str(call.request.url) for call in recorded)
 
         assert cache == "ok"
-        assert len(definitions) == 1
-        assert definitions[0].name == "is1"
-        assert definitions[0].entity_type == "OrganizationBean"
-        assert definitions[0].select_options == [{"id": "1", "label": "Active"}]
-        assert definitions[0].group_id is None
-        assert definitions[0].tab_name == "Overview"
-        assert definitions[0].group_name == "Status"
-        assert definitions[0].layout_name == "Organization"
-        assert definitions[0].resource_type == "organizations"
+        assert list(definitions) == ["99"]
+        definition = definitions["99"]
+        assert definition.name == "is1"
+        assert definition.entity_type == "OrganizationBean"
+        assert definition.select_options == [{"id": "1", "label": "Active"}]
+        assert definition.group_id is None
+        assert definition.tab_name == "Overview"
+        assert definition.group_name == "Status"
+        assert definition.layout_name == "Organization"
+        assert definition.resource_type == "organizations"
 
 
 class TestInMemoryTtl:
@@ -274,8 +275,8 @@ class TestInMemoryTtl:
         assert route.call_count == 1
         assert first_cache == "ok"
         assert second_cache == "ok"
-        assert [d.name for d in first] == ["Cached Field"]
-        assert [d.name for d in second] == ["Cached Field"]
+        assert [d.name for d in first.values()] == ["Cached Field"]
+        assert [d.name for d in second.values()] == ["Cached Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -325,7 +326,7 @@ class TestInMemoryTtl:
 
         assert route.call_count == 2
         assert cache == "ok"
-        assert [d.name for d in definitions] == ["Fresh Field"]
+        assert [d.name for d in definitions.values()] == ["Fresh Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -374,7 +375,7 @@ class TestInMemoryTtl:
 
         assert route.call_count == 2
         assert cache == "ok"
-        assert [d.name for d in definitions] == ["Refreshed Field"]
+        assert [d.name for d in definitions.values()] == ["Refreshed Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -402,7 +403,7 @@ class TestInMemoryTtl:
 
         definitions, cache = await asyncio.wait_for(service.get(clients(base_url)), timeout=1)
         assert cache == "ok"
-        assert [d.name for d in definitions] == ["Warm Field"]
+        assert [d.name for d in definitions.values()] == ["Warm Field"]
 
         release_refresh.set()
         _ = await asyncio.wait_for(refresh_task, timeout=5)
@@ -424,7 +425,7 @@ class TestInMemoryTtl:
         assert route.call_count == 1
         for definitions, cache in results:
             assert cache == "ok"
-            assert [d.name for d in definitions] == ["Fresh Field"]
+            assert [d.name for d in definitions.values()] == ["Fresh Field"]
 
     @staticmethod
     async def _join_in_flight(started: asyncio.Event, release: asyncio.Event) -> None:
@@ -481,7 +482,7 @@ class TestInMemoryTtl:
         assert route.call_count == warm_calls + 1
         for definitions, cache in results[:3]:
             assert cache == "ok"
-            assert [d.name for d in definitions] == ["Refreshed Field"]
+            assert [d.name for d in definitions.values()] == ["Refreshed Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -513,7 +514,7 @@ class TestInMemoryTtl:
         assert route.call_count == warm_calls + 1
         for definitions, cache in results[:3]:
             assert cache == "stale"
-            assert [d.name for d in definitions] == ["Cached Field"]
+            assert [d.name for d in definitions.values()] == ["Cached Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -531,7 +532,7 @@ class TestInMemoryTtl:
         definitions, cache = await service.get(clients(base_url))
 
         assert cache == "stale"
-        assert [d.name for d in definitions] == ["Stale Field"]
+        assert [d.name for d in definitions.values()] == ["Stale Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -556,8 +557,8 @@ class TestInMemoryTtl:
         assert failed.call_count == calls_after_failure
         assert first_cache == "stale"
         assert second_cache == "ok"
-        assert [d.name for d in first] == ["Stale Field"]
-        assert [d.name for d in second] == ["Stale Field"]
+        assert [d.name for d in first.values()] == ["Stale Field"]
+        assert [d.name for d in second.values()] == ["Stale Field"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -592,7 +593,7 @@ class TestInMemoryTtl:
         self._definitions_route(base_url, "After Cancel")
         definitions, cache = await asyncio.wait_for(service.get(client), timeout=5)
         assert cache == "ok"
-        assert [d.name for d in definitions] == ["After Cancel"]
+        assert [d.name for d in definitions.values()] == ["After Cancel"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -610,7 +611,7 @@ class TestInMemoryTtl:
         definitions, cache = await service.get(clients(base_url))
 
         assert cache == "ok"
-        assert [d.name for d in definitions] == ["Recovered Field"]
+        assert [d.name for d in definitions.values()] == ["Recovered Field"]
         assert route.call_count == 1
         assert service._in_flight is None  # pyright: ignore[reportPrivateUsage]
 

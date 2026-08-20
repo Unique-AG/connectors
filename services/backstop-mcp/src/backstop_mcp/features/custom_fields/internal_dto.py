@@ -10,8 +10,15 @@ from backstop_mcp.features.custom_fields.api_responses import (
     CustomFieldGroupParentAttributes,
 )
 from backstop_mcp.features.custom_fields.entity_types import custom_field_entity_type_from_bean
+from backstop_mcp.features.entity_types import SearchType
 
-__all__ = ["CustomFieldDefinitionDto", "CustomFieldGroupDto", "CustomFieldGroupParentDto"]
+__all__ = [
+    "CustomFieldDefinitionDto",
+    "CustomFieldEntityReferenceDto",
+    "CustomFieldGroupDto",
+    "CustomFieldGroupParentDto",
+    "ResolvedCustomFieldValueDto",
+]
 
 _ENTRY_COLLECTION_KEYS = ("entries", "lovEntries", "viewableEntries", "options", "values")
 
@@ -175,6 +182,34 @@ class CustomFieldGroupDto(BaseModel):
             full_path_name=_path_segments(resource.attributes.full_path_name),
             parent=None if parent is None else CustomFieldGroupParentDto.from_attributes(parent),
         )
+
+
+class CustomFieldEntityReferenceDto(BaseModel):
+    """An ENTITY-typed custom-field value parsed from Backstop's inline resource ref."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    resource_type: str | None = None
+    resource_link: str | None = None
+    search_type: SearchType | None = None
+
+
+class ResolvedCustomFieldValueDto(BaseModel):
+    """One record value joined to its catalog definition."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    definition_id: str
+    name: str
+    layout_name: str | None = None
+    group_name: str | None = None
+    field_type: str | None = None
+    tab_name: str | None = None
+    group_id: int | None = None
+    entity_type: str | None = None
+    value: object = None
+    outside_current_options: bool = False
 
 
 def _path_segments(value: list[object] | None) -> list[str]:

@@ -80,6 +80,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "AccountRowResponse",
         "ContactEmailResponse",
         "CustomFieldDefinitionResponse",
+        "CustomFieldEntityReferenceResponse",
         "CustomFieldGroupMemberResponse",
         "CustomFieldGroupParentResponse",
         "CustomFieldGroupResponse",
@@ -90,6 +91,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "PersonResolvedResponse",
         "PositionRowResponse",
         "ProductPositionsResolvedResponse",
+        "ResolvedCustomFieldValueResponse",
         "ResolvedPartyResponse",
     } <= names
 

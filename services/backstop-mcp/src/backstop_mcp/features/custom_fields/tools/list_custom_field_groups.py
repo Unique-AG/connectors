@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
@@ -46,10 +47,10 @@ def _join_id(resource_id: str) -> int | None:
 
 
 def _membership_by_group_id(
-    catalog: list[CustomFieldDefinitionDto],
+    catalog: Mapping[str, CustomFieldDefinitionDto],
 ) -> dict[int, list[CustomFieldGroupMemberResponse]]:
     by_group: dict[int, list[CustomFieldGroupMemberResponse]] = {}
-    for definition in catalog:
+    for definition in catalog.values():
         group_id = definition.group_id
         if group_id is None:
             continue
@@ -106,6 +107,6 @@ async def list_custom_field_groups(
         cache=_cache_status(groups_cache, definitions_cache),
         groups=[
             CustomFieldGroupResponse.from_group(group, _members_for(group.id, membership))
-            for group in groups
+            for group in groups.values()
         ],
     )
