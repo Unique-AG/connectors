@@ -30,7 +30,7 @@ from backstop_mcp.features.activity_history import (
     GetActivityHistoryResponse,
     ResolvedPartyAsOfResponse,
     TimelineRecord,
-    fetch_activities_page_by_type,
+    fetch_activities_page,
     group_page,
     to_timeline_record,
 )
@@ -112,7 +112,7 @@ async def get_activity_history(
         schema=BackstopApiResourceDocument[PartyRecordResponse],
     )
     page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
-        activity_type: fetch_activities_page_by_type(
+        activity_type: fetch_activities_page(
             client,
             activity_type=activity_type,
             segment=args.segment,

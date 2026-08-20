@@ -4,25 +4,26 @@
 `/{segment}/{id}/opportunities?include=stage,stageHistory` walk, projected onto
 `OpportunityResponse`/`StageChangeResponse`, then filtered by `status` and ordered by
 `dateEnteredCurrentStage` in memory (Backstop rejects the filter and ignores the sort on this
-endpoint). See `fetch.py`'s module docstring for that and the other measured quirks it absorbs.
+endpoint). See `fetch_opportunities.py`'s module docstring for that and the other measured quirks
+it absorbs.
 
 `OpportunityStagesService` is the TTL-cached instance stage vocabulary the fetch is handed: an
 opportunity's stage history names only some of the stages it points at, and the rest come from
-here. See `stages.py`.
+here. See `opportunity_stages_service.py`.
 """
 
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
-from backstop_mcp.features.opportunities.fetch import (
+from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityStatus,
     fetch_opportunities,
 )
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
+from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import (
     OpportunityFetchResponse,
     OpportunityResponse,
     StageChangeResponse,
 )
-from backstop_mcp.features.opportunities.stages import OpportunityStagesService
 
 __all__ = [
     "OpportunityFetchResponse",

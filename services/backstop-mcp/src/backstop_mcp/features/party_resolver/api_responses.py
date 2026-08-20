@@ -21,12 +21,12 @@ _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_lengt
 
 
 class PartyAttributes(BaseModel):
-    """Shape of a party resource's `attributes` in `search.py`'s JSON:API responses.
+    """Shape of a party resource's `attributes` in the party-search JSON:API responses.
 
     Deserialized straight off the wire via `BackstopApiCollectionDocument[PartyAttributes]` /
     `BackstopApiResourceDocument[PartyAttributes]` — see `backstop_client.json_api`.
-    `extra="ignore"` since only `id`/`name`/`label` (derived here) ever leave `search.py`.
-    Names are stripped here so `search.py`'s display-name fallback can use plain truthiness
+    `extra="ignore"` since only `id`/`name`/`label` (derived here) ever leave the search modules.
+    Names are stripped here so the display-name fallback can use plain truthiness
     checks instead of re-stripping at point of use.
     """
 
@@ -41,9 +41,9 @@ class PartyAttributes(BaseModel):
     )
     # Quick-search's `id` comes back prefixed (`organizations_341208613`), unusable against
     # `/organizations/{id}`; `resourceId` is the real id. Other party endpoints don't send this
-    # attribute, so it's optional and `search.py` falls back to stripping the `id` prefix.
+    # attribute, so it's optional and `_party_id` falls back to stripping the `id` prefix.
     # `_NonEmptyStr` (not `_StrippedStr`) so a blank/whitespace-only value can't bind to `""` and
-    # slip past `search.py`'s `is not None` check — that would return `""` as the id instead of
+    # slip past `_party_id`'s `is not None` check — that would return `""` as the id instead of
     # falling through to the prefix-strip fallback. Needs the same blank→None coercion as
     # `PartyResolveItemDto` since `_NonEmptyStr` alone rejects (rather than coerces) blank input.
     resource_id: _NonEmptyStr | None = Field(

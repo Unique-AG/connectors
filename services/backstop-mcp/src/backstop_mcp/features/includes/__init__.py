@@ -12,7 +12,7 @@ is in the projection layer — `backstop_client.follow_included` already covers 
 include here needs.
 """
 
-from backstop_mcp.features.includes.resolve import IncludePlan, include_plan
+from backstop_mcp.features.includes.include_plan import IncludePlan, include_plan
 from backstop_mcp.features.includes.responses import (
     CompanyRefResponse,
     ContactCardResponse,

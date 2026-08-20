@@ -24,7 +24,7 @@ from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
-from backstop_mcp.features.activity_history.fetch_activities import (
+from backstop_mcp.features.activity_history.fetch_activities_page import (
     ActivityType,
     BackstopActivityType,
 )

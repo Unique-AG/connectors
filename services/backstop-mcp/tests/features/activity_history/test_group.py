@@ -27,7 +27,7 @@ from backstop_mcp.features.activity_history import (
     EmailItemDto,
     group_page,
 )
-from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
+from backstop_mcp.features.activity_history.fetch_activities_page import BackstopActivityType
 
 
 def _activity(
