@@ -78,6 +78,7 @@ async def fetch_holdings_table(
     )
     return HoldingListingDto(
         rows=kept,
+        source="table",
         closed_omitted=len(rows) - len(kept),
         rows_dropped=rows_dropped,
         open_count=table.open_count,

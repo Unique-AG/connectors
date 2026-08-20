@@ -31,6 +31,7 @@ __all__ = [
     "AumReconciliationDto",
     "HoldingListingDto",
     "HoldingRowDto",
+    "HoldingsSource",
     "InvestorTypeDto",
     "MoneyDto",
     "ProductCandidate",
@@ -262,6 +263,11 @@ class AccountListingDto(BaseModel):
     closed_omitted: int = 0
 
 
+# Which path produced a holdings listing. The undocumented table endpoint or the documented
+# `/accounts` walk — the two answer the same question with different completeness.
+type HoldingsSource = Literal["table", "documented"]
+
+
 class MoneyDto(BaseModel):
     """A money figure carried with Backstop's own rendering.
 
@@ -366,17 +372,22 @@ class HoldingListingDto(BaseModel):
     filtering — so `all_count` can exceed `len(rows)` legitimately. `rows_dropped` is how many
     rows carried no account id and were skipped; non-zero means the endpoint's shape moved and is
     worth surfacing rather than silently under-reporting.
+
+    `source` and `omitted_fields` are facts about which path produced this, not the sentence a
+    caller reads: the response layer turns them into the caveat the model is shown. `omitted_fields`
+    is empty on the table path and names what the documented walk cannot produce on the other.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     rows: tuple[HoldingRowDto, ...]
+    source: HoldingsSource = "table"
+    omitted_fields: tuple[str, ...] = ()
     closed_omitted: int = 0
     rows_dropped: int = 0
     open_count: int | None = None
     all_count: int | None = None
     closed_count: int | None = None
-    fallback_note: str | None = None
 
 
 class SeriesPointDto(BaseModel):
