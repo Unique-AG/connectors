@@ -108,7 +108,7 @@ async def _fetch_documented_holdings(
         open_count=sum(1 for account in listing.accounts if account.is_open),
         all_count=len(listing.accounts) + listing.closed_omitted,
         closed_count=_closed_count(listing.accounts, closed_omitted=listing.closed_omitted),
-        source="documented",
+        source="accounts-api",
         omitted_fields=FALLBACK_OMITTED_FIELDS,
     )
 
