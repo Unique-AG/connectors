@@ -1,25 +1,14 @@
 from collections.abc import Sequence
-from typing import Annotated, ClassVar, Literal
-from urllib.parse import quote
+from typing import Annotated, Literal
 
 from fastmcp import Context
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument
-from backstop_mcp.features.data_hygiene import (
-    AsOfResponse,
-    EmploymentLinkResponse,
-    EntityRelationshipInclude,
-    ProvenanceAttributes,
-    project_entity_relationships,
-)
-from backstop_mcp.features.includes import (
-    PersonInclude,
-    PersonIncludesResponse,
-    include_plan,
-)
+from backstop_mcp.features.data_hygiene import AsOfResponse, EmploymentLinkResponse
+from backstop_mcp.features.includes import PersonInclude, PersonIncludesResponse
+from backstop_mcp.features.org_people import PersonRecordResponse, fetch_person
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
@@ -29,17 +18,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
-
-
-class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
-    """Person resource attributes; extras preserved for the tool payload."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
-
-    name: str | None = Field(
-        default=None,
-        description="Display name as Backstop stores it, usually 'Last, First'.",
-    )
 
 
 class PersonResolvedResponse(OmitNoneModel):
@@ -188,32 +166,19 @@ async def get_person(
         return unresolved_party_response(result)
 
     party = result.value
-    # Quick-search for people uses the shared PERSON_* types, so a hit may be a
-    # contact/employee; follow `party.search_type` instead of hard-coding `/people`.
-    path = f"/{party.search_type}/{quote(party.id, safe='')}"
-    plan = include_plan(PersonIncludesResponse, requested=include)
-    # `plan.param` is empty when nothing was requested, so join only the non-empty parts.
-    include_param = ",".join(
-        part for part in (EntityRelationshipInclude.for_employment(), plan.param) if part
+    fetched = await fetch_person(
+        client,
+        get_employment_index_factory(),
+        search_type=party.search_type,
+        party_id=party.id,
+        include=include,
     )
-    document = await client.get(
-        path,
-        params={"include": include_param} if include_param else None,
-        schema=BackstopApiResourceDocument[PersonRecordResponse],
-    )
-    attributes = document.require_data(path=path).attributes
-    loaded = project_entity_relationships(document)
-    index = get_employment_index_factory().index(
-        relationships=loaded.relationships,
-        relationship_types=loaded.relationship_types,
-    )
-
     return PersonResolvedResponse(
-        person=attributes,
+        person=fetched.person,
         resolved=ResolvedPartyResponse.from_party(
-            party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
+            party, attributes=fetched.person.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=AsOfResponse.from_attributes(attributes),
-        employments=index.links(),
-        included=plan.project(document=document) if plan.planned else None,
+        as_of=AsOfResponse.from_attributes(fetched.person),
+        employments=fetched.employments,
+        included=fetched.included,
     )

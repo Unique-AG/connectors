@@ -7,6 +7,7 @@ import respx
 from backstop_mcp.backstop_client import BackstopResponseSchemaError
 from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import InternalOwnerResponse
+from backstop_mcp.features.org_people import OrganizationRecordResponse
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,
@@ -15,7 +16,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools.get_organization import (
     GetOrganizationResponse,
-    OrganizationRecordResponse,
     OrganizationResolvedResponse,
     get_organization,
 )

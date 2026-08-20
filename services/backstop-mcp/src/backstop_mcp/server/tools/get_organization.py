@@ -1,22 +1,14 @@
 from collections.abc import Sequence
-from typing import Annotated, ClassVar, Literal
-from urllib.parse import quote
+from typing import Annotated, Literal
 
 from fastmcp import Context
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument
-from backstop_mcp.features.data_hygiene import (
-    AsOfResponse,
-    ProvenanceAttributes,
-)
-from backstop_mcp.features.includes import (
-    OrganizationInclude,
-    OrganizationIncludesResponse,
-    include_plan,
-)
+from backstop_mcp.features.data_hygiene import AsOfResponse
+from backstop_mcp.features.includes import OrganizationInclude, OrganizationIncludesResponse
+from backstop_mcp.features.org_people import OrganizationRecordResponse, fetch_organization
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
@@ -26,22 +18,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
-
-
-class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
-    """Shape of an organization resource's `attributes` in `get_organization`'s response.
-
-    `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
-    `AsOfResponse.from_attributes` can read provenance from the model rather than string keys
-    on a dump.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
-
-    name: str | None = Field(
-        default=None,
-        description="Organization name as Backstop stores it.",
-    )
 
 
 class OrganizationResolvedResponse(OmitNoneModel):
@@ -169,19 +145,17 @@ async def get_organization(
         return unresolved_party_response(result)
 
     party = result.value
-    path = f"/organizations/{quote(party.id, safe='')}"
-    plan = include_plan(OrganizationIncludesResponse, requested=include)
-    document = await client.get(
-        path,
-        params={"include": plan.param} if plan.param else None,
-        schema=BackstopApiResourceDocument[OrganizationRecordResponse],
+    fetched = await fetch_organization(
+        client,
+        party_id=party.id,
+        include=include,
     )
-    attributes = document.require_data(path=path).attributes
     return OrganizationResolvedResponse(
-        organization=attributes,
+        organization=fetched.organization,
         resolved=ResolvedPartyResponse.from_party(
-            party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
+            party,
+            attributes=fetched.organization.model_dump(by_alias=True, exclude_none=True),
         ),
-        as_of=AsOfResponse.from_attributes(attributes),
-        included=plan.project(document=document) if plan.planned else None,
+        as_of=AsOfResponse.from_attributes(fetched.organization),
+        included=fetched.included,
     )
