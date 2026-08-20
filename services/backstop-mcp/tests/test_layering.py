@@ -71,9 +71,9 @@
    tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
    `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
    modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
-   `includes/types.py`, `settings.py`) keep their names; `_`-prefixed modules are private shared
-   utilities. `features/auth/` is out of scope; `features/resolution.py` is already exempt by
-   name in rule 5.
+   `includes/types.py`, `settings.py`, `dependencies.py`) keep their names;
+   `_`-prefixed modules are private shared utilities. `features/auth/` is out of
+   scope; `features/resolution.py` is already exempt by name in rule 5.
 
 All six are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
@@ -420,7 +420,9 @@ def _governed_model_layer_sources() -> list[pathlib.Path]:
     return [source for source in _governed_model_sources() if _model_layer_for_path(source)]
 
 
-_LOGIC_NAME_VOCABULARY_FILES = frozenset({"entity_types.py", "settings.py", "resolution.py"})
+_LOGIC_NAME_VOCABULARY_FILES = frozenset(
+    {"dependencies.py", "entity_types.py", "resolution.py", "settings.py"}
+)
 _LOGIC_NAME_VOCABULARY_PATHS = frozenset({pathlib.Path("includes") / "types.py"})
 
 
@@ -703,6 +705,11 @@ class TestTheDetectionItself:
         path = _FEATURES / "party_resolver" / "api_responses.py"
         assert not _is_governed_logic_source(path)
         assert not _logic_module_name_violations("class PartyAttributes: ...\n", path)
+
+    def test_does_not_fire_on_a_feature_dependencies_module(self) -> None:
+        path = _FEATURES / "custom_fields" / "dependencies.py"
+        assert not _is_governed_logic_source(path)
+        assert not _logic_module_name_violations("def get_custom_fields_service(): ...\n", path)
 
     def test_does_not_fire_on_a_private_shared_utility(self) -> None:
         path = _FEATURES / "party_resolver" / "_party_search_types.py"
