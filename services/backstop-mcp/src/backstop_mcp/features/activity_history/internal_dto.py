@@ -9,6 +9,7 @@ from backstop_mcp.backstop_client import ResourceRef
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityAttributes,
     EmailAttributes,
+    EntityActivityAttributes,
 )
 from backstop_mcp.features.entity_types import SearchType, party_search_type
 
@@ -25,6 +26,8 @@ __all__ = [
     "BackstopActivityType",
     "EmailItemDto",
     "EmailPageDto",
+    "EntityActivitiesFetchDto",
+    "EntityActivityDto",
     "MeetingSpecificsDto",
     "ResourceIdentifierDto",
 ]
@@ -231,3 +234,92 @@ class ResourceIdentifierDto(BaseModel):
     @property
     def is_meeting_or_call(self) -> bool:
         return self.resource_type == _MEETING_OR_CALL_RESOURCE_TYPE
+
+
+class EntityActivityDto(BaseModel):
+    """One projected entity-activities row. A row without `id` is dropped by the fetch."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    type: str | None = None
+    activity_type: str | None = None
+    title: str | None = None
+    effective_date: date | None = None
+    created_at: date | None = None
+    modified_at: date | None = None
+    start: datetime | None = None
+    stop: datetime | None = None
+    time_zone: str | None = None
+    location: str | None = None
+    meeting_type: str | None = None
+    short_description: str | None = None
+    description: str | None = None
+    attachments_count: int | None = None
+    author: AttendeeChipDto | None = None
+    attendees: tuple[str, ...] = ()
+    tags: tuple[ActivityTagChipDto, ...] = ()
+    associated_with: tuple[ActivityRegardingDto, ...] = ()
+    from_address: str | None = None
+    to_addresses: tuple[str, ...] = ()
+
+    @classmethod
+    def from_attributes(cls, attributes: EntityActivityAttributes) -> Self | None:
+        if not attributes.id:
+            return None
+        author = attributes.author
+        return cls(
+            id=attributes.id,
+            type=attributes.type,
+            activity_type=attributes.activity_type,
+            title=attributes.title,
+            effective_date=attributes.effective_date,
+            created_at=attributes.created_at,
+            modified_at=attributes.modified_at,
+            start=attributes.start_date,
+            stop=attributes.stop_date,
+            time_zone=attributes.time_zone,
+            location=attributes.location,
+            meeting_type=attributes.meeting_type,
+            short_description=attributes.short_description,
+            description=attributes.formatted_description,
+            attachments_count=attributes.attachments_count,
+            author=(None if author is None else AttendeeChipDto(name=author.name, id=author.id)),
+            attendees=tuple(
+                name for chip in attributes.attendees if (name := chip.name) is not None
+            ),
+            tags=tuple(
+                ActivityTagChipDto(id=tag.id, name=tag.name)
+                for tag in attributes.activity_tags
+                if tag.id and tag.name
+            ),
+            associated_with=tuple(
+                ActivityRegardingDto(
+                    id=party.resource_id,
+                    resource_type=party.resource_type,
+                    resource_link=party.resource_link,
+                    search_type=(
+                        party_search_type(party.resource_type) if party.resource_type else None
+                    ),
+                )
+                for party in attributes.associated_with
+                if party.resource_id
+            ),
+            from_address=None if attributes.from_address is None else attributes.from_address.name,
+            to_addresses=tuple(
+                address.name for address in attributes.to_addresses if address.name is not None
+            ),
+        )
+
+
+class EntityActivitiesFetchDto(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[EntityActivityDto, ...]
+    total_count: int | None
+    rows_dropped: int
+    rows_received: int
+    pages_fetched: int
+    ceiling_clamped: bool
+    truncated_by_row_cap: bool
+    partial_due_to_error: bool = False

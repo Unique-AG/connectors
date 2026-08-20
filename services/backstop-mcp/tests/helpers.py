@@ -5,6 +5,7 @@ a runtime holder. Tests that need a client go through the factory exactly as pro
 so the concurrency gate and config injection under test are the real ones.
 """
 
+import json
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import date
@@ -146,6 +147,11 @@ def recorded_requests(calls: object) -> list[httpx.Request]:
 def recorded_params(route: respx.Route) -> list[httpx.QueryParams]:
     """Query params of every call one respx route recorded, in call order."""
     return [request.url.params for request in recorded_requests(route.calls)]
+
+
+def recorded_json_bodies(route: respx.Route) -> list[dict[str, object]]:
+    """JSON bodies of every call one respx route recorded, in call order."""
+    return [json.loads(request.content) for request in recorded_requests(route.calls)]
 
 
 def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:

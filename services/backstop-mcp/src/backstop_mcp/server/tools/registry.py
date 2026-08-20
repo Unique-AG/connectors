@@ -11,6 +11,7 @@ from backstop_mcp.features.accounts.tools.get_product_investors import get_produ
 from backstop_mcp.features.accounts.tools.get_time_series import get_time_series
 from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.features.activity_history.tools.get_activity_history import get_activity_history
+from backstop_mcp.features.activity_history.tools.search_activities import search_activities
 from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_activity_tags
 from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
     list_custom_field_groups,
@@ -31,6 +32,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     list_activity_tags,
     get_activity_history,
     get_activity_detail,
+    search_activities,
     get_opportunities,
     get_time_series,
     get_product_investors,

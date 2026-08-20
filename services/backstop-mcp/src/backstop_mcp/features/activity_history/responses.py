@@ -37,7 +37,15 @@ from backstop_mcp.features.activity_history.internal_dto import (
     AttendeeChipDto,
     AttendeeDto,
     EmailItemDto,
+    EntityActivitiesFetchDto,
+    EntityActivityDto,
     MeetingSpecificsDto,
+)
+from backstop_mcp.features.collection_scan import (
+    AggregateBucketDto,
+    AggregateBucketResponse,
+    ScanCoverageResponse,
+    scan_coverage,
 )
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
@@ -66,13 +74,29 @@ __all__ = [
     "DateRangeResponse",
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
+    "GetSearchActivitiesResponse",
     "ResolvedPartyAsOfResponse",
+    "SearchActivitiesResolvedResponse",
+    "SearchActivitiesRowResponse",
+    "SearchActivitiesUnavailableResponse",
     "TimelineRecord",
     "to_timeline_record",
 ]
 
 _MAX_RECIPIENTS = 3
 _FULL_BODY_MAX_CHARS = 10_000_000
+_SHORT_DESCRIPTION_MAX_CHARS = 400
+_DESCRIPTION_ROW_CAP_DISCLAIMER = (
+    "include_description capped row bodies at 50; raising max_rows has no effect while that "
+    "flag is set."
+)
+
+
+def _plain_text(html: str | None, *, max_chars: int) -> str | None:
+    if not html:
+        return None
+    text = extract_gist_from_html(html, max_chars=max_chars).text
+    return text or None
 
 
 def _require_since_not_after_until(since: date | None, until: date | None) -> None:
@@ -587,3 +611,266 @@ class ActivityDetailResponse(OmitNoneModel):
             time_zone=None if specifics is None else specifics.time_zone,
             attendees=[AttendeeResponse(name=attendee.name) for attendee in attendees],
         )
+
+
+class SearchActivitiesUnavailableResponse(OmitNoneModel):
+    """The undocumented search endpoint did not answer. Not 'there is no activity'."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    status: Literal["unavailable"] = Field(
+        default="unavailable",
+        description=(
+            "Always 'unavailable': POST /entity-activities failed. This is not an empty "
+            "result — the primary path is undocumented and may 404 on another tenant."
+        ),
+    )
+    fallback_tool: Literal["get_activity_history"] = Field(
+        default="get_activity_history",
+        description=(
+            "Call get_activity_history with a resolved party instead. That path is "
+            "party-scoped only — there is no documented firm-wide activity collection."
+        ),
+    )
+    message: str = Field(
+        description=(
+            "Why the primary failed, and that get_activity_history is the documented "
+            "fallback. A firm-wide question cannot be served on the fallback; narrow to a party."
+        )
+    )
+
+
+class SearchActivitiesRowResponse(OmitNoneModel):
+    """One activity from entity-activities.
+
+    Fields not requested, or not present on this type, are omitted.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(
+        description=(
+            "Backstop id of this activity on the search endpoint. Distinct from the "
+            "composite activity_id get_activity_history returns. Never invent one."
+        )
+    )
+    type: str | None = Field(
+        default=None,
+        description=(
+            "Discriminator: Meeting, Call, Email, Email Blast, Note, Document. Finer than "
+            "`activity_type`, which collapses meetings and calls to `meeting`."
+        ),
+    )
+    activity_type: str | None = Field(
+        default=None,
+        description="Coarse stream name as Backstop stores it, e.g. meeting, email, note.",
+    )
+    title: str | None = Field(default=None, description="Title as Backstop stores it.")
+    effective_date: date | None = Field(
+        default=None,
+        description="Day the activity is dated. Normalized from Backstop's US `M/D/YYYY`.",
+    )
+    created_at: date | None = Field(
+        default=None, description="Day the record was created. Normalized from US `M/D/YYYY`."
+    )
+    modified_at: date | None = Field(
+        default=None, description="Day the record was last saved. Normalized from US `M/D/YYYY`."
+    )
+    start: datetime | None = Field(
+        default=None,
+        description="Meeting/call start. ISO with offset. Omitted on email, note, and document.",
+    )
+    stop: datetime | None = Field(
+        default=None,
+        description="Meeting/call end. ISO with offset. Omitted on other types.",
+    )
+    time_zone: str | None = Field(
+        default=None, description="Meeting/call time zone. Omitted on other types."
+    )
+    location: str | None = Field(
+        default=None, description="Meeting/call location. Omitted on other types."
+    )
+    meeting_type: str | None = Field(
+        default=None,
+        description=(
+            "Labelled meeting kind, e.g. 'Face to Face', 'Phone - Inbound', "
+            "'Phone - Outbound'. Better than the raw FACE_TO_FACE enum."
+        ),
+    )
+    short_description: str | None = Field(
+        default=None,
+        description=(
+            "Plain-text snippet from Backstop's shortDescription (HTML entities decoded). "
+            "Full body is `description` when include_description was set."
+        ),
+    )
+    description: str | None = Field(
+        default=None,
+        description=(
+            "Plain-text body from formattedDescription. Only present when include_description "
+            "was true. Attachments are not listed here — that remains get_activity_detail."
+        ),
+    )
+    attachments_count: int | None = Field(
+        default=None,
+        description=(
+            "How many files are attached. The list of those files is get_activity_detail, "
+            "not this tool."
+        ),
+    )
+    author: AttendeeResponse | None = Field(
+        default=None, description="Who authored this activity, when Backstop publishes one."
+    )
+    attendees: tuple[str, ...] | None = Field(
+        default=None,
+        description="Attendee display names on a meeting or call. No people ids on this path.",
+    )
+    tags: tuple[ActivityTagChipResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Tags on this activity. Empty when there are none. Echo a tag's id into "
+            "activity_tag_ids; never invent one."
+        ),
+    )
+    associated_with: tuple[ActivityRegardingResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Parties this activity is about — a list, mixing people and organizations. "
+            "Richer than REST's single `regarding`. Echo `id` and `search_type`."
+        ),
+    )
+    from_address: str | None = Field(
+        default=None, description="Email sender. Omitted on non-email types."
+    )
+    to_addresses: tuple[str, ...] | None = Field(
+        default=None, description="Email recipients. Empty on non-email types."
+    )
+
+    @classmethod
+    def from_dto(cls, row: EntityActivityDto, *, fields: frozenset[str]) -> Self:
+        include = fields | {"id"}
+        author = None
+        if "author" in include and row.author is not None:
+            author = AttendeeResponse.from_chip(row.author)
+        associated = None
+        if "associated_with" in include:
+            associated = tuple(
+                ActivityRegardingResponse.from_dto(party) for party in row.associated_with
+            )
+        tags = None
+        if "tags" in include:
+            tags = tuple(ActivityTagChipResponse.from_dto(tag) for tag in row.tags)
+        return cls(
+            id=row.id,
+            type=row.type if "type" in include else None,
+            activity_type=row.activity_type if "activity_type" in include else None,
+            title=row.title if "title" in include else None,
+            effective_date=row.effective_date if "effective_date" in include else None,
+            created_at=row.created_at if "created_at" in include else None,
+            modified_at=row.modified_at if "modified_at" in include else None,
+            start=row.start if "start" in include else None,
+            stop=row.stop if "stop" in include else None,
+            time_zone=row.time_zone if "time_zone" in include else None,
+            location=row.location if "location" in include else None,
+            meeting_type=row.meeting_type if "meeting_type" in include else None,
+            short_description=(
+                _plain_text(row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS)
+                if "short_description" in include
+                else None
+            ),
+            description=(
+                _plain_text(row.description, max_chars=_FULL_BODY_MAX_CHARS)
+                if "description" in include
+                else None
+            ),
+            attachments_count=(row.attachments_count if "attachments_count" in include else None),
+            author=author,
+            attendees=row.attendees if "attendees" in include else None,
+            tags=tags,
+            associated_with=associated,
+            from_address=row.from_address if "from_address" in include else None,
+            to_addresses=row.to_addresses if "to_addresses" in include else None,
+        )
+
+
+class SearchActivitiesResolvedResponse(OmitNoneModel):
+    """A completed entity-activities search: row bodies or aggregate counts, plus coverage."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description=(
+            "Always 'resolved': the search ran. An empty `rows` list is 'none in that window'."
+        ),
+    )
+    resolved: ResolvedPartyResponse | None = Field(
+        default=None,
+        description=(
+            "The party this search was scoped to, when a party filter was used. Omitted on a "
+            "firm-wide search. Echo `id` / `search_type` / `name` as party_id later."
+        ),
+    )
+    mode: Literal["rows", "aggregate"] = Field(
+        description=(
+            "`rows` returns activity bodies; `aggregate` returns counts grouped by `group_by`."
+        )
+    )
+    coverage: ScanCoverageResponse = Field(
+        description="How much of the matching set was scanned, and whether it was truncated."
+    )
+    rows: tuple[SearchActivitiesRowResponse, ...] = Field(
+        default=(),
+        description=(
+            "Matching activities in Backstop's newest-effectiveDate-first order. Empty in "
+            "aggregate mode."
+        ),
+    )
+    aggregates: tuple[AggregateBucketResponse, ...] = Field(
+        default=(),
+        description="Count buckets in aggregate mode. Empty in rows mode.",
+    )
+
+    @classmethod
+    def from_fetch(
+        cls,
+        fetch: EntityActivitiesFetchDto,
+        *,
+        mode: Literal["rows", "aggregate"],
+        fields: frozenset[str],
+        resolved: ResolvedPartyResponse | None,
+        ceiling: int,
+        aggregates: tuple[AggregateBucketDto, ...] = (),
+        description_row_capped: bool = False,
+    ) -> Self:
+        extra = (_DESCRIPTION_ROW_CAP_DISCLAIMER,) if description_row_capped else ()
+        coverage = scan_coverage(
+            rows_scanned=fetch.rows_received,
+            visible_count=fetch.total_count,
+            rows_dropped=fetch.rows_dropped,
+            ceiling=ceiling,
+            ceiling_clamped=fetch.ceiling_clamped,
+            truncated_by_row_cap=fetch.truncated_by_row_cap,
+            partial_due_to_error=fetch.partial_due_to_error,
+            extra_disclaimers=extra,
+        )
+        rows = ()
+        if mode == "rows":
+            rows = tuple(
+                SearchActivitiesRowResponse.from_dto(row, fields=fields) for row in fetch.rows
+            )
+        return cls(
+            resolved=resolved,
+            mode=mode,
+            coverage=coverage,
+            rows=rows,
+            aggregates=tuple(AggregateBucketResponse.from_dto(bucket) for bucket in aggregates),
+        )
+
+
+type GetSearchActivitiesResponse = (
+    PartyAmbiguousResponse
+    | NotFoundResponse
+    | SearchActivitiesUnavailableResponse
+    | SearchActivitiesResolvedResponse
+)

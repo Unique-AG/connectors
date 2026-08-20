@@ -52,7 +52,7 @@
    registered. `TOOLS` itself is imported from `server.tools`. Those files still cannot
    import `server.tools.registry` or a private `_`-prefixed sibling such as `_page_input`,
    and cannot reach past a feature package's `__init__`. `registry.py` under `server/tools`
-   may import `features.<feature>.tools.get_*` / `list_*` the same way.
+   may import `features.<feature>.tools.get_*` / `list_*` / `search_*` the same way.
 
    Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
@@ -122,6 +122,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.activity_history",
     "backstop_mcp.features.activity_tags",
     "backstop_mcp.features.auth",
+    "backstop_mcp.features.collection_scan",
     "backstop_mcp.features.custom_fields",
     "backstop_mcp.features.data_hygiene",
     "backstop_mcp.features.includes",
@@ -229,12 +230,16 @@ def _is_server_tools_directory(directory: pathlib.Path) -> bool:
 
 
 def _is_feature_tool_module_import(module: str) -> bool:
-    """`backstop_mcp.features.<pkg>.tools.get_*` / `list_*`, not `_page_input`."""
+    """`backstop_mcp.features.<pkg>.tools.get_*` / `list_*` / `search_*`, not `_page_input`."""
     prefix = f"{_FEATURES_PREFIX}."
     if not module.startswith(prefix):
         return False
     parts = module[len(prefix) :].split(".")
-    return len(parts) >= 3 and parts[1] == "tools" and parts[2].startswith(("get_", "list_"))
+    return (
+        len(parts) >= 3
+        and parts[1] == "tools"
+        and parts[2].startswith(("get_", "list_", "search_"))
+    )
 
 
 def _skip_internal_import(module: str, directory: pathlib.Path) -> bool:
@@ -256,7 +261,8 @@ def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, i
     Auth tests may import `backstop_mcp.features.auth.*`; they still enter `db` and
     `backstop_client` through those packages' `__init__`.
 
-    Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*`);
+    Tool tests may import the tool module under test (`features.<pkg>.tools.get_*` / `list_*` /
+    `search_*`);
     they still cannot import `server.tools.registry` or `_page_input`, and cannot reach past a
     feature package's `__init__`. `registry.py` under `server/tools` may import those feature
     tool modules.
