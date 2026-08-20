@@ -1,10 +1,14 @@
-"""Fidelity: `fetch_holdings_table` against the real recorded payloads, not hand-written fixtures.
+"""Fidelity: `fetch_holdings_table` against a real recorded payload, not a hand-written fixture.
 
 Every other test in this feature builds its own JSON, which means a field Backstop renames — or an
 alias that was wrong from the start — stays invisible: the fixture and the model are written from
-the same mistaken assumption. These tests replay the responses actually recorded from the live
-instance (`docs/json/`) through the real fetch function, so the projection is checked against what
-Backstop sends rather than against what we assumed it sends.
+the same mistaken assumption. These replay a response actually recorded from the live instance, so
+the projection is checked against Backstop's real field names and nesting.
+
+`recordings/` holds those responses with tenant data scrubbed — ids remapped, investor names and
+account numbers replaced, amounts flattened, the host rewritten. Only the *shape* is under test, so
+scrubbing costs nothing, and it means these run in CI: the unredacted originals live in the repo's
+gitignored `docs/json/`, so a test that depended on them would silently skip everywhere it matters.
 
 Driven through `respx` at the feature boundary — no private helpers — so a refactor inside the
 module cannot quietly stop this from testing anything.
@@ -26,30 +30,23 @@ from backstop_mcp.features.accounts import (
 )
 from tests.helpers import BASE_URL
 
-# tests/features/accounts/ -> tests -> backstop-mcp -> services -> repo root
-_RECORDINGS = Path(__file__).resolve().parents[5] / "docs" / "json"
+_RECORDINGS = Path(__file__).parent / "recordings"
 _URL = f"{BASE_URL}/bsg-account-table-data"
 
-_POPULATED = (
-    "023-bsg-account-table-data-200.json",
-    "046-fb-rm-lg-26-bsg-account-table-data-200.json",
-)
-# The two fail-open bodies: a product id, and a nonexistent id. Both are empty 200s.
-_EMPTY = ("037-bsg-account-table-data-200.json", "038-bsg-account-table-data-200.json")
+_POPULATED = "bsg-account-table-data.json"
+# What a product id or a nonexistent id returns: a 200 with an empty table.
+_EMPTY = "bsg-account-table-data-empty.json"
+
+# The one row given a distinctive balance, so a wrong `balance` alias fails loudly here.
+_CANARY_ACCOUNT = "10000999"
+_CANARY_BALANCE = 3619868606.0
 
 
 def _recorded_body(name: str) -> dict[str, object]:
-    """The `body` of one recorded probe, as `explore.py` wrote it."""
-    if not _RECORDINGS.is_dir():
-        pytest.skip(f"recordings directory {_RECORDINGS} not present in this checkout")
+    """A scrubbed recording. Committed, so this never degrades into a skip."""
     path = _RECORDINGS / name
-    # A missing file inside a present directory is a failure, not a skip: a silent skip is how a
-    # fidelity test stops testing anything without anyone noticing.
     assert path.is_file(), f"expected recording {path}"
-    record = cast("dict[str, object]", json.loads(path.read_text(encoding="utf-8")))
-    body = record["body"]
-    assert isinstance(body, dict), f"{name} has no JSON object body"
-    return cast("dict[str, object]", body)
+    return cast("dict[str, object]", json.loads(path.read_text(encoding="utf-8")))
 
 
 async def _replay(client: BackstopClient, name: str, **kwargs: bool) -> HoldingListingDto:
@@ -59,10 +56,9 @@ async def _replay(client: BackstopClient, name: str, **kwargs: bool) -> HoldingL
 
 @pytest.mark.asyncio
 @respx.mock
-@pytest.mark.parametrize("name", _POPULATED)
-async def test_a_recorded_table_projects_every_row(client: BackstopClient, name: str) -> None:
+async def test_a_recorded_table_projects_every_row(client: BackstopClient) -> None:
     """No row is dropped, and Backstop's own counts agree with the rows it sent."""
-    result = await _replay(client, name, include_closed=True)
+    result = await _replay(client, _POPULATED, include_closed=True)
 
     assert result.rows, "recording has no rows to check"
     assert result.rows_dropped == 0
@@ -71,17 +67,20 @@ async def test_a_recorded_table_projects_every_row(client: BackstopClient, name:
 
 @pytest.mark.asyncio
 @respx.mock
-@pytest.mark.parametrize("name", _POPULATED)
-async def test_every_projected_field_is_populated_somewhere(
-    client: BackstopClient, name: str
-) -> None:
+async def test_every_projected_field_is_populated_somewhere(client: BackstopClient) -> None:
     """A field nothing ever populates is the signature of a wrong alias.
+
+    Verified to catch a broken alias on `percentageOfProduct`, `otherId` and `fundedDate`. It
+    cannot catch one on `balance`, `commitment`, `closed`, `investor`, `account`, `product` or
+    `organization`: `populate_by_name=True` means a field whose Python name already equals the
+    wire key is still populated by name when its alias is wrong — so those aliases are unbreakable
+    rather than untested.
 
     The exclusions are fields genuinely empty for every account on this tenant (`"-"` commitments,
     a zero share of master) or only ever set on the fallback path — their absence here says
     nothing about the alias. Everything else must be non-`None` on at least one recorded row.
     """
-    result = await _replay(client, name, include_closed=True)
+    result = await _replay(client, _POPULATED, include_closed=True)
 
     empty_on_this_tenant = {
         "commitment",
@@ -102,34 +101,28 @@ async def test_every_projected_field_is_populated_somewhere(
 
 @pytest.mark.asyncio
 @respx.mock
-@pytest.mark.parametrize("name", _POPULATED)
-async def test_the_recorded_balance_matches_the_documented_series(
-    client: BackstopClient, name: str
-) -> None:
+async def test_the_recorded_balance_matches_the_documented_series(client: BackstopClient) -> None:
     """The claim the whole primary path rests on.
 
-    Account 29431089's newest `/accounts/29431089/values` point is 3619868606.0, recorded in
-    `docs/json/024`. A wrong `balance` alias would make this `None` while every hand-written test
-    still passed.
+    The figure is the one measured live against `/accounts/{id}/values` and recorded in the
+    design doc: this endpoint's balance is the newest point of the documented series. A wrong
+    `balance` alias would make this `None` while every hand-written test still passed.
     """
-    result = await _replay(client, name, include_closed=True)
+    result = await _replay(client, _POPULATED, include_closed=True)
     rows = {row.account_id: row for row in result.rows}
 
-    row = rows.get("29431089")
-    if row is None:
-        pytest.skip("recording does not include account 29431089")
+    row = rows[_CANARY_ACCOUNT]
     assert row.balance is not None
-    assert row.balance.amount == 3619868606.0
+    assert row.balance.amount == _CANARY_BALANCE
 
 
 @pytest.mark.asyncio
 @respx.mock
-@pytest.mark.parametrize("name", _EMPTY)
 async def test_a_recorded_fail_open_body_is_an_empty_table_not_an_error(
-    client: BackstopClient, name: str
+    client: BackstopClient,
 ) -> None:
     """A product id and a nonexistent id both return this. It must parse, and be empty."""
-    result = await _replay(client, name)
+    result = await _replay(client, _EMPTY)
 
     assert result.rows == ()
     assert result.all_count == 0
