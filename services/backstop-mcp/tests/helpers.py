@@ -21,7 +21,7 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
-from backstop_mcp.features.custom_fields import CustomFieldsService
+from backstop_mcp.features.custom_fields import CustomFieldGroupsService, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     EmploymentRulesDto,
@@ -112,6 +112,10 @@ def build_employment_index_factory(
 
 def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
     return CustomFieldsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+
+
+def custom_field_groups_service(*, ttl_minutes: int = 60) -> CustomFieldGroupsService:
+    return CustomFieldGroupsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def opportunity_stages_service(*, ttl_minutes: int = 60) -> OpportunityStagesService:

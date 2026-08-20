@@ -4,9 +4,18 @@ from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
+from backstop_mcp.features.custom_fields.internal_dto import (
+    CustomFieldDefinitionDto,
+    CustomFieldGroupDto,
+    CustomFieldGroupParentDto,
+)
 
-__all__ = ["CustomFieldDefinitionResponse"]
+__all__ = [
+    "CustomFieldDefinitionResponse",
+    "CustomFieldGroupMemberResponse",
+    "CustomFieldGroupParentResponse",
+    "CustomFieldGroupResponse",
+]
 
 
 class CustomFieldDefinitionResponse(BaseModel):
@@ -89,4 +98,97 @@ class CustomFieldDefinitionResponse(BaseModel):
             client_required=definition.client_required,
             system_defined=definition.system_defined,
             description=definition.description,
+        )
+
+
+class CustomFieldGroupParentResponse(BaseModel):
+    """Immediate parent group as it appears on the Backstop row."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str | None = Field(
+        default=None,
+        description="Backstop id of the parent layout group, when published.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Name of the parent layout group, when published.",
+    )
+    parent_id: str | None = Field(
+        default=None,
+        description="Backstop id of the parent's parent, when the parent is itself nested.",
+    )
+
+    @classmethod
+    def from_parent(cls, parent: CustomFieldGroupParentDto) -> Self:
+        return cls(id=parent.id, name=parent.name, parent_id=parent.parent_id)
+
+
+class CustomFieldGroupMemberResponse(BaseModel):
+    """A custom-field definition that sits in a layout group."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(description="Backstop id of this custom-field definition.")
+    name: str = Field(description="Field name as it appears on a record.")
+    entity_type: str = Field(
+        description=(
+            "Standard Backstop Bean identifying the entity this field belongs to, such as a "
+            "party or concrete Backstop entity resource."
+        )
+    )
+    field_type: str | None = Field(
+        default=None, description="Machine type of the field, as Backstop stores it."
+    )
+
+    @classmethod
+    def from_definition(cls, definition: CustomFieldDefinitionDto) -> Self:
+        return cls(
+            id=definition.id,
+            name=definition.name,
+            entity_type=definition.entity_type,
+            field_type=definition.field_type,
+        )
+
+
+class CustomFieldGroupResponse(BaseModel):
+    """One layout group in the standard Backstop catalog returned to MCP callers."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(description="Backstop id of this layout group.")
+    name: str = Field(description="Group name as Backstop publishes it.")
+    full_path_name: list[str] = Field(
+        description=(
+            "Layout path segments from the root tab down to this group, as Backstop publishes "
+            "them. The last segment is this group; earlier segments are its ancestors."
+        )
+    )
+    parent: CustomFieldGroupParentResponse | None = Field(
+        default=None,
+        description=(
+            "Immediate parent group when this group is nested. Absent fields stay null when "
+            "Backstop omits them. Root groups have no parent."
+        ),
+    )
+    membership: list[CustomFieldGroupMemberResponse] = Field(
+        description=(
+            "Custom-field definitions whose group_id matches this group. Empty when no "
+            "definition sits in the group. Definitions without a group_id are not listed here."
+        )
+    )
+
+    @classmethod
+    def from_group(
+        cls,
+        group: CustomFieldGroupDto,
+        membership: list[CustomFieldGroupMemberResponse],
+    ) -> Self:
+        parent = group.parent
+        return cls(
+            id=group.id,
+            name=group.name,
+            full_path_name=list(group.full_path_name),
+            parent=None if parent is None else CustomFieldGroupParentResponse.from_parent(parent),
+            membership=list(membership),
         )

@@ -4,10 +4,14 @@ from typing import ClassVar, Self, cast
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.custom_fields.api_responses import CustomFieldDefinitionAttributes
+from backstop_mcp.features.custom_fields.api_responses import (
+    CustomFieldDefinitionAttributes,
+    CustomFieldGroupAttributes,
+    CustomFieldGroupParentAttributes,
+)
 from backstop_mcp.features.custom_fields.entity_types import custom_field_entity_type_from_bean
 
-__all__ = ["CustomFieldDefinitionDto"]
+__all__ = ["CustomFieldDefinitionDto", "CustomFieldGroupDto", "CustomFieldGroupParentDto"]
 
 _ENTRY_COLLECTION_KEYS = ("entries", "lovEntries", "viewableEntries", "options", "values")
 
@@ -130,3 +134,56 @@ def _select_options(value: object | None) -> list[object]:
     if isinstance(raw_data, Mapping):
         return [dict(cast(Mapping[str, object], raw_data))]
     return []
+
+
+class CustomFieldGroupParentDto(BaseModel):
+    """Immediate parent group as published on the row, without following a parent URL."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str | None = None
+    name: str | None = None
+    parent_id: str | None = None
+
+    @classmethod
+    def from_attributes(cls, attributes: CustomFieldGroupParentAttributes) -> Self:
+        return cls(id=attributes.id, name=attributes.name or None, parent_id=attributes.parent_id)
+
+
+class CustomFieldGroupDto(BaseModel):
+    """A CRM layout group from Backstop `custom-field-groups` attributes."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    name: str
+    full_path_name: list[str]
+    parent: CustomFieldGroupParentDto | None = None
+
+    @classmethod
+    def from_resource(
+        cls, resource: BackstopApiResource[CustomFieldGroupAttributes]
+    ) -> Self | None:
+        """Map one layout-group resource. Returns None when `name` is missing."""
+        name = resource.attributes.name
+        if not name:
+            return None
+        parent = resource.attributes.parent
+        return cls(
+            id=resource.id,
+            name=name,
+            full_path_name=_path_segments(resource.attributes.full_path_name),
+            parent=None if parent is None else CustomFieldGroupParentDto.from_attributes(parent),
+        )
+
+
+def _path_segments(value: list[object] | None) -> list[str]:
+    if not value:
+        return []
+    segments: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            stripped = item.strip()
+            if stripped:
+                segments.append(stripped)
+    return segments
