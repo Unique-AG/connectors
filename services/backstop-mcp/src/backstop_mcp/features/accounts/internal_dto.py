@@ -228,9 +228,7 @@ class AccountRecordDto(BaseModel):
             investor_type=InvestorTypeDto.from_included(
                 _first_included(included, resource, _INVESTOR_TYPE)
             ),
-            product=ResolvedProductDto.from_included(
-                _first_included(included, resource, _PRODUCT)
-            ),
+            product=ResolvedProductDto.from_included(_first_included(included, resource, _PRODUCT)),
             is_open=_account_is_open(resource.attributes),
         )
 
