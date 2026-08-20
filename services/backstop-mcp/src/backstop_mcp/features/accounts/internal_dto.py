@@ -12,11 +12,14 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.features.accounts.api_responses import (
     AccountApiResponse,
     AccountAttributes,
+    AccountTableRowAttributes,
     InvestorQualificationAttributes,
     InvestorTypeAttributes,
     OwnerAttributes,
     ProductAttributes,
     SeriesPointAttributes,
+    TableDataMoneyAttributes,
+    TableDataShareAttributes,
 )
 from backstop_mcp.features.resolution import Candidate, Resolution
 
@@ -26,7 +29,10 @@ __all__ = [
     "AccountPositionDto",
     "AccountRecordDto",
     "AumReconciliationDto",
+    "HoldingListingDto",
+    "HoldingRowDto",
     "InvestorTypeDto",
+    "MoneyDto",
     "ProductCandidate",
     "ProductPositionsDto",
     "ProductResolution",
@@ -35,6 +41,7 @@ __all__ = [
     "SeriesFigureDto",
     "SeriesName",
     "SeriesPointDto",
+    "ShareDto",
 ]
 
 _OWNER = "owner"
@@ -253,6 +260,123 @@ class AccountListingDto(BaseModel):
 
     accounts: tuple[AccountRecordDto, ...]
     closed_omitted: int = 0
+
+
+class MoneyDto(BaseModel):
+    """A money figure carried with Backstop's own rendering.
+
+    `formatted` is kept because it is the only thing that distinguishes "no figure recorded"
+    from a real zero: Backstop renders the former as `"-"` and the latter as `"$0.00"`, while
+    `amount` is `0.0` in both cases. Callers that need the distinction read `formatted`.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    amount: float | None = None
+    currency: str | None = None
+    formatted: str | None = None
+
+    @classmethod
+    def from_attributes(cls, attrs: TableDataMoneyAttributes | None) -> Self | None:
+        if attrs is None:
+            return None
+        if attrs.amount is None and attrs.formatted_value is None:
+            return None
+        return cls(
+            amount=attrs.amount,
+            currency=attrs.currency,
+            formatted=attrs.formatted_value,
+        )
+
+
+class ShareDto(BaseModel):
+    """A share-of-fund figure. `fraction` is a fraction (`0.796`), not a percentage."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    fraction: float | None = None
+    formatted: str | None = None
+
+    @classmethod
+    def from_attributes(cls, attrs: TableDataShareAttributes | None) -> Self | None:
+        if attrs is None:
+            return None
+        if attrs.value is None and attrs.formatted_value is None:
+            return None
+        return cls(fraction=attrs.value, formatted=attrs.formatted_value)
+
+
+class HoldingRowDto(BaseModel):
+    """One account a party holds, with the snapshot figures from the UI table endpoint.
+
+    `balance` has **no as-of date and no `valueStatus`** — it matched the newest
+    `/accounts/{id}/values` point exactly on a measured account, including when that point was an
+    `ESTIMATE`, and the endpoint does not say which. A dated, labelled figure is `get_time_series`.
+
+    `account_id` is the id every follow-up call needs, so a row without one is not projected at
+    all: it cannot be used for anything a caller would do next.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    account_id: str
+    product_id: str | None = None
+    product_short_name: str | None = None
+    investor_id: str | None = None
+    investor_resource_type: str | None = None
+    account_term_id: str | None = None
+    other_id: str | None = None
+    funded_date: date | None = None
+    closed_date: date | None = None
+    closed: bool = False
+    balance: MoneyDto | None = None
+    commitment: MoneyDto | None = None
+    unfunded_commitment: MoneyDto | None = None
+    percentage_of_product: ShareDto | None = None
+    percentage_of_master: ShareDto | None = None
+
+    @classmethod
+    def from_attributes(cls, attrs: AccountTableRowAttributes) -> Self | None:
+        """Project one table row, or `None` when it carries no usable account id."""
+        if attrs.account is None:
+            return None
+        return cls(
+            account_id=attrs.account.resource_id,
+            product_id=attrs.product.resource_id if attrs.product else None,
+            product_short_name=attrs.product.short_name if attrs.product else None,
+            investor_id=attrs.investor.resource_id if attrs.investor else None,
+            investor_resource_type=attrs.investor.resource_type if attrs.investor else None,
+            account_term_id=attrs.account_term.resource_id if attrs.account_term else None,
+            other_id=attrs.other_id,
+            funded_date=attrs.funded_date,
+            closed_date=attrs.closed_date,
+            closed=bool(attrs.closed),
+            balance=MoneyDto.from_attributes(attrs.balance),
+            commitment=MoneyDto.from_attributes(attrs.commitment),
+            unfunded_commitment=MoneyDto.from_attributes(attrs.unfunded_commitment),
+            percentage_of_product=ShareDto.from_attributes(attrs.percentage_of_product),
+            percentage_of_master=ShareDto.from_attributes(attrs.percentage_of_master),
+        )
+
+
+class HoldingListingDto(BaseModel):
+    """A party's holdings after the open/closed split.
+
+    The three counts are Backstop's own, covering the **whole** table before `include_closed`
+    filtering — so `all_count` can exceed `len(rows)` legitimately. `rows_dropped` is how many
+    rows carried no account id and were skipped; non-zero means the endpoint's shape moved and is
+    worth surfacing rather than silently under-reporting.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[HoldingRowDto, ...]
+    closed_omitted: int = 0
+    rows_dropped: int = 0
+    open_count: int | None = None
+    all_count: int | None = None
+    closed_count: int | None = None
+    fallback_note: str | None = None
 
 
 class SeriesPointDto(BaseModel):

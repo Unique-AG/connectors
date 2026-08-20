@@ -1,21 +1,29 @@
-from typing import Annotated, ClassVar
+from collections.abc import Mapping
+from typing import Annotated, ClassVar, cast
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
 from backstop_mcp.dates import LenientDate
-from backstop_mcp.lenient import LenientBool, LenientFloat
+from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt
 
 __all__ = [
     "ACCOUNT_LISTING_FIELDS",
     "AccountApiResponse",
     "AccountAttributes",
+    "AccountTableDataAttributes",
+    "AccountTableDataDocument",
+    "AccountTableDataEntry",
+    "AccountTableRowAttributes",
     "InvestorQualificationAttributes",
     "InvestorTypeAttributes",
     "OwnerAttributes",
     "ProductAttributes",
     "ProductConfigurationAttributes",
     "SeriesPointAttributes",
+    "TableDataMoneyAttributes",
+    "TableDataProductAttributes",
+    "TableDataShareAttributes",
 ]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
@@ -134,6 +142,139 @@ class SeriesPointAttributes(BaseModel):
     date: LenientDate = None
     value: LenientFloat = None
     value_status: _CleanStr = Field(default=None, alias="valueStatus")
+
+
+def _drop_unresolvable_ref(value: object) -> object:
+    """A reference with no `resourceId` cannot be resolved, so read it as absent.
+
+    `ResourceRef` requires `resource_id`, which is right everywhere it is used against a
+    documented endpoint. Here it would fail the whole document over one unusable reference on
+    one row of an undocumented one, so the field degrades to `None` instead.
+    """
+    if not isinstance(value, Mapping):
+        return value
+    reference = cast("Mapping[str, object]", value)
+    return None if not reference.get("resourceId") else reference
+
+
+_OptionalRef = Annotated[ResourceRef | None, BeforeValidator(_drop_unresolvable_ref)]
+
+
+class TableDataMoneyAttributes(BaseModel):
+    """A money figure on a table-data row: `{amount, currency, currencySymbol, formattedValue}`.
+
+    `formatted_value` is Backstop's own rendering and is `"-"` (not `"$0.00"`) for an unset
+    figure, so it is carried rather than re-derived: `amount` `0.0` with `formattedValue` `"-"`
+    means "no commitment recorded", while `0.0` with `"$0.00"` means a real zero.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    amount: LenientFloat = None
+    currency: _CleanStr = None
+    currency_symbol: _CleanStr = Field(default=None, alias="currencySymbol")
+    formatted_value: _CleanStr = Field(default=None, alias="formattedValue")
+
+
+class TableDataShareAttributes(BaseModel):
+    """A share-of-fund figure: `{value, formattedValue}`.
+
+    `value` is a **fraction**, not a percentage — `0.796` renders as `79.6%` — matching the
+    `percentageOfFundHistory` series rather than the label.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    value: LenientFloat = None
+    formatted_value: _CleanStr = Field(default=None, alias="formattedValue")
+
+
+class TableDataProductAttributes(BaseModel):
+    """The `product` object on a table-data row: a `ResourceRef` plus `shortName` inline.
+
+    `shortName` is the tenant's own label (`CIO2`, `CGUP`, `Dispersion`) and is the only name on
+    the row — there is no full product name here, so a caller who needs one resolves the id.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    resource_id: _CleanStr = Field(default=None, alias="resourceId")
+    resource_type: _CleanStr = Field(default=None, alias="resourceType")
+    short_name: _CleanStr = Field(default=None, alias="shortName")
+
+
+class AccountTableRowAttributes(BaseModel):
+    """One entry of `bsg-account-table-data`'s `attributes.accounts`.
+
+    Undocumented UI endpoint, so every field is optional and every reference degrades: a shape
+    change must lose a field, not the whole holdings answer. `product` carries `shortName`
+    inline, which is why it is not a bare `ResourceRef`.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    investor: _OptionalRef = None
+    account: _OptionalRef = None
+    organization: _OptionalRef = None
+    account_term: _OptionalRef = Field(default=None, alias="accountTerm")
+    product: TableDataProductAttributes | None = None
+    association_type: _CleanStr = Field(default=None, alias="associationType")
+    other_id: _CleanStr = Field(default=None, alias="otherId")
+    funded_date: LenientDate = Field(default=None, alias="fundedDate")
+    closed_date: LenientDate = Field(default=None, alias="closedDate")
+    closed: LenientBool = None
+    balance: TableDataMoneyAttributes | None = None
+    commitment: TableDataMoneyAttributes | None = None
+    unfunded_commitment: TableDataMoneyAttributes | None = Field(
+        default=None, alias="unfundedCommitment"
+    )
+    percentage_of_product: TableDataShareAttributes | None = Field(
+        default=None, alias="percentageOfProduct"
+    )
+    percentage_of_master: TableDataShareAttributes | None = Field(
+        default=None, alias="percentageOfMaster"
+    )
+
+
+class AccountTableDataAttributes(BaseModel):
+    """`data[0].attributes` of `bsg-account-table-data`.
+
+    The counts are Backstop's own and are published rather than recomputed from `accounts`:
+    they agree today, and a disagreement is worth surfacing rather than hiding.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    accounts: tuple[AccountTableRowAttributes, ...] = ()
+    open_count: LenientInt = Field(default=None, alias="openCount")
+    all_count: LenientInt = Field(default=None, alias="allCount")
+    closed_count: LenientInt = Field(default=None, alias="closedCount")
+
+
+class AccountTableDataEntry(BaseModel):
+    """One element of the top-level `data` list. Its `id` is `null`, so this is not a resource."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    attributes: AccountTableDataAttributes = AccountTableDataAttributes()
+
+
+class AccountTableDataDocument(BaseModel):
+    """Whole `bsg-account-table-data` body.
+
+    Deliberately not `BackstopApiResourceDocument`: `data` is a **list** whose single element has
+    a `null` id, `links` is `null`, `included` is always `[]`, and `meta.totalResourceCount` is
+    `0` regardless of how many rows came back. None of the JSON:API envelope means anything here.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    data: tuple[AccountTableDataEntry, ...] = ()
+
+    @property
+    def table(self) -> AccountTableDataAttributes:
+        """The single table, or an empty one when Backstop returned no `data` element at all."""
+        return self.data[0].attributes if self.data else AccountTableDataAttributes()
 
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
