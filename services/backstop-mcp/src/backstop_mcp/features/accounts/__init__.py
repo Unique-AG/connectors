@@ -40,9 +40,13 @@ from backstop_mcp.features.accounts.internal_dto import (
 from backstop_mcp.features.accounts.resolve_product import resolve_product
 from backstop_mcp.features.accounts.responses import (
     AccountRowResponse,
+    HoldingFigureErrorResponse,
+    HoldingRowResponse,
+    MoneyResponse,
     PartyAccountsResolvedResponse,
     ProductAmbiguousResponse,
     ProductPositionsResolvedResponse,
+    ShareResponse,
 )
 from backstop_mcp.features.accounts.split_open import split_open
 
@@ -54,13 +58,16 @@ __all__ = [
     "AccountRowResponse",
     "FALLBACK_OMITTED_FIELDS",
     "HoldingFigureErrorDto",
+    "HoldingFigureErrorResponse",
     "HoldingListingDto",
     "HoldingRowDto",
+    "HoldingRowResponse",
     "HoldingsSource",
     "HoldingsTableShapeError",
     "InvestorTypeDto",
     "MAX_POSITION_ACCOUNTS",
     "MoneyDto",
+    "MoneyResponse",
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
@@ -69,6 +76,7 @@ __all__ = [
     "ProductResolution",
     "ResolvedProductDto",
     "ShareDto",
+    "ShareResponse",
     "fetch_accounts_for_party",
     "fetch_accounts_for_product",
     "fetch_holdings",

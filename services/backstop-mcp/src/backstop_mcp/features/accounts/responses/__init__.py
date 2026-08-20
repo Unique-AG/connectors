@@ -6,7 +6,13 @@ closed-account hint, and the figure shape both tools read from; `product_positio
 `get_product_positions` to `get_accounts_for_party` is reading one vocabulary.
 """
 
-from backstop_mcp.features.accounts.responses.party_accounts import PartyAccountsResolvedResponse
+from backstop_mcp.features.accounts.responses.party_accounts import (
+    HoldingFigureErrorResponse,
+    HoldingRowResponse,
+    MoneyResponse,
+    PartyAccountsResolvedResponse,
+    ShareResponse,
+)
 from backstop_mcp.features.accounts.responses.product_positions import (
     ProductAmbiguousResponse,
     ProductCandidateResponse,
@@ -28,8 +34,11 @@ from backstop_mcp.features.accounts.responses.shared import (
 __all__ = [
     "AccountRowResponse",
     "FigureResponse",
+    "HoldingFigureErrorResponse",
+    "HoldingRowResponse",
     "InvestorQualificationResponse",
     "InvestorTypeResponse",
+    "MoneyResponse",
     "OwnerResponse",
     "PartyAccountsResolvedResponse",
     "PositionRowResponse",
@@ -38,6 +47,7 @@ __all__ = [
     "ProductPositionsResolvedResponse",
     "ProductRefResponse",
     "SeriesErrorResponse",
+    "ShareResponse",
     "UnvaluedPointResponse",
     "closed_hint",
 ]

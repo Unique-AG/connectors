@@ -39,11 +39,11 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EmailItemDto,
     MeetingSpecificsDto,
 )
-from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
 )
+from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyDto,
