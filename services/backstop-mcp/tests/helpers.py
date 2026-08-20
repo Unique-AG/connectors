@@ -1,9 +1,8 @@
 """Shared test construction helpers.
 
-Mirrors what `create_app()` does, minus the web layer: build one `BackstopClientFactory`, and
-install it (plus a `CustomFieldsService`) in the single `runtime.Services` holder. Tests that
-need a client go through the factory exactly as production does, so the concurrency gate and
-config injection under test are the real ones.
+Helpers build a factory the way production does (`transport_settings` / `retry_settings`), not
+a runtime holder. Tests that need a client go through the factory exactly as production does,
+so the concurrency gate and config injection under test are the real ones.
 """
 
 from collections.abc import AsyncIterator, Sequence
@@ -22,7 +21,6 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
-from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.auth import BackstopAuthContext
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
@@ -31,7 +29,6 @@ from backstop_mcp.features.data_hygiene import (
     TypeVocabularyDto,
 )
 from backstop_mcp.features.opportunities import OpportunityStagesService
-from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
 
@@ -80,26 +77,6 @@ def client_factory(
     """
     config = backstop_config(base_url, **overrides)
     return BackstopClientFactory(transport_settings(config), retry_settings(config), auth=auth)
-
-
-def install_services(
-    *,
-    backstop: BackstopClientFactory,
-    custom_fields: CustomFieldsService,
-    employment_index_factory: EmploymentIndexFactory | None = None,
-    activity_history_settings: ActivityHistorySettings | None = None,
-    opportunity_stages: OpportunityStagesService | None = None,
-) -> Services:
-    services = Services(
-        backstop=backstop,
-        custom_fields=custom_fields,
-        employment_index_factory=employment_index_factory or build_employment_index_factory(),
-        activity_history=activity_history_settings
-        or ActivityHistorySettings(page_size=10, gist_max_chars=300),
-        opportunity_stages=opportunity_stages or opportunity_stages_service(),
-    )
-    configure_services(services)
-    return services
 
 
 def build_employment_index_factory(

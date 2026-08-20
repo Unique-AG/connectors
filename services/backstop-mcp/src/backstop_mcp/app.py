@@ -17,31 +17,23 @@ from backstop_mcp.dependencies import (
     get_app_config,
     get_auth_config,
     get_auth_provider,
-    get_backstop_client_factory,
     get_engine,
     get_session_factory,
 )
-from backstop_mcp.features.activity_history import get_activity_history_settings
 from backstop_mcp.features.auth import cleanup_lifespan
-from backstop_mcp.features.custom_fields import get_custom_fields_service
-from backstop_mcp.features.data_hygiene import get_employment_index_factory
-from backstop_mcp.features.opportunities import get_opportunity_stages_service
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
-from backstop_mcp.server.runtime import Services, configure_services, reset_services
 from backstop_mcp.server.tools import TOOLS
 
 logger = logging.getLogger(__name__)
 
 
 def create_app() -> Starlette:
-    """The composition root.
+    """Assemble the ASGI app.
 
-    Config and long-lived collaborators are resolved from the cached providers in
-    `dependencies.py` — nothing here re-reads the environment. Feature services that still
-    live on `runtime.Services` are built here and installed so tools via `runtime.py` keep
-    working.
+    Logging, metrics, FastMCP, TOOLS, setup_ops, /ready /login, middleware, lifespan.
+    Collaborators come from cached providers, not a runtime holder.
     """
     config = get_app_config()
     auth_config = get_auth_config()
@@ -51,18 +43,7 @@ def create_app() -> Starlette:
 
     engine = get_engine()
     session_factory = get_session_factory()
-    backstop_clients = get_backstop_client_factory()
     auth_provider = get_auth_provider()
-
-    configure_services(
-        Services(
-            backstop=backstop_clients,
-            custom_fields=get_custom_fields_service(),
-            employment_index_factory=get_employment_index_factory(),
-            activity_history=get_activity_history_settings(),
-            opportunity_stages=get_opportunity_stages_service(),
-        )
-    )
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
@@ -73,7 +54,6 @@ def create_app() -> Starlette:
                 yield
         finally:
             await close_singletons()
-            await reset_services()
 
     mcp = FastMCP(
         "Backstop MCP",
