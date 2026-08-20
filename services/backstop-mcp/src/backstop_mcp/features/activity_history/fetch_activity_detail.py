@@ -1,9 +1,9 @@
 """Fetch layer for `get_activity_detail`: the detail record, meeting specifics, and attendees.
 
-Three endpoints, all keyed by the **bare** `ActivityHandle.resource_id` — the
+Three endpoints, all keyed by the **bare** `ResourceIdentifierDto.resource_id` — the
 `specificResource.resourceId` a timeline record already carries — never the composite
 `{resourceType}_{resourceId}` handle the `/activities` view uses for its own resource ids (see
-`activity_handle.py`). Every field name below was byte-verified against a live instance:
+`ResourceIdentifierDto`). Every field name below was byte-verified against a live instance:
 
 - `/entity-activity-details/{resource_id}` — `type`, `title` and `description` (the full HTML
   body), for any activity kind. It carries nothing else worth reading: the whole attribute set is
@@ -14,7 +14,7 @@ Three endpoints, all keyed by the **bare** `ActivityHandle.resource_id` — the
 - `/meeting-or-calls/{resource_id}/attendees` — the trimmed attendee list.
 
 The latter two are valid only for a `meeting-or-calls` handle — both 404 for a note's or a
-document's resource id — so `ActivityHandle.is_meeting_or_call` gates them.
+document's resource id — so `ResourceIdentifierDto.is_meeting_or_call` gates them.
 
 Known Backstop imprecision, deliberately passed through rather than papered over: the detail
 record's `type` is `"meeting"` for a call as well as a meeting (verified on a `PHONE_OUT` record),
