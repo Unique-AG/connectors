@@ -17,7 +17,7 @@ from backstop_mcp.server.tools.get_opportunities import (
     get_opportunities,
 )
 from backstop_mcp.server.tools.registry import TOOLS
-from tests.features.opportunities.test_fetch import VOCABULARY
+from tests.features.opportunities.test_fetch_opportunities import VOCABULARY
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,

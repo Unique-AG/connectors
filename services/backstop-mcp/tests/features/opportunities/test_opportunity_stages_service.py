@@ -7,7 +7,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
-from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
+from backstop_mcp.features.opportunities import OpportunityStagesService
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]

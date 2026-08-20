@@ -4,15 +4,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
-from backstop_mcp.features.accounts import (
-    fetch_accounts_for_party,
-    fetch_accounts_for_product,
-)
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.accounts import fetch_accounts_for_party
 from tests.helpers import BASE_URL, recorded_params, resource
 
 _ACCOUNTS_URL = f"{BASE_URL}/accounts"
-_NEXT_PAGE = "/accounts?page[offset]=100"
 _OWNER_ID = "341688185"
 _OTHER_OWNER_ID = "999"
 _PRODUCT_ID = "1292283"
@@ -85,117 +81,6 @@ _EXPECTED_FIELDS = {
     "newIssueEligible",
     "usDomiciled",
 }
-
-
-class TestFetchAccountsForProduct:
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_filters_by_product_id_and_includes_owner_and_investor_type(
-        self, client: BackstopClient
-    ) -> None:
-        route = respx.get(_ACCOUNTS_URL).mock(
-            return_value=_page(
-                _account(
-                    "1",
-                    owner_id=_OWNER_ID,
-                    investor_type_id="10",
-                    name="Open",
-                ),
-                included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
-                    resource("10", "investor-types", name="Fund of Funds"),
-                ],
-            )
-        )
-
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
-
-        params = route.calls.last.request.url.params
-        assert params["filter[product.id][eq]"] == _PRODUCT_ID
-        assert params["include"] == "owner,investorType"
-        assert params["page[limit]"] == "100"
-        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
-        assert "product" not in params["include"]
-        assert len(listing.accounts) == 1
-        assert listing.accounts[0].owner is not None
-        assert listing.accounts[0].owner.id == _OWNER_ID
-        assert listing.accounts[0].investor_type is not None
-        assert listing.accounts[0].investor_type.name == "Fund of Funds"
-        assert listing.accounts[0].product is None
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_walks_links_next(self, client: BackstopClient) -> None:
-        route = respx.get(_ACCOUNTS_URL).mock(
-            side_effect=[
-                _page(_account("1", name="First"), next_url=_NEXT_PAGE),
-                _page(_account("2", name="Second")),
-            ]
-        )
-
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
-
-        assert route.call_count == 2
-        assert [account.id for account in listing.accounts] == ["1", "2"]
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_defaults_to_open_and_counts_omitted_closed(self, client: BackstopClient) -> None:
-        respx.get(_ACCOUNTS_URL).mock(
-            return_value=_page(
-                _account("open", name="Live"),
-                _account("closed", name="Gone", closedDate="2020-01-15"),
-            )
-        )
-
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
-
-        assert [account.id for account in listing.accounts] == ["open"]
-        assert listing.closed_omitted == 1
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_include_closed_keeps_closed_rows(self, client: BackstopClient) -> None:
-        respx.get(_ACCOUNTS_URL).mock(
-            return_value=_page(
-                _account("open", name="Live"),
-                _account("closed", name="Gone", closedDate="2020-01-15"),
-            )
-        )
-
-        listing = await fetch_accounts_for_product(
-            client, product_id=_PRODUCT_ID, include_closed=True
-        )
-
-        assert [account.id for account in listing.accounts] == ["open", "closed"]
-        assert listing.closed_omitted == 0
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_a_malformed_account_fails_the_page(self, client: BackstopClient) -> None:
-        respx.get(_ACCOUNTS_URL).mock(
-            return_value=_page(
-                _account("ok", name="Keep"),
-                {"type": "accounts", "attributes": {"name": "Drop"}},
-            )
-        )
-
-        with pytest.raises(BackstopResponseSchemaError):
-            await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_a_non_bool_flag_is_absence_not_a_failed_page(
-        self, client: BackstopClient
-    ) -> None:
-        respx.get(_ACCOUNTS_URL).mock(
-            return_value=_page(_account("ok", name="Keep", isEmployeeAccount="not-a-bool"))
-        )
-
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
-
-        assert [account.id for account in listing.accounts] == ["ok"]
-        assert listing.accounts[0].is_employee_account is None
 
 
 class TestFetchAccountsForParty:

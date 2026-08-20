@@ -1,6 +1,6 @@
 import pytest
 
-from backstop_mcp.features.custom_fields.entity_types import (
+from backstop_mcp.features.custom_fields import (
     CUSTOM_FIELD_BEANS,
     CustomFieldEntityType,
     custom_field_entity_type,
