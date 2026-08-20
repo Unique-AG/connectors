@@ -27,12 +27,18 @@ the timeline `activity_id` into `{resource_type, resource_id}`;
 `ActivityDetailResponse`/`AttendeeResponse`: that tool's wire shape
 and the pure conversion into it. See `responses.py`.
 
+`fetch_entity_activities`: `POST /entity-activities` pageNum loop for `search_activities`.
+`aggregate_entity_activities`: counts grouped by type, tag, party, or period.
+
 `ActivityHistorySettings`: the per-stream page size and gist truncation budget, translated from
 `config.ActivityHistoryConfig` by `get_activity_history_settings`. See `settings.py`.
 
 The MCP tools live in `features/activity_history/tools/`.
 """
 
+from backstop_mcp.features.activity_history.aggregate_entity_activities import (
+    aggregate_entity_activities,
+)
 from backstop_mcp.features.activity_history.api_responses import ActivityAttributes
 from backstop_mcp.features.activity_history.dependencies import get_activity_history_settings
 from backstop_mcp.features.activity_history.extract_gist_from_html import (
@@ -52,6 +58,14 @@ from backstop_mcp.features.activity_history.fetch_activity_detail import (
     fetch_attendees,
     fetch_meeting_specifics,
 )
+from backstop_mcp.features.activity_history.fetch_entity_activities import (
+    ENTITY_ACTIVITY_TYPES,
+    MAX_RETRIEVABLE,
+    EntityActivityType,
+    entity_activities_request_body,
+    fetch_entity_activities,
+    party_bean,
+)
 from backstop_mcp.features.activity_history.group_activity_page import group_activity_page
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
@@ -63,6 +77,8 @@ from backstop_mcp.features.activity_history.internal_dto import (
     AttendeeDto,
     EmailItemDto,
     EmailPageDto,
+    EntityActivitiesFetchDto,
+    EntityActivityDto,
     MeetingSpecificsDto,
     ResourceIdentifierDto,
 )
@@ -78,11 +94,19 @@ from backstop_mcp.features.activity_history.responses import (
     DateRangeResponse,
     EmailRecordResponse,
     GetActivityHistoryResponse,
+    GetSearchActivitiesResponse,
     ResolvedPartyAsOfResponse,
+    SearchActivitiesResolvedResponse,
+    SearchActivitiesRowResponse,
+    SearchActivitiesUnavailableResponse,
     TimelineRecord,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
+from backstop_mcp.features.collection_scan import (
+    AggregateBucketDto,
+    ScanCoverageResponse,
+)
 
 __all__ = [
     "ActivityAttributes",
@@ -100,6 +124,7 @@ __all__ = [
     "ActivityTagChipDto",
     "ActivityTagChipResponse",
     "ActivityType",
+    "AggregateBucketDto",
     "AttendeeChipDto",
     "AttendeeDto",
     "AttendeeResponse",
@@ -108,21 +133,35 @@ __all__ = [
     "EmailItemDto",
     "EmailPageDto",
     "EmailRecordResponse",
+    "ENTITY_ACTIVITY_TYPES",
+    "EntityActivitiesFetchDto",
+    "EntityActivityDto",
+    "EntityActivityType",
     "GetActivityHistoryResponse",
+    "GetSearchActivitiesResponse",
     "Gist",
+    "MAX_RETRIEVABLE",
     "MeetingSpecificsDto",
     "ResolvedPartyAsOfResponse",
     "ResourceIdentifierDto",
+    "ScanCoverageResponse",
+    "SearchActivitiesResolvedResponse",
+    "SearchActivitiesRowResponse",
+    "SearchActivitiesUnavailableResponse",
     "Segment",
     "TimelineRecord",
+    "aggregate_entity_activities",
+    "entity_activities_request_body",
     "extract_gist_from_html",
     "fetch_activity_detail",
     "fetch_activity_page",
     "fetch_activities_page",
     "fetch_attendees",
     "fetch_email_page",
+    "fetch_entity_activities",
     "fetch_meeting_specifics",
     "get_activity_history_settings",
     "group_activity_page",
+    "party_bean",
     "to_timeline_record",
 ]
