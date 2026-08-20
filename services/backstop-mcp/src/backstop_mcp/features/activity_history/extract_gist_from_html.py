@@ -3,7 +3,7 @@ truncate at a word boundary to a caller-supplied budget.
 
 Note what a gist is *not*: the first ~300 chars of a meeting note are usually its attendee
 table, so the gist answers "who" far better than "what was discussed" — nothing here tries to
-summarize. See `to_gist` for the library choice this rests on.
+summarize. See `extract_gist_from_html` for the library choice this rests on.
 """
 
 import logging
@@ -37,7 +37,7 @@ class Gist(BaseModel):
     full_length: int
 
 
-def to_gist(html: str, *, max_chars: int) -> Gist:
+def extract_gist_from_html(html: str, *, max_chars: int) -> Gist:
     """Convert `html` to a squeezed Markdown gist, truncated at a word boundary to `max_chars`.
 
     Conversion is `markdownify` (see module docstring): it renders tables as Markdown pipe

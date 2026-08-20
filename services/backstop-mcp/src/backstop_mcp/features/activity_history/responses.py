@@ -24,11 +24,11 @@ from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
+from backstop_mcp.features.activity_history.extract_gist_from_html import extract_gist_from_html
 from backstop_mcp.features.activity_history.fetch_activities_page import (
     ActivityType,
     BackstopActivityType,
 )
-from backstop_mcp.features.activity_history.gist_from_html import to_gist
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     ActivityItemDto,
@@ -228,7 +228,7 @@ class ActivityRecordResponse(OmitNoneModel):
 
     @classmethod
     def from_item(cls, item: ActivityItemDto, *, gist_max_chars: int) -> Self:
-        gist = to_gist(item.description or "", max_chars=gist_max_chars)
+        gist = extract_gist_from_html(item.description or "", max_chars=gist_max_chars)
         return cls(
             type=item.stream,
             activity_id=item.id,
@@ -470,7 +470,7 @@ class ActivityDetailResponse(OmitNoneModel):
         `detail.resource_id`, so what comes back is byte-identical to what went in — and stays
         a handle the model can pass straight back to this tool.
         """
-        gist = to_gist(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
+        gist = extract_gist_from_html(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
         return cls(
             activity_id=activity_id,
             type=detail.type,

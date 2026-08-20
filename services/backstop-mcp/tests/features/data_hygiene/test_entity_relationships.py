@@ -1,9 +1,9 @@
-"""`entity_relationships`: pull employment side-loads out of a by-id document."""
+"""`project_entity_relationships`: pull employment side-loads out of a by-id document."""
 
 from pydantic import BaseModel
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
-from backstop_mcp.features.data_hygiene import entity_relationships
+from backstop_mcp.features.data_hygiene import project_entity_relationships
 
 
 class _Attrs(BaseModel):
@@ -44,7 +44,7 @@ class TestEntityRelationships:
             }
         )
 
-        result = entity_relationships(document)
+        result = project_entity_relationships(document)
 
         assert [item.id for item in result.relationships] == ["er2", "er1"]
         assert [item.id for item in result.relationship_types] == ["t1"]

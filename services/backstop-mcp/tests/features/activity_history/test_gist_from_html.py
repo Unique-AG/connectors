@@ -1,4 +1,4 @@
-"""`to_gist`: HTML→Markdown conversion, squeeze, and word-boundary truncation.
+"""`extract_gist_from_html`: HTML→Markdown conversion, squeeze, and word-boundary truncation.
 
 Each test targets one behaviour called out in the design: table rows survive as Markdown pipe
 rows while markdownify's synthetic empty header is squeezed out, entities decode, blank-line
@@ -6,7 +6,7 @@ runs collapse, short input is left alone, long input truncates on a real word bo
 reports the correct pre-truncation length, and the `max_chars` boundary itself is exact.
 """
 
-from backstop_mcp.features.activity_history import Gist, to_gist
+from backstop_mcp.features.activity_history import Gist, extract_gist_from_html
 
 
 class TestTableConversion:
@@ -23,7 +23,7 @@ class TestTableConversion:
             "</table>"
         )
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist == Gist(
             text=(
@@ -37,7 +37,7 @@ class TestTableConversion:
     def test_synthetic_empty_header_and_separator_are_dropped(self) -> None:
         html = "<table><tr><td>A</td><td>B</td></tr></table>"
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert "---" not in gist.text
         assert "|  |" not in gist.text
@@ -51,7 +51,7 @@ class TestTableConversion:
             "</table>"
         )
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text.splitlines()[0] == "| Firm | First |"
 
@@ -67,7 +67,7 @@ class TestTableConversion:
             "</table>"
         )
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text == ("| Firm | Status |\n| --- | --- |\n|  |  |\n| Real Corp | Active |")
 
@@ -82,7 +82,7 @@ class TestTableConversion:
             "</table>"
         )
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text == ("| Firm | Status |\n| --- | --- |\n| - | - |\n| Real Corp | Active |")
 
@@ -98,7 +98,7 @@ class TestTableConversion:
             "</table>"
         )
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text == (
             "| Firm | Status |\n| --- | --- |\n|  |  |\n| - | - |\n| Real Corp | Active |"
@@ -110,21 +110,21 @@ class TestTableConversion:
             "<table><tr><td>C</td><td>D</td></tr></table>"
         )
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text == "| A | B |\n\n| C | D |"
 
     def test_td_only_table_not_first_in_document_still_gets_header_stripped(self) -> None:
         html = "<p>Some intro text.</p><table><tr><td>A</td><td>B</td></tr></table>"
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text == "Some intro text.\n\n| A | B |"
 
 
 class TestEntityDecoding:
     def test_ampersand_and_numeric_entities_decode(self) -> None:
-        gist = to_gist("<p>Bell &amp; Howell &#39;n Co&#39;</p>", max_chars=300)
+        gist = extract_gist_from_html("<p>Bell &amp; Howell &#39;n Co&#39;</p>", max_chars=300)
 
         assert gist.text == "Bell & Howell 'n Co'"
 
@@ -135,7 +135,7 @@ class TestBlankLineSqueeze:
         # between the two paragraphs, not just literal "\n\n\n" — the squeeze must catch both.
         html = "<p>A</p><br><br><br><br><p>B</p>"
 
-        gist = to_gist(html, max_chars=300)
+        gist = extract_gist_from_html(html, max_chars=300)
 
         assert gist.text == "A\n\nB"
         assert "\n\n\n" not in gist.text
@@ -143,22 +143,22 @@ class TestBlankLineSqueeze:
 
 class TestShortInputIsUntouched:
     def test_short_input_is_not_truncated(self) -> None:
-        gist = to_gist("<p>short</p>", max_chars=300)
+        gist = extract_gist_from_html("<p>short</p>", max_chars=300)
 
         assert gist == Gist(text="short", truncated=False, full_length=5)
 
     def test_empty_html_produces_an_empty_gist(self) -> None:
-        gist = to_gist("", max_chars=300)
+        gist = extract_gist_from_html("", max_chars=300)
 
         assert gist == Gist(text="", truncated=False, full_length=0)
 
     def test_whitespace_only_html_produces_an_empty_gist(self) -> None:
-        gist = to_gist("<div>   </div>", max_chars=300)
+        gist = extract_gist_from_html("<div>   </div>", max_chars=300)
 
         assert gist == Gist(text="", truncated=False, full_length=0)
 
     def test_no_text_html_produces_an_empty_gist(self) -> None:
-        gist = to_gist("<p>&nbsp;</p>", max_chars=300)
+        gist = extract_gist_from_html("<p>&nbsp;</p>", max_chars=300)
 
         assert gist == Gist(text="", truncated=False, full_length=0)
 
@@ -169,7 +169,7 @@ class TestTruncation:
         html = f"<p>{words}</p>"
         full_markdown_length = len(words)
 
-        gist = to_gist(html, max_chars=50)
+        gist = extract_gist_from_html(html, max_chars=50)
 
         assert gist.truncated is True
         assert gist.full_length == full_markdown_length
@@ -182,14 +182,14 @@ class TestTruncation:
     def test_exactly_at_the_limit_is_not_truncated(self) -> None:
         html = "<p>abcde fghij klmno</p>"  # 17 characters once converted
 
-        gist = to_gist(html, max_chars=17)
+        gist = extract_gist_from_html(html, max_chars=17)
 
         assert gist == Gist(text="abcde fghij klmno", truncated=False, full_length=17)
 
     def test_one_char_over_the_limit_truncates_to_the_prior_word_boundary(self) -> None:
         html = "<p>abcde fghij klmno</p>"  # 17 characters once converted
 
-        gist = to_gist(html, max_chars=16)
+        gist = extract_gist_from_html(html, max_chars=16)
 
         assert gist == Gist(text="abcde fghij", truncated=True, full_length=17)
 
@@ -200,7 +200,7 @@ class TestTruncation:
         words = " ".join(["café"] * 20)
         html = f"<p>{words}</p>"
 
-        gist = to_gist(html, max_chars=10)
+        gist = extract_gist_from_html(html, max_chars=10)
 
         assert gist.truncated is True
         assert gist.full_length == len(words)
@@ -214,7 +214,7 @@ class TestTruncation:
         html = f"<p>{full_text}</p>"
 
         for max_chars in range(1, len(full_text)):
-            gist = to_gist(html, max_chars=max_chars)
+            gist = extract_gist_from_html(html, max_chars=max_chars)
             if " " in gist.text:
                 # Cut on a real boundary: every token but is a complete word.
                 assert all(token in words for token in gist.text.split(" "))

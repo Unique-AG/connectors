@@ -1,9 +1,10 @@
-"""`group_page`: per-stream date_range and next continuation, over a plain in-memory page.
+"""`group_activity_page`: per-stream date_range and next continuation, over a plain in-memory
+page.
 
-`group_page` is a pure, synchronous function — no HTTP, no `respx`, no async fixtures. Each test
-builds a list of `ActivityItemDto`/`EmailItemDto` plus fetch params, which is the whole point of
-decoupling fetching from grouping: the helper cannot tell a synthetic fixture from a page a
-real `BackstopClient`-backed layer fetched.
+`group_activity_page` is a pure, synchronous function — no HTTP, no `respx`, no async fixtures.
+Each test builds a list of `ActivityItemDto`/`EmailItemDto` plus fetch params, which is the
+whole point of decoupling fetching from grouping: the helper cannot tell a synthetic fixture
+from a page a real `BackstopClient`-backed layer fetched.
 
 Each test targets one behaviour: this page's min/max `occurred_at` (including that start is the
 oldest date even when Backstop returns newest-first), `date_range` of `None` when nothing dated
@@ -25,7 +26,7 @@ from backstop_mcp.features.activity_history import (
     ActivityType,
     DateRangeResponse,
     EmailItemDto,
-    group_page,
+    group_activity_page,
 )
 from backstop_mcp.features.activity_history.fetch_activities_page import BackstopActivityType
 
@@ -69,7 +70,7 @@ def _group(
     since: date | None = None,
     until: date | None = None,
 ) -> ActivityGroupResponse[ActivityItemDto | EmailItemDto]:
-    return group_page(
+    return group_activity_page(
         items,
         activity_type=activity_type,
         end_of_stream=end_of_stream,
