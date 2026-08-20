@@ -1,4 +1,4 @@
-"""Structured logging: `unique_mcp`'s pino-json contract, and the four things it lacks.
+"""Structured logging: `unique_mcp`'s pino-json contract, and what it does not do on its own.
 
 `unique_mcp.logging.configure_logging` owns the format — one `StreamHandler` on stderr whose
 formatter renders a pino-json object, which is what the chart's `logging.unique.app/format:
