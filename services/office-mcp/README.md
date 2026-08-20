@@ -363,6 +363,26 @@ exchange hands the caller's Graph token as a string; this package sends it.
 - **Trap:** The SDK bearer provider does not validate allowed-hosts. Redirects to off-Graph URLs send
   the caller's delegated credential. Restrict to `graph.microsoft.com` only.
 
+## Logs
+
+Every line is one pino-json object on **stderr**, at `LOG_LEVEL` (default `info`), which is what the
+chart's `logging.unique.app/format: pino-json` pod label promises the log pipeline. Nothing is
+written to stdout: uvicorn's access lines, FastMCP's own lines and Python warnings are all routed
+through the same handler, because each one arrives outside that contract by default —
+`src/office_mcp/logging.py` says how and why for each.
+
+Every line carries `correlation_id`, so a line can always be grouped: the trace id of the active
+span, else the MCP request id of the message being handled, else the id of the HTTP request, else the
+id of this process's boot. `trace_id`, `request_id`, `session_id` and `http_request_id` appear beside
+it when they are known. An `x-request-id` from a gateway is used as-is.
+
+Secrets never reach a line. A field whose name reads like a credential (`Authorization`,
+`x-api-key`, `client_secret`, however it is spelled) is replaced with `[Redacted]`, nested inside an
+`extra=` as well; so is a value shaped like one — a bearer token, a JWT, a password in a URL, a
+credential in a query string — wherever it appears, including inside an exception's stack. Two
+independent nets, because a secret with an innocent name and an innocent-looking secret are
+different failures.
+
 ## Run locally
 
 ```bash
