@@ -10,19 +10,19 @@ from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
 
-type CatalogResult = tuple[list[CustomFieldGroupDto], Literal["ok", "stale"]]
+type CatalogResult = tuple[dict[str, CustomFieldGroupDto], Literal["ok", "stale"]]
 
 
 class CustomFieldGroupsService:
     """Process-wide custom-field group catalog.
 
-    Groups come from a real Backstop fetch and live in one in-memory list. Until a
-    fetch succeeds this service has nothing to serve. Constructed by
+    Groups come from a real Backstop fetch and live in one in-memory dict keyed by group id.
+    Until a fetch succeeds this service has nothing to serve. Constructed by
     `get_custom_field_groups_service` in this feature's `dependencies.py`.
     """
 
     def __init__(self, *, ttl: timedelta) -> None:
-        self._groups: list[CustomFieldGroupDto] | None = None
+        self._groups: dict[str, CustomFieldGroupDto] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._lock: asyncio.Lock = asyncio.Lock()
         self._in_flight: asyncio.Future[CatalogResult] | None = None
@@ -33,15 +33,15 @@ class CustomFieldGroupsService:
 
     async def get(
         self, client: BackstopClient, *, refresh: bool = False
-    ) -> tuple[list[CustomFieldGroupDto], Literal["ok", "stale"]]:
+    ) -> tuple[dict[str, CustomFieldGroupDto], Literal["ok", "stale"]]:
         cached = self._groups
         if cached is not None and self._freshness.within() and not refresh:
-            return list(cached), "ok"
+            return dict(cached), "ok"
 
         async with self._lock:
             cached = self._groups
             if cached is not None and self._freshness.within() and not refresh:
-                return list(cached), "ok"
+                return dict(cached), "ok"
             if self._in_flight is not None and not self._in_flight.done():
                 in_flight = self._in_flight
                 owner = False
@@ -52,7 +52,7 @@ class CustomFieldGroupsService:
 
         if not owner:
             groups, status = await in_flight
-            return list(groups), status
+            return dict(groups), status
 
         try:
             return await self._fetch(client, in_flight)
@@ -90,7 +90,7 @@ class CustomFieldGroupsService:
                     exc_info=True,
                 )
                 self._freshness.mark()
-                result: CatalogResult = (list(self._groups), "stale")
+                result: CatalogResult = (dict(self._groups), "stale")
                 in_flight.set_result(result)
                 return result
             in_flight.set_exception(error)
@@ -99,6 +99,6 @@ class CustomFieldGroupsService:
         self._groups = groups
         self._freshness.mark()
         logger.info("custom_fields.groups.refreshed", extra={"groups": len(groups)})
-        result = (list(groups), "ok")
+        result = (dict(groups), "ok")
         in_flight.set_result(result)
         return result

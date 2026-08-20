@@ -13,8 +13,8 @@ _DUPLICATE_GROUP_WARNING = (
 )
 
 
-async def fetch_custom_field_groups(client: BackstopClient) -> list[CustomFieldGroupDto]:
-    """Fetch Backstop's layout-group catalog in one paginated walk."""
+async def fetch_custom_field_groups(client: BackstopClient) -> dict[str, CustomFieldGroupDto]:
+    """Fetch Backstop's layout-group catalog in one paginated walk, keyed by group id."""
     page = await client.paginate(
         _GROUPS_PATH,
         schema=BackstopApiResource[CustomFieldGroupAttributes],
@@ -32,4 +32,4 @@ async def fetch_custom_field_groups(client: BackstopClient) -> list[CustomFieldG
             groups_by_id[group.id] = group
         elif existing != group:
             logger.warning(_DUPLICATE_GROUP_WARNING, group.id)
-    return list(groups_by_id.values())
+    return groups_by_id

@@ -9,6 +9,7 @@ __all__ = [
     "CustomFieldDefinitionAttributes",
     "CustomFieldGroupAttributes",
     "CustomFieldGroupParentAttributes",
+    "CustomFieldValueAttributes",
 ]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
@@ -63,6 +64,16 @@ class CustomFieldDefinitionAttributes(BaseModel):
     required: LenientBool = None
     client_required: LenientBool = Field(default=None, alias="clientRequired")
     system_defined: LenientBool = Field(default=None, alias="systemDefined")
+
+
+class CustomFieldValueAttributes(BaseModel):
+    """One entry of a record's `regularCustomFieldValues` list."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    definition_id: _IdStr = Field(default=None, alias="definitionId")
+    name: _StrippedStr | None = None
+    value: object = None
 
 
 class CustomFieldGroupParentAttributes(BaseModel):

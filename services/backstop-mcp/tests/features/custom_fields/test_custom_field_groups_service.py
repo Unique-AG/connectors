@@ -79,8 +79,8 @@ class TestInMemoryTtl:
         assert route.call_count == 1
         assert first_cache == "ok"
         assert second_cache == "ok"
-        assert [group.name for group in first] == ["Cached Group"]
-        assert [group.name for group in second] == ["Cached Group"]
+        assert [group.name for group in first.values()] == ["Cached Group"]
+        assert [group.name for group in second.values()] == ["Cached Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -126,7 +126,7 @@ class TestInMemoryTtl:
 
         assert route.call_count == 2
         assert cache == "ok"
-        assert [group.name for group in groups] == ["Fresh Group"]
+        assert [group.name for group in groups.values()] == ["Fresh Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -171,7 +171,7 @@ class TestInMemoryTtl:
 
         assert route.call_count == 2
         assert cache == "ok"
-        assert [group.name for group in groups] == ["Refreshed Group"]
+        assert [group.name for group in groups.values()] == ["Refreshed Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -199,7 +199,7 @@ class TestInMemoryTtl:
 
         groups, cache = await asyncio.wait_for(service.get(clients(base_url)), timeout=1)
         assert cache == "ok"
-        assert [group.name for group in groups] == ["Warm Group"]
+        assert [group.name for group in groups.values()] == ["Warm Group"]
 
         release_refresh.set()
         _ = await asyncio.wait_for(refresh_task, timeout=5)
@@ -221,7 +221,7 @@ class TestInMemoryTtl:
         assert route.call_count == 1
         for groups, cache in results:
             assert cache == "ok"
-            assert [group.name for group in groups] == ["Fresh Group"]
+            assert [group.name for group in groups.values()] == ["Fresh Group"]
 
     @staticmethod
     async def _join_in_flight(started: asyncio.Event, release: asyncio.Event) -> None:
@@ -274,7 +274,7 @@ class TestInMemoryTtl:
         assert route.call_count == warm_calls + 1
         for groups, cache in results[:3]:
             assert cache == "ok"
-            assert [group.name for group in groups] == ["Refreshed Group"]
+            assert [group.name for group in groups.values()] == ["Refreshed Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -306,7 +306,7 @@ class TestInMemoryTtl:
         assert route.call_count == warm_calls + 1
         for groups, cache in results[:3]:
             assert cache == "stale"
-            assert [group.name for group in groups] == ["Cached Group"]
+            assert [group.name for group in groups.values()] == ["Cached Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -324,7 +324,7 @@ class TestInMemoryTtl:
         groups, cache = await service.get(clients(base_url))
 
         assert cache == "stale"
-        assert [group.name for group in groups] == ["Stale Group"]
+        assert [group.name for group in groups.values()] == ["Stale Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -349,8 +349,8 @@ class TestInMemoryTtl:
         assert failed.call_count == calls_after_failure
         assert first_cache == "stale"
         assert second_cache == "ok"
-        assert [group.name for group in first] == ["Stale Group"]
-        assert [group.name for group in second] == ["Stale Group"]
+        assert [group.name for group in first.values()] == ["Stale Group"]
+        assert [group.name for group in second.values()] == ["Stale Group"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -385,7 +385,7 @@ class TestInMemoryTtl:
         self._groups_route(base_url, "After Cancel")
         groups, cache = await asyncio.wait_for(service.get(client), timeout=5)
         assert cache == "ok"
-        assert [group.name for group in groups] == ["After Cancel"]
+        assert [group.name for group in groups.values()] == ["After Cancel"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -403,7 +403,7 @@ class TestInMemoryTtl:
         groups, cache = await service.get(clients(base_url))
 
         assert cache == "ok"
-        assert [group.name for group in groups] == ["Recovered Group"]
+        assert [group.name for group in groups.values()] == ["Recovered Group"]
         assert route.call_count == 1
         assert service._in_flight is None  # pyright: ignore[reportPrivateUsage]
 

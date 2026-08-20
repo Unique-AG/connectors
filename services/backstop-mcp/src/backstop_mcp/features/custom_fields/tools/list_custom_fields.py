@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
@@ -38,11 +39,11 @@ class ListCustomFieldsResponse(BaseModel):
 
 
 def _definitions_for(
-    catalog: list[CustomFieldDefinitionDto], entity_type: CustomFieldEntityType
+    catalog: Mapping[str, CustomFieldDefinitionDto], entity_type: CustomFieldEntityType
 ) -> list[CustomFieldDefinitionResponse]:
     return [
         CustomFieldDefinitionResponse.from_definition(definition)
-        for definition in catalog
+        for definition in catalog.values()
         if custom_field_entity_type_from_bean(definition.entity_type) == entity_type
     ]
 
