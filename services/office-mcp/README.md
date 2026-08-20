@@ -334,13 +334,15 @@ exchange hands the caller's Graph token as a string; this package sends it.
 - **Throttling is the SDK's.** Its retry middleware waits out Retry-After on 429/503/504 three
   times, on asyncio.sleep, so a wait never blocks the event loop. This is Graph's documented
   contract. Nothing here re-implements it. There is no rate limiter. What is added is the typed
-  outcome: a 429 that outlasts the retries reaches callers as GraphThrottled with
-  retry_after_seconds, not a status code to re-interpret. An outlasted 503 or 504 reaches them
-  as GraphUnavailable.
+  outcome: throttling that outlasts the retries reaches callers as GraphThrottled with
+  retry_after_seconds, not a status code to re-interpret. Graph rate limits with a 503 as well as
+  with a 429, and Retry-After is the only thing that says which it did — so a 5xx carrying that
+  header is GraphThrottled and the same status without it is GraphUnavailable. Counted as an
+  outage, throttling sends an operator after an incident when the remedy is quota.
 
-- **Errors are four types (four remedies):** `GraphThrottled` (429), `GraphForbidden` (401/403),
-  `GraphNotFound` (404), `GraphUnavailable` (5xx or unreachable). Wrap Graph work with
-  `with graph_errors():`.
+- **Errors are four types (four remedies):** `GraphThrottled` (429, or a retriable 5xx that named a
+  delay), `GraphForbidden` (401/403), `GraphNotFound` (404), `GraphUnavailable` (a 5xx with nothing
+  to wait for, or unreachable). Wrap Graph work with `with graph_errors():`.
 
 - **Paging follows @odata.nextLink** via `collect_pages`, with item and scan caps. A channel's
   messages are the exception and are not walked at all: Graph allows about one request a second on
@@ -386,7 +388,7 @@ store creates its table on first use.
   `graph_pages_scanned{operation}`. `operation` is the tool's own name and never a URL — a label
   taken off a Graph URL would be one time series per chat. `status` is the remedy the failure needs
   (`forbidden`, `not_found`, `throttled`, `unavailable`), not the HTTP code. `retried` says whether
-  the SDK spent its retries on a 429 or refused the wait Graph asked for.
+  the SDK spent its retries on the throttling or refused the wait Graph asked for.
 - Traces: off unless an `OTEL_*` variable says where to send them. `OTEL_TRACES_EXPORTER=console`
   prints spans to stderr; an `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends them to a collector and
   needs nothing else. `.env.example` lists the knobs, the chart wires them from
