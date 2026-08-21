@@ -931,6 +931,64 @@ def _instrument(sample: str) -> str:
     return sample
 
 
+# The word a panel is not allowed to use loosely, and the one this whole distinction is about. A
+# panel titled "Graph calls/min" over `graph_operations_total` was counting tool calls and calling
+# them Graph calls, which is the reading the `graph_requests_total` rename was meant to end.
+_A_CALL_IN_A_TITLE = re.compile(r"\bcalls?\b", re.IGNORECASE)
+
+# The two series that count a Graph call. Everything else `graph_*` counts an operation, a page or
+# a 429.
+_STEP_LEVEL = frozenset({GRAPH_STEPS_TOTAL, GRAPH_STEP_DURATION_SECONDS})
+
+
+def _panel_graph_metrics(panel: Mapping[str, object]) -> set[str]:
+    """The `graph_*` instruments one panel queries, histogram suffixes resolved."""
+    return {_instrument(name) for query in _queries(panel) for name in _metric_names(query)}
+
+
+class TestNoPanelPromisesGraphCallsAndPlotsOperations:
+    """The naming half of the operation/step split, which the series-name tests cannot see.
+
+    A panel querying the right series can still be titled and described wrongly, and a wrong title
+    is worse than an empty panel: it renders a real number that a reader takes for a different
+    measurement. `list_meeting_recordings` makes three Graph calls per invocation, so an operation
+    rate read as a Graph call rate understates Graph traffic by whatever the fan-out happens to be.
+
+    So the word "call" in a title has to be earned by plotting a step series. Operations get called
+    operations, and the panel that says "call" is the one counting them.
+    """
+
+    def test_a_panel_whose_title_says_call_plots_a_step_series(self) -> None:
+        mislabelled = sorted(
+            (title, tuple(sorted(queried)))
+            for panel in _panels()
+            if (queried := _panel_graph_metrics(panel))
+            and isinstance(title := panel.get("title"), str)
+            and _A_CALL_IN_A_TITLE.search(title)
+            and not queried & _STEP_LEVEL
+        )
+        assert not mislabelled, (
+            f"{mislabelled} says 'call' over a series that counts operations. An operation is one "
+            + "tool call and a tool makes several Graph calls, so the panel reads as a Graph call "
+            + f"rate and is not one. Title it an operation, or query {sorted(_STEP_LEVEL)}."
+        )
+
+    def test_a_step_series_is_plotted_under_that_name_somewhere(self) -> None:
+        """The other direction: the call axis has to exist, or the rule above just deletes it."""
+        titled = {
+            title
+            for panel in _panels()
+            if _panel_graph_metrics(panel) & _STEP_LEVEL
+            and isinstance(title := panel.get("title"), str)
+            and _A_CALL_IN_A_TITLE.search(title)
+        }
+        assert titled, (
+            "no panel plots a step series under a title that says 'call'. Renaming the operation "
+            + "panels leaves an operator with no Graph call rate at all, which is the confusion "
+            + "the other way round."
+        )
+
+
 # How a dashboard query says "count this as a failure": everything except the statuses it names.
 _EXCLUDED_STATUSES = re.compile(r'status!~\\?"([a-z_|]+)\\?"')
 

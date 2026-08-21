@@ -47,7 +47,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Every Microsoft Graph call this connector made on a caller's behalf.",
+      "description": "Graph operations served on a caller's behalf. One operation is one tool call, not one HTTP request: a tool that makes three Graph calls counts once here and three times in graph_steps_total. Graph call rate by step is the panel that counts the calls.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -99,7 +99,7 @@
           "refId": "A"
         }
       ],
-      "title": "Graph calls/min",
+      "title": "Graph operations/min",
       "type": "stat"
     },
     {
@@ -107,7 +107,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "not_found is excluded: a caller asking for a chat or a message that is gone got an answer, not an incident. forbidden is included \u2014 it almost always means the app registration is missing a delegated permission or an admin consent, which is a deployment defect.",
+      "description": "Failing operations as a share of the operations served \u2014 one tool call each, not one HTTP request each. not_found is excluded: a caller asking for a chat or a message that is gone got an answer, not an incident. forbidden is included \u2014 it almost always means the app registration is missing a delegated permission or an admin consent, which is a deployment defect.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -175,7 +175,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "The top finite bucket is 30s \u2014 one Graph request timeout (GraphSettings.request_timeout_seconds), set as a view in office_mcp/metrics.py. A quantile pinned on 30 means the call spent Retry-After waits or timed out and was retried; the throttling and status panels say which.",
+      "description": "One operation end to end, which is one tool call and every Graph request inside it. The top finite bucket is 30s \u2014 one Graph request timeout (GraphSettings.request_timeout_seconds), set as a view in office_mcp/metrics.py. A quantile pinned on 30 means the call spent Retry-After waits or timed out and was retried; the throttling and status panels say which.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -754,7 +754,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "operation is a name chosen in code, one per tool \u2014 never a Graph URL. graph_client/observability.py says why that is a hard rule.",
+      "description": "One observation per tool call, split by the operation it was counted under. operation is a name chosen in code, one per tool \u2014 never a Graph URL. graph_client/observability.py says why that is a hard rule.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -837,7 +837,7 @@
           "refId": "A"
         }
       ],
-      "title": "Graph call rate by operation",
+      "title": "Graph operation rate",
       "type": "timeseries"
     },
     {
@@ -1039,7 +1039,7 @@
           "refId": "C"
         }
       ],
-      "title": "Graph call duration",
+      "title": "Graph operation duration",
       "type": "timeseries"
     },
     {
@@ -1340,6 +1340,97 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "One observation per Graph call inside a tool, which is the call rate the operation panels do not show. A paged walk is one call here however many pages it read \u2014 Pages scanned per walk counts those.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 31
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (operation, step) (rate(graph_steps_total{job=~\"$job\"}[$__rate_interval]))",
+          "legendFormat": "{{operation}} \u00b7 {{step}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Graph call rate by step",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "description": "Which Graph call inside a tool is slow. `operation` is the tool, `step` is the call it made \u2014 the panel above says a tool got slower, this one says which of its Graph calls did.",
       "fieldConfig": {
         "defaults": {
@@ -1393,8 +1484,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
+        "w": 8,
+        "x": 8,
         "y": 31
       },
       "id": 24,
@@ -1484,8 +1575,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 16,
         "y": 31
       },
       "id": 25,
