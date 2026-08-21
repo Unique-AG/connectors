@@ -38,7 +38,7 @@ Deleting either one puts the defect back silently: the spans keep being emitted 
 healthy, they just go to the wrong trace, which nothing that counts spans would notice.
 """
 
-from collections.abc import Awaitable, Callable, Mapping, MutableMapping
+from collections.abc import Mapping
 from typing import override
 
 from fastmcp.server.dependencies import get_http_request
@@ -46,17 +46,9 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from opentelemetry import context as otel_context
 from opentelemetry.context import Context
 
-__all__ = ["TraceContextCaptureMiddleware", "TraceContextRestoreMiddleware"]
+from office_mcp.asgi import ASGIApp, ASGIReceive, ASGIScope, ASGISend
 
-# Local ASGI aliases rather than Starlette's. Starlette spells `Scope` as
-# `MutableMapping[str, Any]`, and every read off it is then an `Any` this service's type checking
-# rejects. `unique_toolkit`'s own tracing middleware keeps the same local aliases for the same
-# reason.
-type ASGIScope = MutableMapping[str, object]
-type ASGIMessage = MutableMapping[str, object]
-type ASGIReceive = Callable[[], Awaitable[ASGIMessage]]
-type ASGISend = Callable[[ASGIMessage], Awaitable[None]]
-type ASGIApp = Callable[[ASGIScope, ASGIReceive, ASGISend], Awaitable[None]]
+__all__ = ["TraceContextCaptureMiddleware", "TraceContextRestoreMiddleware"]
 
 # Namespaced because the scope is shared with every other middleware in the stack, this service's
 # and its frameworks'. The two halves below are the only readers and the only writer.

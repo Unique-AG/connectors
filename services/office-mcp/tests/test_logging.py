@@ -27,7 +27,8 @@ import sys
 import time
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import IO, Protocol, cast
+from types import TracebackType
+from typing import IO, Protocol, cast, override
 
 import httpx
 import mcp.server.lowlevel.server as sdk_server
@@ -46,6 +47,7 @@ from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceCon
 from office_mcp.logging import (
     CENSORED,
     TRUNCATED,
+    UNPRINTABLE,
     RedactionFilter,
     StaleMessageLineFilter,
     configure_logging,
@@ -227,6 +229,36 @@ class TestNothingSecretReachesTheLog:
 
         assert sink.one()["assertion_result"] == CENSORED
 
+    def test_a_field_name_that_cannot_be_rendered_censors_its_value(self, sink: _Sink) -> None:
+        """The same guard on the other half of a field, and the direction of the fallback is the
+        point: the name is what decides whether the value is logged at all, so a name that cannot
+        be read is a decision that cannot be made — and answering "not sensitive" would log a value
+        that the same key spelled readably would have censored."""
+
+        class _HostileKey:
+            @override
+            def __str__(self) -> str:
+                raise RuntimeError("this key refuses to be logged")
+
+        _log("inbound", headers={_HostileKey(): "opaque-key-value"})
+
+        assert sink.one()["headers"] == {UNPRINTABLE: CENSORED}
+
+    def test_a_message_that_cannot_be_interpolated_keeps_the_line(self, sink: _Sink) -> None:
+        """A `%`-template and the arguments meant to fill it are written in two places, so they
+        disagree: `logger.info("100%", 1)` raises `ValueError: incomplete format`. Stdlib survives
+        that with a stderr note, and a filter on the root handler must not do worse to a mistake in
+        uvicorn, kiota, asyncpg or msal — least of all inside their own `except:
+        logger.exception(...)`, where it would replace the error being reported.
+
+        The template that is kept is still censored, and the arguments are dropped with it:
+        `Handler.handleError` writes both out verbatim, so nothing may reach it."""
+        _log("connecting to postgresql://office:hunter2@db.internal 100%", "unused")
+
+        line = sink.one()
+        assert line["msg"] == f"connecting to postgresql://{CENSORED}@db.internal 100%"
+        assert "hunter2" not in sink.stream.getvalue()
+
     def test_a_token_interpolated_into_the_message_is_censored(self, sink: _Sink) -> None:
         """`%s` of a token is a token, and the message is not an attribute the name check sees."""
         _log("retrying with %s", f"Bearer {_JWT}")
@@ -241,6 +273,27 @@ class TestNothingSecretReachesTheLog:
 
         message = cast("str", sink.one()["msg"])
         assert f"api-key={CENSORED}&page=2" in message, message
+
+    def test_an_authorization_code_in_a_query_string_is_censored(self, sink: _Sink) -> None:
+        """The parameter no name check would suspect and every sign-in carries. `/auth/callback` is
+        not one of the paths upstream's access filter drops, so uvicorn writes a live Entra
+        authorization code into the log pipeline on every successful consent."""
+        _log('127.0.0.1:1 - "GET /auth/callback?code=1.AXcAlive-auth-code&state=x HTTP/1.1" 302')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"code={CENSORED}&state=x" in message, message
+        assert "1.AXcAlive-auth-code" not in sink.stream.getvalue()
+
+    @pytest.mark.parametrize("parameter", ["postcode", "encoding", "areacode"], ids=repr)
+    def test_a_parameter_that_merely_contains_code_is_kept(
+        self, sink: _Sink, parameter: str
+    ) -> None:
+        """Why `code` is matched as a whole parameter name: as a substring it would censor these,
+        and a censored line answers no question about the request it describes."""
+        _log(f'127.0.0.1:1 - "GET /mcp?{parameter}=8000 HTTP/1.1" 200')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"{parameter}=8000" in message, message
 
     def test_a_password_in_a_url_is_censored(self, sink: _Sink) -> None:
         """Reachable today: `server/readiness.py` logs the store's failure with `exc_info=True`,
@@ -264,6 +317,67 @@ class TestNothingSecretReachesTheLog:
         assert "hunter2" not in json.dumps(err), err
         assert CENSORED in cast("str", err["message"])
         assert "ConnectionRefusedError" in cast("str", err["stack"]), "the stack is still a stack"
+
+    def test_an_exception_whose_message_cannot_be_rendered_keeps_the_line(
+        self, sink: _Sink
+    ) -> None:
+        """`str(exc)` is a dependency's `__str__` like any other, and this one is reached from a
+        filter — where an exception raised replaces the error the caller was reporting. The rest of
+        the field survives: `traceback` renders a raising `__str__` as `<exception str() failed>`
+        rather than propagating it, so the cause is still there and still censored."""
+
+        class _Hostile(RuntimeError):
+            @override
+            def __str__(self) -> str:
+                raise RuntimeError("this exception refuses to be rendered")
+
+        try:
+            try:
+                raise ConnectionRefusedError("postgresql://office:hunter2@db.internal:5432/office")
+            except ConnectionRefusedError as cause:
+                raise _Hostile from cause
+        except _Hostile:
+            logging.getLogger("some.vendor.module").warning("store unreachable", exc_info=True)
+
+        err = cast("Mapping[str, object]", sink.one()["err"])
+        assert err["name"] == "_Hostile"
+        assert err["message"] == UNPRINTABLE
+        assert "hunter2" not in json.dumps(err), err
+        assert CENSORED in cast("str", err["stack"]), "the cause is still in the stack"
+
+    def test_a_stack_that_cannot_be_formatted_does_not_raise_out_of_the_filter(self) -> None:
+        """`exc_info` is whatever the caller passed — `logging` forwards any three-tuple through
+        untouched — and `traceback.format_exception` raises `AttributeError: 'str' object has no
+        attribute 'tb_frame'` on a third element that is not a traceback.
+
+        The one case in this class asserted without the real handler, and the reason is the vector
+        itself: a malformed `exc_info` also breaks every *other* handler on the root logger, because
+        stdlib's own `Formatter.format` calls `formatException` on it — and pytest's capture handler
+        re-raises what it cannot format. So what is asserted here is only what this filter owes its
+        caller: it renders what it can, censors that, and returns True.
+        """
+        broken = ConnectionRefusedError("postgresql://office:hunter2@db.internal:5432/office")
+        record = logging.LogRecord(
+            "some.vendor.module",
+            logging.WARNING,
+            __file__,
+            1,
+            "store unreachable",
+            None,
+            # The cast is the vector, not a convenience: this is the tuple a dependency assembling
+            # `exc_info` by hand passes in, and the type checker is why this service never does.
+            cast(
+                "tuple[type[BaseException], BaseException, TracebackType | None]",
+                (ConnectionRefusedError, broken, "not a traceback"),
+            ),
+        )
+
+        assert RedactionFilter().filter(record) is True
+
+        err = cast("Mapping[str, object]", cast("Mapping[str, object]", record.__dict__)["err"])
+        assert err["name"] == "ConnectionRefusedError"
+        assert err["stack"] == UNPRINTABLE
+        assert err["message"] == f"postgresql://{CENSORED}@db.internal:5432/office"
 
     def test_the_callers_own_dictionary_is_not_touched(self, sink: _Sink) -> None:
         """Redaction rebuilds; it does not edit. The caller is still holding these headers and
