@@ -1,6 +1,6 @@
 [project]
 name = "hello-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Minimal no-auth FastMCP Hello World server"
 requires-python = ">=3.12"
 dependencies = [
