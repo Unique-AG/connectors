@@ -67,18 +67,20 @@ async def get_activity_detail(
     ],
     client: BackstopClient = Depends(get_backstop_client),
 ) -> ActivityDetailResponse:
-    """Fetch one activity's full body, meeting specifics, and attendees by `activity_id`.
+    """Fetch one activity's full body, meeting specifics, attendees, and attachment list.
 
     Documented fallback, with `get_activity_history`, when `search_activities` is unavailable.
     While the primary is up, prefer `search_activities` with `include_description` for note
     text. When it 404s, `get_activity_history` yields a truncated gist and this tool is how
     you read the full body.
 
-    `activity_id` must come from a prior `get_activity_history` response — never invent one,
-    and never pass a `search_activities` row `id` (a different identifier). Unlike the
-    timeline's `gist` (truncated to a token budget), `body` here is the FULL converted text.
-    `start`/`stop`/`location`/`time_zone` and `attendees` are only populated for a
-    meeting/call record; a note or document leaves them `None`/empty.
+    The attachment list is this tool's one unique capability versus `search_activities`, which
+    only publishes `attachments_count`. `activity_id` must come from a prior
+    `get_activity_history` response — never invent one, and never pass a `search_activities`
+    row `id` (a different identifier). Unlike the timeline's `gist` (truncated to a token
+    budget), `body` here is the FULL converted text. `start`/`stop`/`location`/`time_zone`
+    and `attendees` are only populated for a meeting/call record; a note or document leaves
+    them `None`/empty.
     """
     _ = ctx
     handle = ResourceIdentifierDto.from_activity_id(activity_id)

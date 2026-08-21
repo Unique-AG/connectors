@@ -48,6 +48,8 @@ SearchRowField = Literal[
     "probability",
     "requested_amount",
     "allocated_amount",
+    "weighted_value",
+    "weighted_allocated_value",
     "currency",
     "expected_investment_date",
     "closed_date",
@@ -101,6 +103,13 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     allocated_amount: float | None = Field(
         default=None, description="Amount allocated so far, in `currency`."
     )
+    weighted_value: float | None = Field(
+        default=None,
+        description="Backstop's requested amount times probability — use for book-wide ranking.",
+    )
+    weighted_allocated_value: float | None = Field(
+        default=None, description="Backstop's allocated amount times probability."
+    )
     currency: str | None = Field(default=None, description="ISO currency of both amounts.")
     expected_investment_date: object = Field(
         default=None, description="Day the investment is expected."
@@ -141,6 +150,10 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             payload["requested_amount"] = row.requested_amount
         if "allocated_amount" in fields:
             payload["allocated_amount"] = row.allocated_amount
+        if "weighted_value" in fields:
+            payload["weighted_value"] = row.weighted_value
+        if "weighted_allocated_value" in fields:
+            payload["weighted_allocated_value"] = row.weighted_allocated_value
         if "currency" in fields:
             payload["currency"] = row.currency
         if "expected_investment_date" in fields:

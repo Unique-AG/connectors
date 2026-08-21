@@ -379,7 +379,7 @@ class TestProjection:
     async def test_attributes_outside_the_modelled_subset_do_not_surface(
         self, client: BackstopClient
     ) -> None:
-        """`waitlistId`, `isErisa` and the weighted amounts are on the wire, not in scope."""
+        """`waitlistId` and `isErisa` are on the wire, not in scope. Weighted values are."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity(
@@ -397,11 +397,16 @@ class TestProjection:
 
         result = await _fetch(client)
 
-        assert set(result.opportunities[0].model_dump()) == {
+        dumped = result.opportunities[0].model_dump()
+        assert dumped["weighted_value"] == 100000000.0
+        assert dumped["weighted_allocated_value"] == 0.0
+        assert set(dumped) == {
             "id",
             "name",
             "stage",
             "stage_id",
+            "weighted_value",
+            "weighted_allocated_value",
             "custom_field_values",
             "stage_history",
         }

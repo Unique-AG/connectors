@@ -16,10 +16,10 @@ People at an organization, with employment status and categories there: get_peop
 the party (get_organization / get_person), not on get_people_for_party.
 
 Holdings: get_accounts_for_party first (undocumented table-data; may 404 — that is not \
-"holds nothing"). Fall back to get_time_series on a specific account. Dated NAV, ITD, \
-share of fund, lifetime in/out: get_time_series on one account or one product, one series \
-per call. A missing value on a dated point is "not in yet", not zero. `aums` is the \
-product's total assets under management, not one investor's balance.
+"holds nothing"; the tool then falls back internally to the documented /accounts walk). \
+Dated NAV, ITD, share of fund, lifetime in/out: get_time_series on one account or one \
+product, one series per call. A missing value on a dated point is "not in yet", not zero. \
+`aums` is the product's total assets under management, not one investor's balance.
 
 Product chain: resolve a product, then get_product_investors for who is in it (owners only, \
 no figures), then get_time_series for the specific accounts in question. Do not iterate \
@@ -32,8 +32,9 @@ missing.
 Meetings, calls, notes, emails, documents: search_activities first. That primary is an \
 undocumented UI search and may 404 — that is not "no activity exists". Fall back to \
 get_activity_history (party-scoped only), then get_activity_detail for the full \
-untruncated body. Prefer search_activities with include_description for note text \
-while the primary answers. Do not look for those on get_person / get_organization.
+untruncated body and the attachment list. Prefer search_activities with include_description \
+for note text while the primary answers. Do not look for those on get_person / \
+get_organization.
 
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \

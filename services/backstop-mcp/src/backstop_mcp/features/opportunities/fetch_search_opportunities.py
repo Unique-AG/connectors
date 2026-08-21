@@ -49,7 +49,8 @@ _CONTACT_FIELDS = "name,country,state,city"
 _PRODUCT_FIELDS = "name"
 _STAGE_FIELDS = "name"
 _OPPORTUNITY_FIELDS = (
-    "name,isOpen,probability,requestedAmount,allocatedAmount,currencyCode,"
+    "name,isOpen,probability,requestedAmount,allocatedAmount,weightedValue,"
+    "weightedAllocatedValue,currencyCode,"
     "expectedInvestmentDate,closedDate,daysOpen,daysInCurrentStage,dateEnteredCurrentStage,"
     "previousStage"
 )
@@ -114,6 +115,8 @@ def _from_deal(
         probability=deal.probability,
         requested_amount=deal.requested_amount,
         allocated_amount=deal.allocated_amount,
+        weighted_value=deal.weighted_value,
+        weighted_allocated_value=deal.weighted_allocated_value,
         currency=deal.currency,
         expected_investment_date=deal.expected_investment_date,
         closed_date=deal.closed_date,
