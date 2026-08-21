@@ -118,7 +118,11 @@ class TestGetCapitalFlows:
                             "fundAccount": {"data": {"id": "a1", "type": "accounts"}}
                         },
                     },
-                    resource("a1", "accounts", name="Koch acct"),
+                    {
+                        **resource("a1", "accounts", name="Koch acct"),
+                        "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
+                    },
+                    resource("o1", "contacts", name="Koch"),
                 ],
             )
         )
@@ -140,7 +144,7 @@ class TestGetCapitalFlows:
         assert sub_params["filter[transactionDate][ge]"] == "2026-01-01"
         assert sub_params["filter[transactionDate][le]"] == "2026-12-31"
         assert sub_params["include"] == "fundAccount.owner"
-        assert red_params["include"] == "originalSubscription.fundAccount"
+        assert red_params["include"] == "originalSubscription.fundAccount.owner"
         assert result.request_count == 2
         assert result.non_actual_count == 0
         assert result.scan_truncated is False
@@ -151,6 +155,52 @@ class TestGetCapitalFlows:
         assert object_dict(kinds["subscription"]["account"])["id"] == "a1"
         assert kinds["redemption"]["unattributed"] is False
         assert object_dict(kinds["redemption"]["account"])["id"] == "a1"
+        assert object_dict(kinds["redemption"]["owner"])["id"] == "o1"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_owner_id_keeps_redemptions_attributed_through_the_account(self) -> None:
+        """Redemptions have no owner of their own; it lives on originalSubscription.fundAccount.
+
+        The walk must include `.owner` or owner_id filtering drops every redemption that
+        otherwise resolved to an account.
+        """
+        base_url = tenant("cf-red-owner")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(return_value=_page())
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(
+            return_value=_page(
+                _red("r1", original_id="s1"),
+                included=[
+                    {
+                        **_sub("s1"),
+                        "relationships": {
+                            "fundAccount": {"data": {"id": "a1", "type": "accounts"}}
+                        },
+                    },
+                    {
+                        **resource("a1", "accounts", name="Koch acct"),
+                        "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
+                    },
+                    resource("o1", "contacts", name="Koch"),
+                ],
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    owner_id="o1",
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
+        assert [item["id"] for item in flows] == ["r1"]
+        assert object_dict(flows[0]["owner"])["id"] == "o1"
+        assert result.redemption_count == 1
 
     @pytest.mark.asyncio
     @respx.mock

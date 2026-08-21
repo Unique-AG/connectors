@@ -1,7 +1,7 @@
 """Subscriptions and redemptions for a mandatory transaction-date window.
 
 Two collection walks: `/hedge-fund-account-subscriptions?include=fundAccount.owner` and
-`/hedge-fund-account-redemptions?include=originalSubscription.fundAccount`. A redemption
+`/hedge-fund-account-redemptions?include=originalSubscription.fundAccount.owner`. A redemption
 has no `fundAccount` of its own — it reaches an account only through
 `originalSubscription`. Missing that chain is reported as `unattributed`, not dropped.
 `filter[transactionDate]` is mandatory; an unfiltered read is 400. Actuals only
@@ -243,7 +243,7 @@ async def fetch_capital_flows(
         _walk(
             client,
             _REDS_PATH,
-            include="originalSubscription.fundAccount",
+            include="originalSubscription.fundAccount.owner",
             start_date=start_date,
             end_date=end_date,
             kind="redemption",
