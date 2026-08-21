@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.2...backstop-mcp@0.0.3) (2026-08-21)
+
+
+### Features
+
+* **backstop-mcp,main:** cover remaining CRM question axes with dedicated tools ([#832](https://github.com/Unique-AG/connectors/issues/832)) ([2444db4](https://github.com/Unique-AG/connectors/commit/2444db42d34a4f9d87dfb32f7631469767230c99))
+
 ## [0.0.2](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.1...backstop-mcp@0.0.2) (2026-08-19)
 
 
