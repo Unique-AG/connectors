@@ -1,6 +1,6 @@
 [project]
 name = "office-mcp"
-version = "0.1.0"
+version = "0.0.0"
 description = "Microsoft 365 (Office) FastMCP server"
 requires-python = ">=3.12"
 dependencies = [
