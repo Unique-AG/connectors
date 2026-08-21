@@ -46,12 +46,7 @@ from pydantic import BaseModel, Field
 
 from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle
-from office_mcp.shared.messages import (
-    MAX_REPLIES_PER_POST,
-    TeamsMessage,
-    event_of,
-    message_of,
-)
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage, event_of
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "browse_channel"
@@ -204,10 +199,12 @@ async def browse_channel(
     for post in kept:
         assert post.id is not None, "Graph returned a channel message with no id"
         messages.append(
-            message_of(post, handle=MessageHandle(post.id, team_id=team_id, channel_id=channel_id))
+            TeamsMessage.from_message(
+                post, handle=MessageHandle(post.id, team_id=team_id, channel_id=channel_id)
+            )
         )
         messages.extend(
-            message_of(
+            TeamsMessage.from_message(
                 reply,
                 handle=MessageHandle(
                     _reply_id(reply), team_id=team_id, channel_id=channel_id, reply_to_id=post.id

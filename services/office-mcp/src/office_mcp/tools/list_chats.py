@@ -17,13 +17,14 @@ Chat.ReadBasic) for recency sort.
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
 from msgraph.generated.models.chat import Chat
+from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.generated.users.item.chats.chats_request_builder import ChatsRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
@@ -93,6 +94,16 @@ class ChatMember(BaseModel):
         ),
     )
 
+    @classmethod
+    def from_conversation_member(cls, member: ConversationMember, *, include_email: bool) -> Self:
+        """One chat member. Only aadUserConversationMember carries email."""
+        return cls(
+            display_name=member.display_name,
+            email=member.email
+            if include_email and isinstance(member, AadUserConversationMember)
+            else None,
+        )
+
 
 class ChatSummary(BaseModel):
     chat_id: str = Field(
@@ -146,6 +157,32 @@ class ChatSummary(BaseModel):
         )
     )
 
+    @classmethod
+    def from_chat(cls, chat: Chat, *, include_member_emails: bool) -> Self:
+        """One chat as this tool reports it."""
+        assert chat.id is not None, "Graph returned a chat with no id"
+        preview = chat.last_message_preview
+        # Graph documents `topic` as absent on an unnamed chat, but a blank one survives the SDK as
+        # `""` and is not a name either. Normalised once, here, so a caller never has to tell the
+        # two apart.
+        topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
+        members = _members(chat, include_member_emails) if topic is None else None
+        # `chat_type` is passed as-is, not as `chat.chat_type.value`. `ChatType` subclasses `str`,
+        # so the member already is its wire value ("group"). `.value` looks like the right way to
+        # read it but is typed as a one-tuple, because the generated members carry a trailing comma
+        # (`OneOnOne = "oneOnOne",`).
+        meeting = chat.online_meeting_info
+        return cls(
+            chat_id=chat.id,
+            chat_type=chat.chat_type if chat.chat_type is not None else "unknown",
+            topic=topic,
+            meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
+            last_message_at=preview.created_date_time if preview is not None else None,
+            created_at=chat.created_date_time,
+            members=members,
+            members_may_be_incomplete=members is not None and len(members) >= MEMBERS_PER_CHAT,
+        )
+
 
 class ChatList(BaseModel):
     chats: list[ChatSummary] = Field(
@@ -176,42 +213,17 @@ async def list_recent_chats(
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
 
-    return ChatList(chats=[_summarise(chat, include_member_emails) for chat in collected.items])
-
-
-def _summarise(chat: Chat, include_member_emails: bool) -> ChatSummary:
-    assert chat.id is not None, "Graph returned a chat with no id"
-    preview = chat.last_message_preview
-    # Graph documents `topic` as absent on an unnamed chat, but a blank one survives the SDK as `""`
-    # and is not a name either. Normalised once, here, so a caller never has to tell the two apart.
-    topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
-    members = _members(chat, include_member_emails) if topic is None else None
-    # `chat_type` is passed as-is, not as `chat.chat_type.value`. `ChatType` subclasses `str`, so
-    # the member already is its wire value ("group"). `.value` looks like the right way to read
-    # it but is typed as a one-tuple, because the generated members carry a trailing comma
-    # (`OneOnOne = "oneOnOne",`).
-    meeting = chat.online_meeting_info
-    return ChatSummary(
-        chat_id=chat.id,
-        chat_type=chat.chat_type if chat.chat_type is not None else "unknown",
-        topic=topic,
-        meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
-        last_message_at=preview.created_date_time if preview is not None else None,
-        created_at=chat.created_date_time,
-        members=members,
-        members_may_be_incomplete=members is not None and len(members) >= MEMBERS_PER_CHAT,
+    return ChatList(
+        chats=[
+            ChatSummary.from_chat(chat, include_member_emails=include_member_emails)
+            for chat in collected.items
+        ]
     )
 
 
 def _members(chat: Chat, include_emails: bool) -> list[ChatMember]:
-    """Chat members. Only aadUserConversationMember carries email."""
     return [
-        ChatMember(
-            display_name=member.display_name,
-            email=member.email
-            if include_emails and isinstance(member, AadUserConversationMember)
-            else None,
-        )
+        ChatMember.from_conversation_member(member, include_email=include_emails)
         for member in chat.members or []
     ]
 

@@ -18,7 +18,7 @@ answer shape, fields, permission, and description."""
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -110,6 +110,20 @@ class ChannelSummary(BaseModel):
         description="When the channel was created — useful to tell apart similarly named channels."
     )
 
+    @classmethod
+    def from_channel(cls, channel: Channel) -> Self:
+        """Summary of one channel as Graph returned it."""
+        assert channel.id is not None, "Graph returned a channel with no id"
+        # `ChannelMembershipType` subclasses `str`; each member equals its own wire value. A type
+        # the SDK's enum names no member for deserializes to None rather than raising.
+        return cls(
+            channel_id=channel.id,
+            display_name=channel.display_name,
+            description=channel.description,
+            membership_type=channel.membership_type,
+            created_at=channel.created_date_time,
+        )
+
 
 class ChannelList(BaseModel):
     channels: list[ChannelSummary] = Field(
@@ -139,7 +153,9 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
         assert first_page is not None, "Graph answered a channel listing with no collection"
         collected = await collect_pages(first_page, client, limit=limit, headers=headers)
 
-    return ChannelList(channels=[_channel(channel) for channel in collected.items])
+    return ChannelList(
+        channels=[ChannelSummary.from_channel(channel) for channel in collected.items]
+    )
 
 
 def _headers() -> HeadersCollection:
@@ -151,19 +167,6 @@ def _headers() -> HeadersCollection:
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers
-
-
-def _channel(channel: Channel) -> ChannelSummary:
-    assert channel.id is not None, "Graph returned a channel with no id"
-    # `ChannelMembershipType` subclasses `str`; each member equals its own wire value. A type the
-    # SDK's enum names no member for deserializes to None rather than raising.
-    return ChannelSummary(
-        channel_id=channel.id,
-        display_name=channel.display_name,
-        description=channel.description,
-        membership_type=channel.membership_type,
-        created_at=channel.created_date_time,
-    )
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

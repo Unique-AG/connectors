@@ -22,17 +22,17 @@ What the normalisation has to survive, all of it documented and none of it optio
   `emailAddress`, because Teams messages are indexed out of the substrate mailbox. A bot, a
   connector or an outgoing webhook arrives as an application identity
   (https://learn.microsoft.com/en-us/graph/api/resources/teamworkapplicationidentity), whose
-  display name is again *optional* and whose id is not. All three go through `sender_of`, which is
-  why a sender is the same four fields whichever shape Graph used, with different ones filled in —
-  and why which fields are populated says which shape Graph answered with rather than saying the
-  sender has no name, no address or no id.
-* **Every field of a sender is optional; the identity Graph named is not.** So `sender_of` decides
-  on what the identity holds rather than on the fields it produced: an identity carrying an id or a
-  name is a sender, whatever else it left blank. Deciding on the output instead discards every
-  actor Graph names in a field this projection does not read — an application whose display name is
-  blank loses its id and its message together. Deciding on the identity object's mere presence is
-  the opposite error: Graph sends empty ones, and reading those as senders answers with a hit whose
-  every field is null.
+  display name is again *optional* and whose id is not. All three go through
+  `MessageSender.from_identity`, which is why a sender is the same four fields whichever shape
+  Graph used, with different ones filled in — and why which fields are populated says which shape
+  Graph answered with rather than saying the sender has no name, no address or no id.
+* **Every field of a sender is optional; the identity Graph named is not.** So
+  `MessageSender.from_identity` decides on what the identity holds rather than on the fields it
+  produced: an identity carrying an id or a name is a sender, whatever else it left blank.
+  Deciding on the output instead discards every actor Graph names in a field this projection does
+  not read — an application whose display name is blank loses its id and its message together.
+  Deciding on the identity object's mere presence is the opposite error: Graph sends empty ones,
+  and reading those as senders answers with a hit whose every field is null.
 * **System / event messages have no sender and no text.** Microsoft documents the identity set as
   null "for a message that has been deleted or sent by the Microsoft Teams internal system; for
   example, event messages for addition of members", and such a message's `body.content` is the
@@ -62,7 +62,7 @@ import html
 import json
 import re
 from datetime import datetime
-from typing import cast
+from typing import Self, cast
 
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
@@ -139,6 +139,38 @@ class MessageSender(BaseModel):
         )
     )
 
+    @classmethod
+    def from_identity(cls, identity: ChatMessageFromIdentitySet | None) -> Self | None:
+        """The sender, or None when Graph named nobody.
+
+        One function for all three identity shapes so a search hit and a read of the same message
+        report the same sender. The decision is made on the identity Graph named, not on the fields
+        above: every one of those is optional, so an identity carrying an id or a name is a sender
+        whatever else it left blank. The identity object being present says nothing — Graph sends an
+        empty one. A null `from`, and an identity set naming nobody, is how Graph sends a deleted
+        message and a Teams internal system message.
+        """
+        if identity is None:
+            return None
+        user = identity.user
+        application = identity.application
+        mailbox_name, mailbox_address = _mailbox_identity(identity)
+        named = _names_anybody(user) or _names_anybody(application)
+        if not named and mailbox_name is None and mailbox_address is None:
+            return None
+        display_name = user.display_name if user is not None else None
+        if display_name is None and application is not None:
+            display_name = application.display_name
+        return cls(
+            # Empty strings are collapsed to null: `displayName` is documented Optional and Graph
+            # does send it blank, and a name that is present-but-empty reads as an unnamed sender
+            # rather than as the "Graph did not say" that the id fields are there to work around.
+            display_name=_present(display_name) or mailbox_name,
+            email=mailbox_address,
+            user_id=user.id if user is not None else None,
+            application_id=application.id if application is not None else None,
+        )
+
 
 class MessageMention(BaseModel):
     """One @-mention.
@@ -159,6 +191,13 @@ class MessageMention(BaseModel):
             + "channels, tags, etc)."
         )
     )
+
+    @classmethod
+    def from_mention(cls, mention: ChatMessageMention) -> Self:
+        """One entry of a message's `mentions[]`."""
+        mentioned = mention.mentioned
+        user = mentioned.user if mentioned is not None else None
+        return cls(text=mention.mention_text, user_id=user.id if user is not None else None)
 
 
 class MessageAttachment(BaseModel):
@@ -189,6 +228,18 @@ class MessageAttachment(BaseModel):
             + "as a reference to show."
         )
     )
+
+    @classmethod
+    def from_attachment(cls, attachment: ChatMessageAttachment) -> Self:
+        """One entry of a message's `attachments[]`."""
+        return cls(
+            name=attachment.name,
+            content_type=attachment.content_type,
+            # `content` and `contentUrl` are documented as mutually exclusive, and `content` is a
+            # card payload or a forwarded message's JSON rather than a location — so only the URL
+            # is a URL.
+            url=attachment.content_url,
+        )
 
 
 class TeamsMessage(BaseModel):
@@ -284,69 +335,39 @@ class TeamsMessage(BaseModel):
         )
     )
 
+    @classmethod
+    def from_message(cls, message: ChatMessage, *, handle: MessageHandle) -> Self:
+        """`message` as this connector reports, addressed by `handle`.
 
-def sender_of(identity: ChatMessageFromIdentitySet | None) -> MessageSender | None:
-    """The sender, or None when Graph named nobody.
-
-    One function for all three identity shapes so a search hit and a read of the same message
-    report the same sender. The decision is made on the identity Graph named, not on the fields
-    below: every one of those is optional, so an identity carrying an id or a name is a sender
-    whatever else it left blank. The identity object being present says nothing — Graph sends an
-    empty one. A null `from`, and an identity set naming nobody, is how Graph sends a deleted
-    message and a Teams internal system message.
-    """
-    if identity is None:
-        return None
-    user = identity.user
-    application = identity.application
-    mailbox_name, mailbox_address = _mailbox_identity(identity)
-    named = _names_anybody(user) or _names_anybody(application)
-    if not named and mailbox_name is None and mailbox_address is None:
-        return None
-    display_name = user.display_name if user is not None else None
-    if display_name is None and application is not None:
-        display_name = application.display_name
-    return MessageSender(
-        # Empty strings are collapsed to null: `displayName` is documented Optional and Graph does
-        # send it blank, and a name that is present-but-empty reads as an unnamed sender rather
-        # than as the "Graph did not say" that the id fields are there to work around.
-        display_name=_present(display_name) or mailbox_name,
-        email=mailbox_address,
-        user_id=user.id if user is not None else None,
-        application_id=application.id if application is not None else None,
-    )
-
-
-def message_of(message: ChatMessage, *, handle: MessageHandle) -> TeamsMessage:
-    """`message` as this connector reports, addressed by `handle`.
-
-    One function for all Graph projections. A `chatMessage` carries the same fields whichever
-    collection it came from, so every tool answers with the same shape normalised the same way.
-    """
-    mentions = message.mentions or []
-    attachments = message.attachments or []
-    return TeamsMessage(
-        uri=handle.uri,
-        message_id=message.id or handle.message_id,
-        chat_id=handle.chat_id,
-        team_id=handle.team_id,
-        channel_id=handle.channel_id,
-        sender=sender_of(message.from_),
-        text=_text(message, mentions=mentions, attachments=attachments),
-        event=event_of(message),
-        created_at=message.created_date_time,
-        last_edited_at=message.last_edited_date_time,
-        deleted_at=message.deleted_date_time,
-        # The handle is the fallback rather than the source: it names a parent only for a reply,
-        # while Graph sets `replyToId` on every message in a channel thread.
-        reply_to_id=message.reply_to_id or handle.reply_to_id,
-        subject=message.subject,
-        # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
-        importance=message.importance,
-        web_url=message.web_url,
-        mentions=[_mention(mention) for mention in mentions],
-        attachments=[_attachment(attachment) for attachment in attachments],
-    )
+        One function for all Graph projections. A `chatMessage` carries the same fields whichever
+        collection it came from, so every tool answers with the same shape normalised the same way.
+        """
+        mentions = message.mentions or []
+        attachments = message.attachments or []
+        return cls(
+            uri=handle.uri,
+            message_id=message.id or handle.message_id,
+            chat_id=handle.chat_id,
+            team_id=handle.team_id,
+            channel_id=handle.channel_id,
+            sender=MessageSender.from_identity(message.from_),
+            text=_text(message, mentions=mentions, attachments=attachments),
+            event=event_of(message),
+            created_at=message.created_date_time,
+            last_edited_at=message.last_edited_date_time,
+            deleted_at=message.deleted_date_time,
+            # The handle is the fallback rather than the source: it names a parent only for a
+            # reply, while Graph sets `replyToId` on every message in a channel thread.
+            reply_to_id=message.reply_to_id or handle.reply_to_id,
+            subject=message.subject,
+            # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
+            importance=message.importance,
+            web_url=message.web_url,
+            mentions=[MessageMention.from_mention(mention) for mention in mentions],
+            attachments=[
+                MessageAttachment.from_attachment(attachment) for attachment in attachments
+            ],
+        )
 
 
 # Every eventMessageDetail subtype is named <what happened>EventMessageDetail. Reading the name
@@ -369,15 +390,15 @@ def event_of(message: ChatMessage) -> str | None:
     because Graph omits eventDetail on some events and names no author on others. Checking only
     one would miss events or misidentify messages.
 
-    The sender signal is `sender_of` rather than `from` being null, so that the two answers cannot
-    disagree: `sender` null means nobody wrote it, and this is what then says what happened. Graph
-    also sends an identity set naming nobody, which is a message with no author just as much as a
-    null `from` is.
+    The sender signal is `MessageSender.from_identity` rather than `from` being null, so that the
+    two answers cannot disagree: `sender` null means nobody wrote it, and this is what then says
+    what happened. Graph also sends an identity set naming nobody, which is a message with no
+    author just as much as a null `from` is.
     """
     detail = message.event_detail
     if detail is not None:
         return _event_name(detail.odata_type) or _UNDESCRIBED_EVENT
-    if sender_of(message.from_) is None or (
+    if MessageSender.from_identity(message.from_) is None or (
         message.message_type is not None and message.message_type != ChatMessageType.Message
     ):
         return _UNDESCRIBED_EVENT
@@ -392,22 +413,6 @@ def _event_name(odata_type: str | None) -> str | None:
     if matched is None:
         return None
     return _CAMEL_BOUNDARY.sub(" ", matched.group(1)).lower()
-
-
-def _mention(mention: ChatMessageMention) -> MessageMention:
-    mentioned = mention.mentioned
-    user = mentioned.user if mentioned is not None else None
-    return MessageMention(text=mention.mention_text, user_id=user.id if user is not None else None)
-
-
-def _attachment(attachment: ChatMessageAttachment) -> MessageAttachment:
-    return MessageAttachment(
-        name=attachment.name,
-        content_type=attachment.content_type,
-        # `content` and `contentUrl` are documented as mutually exclusive, and `content` is a card
-        # payload or a forwarded message's JSON rather than a location — so only the URL is a URL.
-        url=attachment.content_url,
-    )
 
 
 def _names_anybody(identity: Identity | None) -> bool:

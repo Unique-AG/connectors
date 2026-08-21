@@ -45,7 +45,7 @@ from office_mcp.shared.handles import (
     MessageHandle,
     message_handle,
 )
-from office_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage, message_of
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
 
 TOOL_NAME = "read_message"
@@ -167,7 +167,7 @@ async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> 
         message = await _get(client, handle)
 
     assert message is not None, "Graph answered a message read with no message"
-    return message_of(message, handle=handle)
+    return TeamsMessage.from_message(message, handle=handle)
 
 
 async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage | None:

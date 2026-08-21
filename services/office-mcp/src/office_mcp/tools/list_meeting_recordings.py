@@ -43,7 +43,7 @@ from SharePoint and OneDrive.
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -204,6 +204,21 @@ class RecordingSummary(BaseModel):
         )
     )
 
+    @classmethod
+    def from_recording(cls, recording: CallRecording, caller: str | None) -> Self:
+        """Map one Graph recording to a summary, placing `caller` on the organiser-only rule."""
+        assert recording.id is not None, "Graph returned a recording with no id"
+        organizer = _organizer_user_id(recording)
+        return cls(
+            recording_id=recording.id,
+            started_at=recording.created_date_time,
+            ended_at=recording.end_date_time,
+            duration_seconds=_duration_seconds(recording),
+            content_access=_content_access(organizer, caller),
+            organizer_user_id=organizer,
+            content_correlation_id=recording.content_correlation_id,
+        )
+
 
 class MeetingRecordings(BaseModel):
     status: str = Field(
@@ -331,7 +346,7 @@ async def list_meeting_recordings(
         meeting_type=meeting.meeting_type,
         started_at=meeting.start_date_time,
         ended_at=meeting.end_date_time,
-        recordings=[_summary(recording, caller) for recording in found],
+        recordings=[RecordingSummary.from_recording(recording, caller) for recording in found],
         scan_incomplete=collected.capped if include_scan_completeness else None,
     )
 
@@ -341,20 +356,6 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
     if scan_stopped_short:
         return "scan_incomplete"
     return "not_recorded" if settled else "not_ready"
-
-
-def _summary(recording: CallRecording, caller: str | None) -> RecordingSummary:
-    assert recording.id is not None, "Graph returned a recording with no id"
-    organizer = _organizer_user_id(recording)
-    return RecordingSummary(
-        recording_id=recording.id,
-        started_at=recording.created_date_time,
-        ended_at=recording.end_date_time,
-        duration_seconds=_duration_seconds(recording),
-        content_access=_content_access(organizer, caller),
-        organizer_user_id=organizer,
-        content_correlation_id=recording.content_correlation_id,
-    )
 
 
 def _organizer_user_id(recording: CallRecording) -> str | None:

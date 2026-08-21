@@ -15,7 +15,7 @@ prevent empty pages: inverted time bounds and blank speaker filter.
 import html
 import re
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -128,6 +128,31 @@ class TranscriptTurn(BaseModel):
     )
     end_seconds: float = Field(description="Turn end, same scale.")
     text: str = Field(description="Spoken words without cue markup.")
+
+    @classmethod
+    def from_block(cls, block: str, *, attributed: bool) -> Self | None:
+        """Cue block as a turn, or None if not a cue or has no words."""
+        lines = [line for line in block.split("\n") if line.strip()]
+        timing = next(
+            (
+                (index, match)
+                for index, line in enumerate(lines)
+                if (match := _CUE_TIMING.match(line))
+            ),
+            None,
+        )
+        if timing is None:
+            return None
+        index, match = timing
+        speaker, said = _spoken("\n".join(lines[index + 1 :]), attributed=attributed)
+        if not said:
+            return None
+        return cls(
+            speaker=speaker,
+            start_seconds=_seconds(match.group("start")),
+            end_seconds=_seconds(match.group("end")),
+            text=said,
+        )
 
 
 class Transcript(BaseModel):
@@ -296,31 +321,10 @@ def _turns(content: bytes, *, attributed: bool) -> list[TranscriptTurn]:
     text = content.decode("utf-8-sig", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
     turns: list[TranscriptTurn] = []
     for block in _BLANK_LINE.split(text):
-        turn = _turn(block, attributed=attributed)
+        turn = TranscriptTurn.from_block(block, attributed=attributed)
         if turn is not None:
             turns.append(turn)
     return turns
-
-
-def _turn(block: str, *, attributed: bool) -> TranscriptTurn | None:
-    """Cue block as a turn, or None if not a cue or has no words."""
-    lines = [line for line in block.split("\n") if line.strip()]
-    timing = next(
-        ((index, match) for index, line in enumerate(lines) if (match := _CUE_TIMING.match(line))),
-        None,
-    )
-    if timing is None:
-        return None
-    index, match = timing
-    speaker, said = _spoken("\n".join(lines[index + 1 :]), attributed=attributed)
-    if not said:
-        return None
-    return TranscriptTurn(
-        speaker=speaker,
-        start_seconds=_seconds(match.group("start")),
-        end_seconds=_seconds(match.group("end")),
-        text=said,
-    )
 
 
 def _spoken(payload: str, *, attributed: bool) -> tuple[str | None, str]:

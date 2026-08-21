@@ -11,7 +11,7 @@ Only five properties populate: `id`, `displayName`, `description`, `isArchived`,
 """
 
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -70,6 +70,17 @@ class TeamSummary(BaseModel):
         )
     )
 
+    @classmethod
+    def from_team(cls, team: Team) -> Self:
+        """Map Graph team to TeamSummary, renaming id→team_id."""
+        assert team.id is not None
+        return cls(
+            team_id=team.id,
+            display_name=team.display_name,
+            description=team.description,
+            is_archived=team.is_archived,
+        )
+
 
 class TeamList(BaseModel):
     teams: list[TeamSummary] = Field(
@@ -90,17 +101,7 @@ async def list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
         assert first_page is not None, "Graph answered GET /me/joinedTeams with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
 
-    return TeamList(teams=[_team(team) for team in collected.items])
-
-
-def _team(team: Team) -> TeamSummary:
-    assert team.id is not None
-    return TeamSummary(
-        team_id=team.id,
-        display_name=team.display_name,
-        description=team.description,
-        is_archived=team.is_archived,
-    )
+    return TeamList(teams=[TeamSummary.from_team(team) for team in collected.items])
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

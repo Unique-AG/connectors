@@ -37,7 +37,7 @@ blur two different fixes: raise `limit`, or accept that nothing more can be know
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -139,6 +139,18 @@ class TranscriptSummary(BaseModel):
     content_correlation_id: str | None = Field(
         description="Microsoft's id linking this transcript to the recording of the same call."
     )
+
+    @classmethod
+    def from_transcript(cls, meeting_id: str, transcript: CallTranscript) -> Self:
+        """Summary of one Graph transcript, handled by the meeting that holds it."""
+        assert transcript.id is not None, "Graph returned a transcript with no id"
+        return cls(
+            uri=TranscriptHandle(meeting_id, transcript.id).uri,
+            transcript_id=transcript.id,
+            started_at=transcript.created_date_time,
+            ended_at=transcript.end_date_time,
+            content_correlation_id=transcript.content_correlation_id,
+        )
 
 
 class MeetingTranscripts(BaseModel):
@@ -247,7 +259,9 @@ async def list_meeting_transcripts(
         meeting_type=meeting.meeting_type,
         started_at=meeting.start_date_time,
         ended_at=meeting.end_date_time,
-        transcripts=[_summary(meeting.id, transcript) for transcript in found],
+        transcripts=[
+            TranscriptSummary.from_transcript(meeting.id, transcript) for transcript in found
+        ],
         scan_incomplete=collected.capped if include_scan_completeness else None,
     )
 
@@ -257,17 +271,6 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
     if scan_stopped_short:
         return "scan_incomplete"
     return "not_transcribed" if settled else "not_ready"
-
-
-def _summary(meeting_id: str, transcript: CallTranscript) -> TranscriptSummary:
-    assert transcript.id is not None, "Graph returned a transcript with no id"
-    return TranscriptSummary(
-        uri=TranscriptHandle(meeting_id, transcript.id).uri,
-        transcript_id=transcript.id,
-        started_at=transcript.created_date_time,
-        ended_at=transcript.end_date_time,
-        content_correlation_id=transcript.content_correlation_id,
-    )
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

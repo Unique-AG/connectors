@@ -48,7 +48,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Self
 from uuid import UUID
 
 import httpx
@@ -69,7 +69,7 @@ from pydantic import BaseModel, Field
 
 from office_mcp.graph_client import graph_errors
 from office_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, MessageHandle
-from office_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender, sender_of
+from office_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender
 from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "search_messages"
@@ -209,6 +209,47 @@ class MessageHit(BaseModel):
             + "null for chat messages, which Graph gives no such link — use `uri` to read those."
         )
     )
+
+    @classmethod
+    def from_hit(cls, hit: SearchHit) -> Self | None:
+        """One hit as a result, or None for a hit that is not a message a person wrote."""
+        resource = hit.resource
+        if not isinstance(resource, ChatMessage) or resource.id is None:
+            return None
+        sender = MessageSender.from_identity(resource.from_)
+        if sender is None:
+            # Graph named no sender. It documents the identity set as null "for a message that has
+            # been deleted or sent by the Microsoft Teams internal system; for example, event
+            # messages for addition of members" — "Ada joined the chat", a call ending, a channel
+            # being renamed. A system event message also carries a body of the literal
+            # `<systemEventMessage/>`, and the sentence Teams shows is rendered by the client and
+            # never sent, so such a hit has neither an author nor any text. The `messageType` and
+            # `eventDetail` properties that would name it are not in search's retrievable set,
+            # which leaves the missing sender as the signal.
+            return None
+        channel = resource.channel_identity
+        team_id = channel.team_id if channel is not None else None
+        channel_id = channel.channel_id if channel is not None else None
+        return cls(
+            uri=_hit_uri(
+                message_id=resource.id,
+                chat_id=resource.chat_id,
+                team_id=team_id,
+                channel_id=channel_id,
+            ),
+            message_id=resource.id,
+            chat_id=resource.chat_id,
+            team_id=team_id,
+            channel_id=channel_id,
+            subject=resource.subject,
+            summary=hit.summary,
+            sender=sender,
+            created_at=resource.created_date_time,
+            last_modified_at=resource.last_modified_date_time,
+            # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
+            importance=resource.importance,
+            web_url=resource.web_url,
+        )
 
 
 class MessageSearchResults(BaseModel):
@@ -431,7 +472,9 @@ async def search_messages(
     more_to_come = bool(container.more_results_available) if container else False
 
     return MessageSearchResults(
-        messages=[message for message in (_message(hit) for hit in hits) if message is not None],
+        messages=[
+            message for message in (MessageHit.from_hit(hit) for hit in hits) if message is not None
+        ],
         # `moreResultsAvailable` on its own is not a next page. The offset advances by the hits
         # Graph returned, so a page carrying none of them while still saying more are coming would
         # hand back the very offset it was asked at — and a caller doing what `next_offset`
@@ -451,46 +494,6 @@ def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
         for container in search_response.hits_containers or []:
             return container
     return None
-
-
-def _message(hit: SearchHit) -> MessageHit | None:
-    """One hit as a result, or None for a hit that is not a message a person wrote."""
-    resource = hit.resource
-    if not isinstance(resource, ChatMessage) or resource.id is None:
-        return None
-    sender = sender_of(resource.from_)
-    if sender is None:
-        # Graph named no sender. It documents the identity set as null "for a message that has been
-        # deleted or sent by the Microsoft Teams internal system; for example, event messages for
-        # addition of members" — "Ada joined the chat", a call ending, a channel being renamed. A
-        # system event message also carries a body of the literal `<systemEventMessage/>`, and the
-        # sentence Teams shows is rendered by the client and never sent, so such a hit has neither
-        # an author nor any text. The `messageType` and `eventDetail` properties that would name it
-        # are not in search's retrievable set, which leaves the missing sender as the signal.
-        return None
-    channel = resource.channel_identity
-    team_id = channel.team_id if channel is not None else None
-    channel_id = channel.channel_id if channel is not None else None
-    return MessageHit(
-        uri=_hit_uri(
-            message_id=resource.id,
-            chat_id=resource.chat_id,
-            team_id=team_id,
-            channel_id=channel_id,
-        ),
-        message_id=resource.id,
-        chat_id=resource.chat_id,
-        team_id=team_id,
-        channel_id=channel_id,
-        subject=resource.subject,
-        summary=hit.summary,
-        sender=sender,
-        created_at=resource.created_date_time,
-        last_modified_at=resource.last_modified_date_time,
-        # `ChatMessageImportance` subclasses `str`, so the member is its own wire value.
-        importance=resource.importance,
-        web_url=resource.web_url,
-    )
 
 
 def _hit_uri(

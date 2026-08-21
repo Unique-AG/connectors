@@ -10,6 +10,7 @@ accounts). Compare user_id only against another user_id—it is the immutable En
 """
 
 from collections.abc import Mapping
+from typing import Self
 
 import httpx
 from fastmcp import FastMCP
@@ -73,6 +74,18 @@ class SignedInUser(BaseModel):
         description="The user's job title from the directory, when the directory records one."
     )
 
+    @classmethod
+    def from_user(cls, user: User) -> Self:
+        """Map Graph user to SignedInUser, renaming id→user_id and mail→email."""
+        assert user.id is not None, "Graph answered GET /me with a user that has no id"
+        return cls(
+            user_id=user.id,
+            display_name=user.display_name,
+            email=user.mail,
+            user_principal_name=user.user_principal_name,
+            job_title=user.job_title,
+        )
+
 
 async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
     """Return the caller's profile with the five properties this tool promises.
@@ -84,19 +97,7 @@ async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
     so the block comes out one level up rather than the name going one level down.
     """
     with graph_errors(TOOL_NAME):
-        return _profile(await identity.signed_in_user(client))
-
-
-def _profile(user: User) -> SignedInUser:
-    """Map Graph user to SignedInUser, renaming id→user_id and mail→email."""
-    assert user.id is not None, "Graph answered GET /me with a user that has no id"
-    return SignedInUser(
-        user_id=user.id,
-        display_name=user.display_name,
-        email=user.mail,
-        user_principal_name=user.user_principal_name,
-        job_title=user.job_title,
-    )
+        return SignedInUser.from_user(await identity.signed_in_user(client))
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
