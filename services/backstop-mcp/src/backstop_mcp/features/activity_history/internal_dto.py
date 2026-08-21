@@ -245,31 +245,40 @@ class ResourceIdentifierDto(BaseModel):
     `/meeting-or-calls/{id}` and `/meeting-or-calls/{id}/attendees` all take the **bare**
     `resource_id`. Passing the composite to `/entity-activity-details` does not 404 — it answers
     `200 {"data": null}`, so the mistake surfaces as a schema error rather than a not-found (see
-    `BackstopApiResourceDocument.require_data`). This is where the two forms meet, so that
-    translation happens once instead of at each call site.
+    `BackstopApiResourceDocument.require_data`).
+
+    `search_activities` rows use a different `id` (e.g. `1659094659`) that is already the bare
+    id `/entity-activity-details/{id}` wants. A handle with no underscore is accepted as that
+    form; meeting extras are gated on the detail record's `type`, not on this DTO.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    resource_type: str
+    resource_type: str | None
     resource_id: str
 
     @classmethod
     def from_activity_id(cls, activity_id: str) -> Self:
-        """Split a timeline `activity_id` into its resource type and bare resource id.
+        """Split a timeline `activity_id`, or accept a search_activities bare id.
 
-        Splits on the LAST underscore: resource ids are numeric, while a resource type can carry
-        hyphens (`meeting-or-calls`), so the final separator is the unambiguous one.
+        Composite handles split on the LAST underscore: resource ids are numeric, while a
+        resource type can carry hyphens (`meeting-or-calls`), so the final separator is the
+        unambiguous one. A value with no underscore is the search-row / detail-record id.
         """
-        resource_type, separator, resource_id = activity_id.rpartition("_")
-        if not separator or not resource_type or not resource_id:
-            logger.info("activity_history.handle.malformed", extra={"activity_id": activity_id})
-            raise ToolError(
-                f"{activity_id!r} is not a valid activity_id. Expected "
-                + "'{resource_type}_{resource_id}' (e.g. 'meeting-or-calls_76537547', "
-                + "'notes_26018215'), exactly as a get_activity_history record reports it."
-            )
-        return cls(resource_type=resource_type, resource_id=resource_id)
+        handle = activity_id.strip()
+        resource_type, separator, resource_id = handle.rpartition("_")
+        if separator and resource_type and resource_id:
+            return cls(resource_type=resource_type, resource_id=resource_id)
+        if handle:
+            logger.info("activity_history.handle.bare_id", extra={"activity_id": handle})
+            return cls(resource_type=None, resource_id=handle)
+        logger.info("activity_history.handle.malformed", extra={"activity_id": activity_id})
+        raise ToolError(
+            f"{activity_id!r} is not a valid activity_id. Expected "
+            + "'{resource_type}_{resource_id}' from get_activity_history "
+            + "(e.g. 'meeting-or-calls_76537547') or a search_activities row `id` "
+            + "(e.g. '1659094659')."
+        )
 
     @property
     def is_meeting_or_call(self) -> bool:

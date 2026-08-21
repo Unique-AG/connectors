@@ -51,6 +51,7 @@ _MAX_ROWS = 1_000
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
     {
         "id",
+        "activity_id",
         "type",
         "title",
         "effective_date",
@@ -73,6 +74,7 @@ _FALLBACK_MESSAGE = (
 SearchMode = Literal["rows", "aggregate"]
 SearchRowField = Literal[
     "id",
+    "activity_id",
     "type",
     "activity_type",
     "title",
@@ -102,6 +104,23 @@ def _is_wide_sweep(
     return not associated_withs and not activity_tags and not authors
 
 
+def _add_years(day: date, years: int) -> date:
+    try:
+        return day.replace(year=day.year + years)
+    except ValueError:
+        return day.replace(year=day.year + years, day=28)
+
+
+def _date_window(
+    start_date: date | None, end_date: date | None, *, today: date
+) -> tuple[date, date]:
+    until = end_date if end_date is not None else today
+    since = start_date if start_date is not None else _add_years(until, -1)
+    if since > until:
+        raise ValueError("start_date must not be after end_date")
+    return since, until
+
+
 @tool(
     annotations=ToolAnnotations(
         readOnlyHint=True,
@@ -114,13 +133,26 @@ def _is_wide_sweep(
 async def search_activities(
     ctx: Context,
     start_date: Annotated[
-        date,
-        Field(description="Inclusive start of the mandatory effective-date window."),
-    ],
+        date | None,
+        Field(
+            default=None,
+            description=(
+                "Inclusive start of the effective-date window. Omit to use one year before "
+                "`end_date` (or before today when `end_date` is also omitted)."
+            ),
+        ),
+    ] = None,
     end_date: Annotated[
-        date,
-        Field(description="Inclusive end of the mandatory effective-date window."),
-    ],
+        date | None,
+        Field(
+            default=None,
+            description=(
+                "Inclusive end of the effective-date window. Omit to use today. A call with "
+                "only `end_date` (e.g. 2024-12-31) still runs — `start_date` fills in as one "
+                "year earlier."
+            ),
+        ),
+    ] = None,
     search_type: Annotated[
         SearchType | None,
         Field(
@@ -223,8 +255,8 @@ async def search_activities(
             le=_MAX_ROWS,
             description=(
                 f"Maximum row bodies to return in rows mode. Aggregate mode scans up to the "
-                f"{MAX_RETRIEVABLE} ceiling regardless. include_description caps this at 50 "
-                "and is refused in aggregate mode."
+                f"{MAX_RETRIEVABLE} ceiling on a scoped search and is refused on a wide sweep. "
+                "include_description caps this at 50 and is refused in aggregate mode."
             ),
         ),
     ] = _DEFAULT_MAX_ROWS,
@@ -233,10 +265,10 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Sparse row fields. Default is id, type, title, effective_date, "
+                "Sparse row fields. Default is id, activity_id, type, title, effective_date, "
                 "short_description, associated_with, tags, attendees, author, meeting_type, "
                 "attachments_count. `description` is only filled when include_description "
-                "is true."
+                "is true. Pass `activity_id` to get_activity_detail."
             ),
         ),
     ] = None,
@@ -244,10 +276,10 @@ async def search_activities(
 ) -> GetSearchActivitiesResponse:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
-    Always start here when the question has a date window. Pass mandatory `start_date` /
-    `end_date`. Optionally scope to a party (`search_type` plus `party_id` or `search`),
-    restrict `types`, filter `activity_tag_ids` (OR, unlike get_activity_history), and filter
-    `authors` by email.
+    Always start here when the question has a date window. Pass `start_date` and `end_date`;
+    omitting `start_date` uses one year before `end_date`, omitting `end_date` uses today.
+    Optionally scope to a party (`search_type` plus `party_id` or `search`), restrict `types`,
+    filter `activity_tag_ids` (OR, unlike get_activity_history), and filter `authors` by email.
 
     This is the primary activity tool; `get_activity_history` is fallback only. It is an
     undocumented UI search (`POST /entity-activities`) and may 404 on another tenant — that is
@@ -258,12 +290,14 @@ async def search_activities(
     `pageNum × pageSize` before requesting so it never provokes that 500, and returns the
     partial set with a disclaimer. Tag filters here are OR; REST tag filters are AND.
 
-    `mode=aggregate` with `group_by` answers a counting question without row bodies.
-    `include_description` is opt-in, capped, refused in aggregate mode, and refused on a wide
-    sweep. `attachments_count` is a count only — `get_activity_detail` lists the files.
+    `mode=aggregate` with `group_by` answers a counting question without row bodies. Aggregate
+    and `include_description` are refused on a wide sweep (no party, no tags, no authors) —
+    that walk hits the 10000 ceiling. `include_description` is opt-in, capped, and refused in
+    aggregate mode. `attachments_count` is a count only — pass the row `activity_id` (or `id`)
+    to `get_activity_detail` for the file list. That is the same argument
+    `get_activity_history` rows use.
     """
-    if start_date > end_date:
-        raise ValueError("start_date must not be after end_date")
+    start_date, end_date = _date_window(start_date, end_date, today=date.today())
     if mode == "aggregate" and group_by is None:
         raise ValueError("group_by is required when mode is aggregate")
     if mode == "rows" and group_by is not None:
@@ -294,12 +328,18 @@ async def search_activities(
     selected_types: tuple[EntityActivityType, ...] = (
         tuple(types) if types else ENTITY_ACTIVITY_TYPES
     )
-    if include_description and _is_wide_sweep(
+    wide = _is_wide_sweep(
         associated_withs=associated_withs, activity_tags=tag_ids, authors=author_emails
-    ):
+    )
+    if include_description and wide:
         raise ValueError(
             "include_description is refused on a wide sweep; pass a party, "
             + "activity_tag_ids, or authors, or leave include_description false"
+        )
+    if mode == "aggregate" and wide:
+        raise ValueError(
+            "mode=aggregate is refused on a wide sweep; pass a party, activity_tag_ids, "
+            + "or authors, or use mode=rows"
         )
 
     row_cap = min(max_rows, _DESCRIPTION_MAX_ROWS) if include_description else max_rows

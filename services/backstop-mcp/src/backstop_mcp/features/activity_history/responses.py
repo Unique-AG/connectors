@@ -5,11 +5,11 @@ Standing caveats (documents excluded from the token budget concerns, same-day em
 ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
 see the design doc's "Token budget" section. This module carries no prose `notes` field.
 
-Neither `resource_type` nor `resource_id` is surfaced on its own: `activity_id` is already the
-composite `{resourceType}_{resourceId}` (see `ResourceIdentifierDto`), so the two halves are always
-delivered together. A bare `resource_id` would be an id with no collection to look it up in —
-unusable on its own, and easy to mistake for something `get_activity_detail` accepts. `type`
-already says which stream a record came from.
+Neither `resource_type` nor `resource_id` is surfaced on its own on history rows:
+`activity_id` is already the composite `{resourceType}_{resourceId}` (see
+`ResourceIdentifierDto`), so the two halves are always delivered together. `search_activities`
+rows publish the same `activity_id` field with the search-row id, which
+`get_activity_detail` also accepts. `type` already says which stream a record came from.
 
 Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurred_at`) use
 `validation_alias` + `from_attributes`. Gist conversion, recipient capping, and the
@@ -325,7 +325,7 @@ class ActivityRecordResponse(OmitNoneModel):
         validation_alias=AliasChoices("activity_id", "id"),
         description=(
             "Handle for this record. Pass it to `get_activity_detail` for the full body — "
-            "never invent one."
+            "the same argument `search_activities` rows use. Never invent one."
         ),
     )
     resource_id: str | None = Field(
@@ -415,8 +415,8 @@ class EmailRecordResponse(OmitNoneModel):
     activity_id: str = Field(
         validation_alias=AliasChoices("activity_id", "id"),
         description=(
-            "Handle for this email on the timeline. Emails have no body on this tool — "
-            "subject and addresses only."
+            "Handle for this email. Pass it to `get_activity_detail` for the body and "
+            "attachment list. Emails have no body on this tool — subject and addresses only."
         ),
     )
     occurred_at: datetime | None = Field(
@@ -690,8 +690,16 @@ class SearchActivitiesRowResponse(OmitNoneModel):
 
     id: str = Field(
         description=(
-            "Backstop id of this activity on the search endpoint. Distinct from the "
-            "composite activity_id get_activity_history returns. Never invent one."
+            "Same value as `activity_id`. Pass either to get_activity_detail. Distinct from "
+            "the composite `meeting-or-calls_{id}` get_activity_history returns, which also "
+            "works there. Never invent one."
+        )
+    )
+    activity_id: str = Field(
+        description=(
+            "Pass this to get_activity_detail. Same value as `id` — the id "
+            "`/entity-activity-details` uses. A get_activity_history `activity_id` "
+            "(`meeting-or-calls_76537547`) also works."
         )
     )
     type: str | None = Field(
@@ -748,14 +756,15 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Plain-text body from formattedDescription. Only present when include_description "
-            "was true. `attachments_count` is a count only — the file list is on "
-            "`get_activity_detail`."
+            "was true. `attachments_count` is a count only — pass `activity_id` to "
+            "`get_activity_detail` for the file list."
         ),
     )
     attachments_count: int | None = Field(
         default=None,
         description=(
-            "How many files are attached. A count only — `get_activity_detail` lists the files."
+            "How many files are attached. A count only — pass `activity_id` to "
+            "`get_activity_detail` for the file list."
         ),
     )
     author: AttendeeResponse | None = Field(
@@ -788,14 +797,18 @@ class SearchActivitiesRowResponse(OmitNoneModel):
 
     @classmethod
     def from_dto(cls, row: EntityActivityDto, *, fields: frozenset[str]) -> Self:
-        """Only the requested `fields`, plus `id` — a row the caller cannot identify is no use.
+        """Only the requested `fields`, plus `id` and `activity_id`.
+
+        Both identifiers are the same value: `id` is what the search endpoint stores, and
+        `activity_id` is the handle `get_activity_detail` takes (also from get_activity_history).
+        A row the caller cannot identify is no use.
 
         The two description fields are the only ones whose published shape is not their stored
         shape: Backstop sends HTML and this publishes plain text, truncated. They are computed
         here only when selected, since flattening a note body is the expensive part of a row.
         """
-        include = fields | {"id"}
-        overrides: dict[str, object] = {}
+        include = fields | {"id", "activity_id"}
+        overrides: dict[str, object] = {"activity_id": row.id}
         if "short_description" in include:
             overrides["short_description"] = _plain_text(
                 row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS

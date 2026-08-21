@@ -781,3 +781,18 @@ class TestGetPersonCustomFields:
             }
         ]
         assert "regularCustomFieldValues" not in object_dict(payload["person"])
+
+        filtered = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                custom_field_definition_ids=[202],
+                client=client,
+                custom_fields=_catalog(),
+                employment_index_factory=_INDEX,
+            )
+        )
+        assert [
+            object_dict(item)["definition_id"]
+            for item in object_list(filtered["custom_field_values"])
+        ] == ["202"]

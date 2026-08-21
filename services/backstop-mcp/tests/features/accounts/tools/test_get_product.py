@@ -72,6 +72,7 @@ class TestGetProduct:
         assert get_product in TOOLS
         doc = get_product.__doc__ or ""
         assert "Strategy" in doc
+        assert "search" in doc
         assert "get_product_investors" in doc
 
     @pytest.mark.asyncio
@@ -121,8 +122,14 @@ class TestGetProduct:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_named_product_fetches_the_full_record_after_resolve(self) -> None:
-        base_url = tenant("gp-one")
+    @pytest.mark.parametrize(
+        ("case", "kwargs"),
+        [("product", {"product": "Dispersion"}), ("search", {"search": "Dispersion"})],
+    )
+    async def test_named_product_fetches_the_full_record_after_resolve(
+        self, case: str, kwargs: dict[str, str]
+    ) -> None:
+        base_url = tenant(f"gp-one-{case}")
         index = respx.get(f"{base_url}/products").mock(
             return_value=httpx.Response(
                 200,
@@ -153,10 +160,10 @@ class TestGetProduct:
             result = tool_model(
                 await get_product(
                     ctx_never_elicit(),
-                    product="Dispersion",
                     custom_field_names=["Strategy"],
                     client=client,
                     custom_fields=custom_fields_service(),
+                    **kwargs,
                 ),
                 ProductResolvedResponse,
             )
@@ -230,3 +237,19 @@ class TestGetProduct:
 
         assert result.query == _PRODUCT_ID
         assert result.scope == "products"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_product_and_search_together_fail_before_any_request(self) -> None:
+        base_url = tenant("gp-both-names")
+        products = respx.get(f"{base_url}/products")
+        async with tool_client(base_url) as client:
+            with pytest.raises(ValueError, match="Pass at most one of product or search"):
+                await get_product(
+                    ctx_never_elicit(),
+                    product="Dispersion",
+                    search="Keystone",
+                    client=client,
+                    custom_fields=custom_fields_service(),
+                )
+        assert products.call_count == 0

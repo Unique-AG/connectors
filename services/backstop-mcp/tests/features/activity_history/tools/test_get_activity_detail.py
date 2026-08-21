@@ -2,11 +2,12 @@
 
 Each test targets one behaviour from the task: a meeting/call `activity_id` returns a
 fully-populated response (and hits attendees); a note/document-shaped `activity_id` never
-touches the attendees endpoint and returns empty/`None` meeting specifics; the full body is
-untruncated even for HTML long enough that the timeline's gist budget would have truncated it;
-a 404 propagates as `BackstopApiError`; and missing/unexpected wire fields degrade to
-`None`/empty rather than crashing (the defensive `AliasChoices`/`extra="ignore"` parsing —
-none of this tool's upstream field names were byte-verified, see
+touches the attendees endpoint and returns empty/`None` meeting specifics; a search_activities
+row id (bare numeric) fetches detail and only then meeting extras when `type` is meeting; the
+full body is untruncated even for HTML long enough that the timeline's gist budget would have
+truncated it; a 404 propagates as `BackstopApiError`; and missing/unexpected wire fields
+degrade to `None`/empty rather than crashing (the defensive `AliasChoices`/`extra="ignore"`
+parsing — none of this tool's upstream field names were byte-verified, see
 `fetch_activity_detail.py`'s module docstring).
 """
 
@@ -58,6 +59,7 @@ class TestGetActivityDetailDocstring:
         assert "include_description" in doc
         assert "attachment list" in doc
         assert "attachments_count" in doc
+        assert "search_activities row" in doc
 
 
 class TestMeetingOrCall:
@@ -245,17 +247,99 @@ class TestErrorPropagation:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_bare_id_is_rejected_without_reaching_backstop(
+    @pytest.mark.parametrize("activity_id", ["1659094659", "1791831538"])
+    async def test_a_search_row_id_fetches_email_detail_without_meeting_routes(
+        self, client: BackstopClient, activity_id: str
+    ) -> None:
+        """The ids from the live search_activities → get_activity_detail failures."""
+        _details_route(activity_id).mock(
+            return_value=httpx.Response(
+                200,
+                json=_detail_document(
+                    activity_id,
+                    type="email",
+                    title="Thank you / Follow Up",
+                    description="<p>Thanks for the time.</p>",
+                ),
+            )
+        )
+        specifics = _specifics_route(activity_id).mock(
+            return_value=httpx.Response(200, json=_specifics_document(activity_id))
+        )
+        attendees = _attendees_route(activity_id).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = tool_model(
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            ActivityDetailResponse,
+        )
+
+        assert specifics.call_count == 0
+        assert attendees.call_count == 0
+        assert result.activity_id == activity_id
+        assert result.type == "email"
+        assert result.title == "Thank you / Follow Up"
+        assert "Thanks for the time" in result.body
+        assert result.start is None
+        assert result.attendees == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_bare_meeting_id_loads_specifics_after_detail(
         self, client: BackstopClient
     ) -> None:
-        """The composite handle is the only accepted form, and it is checked locally.
+        """Without a resource type, meeting extras wait on the detail record's `type`."""
 
-        A bare id has no resource type, so there is no collection to send it to — failing here
-        beats guessing `/entity-activity-details` and reporting whatever that returns.
-        """
+        activity_id = "75213203"
+        _details_route(activity_id).mock(
+            return_value=httpx.Response(
+                200,
+                json=_detail_document(
+                    activity_id,
+                    type="meeting",
+                    title="Koch 2025 Review",
+                    description="<p>Keystone demo.</p>",
+                ),
+            )
+        )
+        _specifics_route(activity_id).mock(
+            return_value=httpx.Response(
+                200,
+                json=_specifics_document(
+                    activity_id,
+                    startTimestamp="2025-12-01T15:00:00Z",
+                    location="Koch HQ",
+                    timeZone="America/Chicago",
+                ),
+            )
+        )
+        _attendees_route(activity_id).mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("att1", "people", name="Jane Doe")),
+            )
+        )
+
+        result = tool_model(
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            ActivityDetailResponse,
+        )
+
+        assert result.activity_id == activity_id
+        assert result.type == "meeting"
+        assert result.location == "Koch HQ"
+        assert result.start == datetime.fromisoformat("2025-12-01T15:00:00+00:00")
+        assert [attendee.name for attendee in result.attendees] == ["Jane Doe"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_empty_id_is_rejected_without_reaching_backstop(
+        self, client: BackstopClient
+    ) -> None:
 
         with pytest.raises(ToolError, match="not a valid activity_id"):
-            await get_activity_detail(ctx_never_elicit(), activity_id="76280387", client=client)
+            await get_activity_detail(ctx_never_elicit(), activity_id="   ", client=client)
 
         assert len(respx.calls) == 0
 

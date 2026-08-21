@@ -145,7 +145,13 @@ class TestGetProductInvestors:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_short_name_resolves_through_the_catalog(self, client: BackstopClient) -> None:
+    @pytest.mark.parametrize(
+        "kwargs",
+        [{"product": "CGUP"}, {"search": "CGUP"}],
+    )
+    async def test_short_name_resolves_through_the_catalog(
+        self, client: BackstopClient, kwargs: dict[str, str]
+    ) -> None:
         by_id = respx.get(f"{_PRODUCTS_URL}/CGUP").mock(
             return_value=httpx.Response(400, json={"errors": [{"title": "Bad Request"}]})
         )
@@ -153,7 +159,7 @@ class TestGetProductInvestors:
         accounts = respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
 
         result = tool_model(
-            await get_product_investors(ctx_never_elicit(), product="CGUP", client=client),
+            await get_product_investors(ctx_never_elicit(), client=client, **kwargs),
             ProductInvestorsResolvedResponse,
         )
 
@@ -305,6 +311,13 @@ class TestGetProductInvestors:
                 product="CGUP",
                 client=client,
             )
+        with pytest.raises(ValueError, match="Pass at most one of product or search"):
+            await get_product_investors(
+                ctx_never_elicit(),
+                product="CGUP",
+                search="Keystone",
+                client=client,
+            )
         assert products.call_count == 0
         assert accounts.call_count == 0
 
@@ -318,4 +331,5 @@ class TestGetProductInvestors:
         assert "account-by-account" in doc
         assert "one call per (account, series)" in doc
         assert "not one investor's balance" in doc
+        assert "search" in doc
         assert "fan-out" in doc

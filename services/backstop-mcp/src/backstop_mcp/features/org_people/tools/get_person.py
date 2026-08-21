@@ -29,7 +29,7 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.models import OmitNoneModel, published_output_schema
+from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
 
 
 class PersonResolvedResponse(OmitNoneModel):
@@ -178,11 +178,13 @@ async def get_person(
         ),
     ] = (),
     custom_field_definition_ids: Annotated[
-        Sequence[str],
+        Sequence[CoercedId],
         Field(
             description=(
-                "Custom-field definition ids whose values to keep. Combined with other "
-                "custom-field filters with AND. Omit to keep every definition."
+                "Custom-field definition ids whose values to keep, as published on "
+                "list_custom_fields `id` and on `custom_field_values[].definition_id`. "
+                "JSON numbers are accepted. Combined with other custom-field filters with "
+                "AND. Omit to keep every definition."
             ),
         ),
     ] = (),
@@ -261,7 +263,7 @@ async def get_person(
         tabs=custom_field_tabs,
         groups=custom_field_groups,
         group_ids=custom_field_group_ids,
-        definition_ids=custom_field_definition_ids,
+        definition_ids=coerce_ids(custom_field_definition_ids),
         names=custom_field_names,
     )
     return PersonResolvedResponse(

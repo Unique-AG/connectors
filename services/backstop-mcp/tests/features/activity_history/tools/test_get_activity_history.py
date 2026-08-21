@@ -108,6 +108,8 @@ class TestGetActivityHistoryDocstring:
         assert "Do not start here" in doc
         assert "fallback" in doc
         assert "include_description" in doc
+        assert "get_activity_detail" in doc
+        assert "activity_id" in doc
 
 
 class TestFirstCallByTrustedPartyId:

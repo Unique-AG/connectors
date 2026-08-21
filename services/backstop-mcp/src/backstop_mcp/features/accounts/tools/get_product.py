@@ -67,9 +67,9 @@ class ProductResolvedResponse(OmitNoneModel):
     )
     products: tuple[ProductRecordResponse, ...] = Field(
         description=(
-            "Matching products. One item when a name or id was passed; the catalog when neither "
-            "was. The catalog is small (~72 on this instance) — this is one walk, not a "
-            "per-product fan-out."
+            "Matching products. One item when a name (`search` / `product`) or id was passed; "
+            "the catalog when none was. The catalog is small (~72 on this instance) — this is "
+            "one walk, not a per-product fan-out."
         )
     )
     scan_truncated: bool = Field(
@@ -119,7 +119,7 @@ async def get_product(
         Field(
             description=(
                 "Trusted Backstop product id from a prior resolve echo. Never invent one. "
-                "Omit together with `product` to walk the catalog."
+                "Omit together with `product` and `search` to walk the catalog."
             ),
         ),
     ] = None,
@@ -127,8 +127,19 @@ async def get_product(
         str | None,
         Field(
             description=(
-                "Product short name (`CGUP`) or display name. Duplicate short names are "
-                "ambiguous. Omit together with `product_id` to walk the catalog."
+                "Product short name (`CGUP`) or display name. Same lookup as `search`. "
+                "Duplicate short names are ambiguous. Omit together with `product_id` and "
+                "`search` to walk the catalog."
+            ),
+        ),
+    ] = None,
+    search: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Product short name (`CGUP`) or display name — same lookup as `product`. "
+                "Use this the way get_person uses `search`. Duplicate short names are "
+                "ambiguous. Omit together with `product_id` and `product` to walk the catalog."
             ),
         ),
     ] = None,
@@ -146,16 +157,20 @@ async def get_product(
 ) -> GetProductResponse:
     """Product identity and custom-field values — Strategy, Domicile, Fee Structure, and the rest.
 
-    Pass a trusted `product_id` or `product` (short name or display name) for one product.
-    Omit both to walk the catalog in one request (this instance has ~72 products). That is how
-    you answer "which of our products are Convertible Arbitrage": walk with
-    `custom_field_names=["Strategy"]` and read the values. Do not iterate `get_product_investors`
-    or `get_time_series` for this — those tools do not publish product custom fields.
+    Pass a trusted `product_id`, or `search` / `product` (short name or display name) for one
+    product. `search` is the same name lookup as on get_person. Omit all three to walk the
+    catalog in one request (this instance has ~72 products). That is how you answer "which of
+    our products are Convertible Arbitrage": walk with `custom_field_names=["Strategy"]` and
+    read the values. Do not iterate `get_product_investors` or `get_time_series` for this —
+    those tools do not publish product custom fields.
     """
-    if product_id is not None and product is not None:
-        raise ValueError("Pass at most one of product_id or product")
+    if product is not None and search is not None:
+        raise ValueError("Pass at most one of product or search")
+    name = product if product is not None else search
+    if product_id is not None and name is not None:
+        raise ValueError("Pass at most one of product_id or product/search")
 
-    if product_id is None and product is None:
+    if product_id is None and name is None:
         catalog = await fetch_product_catalog(client)
         # Concurrently: the catalog is ~72 rows and each row is a catalog join, so a sequential
         # comprehension is 72 awaits in a row for work that has no ordering between rows.
@@ -177,8 +192,8 @@ async def get_product(
             client, custom_fields, product_id=product_id, names=custom_field_names
         )
 
-    assert product is not None
-    outcome = await resolve_product_query(ctx, client, query=product)
+    assert name is not None
+    outcome = await resolve_product_query(ctx, client, query=name)
     if not isinstance(outcome, Resolved):
         return ProductAmbiguousResponse.from_unresolved(outcome)
 
@@ -198,8 +213,8 @@ async def _by_trusted_id(
     """One by-id GET. A 404 is `not_found`; every other error stays an error.
 
     Backstop answers `GET /products/{non-digit}` with 400 rather than 404, so a value that is
-    not an id is reported as an error rather than silently searched — `product` is the parameter
-    for a name.
+    not an id is reported as an error rather than silently searched — `search` (or `product`)
+    is the parameter for a name.
     """
     try:
         item = await fetch_product(client, product_id=product_id)

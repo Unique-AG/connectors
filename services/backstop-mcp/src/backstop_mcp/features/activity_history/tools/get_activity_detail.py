@@ -1,22 +1,22 @@
 """`get_activity_detail`: full converted body, meeting specifics, and attendees for one activity.
 
-`activity_id` alone is a complete, self-sufficient handle — no party resolution needed. It is the
-composite `{resourceType}_{resourceId}` a timeline record carries, so decoding it yields both the
-bare resource id every detail endpoint wants and the resource type that says which endpoints
-apply (see `ResourceIdentifierDto`).
+`activity_id` is a complete, self-sufficient handle — no party resolution needed. A
+`get_activity_history` composite `{resourceType}_{resourceId}` yields both the bare resource
+id every detail endpoint wants and the resource type that says which endpoints apply (see
+`ResourceIdentifierDto`). A `search_activities` row `activity_id` (same value as `id`) is
+already that bare id (`/entity-activity-details/{id}` answers it live); meeting extras then
+follow the detail record's `type`, because a search id has no resource type.
 
-For a meeting/call all three fetches — the detail record, the meeting specifics, and the
-attendees — run CONCURRENTLY via `asyncio.gather`, mirroring `get_activity_history`'s stream
-fan-out rather than gating the two `/meeting-or-calls` calls on the detail response. A note or
-document is one request: both `/meeting-or-calls` paths 404 for a resource id that is not a
-meeting/call.
+For a meeting/call composite, all three fetches — the detail record, the meeting specifics,
+and the attendees — run CONCURRENTLY via `asyncio.gather`. A note or document composite is
+one request: both `/meeting-or-calls` paths 404 for a resource id that is not a meeting/call.
+A bare id fetches detail first, then the two meeting endpoints only when `type` is meeting
+or call.
 
-A stale or invented `activity_id` raises rather than returning a bespoke not-found response,
-matching `get_person`/`get_activity_history`'s convention that it must only ever be a value the
-caller got from a prior timeline response. A handle that is not `{resourceType}_{resourceId}` at
-all fails locally as a `ToolError`; one that is well-formed but unknown becomes a 404
-`BackstopApiError` (`/entity-activity-details` answers 200 with null primary data for those, which
-`BackstopApiResourceDocument.require_data` converts).
+A stale or invented `activity_id` raises rather than returning a bespoke not-found response.
+An empty handle fails locally as a `ToolError`; one that is well-formed but unknown becomes
+a 404 `BackstopApiError` (`/entity-activity-details` answers 200 with null primary data for
+those, which `BackstopApiResourceDocument.require_data` converts).
 """
 
 import asyncio
@@ -42,6 +42,12 @@ from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
 
+_MEETING_DETAIL_TYPES = frozenset({"meeting", "call"})
+
+
+def _is_meeting_detail_type(detail_type: str | None) -> bool:
+    return (detail_type or "").casefold() in _MEETING_DETAIL_TYPES
+
 
 @tool(
     annotations=ToolAnnotations(
@@ -58,10 +64,10 @@ async def get_activity_detail(
         str,
         Field(
             description=(
-                "The `activity_id` of one meeting, call, note, or document from a prior "
-                "get_activity_history response. Not a search_activities row `id` — those are "
-                "a different identifier and will not work here. Never invent or guess one — "
-                "an unknown id raises rather than returning a not-found response."
+                "The `activity_id` from get_activity_history (`meeting-or-calls_76537547`) or "
+                "the `id` from a search_activities row (`1659094659`). Both resolve on "
+                "`/entity-activity-details`. Never invent or guess one — an unknown id raises "
+                "rather than returning a not-found response."
             ),
         ),
     ],
@@ -75,12 +81,11 @@ async def get_activity_detail(
     you read the full body.
 
     The attachment list is this tool's one unique capability versus `search_activities`, which
-    only publishes `attachments_count`. `activity_id` must come from a prior
-    `get_activity_history` response — never invent one, and never pass a `search_activities`
-    row `id` (a different identifier). Unlike the timeline's `gist` (truncated to a token
-    budget), `body` here is the FULL converted text. `start`/`stop`/`location`/`time_zone`
-    and `attendees` are only populated for a meeting/call record; a note or document leaves
-    them `None`/empty.
+    only publishes `attachments_count`. Pass `activity_id` from get_activity_history or the
+    `id` from a search_activities row — never invent one. Unlike the timeline's `gist`
+    (truncated to a token budget), `body` here is the FULL converted text. `start`/`stop`/
+    `location`/`time_zone` and `attendees` are only populated for a meeting/call record; a
+    note, document, or email leaves them `None`/empty.
     """
     _ = ctx
     handle = ResourceIdentifierDto.from_activity_id(activity_id)
@@ -100,7 +105,7 @@ async def get_activity_detail(
             fetch_meeting_specifics(client, resource_id=resource_id),
             fetch_attendees(client, resource_id=resource_id),
         )
-    else:
+    elif handle.resource_type is not None:
         logger.debug(
             "activity_history.detail.get.skip_meeting_fetches",
             extra={"activity_id": activity_id, "resource_type": handle.resource_type},
@@ -108,6 +113,18 @@ async def get_activity_detail(
         detail = await fetch_activity_detail(client, resource_id=resource_id)
         specifics = None
         attendees = ()
+    else:
+        # search_activities `id` has no resource type. Detail's `type` says whether
+        # /meeting-or-calls applies (email/note/document 404 there).
+        detail = await fetch_activity_detail(client, resource_id=resource_id)
+        if _is_meeting_detail_type(detail.type):
+            specifics, attendees = await asyncio.gather(
+                fetch_meeting_specifics(client, resource_id=resource_id),
+                fetch_attendees(client, resource_id=resource_id),
+            )
+        else:
+            specifics = None
+            attendees = ()
 
     logger.info(
         "activity_history.detail.get.completed",

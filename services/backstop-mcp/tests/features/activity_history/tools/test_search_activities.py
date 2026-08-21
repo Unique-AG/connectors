@@ -13,7 +13,10 @@ from backstop_mcp.features.activity_history import (
     SearchActivitiesResolvedResponse,
     SearchActivitiesUnavailableResponse,
 )
-from backstop_mcp.features.activity_history.tools.search_activities import search_activities
+from backstop_mcp.features.activity_history.tools.search_activities import (
+    _date_window,
+    search_activities,
+)
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_json_bodies
@@ -63,10 +66,13 @@ class TestSearchActivities:
         doc = search_activities.__doc__ or ""
         assert "OR" in doc
         assert "Always start here" in doc
+        assert "one year" in doc
         assert "fallback only" in doc
         assert "get_activity_history" in doc
         assert "10000" in doc
         assert "visible to you" in doc
+        assert "get_activity_detail" in doc
+        assert "activity_id" in doc
 
     @pytest.mark.asyncio
     @respx.mock
@@ -101,6 +107,7 @@ class TestSearchActivities:
         payload = tool_payload(result)
         row = object_dict(object_list(payload["rows"])[0])
         assert row["id"] == "1"
+        assert row["activity_id"] == "1"
         assert row["effective_date"] == "2026-08-20"
         assert "description" not in row
         assert result.coverage.visible_count == 1
@@ -196,6 +203,18 @@ class TestSearchActivities:
             )
 
     @pytest.mark.asyncio
+    async def test_aggregate_on_a_wide_sweep_is_refused(self, client: BackstopClient) -> None:
+        with pytest.raises(ValueError, match="wide sweep"):
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+                mode="aggregate",
+                group_by="type",
+                client=client,
+            )
+
+    @pytest.mark.asyncio
     @respx.mock
     async def test_aggregate_counts_without_row_bodies(self, client: BackstopClient) -> None:
         respx.post(_URL).mock(
@@ -281,7 +300,7 @@ class TestSearchActivities:
         )
 
         row = object_dict(object_list(tool_payload(result)["rows"])[0])
-        assert row == {"id": "1", "title": "Catch-up"}
+        assert row == {"id": "1", "activity_id": "1", "title": "Catch-up"}
 
     @pytest.mark.asyncio
     @respx.mock
@@ -313,6 +332,39 @@ class TestSearchActivities:
         assert "&nbsp;" not in str(row.get("short_description", ""))
         assert "<p>" not in str(row.get("description", ""))
         assert "dispersion" in str(row.get("description", ""))
+
+    def test_omitted_start_date_is_one_year_before_end_date(self) -> None:
+        since, until = _date_window(None, date(2024, 12, 31), today=date(2026, 8, 21))
+        assert (since, until) == (date(2023, 12, 31), date(2024, 12, 31))
+
+    def test_leap_day_minus_one_year_lands_on_february_28(self) -> None:
+        since, until = _date_window(None, date(2024, 2, 29), today=date(2026, 8, 21))
+        assert (since, until) == (date(2023, 2, 28), date(2024, 2, 29))
+
+    def test_omitted_end_date_is_today(self) -> None:
+        since, until = _date_window(date(2025, 8, 21), None, today=date(2026, 8, 21))
+        assert (since, until) == (date(2025, 8, 21), date(2026, 8, 21))
+
+    def test_both_dates_omitted_are_the_year_ending_today(self) -> None:
+        since, until = _date_window(None, None, today=date(2026, 8, 21))
+        assert (since, until) == (date(2025, 8, 21), date(2026, 8, 21))
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_end_date_without_start_date_still_searches(self, client: BackstopClient) -> None:
+        route = respx.post(_URL).mock(return_value=_page(_row(), total=1))
+
+        await search_activities(
+            ctx_never_elicit(),
+            end_date=date(2024, 12, 31),
+            max_rows=1000,
+            client=client,
+        )
+
+        filters = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
+        effective = object_dict(object_dict(filters["filters"])["effectiveDate"])
+        assert effective["startTimestamp"] == "2023-12-31T00:00:00"
+        assert effective["endTimestamp"] == "2024-12-31T23:59:59"
 
     @pytest.mark.asyncio
     async def test_inverted_dates_fail_before_a_request(self, client: BackstopClient) -> None:

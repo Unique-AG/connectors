@@ -21,9 +21,9 @@ Dated NAV, ITD, share of fund, lifetime in/out: get_time_series on one account o
 product, one series per call. A missing value on a dated point is "not in yet", not zero. \
 `aums` is the product's total assets under management, not one investor's balance.
 
-Product Strategy, Domicile, Fee Structure: get_product (omit the name to walk the \
-catalog in one request; slice with custom_field_names=['Strategy']). Those values are \
-not on get_product_investors.
+Product Strategy, Domicile, Fee Structure: get_product (`search` like other tools, or \
+omit it to walk the catalog in one request; slice with custom_field_names=['Strategy']). \
+Those values are not on get_product_investors.
 
 Product chain: resolve a product, then get_product_investors for who is in it (owners only, \
 no figures), then get_time_series for the specific accounts in question. Do not iterate \
@@ -37,12 +37,14 @@ subscription date, not only the period you are asking about. A redemption with n
 account through originalSubscription is unattributed, not missing.
 
 Meetings, calls, notes, emails, documents: always start with search_activities — that is \
-the filtered search (mandatory start_date/end_date, optional types, activity_tag_ids, \
-authors, party). That primary is an undocumented UI search and may 404 — that is not "no \
+the filtered search (start_date/end_date — omit start_date for one year before end_date, \
+omit end_date for today; optional types, activity_tag_ids, authors, party). That primary \
+is an undocumented UI search and may 404 — that is not "no \
 activity exists". get_activity_history is only the party-scoped fallback for paging one \
 REST stream when that primary is missing; do not start with it, including for notes. A \
 403 on one history stream is not an empty stream — retry those types on search_activities. \
-Then get_activity_detail for the full untruncated body and the attachment list. Prefer \
+Then get_activity_detail with that row's `id` (or a get_activity_history `activity_id`) \
+for the full untruncated body and the attachment list. Prefer \
 search_activities with include_description for note text while the primary answers. Do \
 not look for those on get_person / get_organization.
 

@@ -919,7 +919,7 @@ async def _organization_custom_fields(
     custom_field_tabs: tuple[str, ...] = (),
     custom_field_groups: tuple[str, ...] = (),
     custom_field_group_ids: tuple[int, ...] = (),
-    custom_field_definition_ids: tuple[str, ...] = (),
+    custom_field_definition_ids: tuple[str | int, ...] = (),
     custom_field_names: tuple[str, ...] = (),
 ) -> list[dict[str, object]]:
     payload = tool_payload(
@@ -1014,6 +1014,9 @@ class TestGetOrganizationCustomFields:
         by_definition_id = await _organization_custom_fields(
             client, catalog, custom_field_definition_ids=("101",)
         )
+        by_numeric_definition_id = await _organization_custom_fields(
+            client, catalog, custom_field_definition_ids=(101,)
+        )
         by_name = await _organization_custom_fields(
             client, catalog, custom_field_names=("org field",)
         )
@@ -1036,6 +1039,7 @@ class TestGetOrganizationCustomFields:
         assert [item["definition_id"] for item in by_group] == ["202"]
         assert [item["definition_id"] for item in by_group_id] == ["301"]
         assert [item["definition_id"] for item in by_definition_id] == ["101"]
+        assert [item["definition_id"] for item in by_numeric_definition_id] == ["101"]
         assert [item["definition_id"] for item in by_name] == ["101"]
         assert [item["definition_id"] for item in combined] == ["101"]
         assert combined_miss == []

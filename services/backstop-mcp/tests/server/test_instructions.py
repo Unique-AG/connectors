@@ -9,12 +9,14 @@ class TestInstructions:
         assert "get_time_series" in INSTRUCTIONS
         assert "get_product_investors" in INSTRUCTIONS
         assert "not on get_product_investors" in INSTRUCTIONS
+        assert "get_product (`search`" in INSTRUCTIONS
         assert "assets under management" in INSTRUCTIONS
         assert "get_people_for_party" in INSTRUCTIONS
         assert "numberOfEmployees" in INSTRUCTIONS
         assert "search_activities" in INSTRUCTIONS
         assert "get_activity_history" in INSTRUCTIONS
         assert "filtered search" in INSTRUCTIONS
+        assert "one year before end_date" in INSTRUCTIONS
         assert "always start with search_activities" in INSTRUCTIONS
         assert "do not start with it" in INSTRUCTIONS
         assert "get_activity_detail" in INSTRUCTIONS
@@ -36,4 +38,5 @@ class TestInstructions:
         assert "get_tasks_for_party" in INSTRUCTIONS
         assert "not on get_people_for_party" in INSTRUCTIONS
         assert "attachment list" in INSTRUCTIONS
+        assert "row's `id`" in INSTRUCTIONS
         assert "falls back internally" in INSTRUCTIONS

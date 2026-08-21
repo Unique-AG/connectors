@@ -116,6 +116,9 @@ async def get_activity_history(
 
     `resolved.as_of` is plain provenance from the party's own record; relay it, do not treat
     record age as a staleness verdict.
+
+    Pass a row's `activity_id` to `get_activity_detail` for the full untruncated body and the
+    attachment list. `search_activities` rows use the same argument.
     """
     args = await extract_fetch_activity_history_args(
         ctx, client, request, page_size=activity_history.page_size

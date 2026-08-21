@@ -49,7 +49,7 @@ async def get_product_investors(
             description=(
                 "Trusted Backstop product id from a prior resolve echo. A short name here is "
                 "resolved through the catalog rather than failing. Never invent one. Exactly "
-                "one of `product_id` or `product` must be provided."
+                "one of `product_id` or `product`/`search` must be provided."
             ),
         ),
     ] = None,
@@ -59,8 +59,19 @@ async def get_product_investors(
             description=(
                 "Product short name (`CGUP`) or display name. Same catalog resolve as "
                 "`product_id`. Duplicate short names (`BLUC`, `Dispersion`) are ambiguous — "
-                "pick from the candidates rather than guessing. Exactly one of `product_id` or "
-                "`product` must be provided."
+                "pick from the candidates rather than guessing. Same lookup as `search`. "
+                "Exactly one of `product_id` or `product`/`search` must be provided."
+            ),
+        ),
+    ] = None,
+    search: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Product short name (`CGUP`) or display name — same lookup as `product`. "
+                "Use this the way get_person uses `search`. Duplicate short names are "
+                "ambiguous — pick from the candidates rather than guessing. Exactly one of "
+                "`product_id` or `product`/`search` must be provided."
             ),
         ),
     ] = None,
@@ -77,7 +88,8 @@ async def get_product_investors(
 ) -> GetProductInvestorsResponse:
     """The accounts in one product, and who owns them. No balances, no series.
 
-    Pass a trusted `product_id` or `product` (short name or display name). This is step 1 of
+    Pass a trusted `product_id`, or `search` / `product` (short name or display name).
+    `search` is the same name lookup as on get_person. This is step 1 of
     two: identity and owners only. A dated figure is step 2 — `get_time_series` on that
     account. Figures cost one call per (account, series), so a fund with 200 accounts is
     not a question to answer account-by-account — that reconstitutes the fan-out this
@@ -89,10 +101,13 @@ async def get_product_investors(
     means a person. An empty list with `closed_omitted>0` means every account is closed —
     pass `include_closed=true` rather than reading that as "no investors".
     """
-    if (product_id is None) == (product is None):
+    if product is not None and search is not None:
+        raise ValueError("Pass at most one of product or search")
+    name = product if product is not None else search
+    if (product_id is None) == (name is None):
         raise ValueError("Exactly one of product_id or product must be provided")
 
-    query = product_id if product_id is not None else product
+    query = product_id if product_id is not None else name
     assert query is not None
     outcome = await resolve_product_query(ctx, client, query=query)
     if not isinstance(outcome, Resolved):

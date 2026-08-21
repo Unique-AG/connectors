@@ -20,10 +20,10 @@ shape of one fetched item and the union conversion into it. `ActivityHistoryReso
 
 `fetch_activity_detail`/`fetch_meeting_specifics`/`fetch_attendees`: the `get_activity_detail`
 fetch primitive — one activity's full `entity-activity-details` record plus, for a
-meeting-or-calls handle, timings and attendees. `ResourceIdentifierDto.from_activity_id` splits
-the timeline `activity_id` into `{resource_type, resource_id}`;
-`ResourceIdentifierDto.is_meeting_or_call` gates the two `/meeting-or-calls` fetches. See
-`fetch_activity_detail.py`.
+meeting-or-calls handle, timings and attendees. `ResourceIdentifierDto.from_activity_id`
+accepts a history composite `{resource_type}_{resource_id}` or a search_activities row id;
+`ResourceIdentifierDto.is_meeting_or_call` gates the two `/meeting-or-calls` fetches for a
+composite. A search id waits on the detail record's `type`. See `fetch_activity_detail.py`.
 `ActivityDetailResponse`/`AttendeeResponse`: that tool's wire shape
 and the pure conversion into it. See `responses.py`.
 
