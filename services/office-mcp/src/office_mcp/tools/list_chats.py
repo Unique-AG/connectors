@@ -1,18 +1,12 @@
 """`list_chats` — the signed-in user's Teams chats, most recent first.
 
-Lists one-to-one, group, and meeting chats with id, type, topic, last message time, and members
-(for unnamed chats). No message text. This tool names conversations for other tools and shows which
-chats are live and when last posted in.
-
 Graph's `lastUpdatedDateTime` changes on a rename or a member change. It is not recency. Only the
 last message sent decides `last_message_at` and the sort order.
 
-`limit` is a window, not a cursor. A full window may have more. A short one is all. The walk
-follows Graph's paging to completion rather than trusting a short page.
+`limit` is a window, not a cursor. The walk follows Graph's paging to completion rather than
+trusting a short page.
 
-Meeting chats (conversation attached to a Teams meeting) have the meeting subject as `topic` and
-carry `meeting_uri`, the only route from conversation to meeting. Chat.Read is required (not
-Chat.ReadBasic) for recency sort.
+The recency sort needs `Chat.Read`, not `Chat.ReadBasic`.
 """
 
 from collections.abc import Mapping
@@ -42,7 +36,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
 # `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
-# there is exactly one call to make.
+# the one call needs none.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 MAX_CHATS = 50
@@ -96,7 +90,7 @@ class ChatMember(BaseModel):
 
     @classmethod
     def from_conversation_member(cls, member: ConversationMember, *, include_email: bool) -> Self:
-        """One chat member. Only aadUserConversationMember carries email."""
+        """Only aadUserConversationMember carries email."""
         return cls(
             display_name=member.display_name,
             email=member.email
@@ -159,18 +153,15 @@ class ChatSummary(BaseModel):
 
     @classmethod
     def from_chat(cls, chat: Chat, *, include_member_emails: bool) -> Self:
-        """One chat as this tool reports it."""
         assert chat.id is not None, "Graph returned a chat with no id"
         preview = chat.last_message_preview
-        # Graph documents `topic` as absent on an unnamed chat, but a blank one survives the SDK as
-        # `""` and is not a name either. Normalised once, here, so a caller never has to tell the
-        # two apart.
+        # Graph documents `topic` as absent on an unnamed chat, but a blank one survives the SDK
+        # as `""` and is not a name either. Normalised here, so a caller never tells the two apart.
         topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
         members = _members(chat, include_member_emails) if topic is None else None
-        # `chat_type` is passed as-is, not as `chat.chat_type.value`. `ChatType` subclasses `str`,
-        # so the member already is its wire value ("group"). `.value` looks like the right way to
-        # read it but is typed as a one-tuple, because the generated members carry a trailing comma
-        # (`OneOnOne = "oneOnOne",`).
+        # `chat_type` is passed as-is, not as `chat.chat_type.value`: `ChatType` subclasses `str`,
+        # so the member already is its wire value ("group"). `.value` looks right but is typed as
+        # a one-tuple: the generated members carry a trailing comma (`OneOnOne = "oneOnOne",`).
         meeting = chat.online_meeting_info
         return cls(
             chat_id=chat.id,
@@ -202,7 +193,7 @@ async def list_recent_chats(
     configuration = RequestConfiguration[_ChatsQuery](
         query_parameters=ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters(
             # Graph rejects `$select` on this collection as an unsupported parameter. These
-            # expansions are what bring back the fields below instead.
+            # expansions bring back the fields below instead.
             expand=["members", "lastMessagePreview"],
             orderby=[_RECENCY],
             top=limit,
@@ -229,12 +220,10 @@ def _members(chat: Chat, include_emails: bool) -> list[ChatMember]:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool against the shared Graph transport.
-
-    `transport` is the long-lived client from `create_graph_transport`. This tool borrows it per
-    call and does not own it; `create_app` closes it on shutdown.
-    """
-    # Built here because this is where `transport` is, and named rather than called in the default.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

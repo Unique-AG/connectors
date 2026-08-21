@@ -1,7 +1,7 @@
 """The `teams:///` grammar: what round-trips, and what is not a handle of a given family.
 
 The families are separate because the tools and the permissions behind them are, so the assertions
-that matter most here are the negative ones — a message handle must not parse as a meeting's, a
+that matter most here are the negative ones: a message handle must not parse as a meeting's, a
 meeting's must not parse as a message's, and a meeting's must not parse as a transcript's. Every id
 below is invented.
 """
@@ -11,8 +11,8 @@ import pytest
 from office_mcp.shared import handles
 
 # A join URL shaped like the ones Graph actually stores: `%3a` and `%40` already percent-escaped, a
-# `?context=` query with `%7b`/`%22` in its value, and an `&` parameter after it. Every one of those
-# is a character a handle has to carry through one path segment and hand back byte-identical.
+# `?context=` query with `%7b` and `%22` in its value, and an `&` parameter after it. Every one of
+# those is a character a handle has to carry through one path segment and hand back byte-identical.
 JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -51,10 +51,10 @@ _REPLY_HANDLE = handles.MessageHandle(
 class TestTheMessageHandleGrammar:
     """The three shapes a Teams message is addressed by, and everything that is not one of them.
 
-    `search_messages` mints two of these and `browse_channel` the third; `read_message` reads all
-    three back. That is exactly why the grammar is neither tool's — a handle one minted and another
-    answers 404 to does not look like a disagreement — so it is tested here, once, rather than
-    beside whichever tool happens to write it.
+    `search_messages` mints two of these and `browse_channel` mints the third. `read_message` reads
+    all three back. That is why the grammar is neither tool's: a handle one minted and another
+    answers 404 to does not look like a disagreement, so it is tested here, once, rather than beside
+    whichever tool happens to write it.
     """
 
     def test_it_reads_the_two_shapes_search_emits_and_decodes_their_ids(self) -> None:
@@ -68,7 +68,7 @@ class TestTheMessageHandleGrammar:
 
     def test_it_reads_the_reply_shape_that_only_browsing_a_channel_can_mint(self) -> None:
         """The third shape. Graph addresses a reply in a channel thread under the post it answers,
-        and the search projection carries no `replyToId` — so a search hit on a reply becomes the
+        and the search projection carries no `replyToId`, so a search hit on a reply becomes the
         root-post shape and cannot be read, while `browse_channel` walks a channel post by post and
         knows each reply's parent. The grammar still lives here, with the other two: two modules
         that each knew how to write a handle would be free to disagree.
@@ -87,15 +87,15 @@ class TestTheMessageHandleGrammar:
 
     def test_an_unencoded_id_still_resolves(self) -> None:
         """A caller that copied a handle out of a log rather than out of a response has ids that
-        were never encoded; `:` and `@` are unambiguous in a path segment, so those are read too."""
+        were never encoded. `:` and `@` are unambiguous in a path segment, so those are read too."""
         handle = handles.message_handle(f"teams:///chats/{_CHAT_ID}/messages/{_MESSAGE_ID}")
 
         assert handle == _CHAT_HANDLE
 
     def test_it_says_which_permission_each_shape_is_read_under(self) -> None:
         """Graph's permissions for a message read are per surface and the handle is the only
-        thing that knows which surface, so a 403 on a chat read can only be about `Chat.Read` —
-        naming the channel permission alongside it would send an administrator after one that was
+        thing that knows which surface, so a 403 on a chat read can only be about `Chat.Read`.
+        Naming the channel permission alongside it would send an administrator after one that was
         never missing."""
         assert _CHAT_HANDLE.permission == "Chat.Read"
         assert _CHANNEL_HANDLE.permission == "ChannelMessage.Read.All"
@@ -114,7 +114,7 @@ class TestTheMessageHandleGrammar:
             "teams:///messages/1770000000000",
             "teams:///chats//messages/1770000000000",
             "teams:///chats/19%3Arelease%40thread.v2/messages/",
-            # A chat has no replies in Graph's addressing — only a channel thread does.
+            # A chat has no replies in Graph's addressing. Only a channel thread does.
             "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000/replies/1770000000001",
             "teams:///teams/8a9c3c47/channels/19%3Ageneral/messages/1770000000000/replies/",
             "teams:///teams/8a9c3c47/channels/19%3Ageneral/messages//replies/1770000000001",
@@ -167,7 +167,7 @@ class TestTheHandleGrammar:
             "teams:///meetings/%20",
             "teams:///meetings/a/b",
             # The handle a model re-spelled by hand: the slashes in a raw join URL make it several
-            # path segments. Refusing it is the point — half of it, carried as if it were the whole,
+            # path segments. Refusing it is the point: half of it, carried as if it were the whole,
             # is a lookup Graph answers nothing for and a "no such meeting" nobody could explain.
             f"teams:///meetings/{JOIN_WEB_URL}",
             # The schemes a polymorphic reader would advertise and this connector cannot serve.

@@ -57,8 +57,8 @@ class TestTheCallersTokenIsWhatCalls:
     async def test_the_right_host_over_the_wrong_scheme_is_given_nothing_either(self) -> None:
         """`AllowedHostsValidator` compares the hostname and nothing else.
 
-        So the host check on its own hands the delegated token to `http://graph.microsoft.com/...`
-        — in cleartext — and to anything else spelling that same host. Each of these passes the
+        So the host check on its own hands the delegated token to `http://graph.microsoft.com/...`,
+        in cleartext, and to anything else spelling that same host. Each of these passes the
         validator, which is why each is asserted.
         """
         provider = _CallerTokenProvider(CALLER_TOKEN)
@@ -76,7 +76,7 @@ class TestTheGraphBaseUrlIsSetInOnePlace:
 
         httpx normalises a base_url it is given to end with a slash, `HttpxRequestAdapter` copies
         the transport's verbatim, and the SDK's URL templates then join their own leading slash
-        onto it. Graph tolerates the empty segment, so nothing here would fail loudly — respx
+        onto it. Graph tolerates the empty segment, so nothing here would fail loudly. respx
         happens to refuse to match the malformed URL, which is incidental and not something to
         rest on. Asserted on the built URL directly instead.
         """
@@ -96,7 +96,7 @@ class TestTheGraphBaseUrlIsSetInOnePlace:
         trailing slash is what keeps the join clean if it ever does.
         """
         # The ignore is for the SDK leaving `request_adapter`'s generic parameter unbound on the
-        # client; `base_url` on it is annotated `str`.
+        # client. `base_url` on it is annotated `str`.
         base_url: str = client.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
 
         assert str(transport.base_url) == ""
@@ -114,9 +114,9 @@ class TestThrottling:
         """Graph's throttling contract, which the SDK's own retry middleware implements.
 
         Asserted here because the transport is built with a custom `httpx.AsyncClient`, and the
-        factory does not install any middleware on a client it is handed unless asked — so
-        losing the retry handler is a one-line mistake with no other symptom than intermittent
-        429s reaching tools.
+        factory does not install any middleware on a client it is handed unless asked. Losing the
+        retry handler is a one-line mistake whose only symptom is intermittent 429s reaching
+        tools.
         """
         graph.get("/me").mock(
             side_effect=[

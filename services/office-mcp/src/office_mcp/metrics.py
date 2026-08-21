@@ -55,7 +55,7 @@ _GRAPH_LATENCY_BUCKETS = (
 
 # Three histograms whose default buckets would answer the wrong question, corrected here rather than
 # where they are declared: a bucket layout is an aggregation, an aggregation is the provider's, and
-# a view matches on the instrument's name — so this needs nothing from the module that records it.
+# a view matches on the instrument's name, so this needs nothing from the module that records it.
 #
 # The OpenTelemetry default layout runs 0, 5, 10, 25 … 10000, which is minutes-shaped. Nearly every
 # observation of any of the three — one page read, or a call that took well under five seconds —
@@ -80,10 +80,10 @@ _VIEWS = (
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
-    """Install OTel→Prometheus reader to route domain instruments to the toolkit registry.
+    """Install the OTel-to-Prometheus reader that routes domain instruments to the toolkit registry.
 
-    Trap: `/metrics` reads `unique_toolkit.monitoring.REGISTRY`, not `prometheus_client`'s
-    default registry. Point the reader at it explicitly, or metrics never appear in a scrape.
+    Trap: `/metrics` reads `unique_toolkit.monitoring.REGISTRY`, not `prometheus_client`'s default
+    registry. Point the reader at it explicitly, or metrics never appear in a scrape.
     """
     global _provider
     if _provider is not None:

@@ -1,59 +1,40 @@
 """Graph failures sorted by remedy.
 
-The SDK reports all failures as APIError with a status code. This module categorizes them once so
-each caller does not re-derive remedies:
+The SDK reports all failures as `APIError` with a status code. This module categorises them once so
+each caller does not re-derive the remedy:
 
-- GraphThrottled (429, or a retriable 5xx that named a delay): Retriable. Graph supplies
+- `GraphThrottled` (429, or a retriable 5xx that named a delay): retriable, and Graph supplies
   Retry-After.
-- GraphForbidden (401/403): Token lacks permission.
-- GraphNotFound (404): Resource not found or not visible.
-- GraphUnavailable (a 5xx with nothing to wait for, or no response): Service down or unreachable.
+- `GraphForbidden` (401 or 403): the token lacks permission.
+- `GraphNotFound` (404): not found, or not visible.
+- `GraphUnavailable` (a 5xx with nothing to wait for, or no response): service down or unreachable.
 
-Anything else (400, 409) raises GraphFailure. Other status codes do not suggest remedies.
+Anything else (400, 409) raises `GraphFailure`. Those status codes suggest no remedy.
 
-One of them is not a failed request at all. `GraphPagingUnending` is Graph answering 200 after 200
-with nothing in them while still advertising more of a collection, which no status code describes
-and the SDK therefore cannot report — only the walk in `pagination` sees it. It belongs here
-anyway, because "what Graph did wrong" is what this vocabulary is and because being a
-`GraphFailure` is what carries it through `shared/seam.py` to the caller as advice rather than as a
-crash.
+`GraphPagingUnending` is the one that is not a failed request: Graph answering 200 after 200 with
+nothing in them while still advertising more of a collection, which no status code describes and
+the SDK therefore cannot report. It is a `GraphFailure` so that `shared/seam.py` carries it to the
+caller as advice rather than as a crash. See its class docstring.
 
-One thing above the status code is carried too: `inner_code`, Graph's `error.innerError.code`.
-Where a status and an outer code are the same for two failures with opposite remedies, that is
-the only field that tells them apart — the transcript APIs answer both "your tenant has switched
-Graph access to transcripts off, and no app can switch it back on" and "this tenant will not give
-you speaker names, ask for the unattributed format" as `403 Forbidden` / `code: Forbidden`, and
-Microsoft's own instruction is to "branch on the `innerError.code` value, not the message text.
-Messages are subject to change" (https://learn.microsoft.com/en-us/graph/api/calltranscript-get).
-It is data like `status` is, not a category: a subclass per inner code would be a subclass per
-Graph feature.
+`inner_code` is Graph's `error.innerError.code`, carried alongside the status. Where a status and
+an outer code are the same for two failures with opposite remedies, it is the only field that tells
+them apart: the transcript APIs answer both "your tenant has switched Graph access to transcripts
+off, and no app can switch it back on" and "this tenant will not give you speaker names, ask for
+the unattributed format" as `403 Forbidden` with `code: Forbidden`, and Microsoft's own instruction
+is to "branch on the `innerError.code` value, not the message text. Messages are subject to change"
+(https://learn.microsoft.com/en-us/graph/api/calltranscript-get). It is data like `status` is, not
+a category: a subclass per inner code would be a subclass per Graph feature.
 
-Some failures reach a caller that Graph never described with a status code at all, and they used to
-escape this module entirely — unworded to the caller and counted under the `error` sentinel that
-means "an exception this seam cannot describe".
-
-Three of them are the SDK failing rather than Graph refusing, and all three are `GraphUnavailable`,
-because none carries a status, a code or a request id and all three mean one thing to a caller: no
-answer arrived that this connector could use. `RedirectError` is the redirect handler giving up and
-`ResponseError` is the adapter getting no response to read, both from the SDK's own
-`KiotaHTTPXError` family. The third is a bare `Exception`, which the SDK really does raise — the
-parse-node registry raises the base class for a content type it has no parser for, which is what a
-gateway answering `text/html` on a 500 in front of Graph produces.
-
-An `Exception` *subclass* is deliberately not translated. This service raises none, so a subclass
-arriving there is a bug of this connector's own, and reporting one as Graph being unavailable would
-tell an operator to retry and blame Microsoft for it. Those keep travelling untranslated and stay
-`error`, which is what that label is for.
-
-`CancelledError` is the last, and it is not a failure of anything: the caller went away. It keeps
-its own status so that an MCP client hanging up stops reading on a dashboard as this connector
-failing, and it is re-raised untranslated so the task group that sent it learns it was obeyed.
+Some failures reach a caller that Graph never described with a status code at all. Three are the
+SDK failing rather than Graph refusing, and all three become `GraphUnavailable`, because none
+carries a status, a code or a request id and all three mean one thing: no answer arrived that this
+connector could use. `CancelledError` is the caller going away, and is re-raised untranslated.
+`_measured` says what each one is.
 
 `graph_errors` also counts and times the operation it wraps, and `graph_step` counts one Graph call
 inside it. They are the seam every Graph call already goes through, and the categories above are
-exactly the `status` a counter wants — measuring anywhere else would mean re-deriving them. The
-instruments themselves live in `graph_client/observability.py`; this module supplies the taxonomy
-and nothing else about them.
+exactly the `status` a counter wants, so measuring anywhere else would mean re-deriving them. The
+instruments live in `graph_client/observability.py`.
 """
 
 from asyncio import CancelledError
@@ -79,10 +60,10 @@ from office_mcp.graph_client.observability import (
 
 
 class GraphFailure(Exception):
-    """Graph request failure. Subclass indicates remedy. Support needs request_id.
+    """Graph request failure. The subclass is the remedy. Support needs `request_id`.
 
-    `inner_code` defaults to `None` because most Graph errors carry no
-    inner code worth branching on; where one does, it is the whole of the difference.
+    `inner_code` defaults to `None`: most Graph errors carry no inner code worth branching on, and
+    where one does, it is the whole of the difference.
     """
 
     def __init__(
@@ -102,16 +83,16 @@ class GraphFailure(Exception):
 
 
 class GraphThrottled(GraphFailure):
-    """Rate limit from Graph. SDK retries did not outlast it. Obey Retry-After header for fastest
-    recovery: usage keeps accruing while throttled, so an early retry only extends the wait. This
-    means the SDK already retried `GraphSettings.max_retries` times, or Retry-After asked for more
-    than the SDK's 180 s wait ceiling and it gave up. None means Graph sent no header—choose your
-    own backoff.
+    """Rate limit from Graph that the SDK's retries did not outlast.
+
+    Obey the Retry-After header for the fastest recovery: usage keeps accruing while throttled, so
+    an early retry only extends the wait. Reaching here means the SDK retried
+    `GraphSettings.max_retries` times, or Retry-After asked for more than the SDK's 180 s wait
+    ceiling and it gave up. `None` means Graph sent no header, so choose your own backoff.
 
     TRAP: this is not only 429. Graph also holds a caller off with a 5xx that carries Retry-After,
-    and `status` is what tells the two apart where that matters — a 429 is quota, a 503 with a
-    delay may be quota or load shedding. Either way the delay is the remedy, which is why they are
-    one class; see `_is_throttling`."""
+    and `status` tells the two apart: a 429 is quota, a 503 with a delay may be quota or load
+    shedding. The delay is the remedy either way, so they are one class. See `_is_throttling`."""
 
     def __init__(
         self,
@@ -130,8 +111,8 @@ class GraphThrottled(GraphFailure):
 
 
 class GraphForbidden(GraphFailure):
-    """Graph refused the caller, not the request. TRAP: 401 (token rejected) and 403 (no scope)
-    are both forbidden. Status tells them apart. 401 means sign in again. 403 means ask an
+    """Graph refused the caller, not the request. TRAP: 401 (token rejected) and 403 (no scope) are
+    both forbidden, and `status` tells them apart. 401 means sign in again, 403 means ask an
     administrator."""
 
 
@@ -141,23 +122,22 @@ class GraphNotFound(GraphFailure):
 
 class GraphUnavailable(GraphFailure):
     """Graph returned a 5xx with nothing to wait for, timed out, or could not be reached. Usually
-    transient. TRAP: Some 500s are permanent for certain content (Loop components, certain cards).
-    Endless retries spin. A 5xx that did name a delay is `GraphThrottled`, not this: the remedy
-    there is the delay, and counting it here would read on a dashboard as an outage."""
+    transient. TRAP: some 500s are permanent for certain content (Loop components, certain cards),
+    where retries spin forever. A 5xx that did name a delay is `GraphThrottled`: the remedy there
+    is the delay, and counting it here would read on a dashboard as an outage."""
 
 
 class GraphPagingUnending(GraphFailure):
     """Graph would not end a collection: a run of empty pages, every one advertising more.
 
-    Not a failed request—each of those pages was a 200—so it carries no status, no code and no
-    request id, and `_classify` never produces it. `pagination.collect_pages` raises it directly
+    Not a failed request, since each of those pages was a 200, so it carries no status, no code and
+    no request id, and `_classify` never produces it. `pagination.collect_pages` raises it directly
     when the run exceeds `pagination.MAX_EMPTY_PAGES`, and `empty_pages` is how long that run was.
 
-    A raise rather than the `assert` this used to be, for two reasons that are both about the bound
-    being real. `python -O` strips asserts, and the bound is the only thing between a collection
-    that answers nothing but empty pages and a walk that follows them until throttling or a timeout
-    ends it—the thousand-page walk `MAX_EMPTY_PAGES` exists to prevent. And Graph misbehaving is
-    the boundary this module exists to describe, not an invariant of this connector's own code.
+    A raise rather than an `assert`, for two reasons. `python -O` strips asserts, and that bound is
+    the only thing between a collection that answers nothing but empty pages and a walk that
+    follows them until throttling or a timeout ends it. And Graph misbehaving is the boundary this
+    module exists to describe, not an invariant of this connector's own code.
     """
 
     def __init__(self, message: str, *, empty_pages: int) -> None:
@@ -191,10 +171,9 @@ _UNCLASSIFIED = "error"
 # a dashboard as this connector failing.
 _CANCELLED = "cancelled"
 
-# Every value the `status` label can take, so that the bound is a thing a reader can see and a test
-# can assert rather than a claim. Public because a dashboard has to decide, for each one, whether it
-# counts as a failure — `cancelled` is the one that answers differently from every other non-`ok`
-# value, and the way that decision gets forgotten is nobody being able to enumerate the options.
+# Every value the `status` label can take, so a reader can see the set and a test can assert it.
+# Public because a dashboard has to decide, for each one, whether it counts as a failure, and
+# `cancelled` is the one that answers differently from every other non-`ok` value.
 GRAPH_STATUSES: frozenset[str] = frozenset({*_STATUS.values(), _OK, _UNCLASSIFIED, _CANCELLED})
 
 
@@ -202,11 +181,11 @@ GRAPH_STATUSES: frozenset[str] = frozenset({*_STATUS.values(), _OK, _UNCLASSIFIE
 def graph_errors(operation: str, *, step: str | None = None) -> Generator[None]:
     """Translate SDK failures into Graph error types, and count what the operation cost.
 
-    `operation` is the name this call is counted under — pass the tool's own `TOOL_NAME`. It must be
-    a name chosen in code and never anything off the URL; see `observability.py` for why that is a
-    hard rule rather than a preference. It is required: a tool that could leave it out would be
-    missing from every Graph dashboard, and nothing at the call site would say so. A test driving
-    the SDK directly names itself like anything else does.
+    `operation` is the name this call is counted under. Pass the tool's own `TOOL_NAME`. It must be
+    chosen in code and never taken off the URL. `observability.py` says why that is a hard rule
+    rather than a preference. It is required, because a tool that left it out would be missing from
+    every Graph dashboard with nothing at the call site to say so. A test driving the SDK directly
+    names itself like anything else does.
 
     `step` names one Graph call inside this block for the finer-grained instruments, for the tool
     that makes exactly one. A tool that makes several uses `graph_step` around each instead.
@@ -219,14 +198,13 @@ def graph_errors(operation: str, *, step: str | None = None) -> Generator[None]:
 def graph_step(step: str) -> Generator[None]:
     """Measure one Graph call inside the `graph_errors` block already in scope.
 
-    This is what restores per-call visibility inside a tool that makes several Graph calls: the
-    operation-level instruments still answer "what did this tool call cost", and the step-level ones
-    answer "which Graph call inside it was slow". The operation comes from the block above rather
-    than from an argument, because it is already in scope and a second argument would be a second
-    thing to keep in agreement with the first.
+    In a tool that makes several Graph calls, the operation-level instruments answer "what did this
+    tool call cost" and the step-level ones answer "which Graph call inside it was slow". The
+    operation comes from the block above rather than from an argument, because it is already in
+    scope and a second argument would be a second thing to keep in agreement with the first.
 
     Outside any `graph_errors` block there is no operation to attribute a step to, so nothing is
-    recorded — the same rule `record_graph_call` keeps, and for the same reason.
+    recorded. `record_graph_call` keeps the same rule for the same reason.
     """
     with _measured(current_graph_operation(), step=step, operation_level=False):
         yield
@@ -277,26 +255,26 @@ def _measured(
         status = _CANCELLED
         raise
     except Exception as error:
-        # Two SDK failures that are not `APIError`, carry no response to classify, and both used to
-        # reach a caller as an unworded `ToolError` counted under `_UNCLASSIFIED`.
+        # SDK failures that are not `APIError` and carry no response to classify. Three shapes, and
+        # all three used to reach a caller as an unworded `ToolError` counted under
+        # `_UNCLASSIFIED`.
         #
-        # `KiotaHTTPXError` is the SDK's own family. `RedirectError` when the redirect handler gives
-        # up (`kiota_http/middleware/redirect_handler.py:94`) and `ResponseError` when the adapter
-        # gets no response to read (`kiota_http/httpx_request_adapter.py:602`) are the two reachable
-        # from a Graph call.
+        # `KiotaHTTPXError` is the SDK's own family. Two of that family are reachable from a
+        # Graph call: `RedirectError` when the redirect handler gives up
+        # (`kiota_http/middleware/redirect_handler.py:94`), and `ResponseError` when the adapter
+        # gets no response to read (`kiota_http/httpx_request_adapter.py:602`).
         #
         # A bare `Exception` is the SDK failing to read what Graph sent. The parse-node registry
         # raises the base class for a content type it has no parser for
         # (`kiota_abstractions/serialization/parse_node_factory_registry.py:48`), which is what a
-        # gateway answering `text/html` on a 500 in front of Graph produces — a real shape, and one
-        # no `error_map` can describe because the body never became a model.
+        # gateway answering `text/html` on a 500 in front of Graph produces. No `error_map` can
+        # describe that, because the body never became a model.
         #
         # TRAP: the *exact* base class is the discriminator, and `isinstance` here would be a bug.
-        # Nothing in this service raises `Exception` itself — an internal invariant is an `assert`
-        # and a boundary is a typed raise — so any subclass reaching here is this connector's own
-        # fault, not Graph's. Those must keep travelling untranslated and stay `_UNCLASSIFIED`,
-        # because a bug of ours reported as `GraphUnavailable` tells an operator to retry and blames
-        # Microsoft for it.
+        # Nothing in this service raises `Exception` itself (an internal invariant is an `assert`, a
+        # boundary is a typed raise), so any subclass reaching here is this connector's own fault,
+        # not Graph's. Those keep travelling untranslated and stay `_UNCLASSIFIED`: a bug of ours
+        # reported as `GraphUnavailable` tells an operator to retry and blames Microsoft for it.
         if not isinstance(error, KiotaHTTPXError) and type(error) is not Exception:
             raise
         # Unavailable is the honest remedy for both: Graph did not give an answer this connector
@@ -326,35 +304,34 @@ def _status_of(failure: GraphFailure) -> str:
 def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
     """Whether the SDK retried this throttling before giving up on it.
 
-    Throttling the SDK recovered from never reaches this module, so every throttling counted here is
-    throttling that survived — and it survives in two ways with opposite remedies. The retry
-    handler refuses to wait at all once the delay reaches its 180 s ceiling
-    (`kiota_http/middleware/retry_handler.py:97`), so a `Retry-After` that long means no attempt was
-    made and the answer is available later; anything shorter means `GraphSettings.max_retries`
+    Throttling the SDK recovered from never reaches this module, so every throttling counted here
+    survived, and it survives in two ways with opposite remedies. The retry handler refuses to wait
+    at all once the delay reaches its 180 s ceiling
+    (`kiota_http/middleware/retry_handler.py:97`), so a `Retry-After` that long means no attempt
+    was made and the answer is available later. Anything shorter means `GraphSettings.max_retries`
     attempts were spent and the quota is genuinely gone.
 
-    No header at all reads as retried, because that is what the SDK does with one: it falls back to
-    exponential backoff, which is always under the ceiling.
+    No header at all reads as retried, because the SDK falls back to exponential backoff, which is
+    always under the ceiling.
 
     TRAP for whoever tunes `GraphSettings.max_retries`: that 180 s ceiling is per attempt, not
     cumulative. The SDK's `RetryHandlerOption` documents a `retry_time_limit` that would bound the
     total and never implements one, so three retries of a `Retry-After: 179` is about nine minutes
-    of sleeping inside one MCP tool call, which is far past what an interactive client waits for.
+    of sleeping inside one MCP tool call, far past what an interactive client waits for.
     """
     advice = failure.retry_after_seconds
     return advice is None or advice < RetryHandlerOption.MAX_DELAY
 
 
-# The statuses the SDK's retry handler acts on, borrowed rather than restated so that the two
-# cannot disagree: `_is_throttling` below is only true of a status the handler really did wait
+# The statuses the SDK's retry handler acts on, borrowed rather than restated so the two cannot
+# disagree: `_is_throttling` below is only true of a status the handler really did wait
 # `Retry-After` out on (`kiota_http/middleware/retry_handler.py:54` declares the set, `:140`
 # consults it).
 #
 # Copied into a frozenset rather than aliased. `DEFAULT_RETRY_STATUS_CODES` is a mutable class
 # attribute and `RetryHandler.__init__` hands that same object to every instance
 # (`retry_handler.py:67`), so an alias here is a live write path into SDK state: one handler
-# mutating `retry_on_status_codes` would silently change how this module classifies throttling
-# service-wide. The frozenset keeps the borrow and drops the write path.
+# mutating `retry_on_status_codes` would change how this module classifies throttling service-wide.
 _RETRIED_BY_THE_SDK: frozenset[int] = frozenset(RetryHandler.DEFAULT_RETRY_STATUS_CODES)
 
 _TOO_MANY_REQUESTS = 429
@@ -363,14 +340,14 @@ _TOO_MANY_REQUESTS = 429
 def _is_throttling(status: int | None, retry_after_seconds: float | None) -> bool:
     """Whether Graph held this caller off, rather than failing to serve it.
 
-    A 429 always is, header or no header. Above that the two are told apart by the header alone:
-    Graph rate limits with a 503 as well as with a 429, and a service that names the second it will
-    answer again is one holding a caller off, not one that has fallen over. So precedence runs in
-    that order — a 503 carrying `Retry-After` is throttling, a 503 without it is unavailability —
-    and it matters because the remedies are opposite. Throttling is answered by waiting exactly as
-    long as Graph asked and then by quota; an outage is answered by one retry and then by a report.
-    Counted as an outage, throttling sends an operator after the wrong one of those, which is what
-    `status="unavailable"` on a rate-limited connector used to do.
+    A 429 always is, header or no header. Above that the header alone tells the two apart: Graph
+    rate limits with a 503 as well as with a 429, and a service that names the second it will
+    answer again is holding a caller off, not falling over. So a 503 carrying `Retry-After` is
+    throttling and a 503 without one is unavailability, and the difference matters because the
+    remedies are opposite. Throttling is answered by waiting exactly as long as Graph asked, then
+    by quota. An outage is answered by one retry, then by a report. Counted as an outage, throttling
+    sends an operator after the wrong one. That is what `status="unavailable"` on a rate-limited
+    connector used to do.
 
     Restricted to the statuses the SDK retries, which is what keeps `_sdk_spent_its_retries` true
     of the result: the handler takes its delay from `Retry-After` on exactly those, so a
@@ -435,26 +412,25 @@ def _inner_code(error: APIError) -> str | None:
 
 
 def _lowercase_headers(error: APIError) -> dict[str, str]:
-    """Convert response_headers to dict with lowercased keys.
+    """`response_headers` as a dict with lowercased keys.
 
-    The declared type is dict[str, str], but the request adapter may assign httpx.Headers
-    instead. httpx.Headers is case-insensitive; lowercasing the keys makes both forms behave alike.
+    The declared type is `dict[str, str]`, but the request adapter may assign `httpx.Headers`
+    instead. `httpx.Headers` is case-insensitive, and lowercasing makes both forms behave alike.
     """
     return {name.lower(): value for name, value in (error.response_headers or {}).items()}
 
 
 def _retry_after_seconds(headers: dict[str, str]) -> float | None:
-    """Parse Retry-After header as delay-seconds or None.
+    """Parse the Retry-After header as delay-seconds, or `None`.
 
     Graph documents this header as delay-seconds and never sends the legal HTTP-date form here.
     This parser does not guess at that form: a wrong guess about the caller's clock is worse than
     reporting no advice.
 
-    The SDK does not make the same choice — its own `_parse_retry_after` handles the date form — so
-    the two disagree in exactly one case worth writing down. On a 503 carrying a date-form
-    `Retry-After`, the SDK would wait it out and this module would read no delay, which makes
-    `_is_throttling` false and files a rate limit under `unavailable`. Graph does not send that
-    shape, which is why guessing is still the worse trade; if it ever starts, this is where it
+    The SDK's own `_parse_retry_after` does handle the date form, so the two disagree in one case.
+    On a 503 carrying a date-form Retry-After, the SDK would wait it out and this module would read
+    no delay, making `_is_throttling` false and filing a rate limit under `unavailable`. Graph does
+    not send that shape, so guessing is still the worse trade. If it ever starts, this is where it
     shows up.
     """
     value = headers.get("retry-after")

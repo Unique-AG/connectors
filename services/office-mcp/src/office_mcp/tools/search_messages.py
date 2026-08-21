@@ -1,47 +1,41 @@
 """`search_messages` — full-text search across every Teams message the signed-in user can see.
 
-`POST /search/query` with `entityTypes: ["chatMessage"]` is the only full-text path Microsoft
-Graph offers over Teams messages, and it runs in delegated context only
-(https://learn.microsoft.com/en-us/graph/search-concept-chat-messages). Four of its documented
-properties shape everything below.
+`POST /search/query` with `entityTypes: ["chatMessage"]` is the only full-text path Microsoft Graph
+offers over Teams messages, and it runs in delegated context only
+(https://learn.microsoft.com/en-us/graph/search-concept-chat-messages). Four documented properties
+shape everything below.
 
 * **The hit is a projection, not a message.** The retrievable set is `channelIdentity`, `chatId`,
   `createdDateTime`, `etag`, `from`, `id`, `importance`, `lastModifiedDateTime`, `subject` and
-  `webUrl` — no `body`. Graph says so outright: "The search Teams API doesn't return all
-  properties defined in chatMessage." The only text a hit carries is the `summary` snippet. A
-  result is therefore metadata plus a handle by necessity, and the handle is what `read_message`
-  resolves into the message itself.
-* **`total` is not a match count.** "For Teams messages, the total property of the
-  searchHitsContainer type contains the number of results on the page, not the total number of
-  matching results." It is not read here and no total is reported: `moreResultsAvailable` is the
-  only honest "keep going" signal Graph gives, and `next_offset` is how this tool says it.
-* **Sorting is unsupported.** "The search API doesn't support custom sort for … chatMessage …", so
-  there is no ordering knob to expose, and none is invented.
-* **Paging is stateless.** `from`/`size` integers rather than an opaque `@odata.nextLink`, which is
-  why `graph_client.collect_pages` has nothing to do here and why a caller can resume a search on
-  a later, unrelated call.
+  `webUrl`, with no `body`. A hit's only text is its `summary` snippet, so a result is metadata
+  plus a handle, and `read_message` resolves that handle into the message.
+* **`total` is not a match count.** Graph puts the number of results on the page in it, not the
+  number of matching results, so nothing here reads it and no total is reported.
+  `moreResultsAvailable` is Graph's only "keep going" signal, and `next_offset` is how this tool
+  says it.
+* **Sorting is unsupported.** Graph supports no custom sort for `chatMessage`, so this tool offers
+  no ordering argument and invents no order of its own.
+* **Paging is stateless.** `from`/`size` integers rather than an opaque `@odata.nextLink`, so
+  `graph_client.collect_pages` has no part here and a caller can resume a search on a later,
+  unrelated call.
 
 Deliberately absent: the per-chat scan that the connector this one replaces falls back to when it
-lacks a permission or is given a date filter. Graph caps reads at "one request per second per app
-per tenant … on a given channel or chat" (https://learn.microsoft.com/en-us/graph/throttling), and
-that budget is *per app*, so one user's sweep of fifty chats degrades every other user in the
-tenant. Date bounds go into the query string instead, where the index applies them for the price of
-the one request that was being made anyway. This tool is one Graph request, always.
+lacks a permission or is given a date filter. Graph caps reads at one request per second per app
+per tenant on a given channel or chat (https://learn.microsoft.com/en-us/graph/throttling), and the
+budget is per app, so one user's sweep of fifty chats degrades every other user in the tenant. Date
+bounds go into the query string instead, where the index applies them inside the one Graph request
+this tool always makes.
 
-**Two rules of the criteria are enforced twice, and the duplication is deliberate.** "At least one
-criterion" is advertised in the input schema as an `anyOf` — the JSON Schema spelling of it, and the
-only form a client can check — *and* re-checked in the tool body, because FastMCP validates
-arguments against the function signature rather than against the schema it advertises, so a client
-that ignores the `anyOf` would otherwise reach Graph with a search for everything. Emptiness is
-measured on the query string, not on which arguments were passed, so `query` text with no actual
-words (whitespace, punctuation only) contributes nothing and may cause a refusal if no other
-criterion is set.
+**The "at least one criterion" rule is enforced twice, deliberately.** The input schema advertises
+it as an `anyOf`, the only form a client can check, and the tool body re-checks it, because FastMCP
+validates arguments against the function signature rather than against the schema it advertises: a
+client that ignored the `anyOf` would otherwise reach Graph with a search for everything. Emptiness
+is measured on the query string, not on which arguments were passed, so `query` text of whitespace
+or punctuation only contributes nothing and may cause a refusal if no other criterion is set.
 
-What this file does not own is the handle grammar (`shared/handles.py`, so the handle minted here is
-the handle `read_message` parses — two spellers would look like a search result that cannot be read)
-and the sender shape (`shared/messages.py`, so a hit and a read agree about who sent something).
-Everything else — the name, the description, the arguments, the answer shape,
-the request, the query builder, the injection guard and every refusal below — is here.
+Owned elsewhere: the handle grammar in `shared/handles.py`, so the handle minted here is the one
+`read_message` parses, and the sender shape in `shared/messages.py`, so a hit and a read agree
+about who sent something.
 """
 
 import re
@@ -77,24 +71,21 @@ TOOL_NAME = "search_messages"
 # The one Graph call this tool makes, as the step instruments count it.
 STEP = "search_query"
 
-# `Chat.Read` is what `/search/query` accepts for the `chatMessage` entity; Graph's own search
-# overview promises a search never returns more than the equivalent GET would, and every
-# channel-message GET in v1.0 requires `ChannelMessage.Read.All` — so without it a search silently
-# covers chats only. Both are requested rather than one, so a tenant that withholds the broad one
-# is refused at consent time instead of being served half an answer at query time. The two names
-# are `shared/handles.py`'s, because which of them a *read* is made under is decided by the surface
-# a handle addresses; a search is made under both, having no handle yet.
+# `/search/query` accepts `Chat.Read` for the `chatMessage` entity, and Graph promises a search
+# never returns more than the equivalent GET would. Every channel-message GET in v1.0 requires
+# `ChannelMessage.Read.All`, so without it a search silently covers chats only. Both are requested,
+# so a tenant that withholds the broad one is refused at consent time instead of served half an
+# answer at query time. The names come from `shared/handles.py`: a read is made under the permission
+# of the surface its handle addresses. A search has no handle, so it is made under both.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
-# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
-# and never reaches Graph, which would leave its Graph refusals unchecked.
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
+# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
-# Graph documents a general `size` maximum of 1000. No chatMessage-specific ceiling is published;
-# Graph caps the `message` and `event` entities at 25. This tool uses 50 on undocumented ground,
-# as a safe value between the two.
+# Graph documents a general `size` maximum of 1000 and caps the `message` and `event` entities at
+# 25. It publishes no ceiling for `chatMessage`, so 50 is an undocumented choice between the two.
 MAX_RESULTS = 50
 
 _DESCRIPTION = f"""\
@@ -218,14 +209,12 @@ class MessageHit(BaseModel):
             return None
         sender = MessageSender.from_identity(resource.from_)
         if sender is None:
-            # Graph named no sender. It documents the identity set as null "for a message that has
-            # been deleted or sent by the Microsoft Teams internal system; for example, event
-            # messages for addition of members" — "Ada joined the chat", a call ending, a channel
-            # being renamed. A system event message also carries a body of the literal
-            # `<systemEventMessage/>`, and the sentence Teams shows is rendered by the client and
-            # never sent, so such a hit has neither an author nor any text. The `messageType` and
-            # `eventDetail` properties that would name it are not in search's retrievable set,
-            # which leaves the missing sender as the signal.
+            # Graph documents the identity as null "for a message that has been deleted or sent by
+            # the Microsoft Teams internal system; for example, event messages for addition of
+            # members". A system event message carries a body of the literal `<systemEventMessage/>`
+            # and Teams renders the sentence it shows on the client rather than sending it, so such
+            # a hit has neither an author nor any text. Search's retrievable set holds neither
+            # `messageType` nor `eventDetail`, so the missing sender is the signal.
             return None
         channel = resource.channel_identity
         team_id = channel.team_id if channel is not None else None
@@ -269,9 +258,8 @@ class MessageSearchResults(BaseModel):
 class SearchCriteria:
     """What to match, before it becomes a query string.
 
-    Every field is optional and Microsoft ANDs them together. All of them unset would ask for
-    every message the user can see, which is not a question anyone asked — `is_empty` is what the
-    tool boundary refuses.
+    Every field is optional and Microsoft ANDs them together. All of them unset would ask for every
+    message the user can see, so the tool boundary refuses criteria that are `is_empty`.
     """
 
     query: str | None = None
@@ -286,16 +274,15 @@ class SearchCriteria:
 
     @property
     def is_empty(self) -> bool:
-        """Whether these criteria would match on nothing at all."""
+        """Whether these criteria name nothing to match on."""
         return not _query_string(self)
 
 
 CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria))
 
-# Graph would answer a criteria-free search with an arbitrary slice of everything the user can
-# read. That reads like a real result set, so it is the one failure mode a model cannot detect
-# from the response. Built from `CRITERIA` rather than written out, so a criterion added above
-# appears here without anybody remembering to add it.
+# Graph answers a criteria-free search with an arbitrary slice of everything the user can read.
+# That slice reads like a real result set, so it is the one failure a model cannot detect from the
+# response. The text is built from `CRITERIA`, so a criterion added above appears here on its own.
 _NO_CRITERIA = (
     "search_messages needs at least one of "
     + ", ".join(CRITERIA)
@@ -306,11 +293,9 @@ _NO_CRITERIA = (
 # The characters that would let a caller's string be read as Keyword Query Language instead of as
 # text: whitespace separates terms, `:` `<` `>` `=` introduce a property restriction or a
 # comparison, `(` and `)` group, `"` would close the quoting applied here, and `*` is the wildcard.
-# A leading `-` is KQL's documented shorthand for NOT and negates what follows it. (`+` is the
-# shorthand for AND, which is the default anyway, so it needs no handling.) A string holding any of
-# these is quoted — which is what turns `sent>2020-01-01` into something to look for rather than a
-# filter the caller was never offered. A string holding none of them cannot express a restriction, a
-# wildcard or a negation, so it is left alone and stays a keyword.
+# A leading `-` is KQL's shorthand for NOT and negates what follows it. (`+` is the shorthand for
+# AND, the default anyway, so it needs no handling.) A string holding any of these is quoted, so
+# `sent>2020-01-01` becomes text to look for. A string holding none of them stays a keyword.
 _KQL_OPERATORS = re.compile(r'[\s:"<>=()*]')
 
 
@@ -319,13 +304,12 @@ def _needs_quoting(text: str) -> bool:
     return _KQL_OPERATORS.search(text) is not None or text.startswith("-")
 
 
-# `_quoted` is the guard `services/teams-mcp` ships merged, and it is for a *filter value* — one
-# scope term's argument, e.g. the `from:` in `from:"ada lovelace"`. A value needs the wildcard rule
-# as much as a word does: KQL documents `<property>:*` as a match on every item that has a value
-# for that property, so a `sender` of `*` asks for every message that has a sender. That is the
-# arbitrary sample of everything `_NO_CRITERIA` exists to refuse, reached through a query string
-# that is not empty. `from:ada*` is the same defect in miniature: prefix matching this tool never
-# offered.
+# `_quoted` is the guard `services/teams-mcp` ships merged, and it is for a filter value: one scope
+# term's argument, such as the `from:` in `from:"ada lovelace"`. A value needs the wildcard rule as
+# much as a word does. KQL documents `<property>:*` as a match on every item that has a value for
+# that property, so a `sender` of `*` asks for every message that has a sender. That is the
+# arbitrary sample `_NO_CRITERIA` exists to refuse, reached through a query string that is not
+# empty. `from:ada*` is the same defect in miniature: prefix matching this tool never offered.
 def _quoted(value: str) -> str:
     """A filter value, safe to put after a scope term. One value, therefore at most one term."""
     if _needs_quoting(value):
@@ -334,32 +318,30 @@ def _quoted(value: str) -> str:
 
 
 # A caller's free text is not a filter value, and quoting it like one costs them every match whose
-# words are not adjacent — Microsoft is explicit about both halves of this
+# words are not adjacent. Microsoft is explicit about both halves
 # (https://learn.microsoft.com/en-us/sharepoint/dev/general-development/keyword-query-language-kql-syntax-reference):
 # a quoted phrase "returns only the items in which the words in your phrase are located next to each
 # other", while "if there are multiple free-text expressions without any operators in between them,
 # the query behavior is the same as using the AND operator". So free text is guarded one word at a
-# time and the words reach Graph as separate terms it will AND — every word must appear, anywhere in
-# the message, in any order. Adjacency is still available: a caller who wants it quotes the words
-# themselves, and this is what tells those two apart.
+# time and reaches Graph as terms it will AND: every word must appear, anywhere, in any order. A
+# caller who wants adjacency quotes the words, and `_PHRASE` is what tells the two apart.
 _PHRASE = re.compile(r'"([^"]*)"')
 
-# Beyond the rules above, a *word* has one further way to be read as KQL: KQL's boolean and
-# proximity operators are themselves words — "the operators are case-sensitive (uppercase)", which
-# is why the comparison below is too. Such a word cannot smuggle in a scope term, but it changes
-# what the search *means* rather than what it looks for: a bare `OR` between two of the caller's
-# words turns the AND they were promised into an OR. This is the one rule the two guards do not
-# share, because an operator word only operates between terms and a filter value never stands
-# there — it is glued to its scope term, so `from:OR` names a sender.
+# A word can be read as KQL in one more way: the boolean and proximity operators are themselves
+# words, and "the operators are case-sensitive (uppercase)", so the comparison below is too. Such a
+# word cannot smuggle in a scope term, but it changes what the search means rather than what it
+# looks for: a bare `OR` between two of the caller's words turns the AND they were promised into an
+# OR. `_quoted` does not share this rule, because an operator word only operates between terms, and
+# a filter value never stands there: it is glued to its scope term, so `from:OR` names a sender.
 _KQL_KEYWORDS = frozenset({"AND", "OR", "NOT", "NEAR", "ONEAR"})
 
 
 def _free_text(query: str) -> str:
     """A caller's own words, as terms Graph will AND. Empty when they typed nothing to look for.
 
-    Whatever the caller put in double quotes stays one phrase — the only adjacency this tool asks
-    Graph for, because it is the only one anybody asked for. Everything outside those quotes is
-    words, and an unbalanced quote is just a character in one of them.
+    Whatever the caller put in double quotes stays one phrase, the only adjacency this tool asks
+    Graph for. Everything outside those quotes is words, and an unbalanced quote is one character
+    in one of them.
     """
     terms: list[str] = []
     words_from = 0
@@ -387,10 +369,9 @@ def _keyword(word: str) -> str:
 def _phrase(text: str) -> str:
     """`text` as a KQL phrase: matched where those words are adjacent, and read as no operator.
 
-    The quoting is the guard as much as it is the phrase — everything inside a quoted phrase is
-    text — so the only thing left to handle is a quote in the text itself, which KQL escapes by
-    doubling it. That keeps the number of quotes in the query even, and so keeps the quoting
-    unclosable from inside.
+    The quoting is the guard as much as the phrase, because everything inside a quoted phrase is
+    text. That leaves only a quote in the text itself, which KQL escapes by doubling it. Doubling
+    keeps the number of quotes in the query even, so the quoting cannot be closed from inside.
     """
     return '"' + text.replace('"', '""') + '"'
 
@@ -402,17 +383,15 @@ def _flag(value: bool) -> str:
 def _query_string(criteria: SearchCriteria) -> str:
     """The `queryString` these criteria become. Empty exactly when nothing was asked for.
 
-    The scope terms are the ones Microsoft documents for `chatMessage`: `from`, `to`,
-    `hasAttachment`, `IsRead`, `IsMentioned`, `mentions` and `sent`, in their documented spellings
-    (the casing is Microsoft's, not a mistake). `sent` is the one that is not a `term:value` pair
-    at all — it is a comparison, `sent > 2022-07-14` — and `>=`/`<=` are used so that a bound
-    lands on the day the caller named rather than the day after it, which is what `sent_after` and
-    `sent_before` promise.
+    The scope terms below, and their odd casing, are Microsoft's own for `chatMessage`. `sent` is
+    no `term:value` pair but a comparison, `sent > 2022-07-14`, and it uses `>=` and `<=` so that a
+    bound lands on the day the caller named rather than the day after. That is what `sent_after`
+    and `sent_before` promise.
 
-    `query` is the one input that is not a scope term's value, and it is the one that becomes more
-    than one term: it is free text, so it becomes the caller's words, ANDed with everything else
-    here. A query of nothing but punctuation therefore contributes nothing, which is what makes
-    this string — rather than the arguments it was built from — the honest test of `is_empty`.
+    `query` is the one input that is not a scope term's value, and the one that becomes more than
+    one term: free text becomes the caller's words, ANDed with everything else. A query of nothing
+    but punctuation contributes nothing, so this string, not the arguments behind it, is the honest
+    test of `is_empty`.
     """
     terms: list[str] = []
     if criteria.query:
@@ -445,8 +424,8 @@ async def search_messages(
 ) -> MessageSearchResults:
     """One page of matches for `criteria`, starting at `offset`.
 
-    Exactly one Graph request, whatever the criteria: there is no fan-out and no second call to
-    fill in content. Callers that want the text of a match read its `uri`.
+    Exactly one Graph request, whatever the criteria: no fan-out, no second call for content. A
+    caller that wants the text of a match reads its `uri`.
     """
     query = _query_string(criteria)
     assert query, "search_messages needs at least one criterion; the tool refuses an empty set"
@@ -476,10 +455,9 @@ async def search_messages(
             message for message in (MessageHit.from_hit(hit) for hit in hits) if message is not None
         ],
         # `moreResultsAvailable` on its own is not a next page. The offset advances by the hits
-        # Graph returned, so a page carrying none of them while still saying more are coming would
-        # hand back the very offset it was asked at — and a caller doing what `next_offset`
-        # promises re-requests that same empty page for ever. There is no offset that reaches
-        # anything further from here, and null is how this contract says so.
+        # Graph returned, so a page with no hits that still says more are coming would hand back the
+        # offset it was asked at, and a caller doing what `next_offset` promises would re-request
+        # that empty page for ever. No offset reaches anything further, and null says so.
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
 
@@ -488,7 +466,7 @@ def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:
     """The one container this request produces.
 
     Graph "currently supports only a single searchRequest at a time" and one entity type, so the
-    nesting — a response per request, a container per entity type — only ever holds one of each.
+    nesting, a response per request and a container per entity type, holds one of each.
     """
     for search_response in response.value or []:
         for container in search_response.hits_containers or []:
@@ -508,17 +486,15 @@ def _hit_uri(
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Declare this tool against the shared Graph transport.
-
-    `transport` is the long-lived `httpx.AsyncClient` from `create_graph_transport`; the tool
-    borrows it per call and never owns it. `create_app` closes it on shutdown.
-    """
-    # Built here because this is where `transport` is, and named rather than called in the default.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
-    # Declared and registered in two steps rather than with `@mcp.tool`, which does both and hands
-    # back the function. `add_tool` returns the registered tool, which is the only way to reach the
-    # schema `_require_a_criterion` has to add to. Same registration, same metadata.
+    # Declared and registered in two steps rather than with `@mcp.tool`, which hands back the
+    # function. `add_tool` returns the registered tool, the only way to reach the schema
+    # `_require_a_criterion` adds to. Same registration, same metadata.
     @tool_metadata(
         name=TOOL_NAME,
         title="Search Teams Messages",
@@ -644,11 +620,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 def _require_a_criterion(tool: Tool) -> None:
     """Put "at least one criterion" in the tool's schema, where a client can enforce it.
 
-    FastMCP derives an input schema from the function signature, and a signature has no way to say
-    that a set of optional parameters cannot all be omitted — so the rule would otherwise live only
-    in the description and in the tool's own runtime check. `anyOf` over one-element `required`
-    lists is the JSON Schema spelling of it, and the registered tool's schema is where it goes.
-    The runtime check stays: FastMCP validates arguments against the signature rather than against
-    this schema, so a client that ignores it must still be refused.
+    A function signature cannot say that a set of optional parameters must not all be omitted, and
+    FastMCP derives the input schema from the signature. `anyOf` over one-element `required` lists
+    is the JSON Schema spelling of the rule. The runtime check stays: FastMCP validates arguments
+    against the signature rather than against this schema, so a client that ignores the schema must
+    still be refused.
     """
     tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]

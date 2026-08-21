@@ -1,11 +1,12 @@
 """`list_channels`: what the query asks for, what it declines, and the pages it follows.
 
 Two of the assertions here are about parameters. `$select` is a requirement rather than an
-optimisation — Graph documents populating a channel's `email` as an expensive operation — and `$top`
-is one Graph answers with a 400, which `services/teams-mcp` shipped and had to take back out.
+optimisation, because Graph documents populating a channel's `email` as an expensive operation.
+`$top` is one Graph answers with a 400, which `services/teams-mcp` shipped and had to take back
+out.
 
 A third is about a header. `membershipType` is an evolvable enum, so `shared` reaches an answer only
-for a request that asks for unknown members — the first request and every paged one after it.
+for a request that asks for unknown members: the first request and every paged one after it.
 
 Every payload is synthesised from Microsoft's documented shapes.
 """
@@ -52,8 +53,7 @@ def _graph_page(
 
     `shared` sits after `unknownFutureValue` in `membershipType`, so Graph substitutes the sentinel
     for a request that does not ask for unknown members. A mock that answered `shared` either way
-    would pass whether or not the request asked, which is the whole of what the tests using this are
-    about.
+    would pass whether or not the request asked, which is what the tests using this are about.
     """
 
     def answer(request: httpx.Request) -> httpx.Response:
@@ -154,10 +154,9 @@ class TestTheInventoryItReports:
 
         Graph answers the odd page with nothing in it and an `@odata.nextLink` still set, and the
         SDK's own page walker reads an empty page as the end of a collection. Believing it here
-        would not merely drop a channel — it would turn a window with more behind it into "this
-        team has one channel", a claim about the user's own team that nothing checked. The
-        sentence in the description is therefore only true while every page is followed, and this
-        is the test that says so for this collection rather than for paging in general.
+        would not merely drop a channel. It would turn a window with more behind it into "this team
+        has one channel", a claim about the user's own team that nothing checked. The sentence in
+        the description is only true while every page is followed.
         """
         graph.get(_CHANNELS_PATH, params={"$skiptoken": "third"}).mock(
             return_value=httpx.Response(
@@ -218,11 +217,11 @@ class TestTheInventoryItReports:
     ) -> None:
         """What the `Prefer` header buys, and why a missing one is worse than a missing label: the
         SDK's enum names a member for `unknownFutureValue`, so the sentinel is not dropped and not
-        nulled — it arrives as that word, and a channel labelled with it reads as a channel whose
+        nulled. It arrives as that word, and a channel labelled with it reads as a channel whose
         type this connector could not determine.
 
-        The neighbouring test over a wire value of `hypothetical` exercises the other path — a value
-        the enum names no member for, which does become null — and says nothing about this one.
+        The neighbouring test over a wire value of `hypothetical` exercises the other path, a value
+        the enum names no member for, which does become null, and says nothing about this one.
         """
         graph.get(_CHANNELS_PATH).mock(
             side_effect=_graph_page(
@@ -242,7 +241,7 @@ class TestTheInventoryItReports:
         """The half of the header that is easy to miss. The SDK's `PageIterator` starts with an
         empty header collection and stamps it onto every next-page request, so a `Prefer` header set
         on the first request alone leaves every shared channel past page one labelled
-        `unknownFutureValue` — a listing that is right at the top and wrong further down, for no
+        `unknownFutureValue`: a listing that is right at the top and wrong further down, for no
         reason a reader of it can see.
         """
         graph.get(_CHANNELS_PATH, params={"$skiptoken": "second"}).mock(
@@ -268,9 +267,9 @@ class TestGraphFailures:
     async def test_a_refusal_arrives_classified_for_the_tool_to_explain(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This request is made under its own delegated permission — a tenant commonly grants the
-        two basic ones and withholds the broad message permission — so the failure has to reach the
-        tool layer, which is what names the permission."""
+        """This request is made under its own delegated permission, and a tenant commonly grants
+        the two basic ones while withholding the broad message permission, so the failure has to
+        reach the tool layer, which is what names the permission."""
         denied = httpx.Response(
             403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
         )
@@ -281,5 +280,5 @@ class TestGraphFailures:
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         """A tool owns the permission its own request needs, and listing channels is the cheap
-        "basic" scope — reading what was posted in one is browse_channel's broader permission."""
+        "basic" scope. Reading what was posted in one is browse_channel's broader permission."""
         assert lister.GRAPH_PERMISSIONS == ("Channel.ReadBasic.All",)

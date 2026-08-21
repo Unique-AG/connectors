@@ -1,38 +1,37 @@
 """`list_meeting_transcripts` — transcripts a Teams meeting holds and whether it was transcribed.
 
-First half of reading: this lists what exists. read_transcript returns the words. Two tools because
-transcripts are large and recurring meetings are one collection to Graph — occurrences share one
-collection, distinguished only by transcription start time.
+This lists what exists. read_transcript returns the words. Two tools because transcripts are large
+and a recurring meeting is one collection to Graph, its occurrences told apart only by
+transcription start time.
 
-Five answers: available (newest first) / not_ready (window just closed; retry permitted) /
-not_transcribed (never recorded or transcribed; no retry) / scan_incomplete (more transcripts than
-one call reads; none in window; stop, no remedy) / meeting_not_found (URL matched no meeting).
+Five answers: available (newest first), not_ready (window just closed, retry permitted),
+not_transcribed (never recorded or transcribed, no retry), scan_incomplete (more transcripts than
+one call reads, none in window, stop, no remedy), and meeting_not_found (URL matched no meeting).
 
-Newest first: Graph has no `$orderby`. Read up to MAX_ARTIFACT_SCAN, sort, cut to `limit`.
-Stopping at `limit` before sorting returns an arbitrary subset sorted among itself — wrong answer
-with right shape. This is why newest_in_window is a named function.
+Newest first: Graph has no `$orderby`. Read up to MAX_ARTIFACT_SCAN, sort, cut to `limit`. Cutting
+before sorting returns an arbitrary subset sorted among itself, a wrong answer in the right shape.
+That is why newest_in_window is a named function.
 
-TRAP: Transcript access is a tenant-wide Teams switch, OFF by default. When off, every call answers
-403. This is not a permission — it needs admin action to turn on. Microsoft scopes this to
-transcripts only; recordings are unaffected, which is why `list_meeting_recordings` is a separate
-tool. In a tenant that never touched the switch, this call fails and that one answers.
+TRAP: Transcript access is a tenant-wide Teams switch, OFF by default, and every call answers 403
+while it is off. It is not a permission and needs admin action. Microsoft scopes the switch to
+transcripts, so in a tenant that never touched it this call fails and `list_meeting_recordings`
+answers. That is why the two are separate tools.
 
-Window applies after fetching, not in the request. Graph documents no filterable date on this
-collection — the only filterable property shown by example is `contentCorrelationId`
-(https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example 11), never a date. So the
-request is bare and the same MAX_ARTIFACT_SCAN artifacts are read for any window. Narrowing and
-retrying reads the same artifacts and returns the same answer — advice a model could follow forever.
-The channel browser tool already shipped that same mistake, as circular retry advice. The fix here:
-state plainly that there is nothing to try.
+The window applies after fetching, not in the request. Graph documents no filterable date on this
+collection, only `contentCorrelationId`
+(https://learn.microsoft.com/en-us/graph/api/calltranscript-get, Example 11), so any window reads
+the same MAX_ARTIFACT_SCAN artifacts and narrowing returns the same answer. A model told to narrow
+would retry forever. `browse_channel` already shipped that mistake, as circular retry advice. The
+fix here: state plainly that there is nothing to try.
 
-TRAP: Graph can return an empty page that still carries a next link — the page is empty, but not
-the end of the collection. `graph_client/pagination.py` follows that link instead of stopping.
-Without this, a meeting Graph pages as `[3, nothing, 1]` would look like it held only 3 transcripts.
-Tests page a meeting that exact way and assert every transcript still comes back.
+TRAP: Graph can return an empty page that still carries a next link, so an empty page is not the
+end of the collection. `graph_client/pagination.py` follows the link, and without that a meeting
+Graph pages as `[3, nothing, 1]` would look like it held only 3 transcripts. Tests page a meeting
+that exact way and assert every transcript still comes back.
 
 `include_scan_completeness` is opt-in. A short list already shows the window holds no more than
-`limit` transcripts. It cannot show whether the read itself stopped early. One merged flag would
-blur two different fixes: raise `limit`, or accept that nothing more can be known.
+`limit` transcripts, but it cannot show whether the read itself stopped early. One merged flag
+would blur two different fixes: raise `limit`, or accept that nothing more can be known.
 """
 
 from collections.abc import Mapping
@@ -60,26 +59,24 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_meeting_transcripts"
 
-# This tool's own listing request and the walk that continues it. The meeting resolve
-# before it is counted under `shared/meetings.py`'s own step, and the identity check under
-# `shared/identity.py`'s — each Graph call is named by the module that owns it.
+# This tool's listing request and the walk that continues it. Each Graph call is named by the
+# module that owns it, so the meeting resolve before it counts under `shared/meetings.py`'s step.
 STEP_TRANSCRIPTS = "transcripts"
 
-# Two permissions: meeting resolve and transcript read, redeemed under one token by Entra.
-# Transcript permission is shared with read_transcript. It lives in shared/meetings.py because
-# tests/test_layering.py rule 4 forbids one tool file from importing another.
+# Two permissions: meeting resolve and transcript read, redeemed under one token by Entra. The
+# transcript permission is shared with read_transcript and lives in `shared/meetings.py`, because
+# `tests/test_layering.py` rule 4 forbids one tool file from importing another.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
-# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
-# and never reaches Graph, which would leave its Graph refusals unchecked.
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
+# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "meeting_uri": "teams:///meetings/https%3A%2F%2Fteams.microsoft.invalid%2Fl%2Fmeetup-join"
     + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
 }
 
-# Maximum transcripts to return. Graph documents `$top` but publishes no ceiling, so this is ours.
+# Max transcripts per call. Graph documents `$top` but publishes no ceiling, so this limit is ours.
 MAX_TRANSCRIPTS = 50
 
 # This connector's own vocabulary, not Microsoft's, so it is closed and publishes as an enum
@@ -151,7 +148,7 @@ class TranscriptSummary(BaseModel):
 
     @classmethod
     def from_transcript(cls, meeting_id: str, transcript: CallTranscript) -> Self:
-        """Summary of one Graph transcript, handled by the meeting that holds it."""
+        """Summary of one Graph transcript, with a `TranscriptHandle` built from `meeting_id`."""
         assert transcript.id is not None, "Graph returned a transcript with no id"
         return cls(
             uri=TranscriptHandle(meeting_id, transcript.id).uri,
@@ -230,9 +227,9 @@ async def list_meeting_transcripts(
     limit: int,
     include_scan_completeness: bool,
 ) -> MeetingTranscripts:
-    """Transcripts of the meeting and what to do about them.
+    """Transcripts of the meeting `handle` addresses and what to do about them.
 
-    At most two Graph requests: resolve URL, then list.
+    At most two Graph requests: resolve the URL, then list.
     """
     assert 1 <= limit <= MAX_TRANSCRIPTS, f"limit must be within 1..{MAX_TRANSCRIPTS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -264,7 +261,7 @@ async def list_meeting_transcripts(
         else _absence(scan_stopped_short=collected.capped, settled=window.settled(meeting)),
         meeting_id=meeting.id,
         subject=meeting.subject,
-        # meetingType is a generated enum; unknown values deserialize to None, not an error.
+        # meetingType is a generated enum. Unknown values deserialize to None, not to an error.
         meeting_type=meeting.meeting_type,
         started_at=meeting.start_date_time,
         ended_at=meeting.end_date_time,
@@ -283,8 +280,10 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> TranscriptStatus:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool against the shared Graph transport."""
-    # Built here because this is where `transport` is, and named rather than called in the default.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

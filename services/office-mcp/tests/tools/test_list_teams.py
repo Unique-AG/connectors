@@ -2,7 +2,7 @@
 
 The load-bearing assertion is about a parameter that is *not* sent. Graph answers an unsupported
 OData parameter on `/me/joinedTeams` with a 400, and `services/teams-mcp` shipped a `$top` on it and
-had to take it back out, so "no `$top`" is a contract rather than an omission.
+had to take it back out, so no `$top` is a contract rather than an omission.
 
 Every payload is synthesised from Microsoft's documented shapes.
 """
@@ -23,7 +23,7 @@ def _team_payload(
 ) -> dict[str, object]:
     """One `team` as `GET /me/joinedTeams` returns it.
 
-    Only these five properties are populated on that endpoint; the nulls are Graph's, not this
+    Only these five properties are populated on that endpoint. The nulls are Graph's, not this
     fixture's shorthand.
     """
     return {
@@ -108,7 +108,7 @@ class TestTheInventoryItReports:
 
         Graph answers the occasional page with nothing in it and a cursor still set, and the SDK's
         own page walker reads an empty page as the end of a collection. Believing it here would not
-        merely drop a team — it would turn a window with more behind it into "you are in one team",
+        merely drop a team. It would turn a window with more behind it into "you are in one team",
         which is a claim about the user's own tenant that nothing checked. This tool cannot even
         ask for a smaller collection to make the walk shorter, since `/me/joinedTeams` takes no
         `$top`, so the sentence is only true while every page is followed.
@@ -170,8 +170,8 @@ class TestGraphFailures:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """This request is made under its own delegated permission, and a tenant commonly grants
-        the two basic ones and withholds the broad message permission — so the failure has to reach
-        the tool layer, which is what names the permission."""
+        the two basic ones while withholding the broad message permission, so the failure has to
+        reach the tool layer, which is what names the permission."""
         denied = httpx.Response(
             403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
         )

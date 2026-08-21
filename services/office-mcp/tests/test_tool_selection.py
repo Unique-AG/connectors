@@ -1,24 +1,21 @@
 """Which tools a deployment runs, and therefore what every one of its users consents to.
 
 The one thing a restart cannot fix. Scopes ride `additional_authorize_scopes`, so a permission not
-requested at sign-in cannot be redeemed by a later call — the On-Behalf-Of exchange fails with
-AADSTS65001 before the tool body runs — and a permission requested that the app registration does
-not carry fails the authorize hop for *every* user, with nothing in this server's logs. A selection
-that is quietly one tool short is therefore a deployment nobody can correct from the outside, which
-is why every way of writing one wrongly has to abort startup instead.
+requested at sign-in cannot be redeemed by a later call: the On-Behalf-Of exchange fails with
+AADSTS65001 before the tool body runs. A permission requested that the app registration does not
+carry fails the authorize hop for *every* user, with nothing in this server's logs. A selection
+quietly one tool short is a deployment nobody can correct from the outside, so every way of writing
+one wrongly has to abort startup instead.
 
 Two halves, each tested where it lives. `SurfaceConfig` decides whether the two environment
-variables say anything usable at all — neither set, both set, an empty list, a preset that is not a
-preset — because that is a question about the environment, and config is the only thing that reads
-it. `resolve` decides what a usable answer expands to, and it is the only place that knows which
-tools exist, so it is the only place that can call a tool name a typo.
+variables say anything usable at all: neither set, both set, an empty list, or a preset that is not
+a preset. That is a question about the environment, and config is the only thing that reads it.
+`resolve` decides what a usable answer expands to, and it is the only place that knows which tools
+exist, so it is the only place that can call a tool name a typo.
 
-Several tests here stand a registry of their own up in place of the real one. That is not a way
-round the real thing: there is one tool in the tree and it is always on, so every selection resolves
-to the same list, and the properties that matter most — that registry order beats the operator's
-order, that a name not asked for is genuinely left out — would have nothing to bite on for another
-nine pull requests. The stubs are the three things the registry reads off a tool module, and
-nothing else.
+Several tests stand a registry of their own up in place of the real one, so that registry order
+beating the operator's order, and a name not asked for being left out, are asserted against a fixed
+list. The stubs are the three things the registry reads off a tool module, and nothing else.
 """
 
 from collections.abc import Iterator, Mapping
@@ -50,8 +47,8 @@ _THIRD = "third_tool"
 class _StubModule:
     """A tool module in the only three respects the registry reads one.
 
-    It records its own registrations rather than being handed somewhere to write them, so a test can
-    ask which modules were declared without anything holding a list on its behalf.
+    It records its own registrations, so a test can ask which modules were declared without
+    anything holding a list on its behalf.
     """
 
     TOOL_NAME: str
@@ -79,9 +76,9 @@ class _Registry:
 def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[_Registry]:
     """The registry replaced by three tools, the always-on one first as the real registry has it.
 
-    Everything `resolve` reads is patched together — the modules, the names derived from them, and
-    the preset mapping — because leaving one of the three behind would make a passing test prove
-    nothing about the code the real registry runs.
+    Everything `resolve` reads is patched together: the modules, the names derived from them, and
+    the preset mapping. Leaving one of the three behind would make a passing test prove nothing
+    about the code the real registry runs.
     """
     stubs = _Registry(
         (
@@ -114,10 +111,10 @@ class TestTheTwoVariablesAreOneChoice:
     def test_the_spelling_an_operator_writes_is_the_one_that_works(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Read out of the environment rather than handed in, because the environment is the only
-        place the settings source runs at all: a collection-typed setting is JSON-decoded there,
-        before any validator of ours, and this asserts that the spelling every operator writes
-        survives that. Blanks and a trailing comma are absorbed with it.
+        """Read out of the environment rather than handed in, because the settings source only
+        runs there: a collection-typed setting is JSON-decoded before any validator of ours, and
+        the spelling every operator writes has to survive that. Blanks and a trailing comma are
+        absorbed with it.
         """
         monkeypatch.setenv("TOOLS_ENABLED", "get_me, list_chats ,read_message,")
 
@@ -156,8 +153,8 @@ class TestTheTwoVariablesAreOneChoice:
         assert "names no tool" in str(refusal.value)
 
     def test_a_preset_that_is_not_one_is_refused_with_the_ones_that_are(self) -> None:
-        """Caught by the enum, which is the whole reason the names live in config: the message lists
-        the values that would have worked, and the same names fill the Helm chart's schema."""
+        """Caught by the enum, which is why the names live in config: the message lists the values
+        that would have worked, and the same names fill the Helm chart's schema."""
         with pytest.raises(ValidationError) as refusal:
             SurfaceConfig.model_validate({"tools_preset": "teams-transcript"})
 
@@ -166,12 +163,12 @@ class TestTheTwoVariablesAreOneChoice:
 
 class TestConfigAndTheRegistryAgreeAboutPresetNames:
     """The names live in `config.py` and their contents in `tools/__init__.py`, so the two have to
-    agree — and nothing but this makes them.
+    agree, and nothing but this makes them.
 
-    Both directions, because each is a different failure. A `ToolsPreset` member with no mapping is
-    a value pydantic accepts and `resolve` then cannot expand: a startup crash for a spelling this
+    Both directions, because each fails differently. A `ToolsPreset` member with no mapping is a
+    value pydantic accepts and `resolve` cannot expand: a startup crash for a spelling this
     service's own error message recommended. A mapping with no member is a surface nobody can ask
-    for, which is dead weight that reads as supported.
+    for, dead weight that reads as supported.
     """
 
     def test_every_preset_name_expands_to_tools(self) -> None:
@@ -194,12 +191,11 @@ class TestConfigAndTheRegistryAgreeAboutPresetNames:
         """The check the two above cannot make: they compare names, and a mapping is only as good as
         the tools it names.
 
-        Asserted against the registry and never against what `resolve` returned, which is the trap
-        here: a selection's own `tools` are built by *filtering* the registry, so
-        `resolve(...).tools - TOOL_NAMES` is empty whatever the mapping says, and a preset member
-        one character wrong would resolve one tool short with a test like that still green. `teams`
-        is derived from the registry and so passes trivially; the hand-written presets are what this
-        is for, and they arrive with the tools they name.
+        The trap is asserting against what `resolve` returned. A selection's own `tools` are built
+        by *filtering* the registry, so `resolve(...).tools - TOOL_NAMES` is empty whatever the
+        mapping says, and a preset member one character wrong would resolve one tool short with a
+        test like that still green. So this asserts against the registry. `teams` is derived from
+        the registry and passes trivially. The hand-written presets are what this is for.
         """
         for preset, members in PRESETS.items():
             unknown = sorted(set(members) - set(TOOL_NAMES))
@@ -234,9 +230,9 @@ class TestGetMeIsAlwaysOn:
 
     @pytest.mark.usefixtures("registry")
     def test_so_every_deployment_asks_for_at_least_one_permission(self) -> None:
-        """The consequence worth stating plainly: there is no such thing here as a consent screen
-        that asks for nothing. `User.Read` is the least-privileged delegated permission Microsoft
-        publishes and it needs no administrator."""
+        """No deployment here produces a consent screen that asks for nothing. `User.Read` is the
+        least-privileged delegated permission Microsoft publishes and it needs no
+        administrator."""
         selection = resolve(preset=None, enabled=[_SECOND])
 
         assert selection.permissions[0] == "User.Read"
@@ -279,9 +275,9 @@ class TestANarrowedSelectionAsksForLess:
     async def test_a_tool_left_out_takes_its_permission_with_it_and_is_not_registered(
         self, registry: _Registry
     ) -> None:
-        """The whole point, and the thing FastMCP's `enable`/`disable` transforms cannot do: they
-        hide a registered tool and leave the scopes already computed, so they shorten `tools/list`
-        and change nothing whatever about what the tenant is asked to grant."""
+        """What FastMCP's `enable` and `disable` transforms cannot do: they hide a registered tool
+        and leave the scopes already computed, so they shorten `tools/list` and change nothing about
+        what the tenant is asked to grant."""
         selection = resolve(preset=None, enabled=[_SECOND])
         mcp: FastMCP = FastMCP("selection-under-test", version="0")
 
@@ -298,8 +294,8 @@ class TestANarrowedSelectionAsksForLess:
     ) -> None:
         """The runtime half of the guard above, and the reason it is an assertion rather than an
         exception: a preset that lists a tool this server does not have is a defect in the registry,
-        not something an operator typed. Silence is the one answer it must not give — the tool would
-        simply not register, and its permission would simply not be asked for.
+        not something an operator typed. Silence is the one answer it must not give: the tool would
+        not register, and its permission would not be asked for.
         """
         monkeypatch.setattr(tools_module, "PRESETS", {ToolsPreset.TEAMS: (_SECOND, "secnod_tool")})
 
@@ -312,7 +308,7 @@ class TestANarrowedSelectionAsksForLess:
     def test_a_name_this_server_has_no_tool_for_aborts_and_lists_the_ones_it_has(self) -> None:
         """A typo must never quietly cost a tool: it would register one tool fewer and ask for one
         permission fewer than its operator believes, and the first sign of it is a model that cannot
-        find a tool the deployment was supposed to expose — long after everyone consented."""
+        find a tool the deployment was supposed to expose, long after everyone consented."""
         with pytest.raises(ValueError, match="no tool for") as refusal:
             resolve(preset=None, enabled=[_SECOND, "secnod_tool"])
 
@@ -322,8 +318,7 @@ class TestANarrowedSelectionAsksForLess:
 
 
 class TestResolveTrustsConfigToHaveAskedTheQuestion:
-    """The one-of rule is `SurfaceConfig`'s, so `resolve` asserts it rather than re-checking it —
-    and the assertion is what says so out loud instead of a comment nobody reads."""
+    """The one-of rule is `SurfaceConfig`'s, so `resolve` asserts it rather than re-checking it."""
 
     def test_neither_argument_is_a_programming_error_here(self) -> None:
         with pytest.raises(AssertionError, match="exactly one"):
@@ -336,8 +331,13 @@ class TestResolveTrustsConfigToHaveAskedTheQuestion:
 
 class TestRegisteringWhatWasSelected:
     async def test_the_real_registry_declares_exactly_the_selection(self) -> None:
-        """Against the real registry and a real server: with one tool in the tree this says the
-        always-on floor is registered, which is the claim every deployment here rests on."""
+        """The one test that compares what FastMCP lists against what the selection promised.
+
+        `Selection.tools` is built from each module's `TOOL_NAME`, and what a model can call is the
+        name that module passed to `@mcp.tool`. A tool registered under another spelling would
+        still be selected and still have its permission asked for, and would never appear in
+        `tools/list`. The stub registry hands FastMCP nothing, so no test over it can catch that.
+        """
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         mcp: FastMCP = FastMCP("registration-under-test", version="0")
 
@@ -351,10 +351,10 @@ class TestRegisteringWhatWasSelected:
 # Which tool mints the argument each consumer takes, written out rather than derived. Permissions do
 # not encode it and nothing in `src/` guards it: a selection that enables a consumer without its
 # producer starts, and the tool's own refusal names the missing tool on first use (F4 of the
-# design). Catching it there would need a second declaration on every tool file, an enum of argument
-# sources, a module in `shared/` to hold it and a validator — a large mechanism for a
-# misconfiguration the operator caused explicitly. What the presets *we ship* promise is narrower
-# and worth one assertion each: every tool in one can get its arguments from another member of it.
+# design). Catching it in `src/` would need a second declaration on every tool file, an enum of
+# argument sources, a module in `shared/` and a validator: a large mechanism for a misconfiguration
+# the operator caused explicitly. The presets this service ships promise something narrower, one
+# assertion each: every tool in one can get its arguments from another member of it.
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "list_channels": {"team_id": ("list_teams",)},
     "browse_channel": {
@@ -363,7 +363,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     },
     "read_message": {"uri": ("search_messages", "browse_channel")},
     # An Entra object id, which `get_me` is one source of by that argument's own description. Always
-    # satisfied, because `get_me` is the floor — recorded anyway, so the guard below can insist that
+    # satisfied, because `get_me` is the floor. Recorded anyway, so the guard below can insist that
     # an argument naming a tool is classified as minted rather than as the caller's to compose.
     "search_messages": {"mentions": ("get_me",)},
     "list_meeting_transcripts": {"meeting_uri": ("list_chats",)},
@@ -374,8 +374,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 
 # Arguments a caller composes rather than receives: `search_messages` requires at least one search
 # criterion, which its schema says with nine one-name `anyOf` branches. None is minted by a tool, so
-# none needs a producer — and listing them is what makes that a decision rather than a blind spot.
-# An argument named here has been looked at and found not to be a handle.
+# none needs a producer. Listing them makes that a decision rather than a blind spot. An argument
+# named here has been looked at and found not to be a handle.
 _COMPOSED_BY_THE_CALLER: frozenset[str] = frozenset(
     {
         "query",
@@ -395,8 +395,8 @@ def _required_arguments(schema: Mapping[str, object]) -> set[str]:
 
     Not just the top-level `required`: a tool that requires "at least one of these" says it with a
     `required` inside each branch of an `anyOf`, and reading only the top level would report
-    `search_messages` as requiring nothing at all. So the whole schema is walked, and classifying is
-    done above rather than by where JSON Schema happened to put the word.
+    `search_messages` as requiring nothing at all. So the whole schema is walked, and the
+    classifying is done above rather than by where JSON Schema put the word.
     """
     found: set[str] = set()
     pending: list[object] = [schema]
@@ -426,15 +426,15 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
     """A preset is a use case, so every tool in one has to be reachable inside it.
 
     The failure this catches can have **no permission signature at all**. `teams-messages` without
-    `search_messages` asks for the identical three permissions — `User.Read`, `Chat.Read` and
-    `ChannelMessage.Read.All`, because `read_message` declares the last two itself — and exposes a
-    `read_message` nothing in the preset can address, since the handle it takes is minted by a tool
-    that is not there. Nothing about the consent screen would look wrong.
+    `search_messages` asks for the identical three permissions, `User.Read`, `Chat.Read` and
+    `ChannelMessage.Read.All`, because `read_message` declares the last two itself. It also exposes
+    a `read_message` nothing in the preset can address, because the handle it takes is minted by a
+    tool that is not there. Nothing about the consent screen would look wrong.
 
-    Written per preset against a table of argument sources, which is the trade the design records
-    (F4): the presets we ship are hand-written sets, so their sanity is one assertion each rather
-    than a mechanism in the registry. A hand-written `TOOLS_ENABLED` may still name a consumer
-    without its producer, and the tool's own refusal names the missing tool on first use.
+    Written per preset against a table of argument sources, the trade the design records (F4): the
+    presets this service ships are hand-written sets, so each is one assertion rather than a
+    mechanism in the registry. A hand-written `TOOLS_ENABLED` may still name a consumer without its
+    producer, and the tool's own refusal names the missing tool on first use.
     """
 
     def test_the_table_is_about_tools_this_server_has(self) -> None:
@@ -456,9 +456,9 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         schemas rather than off the table.
 
         A tool arriving with a required argument nobody classified would leave the check below
-        passing while saying nothing about that argument — which is how the table came to record
-        only one of `browse_channel`'s two required ids. Every required argument has to be one of
-        two things: minted by another tool, or composed by the caller. Nothing may be neither.
+        passing while saying nothing about that argument. That is how the table came to record only
+        one of `browse_channel`'s two required ids. Every required argument has to be one of two
+        things: minted by another tool, or composed by the caller. Nothing may be neither.
         """
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         mcp: FastMCP = FastMCP("argument-survey", version="0")
@@ -481,13 +481,13 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         )
 
     async def test_an_argument_whose_prose_names_a_tool_is_classified_as_minted(self) -> None:
-        """The classification's own guard, and the reason it is not just a claim in a comment.
+        """The classification's own guard.
 
         `_COMPOSED_BY_THE_CALLER` is a flat list of names, so putting a handle in it would satisfy
         the completeness check above and quietly stop the reachability check below from asking about
-        that tool at all. What tells the two apart is already written where it cannot drift: a
-        minted argument names its producer in its own description, because that is how a model is
-        told where to get one. So an argument whose prose names a tool must be recorded as minted.
+        that tool at all. A minted argument names its producer in its own description, because that
+        is how a model is told where to get one, so an argument whose prose names a tool must be
+        recorded as minted.
         """
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         mcp: FastMCP = FastMCP("prose-survey", version="0")
@@ -542,7 +542,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
     @pytest.mark.parametrize("preset", list(ToolsPreset))
     def test_it_is_narrower_than_everything_or_is_everything(self, preset: ToolsPreset) -> None:
         """A curated preset that quietly resolved to the whole surface would ask every tenant for
-        every permission while reading as a narrow deployment — the exact thing this feature exists
+        every permission while reading as a narrow deployment: the exact thing this feature exists
         to stop, hidden behind a name that promises the opposite."""
         selection = resolve(preset=preset, enabled=None)
 
@@ -555,10 +555,10 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 # What each curated preset costs a tenant, transcribed from the design document's own table: the
 # permissions it asks every user to consent to, how many of those need an administrator, and how
 # many tools it exposes (counting the always-on floor). Written out rather than derived from
-# `PRESETS`, because a derivation agrees with any mistake in `PRESETS` — which is what makes the
+# `PRESETS`, because a derivation agrees with any mistake in `PRESETS`. Writing it out makes the
 # promise these presets exist for, "one admin consent and no ChannelMessage.Read.All for a
-# transcripts deployment", checkable rather than circular. The test below it states that one row on
-# its own, because it is the row the feature was built for.
+# transcripts deployment", checkable rather than circular. The last test below states that row on
+# its own.
 _PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 2),
     (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 4),
@@ -613,10 +613,9 @@ _PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
 class TestWhatEachPresetCostsATenant:
     """The consent screen each preset produces, which is the whole of what an operator is choosing.
 
-    This is the assertion the feature is for. A preset whose tools drifted would still resolve,
-    still register and still start; the only visible difference would be a permission on a consent
-    screen a tenant already agreed to, and by then the deployment cannot be narrowed without every
-    user signing in again.
+    A preset whose tools drifted would still resolve, still register and still start. The only
+    visible difference would be a permission on a consent screen a tenant already agreed to, and by
+    then the deployment cannot be narrowed without every user signing in again.
     """
 
     def test_every_preset_has_a_cost_written_down(self) -> None:
@@ -645,9 +644,8 @@ class TestWhatEachPresetCostsATenant:
         assert len(selection.tools) == tools
 
     def test_the_transcripts_deployment_does_not_pay_for_channel_messages(self) -> None:
-        """The commercially important row, stated on its own because it is the claim the design is
-        built on: reading meeting transcripts costs one admin consent and does not drag in the
-        permission to read every channel message in the tenant."""
+        """The claim the design is built on: reading meeting transcripts costs one admin consent
+        and does not drag in the permission to read every channel message in the tenant."""
         selection = resolve(preset=ToolsPreset.TEAMS_TRANSCRIPTS, enabled=None)
 
         assert "ChannelMessage.Read.All" not in selection.permissions

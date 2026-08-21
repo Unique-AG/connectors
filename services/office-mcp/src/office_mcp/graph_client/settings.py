@@ -1,7 +1,7 @@
-"""Configuration for the Graph transport, injected not read from environment.
+"""Graph transport configuration, injected rather than read from the environment.
 
-graph_client/ cannot import office_mcp.config. A transport that reads the environment can
-diverge from the app's config. create_app translates app config into this type and injects it.
+`graph_client/` cannot import `office_mcp.config`. A transport that read the environment could
+diverge from the app's config, so `create_app` translates app config into this type.
 """
 
 from dataclasses import dataclass
@@ -11,17 +11,15 @@ from dataclasses import dataclass
 class GraphSettings:
     """Request timeout, connect timeout, and retry count for Graph calls.
 
-    The SDK defaults are 100 s read, 30 s connect, 3 retries. Those suit batch clients: four
-    attempts at 100 s each, plus Retry-After sleeps, equals 15 minutes per tool call. MCP
-    clients give up much sooner. These values are sized for interactive calls.
+    The SDK defaults are 100 s read, 30 s connect, 3 retries, sized for batch clients: four
+    attempts at 100 s each, plus Retry-After sleeps, is 15 minutes per tool call. An MCP client
+    gives up long before that. `max_retries` still keeps the SDK's 3, because waiting out
+    Retry-After is Graph's documented throttling contract and giving up on the first 429 accrues
+    quota without getting an answer.
 
-    max_retries keeps the SDK's 3 by design. Waiting out Retry-After and retrying is Graph's
-    documented throttling contract. A client giving up on the first 429 accrues quota without
-    getting an answer.
-
-    The defaults below are the values the service ships with, not the values it runs with: the
-    matching `AppConfig` fields are what an operator sets, and `create_app` passes all three. They
-    are kept here as well so that a `GraphSettings()` written in a test is the deployed shape.
+    These defaults are what the service ships with, not what it runs with. `create_app` passes all
+    three from the matching `AppConfig` fields, and they are repeated here so a `GraphSettings()`
+    in a test is the deployed shape.
     """
 
     request_timeout_seconds: float = 30.0

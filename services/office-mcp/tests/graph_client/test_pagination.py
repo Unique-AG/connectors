@@ -32,7 +32,7 @@ class RecordedPages:
 
     The histogram itself is asserted on in `tests/test_graph_metrics.py`, from inside a
     `graph_errors` block: `observability` drops a count taken outside one, and every walk here is
-    outside one. What is worth pinning in this file is the number this module arrives at.
+    outside one. What this file pins is the number this module arrives at.
     """
 
     def __init__(self) -> None:
@@ -89,7 +89,7 @@ class TestFollowingNextLink:
     async def test_the_next_link_is_replayed_verbatim(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole URL is the cursor; Graph documents that its `$skiptoken` is not ours to
+        """The whole URL is the cursor. Graph documents that its `$skiptoken` is not ours to
         take apart and re-send under our own query parameters."""
         mock_two_pages(graph)
         first = await client.me.chats.get()
@@ -105,7 +105,7 @@ class TestFollowingNextLink:
         """The SDK quirk this walk exists to close, and what it costs the tools above.
 
         `PageIterator.enumerate` returns False for a page whose `value` is empty and
-        `PageIterator.iterate` reads that as the end of the collection — so the SDK's own walk over
+        `PageIterator.iterate` reads that as the end of the collection, so the SDK's own walk over
         `[items + nextLink]`, `[nothing + nextLink]`, `[the last item]` stops on the middle page.
         Every tool over this module reports "that is all of it" by coming back short of `limit`, so
         a walk that stops there does not merely lose chats: it turns a window Graph had more behind
@@ -162,7 +162,7 @@ class TestAFirstPageCarryingNoValueAtAll:
     async def test_a_first_page_with_no_value_but_a_next_link_is_walked_through(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The shape the known issue on `getAllRecordings`/`getAllTranscripts` produces: a token
+        """The shape the known issue on `getAllRecordings` and `getAllTranscripts` produces: a token
         reset answers 200 with nothing in it and a `@odata.nextLink` still set. Landing on the
         first request rather than a later one must not change what the walk does with it."""
         graph.get("/me/chats", params={"$skiptoken": "synthetic-page-2"}).mock(
@@ -184,7 +184,7 @@ class TestAFirstPageCarryingNoValueAtAll:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The walk reads page one as empty by standing in a copy for it, not by writing an empty
-        list over what the caller handed it — the caller keeps whatever Graph actually sent."""
+        list over what the caller handed it: the caller keeps whatever Graph actually sent."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(200, json={"@odata.context": f"{GRAPH_V1}/$metadata#chats"})
         )
@@ -333,8 +333,8 @@ class TestTheCaps:
         cap has to bound what was *looked at*, not what was kept.
 
         `max_scanned` is a parameter rather than only a constant because a caller with a small
-        collection and a tighter request budget passes its own; the default is the safety valve for
-        a caller that has no opinion."""
+        collection and a tighter request budget passes its own. The default is the safety valve
+        for a caller that has no opinion."""
         mock_two_pages(graph)
         first = await client.me.chats.get()
         assert first is not None
@@ -373,13 +373,13 @@ class TestTheCaps:
         """Following an empty page means a run of them must be bounded, and bounding items does not
         bound it: a page with nothing in it spends a request and no scan budget at all.
 
-        `MAX_EMPTY_PAGES` is that bound, and it is counted against nothing else. The tempting
-        arithmetic is to pool it — `max_scanned` requests plus this allowance for the whole walk,
-        on the grounds that at most `max_scanned` requests can go on pages that carried anything, so
-        the rest bounds the empty ones. A collection answering nothing but empty pages spends *no*
-        scan budget, so the whole pool would be theirs. Hence the count is pinned to the requests it
-        actually costs rather than to a formula: the caller's own first page plus `MAX_EMPTY_PAGES`
-        followed after it, whatever `max_scanned` is.
+        `MAX_EMPTY_PAGES` is that bound, counted against nothing else. The tempting arithmetic is
+        to pool it: `max_scanned` requests plus this allowance for the whole walk, on the grounds
+        that at most `max_scanned` requests can go on pages that carried anything, so the rest
+        bounds the empty ones. A collection answering nothing but empty pages spends *no* scan
+        budget, so the whole pool would be theirs. So the count is pinned to the requests it costs:
+        the caller's own first page plus `MAX_EMPTY_PAGES` followed after it, whatever `max_scanned`
+        is.
         """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -402,9 +402,9 @@ class TestTheCaps:
     ) -> None:
         """The same collection at the module's own `max_scanned`, which is what production passes.
 
-        This is the measurement a pooled budget would get wrong by two orders of magnitude: the
-        bound has to be the same 11 requests whether the walk was allowed 3 items or 1000, because
-        neither number says anything about pages that carried none.
+        A pooled budget would get this wrong by two orders of magnitude: the bound has to be the
+        same 11 requests whether the walk was allowed 3 items or 1000, because neither number says
+        anything about pages that carried none.
         """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -424,9 +424,9 @@ class TestTheCaps:
     ) -> None:
         """Why the bound is per run rather than per walk. Graph does answer the occasional empty
         page in the middle of a collection that is otherwise fine, so a walk over more of them *in
-        total*
-        than the allowance — with an item between each — is making progress and must not be given up
-        on. A page carrying an item starts the count again; only a run of nothing is refused.
+        total* than the allowance, with an item between each, is making progress and must not be
+        given up on. A page carrying an item starts the count again. Only a run of nothing is
+        refused.
         """
         pages = MAX_EMPTY_PAGES + 4
         for index in range(pages):
@@ -540,12 +540,12 @@ class TestTheBoundIsNotAnAssertion:
     def test_the_bound_still_stops_the_walk_under_python_O(self) -> None:
         """`python -O` strips `assert` statements, so a bound written as one is not a bound at all.
 
-        This is why the refusal is a raise, and it cannot be tested in-process: `__debug__` is
-        fixed when the interpreter starts. So the empty-page test is re-run in a child interpreter
-        started with `-O`, where a walk with nothing to stop it follows a collection that never
-        ends — which is why the child is given a deadline and why running out of it is reported as
-        the failure it is. Write the bound as an `assert` and this test fails: either the child
-        hangs on the endless collection, or `pytest.raises` reports that nothing was raised.
+        So the refusal is a raise, and it cannot be tested in-process: `__debug__` is fixed when
+        the interpreter starts. The empty-page test is re-run in a child interpreter started with
+        `-O`, where a walk with nothing to stop it follows a collection that never ends, so the
+        child is given a deadline and running out of it is reported as the failure it is. Write the
+        bound as an `assert` and this test fails: either the child hangs on the endless collection,
+        or `pytest.raises` reports that nothing was raised.
         """
         stripped = subprocess.run(
             [sys.executable, "-O", "-c", "print(__debug__)"],

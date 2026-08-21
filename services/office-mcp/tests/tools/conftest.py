@@ -1,10 +1,11 @@
 """A mocked graph.microsoft.com, and a Graph client that calls it as a synthetic user.
 
-The same three fixtures the other test directories build, built here too rather than imported
-across: a tool file's tests reach for nothing outside the tool and its `shared/` vocabulary, and a
-test package that imported another test package's fixtures would make the directories as tangled as
-the modules used to be. Every payload in this directory is invented — the ids are obviously fake,
-the domains are `.invalid`, and the names are from the public domain.
+The other test directories build the same three fixtures. They are duplicated here rather than
+imported across: a tool file's tests reach for nothing outside the tool and its `shared/`
+vocabulary, and no test package should depend on another one's fixtures.
+
+Every payload in this directory is invented: the ids are fake, the domains are `.invalid`, and the
+names are from the public domain.
 """
 
 from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
@@ -18,7 +19,7 @@ from office_mcp.graph_client import GraphSettings, create_graph_transport, graph
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
-# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters here.
+# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters.
 CALLER_TOKEN = "synthetic-graph-access-token"
 
 
@@ -47,9 +48,9 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
 # trip pass over two different meetings.
 
 # A join URL shaped like the ones Graph actually stores, and the reason the escaping is a bug class:
-# it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b`/`%22`
-# in its value, and an `&` parameter after it. Every one of those breaks a `$filter` that is encoded
-# too little, too much, or not at all — and breaks it into `200 OK` with an empty result.
+# it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b` and
+# `%22` in its value, and an `&` parameter after it. Every one of those breaks a `$filter` that is
+# encoded too little, too much, or not at all, and breaks it into `200 OK` with an empty result.
 JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -60,9 +61,9 @@ MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
 
 # The signed-in user, and somebody else, as `GET /me` answers and as a recording's organiser is
 # named. Two ids rather than one because the whole of the organiser-only rule is which of them the
-# recording belongs to, and `ME` is here for a second reason besides: it is the unrelated call a
-# tool's tests reach for when what they are proving is that a request configuration built for one
-# call did not change every other one.
+# recording belongs to, and `ME` is here for a second reason: it is the unrelated call a tool's
+# tests reach for when they are proving that a request configuration built for one call did not
+# change every other one.
 SIGNED_IN_USER_ID = "00000000-0000-4000-8000-000000000001"
 OTHER_USER_ID = "00000000-0000-4000-8000-000000000002"
 
@@ -102,7 +103,7 @@ def transcript_payload(
     ended_at: str | None = "2026-02-10T14:58:02.117Z",
     content_correlation_id: str | None = "bc842d7a-2f6e-4b18-a1c7-73ef91d5c8e3",
 ) -> dict[str, object]:
-    """One `callTranscript`, which is metadata only — the words come from `/content`."""
+    """One `callTranscript`, which is metadata only: the words come from `/content`."""
     return {
         "id": transcript_id,
         "meetingId": meeting_id,
@@ -123,12 +124,12 @@ def recording_payload(
     organizer_user_id: str | None = OTHER_USER_ID,
     organizer_odata_type: str = "#microsoft.graph.teamworkUserIdentity",
 ) -> dict[str, object]:
-    """One `callRecording`, which is metadata only — the bytes are an MP4 nothing here fetches.
+    """One `callRecording`, which is metadata only: the bytes are an MP4 nothing here fetches.
 
     `organizer_odata_type` is a parameter because Microsoft's own list-recordings sample sends
     `#Microsoft.Teams.GraphSvc.teamworkUserIdentity` on this property, which is not a type the SDK
     knows: an unknown discriminator has to keep deserializing rather than take the listing down.
-    There is no duration, size or media-type property on this resource; that is not an omission
+    There is no duration, size or media-type property on this resource. That is not an omission
     here.
     """
     user = (
@@ -160,7 +161,7 @@ def recording_payload(
 
 # The Teams-message payloads, here rather than in one of the two test files that use them: a search
 # hit and a full message are what `search_messages` and `read_message` are respectively about, and
-# each tool's tests need one of the other's — a hit to read by its own handle, a message to read it
+# each tool's tests need one of the other's: a hit to read by its own handle, a message to read it
 # into. Two copies of either would let the round trip pass over two different messages.
 
 # The sender shape a search hit carries: Teams messages are indexed out of the substrate mailbox,
@@ -190,7 +191,7 @@ def chat_hit(
 ) -> dict[str, object]:
     """One `searchHit` over a chat message, in the reduced projection Graph returns.
 
-    `sender=None` produces a system event message — Graph sends `from: null` and a body of the
+    `sender=None` produces a system event message. Graph sends `from: null` and a body of the
     literal `<systemEventMessage/>` for those, and the projection carries neither `messageType`
     nor `eventDetail` to name them by.
     """
@@ -245,7 +246,7 @@ def message_payload(
 ) -> dict[str, object]:
     """One full `chatMessage`, as `GET /chats/{id}/messages/{id}` returns it.
 
-    Unlike a search hit this carries a `body` — which is the whole reason a reader exists — and the
+    Unlike a search hit this carries a `body`, which is the whole reason a reader exists, and the
     Teams-shaped sender rather than the mailbox-shaped one.
     """
     return {
@@ -279,8 +280,8 @@ def search_response(
 ) -> dict[str, object]:
     """A `POST /search/query` response around `hits`, or around no `hits` key at all.
 
-    Graph nests one response per request and one container per entity type; since it honours a
-    single request over a single entity type, there is only ever one of each.
+    Graph nests one response per request and one container per entity type. It honours a single
+    request over a single entity type, so there is only ever one of each.
     """
     container: dict[str, object] = {"moreResultsAvailable": more_results_available}
     if hits is not None:

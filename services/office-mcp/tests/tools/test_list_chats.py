@@ -1,9 +1,9 @@
 """`list_chats`: the query Graph is sent, and the traps in what comes back.
 
 The chat payloads are built here rather than in the package conftest because they are this tool's
-own — a chat, its expanded members and the `onlineMeetingInfo` a meeting chat carries are what
-`list_chats` reads and what nothing else reads. Every one of them is invented: the ids are obviously
-fake, the domains are `.invalid`, and the names are from the public domain.
+own: a chat, its expanded members and the `onlineMeetingInfo` a meeting chat carries are what
+`list_chats` reads and what nothing else reads. Every one of them is invented: the ids are fake, the
+domains are `.invalid`, and the names are from the public domain.
 """
 
 from collections.abc import Mapping, Sequence
@@ -42,8 +42,9 @@ def chat_payload(
 ) -> dict[str, object]:
     """One `chat` as `GET /me/chats?$expand=members,lastMessagePreview` returns it.
 
-    `onlineMeetingInfo` is in the default projection of this collection — Graph sends it as null for
-    every chat that is not a meeting's — so it is always present here and only sometimes populated.
+    `onlineMeetingInfo` is in the default projection of this collection, and Graph sends it as null
+    for every chat that is not a meeting's, so it is always present here and only sometimes
+    populated.
     """
     payload: dict[str, object] = {
         "id": chat_id,
@@ -64,10 +65,10 @@ def chat_payload(
 
 
 # A join URL shaped like the ones Graph actually stores, and the reason the escaping is a bug class:
-# it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b`/`%22`
-# in its value, and an `&` parameter after it. Every one of those breaks a `$filter` that is encoded
-# too little, too much, or not at all — and breaks it into `200 OK` with an empty result. Nothing
-# here sends that filter; this is the URL the handle a meeting chat carries has to survive carrying.
+# it carries `%3a` and `%40` that are already percent-escaped, a `?context=` query with `%7b` and
+# `%22` in its value, and an `&` parameter after it. Every one of those breaks a `$filter` that is
+# encoded too little, too much, or not at all, and breaks it into `200 OK` with an empty result.
+# Nothing here sends that filter. This is the URL the handle a meeting chat carries has to survive.
 JOIN_WEB_URL = (
     "https://teams.microsoft.invalid/l/meetup-join/"
     + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
@@ -101,8 +102,8 @@ class TestTheQueryItSends:
         """The three query parameters this tool's contract rests on.
 
         Dropping `$orderby` silently returns *some* chats instead of the recent ones, and dropping
-        an expansion silently empties `members` or `last_message_at` — all three failures look
-        like a working tool.
+        an expansion silently empties `members` or `last_message_at`. All three failures look like
+        a working tool.
         """
         route = graph.get("/me/chats").mock(
             return_value=httpx.Response(200, json={"value": [chat_payload("19:a@thread.v2")]})
@@ -186,9 +187,9 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph documents an unnamed chat as `topic: null`, and an empty string as neither in nor
-        out. It survives the SDK intact — kiota reads a string as a string — so `""` would be a name
-        to the roster test and no name to the reader, leaving a chat with nothing but its thread id
-        to identify it. A blank topic is reported as null instead.
+        out. It survives the SDK intact, because kiota reads a string as a string, so `""` would be
+        a name to the roster test and no name to the reader, leaving a chat with nothing but its
+        thread id to identify it. A blank topic is reported as null instead.
         """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -260,10 +261,10 @@ class TestWhatTheCallerIsTold:
         """Graph returns at most 25 members per chat on this endpoint and says nothing about it,
         so a model summarising "who is in this chat" from the list is wrong without a flag.
 
-        The chat below has *exactly* the cap's worth of members, which is the case the flag may
-        not overclaim on: nothing was dropped from it, and Graph's response is byte-for-byte what
-        a 200-person chat's would be. So the flag is raised — 25-of-25 and 25-of-200 have to be
-        treated alike — and says only that members may be missing.
+        The chat below has *exactly* the cap's worth of members, and the flag may not overclaim on
+        it: nothing was dropped, and Graph's response is byte-for-byte what a 200-person chat's
+        would be. So the flag is raised, because 25-of-25 and 25-of-200 have to be treated alike,
+        and it says only that members may be missing.
         """
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -310,7 +311,7 @@ class TestWhatTheCallerIsTold:
     ) -> None:
         """The whole of meeting discovery, and the reason there is no second tool for it: a meeting
         chat is already listed here with its subject and its recency, and `onlineMeetingInfo` is
-        in this collection's default projection — so the handle that reaches the meeting behind it
+        in this collection's default projection, so the handle that reaches the meeting behind it
         costs no extra request and no extra permission."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
@@ -340,7 +341,7 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The unverified half of the discovery path. `joinWebUrl` is documented on the chat
-        resource and modelled by the SDK, but no live call has proved it is always populated — and
+        resource and modelled by the SDK, but no live call has proved it is always populated, and
         it is the only documented route from a chat to its meeting. So a null is reported as a null:
         no handle, and nothing invented from the chat id to stand in for one."""
         graph.get("/me/chats").mock(
@@ -366,7 +367,7 @@ class TestWhatTheCallerIsTold:
 
     def test_the_handle_field_says_a_null_is_a_dead_end(self) -> None:
         """A model reads this description, and the honest reading of a null is "there is no route",
-        not "try something else" — there is nothing else to try."""
+        not "try something else". There is nothing else to try."""
         description = chats.ChatSummary.model_fields["meeting_uri"].description
 
         assert description is not None
@@ -377,11 +378,11 @@ class TestWhatTheCallerIsTold:
         )
 
     def test_the_chat_id_field_forbids_building_a_handle_rather_than_explaining_how(self) -> None:
-        """This wording is the whole guardrail, which is why it is asserted. A chat handle is not
-        enforcement-backed: `handles.message_handle` matches an unencoded `19:...@thread.v2`, so a
-        hand-built handle parses and reaches Graph. A description that names the second half of the
-        format teaches the recipe from the one tool that cannot supply it — `list_chats` returns no
-        message ids — so the prohibition is unconditional and the format is not spelled out here.
+        """This wording is the whole guardrail. A chat handle is not enforcement-backed:
+        `handles.message_handle` matches an unencoded `19:...@thread.v2`, so a hand-built handle
+        parses and reaches Graph. A description that names the second half of the format teaches the
+        recipe from the one tool that cannot supply it, since `list_chats` returns no message ids,
+        so the prohibition is unconditional and the format is not spelled out here.
         """
         description = chats.ChatSummary.model_fields["chat_id"].description
 
@@ -418,8 +419,8 @@ class TestTheWindowAndItsHonesty:
     async def test_a_short_first_page_is_followed_rather_than_believed(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph documents that `$top` "might not return all chats within a single response" — so
-        a page shorter than `limit` with a next link is a paging artefact, not the end of the
+        """Graph documents that `$top` "might not return all chats within a single response", so a
+        page shorter than `limit` with a next link is a paging artefact, not the end of the
         collection. Believing it truncates the window for no reason."""
         # Registered before the unconstrained route below, which would otherwise also match the
         # second request and hand back page one again.
@@ -452,8 +453,8 @@ class TestTheWindowAndItsHonesty:
 
         Graph answers the occasional page with nothing in it and a cursor still set, and the SDK's
         own page walker treats an empty page as the end of the collection. Believing it here would
-        not merely drop chats — it would turn a window with more behind it into "you have one
-        chat", which is a claim about the user's tenant that nothing checked.
+        not merely drop chats. It would turn a window with more behind it into "you have one chat",
+        which is a claim about the user's tenant that nothing checked.
         """
         graph.get("/me/chats", params={"$skiptoken": "third"}).mock(
             return_value=httpx.Response(200, json={"value": [chat_payload("19:c@thread.v2")]})
@@ -504,8 +505,8 @@ class TestGraphFailures:
     async def test_throttling_carries_graphs_own_retry_after(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`Retry-After: 900` exceeds the SDK retry handler's 180 s ceiling, so it declines to
-        wait and the failure reaches the caller — which is the only case a tool has to explain."""
+        """`Retry-After: 900` exceeds the SDK retry handler's 180 s ceiling, so it declines to wait
+        and the failure reaches the caller, which is the only case a tool has to explain."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 429,

@@ -1,10 +1,10 @@
 """What every log line this service writes must and must not carry.
 
 Asserted through the **real** handler: `configure_logging` installs it, `unique_mcp`'s own pino
-formatter renders it, and the only thing these tests change is where its stream points. That is
-deliberate. The defects here are all properties of a formatter this service does not own — it copies
-every `extra=` into the payload and serialises whole exception stacks — so a test that formatted the
-records itself would assert against the wrong opponent.
+formatter renders it, and the only thing these tests change is where its stream points. The defects
+here are all properties of a formatter this service does not own, which copies every `extra=` into
+the payload and serialises whole exception stacks, so a test that formatted the records itself would
+assert against the wrong opponent.
 
 Four subjects, one per defect:
 
@@ -62,7 +62,7 @@ _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 _JWT = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub2JvZHkifQ.c2lnbmF0dXJl"
 
 # The two traces the session below runs under, one per request. Different on purpose: that is the
-# whole experiment, exactly as in `test_tracing.py`.
+# whole experiment, as in `test_tracing.py`.
 _INITIALIZE_TRACE = "cc3333333333333333333333333333cc"
 _TOOL_CALL_TRACE = "dd4444444444444444444444444444dd"
 _INITIALIZE_TRACEPARENT = f"00-{_INITIALIZE_TRACE}-3333333333333333-01"
@@ -107,9 +107,9 @@ def _pino_handler() -> logging.Handler:
     """The handler `configure_logging` installed, found by the formatter upstream puts on it.
 
     Not found by this service's own filters, which is the obvious way and the wrong one:
-    `configure_logging` installs those on *every* root handler, and under pytest there are five —
-    which is the property `test_no_handler_escapes_the_filters` asserts. The pino formatter is what
-    makes exactly one of them the one the pod's log pipeline reads.
+    `configure_logging` installs those on *every* root handler, and under pytest there are five, as
+    `test_no_handler_escapes_the_filters` asserts. The pino formatter is what makes exactly one
+    handler the one the pod's log pipeline reads.
     """
     handlers = [
         handler
@@ -127,9 +127,9 @@ def _pino_handler() -> logging.Handler:
 def sink() -> Iterator[_Sink]:
     """The real pino handler, writing where a test can read it.
 
-    `configure_logging` is idempotent and process-wide — `create_app` calls it too — so this
-    restores the stream and the root level rather than the handler: removing it would leave a
-    later `create_app` in this session with no handler to reinstall.
+    `configure_logging` is idempotent and process-wide, and `create_app` calls it too, so this
+    restores the stream and the root level rather than the handler. Removing the handler would
+    leave a later `create_app` in this session with none to reinstall.
     """
     root = logging.getLogger()
     level = root.level
@@ -149,8 +149,8 @@ def sink() -> Iterator[_Sink]:
 def _log(message: str, *args: object, **extra: object) -> None:
     """One line, from a logger this service has never heard of.
 
-    The name is the point: the filters are on the handler, so what redacts a line does not depend
-    on which logger wrote it — a vendor module, a framework, or a name invented in a later release.
+    The filters are on the handler, so what redacts a line does not depend on which logger wrote
+    it, whether a vendor module, a framework, or a name invented later.
     """
     logging.getLogger("some.vendor.module").info(message, *args, extra=extra or None)
 
@@ -217,8 +217,8 @@ class TestNothingSecretReachesTheLog:
         self, sink: _Sink
     ) -> None:
         """The second net. A token reaches this service on every request, and the field it ends up
-        in is not always one a name check would suspect — an httpx exception's `repr` of the
-        request it failed to send is a string, and this is that string."""
+        in is not always one a name check would suspect. An httpx exception's `repr` of the request
+        it failed to send is a string, and this is that string."""
         _log("failed", detail=f"<Request headers={{'authorization': 'Bearer {_JWT}'}}>")
 
         assert CENSORED in cast("str", sink.one()["detail"])
@@ -380,7 +380,7 @@ class TestNothingSecretReachesTheLog:
         assert err["message"] == f"postgresql://{CENSORED}@db.internal:5432/office"
 
     def test_the_callers_own_dictionary_is_not_touched(self, sink: _Sink) -> None:
-        """Redaction rebuilds; it does not edit. The caller is still holding these headers and
+        """Redaction rebuilds rather than edits. The caller is still holding these headers and
         still going to send them, so censoring in place would corrupt the request the line is
         about."""
         headers = {"Authorization": f"Bearer {_JWT}"}
@@ -424,10 +424,10 @@ class TestNoLineLeavesByAnotherDoor:
     @pytest.mark.usefixtures("sink")
     def test_no_logger_keeps_its_own_way_out(self) -> None:
         """A logger with handlers of its own and `propagate = False` bypasses both the formatter and
-        the filters. FastMCP configures itself exactly that way at import time, which is why
-        `configure_logging` takes its logger back — and this is the ratchet for the next dependency
-        that does the same. If it fails, add the logger to `_RECLAIMED_LOGGERS` after reading why it
-        wanted its own handler.
+        the filters. FastMCP configures itself that way at import time, which is why
+        `configure_logging` takes its logger back. This test catches the next dependency that does
+        the same. If it fails, add the logger to `_RECLAIMED_LOGGERS` after reading why it wanted
+        its own handler.
         """
         registry = cast("Mapping[str, object]", logging.Logger.manager.loggerDict)
         escaping = [
@@ -484,7 +484,7 @@ class TestEveryLineIsJoinable:
         self, sink: _Sink, app: Starlette
     ) -> None:
         """The mechanism has to work outside any MCP call. `/ready` is a plain HTTP route, and with
-        tracing off there is no span on it either — so the id comes from the ASGI middleware."""
+        tracing off there is no span on it either, so the id comes from the ASGI middleware."""
         with TestClient(app) as client:
             sink.stream.truncate(0)
             _ = sink.stream.seek(0)
@@ -518,15 +518,15 @@ class TestEveryLineIsJoinable:
 
 
 class TestTheSdkLineThisServiceQuiets:
-    """The one line in a tool call that cannot carry the right trace id, plus its ratchet."""
+    """The one line in a tool call that cannot carry the right trace id, and the guard on it."""
 
     def test_the_sdk_still_writes_the_line_this_service_matches(self) -> None:
         """A drift guard, not a style check. Quieting is matched on the SDK's own message template,
         so an SDK that renames it would leave this service quieting nothing and emitting a stale
-        trace id again — silently, because both halves keep working.
+        trace id again, silently, because both halves keep working.
 
-        Re-read `mcp/server/lowlevel/server.py` and `src/office_mcp/logging.py` together when this
-        fails: either the template moved, or the line no longer runs before the request handler.
+        When this fails, re-read `mcp/server/lowlevel/server.py` and `src/office_mcp/logging.py`
+        together: either the template moved, or the line no longer runs before the request handler.
         """
         source = pathlib.Path(inspect.getfile(sdk_server)).read_text(encoding="utf-8")
 
@@ -610,7 +610,7 @@ class TestOneLinePerMessageInTheRightTrace:
     def test_no_line_about_the_tool_call_is_in_the_initialize_trace(
         self, lines: Sequence[Mapping[str, object]]
     ) -> None:
-        """The whole point, stated over every line rather than over the one that used to be wrong.
+        """Stated over every line rather than over the one that used to be wrong.
 
         The first assertion guards the second: `initialize` really did run under its own
         traceparent, so this is the trace lines used to be swept into and not an id nothing
@@ -642,7 +642,7 @@ class TestABootedServerHonoursTheLogContract:
     The chart labels the pod `logging.unique.app/format: pino-json` and the pipeline reads stderr,
     so a plain-text line, or any line at all on stdout, is a line that is lost. Left to its default,
     uvicorn applies its own `dictConfig` after this service configured logging and writes its access
-    lines to stdout in plain text; `main.py` passes `log_config=None` to stop that.
+    lines to stdout in plain text. `main.py` passes `log_config=None` to stop that.
     """
 
     def test_nothing_is_written_to_stdout(self, booted: "_BootedServer") -> None:
@@ -696,8 +696,8 @@ class TestABootedServerHonoursTheLogContract:
 
 
 def _install_tracer_provider() -> None:
-    """Make span contexts valid. A provider can only be installed once per process, so this reuses
-    whichever one is already in play — the same shape `test_tracing.py` uses."""
+    """Make span contexts valid. The tracer provider is process-wide and can be set only once, so
+    this reuses whichever provider is in play, the same shape `test_tracing.py` uses."""
     if not isinstance(trace.get_tracer_provider(), TracerProvider):
         trace.set_tracer_provider(TracerProvider())
 
@@ -736,11 +736,11 @@ def entra(monkeypatch: pytest.MonkeyPatch) -> None:
     Autouse because a fixture that only patches is nothing a test would otherwise name, and every
     request in this file that reaches `/mcp` is authenticated.
 
-    The token check is stubbed so the transport can be driven without an Entra round trip — and
+    The token check is stubbed so the transport can be driven without an Entra round trip, and
     reusing one session across two requests is the condition the defect lives in. The exchange is
-    refused rather than stubbed because a tool call must not reach the network: what this file is
-    about is the log lines a real `tools/call` produces, and a refused exchange produces the whole
-    set — the message line, the operations layer's failure line, and the cause chain under it.
+    refused rather than stubbed because a tool call must not reach the network, and a refused
+    exchange still produces the whole set of log lines: the message line, the operations layer's
+    failure line, and the cause chain under it.
     """
 
     async def verify_token(_self: AzureProvider, token: str) -> AccessToken:

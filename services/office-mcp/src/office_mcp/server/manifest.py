@@ -1,27 +1,27 @@
 """What this deployment resolved to, written for the person who has to act on it.
 
-An operator chooses a tool surface; Entra decides whether the sign-in that surface implies can
+An operator chooses a tool surface, and Entra decides whether the sign-in that surface implies can
 complete. **Nothing in this server can check the second against the first.** The session token's
-`scp` carries only `access_as_user` — Azure omits Graph scopes from it — so what the registration
-grants is invisible here. A scope the registration does not carry fails at the *authorize* hop: an
-unknown scope is rejected outright, and a real-but-unconsented admin-consent permission sends the
-user to "Need admin approval". Either way it is a login nobody can complete, with nothing in this
-server's logs, and the operator hears about it as a user complaint.
+`scp` carries only `access_as_user`, because Azure omits Graph scopes from it, so what the
+registration grants is invisible here. A scope the registration does not carry fails at the
+*authorize* hop: an unknown scope is rejected outright, and a real but unconsented admin-consent
+permission sends the user to "Need admin approval". Either way it is a login nobody can complete,
+with nothing in this server's logs, and the operator hears about it as a user complaint.
 
 So this is the only place the exact ask is written down, and these lines are what an operator hands
-their Entra administrator. It prints **no consent URL**: provisioning the app registration is
+their Entra administrator. It prints **no consent URL**. Provisioning the app registration is
 deliberately not this service's job, `/.default` would consent to whatever the registration happens
 to carry rather than to what this deployment asks for, and a scope-matched admin-consent URL needs a
-`redirect_uri` matching a registered one — the only Web redirect URI office-mcp registers is
+`redirect_uri` matching a registered one. The only Web redirect URI office-mcp registers is
 FastMCP's OAuth callback, which would render a *successful* consent as an error. The list is the
 deliverable.
 
 The description scan rides along, reporting tools whose prose points a model at a tool this
-deployment does not expose. It only ever **warns**, and that is a decision rather than a shortcut:
-the references are dense and mutual, so requiring every mention would drag `search_messages` — and
-with it `ChannelMessage.Read.All`, an administrator's signature — into a deployment that asked for
-nothing but `list_chats`, which is the opposite of what this feature is for. What the warning buys
-is that nobody is surprised a model was told about a tool it cannot call.
+deployment does not expose. It only ever **warns**, and that is a decision rather than a shortcut.
+The references are dense and mutual, so requiring every mention would drag `search_messages`, and
+with it `ChannelMessage.Read.All` and an administrator's signature, into a deployment that asked
+for nothing but `list_chats`. What the warning buys is that nobody is surprised a model was told
+about a tool it cannot call.
 """
 
 import re
@@ -40,15 +40,13 @@ from office_mcp.tools import ALWAYS_ON, TOOL_NAMES, Selection
 #
 # The `False` entries are what make this checkable. One test asserts the table answers for every
 # name in `REQUESTABLE_PERMISSIONS`, so a permission that arrives without a verdict is a failing
-# test rather than a manifest quietly telling an operator no administrator is needed — which is
-# exactly the sign-in nobody can complete that this module exists to prevent. A set holding only
-# the names that need consent could not tell "no" from "nobody said".
+# test rather than a manifest quietly telling an operator no administrator is needed. A set holding
+# only the names that need consent could not tell "no" from "nobody said".
 #
 # This is the one place a permission may be named before a tool declares it, and it is deliberately
-# the opposite of the rule `REQUESTABLE_PERMISSIONS` keeps about that: nothing here reaches an
-# authorize request, so a name written early costs a manifest line at worst, where a name added
-# early to what the connector *asks for* would wave through the spelling check that list exists to
-# be.
+# the opposite of the rule `REQUESTABLE_PERMISSIONS` keeps. Nothing here reaches an authorize
+# request, so a name written early costs a manifest line at worst, where a name added early to what
+# the connector *asks for* would wave through the spelling check that list exists to be.
 NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "User.Read": False,
     "Chat.Read": False,
@@ -60,9 +58,9 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "OnlineMeetingRecording.Read.All": True,
 }
 
-# The column the values line up in and the width the block wraps to. A tool list and a permission
-# list both outgrow one line, and a hanging indent is what keeps them readable in a log record and
-# in a terminal alike.
+# The column the values line up in, and the width the block wraps to. A tool list and a permission
+# list both outgrow one line, and a hanging indent keeps them readable in a log record and in a
+# terminal alike.
 _LABEL_WIDTH = 17
 _LINE_WIDTH = 96
 
@@ -123,7 +121,7 @@ def _row(label: str, value: str) -> str:
 def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
     """Where an exposed tool's prose points a model at a tool this deployment does not expose.
 
-    `ALWAYS_ON` can never appear here, because it is registered whatever the selection — which is
+    `ALWAYS_ON` can never appear here, because it is registered whatever the selection is. That is
     what lets the tools that send a model to it go on saying so in every deployment.
     """
     absent = tuple(name for name in TOOL_NAMES if name not in selection.tools)
@@ -140,7 +138,7 @@ def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
 
 
 def _mentions(prose: str, name: str) -> bool:
-    """Whether `prose` names the tool `name`, as a whole word rather than as a substring.
+    """Whether `prose` names the tool `name` as a whole word rather than as a substring.
 
     A tool name is one word to a reader and to this check: `read_message` is not mentioned by prose
     saying `read_messages`, and reporting it would be a note about a tool nobody referred to. Tool
@@ -165,7 +163,7 @@ def _prose_of(tool: Tool) -> str:
 
 
 def _descriptions(schema: Mapping[str, object] | None) -> list[str]:
-    """Every `description` anywhere in a JSON schema — parameters, fields, nested objects."""
+    """Every `description` anywhere in a JSON schema: parameters, fields, nested objects."""
     if schema is None:
         return []
     found: list[str] = []

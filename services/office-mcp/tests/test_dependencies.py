@@ -1,10 +1,9 @@
 """The declarations that keep two directly-imported packages from being dropped as redundant.
 
-`starlette` and `unique_toolkit` both reach this service transitively as well — starlette via
-`fastmcp`, unique-toolkit via `unique-mcp` — so the imports in `app.py` and `metrics.py` work
-whether or not `pyproject.toml` names them. That is the hazard: nothing fails today, and the
-declaration reads like duplication until the day a dependency drops its own edge and the import
-breaks at runtime instead of at resolve time.
+`starlette` also reaches this service through `fastmcp`, and `unique_toolkit` through
+`unique-mcp`, so the imports in `app.py` and `metrics.py` work whether or not `pyproject.toml`
+names them. Nothing fails today and the declaration reads like duplication, until an upstream
+package drops its own edge and the import breaks at runtime instead of at resolve time.
 
 Each pair below asserts both halves, so neither can drift alone: the import is really there
 (walked from the AST, not executed), and the package it needs is really declared.

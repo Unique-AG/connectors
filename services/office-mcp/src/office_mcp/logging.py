@@ -2,8 +2,8 @@
 
 `unique_mcp.logging.configure_logging` owns the format — one `StreamHandler` on stderr whose
 formatter renders a pino-json object, which is what the chart's `logging.unique.app/format:
-pino-json` pod label promises the log pipeline. That formatter is upstream code this service does
-not own, and it does two things this service has to live with:
+pino-json` pod label promises the log pipeline. That formatter is upstream code, and it does two
+things this service has to live with:
 
 * it copies **every** non-reserved `LogRecord` attribute into the payload, so anything a caller
   passes as `extra=` is logged verbatim — a header map, a config object, a DSN;
@@ -11,32 +11,30 @@ not own, and it does two things this service has to live with:
   exception is logged verbatim too.
 
 Neither is fixable where the log call is written: the leak is a property of the formatter, not of
-the caller. So the correction is a `logging.Filter` on the handler, which is the one seam that sits
-between a record and that formatter. `logging.Handler.handle` calls `self.filter(record)` and only
-then `self.emit(record)` → `self.format(record)`, so a filter here runs **before** the formatter,
-every time, for every record that handler emits — and a handler's filters do not care which logger
+the caller. So the correction is a `logging.Filter` on the handler, the one seam that sits between a
+record and that formatter. `logging.Handler.handle` calls `self.filter(record)` and only then
+`self.emit(record)` → `self.format(record)`, so a filter here runs **before** the formatter, every
+time, for every record that handler emits. A handler's filters also do not care which logger
 produced the record, so no logger name and no `propagate = False` can slip past one. A filter on a
 *logger* would have both holes: it would see only that logger's own records, and none from its
 children.
 
-Design decision: these filters mutate the record they are given, which the house rule against
-mutating arguments would otherwise forbid. A `logging.Filter` has no return path other than the
-record — the stdlib documents "modify the record in-place" as what a filter is for — and the record
-is a per-emit object the caller does not keep. What is *not* mutated is anything the caller still
-owns: a dict passed as `extra=` is rebuilt rather than edited in place, so redaction never reaches
-back into the header map the caller is still using. See `_redact`.
+These filters mutate the record they are given, which the house rule against mutating arguments
+would otherwise forbid. A `logging.Filter` has no return path other than the record, and the stdlib
+documents "modify the record in-place" as what a filter is for. The record is a per-emit object the
+caller does not keep. What is *not* mutated is anything the caller still owns: a dict passed as
+`extra=` is rebuilt rather than edited in place, so redaction never reaches back into the header map
+the caller is still using. See `_redact`.
 
 Four filters, each for one defect, installed in this order:
 
-`StaleMessageLineFilter` drops the MCP SDK's own per-message INFO line. See its docstring: that line
-is emitted before any middleware of ours can run, so it is the one line in a tool call that carries
-the wrong trace id, and `MessageLogMiddleware` below emits a strictly more informative replacement
-in the right one.
+`StaleMessageLineFilter` drops the MCP SDK's own per-message INFO line, which is emitted before any
+middleware of ours can run and so carries the wrong trace id. See its docstring.
 
 `ColorMessageFilter` drops uvicorn's `color_message` extra. uvicorn's own lifecycle lines carry the
 message a second time with ANSI escapes in it, for a formatter this service does not use.
 
-`CorrelationFilter` gives every line something joinable — a trace id, an MCP request id, an HTTP
+`CorrelationFilter` gives every line something joinable: a trace id, an MCP request id, an HTTP
 request id, or failing all three the id of this process's boot. See its docstring.
 
 `RedactionFilter` is the redaction, by field name and by value shape. See its docstring.
@@ -78,19 +76,17 @@ logger = logging.getLogger(__name__)
 CENSORED = "[Redacted]"
 
 
-# --------------------------------------------------------------------------------------------
-# Redaction
-# --------------------------------------------------------------------------------------------
+# ------ Redaction --------------------------------------------------------------------------
 
 # A field whose *name* contains one of these never has its value logged. Matched on the name with
 # every separator removed and folded to lower case, so `Authorization`, `x-api-key`, `X_API_KEY`,
-# `apiKey` and `api key` are all one marker — the TypeScript reference lists four spellings of two
-# of those as four separate redact paths, and a fifth spelling is what a differently-named key is.
+# `apiKey` and `api key` are all one marker. The TypeScript reference instead lists four spellings
+# of two of those as four separate redact paths, and a fifth spelling is a key it misses.
 #
 # Substrings rather than whole names on purpose: `entra_client_secret` and `graph_access_token` are
-# the names this service would actually reach for, and neither is in any list of exact header names.
-# The cost is a false positive on a field whose name merely contains one — `token_count` would be
-# censored — which is the right way round for a log line.
+# the names this service would reach for, and neither is in any list of exact header names. The cost
+# is a false positive on a name that merely contains one, so `token_count` is censored, which is the
+# right way round for a log line.
 #
 # Trap: `auth` is deliberately NOT a marker. It matches `author`, and a Teams message has one.
 _SENSITIVE_MARKERS: tuple[str, ...] = (
@@ -386,9 +382,7 @@ class RedactionFilter(logging.Filter):
         return True
 
 
-# --------------------------------------------------------------------------------------------
-# Correlation
-# --------------------------------------------------------------------------------------------
+# ------ Correlation ------------------------------------------------------------------------
 
 _CORRELATION_FIELD = "correlation_id"
 _REQUEST_FIELD = "request_id"
@@ -412,9 +406,9 @@ _MAX_FORWARDED_REQUEST_ID = 128
 def _mcp_request_id() -> str | None:
     """The MCP request id of the message being handled, or `None` outside one.
 
-    This is FastMCP's own per-message identity and not a parallel scheme, which also makes it the
-    one identity that is correct inside the streamable-HTTP session task: it is set per message,
-    where anything set per HTTP request is stale there. See `tracing.py`.
+    FastMCP's own per-message identity, not a parallel scheme, which also makes it the one identity
+    that is correct inside the streamable-HTTP session task: it is set per message, where anything
+    set per HTTP request is stale. See `tracing.py`.
     """
     try:
         return get_context().request_id
@@ -491,10 +485,10 @@ class HttpRequestIdMiddleware:
     Mount outermost, so a request that fails before the app has it covered too.
 
     Trap: the contextvar is set and never reset. That is what puts the id on uvicorn's access line,
-    which is written after the app has returned but inside the same per-request task — and a task's
+    which is written after the app has returned but inside the same per-request task, and a task's
     context dies with it, so nothing leaks into the next request. What it does reach is the
     streamable-HTTP session task, which snapshots the context of the `initialize` request that
-    created it; `_correlation_id` therefore prefers the MCP request id, which is per message.
+    created it. `_correlation_id` therefore prefers the MCP request id, which is per message.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -528,16 +522,14 @@ def _forwarded_request_id(scope: ASGIScope) -> str | None:
     return None
 
 
-# --------------------------------------------------------------------------------------------
-# The MCP SDK's own per-message line
-# --------------------------------------------------------------------------------------------
+# ------ The MCP SDK's own per-message line -------------------------------------------------
 
 # The line, and the logger that writes it: `mcp/server/lowlevel/server.py`, in `_handle_request`,
 # immediately before the request handler — which is where FastMCP's whole middleware chain lives.
 # Matched on the *template* rather than on the rendered text, because the template is a literal in
-# that file and the rendered text is not: a ratchet in `tests/test_logging.py` reads it back out of
-# the SDK and fails if it changed, so an SDK upgrade that renames the line is a failing test rather
-# than a silently un-quieted one.
+# that file and the rendered text is not: a drift guard in `tests/test_logging.py` reads it back
+# out of the SDK and fails if it changed, so an SDK upgrade that renames the line is a failing test
+# rather than a silently un-quieted one.
 _SDK_MESSAGE_LOGGER = "mcp.server.lowlevel.server"
 _SDK_PER_MESSAGE_LINE = "Processing request of type %s"
 
@@ -546,8 +538,8 @@ class StaleMessageLineFilter(logging.Filter):
     """Drop the SDK's per-message line, which is the one line that cannot carry the right trace id.
 
     The line is emitted inside the session task, before the request handler and therefore before
-    any middleware of ours, so the ambient OpenTelemetry context it is formatted under is still the
-    one the session task snapshotted at `initialize` — for the whole life of the session. See
+    any middleware of ours, so the ambient OpenTelemetry context it is formatted under is the one
+    the session task snapshotted at `initialize`, for the whole life of the session. See
     `tracing.py` for why that snapshot cannot be corrected from inside the task. At the chart's
     default `LOG_LEVEL=info` it is emitted for every message, so every tool call has exactly one
     line claiming the `initialize` request's trace.
@@ -585,14 +577,11 @@ class MessageLogMiddleware(Middleware):
         return await call_next(context)
 
 
-# --------------------------------------------------------------------------------------------
-# uvicorn's second copy of its own message
-# --------------------------------------------------------------------------------------------
+# ------ uvicorn's second copy of its own message -------------------------------------------
 
 # uvicorn puts an ANSI-coloured copy of the line in `extra` for its own coloured formatter. This
 # service routes uvicorn through the pino formatter instead (see `main.py`), which copies every
-# extra — so every uvicorn lifecycle line would carry its own message twice, once with escape codes
-# in it.
+# extra, so every uvicorn lifecycle line would carry its own message twice, once with escape codes.
 _COLOR_MESSAGE_FIELD = "color_message"
 
 
@@ -604,17 +593,15 @@ class ColorMessageFilter(logging.Filter):
         return True
 
 
-# --------------------------------------------------------------------------------------------
-# Installation
-# --------------------------------------------------------------------------------------------
+# ------ Installation -----------------------------------------------------------------------
 
 # Loggers a dependency has taken out of the root handler's reach, and which this service takes back.
 #
 # `fastmcp/__init__.py:22-26` configures its own logger at **import** time — two `RichHandler`s on
 # stderr and `propagate = False` — so every `fastmcp.*` line is ANSI-decorated plain text that never
-# meets the pino formatter and never meets the filters above. That is not a formatting nit twice
-# over: it is a line the log pipeline cannot parse *and* a line no redaction ran on, and one of
-# those lines is the OAuth proxy warning about non-secure cookies.
+# meets the pino formatter and never meets the filters above. That is a line the log pipeline cannot
+# parse *and* a line no redaction ran on, and one of those lines is the OAuth proxy warning about
+# non-secure cookies.
 #
 # Reclaimed by removing the handlers and letting the records propagate, rather than by asking
 # FastMCP not to configure itself: `FASTMCP_LOG_ENABLED` is read when `fastmcp` is imported, which
@@ -649,12 +636,12 @@ def _install_filters(handler: logging.Handler) -> None:
 
 def configure_logging(config: AppConfig) -> None:
     configure_pino_logging(level=config.log_level.value.upper())
-    # A Python warning is written to stderr by `warnings.showwarning`, as plain text, which is one
-    # more way a line lands on the pino stream that the log pipeline cannot parse — and dependencies
-    # of this service emit them (a store stability warning on every boot, deprecations from the
-    # Graph SDK). This routes them through the `py.warnings` logger instead, so they arrive as
-    # pino-json like everything else. Global, and belongs here for the same reason the handler
-    # does: the contract is a property of the process, not of a call site.
+    # `warnings.showwarning` writes a Python warning to stderr as plain text, which is one more way
+    # a line lands on the pino stream that the log pipeline cannot parse, and dependencies of this
+    # service emit them (a store stability warning on every boot, deprecations from the Graph SDK).
+    # `logging.captureWarnings(True)` routes them through the `py.warnings` logger instead, so
+    # they arrive as pino-json like everything else. Global, and belongs here for the same reason
+    # the handler does: the contract is a property of the process, not of a call site.
     logging.captureWarnings(True)
     for name in _RECLAIMED_LOGGERS:
         _reclaim(name)

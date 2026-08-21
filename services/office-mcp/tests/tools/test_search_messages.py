@@ -1,12 +1,12 @@
 """`search_messages`: the query Graph is sent, and the traps in what comes back.
 
-Every payload is synthesised from Microsoft's own documented shapes — the reduced search
-projection, the Exchange-shaped sender a search hit carries, the authorless system event message.
-Nothing here came from a tenant.
+Every payload is synthesised from Microsoft's own documented shapes: the reduced search projection,
+the Exchange-shaped sender a search hit carries, and the authorless system event message. Nothing
+here came from a tenant.
 
-Which strings are handles at all is `shared/handles.py`'s question, not this tool's:
+Which strings are handles at all is `shared/handles.py`'s question:
 `TestTheMessageHandleGrammar` in `tests/shared/test_handles.py` covers the three shapes and
-everything that is not one of them. What is covered here is which of them a hit carries.
+everything that is not one of them. Which of them a hit carries is covered here.
 """
 
 import json
@@ -50,8 +50,8 @@ def _unquoted_words(query: str) -> list[str]:
     """The words of `query` that a KQL parser would read outside any quoted phrase.
 
     Splitting on `"` and keeping the even-numbered pieces is exactly that, given a query whose
-    quotes are balanced — which every test using this asserts first, because it is the property the
-    quoting exists to hold.
+    quotes are balanced. Every test using this asserts balance first, because it is the property
+    the quoting exists to hold.
     """
     return [
         word
@@ -65,8 +65,8 @@ class TestTheQueryItSends:
     async def test_it_asks_only_for_chat_messages_and_pages_by_offset(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph refuses to mix entity types, and its message search pages by `from`/`size`
-        integers rather than by a cursor — which is what lets a stateless tool resume a search."""
+        """Graph refuses to mix entity types, and its message search pages by `from` and `size`
+        integers rather than by a cursor, which is what lets a stateless tool resume a search."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([chat_hit()]))
         )
@@ -104,14 +104,14 @@ class TestTheQueryItSends:
         graph: respx.MockRouter,
         criteria: SearchCriteria,
     ) -> None:
-        """The claim the whole design rests on, measured rather than asserted in prose.
+        """The claim the whole design rests on, measured rather than asserted.
 
         The connector this one replaces answers a date-bounded or channel-covering search by
         scanning chats one request at a time, and Graph's read budget is "one request per second
-        per app per tenant … on a given channel or chat" — *per app*, so one user's sweep of fifty
-        chats degrades every other user of the app registration. The whole point of putting the
-        dates and the filters into the query string is that the index applies them for the price of
-        the request that was being made anyway. A fan-out added later would be a small-looking
+        per app per tenant … on a given channel or chat". It is *per app*, so one user's sweep of
+        fifty chats degrades every other user of the app registration. Putting the dates and the
+        filters into the query string instead lets the index apply them for the price of the
+        request that was being made anyway. A fan-out added later would be a small-looking
         convenience with a tenant-wide cost, and nothing but a call count says it happened: the
         answer looks the same.
         """
@@ -160,7 +160,7 @@ class TestTheQueryItSends:
     async def test_the_mentioned_user_id_loses_its_hyphens(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft's `mentions` example is a user id "without '-'" — the one scope term whose
+        """Microsoft's `mentions` example is a user id "without '-'", the one scope term whose
         value is not the value the caller supplied."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
@@ -193,9 +193,9 @@ class TestTheQueryItSends:
     async def test_a_multi_word_query_reaches_graph_as_words_and_not_as_a_phrase(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The recall this tool would otherwise lose silently. Quoting the whole query — the guard
-        a *filter value* needs — makes it an exact-adjacency phrase, so "cut the release" would
-        match only messages with those three words side by side and drop "the release was cut"
+        """The recall this tool would otherwise lose silently. Quoting the whole query, which is
+        the guard a *filter value* needs, makes it an exact-adjacency phrase, so "cut the release"
+        would match only messages with those three words side by side and drop "the release was cut"
         entirely, while the parameter promises the words are matched as words. Bare terms are what
         Graph ANDs, so bare terms are what it is sent.
         """
@@ -248,9 +248,9 @@ class TestTheQueryItSends:
 
         The guard works a word at a time rather than over the whole query, so the assertion is
         about the query string's *structure*: outside the quoted spans there is nothing a KQL parser
-        would read as anything but a keyword. A word with no operator character, no wildcard, no
-        leading `-` and no operator spelling is the only thing left bare, and such a word cannot
-        express a restriction, a negation or a boolean.
+        would read as anything but a keyword. Only a word with no operator character, no wildcard,
+        no leading `-` and no operator spelling is left bare, and such a word cannot express a
+        restriction, a negation or a boolean.
         """
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
@@ -319,14 +319,14 @@ class TestTheQueryItSends:
         """A wildcard is the one injection a scope term's value can still carry, and the widest.
 
         KQL reads `<property>:*` as a match on every item that has a value for that property, so
-        `from:*` asks for every message that has a sender — the arbitrary sample of everything the
+        `from:*` asks for every message that has a sender: the arbitrary sample of everything the
         no-criteria refusal exists to prevent, reached through a query string that is not empty, so
         no emptiness check trips. `from:ada*` is the same defect in miniature: prefix matching this
-        tool never offered. A leading `-` is quoted for the same price, because a NOT read into a
-        filter value would invert it and answer the opposite question.
+        tool never offered. A leading `-` is quoted too, because a NOT read into a filter value
+        would invert it and answer the opposite question.
 
-        The last case is the one that must not change: an ordinary address quoted into a phrase
-        would alter every search this tool already serves.
+        The last case must not change: an ordinary address quoted into a phrase would alter every
+        search this tool already serves.
         """
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
@@ -363,7 +363,7 @@ class TestCriteriaThatAskForNothing:
     def test_free_text_with_no_word_in_it_asks_for_nothing(self) -> None:
         """`is_empty` is measured on the query string, not on which arguments were passed, so a
         query that leaves nothing to look for is refused by the boundary that refuses no criteria
-        at all — rather than reaching Graph as a search for everything."""
+        at all, rather than reaching Graph as a search for everything."""
         assert SearchCriteria(query='" "').is_empty is True
 
     @pytest.mark.parametrize(
@@ -381,7 +381,7 @@ class TestCriteriaThatAskForNothing:
         ],
     )
     def test_any_single_criterion_is_enough(self, criteria: SearchCriteria) -> None:
-        """`false` is a criterion — "unread messages" and "messages without attachments" are real
+        """`false` is a criterion: "unread messages" and "messages without attachments" are real
         questions, so only an unset value counts as absent."""
         assert criteria.is_empty is False
 
@@ -411,18 +411,15 @@ class TestTheHandleItMints:
     def test_the_handle_names_the_reader_that_now_takes_it(self) -> None:
         """A description is live protocol surface, and this sentence has had to be both things.
 
-        While nothing on this server opened a handle, it said so outright — "no tool on this server
-        takes it as an argument", "there is no route from here to the message body" — because a
-        description that promised a reader would have taught a model to call something that was not
-        advertised, and the failure is not a clean "no such tool": the model has already decided the
-        snippet is not the answer and now has nowhere to go. That sentence was asserted rather than
-        merely written down precisely because the tool that makes it false is the one that must come
-        back and change it, and `read_message` is that tool.
+        While nothing on this server opened a handle, it said so outright: "no tool on this server
+        takes it as an argument", "there is no route from here to the message body". A description
+        that promised a reader would have taught a model to call one that was not advertised, and
+        the failure is not a clean "no such tool": the model has already decided the snippet is not
+        the answer and has nowhere to go. `read_message` is the tool that makes that sentence false.
 
         The flip has to go the whole way. A model told the snippet is all there is stops looking, so
-        leaving the old wording in place would hide the reader as effectively as not shipping it —
-        a defect nothing else here can see, since every other assertion about this tool passes
-        either way.
+        leaving the old wording in place would hide the reader as effectively as not shipping it, a
+        defect nothing else here can see: every other assertion about this tool passes either way.
         """
         described = search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
@@ -441,7 +438,7 @@ class TestTheHandleItMints:
 
     def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
         """A hit that is really a channel reply carries the root-post shape, which Graph answers 404
-        to — and the advice for that has to end somewhere. `browse_channel` mints a reply's own
+        to, and the advice for that has to end somewhere. `browse_channel` mints a reply's own
         handle but reaches only the newest replies of each post on a channel's first page and
         follows no cursor past them, so "browse the channel instead" is a route for a recent reply
         and a loop for an older one: browse, not find it, read the same advice, browse again. So the
@@ -465,7 +462,7 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The handle is the whole route to the message text, since the search projection has no
-        body — and the ids in it are percent-encoded because a Teams id is full of `:` and `@`."""
+        body, and the ids in it are percent-encoded because a Teams id is full of `:` and `@`."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -503,8 +500,8 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph does occasionally return a hit with no chatId and no channelIdentity. Its snippet
-        is still an answer, so it is reported — with a null `uri` saying it cannot be read in
-        full, rather than being dropped or given a handle that would 404."""
+        is still an answer, so it is reported, with a null `uri` saying it cannot be read in full,
+        rather than being dropped or given a handle that would 404."""
         hit = chat_hit(chat_id=None)
         graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([hit]))
@@ -544,7 +541,7 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Teams messages are indexed out of the substrate mailbox, so a hit's `from` is an
-        Exchange `emailAddress` — a shape the Graph SDK has no field for, and one the Teams read
+        Exchange `emailAddress`: a shape the Graph SDK has no field for, and one the Teams read
         APIs never return."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
@@ -576,7 +573,7 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The other branch: `teamworkUserIdentity` has an id and no email at all, and Microsoft
-        documents its display name as optional — a null there is not an anonymous sender."""
+        documents its display name as optional, so a null there is not an anonymous sender."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -652,10 +649,10 @@ class TestWhatTheCallerIsTold:
         """The three ways Graph declines to name a bot: a null display name, a blank one, and no
         such property.
 
-        Microsoft documents an application identity's `displayName` as optional and its `id` as
-        not, so a bot Graph did not name is still a bot Graph identified. Deciding the hit on the
-        name discards the message and the id along with it — and `application_id` is then the only
-        thing a caller has to tell one bot from another.
+        Microsoft documents an application identity's `displayName` as optional and its `id` as not,
+        so a bot Graph did not name is still a bot Graph identified. Deciding the hit on the name
+        discards the message and the id with it, and `application_id` is the only thing a caller has
+        to tell one bot from another.
         """
         graph.post("/search/query").mock(
             return_value=httpx.Response(
@@ -688,10 +685,10 @@ class TestWhatTheCallerIsTold:
     ) -> None:
         """No user, no application and no mailbox address means no sender to report.
 
-        The identity *object* being present says nothing — Graph sends an empty one — so the
-        decision is what is inside it. Reading presence as a sender would answer with a hit whose
-        every sender field is null, which a model can see but cannot attribute or cite: worse than
-        the drop, because it looks like an answer.
+        The identity *object* being present says nothing, because Graph sends an empty one, so what
+        is inside it decides. Reading presence as a sender would answer with a hit whose every
+        sender field is null, which a model can see but cannot attribute or cite: worse than the
+        drop, because it looks like an answer.
         """
         graph.post("/search/query").mock(
             return_value=httpx.Response(
@@ -712,10 +709,9 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """A message nobody wrote is not a search result: for "Ada joined the chat" Graph sends a
-        null `from` and a body of the literal `<systemEventMessage/>`, rendering the sentence in
-        the Teams client
-        from `eventDetail` — which the search projection does not even return. Left in, these are
-        results with no author and no text, and a model summarising a page of them reports
+        null `from` and a body of the literal `<systemEventMessage/>`, rendering the sentence in the
+        Teams client from `eventDetail`, which the search projection does not even return. Left in,
+        these are results with no author and no text, and a model summarising a page of them reports
         membership churn as the conversation.
         """
         graph.post("/search/query").mock(
@@ -742,7 +738,7 @@ class TestPagingAndItsHonesty:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Microsoft documents `total` as the count of results on the page for Teams messages, not
-        the number of matches — so a tool that reports it tells a model there were 25 matches when
+        the number of matches, so a tool that reports it tells a model there were 25 matches when
         there may be thousands. Nothing here reads it."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
@@ -830,11 +826,11 @@ class TestPagingAndItsHonesty:
         """The paging claim taken at its word, in the one shape that could make it false.
 
         `next_offset` promises "the `offset` that reaches the NEXT page", and it is computed by
-        advancing past the hits Graph returned — so a page with no hits and `moreResultsAvailable`
+        advancing past the hits Graph returned, so a page with no hits and `moreResultsAvailable`
         still set would hand back the offset that was just asked at, and a caller following the
         contract re-requests the same empty page for ever. That is the same defect the chat walk
-        shipped with, in a different currency: a page carrying nothing while saying more is coming
-        is exactly where a cursor stops meaning progress.
+        shipped with: a page carrying nothing while saying more is coming is where a cursor stops
+        meaning progress.
 
         Both directions are asserted, because either one alone would pass while the other rotted:
         this offset advances no caller, and the offset for a page that DID advance is greater than

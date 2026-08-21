@@ -1,12 +1,12 @@
 """`list_meeting_transcripts`: the window, the order, and the five answers.
 
-The `$filter` that gets this tool to a meeting at all, and the window type it scopes an occurrence
-with, are `shared/meetings.py`'s and are tested there — they are promises about the meeting rather
-than about its transcripts. What is tested here is this tool's own: which of the five statuses an
-empty collection becomes, what the order is promised over, and what one transcript is reported as.
+The `$filter` that reaches a meeting, and the window type that scopes an occurrence, are
+`shared/meetings.py`'s and are tested there: they are promises about the meeting rather than about
+its transcripts. This tool's own are here: which of the five statuses an empty collection becomes,
+what the order is promised over, and what one transcript is reported as.
 
 Every payload is synthesised. A transcript is the most sensitive thing this connector touches, so
-nothing here came from a meeting: the ids are obviously fake and the domains are `.invalid`.
+nothing here came from a meeting: the ids are fake and the domains are `.invalid`.
 """
 
 from collections.abc import Mapping
@@ -74,9 +74,9 @@ def _pages(
 ) -> respx.Route:
     """Graph's own paging: a first page carrying `@odata.nextLink`, then the rest.
 
-    Two real pages rather than one page that links to itself, because the walk follows the cursor
-    to the end of the collection (bounded by `MAX_ARTIFACT_SCAN`) rather than stopping as soon as it
-    has `limit` items — which is the whole of what makes "newest first" true.
+    Two real pages rather than one that links to itself, because the walk follows the cursor to the
+    end of the collection (bounded by `MAX_ARTIFACT_SCAN`) rather than stopping once it has `limit`
+    items, which is what makes "newest first" true.
     """
     return graph.get(_TRANSCRIPTS).mock(
         side_effect=[
@@ -94,7 +94,7 @@ def _pages(
 
 # The only meeting shape that outgrows `MAX_ARTIFACT_SCAN`: one occurrence a day, transcribed every
 # time, for the better part of a year. Written oldest-first because Graph documents no `$orderby`
-# here and answers in an order of its own — this is the order that puts the genuinely newest
+# here and answers in an order of its own. This is the order that puts the genuinely newest
 # occurrence past the cap, which is the case both promises below have to be exact about.
 _DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
 _PAST_THE_CAP = meetings.MAX_ARTIFACT_SCAN + 60
@@ -126,9 +126,9 @@ def _daily_series(graph: respx.MockRouter, *, total: int = _PAST_THE_CAP) -> res
 def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
     """A recurring series as Graph holds it: one meeting, one transcript collection, three weeks.
 
-    Three occurrences in one collection is the whole reason a window exists — Graph publishes no
-    occurrence id and no per-occurrence addressing — and `end` is the series-wide `endDateTime`,
-    which is the value the verdict must NOT be read off when a window was asked for.
+    Three occurrences in one collection is why a window exists: Graph publishes no occurrence id
+    and no per-occurrence addressing. `end` is the series-wide `endDateTime`, which the verdict must
+    NOT be read off when a window was asked for.
     """
     _resolved(graph, meeting_type="recurring", end=end)
     _ = graph.get(_TRANSCRIPTS).mock(
@@ -150,7 +150,7 @@ class TestNoMatchIsNotAnError:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph documents this filter as answering `200 OK` with an empty `value` when nothing
-        matches — never a 404 — so "no such meeting" is a status and not an exception, and the
+        matches, never a 404, so "no such meeting" is a status and not an exception, and the
         transcript listing is never even attempted."""
         graph.get(_MEETINGS).mock(return_value=httpx.Response(200, json={"value": []}))
         listing = graph.get(_TRANSCRIPTS).mock(
@@ -293,8 +293,8 @@ class TestScopingToOneOccurrence:
     async def test_a_series_is_one_meeting_and_a_window_picks_an_occurrence(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A recurring series has one join URL, one meeting id and one transcript collection —
-        Graph publishes no occurrence addressing at all — so the only thing separating occurrences
+        """A recurring series has one join URL, one meeting id and one transcript collection, and
+        Graph publishes no occurrence addressing at all, so the only thing separating occurrences
         is when transcription began."""
         _weekly_series(graph)
 
@@ -370,12 +370,12 @@ class TestScopingToOneOccurrence:
     ) -> None:
         """The two facts one flag would conflate, told apart.
 
-        More transcripts in the window than `limit` holds: the newest of them come back, and a
-        caller sees `limit` of them, which is what "there may be older ones" looks like everywhere
-        else here — the remedy being a wider `limit`. What must NOT be reported is a scan that
-        stopped short, because none did: the collection was read to the end, so the first entry is
-        the meeting's own latest. One flag saying both would put the caveat belonging to a capped
-        read on every full window.
+        With more transcripts in the window than `limit` holds, the newest come back and a caller
+        sees `limit` of them, which is what "there may be older ones" looks like everywhere else
+        here, the remedy being a wider `limit`. What must NOT be reported is a scan that stopped
+        short, because none did: the collection was read to the end, so the first entry is the
+        meeting's own latest. One flag saying both would put a capped read's caveat on every full
+        window.
         """
         _resolved(graph)
         _pages(
@@ -402,9 +402,9 @@ class TestScopingToOneOccurrence:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """ "The latest transcript of this series" is the question this tool exists for, and Graph
-        answers this collection in an order of its own — it documents no `$orderby` at all. So the
-        window is filled from the whole collection and sorted before `limit` cuts it. Cutting first
-        and sorting the remainder returns an arbitrary handful sorted among themselves, which reads
+        answers this collection in an order of its own, documenting no `$orderby`. So the window is
+        filled from the whole collection and sorted before `limit` cuts it. Cutting first and
+        sorting the remainder returns an arbitrary handful sorted among themselves, which reads
         exactly like the right answer: here it would have answered `oldest`.
         """
         _resolved(graph, meeting_type="recurring")
@@ -467,7 +467,7 @@ class TestScopingToOneOccurrence:
         """The answer that would otherwise contradict itself: `not_transcribed` ("retrying will not
         help") alongside "there is more". Both cannot be true, and a caller cannot see which one is
         wrong. A meeting with more transcripts than one call looks through, none of them in the
-        window, is `scan_incomplete` — which claims nothing about absence, and which is reported
+        window, is `scan_incomplete`, which claims nothing about absence, and which is reported
         whether or not the caller asked about the scan, because an empty answer is worthless
         without it.
         """
@@ -509,15 +509,14 @@ class TestScopingToOneOccurrence:
     async def test_narrowing_the_window_cannot_reach_past_the_scan_cap(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Why `scan_incomplete` offers no remedy, proved rather than asserted in prose.
+        """Why `scan_incomplete` offers no remedy.
 
-        The window is ours: it is applied to the transcripts *after* Graph has answered, because
-        Graph documents no filterable date on this collection. So the request goes out bare and the
-        same first `MAX_ARTIFACT_SCAN` transcripts are read whatever window was asked for — a wide
-        window and a narrow one over the same collection are the same call with the same answer,
-        and "narrow it and ask again" would be a loop a model could run forever. Here the narrow
-        window even brackets a transcript that genuinely exists (`day-250`), and it is still never
-        seen.
+        The window is ours, applied to the transcripts *after* Graph has answered, because Graph
+        documents no filterable date on this collection. So the request goes out bare and the same
+        first `MAX_ARTIFACT_SCAN` transcripts are read whatever window was asked for. A wide window
+        and a narrow one over the same collection are the same call with the same answer, and
+        "narrow it and ask again" would be a loop a model could run forever. Here the narrow window
+        brackets a transcript that genuinely exists (`day-250`), and it is still never seen.
         """
         _resolved(graph, meeting_type="recurring")
         listing = _daily_series(graph)
@@ -552,7 +551,7 @@ class TestScopingToOneOccurrence:
     async def test_the_unreadable_answer_tells_a_caller_to_stop_rather_than_to_retry(self) -> None:
         """The advice a model reads, pinned against the loop it would otherwise be.
         `scan_incomplete` is the one verdict with no caller action behind it, so what it must say
-        is that there is nothing to try — not an argument to change, which never terminates."""
+        is that there is nothing to try, not an argument to change, which never terminates."""
         described = str(lister.MeetingTranscripts.model_fields["status"].description)
 
         assert "There is nothing to try" in described
@@ -566,13 +565,11 @@ class TestScopingToOneOccurrence:
         """ "Newest first" is exact over the transcripts read, and the read stops at the cap.
 
         A daily series recorded for most of a year has its genuinely newest occurrence past
-        `MAX_ARTIFACT_SCAN`, and Graph offers no `$orderby` to ask for it — so asking for 3 gives
-        the 3 newest of the 200 that were read, not the 3 newest of the meeting. That is the honest
-        answer; calling them "the 3 latest" would be the dishonest one, so the field that says the
-        read stopped short is asked for here and asserted alongside it. It is the one thing about
-        this answer a caller cannot work out from the answer — three entries for a `limit` of three
-        is what an ordinary full window looks like too — which is why it exists at all, and why it
-        is opt-in rather than always on.
+        `MAX_ARTIFACT_SCAN`, and Graph offers no `$orderby` to ask for it, so asking for 3 gives the
+        3 newest of the 200 that were read, not the 3 newest of the meeting. Calling those "the 3
+        latest" would be dishonest, so the field that says the read stopped short is asked for here
+        and asserted alongside them. It is the one thing a caller cannot work out from the answer,
+        since three entries for a `limit` of three is what an ordinary full window looks like too.
         """
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
@@ -599,10 +596,9 @@ class TestScopingToOneOccurrence:
     ) -> None:
         """The same meeting, unasked: the field is null rather than false.
 
-        This is what "opt-in" has to mean for it to be worth anything — a client that does not want
-        the signal never sees it, and a null is not a claim that the scan finished. What does not
-        change is the read: the same transcripts come back in the same order, so the parameter is
-        about the answer's shape and never about the work.
+        That is what "opt-in" has to mean: a client that does not want the signal never sees it,
+        and a null is not a claim that the scan finished. The read does not change, so the parameter
+        is about the answer's shape and never about the work.
         """
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
@@ -626,16 +622,15 @@ class TestScopingToOneOccurrence:
     async def test_a_meeting_graph_pages_through_nothing_is_read_to_its_end(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The claim `scan_incomplete` rests on, proved rather than inherited.
+        """The claim `scan_incomplete` rests on.
 
-        "This meeting has more transcripts than one call reads" is a claim about the meeting, and it
-        is only true while a short walk can have been stopped by nothing but a cap. Graph answers
-        this collection `[3 + nextLink]`, `[nothing + nextLink]`, `[the newest]`, and the SDK's own
-        page walker reads the empty middle page as the end of the collection — which would stop the
-        walk one page short of the newest transcript and report a cap it never reached, on a meeting
-        with four transcripts. Nothing about a four-transcript meeting is incomplete, so the walk in
-        `graph_client/pagination.py` follows an empty page carrying a next link, and this is the
-        test that says so from up here where the wrong answer would have been read.
+        "This meeting has more transcripts than one call reads" is only true while a short walk can
+        have been stopped by nothing but a cap. Graph answers this collection `[3 + nextLink]`,
+        `[nothing + nextLink]`, `[the newest]`, and the SDK's own page walker reads the empty middle
+        page as the end of the collection. That would stop the walk one page short of the newest
+        transcript and report a cap it never reached, on a meeting with four transcripts. Nothing
+        about a four-transcript meeting is incomplete, so the walk in `graph_client/pagination.py`
+        follows an empty page carrying a next link.
         """
         _resolved(graph, meeting_type="recurring")
         listing = graph.get(_TRANSCRIPTS).mock(
@@ -698,13 +693,12 @@ class TestScopingToOneOccurrence:
     async def test_a_short_list_is_not_a_complete_window_when_the_scan_stopped_short(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The same claim the recordings lister proved false of the shared mechanism, checked here
-        too because the sentence was in both descriptions.
+        """The same claim the recordings lister proved false of the shared mechanism.
 
         "Fewer than `limit` means these are the whole window" holds wherever a walk reaches the end
         of its collection, and this walk stops at `MAX_ARTIFACT_SCAN` instead. A meeting past the
         cap answers with two transcripts against a `limit` of twenty while transcripts of that same
-        window sit among the ones never read — a short list meaning the opposite of what the
+        window sit among the ones never read: a short list meaning the opposite of what the
         convention says. Only `scan_incomplete` separates the two cases.
         """
         _resolved(graph, meeting_type="recurring")
@@ -781,14 +775,14 @@ class TestScopingToOneOccurrence:
 
 
 class TestTheWindowShapesAModelActuallySends:
-    """A window is the only reason `started_after`/`started_before` exist, and a model writes a date
-    the way people write dates. `2026-02-10` and `2026-02-10T14:00:00` both used to reach a
-    comparison between a naive datetime and Graph's aware one and raise `TypeError` at the caller —
+    """A window is the only reason `started_after` and `started_before` exist, and a model writes a
+    date the way people write dates. `2026-02-10` and `2026-02-10T14:00:00` both used to reach a
+    comparison between a naive datetime and Graph's aware one and raise `TypeError` at the caller:
     a crash naming no remedy, for a value the schema had accepted.
 
-    What the resolution itself does with each shape is `tests/shared/test_meetings.py`'s, since
-    `OccurrenceWindow` is a promise about the meeting. What is here is that each shape reaches this
-    tool's answer, and bounds this tool's collection, without raising.
+    What the resolution does with each shape is `tests/shared/test_meetings.py`'s, since
+    `OccurrenceWindow` is a promise about the meeting. Here, each shape reaches this tool's answer
+    and bounds this tool's collection without raising.
     """
 
     @pytest.mark.parametrize(
@@ -875,7 +869,7 @@ class TestTheWindowShapesAModelActuallySends:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The other side of the same crash. Graph timestamps in UTC and says so with a `Z`, but a
-        window is worth nothing if one payload without one takes the whole call down — so the
+        window is worth nothing if one payload without one takes the whole call down, so the
         transcript's own timestamp is resolved on the same assumption as the bounds."""
         _resolved(graph, meeting_type="recurring")
         graph.get(_TRANSCRIPTS).mock(
@@ -956,7 +950,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Where it genuinely cannot be told, it still says wait. `started_after` alone leaves the
-        window running up to now, and a series with no end time offers no second piece of evidence —
+        window running up to now, and a series with no end time offers no second piece of evidence.
         Graph publishes neither a processing status nor an SLA, so the cheap wrong answer wins."""
         _weekly_series(graph, end=None)
 
@@ -975,7 +969,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Either side may settle it. A window a caller put in next week is not an instruction to
-        wait for a meeting that ended nine days ago — nothing more is coming from it."""
+        wait for a meeting that ended nine days ago. Nothing more is coming from it."""
         _resolved(graph, end=(datetime.now(UTC) - timedelta(days=9)).isoformat())
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
 

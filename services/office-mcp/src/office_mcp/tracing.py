@@ -2,8 +2,8 @@
 
 Trap: an MCP session's server task is started once, and every message for the rest of that
 session's life runs inside it. `StreamableHTTPSessionManager` starts that task when the session is
-created — which is during `initialize` (mcp 1.28.1, `mcp/server/streamable_http_manager.py:331`,
-`await self._task_group.start(run_server)`) — and a later request on the same session is handed to
+created, during `initialize` (mcp 1.28.1, `mcp/server/streamable_http_manager.py:331`,
+`await self._task_group.start(run_server)`), and a later request on the same session is handed to
 the already-running transport without starting anything (`:261`). An asyncio task snapshots the
 contextvars of whoever created it, so that task, and therefore every message handler it ever runs,
 carries the OpenTelemetry context that was ambient during `initialize` and no other.
@@ -11,7 +11,7 @@ carries the OpenTelemetry context that was ambient during `initialize` and no ot
 What that costs: FastMCP prefers a valid ambient span over anything a message carries (fastmcp
 3.4.5, `fastmcp/telemetry.py:95-98`, "Don't override existing trace context"). The stale ambient
 span is the `initialize` request's server span, and it is valid. So every MCP span for the whole
-life of the session — a `tools/call` an hour later included — is parented into the `initialize`
+life of the session, a `tools/call` an hour later included, is parented into the `initialize`
 request's trace, while that call's own HTTP server span sits alone in a trace with no MCP span in
 it. A session's traces come out as one ever-growing `initialize` trace plus one orphan HTTP span
 per request.
@@ -25,9 +25,10 @@ Hence two halves, which only work together:
 
 `TraceContextCaptureMiddleware` records the ambient OpenTelemetry context on the ASGI `scope`. The
 scope is per request and is not a contextvar, so it is the one channel the session task's snapshot
-cannot staleen. It must be mounted INSIDE `OpenTelemetryMiddleware` — outside-in, that means listed
-after it — or it captures the context from before the server span was made current and hands every
-message the request's *parent* instead of the request.
+cannot make stale. It must be mounted INSIDE `OpenTelemetryMiddleware`. The Starlette middleware
+list runs outside-in, so inside means listed after it. Listed before it, this middleware captures
+the context from before the server span was made current and hands every message the request's
+*parent* instead of the request.
 
 `TraceContextRestoreMiddleware` reads that value back off the request now being served and attaches
 it for the duration of the message, so the span FastMCP opens next parents into the request that
@@ -35,7 +36,7 @@ actually carried the message.
 
 Neither half is redundant with the other, and neither is redundant with `OpenTelemetryMiddleware`.
 Deleting either one puts the defect back silently: the spans keep being emitted and keep looking
-healthy, they just go to the wrong trace, which nothing that counts spans would notice.
+healthy, they just go to the wrong trace, and nothing that counts spans would notice.
 """
 
 from collections.abc import Mapping
@@ -62,11 +63,11 @@ class TraceContextCaptureMiddleware:
         self._app: ASGIApp = app
 
     async def __call__(self, scope: ASGIScope, receive: ASGIReceive, send: ASGISend) -> None:
-        # Design decision: this writes to its caller's `scope`, which the house rule against
-        # mutating arguments would otherwise forbid. The ASGI scope is the protocol's own
-        # per-request state channel — there is no return path from a middleware to the app it
-        # wraps — and being a plain dict rather than a contextvar is the entire point: it is what
-        # survives the session task's contextvar snapshot. See the module docstring.
+        # This writes to its caller's `scope`, which the house rule against mutating arguments
+        # would otherwise forbid. The ASGI scope is the protocol's own per-request state channel and
+        # there is no return path from a middleware to the app it wraps. Being a plain dict rather
+        # than a contextvar is the point: it is what survives the session task's contextvar
+        # snapshot. See the module docstring.
         if scope.get("type") == "http":
             scope[_SCOPE_KEY] = otel_context.get_current()
         await self._app(scope, receive, send)

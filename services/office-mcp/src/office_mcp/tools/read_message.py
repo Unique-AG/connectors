@@ -1,20 +1,20 @@
 """`read_message` — one Microsoft Teams message in full, from a handle another tool creates.
 
-Search cannot answer "what did they actually say". Graph's search index has no message body at all
-— only Microsoft's `summary` snippet. This tool resolves a handle from a search result into the
-full message.
+Search cannot answer "what did they actually say": Graph's search index has no message body, only
+Microsoft's `summary` snippet. This tool resolves a search result's handle into the full message.
 
 The handle decides which surface to read. Graph puts a Teams message in a chat or a channel, each
-with a different endpoint and permission. The handle shape names which surface it addresses.
+with its own endpoint and permission, and a handle's shape names the surface it addresses.
 
-Three failures are kept apart. A malformed handle is ours to explain. Graph's 403 is about that
-one surface's permission only (naming the other would send an admin after a missing one). Graph's
-404 means deleted, never-existed, or invisible — it does not say which, so the tool must not claim
-the message never existed. The generic advice to check the id is wrong here: it came from a tool.
+Three failures are kept apart. A malformed handle is ours to explain. Graph's 403 is about that one
+surface's permission only, because naming the other would send an administrator after a permission
+that was never missing. Graph's 404 means deleted, never existed, or invisible to this user, without
+saying which, so the tool must not claim the message never existed. The generic advice to check the
+id is wrong here: the id came from a tool.
 
-Two messages have no text. A deleted message carries a tombstone, which must not read as content.
-A system event ("Ada joined") has no author and no text in Graph — Teams writes the sentence itself.
-Report the event, not the emptiness.
+Two messages have no text. A deleted message carries a tombstone, which must not read as content. A
+system event ("Ada joined") has no author and no text in Graph, because Teams writes the sentence
+itself. Report the event, not the emptiness.
 """
 
 from collections.abc import Mapping
@@ -51,30 +51,29 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_
 TOOL_NAME = "read_message"
 
 # The surfaces this tool reads, as the step instruments count them. Three rather than one, for the
-# same reason `GRAPH_CALL_NARROWS_TO` below names one permission rather than two: a chat message, a
-# channel post and a channel reply are three different Graph requests with three different failure
-# modes, and a single step would report a tenant that refuses channel messages as a tool that is
-# simply slow. The name is chosen from the handle's shape, which is code, never from the handle.
+# same reason `GRAPH_CALL_NARROWS_TO` names one permission rather than two: a chat message, a
+# channel post and a channel reply are three Graph requests with three failure modes, and a single
+# step would report a tenant that refuses channel messages as a tool that is merely slow. The step
+# name comes from the handle's shape, which is code, never from the handle itself.
 STEP_CHAT_MESSAGE = "chat_message"
 STEP_CHANNEL_MESSAGE = "channel_message"
 STEP_CHANNEL_REPLY = "channel_reply"
 
-# Token exchange requests both because the handle is parsed after the exchange happens.
-# Read uses `Chat.Read` in a chat, `ChannelMessage.Read.All` in a channel.
+# A read uses `Chat.Read` in a chat and `ChannelMessage.Read.All` in a channel. The token exchange
+# requests both, because the handle is parsed after the exchange.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
-# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
-# and never reaches Graph, which would leave its Graph refusals unchecked.
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
+# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 }
 
-# What the call above is refused for, which is not the tuple this tool holds: a message is read on
-# one surface, so a chat handle's refusal names the chat permission alone and naming the channel one
-# as well would send an administrator after a permission that was never missing. `narrowed_to`
-# below is this same statement made per call, from the argument, at run time.
+# What the call above is refused for, and not the tuple this tool holds. A message is read on one
+# surface, so a chat handle's refusal names the chat permission alone: naming the channel one too
+# would send an administrator after a permission that was never missing. `narrowed_to` below makes
+# the same statement per call, from the argument, at run time.
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
@@ -124,7 +123,7 @@ _BAD_HANDLE = (
 
 # Read by `tools/__init__.py` into the advice table `GraphAdviceMiddleware` words a 404 from. Public
 # for that reason: the default advice ("check the id came from a tool response verbatim") is wrong
-# here, because the handle did come from one, and this tool is the only thing that knows that.
+# here, because the handle did come from one.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
     + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
@@ -144,10 +143,9 @@ GRAPH_NOT_FOUND = (
     + "retrieved, and stop looking."
 )
 
-# Without this header, Graph answers systemEventMessage as unknownFutureValue.
-# Most system events are visible without this header: a null `from` or a populated `eventDetail`
-# already marks them. `chatEvent` and `typing` messages show neither signal. `messageType` is the
-# only way to name them, and this header keeps it legible.
+# Without this header, Graph answers `systemEventMessage` as `unknownFutureValue`. A null `from` or
+# a populated `eventDetail` already marks most system events, but `chatEvent` and `typing` show
+# neither, so `messageType` is the only way to name them and this header keeps it legible.
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
@@ -189,9 +187,9 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
         client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
     )
     if handle.reply_to_id is not None:
-        # A reply is addressed under the post it replies to, never beside it — the reply id alone
+        # A reply is addressed under the post it replies to, never beside it: the reply id alone
         # is a 404. `by_chat_message_id1` is the generated name for the second message id in that
-        # path, the first being the parent post's.
+        # path, after the parent post's.
         with graph_step(STEP_CHANNEL_REPLY):
             return await (
                 messages.by_chat_message_id(handle.reply_to_id)
@@ -209,10 +207,8 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
 
 
 def _headers() -> HeadersCollection:
-    """A `HeadersCollection` with the `Prefer` header.
-
-    Built per request: the default is shared by all configurations, so adding to it would affect
-    every Graph request this connector makes.
+    """A `HeadersCollection` with the `Prefer` header, built per request rather than shared:
+    adding to the default would affect every Graph request this connector makes.
     """
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
@@ -220,12 +216,10 @@ def _headers() -> HeadersCollection:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool against the shared Graph transport.
-
-    `transport` is the long-lived client from `create_graph_transport`. This tool borrows it per
-    call and does not own it; `create_app` closes it on shutdown.
-    """
-    # Built here because this is where `transport` is, and named rather than called in the default.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
@@ -254,8 +248,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         handle = message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        # Use only the permission for this surface. The token was exchanged for both because the
-        # handle is parsed after the exchange happens — so the mapping, which runs outside this call
-        # and never sees the handle, is told which of the two this read was made under.
+        # Use only the permission for this surface. The token was exchanged for both, because the
+        # handle is parsed after the exchange. The table that words a 403 is built at startup and
+        # never sees the handle, so this call tells it which of the two the read was made under.
         await narrowed_to(ctx, handle.permission)
         return await read_message(client, handle=handle)

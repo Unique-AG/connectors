@@ -95,7 +95,7 @@ def _spoken(graph: respx.MockRouter) -> respx.Route:
 def _spoken_by_nobody(graph: respx.MockRouter) -> respx.Route:
     """The same endpoint in a tenant with speaker attribution off, which is where it is decided.
 
-    The attributed format is refused and the plain one served, exactly as Graph does it — serving
+    The attributed format is refused and the plain one served, exactly as Graph does it. Serving
     unattributed bytes to the attributed request would say `speaker_attribution` is true, which is
     the field a caller reads to find out why a speaker filter matched nothing.
     """
@@ -193,7 +193,7 @@ class TestReadingTheWords:
     ) -> None:
         """The other 403 on the same endpoint. Microsoft says there is no request-side workaround,
         so a second request would be a wasted call and the advice for it names an administrator
-        rather than a format — which means the retry must be scoped to the inner code, not to 403.
+        rather than a format, which means the retry must be scoped to the inner code, not to 403.
         """
         route = graph.get(_CONTENT).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
 
@@ -211,16 +211,16 @@ class TestReadingTheWords:
     async def test_the_accept_header_is_not_added_to_every_other_graph_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The claim `_accepting` is written on, checked rather than believed. kiota's
+        """The claim `_accepting` is written on. kiota's
         `RequestConfiguration.headers` defaults to ONE `HeadersCollection` shared by every
-        configuration in the process — two configurations built here are the same object — so an
-        `Accept` added to the default is added to every Graph call this connector goes on to make,
-        and the generated builders' own `try_add("Accept", "application/json")` is then a no-op that
+        configuration in the process, so two configurations built here are the same object and an
+        `Accept` added to the default is added to every Graph call this connector goes on to make.
+        The generated builders' own `try_add("Accept", "application/json")` is then a no-op that
         cannot take it back. `Accept: text/vtt` on a JSON call is not a header nobody reads: it is
         every other tool answering with a deserialisation failure, from a request this one made.
 
         The unrelated call is `shared/identity.py`'s `GET /me`, and what makes it a witness rather
-        than a passenger is that it passes a `RequestConfiguration` of its own — a call passing none
+        than a passenger is that it passes a `RequestConfiguration` of its own. A call passing none
         would send Graph's default `Accept` whether or not this one had polluted the shared object,
         so it would keep passing while the leak came back.
         """
@@ -263,9 +263,9 @@ class TestNarrowingWhatComesBack:
     """The filters, over the one transcript that carries every shape the parser survives.
 
     An hour of meeting is thousands of turns and a model reads it to answer one question, so the
-    narrowing has to happen here rather than in the model's context. What is asserted is the part a
-    caller cannot check for itself: which turns a bound admits, and that the page and its
-    `next_offset` are counted over what survived the filter rather than over the whole transcript.
+    narrowing happens here rather than in the model's context. What a caller cannot check for
+    itself is asserted: which turns a bound admits, and that the page and its `next_offset` are
+    counted over what survived the filter rather than over the whole transcript.
     """
 
     async def test_a_lower_bound_keeps_everything_still_running_at_it(
@@ -357,7 +357,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         """A model writes the name it read in a previous answer, or the half of it the caller said.
         An exact, case-sensitive match would answer "nobody said that" to a question about somebody
-        who spoke — a wrong answer with the shape of a right one. A copied name carries the
+        who spoke: a wrong answer with the shape of a right one. A copied name carries the
         whitespace around it, and the turn's own speaker is stripped at parse time, so the filter is
         stripped as well."""
         _spoken(graph)
@@ -468,7 +468,7 @@ class TestNarrowingWhatComesBack:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """The one empty answer that must not read as "she never spoke". Where the tenant forbids
-        attribution every `speaker` is null, so the filter legitimately matches nothing — and
+        attribution every `speaker` is null, so the filter legitimately matches nothing, and
         `speaker_attribution` false is the field that explains it. Refusing the call instead would
         deny a filter the transcript itself supports for time."""
         _spoken_by_nobody(graph)
@@ -521,7 +521,7 @@ class TestNarrowingWhatComesBack:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """No transcript can satisfy it, so it is a mistake in the caller rather than an empty
-        answer — and the tool layer refuses it before this is ever reached."""
+        answer, and the tool layer refuses it before this is ever reached."""
         content = _spoken(graph)
 
         with pytest.raises(AssertionError):

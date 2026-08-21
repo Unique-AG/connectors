@@ -1,80 +1,70 @@
 """The structural rules this package's layout depends on.
 
-**A tool is a file, and these are the rules that keep it one.** `tools/get_me.py` owns its name, the
-prose that teaches a model when to reach for it, its Graph permissions, its arguments, its answer
-shape, its request and its refusals. `shared/` is what a second tool will not be free to disagree
-with it about. `graph_client/` is the transport they borrow. What follows is the whole of what that
-costs, numbered as the finished layout numbers it — three of the eight rules cannot be asserted with
-one tool and one shared module, and they are named below where they are missing rather than
-renumbered around, so that the PR that makes one assertable adds a class and changes nothing else.
+**A tool is a file, and these are the rules that keep it one.** `tools/get_me.py` owns its name,
+the prose that teaches a model when to reach for it, its Graph permissions, its arguments, its
+answer shape, its request and its refusals. `shared/` is what a second tool will not be free to
+disagree with it about. `graph_client/` is the transport they borrow.
 
 `features/`, which was to hold what a tool did, and the tool-declaration module `server/` was to
-hold, are the shape this replaces; the first is deleted here and the second was never written. The
-two numbered rules that held those halves apart went with them.
+hold, are the shape this replaces: the first is deleted, the second was never written.
 
 1. **`shared/` imports no tool module, and only `shared/seam.py` imports FastMCP.** `shared/` is
-   what two tools must not disagree about; a tool is what disagrees. The direction is therefore
-   one-way by construction. The FastMCP half is narrower than a blanket ban because it has to be:
-   the On-Behalf-Of token dependency and the `ToolError` a Graph refusal becomes are exactly the
-   things every tool must say identically, and they are FastMCP types. So they are allowed in one
-   named file — the seam — and nowhere else, which is what keeps the framework out of the handle
-   grammar, the message shape and the rest of the vocabulary.
+   what two tools must not disagree about; a tool is what disagrees, so the direction is one-way.
+   FastMCP is not banned outright because the On-Behalf-Of token dependency and the `ToolError` a
+   Graph refusal becomes are FastMCP types every tool must say identically. They are allowed in one
+   named file, the seam, and nowhere else, which keeps the framework out of the handle grammar, the
+   message shape and the rest of the vocabulary.
 
 2. **`graph_client/` imports nothing of this application.** Not `shared/`, not `tools/`, not
-   `config`, not anything else under `office_mcp` — the transport is infrastructure its callers
-   consume, and it takes its own frozen `GraphSettings` rather than reading config, because a
-   transport is allowed to be *told* and not to be configured. Anything it imported back would be a
-   package cycle and a second place the environment is read.
+   `config`, nothing else under `office_mcp`. The transport takes its own frozen `GraphSettings`
+   rather than reading config, because a transport is allowed to be *told* and not to be
+   configured. Anything it imported back would be a package cycle and a second place the
+   environment is read.
 
 3. **`tools/` imports `shared/`, `graph_client/` and FastMCP, and nothing else of this package.**
-   Those three are the whole of what a tool file is allowed to lean on: the vocabulary, the
-   transport, the framework. Not `server/` — a tool that reached into it would be a tool file in
-   name only, with its wiring somewhere else, which is the shape this layout exists to avoid.
+   Those three are the whole of what a tool file may lean on: the vocabulary, the transport, the
+   framework. Not `server/`: a tool that reached into it would have its wiring somewhere other than
+   in itself, which is the shape this layout exists to avoid.
 
-4. **No tool module imports another tool module.** This is what "independent" means and it is the
-   rule this whole layout exists for. Two tool files that shared a description constant, an error
-   text or a helper would have re-created the tool-declaration module they exist instead of, one
-   import at a time — and the failure is not abstract: the thing tools are most tempted to share is
-   prose, and prose that is shared is prose that stops being about the tool it is on. If two of them
-   genuinely need the same thing, it is shared vocabulary and belongs in `shared/`, where the fact
-   that two tools depend on it is visible. `tools/__init__.py` is exempt and is the only exemption:
-   it is the registry, its whole job is to know every module, and the union of their permissions
-   could not be derived otherwise.
+4. **No tool module imports another tool module.** This is what "independent" means, and the rule
+   this layout exists for. Two tool files that shared a description constant, an error text or a
+   helper would re-create the tool-declaration module they exist instead of, one import at a time.
+   What tools are most tempted to share is prose, and shared prose stops being about the tool it is
+   on. What two tools genuinely need is shared vocabulary and belongs in `shared/`, where the
+   dependency is visible. `tools/__init__.py` is the only exemption: it is the registry, its job is
+   to know every module, and the union of their permissions could not be derived otherwise.
 
-   **The package's own front door is not a way round it.** `from .. import tools` — or
-   `from office_mcp import tools`, or either under an alias — never spells a sibling's name, and it
-   does not have to: the registry imports every tool module, so the package object carries both of
-   them as attributes and `tools.get_me.GRAPH_PERMISSIONS` is one line away. The module that import
-   names is `office_mcp`, which is why a check that only resolved the module missed it entirely;
-   what is matched is therefore the *member* as well, and a tool file that imports the package it
-   lives in is reported like any other sibling import. What is deliberately not chased is
-   `importlib.import_module("office_mcp.tools.get_me")` and its relatives — the same posture rule 6
-   states: a tripwire rather than a barrier, catching the import somebody writes without thinking
-   rather than the one somebody writes to hide.
+   **The package's own front door is not a way round it.** `from .. import tools` and
+   `from office_mcp import tools`, under an alias or not, spell no sibling's name. They do not have
+   to: the registry imports every tool module, so the package object carries each one as an
+   attribute and `tools.get_me.GRAPH_PERMISSIONS` is one line away. The module that import names is
+   `office_mcp`, which is why a check that resolved the module alone missed it entirely, so the
+   *member* is matched as well. `importlib.import_module("office_mcp.tools.get_me")` and its
+   relatives are deliberately not chased. The posture is the same as rule 6's: a tripwire rather
+   than a barrier, catching the import written without thinking rather than the one written to
+   hide.
 
 5. **A config class is only instantiated at the composition root.** `create_app` builds each one
-   exactly once and injects it; anything downstream constructing its own re-reads the environment
-   and so silently ignores what it was given — which is how a tool ends up configured differently
-   from the app it runs in. Reading config types (annotations, imports) is unrestricted; only
+   exactly once and injects it. Anything downstream constructing its own re-reads the environment
+   and silently ignores what it was given, which is how a tool ends up configured differently from
+   the app it runs in. Reading config types is unrestricted, in annotations and in imports. Only
    *calling* them is the violation. `main.py` is exempt as a process entrypoint: it is the root of
    its own program and hands `create_app` the config it built.
 
 6. **One speller per handle family: `shared/handles.py` alone spells or parses a `teams:///` URI.**
    A handle is how one tool's answer becomes another tool's argument, and that works only while
    there is one definition of each shape. Two modules that each knew how to write
-   `teams:///chats/…` would be free to disagree, and the disagreement would not look like a
-   disagreement — it would look like a handle one tool produced and another answers 404 to. The
-   owner is named once for every family rather than per family, which is strictly stronger than
-   letting each grammar live with the tool that mints it: four tools mint between them the five
-   shapes below and no tool file spells one, so there is nothing for a second speller to be.
+   `teams:///chats/…` would be free to disagree, and the disagreement would look like a handle one
+   tool produced and another answers 404 to. The owner is named once for every family rather than
+   per family, which is strictly stronger than letting each grammar live with the tool that mints
+   it: no tool file spells one, so there is nothing for a second speller to be.
 
-   *Spells or parses* is about what a literal is **used for**, not about how it is spaced. Prose is
-   most of what the scheme is written in here and all of it is legitimate: a tool description shows
-   a model the shapes it may pass, a JSON-schema `examples=` or `json_schema_extra` carries a real
-   one so the model sees a genuine percent-encoded id, a one-line docstring is sometimes the shape
-   itself — one line reading `teams:///meetings/{meeting_id}` and nothing else — and a refusal shows
-   the shape again in a fragment short enough to have no whitespace at all. A spacing test forbids
-   all four, and a rule that forbids the idiomatic thing is a rule somebody deletes.
+   *Spells or parses* is about what a literal is **used for**, not how it is spaced. Prose is most
+   of what the scheme is written in here and all of it is legitimate: a tool description shows a
+   model the shapes it may pass, a JSON-schema `examples=` or `json_schema_extra` carries a real one
+   so the model sees a genuine percent-encoded id, a one-line docstring is sometimes the shape
+   itself, and a refusal quotes the shape in a fragment with no whitespace at all. A spacing test
+   forbids all four, and a rule that forbids the idiomatic thing is a rule somebody deletes.
 
    So a literal carrying the scheme is an **implementation** when something is *done* to it —
    concatenated with a value, `%`-formatted, `.format()`ed, `.join()`ed, handed to `re.*`, or handed
@@ -87,11 +77,10 @@ two numbered rules that held those halves apart went with them.
    matching wherever it appears, because it never appears in prose a model reads.
 
    The scheme kept in a module constant — `_SCHEME = "teams:///"` — is caught at the **use** and
-   never at the assignment. It cannot be the assignment: `_HINT = "teams:///meetings/..."` is
-   character-for-character the same statement written for a refusal. So the name is remembered and
-   the line reported is the one that builds or parses with it — `f"{_SCHEME}chats/{c}"`, or
-   `_TEMPLATE.format(...)` — with the message naming the constant and the line it was bound on, so
-   that "why is my constant a violation" is answered in the failure itself.
+   never at the assignment, which is character-for-character `_HINT = "teams:///meetings/..."`
+   written for a refusal. The name is remembered, and the line reported is the one that builds or
+   parses with it, such as `f"{_SCHEME}chats/{c}"` or `_TEMPLATE.format(...)`. The failure names
+   the constant and the line it was bound on.
 
    **This is a text-level check, and it is a tripwire rather than a barrier.** What it cannot see is
    any module that never writes the scheme in one piece. One such module imports `handles.py`'s own
@@ -99,36 +88,35 @@ two numbered rules that held those halves apart went with them.
    violation of that module's surface before it is a violation of this one. The rest write the
    scheme in pieces: `"teams" + ":///" + "chats/" + c`, `"".join(("teams:", "//", "/chats/", c))`,
    `b"teams:///chats/".decode() + c`, `"teams" + chr(58) + "///chats/" + c`, and
-   `"teams:///chats/\\n".strip() + c`. None of them is chased, deliberately — each extra pattern
-   buys one contrived case and costs a rule that is harder to read and easier to trip by accident.
-   The class of thing this catches is the second speller somebody writes without thinking, which is
-   the one that actually happens; somebody determined to hide one succeeds.
+   `"teams:///chats/\\n".strip() + c`. None of them is chased, deliberately: each extra pattern buys
+   one contrived case and costs a rule that is harder to read and easier to trip by accident. It
+   catches the second speller somebody writes without thinking, the one that actually happens;
+   somebody determined to hide one succeeds.
 
 7. **No module may address a single meeting recording.** The listing is the whole of the recordings
    surface, because there are exactly two reasons to reach an individual `callRecording` and both
    are defects: its `content`, which is an MP4 of a meeting that can run thirty hours and which a
    model cannot watch, and its `recordingContentUrl`, which is a Graph URL that only this
-   connector's bearer token opens — so handing it to a caller is either useless or a token leak.
-   (Delegated download is organiser-only anyway, so it would also fail for most callers.) "Return
+   connector's bearer token opens, so handing it to a caller is either useless or a token leak.
+   Delegated download is organiser-only anyway, so it would also fail for most callers. "Return
    metadata and availability, never the bytes" is the whole shape of
    `tools/list_meeting_recordings.py`, and the change that breaks it is a small-looking convenience
    someone adds later, which is why it is a failing test rather than a paragraph. Enforced on the
    two SDK names that reach one recording: `by_call_recording_id` and `recording_content_url`.
    Matched as attribute names through the AST, so a docstring naming Graph's own
    `recordingContentUrl` property — as the recordings module does, to say why it is not returned —
-   is prose and not a violation.
-   The rule is permanent, so its guard finds the recordings listing by what it *does* rather than by
-   where it lives: a listing that moves is a listing this guard still finds, where a guard anchored
-   on a path would fail on the move and read as "delete me" when what it meant was "it moved".
+   is prose and not a violation. The rule is permanent, so its guard finds the recordings listing by
+   what it *does* rather than by where it lives: a guard anchored on a path would fail the day the
+   listing moved and read as "delete me" when what it meant was "it moved".
 
 8. **A package is entered through its `__init__`, never through its modules.** Applies to the
    packages in `_PUBLIC_SURFACE_PACKAGES`: `graph_client/`, `server/` and `tools/`, each of which
-   publishes an `__all__` that is the whole of what it promises. Reaching past one means
-   assembling collaborators the package is responsible for assembling — which is how a tool came
-   to re-read its own config and ignore what `create_app` was given — and on `tools/` it is
-   precisely how somebody imports `tools/get_me.py` directly and stops the registry being the one
-   place every tool module is named — which is the list a selection is filtered over and every
-   Graph scope sign-in asks for is derived from.
+   publishes an `__all__` that is the whole of what it promises. Reaching past one means assembling
+   collaborators the package is responsible for assembling, and that assembly is how a tool came to
+   re-read its own config and ignore what `create_app` was given. On `tools/` it is how somebody
+   imports `tools/get_me.py` directly and stops the registry being the one place every tool module
+   is named, which is the list a selection is filtered over and every Graph scope sign-in asks for
+   is derived from.
 
    `shared/` is deliberately not listed, because it publishes no surface. It is a grouping whose
    `__init__` is documentation and whose *modules* are the units — `shared/identity.py` is who the
@@ -137,19 +125,12 @@ two numbered rules that held those halves apart went with them.
    *for*, so an `__init__` re-exporting the lot would hide the one thing it exists to show. A
    package joins the list as soon as its `__init__` exports anything.
 
-**Rule 7 arrives with the tool it protects, which is the same discipline the rest arrived under.**
-Every rule here is paired with a guard that fails if the rule has stopped having anything to check —
-an empty tree to walk, a missing file to forbid reaching past, a framework nothing imports any more,
-a second tool module that stopped existing so that "another tool module" named nothing, a recordings
-listing that went away so that "a single recording" addressed nothing, a package with no `__all__`
-to insist on — and the same discipline says a rule may not arrive before its guard can pass. A rule
-that is written down while it forbids nothing is a rule that gets deleted for the wrong reason
-later, or worse, kept while the thing it covers quietly leaves.
-
-Rule 4 needed two tool modules to have anything to say and rule 6 needed a handle, and `list_chats`
-was both. Rule 7 needed a recordings listing to be the surface it protects, and
-`list_meeting_recordings` is it — so the rule lands with the tool, in the number the finished layout
-gives it, costing a class and changing nothing else. The whole set is now here.
+Every rule is paired with a guard that fails once the rule has nothing left to check: an empty tree
+to walk, a missing file to forbid reaching past, a framework nothing imports any more, a second tool
+module that stopped existing, a recordings listing that went away, a package with no `__all__` to
+insist on. A rule may not arrive before its guard can pass, because a rule written down while it
+forbids nothing is a rule that gets deleted for the wrong reason later, or worse, kept while the
+thing it covers quietly leaves.
 
 None of the rules is conditional: every package and every surface they are about exists today, so a
 rule that stops running is a failure and not a skip.
@@ -179,35 +160,34 @@ _CONFIG_MODULE = "office_mcp.config"
 _GRAPH_CLIENT_PREFIX = "office_mcp.graph_client"
 _MCP_FRAMEWORK = "fastmcp"
 
-# Packages that publish a surface: outside code imports the package, never a module inside it.
-# Tests are deliberately exempt — the rule walks `src` only — so the pieces a package composes stay
-# directly testable without being callable from production code that should go through the front
-# door. `shared/` is not here on purpose; see rule 8.
+# Packages that publish a surface: outside code imports the package, never a module inside it. The
+# rule walks `src` only, so tests stay free to reach the pieces a package composes. `shared/` is out
+# on purpose; see rule 8.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "office_mcp.graph_client",
     "office_mcp.server",
     "office_mcp.tools",
 )
 
-# The one file under `shared/` that is allowed to speak MCP, because being the seam is what it is
-# for. Named rather than pattern-matched: the exemption is a decision about one file.
+# The one file under `shared/` allowed to speak MCP. Named rather than pattern-matched: the
+# exemption is a decision about one file.
 _SEAM = _SHARED / "seam.py"
 
-# The scheme every handle this connector mints is written in, and the one module that may implement
-# it. See rule 6 for why the check is on building and matching rather than on the text.
+# The scheme every handle is written in, and the one module that may implement it. See rule 6 for
+# why the check is on building and matching rather than on the text.
 _HANDLE_SCHEME = "teams:///"
 _HANDLE_OWNER = _SHARED / "handles.py"
 _HANDLE_FAMILIES = frozenset({"chats", "teams", "meetings", "transcripts"})
 _HANDLE_FAMILY = re.compile(re.escape(_HANDLE_SCHEME) + r"([A-Za-z_]*)")
 
-# What tells a string that *matches* a handle from a string that *shows* one. Regex syntax never
-# appears in prose a model reads, and prose is the only other reason to write the scheme.
+# What tells a string that *matches* a handle from one that *shows* one. Regex syntax never appears
+# in prose a model reads, and prose is the only other reason to write the scheme.
 _PATTERN_SYNTAX: tuple[str, ...] = (r"\A", r"\Z", "[^", "(?")
 
-# The methods that make a scheme-carrying literal an implementation of the grammar. Building is a
-# template being filled (`.format`) or segments being pasted (`.join`); parsing is a URI being taken
-# apart by hand, which is what a second *reader* of the grammar looks like in the wild — written
-# with string methods rather than with a regex, so the pattern-syntax check never sees it.
+# The methods that make a scheme-carrying literal an implementation of the grammar. Building fills a
+# template (`.format`) or pastes segments (`.join`). Parsing takes a URI apart by hand. A parser is
+# a second *reader* of the grammar, written with string methods rather than a regex, so the
+# pattern-syntax check never sees it.
 _BUILDING_METHODS = frozenset({"format", "join"})
 _PARSING_METHODS = frozenset(
     {
@@ -222,32 +202,31 @@ _PARSING_METHODS = frozenset(
     }
 )
 
-# The module a handle handed to `re.compile`/`re.match`/`re.sub`/… is being matched by, whether or
-# not the pattern happens to carry any of `_PATTERN_SYNTAX`.
+# A handle handed to `re.compile`/`re.match`/`re.sub`/… is matched, whether or not the pattern
+# carries any of `_PATTERN_SYNTAX`.
 _REGEX_MODULE = "re"
 
-# Adjacency, not prose: where a literal run hands over to a value — an f-string interpolation or a
-# concatenated expression — the text between the scheme and the handover decides what is being
-# assembled. Reaching the handover without whitespace is a handle (`f"teams:///meetings/{x}"`,
-# `"teams:///chats/" + chat_id`); wandering back into a sentence first is a paragraph. See rule 6.
+# Adjacency, not prose: the text between the scheme and the handover decides what is assembled. The
+# handover is an f-string interpolation or a concatenated expression. Reaching the handover without
+# whitespace is a handle (`f"teams:///meetings/{x}"`, `"teams:///chats/" + chat_id`); wandering back
+# into a sentence first is a paragraph. See rule 6.
 _WHITESPACE = re.compile(r"\s")
 
-# The two names in the generated SDK that address one `callRecording` rather than the collection:
-# the item builder (`…recordings.by_call_recording_id(id)`, whose only child worth having is
-# `.content`) and the entity's own content URL. Rule 7 forbids both anywhere under `src/`.
+# The two generated-SDK names that address one `callRecording` rather than the collection: the item
+# builder (`…recordings.by_call_recording_id(id)`, whose only child worth having is `.content`) and
+# the entity's own content URL. Rule 7 forbids both anywhere under `src/`.
 _RECORDING_ITEM_NAMES = frozenset({"by_call_recording_id", "recording_content_url"})
 
 # What reading a meeting's recordings *collection* looks like, whichever module does it:
 # `client.me.online_meetings.by_online_meeting_id(id).recordings`. Rule 7's guard is written on this
-# rather than on a path because the rule is permanent and the listing's home need not be: a guard
-# that named the path would fail the day the listing moved.
+# rather than on a path, which would fail the day the listing moved.
 _RECORDINGS_COLLECTION = frozenset({"online_meetings", "recordings"})
 
 # The `BaseSettings` classes in config.py, which read the environment when constructed.
 _CONFIG_CLASSES = frozenset({"AppConfig", "DatabaseConfig", "EntraConfig", "SurfaceConfig"})
 
 # Files allowed to construct one, relative to `_SRC`. Both are the root of a program: `app.py` is
-# the composition root, and `main.py` is the server entrypoint that hands it its `AppConfig`.
+# the composition root, `main.py` the entrypoint that hands it its `AppConfig`.
 _COMPOSITION_ROOTS = frozenset({"app.py", "main.py"})
 
 
@@ -263,12 +242,11 @@ def _tool_modules() -> list[pathlib.Path]:
 def _imported_modules(tree: ast.AST, package: str | None = None) -> list[tuple[str, int]]:
     """Every module name this file imports, with the line it's imported on.
 
-    A relative import (`level > 0`) is resolved to an absolute dotted name against `package` —
-    the importing file's own `__package__` — before it's reported. Without that resolution,
-    `from ..server.readiness import ready_response` inside `tools/get_me.py` would never spell
-    `server` at `level == 0` and would be invisible to every rule below. Without a `package`
-    (the ad-hoc source snippets in `TestTheDetectionItself` below, which name no real file),
-    relative imports are skipped: there is nothing to resolve them against.
+    A relative import (`level > 0`) is resolved to an absolute dotted name against `package`, the
+    importing file's own `__package__`. Unresolved, `from ..server.readiness import ready_response`
+    inside `tools/get_me.py` never spells `server` at `level == 0` and is invisible to every rule
+    below. The source snippets in `TestTheDetectionItself` name no real file and so arrive without a
+    `package`. Their relative imports are skipped: there is nothing to resolve them against.
     """
     found: list[tuple[str, int]] = []
     for node in ast.walk(tree):
@@ -288,16 +266,15 @@ def _imported_modules(tree: ast.AST, package: str | None = None) -> list[tuple[s
 def _imported_members(tree: ast.AST, package: str | None = None) -> list[tuple[str, int]]:
     """Every `from X import name`, as the module `name` would be if it is one, with its line.
 
-    The blind spot this exists for: `from .. import tools as _tools` inside `shared/identity.py`
-    imports the module `office_mcp` and binds the whole tool package under a name, so every tool
-    module is an attribute of it and no rule above ever sees one. `from office_mcp import tools` is
-    the same import spelled absolutely. Both are caught here, and under any alias, because the alias
-    is the *binding* and `alias.name` is what was imported.
+    The blind spot this exists for is rule 4's front door: `from .. import tools as _tools` inside
+    `shared/identity.py` imports the module `office_mcp` and binds the whole tool package, so no
+    rule above sees a tool module. Both spellings are caught, under any alias, because the alias is
+    the *binding* and `alias.name` is what was imported.
 
-    Matched **exactly** by the rules that use this, never as a prefix: `from office_mcp.shared
-    import identity` names a module of a package nothing forbids, and `from office_mcp.graph_client
-    import graph_client_for` names a function rather than a module at all. Only a member that *is*
-    the forbidden package is a violation of anything.
+    The rules that use this match **exactly**, never by prefix: `from office_mcp.shared import
+    identity` names a module of a package nothing forbids, and `from office_mcp.graph_client import
+    graph_client_for` names a function rather than a module. Only a member that *is* the forbidden
+    package is a violation.
     """
     found: list[tuple[str, int]] = []
     for node in ast.walk(tree):
@@ -318,11 +295,10 @@ def _imported_members(tree: ast.AST, package: str | None = None) -> list[tuple[s
 def _resolved_import_target(package: str, level: int, module: str | None) -> str | None:
     """The absolute dotted module a relative import's `level`/`module` resolve to.
 
-    Mirrors Python's own relative-import resolution: `level` dots walk up from `package` (the
-    importing file's `__package__`) by `level - 1` components, and `module` — if the import
-    names one (`from . import x` doesn't) — is appended beneath that. Returns `None` if the
-    import walks above the top of the tree, which `ast` parses fine but Python raises
-    `ImportError` for at runtime.
+    Mirrors Python's own resolution: `level` dots walk up from `package` by `level - 1` components,
+    and `module` is appended beneath that when the import names one. `from . import x` names none.
+    Returns `None` if the import walks above the top of the tree, which `ast` parses and Python
+    raises `ImportError` for at runtime.
     """
     parts = package.split(".")
     remaining = len(parts) - (level - 1)
@@ -337,10 +313,9 @@ def _resolved_import_target(package: str, level: int, module: str | None) -> str
 def _dotted_module(source: pathlib.Path) -> str:
     """The dotted module name `source` would import as, e.g. `office_mcp.tools.get_me`.
 
-    Found by anchoring on the `office_mcp` directory in `source`'s own path, rather than by
-    relativizing against the module-level `_SRC` constant — so a temporary copy of the tree
-    (as `TestTheDetectionItself` below uses to prove the escape is caught) resolves the same
-    way the real `src/office_mcp` does.
+    Anchored on the `office_mcp` directory in `source`'s own path rather than on `_SRC`, so the
+    throwaway copy of the tree `TestTheDetectionItself` builds resolves the way `src/office_mcp`
+    does.
     """
     parts = source.with_suffix("").parts
     module_parts = parts[parts.index("office_mcp") :]
@@ -350,10 +325,10 @@ def _dotted_module(source: pathlib.Path) -> str:
 
 
 def _package_of(source: pathlib.Path) -> str:
-    """The value `__package__` has inside `source`, i.e. what its relative imports resolve against.
+    """The value `__package__` has inside `source`: what its relative imports resolve against.
 
-    For a plain module `foo/bar/baz.py` that's `foo.bar` — the package containing it. For
-    `foo/bar/__init__.py` it's `foo.bar` itself, since the module IS the package there.
+    For `foo/bar/baz.py` that is `foo.bar`, the package containing it. For `foo/bar/__init__.py` it
+    is `foo.bar` itself, since there the module is the package.
     """
     module = _dotted_module(source)
     if source.name == "__init__.py":
@@ -369,11 +344,10 @@ def _source_id(source: pathlib.Path) -> str:
 def _reaches(tree: ast.AST, prefix: str, package: str | None = None) -> list[tuple[str, int]]:
     """Every import in `tree` that reaches `prefix`, by module or through the package's front door.
 
-    Two questions, because there are two ways in. The module a file imports is `prefix` itself or
-    something under it (`import office_mcp.tools`, `from office_mcp.tools.get_me import …`), or the
-    file imports the package *as a member* of the package above it (`from .. import tools`), which
-    names `prefix` nowhere and hands over every module inside it just the same. The second is
-    matched exactly and the first by prefix — see `_imported_members` for why.
+    Two ways in: the module a file imports is `prefix` or something under it, or the file imports
+    the package *as a member* of the package above it, which is rule 4's front door and names
+    `prefix` nowhere. The first is matched by prefix and the second exactly. See
+    `_imported_members` for why.
     """
     return [
         (module, line)
@@ -412,8 +386,8 @@ def _internal_imports(
     """Modules of a public-surface package that `source` reaches past the `__init__` for.
 
     A file inside a package may import its own package's modules freely — that is the package
-    composing itself, and `tools/__init__.py` naming every tool module is the clearest case of
-    it — so the directory the file lives in, not its name, decides.
+    composing itself, and `tools/__init__.py` naming every tool module is the clearest case. So the
+    directory the file lives in, not its name, decides.
     """
     return [
         (module, line)
@@ -446,10 +420,10 @@ def _own_package_violations(source: pathlib.Path) -> list[str]:
 def _config_constructions(source: str) -> list[tuple[str, int]]:
     """Calls in `source` that construct a config class, with the line each is on.
 
-    Only calls count. Importing a config type, annotating a parameter with one, or handing one
-    to `isinstance` are all how an injected config is *used*, and none of them read the
-    environment. `AppConfig.model_validate({...})` is likewise left alone: it validates the data
-    it is given rather than gathering its own.
+    Only calls count. Importing a config type, annotating a parameter with one and handing one to
+    `isinstance` are how an injected config is *used*, and none of them read the environment.
+    `AppConfig.model_validate({...})` is left alone too: it validates the data it is given rather
+    than gathering its own.
     """
     found: list[tuple[str, int]] = []
     for node in ast.walk(ast.parse(source)):
@@ -477,34 +451,13 @@ def _config_construction_violations(source: pathlib.Path) -> list[str]:
 def _handle_spellings(source: str) -> list[str]:
     """Where `source` spells or parses a `teams:///` URI, as opposed to showing one.
 
-    The question asked of every scheme-carrying literal is what it is *used for*, not how it is
-    spaced — see rule 6 for why a spacing test would not do. Four shapes, and between them they are
-    what an implementation of the grammar looks like:
+    Rule 6 above is the definition, and this function is that definition in code. A scheme-carrying
+    literal is an implementation when something is done to it, and prose when it merely sits there.
+    Each finding says what the line does with the URI: builds, matches, or spells a handle. A name
+    bound to such a literal is followed to its use.
 
-    * **Matching.** A string that carries the scheme *and* regex syntax, or one handed to `re.*`
-      however it is written. Prose shows a shape; a pattern takes one apart.
-    * **Building through a handover.** An f-string in which an interpolation follows the scheme's
-      own path (`f"teams:///meetings/{segment}"`), or a concatenation that appends a value to it
-      (`"teams:///chats/" + chat_id`). Both are checked on adjacency rather than on the sentence
-      around them, because a description that interpolates a real id is a builder wearing prose's
-      clothes — and, the other way round, a paragraph assembled with `+` from a line that happens
-      to show a handle is not one.
-    * **Building through a template.** `%`-formatting, `.format()` and `.join()`, where the URI is
-      the template or a segment of it rather than something a value is pasted onto.
-    * **Parsing by hand.** The literal handed to `startswith`, `removeprefix`, `split`, `partition`
-      and their neighbours — a second *reader* of the grammar, which is what a second speller
-      actually looks like in the wild.
-
-    A name bound to a scheme-carrying literal is the same thing one step earlier, so it is followed:
-    `_SCHEME = "teams:///"` is caught where it is built with and never where it is assigned, because
-    the assignment is indistinguishable from a refusal's `_HINT = "teams:///meetings/..."`.
-
-    Everything else is prose and is left alone: a description, an `examples=` list, a
-    `json_schema_extra` example, a docstring that is the shape itself, a refusal fragment, or a
-    constant nobody builds with.
-
-    The literal runs inside an f-string are left to the building check, which is the only reason
-    to write an f-string; judging them separately would report the owner's own lines twice.
+    Literal runs inside an f-string are left to the building check, the only reason to write an
+    f-string; judging them separately would report the owner's own lines twice.
     """
     tree = ast.parse(source)
     parents = _parents(tree)
@@ -540,8 +493,8 @@ def _parents(tree: ast.AST) -> dict[int, ast.AST]:
 def _scheme_bindings(tree: ast.AST) -> dict[str, int]:
     """Names assigned a scheme-carrying literal, and the line each was bound on.
 
-    The binding is not the violation and is never reported as one — `_HINT = "teams:///..."` is a
-    refusal, `_SCHEME = "teams:///"` is a grammar's root, and the two are the same statement. This
+    The binding is never the violation: `_SCHEME = "teams:///"` is a grammar's root and
+    `_HINT = "teams:///..."` is a refusal, and the two are the same statement. Remembering the name
     is what lets the *use* of either be judged like the literal itself.
     """
     bound: dict[str, int] = {}
@@ -568,10 +521,10 @@ def _use_made_of(
 ) -> str | None:
     """What `node`'s surroundings do with the URI it carries: build it, match it, or nothing.
 
-    `adjacency` is the literal's own text where there is one, and None for a name — a concatenation
-    is judged on whether the run reaches the handover without whitespace, and a name bound to the
-    scheme has no run to judge, so `+` on one is left alone (that is how a refusal's hint constant
-    goes on being concatenated with more prose).
+    `adjacency` is the literal's own text where there is one, and None for a name. A concatenation
+    is judged on whether the run reaches the handover without whitespace; a name bound to the scheme
+    has no run to judge, so `+` on one is left alone, which is how a refusal's hint constant goes on
+    being concatenated with more prose.
     """
     parent = parents.get(id(node))
     if isinstance(parent, ast.FormattedValue):
@@ -608,11 +561,11 @@ def _use_made_of(
 
 
 def _is_literal_text(node: ast.expr) -> bool:
-    """Whether `node` is text known at parse time, i.e. prose rather than a value handed over.
+    """Whether `node` is text known at parse time: prose, rather than a value handed over.
 
-    A chain of `+`-ed string literals is how a long description is written in this codebase, so the
-    whole chain has to read as one literal — otherwise every paragraph that shows a handle on its
-    own line would look like a concatenation building one.
+    A long description in this codebase is a chain of `+`-ed string literals, so the whole chain has
+    to read as one literal. Otherwise every paragraph that shows a handle on its own line would look
+    like a concatenation building one.
     """
     if isinstance(node, ast.Constant):
         return isinstance(node.value, str)
@@ -646,8 +599,8 @@ def _handle_violations(source: pathlib.Path) -> list[str]:
 def _registry_imports() -> set[str]:
     """The tool modules `tools/__init__.py` names, by module stem.
 
-    Both spellings, because either is how a module gets into `_TOOL_MODULES`: the names of a
-    `from office_mcp.tools import get_me, list_chats`, and the tail of an
+    Both spellings, because either is how a module gets into `_TOOL_MODULES`: the names of
+    `from office_mcp.tools import get_me, list_chats`, and the tail of
     `import office_mcp.tools.get_me`.
     """
     tree = ast.parse((_TOOLS / "__init__.py").read_text())
@@ -696,9 +649,9 @@ def _a_tool_file_containing(
 ) -> pathlib.Path:
     """`tools/list_chats.py` in a throwaway copy of the tree, holding `source`.
 
-    On disk rather than as a string because a relative import only resolves against a real package:
+    On disk rather than as a string because a relative import resolves only against a real package:
     `from .. import tools` is `office_mcp` seen from `office_mcp.tools.list_chats`, and nothing but
-    the file's own path says which. `_SRC` is repointed at the copy so the violation comes back
+    the file's own path says which. `_SRC` is repointed at the copy, so the violation comes back
     named the way the real rules name one.
     """
     module = tmp_path / "office_mcp" / "tools" / "list_chats.py"
@@ -725,9 +678,8 @@ class TestTheDetectionItself:
         self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """`from ..tools.get_me import SignedInUser` inside `shared/identity.py` never spells
-        `tools` at `level == 0`, so a level-blind check is silently invisible to exactly the
-        violation rule 1 exists to catch. Proves the fix against the real checker (`_violations`,
-        what the rules below run) over an actual file on disk.
+        `tools` at `level == 0`, so a level-blind check misses exactly the violation rule 1 exists
+        to catch. Run against the real checker, `_violations`, over a file on disk.
         """
         src = tmp_path / "office_mcp"
         module = src / "shared" / "identity.py"
@@ -743,9 +695,9 @@ class TestTheDetectionItself:
         self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The escape rule 4 would have without this check: the registry imports every tool module,
-        so the package object carries both of them as attributes and one import of it is
-        `tools.get_me.GRAPH_PERMISSIONS`. The module imported is `office_mcp` — no sibling's name
-        appears anywhere — which is why resolving the module alone never sees it.
+        so one import of the package makes `tools.get_me.GRAPH_PERMISSIONS` reachable. The module
+        imported is `office_mcp` and no sibling's name appears, which is why resolving the module
+        alone never sees it.
         """
         module = _a_tool_file_containing("from .. import tools\n", tmp_path, monkeypatch)
 
@@ -783,9 +735,9 @@ class TestTheDetectionItself:
     def test_catches_it_inside_a_function_body(
         self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Where a sibling import is likeliest to be written, since deferring it is how somebody
-        gets round the circular import a module-level one would cause. The walk is over the whole
-        tree, so the line reported is the import's own."""
+        """Where a sibling import is likeliest to be written: deferring it is how somebody gets
+        round the circular import a module-level one would cause. The walk covers the whole tree, so
+        the line reported is the import's own."""
         module = _a_tool_file_containing(
             "def register(mcp: object, transport: object) -> tuple[str, ...]:\n"
             + "    from office_mcp import tools\n"
@@ -853,11 +805,11 @@ class TestTheDetectionItself:
         ) == ["office_mcp.server", "office_mcp.server.readiness"]
 
     def test_does_not_fire_on_permitted_imports(self) -> None:
-        """The negative control, and the one that keeps every rule above from being a rule
-        against importing anything: each is one call to `_imports_under`, so a helper that
-        matched loosely would turn "a tool imports only shared/, graph_client/ and FastMCP" into
-        "a tool imports nothing" and every rule would pass by forbidding the whole language.
-        These three are exactly what rule 3 permits a tool file, plus a cross-cutting module.
+        """The negative control that keeps every rule above from being a rule against importing
+        anything: each is one call to `_imports_under`, so a helper that matched loosely would turn
+        "a tool imports only shared/, graph_client/ and FastMCP" into "a tool imports nothing" and
+        every rule would pass by forbidding the whole language. These three are what rule 3 permits
+        a tool file, plus a cross-cutting module.
         """
         assert not _imports_under(
             "from office_mcp.shared.identity import PROFILE\n"
@@ -868,9 +820,9 @@ class TestTheDetectionItself:
         )
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
-        # `server` stands in for any listed package here; the rule is about the front door, not
-        # about which package happens to be behind it. The importing directory is `_SRC` — i.e.
-        # `app.py`, the composition root, which is the likeliest place to reach past one.
+        # `server` stands in for any listed package: the rule is about the front door, not about
+        # which package is behind it. The importing directory is `_SRC`, the home of `app.py`. The
+        # composition root is the likeliest place to reach past a front door.
         reached = _internal_imports("from office_mcp.server.readiness import ready_response", _SRC)
 
         assert reached == [("office_mcp.server.readiness", 1)]
@@ -938,10 +890,9 @@ class TestTheDetectionItself:
         ) == ["line 2 spells a handle"]
 
     def test_catches_a_handle_assembled_with_format(self) -> None:
-        """Including the named-placeholder form, which is character-for-character what a
-        description shows a model — the difference is that this one is a template rather than a
-        sentence, and `.format` is what it is for. Reported at the `.format`, not at the
-        assignment: the assignment on its own is indistinguishable from a refusal's hint.
+        """The named-placeholder form is character-for-character what a description shows a model;
+        the difference is that this one is a template and `.format` is what it is for. Reported at
+        the `.format` and not at the assignment, which on its own is a refusal's hint.
         """
         assert _handle_spellings(
             '_TEMPLATE = "teams:///chats/{chat_id}/messages/{message_id}"\n'
@@ -962,11 +913,11 @@ class TestTheDetectionItself:
         ) == ["line 2 spells a handle"]
 
     def test_catches_an_f_string_that_reaches_the_scheme_through_a_constant(self) -> None:
-        """No literal in the f-string carries the scheme, so the building check cannot see this
-        one. What gives it away is the constant being *built with*: the assignment is not the
-        violation and is never reported as one — see the prose tests below, where the same
-        statement is a refusal's hint — so the line reported is the f-string, and the message says
-        which constant it reached the scheme through."""
+        """No literal in the f-string carries the scheme, so the building check cannot see it. What
+        gives it away is the constant being *built with*. The assignment is never the violation,
+        because the same statement is a refusal's hint in the prose tests below. So the line
+        reported is the f-string, and the message names the constant it reached the scheme
+        through."""
         assert _handle_spellings(
             '_SCHEME = "teams:///"\n'
             + "def uri(chat_id: str) -> str:\n"
@@ -986,15 +937,14 @@ class TestTheDetectionItself:
         )
 
         # Sorted rather than in source order: the walk is breadth-first, so two literals at
-        # different depths come out in the tree's order and not the file's.
+        # different depths come out in tree order, not file order.
         assert sorted(found) == ["line 2 spells a handle", "line 4 spells a handle"]
 
     def test_leaves_a_handle_shown_to_a_model_alone(self) -> None:
-        """Every description that teaches a shape, every refusal that shows one, and every
-        docstring that names the scheme — including the ones inside an f-string, where the
-        braces are escaped and the placeholders are text, and the one where the example is a
-        real percent-encoded id rather than a placeholder at all. This is the property the
-        text-level check has to keep: prose is most of what the scheme is written in here.
+        """Every description that teaches a shape, every refusal that shows one, and every docstring
+        that names the scheme, including one inside an f-string, where the braces are escaped and
+        the placeholders are text, and one whose example is a real percent-encoded id. Prose is most
+        of what the scheme is written in here, which is the property the text-level check must keep.
         """
         assert not _handle_spellings(
             '"""The `teams:///` grammar: every shape this connector mints."""\n'
@@ -1006,10 +956,9 @@ class TestTheDetectionItself:
         )
 
     def test_leaves_a_schema_example_alone(self) -> None:
-        """`examples=` is the idiomatic JSON-schema way to show a model a real handle, and a real
-        handle has a percent-encoded id in it and no whitespace anywhere. Every tool file still to
-        be written wants this, which is why a rule that forbade it would be a rule somebody deleted
-        rather than obeyed."""
+        """`examples=` is the JSON-schema way to show a model a real handle, and a real handle has a
+        percent-encoded id and no whitespace anywhere. Every tool file still to be written wants
+        this, so a rule that forbade it would be deleted rather than obeyed."""
         assert not _handle_spellings(
             "uri: str = Field(\n"
             + '    description="The message to read.",\n'
@@ -1034,10 +983,9 @@ class TestTheDetectionItself:
         )
 
     def test_leaves_a_refusal_fragment_alone(self) -> None:
-        """A refusal quoting a family, as a bare token because that is how it reads in a sentence —
-        and the same statement as `_SCHEME = "teams:///"`, which is why the binding can never be
-        the violation and the *use* is what is judged. Concatenating it with more prose is still
-        prose."""
+        """A refusal quoting a family as a bare token is the same statement as
+        `_SCHEME = "teams:///"`. So the binding can never be the violation, and the *use* is what is
+        judged. Concatenating it with more prose is still prose."""
         assert not _handle_spellings(
             '_HINT = "teams:///meetings/..."\n'
             + "def refuse() -> str:\n"
@@ -1167,9 +1115,9 @@ class TestAToolLeansOnlyOnSharedAndTheTransport:
 class TestNoToolKnowsAboutAnotherTool:
     def test_there_is_more_than_one_tool_to_confuse(self) -> None:
         """Guards the guard: "no tool module imports another" says nothing about a package holding
-        one file. It also pins the registry as the only importer of them all — if it stopped
-        importing every module, the union of their permissions would have come from somewhere
-        else, which is the failure `tools/__init__.py` exists to prevent."""
+        one file. It also pins the registry as the importer of them all. If the registry stopped
+        importing every module, the union of their permissions would come from somewhere else,
+        which is the failure `tools/__init__.py` exists to prevent."""
         modules = _tool_modules()
         assert len(modules) > 1, f"fewer than two tool modules under {_TOOLS}"
         imported = _registry_imports()
@@ -1249,11 +1197,9 @@ class TestNoModuleReachesForRecordingBytes:
     """Rule 7."""
 
     def test_the_recordings_listing_is_actually_there(self) -> None:
-        """Guards the guard: the rule is that the *collection* is the whole surface, so if nothing
-        listed recordings any more it would be forbidding something nothing does.
-
-        Looked for by what it does rather than by where it lives, so that a listing which moves
-        leaves this passing.
+        """Guards the guard: the *collection* is the whole surface, so if nothing listed recordings
+        any more the rule would forbid something nothing does. Looked for by what it does rather
+        than by where it lives, so a listing that moves leaves this passing.
         """
         listings = _recording_listings()
         assert listings, (

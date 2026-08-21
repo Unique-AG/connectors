@@ -1,12 +1,12 @@
 """The composition root, exercised as a real ASGI app.
 
-Checks that the app starts, its lifespan runs, the process-health routes behave, and that Entra
-auth is actually mounted and enforced. The tools it exposes are exercised over the MCP protocol in
+Checks that the app starts, its lifespan runs, the process-health routes behave, and that Entra auth
+is mounted and enforced. The tools it exposes are exercised over the MCP protocol in
 `test_mcp_tools.py`.
 
 Nothing here reaches Entra: constructing the provider performs no I/O, and the assertions below
-only touch metadata this service serves itself plus one unauthenticated request that is rejected
-before any upstream call would happen.
+touch only metadata this service serves itself, plus one unauthenticated request rejected before any
+upstream call would happen.
 """
 
 import ast
@@ -66,9 +66,8 @@ _UNREACHABLE_DSN = "postgresql://user:pass@127.0.0.1:1/nope"
 class _ToolModule(Protocol):
     """The two things this test reads off a tool file.
 
-    `tools/__init__.py` owns the whole of a tool module's contract; these are the parts of it that
-    decide what reaches the consent screen — the permissions, and the name a selection asks for the
-    tool by.
+    `tools/__init__.py` owns the whole of a tool module's contract. These two decide what reaches
+    the consent screen: the permissions, and the name a selection asks for the tool by.
     """
 
     TOOL_NAME: str
@@ -78,8 +77,8 @@ class _ToolModule(Protocol):
 def _tool_modules() -> list[tuple[str, _ToolModule]]:
     """Every file under `src/office_mcp/tools/` that is a tool, found on disk, with its name.
 
-    `__init__.py` is the registry rather than a tool, and is what this deliberately does not ask:
-    the point of reading the directory is to see a tool file the registry forgot.
+    `__init__.py` is the registry rather than a tool, and is deliberately not asked: the point of
+    reading the directory is to see a tool file the registry forgot.
     """
     tools_dir = pathlib.Path(app_module.__file__).parent / "tools"
     return [
@@ -87,8 +86,8 @@ def _tool_modules() -> list[tuple[str, _ToolModule]]:
             source.stem,
             cast(
                 "_ToolModule",
-                # Through `object`: a `ModuleType` never structurally overlaps a Protocol, which
-                # is the same widening `_MainModule` below needs for the same reason.
+                # Through `object`: a `ModuleType` never structurally overlaps a Protocol.
+                # `_MainModule` below needs the same widening.
                 cast("object", importlib.import_module(f"office_mcp.tools.{source.stem}")),
             ),
         )
@@ -110,17 +109,15 @@ def _entra_config() -> EntraConfig:
 def _surface_config() -> SurfaceConfig:
     """Every tool there is, which is what this file is about.
 
-    A selection is mandatory — `create_app` refuses to start without one, deliberately — so every
-    test here has to state which surface it composes. `teams` is the widest and the one whose scope
-    list every assertion below is written against; the narrowed surfaces are
-    `tests/test_tool_selection.py`'s subject.
+    `create_app` refuses to start without a selection, so every test here states which surface it
+    composes. `teams` is the widest, and every assertion below is written against its scope list;
+    the narrowed surfaces are `tests/test_tool_selection.py`'s subject.
     """
     return SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS})
 
 
-# `starlette.testclient` returns httpx responses that this repo's strict type-checking sees as
-# partially unknown. Narrowed once here, so every assertion below is checked rather than
-# silently `Any`.
+# `starlette.testclient` returns httpx responses this repo's strict type-checking sees as partially
+# unknown. Narrowed once here, so every assertion below is checked rather than silently `Any`.
 class _HttpResponse(Protocol):
     @property
     def status_code(self) -> int: ...
@@ -136,8 +133,8 @@ def _get(client: TestClient, path: str) -> _HttpResponse:
 def _request(client: TestClient, method: str, path: str) -> _HttpResponse:
     """The same narrowing as `_get`, for a verb `TestClient` has no method for.
 
-    Which is the point of the one caller: a method this service does not serve is a label value a
-    client chose, so the test has to be able to send one.
+    A method this service does not serve is a label value a client chose, so the one caller has to
+    be able to send one.
     """
     return cast(
         "_HttpResponse",
@@ -171,9 +168,9 @@ _NAME_LABEL = re.compile(r'name="([^"]*)"')
 def _call_label_values(kind: str) -> set[str]:
     """Every `name` label `mcp_calls_total` carries for one kind of call, from a live scrape.
 
-    Read out of the process-wide Prometheus registry rather than over `/metrics`, because that
-    route serves the same registry and going through HTTP would need a signed-in caller too. The
-    registry is process-wide and never reset, so assert on values this test produced itself.
+    Read out of the Prometheus registry rather than over `/metrics`, which serves the same registry
+    and would need a signed-in caller. The registry is process-wide and never reset, so assert only
+    on values this test produced itself.
     """
     return {
         match.group(1)
@@ -236,12 +233,12 @@ class TestRoutes:
         """Two histograms for one latency is a dashboard that disagrees with itself.
 
         `OpenTelemetryMiddleware` brings its own instruments, and left to the global meter provider
-        they land in the same registry `/metrics` scrapes as unique_toolkit's — so a scrape would
-        answer `http_server_duration_milliseconds` *and* `python_http_request_duration_seconds` for
-        the same requests, differing in unit, in bucket boundaries and in labels. `app.py` hands
-        that middleware a no-op meter provider so the toolkit series is the only one; this is what
-        says so. Asserted on the family names rather than on the middleware's arguments, because
-        what must not regress is the scrape.
+        they land in the same registry `/metrics` scrapes as unique_toolkit's: a scrape would answer
+        `http_server_duration_milliseconds` *and* `python_http_request_duration_seconds` for the
+        same requests, differing in unit, bucket boundaries and labels. `app.py` hands that
+        middleware a no-op meter provider so the toolkit series is the only one. Asserted on the
+        family names rather than the middleware's arguments, because the scrape is what must not
+        regress.
         """
         # A request has to have been served before a latency histogram exists to find. The scrape
         # itself does not count: it is still in flight when the registry is read.
@@ -266,14 +263,13 @@ class TestRoutes:
         `prometheus_client`'s default layout stops at 10 s. One inbound MCP request contains a tool
         call and every Graph call that tool made — four 30 s attempts before any Retry-After wait,
         several requests for a paged walk — so at the default every slow request falls into `+Inf`
-        and p95 and p99 both read 10, which is the one number the panel must not invent. Asserted on
-        the scrape rather than on the argument, because a histogram is registered once per process
-        and the first middleware to declare it wins: the argument is only correct if it arrived
-        first, and only the scrape says whether it did.
+        and p95 and p99 both read 10, the one number the panel must not invent. Asserted on the
+        scrape rather than on the argument, because a histogram is registered once per process and
+        the first middleware to declare it wins: the argument is right only if it arrived first, and
+        only the scrape says whether it did.
 
-        `/manifest` and not `/health`, which `setup_ops` excludes from these metrics along with the
-        other probe routes — a scrape after a health check finds the family declared and empty, and
-        a histogram with no observations has no buckets to read.
+        `/manifest` and not `/health`: `setup_ops` excludes the probe routes from these metrics,
+        and a histogram with no observations has no buckets to read.
         """
         assert _get(app_client, "/manifest").status_code == 200
 
@@ -291,9 +287,8 @@ class TestRoutes:
         """`/manifest` is where an operator reads the exact permission list without a pod's logs.
 
         Asserted here rather than only against `surface_manifest`, because the spec asks for a log
-        line *and a route*: a test that calls the function directly passes just as happily with the
-        route deleted, and the permission list is the one thing about this deployment that cannot be
-        corrected after a tenant has consented to it.
+        line *and* a route: a test that calls the function directly passes with the route deleted,
+        and the permission list cannot be corrected after a tenant has consented to it.
         """
         response = _get(app_client, "/manifest")
 
@@ -304,9 +299,9 @@ class TestRoutes:
     def test_the_resolved_surface_is_logged_once_at_startup(
         self, postgres_container: PostgresContainer, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """And the other half of it: an operator who never calls the route still finds the list in
-        the pod's log. Once, not per request — this runs in the lifespan, and a manifest that landed
-        on every call would bury the line that matters in a log nobody reads twice.
+        """The other half: an operator who never calls the route still finds the list in the pod's
+        log. Once, not per request: this runs in the lifespan, and a manifest on every call would
+        bury the line that matters.
         """
         url = postgres_container.get_connection_url().replace("+psycopg2", "")
         app = create_app(
@@ -357,29 +352,27 @@ class TestAuthIsMountedAndEnforced:
 class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
     """The scope list handed to the auth provider, which is the one thing a restart cannot fix.
 
-    `tools/__init__.py` derives it from the tool modules and is guarded where it is built. What is
-    guarded here is that the value actually reaching Entra *is* that derivation, and that every
-    tool file on disk is inside it. Either failure is silent and late: every tool still registers,
-    every schema is unchanged, every other test in this suite passes, and the failure only appears
-    in a live tenant as AADSTS65001 from the On-Behalf-Of exchange — before the tool body runs, for
-    a permission that cannot be obtained after sign-in.
+    `tools/__init__.py` derives it from the tool modules and is guarded where it is built. Guarded
+    here is that the value reaching Entra *is* that derivation, and that every tool file on disk is
+    inside it. Either failure is silent and late: every tool still registers, every schema is
+    unchanged, every other test in this suite passes, and the failure appears only in a live tenant
+    as AADSTS65001 from the On-Behalf-Of exchange, before the tool body runs, for a permission that
+    cannot be obtained after sign-in.
 
-    A set comparison is not enough here, and that is not a stylistic preference. Two tools name the
-    same permission all over this registry, so a change that reordered the list — or that dropped a
-    tool whose every permission another tool also names — would leave the *set* identical and move
-    only the order. The tuple is therefore what is asserted, which is also the property that
-    matters in production: the consent screen and every cached On-Behalf-Of token key are keyed by
-    this list as a string.
+    A set comparison is not enough. Two tools name the same permission all over this registry, so a
+    change that reordered the list would leave the *set* identical, and so would dropping a tool
+    whose every permission another tool also names. The tuple is what is asserted, which is the
+    property that matters in production: the consent screen and every cached On-Behalf-Of token key
+    are keyed by this list as a string.
 
-    What a derivation cannot check is the *names*: every assertion that reads the tool files and
-    compares them with a list built from those same files agrees with a typo, because the typo is
-    on both sides of it. So two of the assertions here compare them against
-    `shared/seam.py`'s `REQUESTABLE_PERMISSIONS`, which is written out by hand precisely so that it
-    is not a derivation, and against the one shape a permission tuple may not have.
+    What a derivation cannot check is the *names*: an assertion that reads the tool files and
+    compares them with a list built from those same files agrees with a typo, because the typo is on
+    both sides of it. So two of the assertions here compare them against `shared/seam.py`'s
+    `REQUESTABLE_PERMISSIONS`, written out by hand precisely so that it is not a derivation, and
+    against the one shape a permission tuple may not have.
 
-    Every assertion is written against the widest surface — `TOOLS_PRESET=teams`, every tool there
-    is — because that is the selection under which "every tool file's permissions" has anything to
-    mean. What a *narrowed* surface asks for is `tests/test_tool_selection.py`'s subject.
+    Every assertion is written against the widest surface, `TOOLS_PRESET=teams`, the only selection
+    under which "every tool file's permissions" means anything.
     """
 
     def test_the_widest_surface_has_something_to_contribute(self) -> None:
@@ -396,9 +389,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
         Read off the tool *files*, keyed by the selection's own tool order, so this is not a
         derivation compared with itself: a permission dropped, added or reordered fails here, and
-        the order is what production is keyed by. Two tools naming the same permission is normal, so
-        a set comparison would let a reorder — or the loss of a tool whose every permission another
-        tool also names — pass unnoticed.
+        the order is what production is keyed by.
         """
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         # Keyed by the name a selection uses, which is the tool file's own `TOOL_NAME` and not its
@@ -440,12 +431,12 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     def test_every_declared_permission_is_one_this_connector_may_ask_for(self) -> None:
         """The check the two above cannot make. Both compare the tool files against a list derived
-        from those same files, so a misspelling is on both sides of the comparison and holds:
+        from those same files, so a misspelling sits on both sides and holds:
         `GRAPH_PERMISSIONS = ("Chat.Raed",)` passes every other assertion in this suite while
-        putting a scope Entra does not know into `additional_authorize_scopes` — and Entra rejects
-        an authorize request carrying an unknown scope, so every sign-in fails, for every user, for
-        a tool nobody called. `shared/seam.py` writes the names out once, independently, which is
-        the only thing that can catch it.
+        putting a scope Entra does not know into `additional_authorize_scopes`. Entra rejects an
+        authorize request carrying an unknown scope, so every sign-in fails, for every user, for a
+        tool nobody called. `shared/seam.py` writes the names out once, independently, which is the
+        only thing that catches it.
         """
         unknown = {
             f"{name}: {permission}"
@@ -474,15 +465,15 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
         )
 
     def test_create_app_resolves_the_surface_once_and_both_halves_come_from_it(self) -> None:
-        """The scopes Entra is asked for belong to the very selection the tools were registered
-        from — asserted by identity, which is the whole of what is being asserted.
+        """The scopes Entra is asked for belong to the selection the tools were registered from,
+        asserted by identity.
 
         Two resolutions would be two chances to disagree about a tool, and the disagreement is
         unfixable either way round: a tool registered whose permission was not requested fails at
         its first call with AADSTS65001, and a permission requested for a tool nobody registered
         widens every user's consent screen for a tool that is not there. So both consumers are
-        watched, and what is compared is the object rather than its contents — two lists that merely
-        looked equal would be exactly the second derivation this forbids.
+        watched, and the object is compared rather than its contents. Two lists that merely looked
+        equal would be the second derivation this forbids.
         """
         asked_for: list[Sequence[str]] = []
         registered: list[Selection] = []
@@ -566,9 +557,8 @@ class TestReadyProbesTheConnectionSignInDependsOn:
         url = postgres_container.get_connection_url().replace("+psycopg2", "")
         database_config = DatabaseConfig.model_validate({"url": url})
         entra_config = _entra_config()
-        # A fresh recorder per call, so building a *second* store — one that would connect on
-        # its own behind the provider's back — is visible as a second entry rather than
-        # silently answering as the first.
+        # A fresh recorder per call, so a *second* store, one that would connect behind the
+        # provider's back, shows up as a second entry rather than answering as the first.
         built: list[_ProbeRecordingStorage] = []
         provider_was_given: list[AsyncKeyValue] = []
 
@@ -702,20 +692,18 @@ class _MainModule(Protocol):
 def main_module() -> Iterator[_MainModule]:
     """Import `office_mcp.main`, containing its `load_dotenv()` module-level side effect.
 
-    `office_mcp.main` calls `load_dotenv()` at import time — right for an operator launching the
-    process, but it would otherwise push this service's local `.env` into `os.environ` for the
-    rest of the test session the first time anything imports this module. The module is only
-    ever exec'd once per process, so the whole environment — not just the handful of vars `.env`
-    sets — is snapshotted and restored around that one import.
+    `load_dotenv()` at import time is right for an operator launching the process, but it would
+    otherwise push this service's local `.env` into `os.environ` for the rest of the test session.
+    The module is exec'd once per process, so the whole environment is snapshotted and restored
+    around that one import, not just the variables `.env` sets.
     """
     environment_before = os.environ.copy()
     try:
-        # Importing the module runs `AppConfig()` and `create_app()` — which builds a
-        # `DatabaseConfig()` too — so the import needs a complete environment or it raises.
-        # Set one here rather than relying on the developer's local `.env`: CI has no `.env`,
-        # and `load_dotenv()` doesn't override variables that are already set, so these win in
-        # both places. Postgres is never reached — the OAuth store connects lazily, on its first
-        # read, and nothing here serves a request — so an unroutable URL is enough.
+        # Importing the module runs `AppConfig()` and `create_app()`, which builds a
+        # `DatabaseConfig()` too, so the import needs a complete environment or it raises. Set one
+        # here rather than relying on a local `.env`: CI has none, and `load_dotenv()` does not
+        # override variables already set, so these win in both places. An unroutable URL is enough,
+        # because the OAuth store connects on its first read and nothing here serves a request.
         os.environ["PUBLIC_BASE_URL"] = _PUBLIC_BASE_URL
         os.environ["DB_URL"] = "postgresql://user:pass@127.0.0.1:1/nope"
         # `create_app` builds an `EntraConfig` too, and all three of these are required.
@@ -728,8 +716,8 @@ def main_module() -> Iterator[_MainModule]:
 
         # Imported through `importlib`, then widened via `object` before being narrowed: the
         # `import` statement form infers a literal `Module("office_mcp.main")` type that
-        # `reportInvalidCast` refuses to convert to `_MainModule` at all — even through
-        # `object` — whereas the plain `ModuleType` `import_module` returns widens cleanly.
+        # `reportInvalidCast` refuses to convert to `_MainModule` even through `object`, whereas the
+        # plain `ModuleType` `import_module` returns widens cleanly.
         yield cast("_MainModule", cast("object", importlib.import_module("office_mcp.main")))
     finally:
         os.environ.clear()
@@ -737,13 +725,12 @@ def main_module() -> Iterator[_MainModule]:
 
 
 class TestMainEntrypoint:
-    """`office_mcp.main.main()`, exercised without ever letting uvicorn actually serve.
+    """`office_mcp.main.main()`, exercised without letting uvicorn serve.
 
-    A string target (`"office_mcp.main:app"`) makes uvicorn re-import this module under its own
-    name when run as a script rather than through the `office-mcp` console script — re-running
-    `create_app()` a second time, with a second OAuth store (and a second connection pool behind
-    it) that nothing ever shuts down. Passing the already-built `app` object avoids the
-    re-import entirely.
+    A string target (`"office_mcp.main:app"`) makes uvicorn re-import this module under its own name
+    when run as a script rather than through the `office-mcp` console script, running `create_app()`
+    a second time with a second OAuth store that nothing shuts down, and a second connection pool
+    behind it. Passing the already-built `app` object avoids the re-import.
     """
 
     def test_uvicorn_is_given_the_app_object_not_a_string_target(
@@ -780,9 +767,8 @@ class TestTheGraphTimeoutBudgetIsInjected:
     """`graph_client/` may not read config (rule 2), so the composition root translates it.
 
     The seam existed before these tests and carried nothing through it: every construction in the
-    repo was a bare `GraphSettings()`, which made the three values operators most want to turn —
-    the request timeout, the connect timeout and the retry count — unreachable without a code
-    change, while three files said the opposite.
+    repo was a bare `GraphSettings()`. A bare one left the request timeout, the connect timeout
+    and the retry count unreachable without a code change, while three files said the opposite.
     """
 
     def test_the_composition_root_hands_the_transport_what_an_operator_configured(self) -> None:
@@ -843,10 +829,10 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
     async def test_this_server_registers_no_resource_and_no_prompt_today(self) -> None:
         """Records the state the resource and prompt paths are exercised against, not a decision.
 
-        All three paths now resolve before renaming, so nothing here depends on the registries being
-        empty. What being empty does mean is that the resolve-first branch on those two is never the
-        one taken in this deployment — so when the Outlook or SharePoint surfaces add a member, this
-        fails and says to go and cover the branch that starts running.
+        All three paths resolve before renaming, so nothing here depends on the registries being
+        empty. Empty means the resolve-first branch on those two is never taken in this deployment,
+        so when the Outlook or SharePoint surfaces add a member this fails and says to cover the
+        branch that starts running.
         """
         async with Client(FastMCPTransport(_server_of(_app()))) as client:
             assert await client.list_resources() == []
@@ -856,9 +842,8 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
     async def test_a_resource_and_a_prompt_that_do_resolve_keep_their_own_name(self) -> None:
         """The resolve-first branch on the two paths this deployment cannot reach yet.
 
-        Asserted on a server built here rather than on the composed app, because the composed app
-        registers neither — which is the whole reason this branch would otherwise go untested until
-        the day something depended on it.
+        Asserted on a server built here rather than on the composed app. The composed app registers
+        neither, so this branch would otherwise go untested until something depended on it.
         """
         server: FastMCP[None] = FastMCP("Office MCP", middleware=[BoundedNameMiddleware()])
 
@@ -882,11 +867,11 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
         ] == ["prompt reached"]
 
     async def test_every_registered_tool_still_dispatches_under_its_own_name(self) -> None:
-        """The renaming is only allowed to touch a call that was going to be refused anyway.
+        """The renaming may only touch a call that was going to be refused anyway.
 
         Every tool is called with no arguments, so each fails — on its arguments, or on the
-        On-Behalf-Of exchange an unauthenticated in-process client cannot make. What matters is
-        that none of them fails as *unknown*, which is what a renamed call would have become.
+        On-Behalf-Of exchange an unauthenticated in-process client cannot make. What matters is that
+        none fails as *unknown*, which is what a renamed call would have become.
         """
         async with Client(FastMCPTransport(_server_of(_app()))) as client:
             registered = [tool.name for tool in await client.list_tools()]
@@ -1033,9 +1018,9 @@ class TestThePathAndMethodLabelsAreBoundedByTheRouter:
     def test_an_unrouted_path_still_gets_starlettes_own_404(self, app_client: TestClient) -> None:
         """This middleware rewrites and passes through; it refuses nothing.
 
-        So a route somebody forgets to register still answers 404 exactly as before, rather than a
-        missing registration becoming an outage — which is what a known-paths gate in front of the
-        router would have made it.
+        A route somebody forgets to register still answers 404 as before, rather than a missing
+        registration becoming an outage, which is what a known-paths gate in front of the router
+        would have made it.
         """
         answered = _get(app_client, "/not-a-route-at-all")
 
@@ -1047,9 +1032,8 @@ class TestThePathAndMethodLabelsAreBoundedByTheRouter:
 
         Starlette applies `user_middleware` outside-in, so earlier in the list is further out.
         Outside the toolkit's metrics middleware, or the label has already been read. Inside the
-        request-id one, so an operator reading a flood of 404s still sees the real paths — a log
-        line is where that truth belongs, and a metric label is the one place it must not
-        accumulate.
+        request-id one, so an operator reading a flood of 404s still sees the real paths: a log line
+        is where that truth belongs, and a metric label is where it must not accumulate.
         """
         # `Middleware.cls` is typed as a factory protocol rather than a class, so the name comes
         # off it through `type[object]`. Names rather than identities because three of the readers
@@ -1076,8 +1060,8 @@ class TestThePathAndMethodLabelsAreBoundedByTheRouter:
 
 
 # What a method that releases what an object holds is called. Anchored at the start, so `is_closed`
-# — a flag, and the one that lied about this service's own Graph transport — can never be mistaken
-# for one.
+# is never mistaken for one: it is a flag, and it is the flag that lied about this service's own
+# Graph transport.
 _CLOSER = re.compile(r"^a?close(_|$)|^(?:shutdown|disconnect|dispose)$")
 
 # Long-lived objects `create_app` builds that the lifespan deliberately does not close, and why.
@@ -1264,21 +1248,21 @@ def _closed_in_the_lifespan() -> set[str]:
 class TestEveryLongLivedObjectIsClosedOnShutdown:
     """The composition root builds each long-lived object once, and shutdown is the only release.
 
-    A pool the lifespan forgets leaks for as long as the pod lives, and it is silent while it does:
-    the app starts, every request is served, and nothing counts the sockets. The mistake is one
-    line missing from a `finally` block that the commit adding the object had no reason to touch.
+    A pool the lifespan forgets leaks for as long as the pod lives, and silently: the app starts,
+    every request is served, and nothing counts the sockets. The mistake is one line missing from a
+    `finally` block that the commit adding the object had no reason to touch.
 
     Structural rather than behavioural, for two reasons. A behavioural test can only assert about
     the objects it was written to know, and the one this exists for is the object nobody wrote a
-    test for — visible only in what `create_app` binds. And `test_mcp_tools.py`'s
-    `TestTheTransportTheToolsShare` records a behavioural version of exactly this check that passed
-    while the pool it was about survived every shutdown: it asserted `is_closed`, and `is_closed`
-    was the only thing `aclose()` moved.
+    test for, visible only in what `create_app` binds. And `test_mcp_tools.py`'s
+    `TestTheTransportTheToolsShare` records a behavioural version of this check that passed while
+    the pool it was about survived every shutdown: it asserted `is_closed`, and `is_closed` was the
+    only thing `aclose()` moved.
 
     What is closeable is read off the type the composition root is handed, which is why
     `oauth_storage` needs no exemption below: `build_oauth_storage` answers `AsyncKeyValue`, a
-    protocol that declares no closer at all. Reaching through its encryption wrapper for the store's
-    own is exactly what `app.py`'s lifespan explains it is not doing.
+    protocol that declares no closer. Reaching through its encryption wrapper for the store's own is
+    exactly what `app.py`'s lifespan explains it is not doing.
     """
 
     def test_the_root_builds_something_closeable_and_the_lifespan_closes_it(self) -> None:

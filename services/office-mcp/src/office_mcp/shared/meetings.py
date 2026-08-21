@@ -1,92 +1,86 @@
 """How a meeting is reached, which occurrence was asked about, and what "newest" is worth.
 
-Three facts about the *meeting*, not transcripts. They are meeting promises no second tool should
-make for itself — a caller cannot see two tools disagreeing about "the latest occurrence", only one
-being wrong. `callTranscript` and `callRecording` collections share one `onlineMeeting`, reach it
-the same way, and answer empty ambiguously.
-
-`read_transcript` takes one name from here: the permission a transcript resource costs. It does not
-resolve (the handle carries the resolved id) or order (the lister called). That is the working
-split: the reader cannot repeat the resolve, and the permission it declares is the resource cost,
-not the request cost. Had that name lived in a tool file it would be spelled twice (rule 4 forbids
-tool files sharing a constant).
+Three facts about the *meeting*, not about transcripts. They are meeting promises no second tool
+should make for itself: a caller cannot see two tools disagreeing about "the latest occurrence",
+only one of them being wrong. The `callTranscript` and `callRecording` collections share one
+`onlineMeeting`, reach it the same way, and answer empty ambiguously.
 
 ## How a meeting is addressed, and the one place the chain can break
 
 Graph documents exactly three delegated ways to reach an `onlineMeeting`
 (https://learn.microsoft.com/en-us/graph/api/onlinemeeting-get): by its own `id`, by `joinWebUrl`,
-or by `joinMeetingIdSettings/joinMeetingId`. Only the join URL path works from Teams' conversation
-side. Only place delegated callers get one: `chat.onlineMeetingInfo.joinWebUrl` in default
-`GET /me/chats`. That collection supports `$expand`, `$top`, `$filter`, and `$orderby` only. It has
-no `$select`, so the field could not be requested even if it were absent. Chat id is not a route;
-neither is chat `webUrl`.
+or by `joinMeetingIdSettings/joinMeetingId`. Only the join URL works from Teams' conversation side,
+and the only place a delegated caller gets one is `chat.onlineMeetingInfo.joinWebUrl` in the default
+`GET /me/chats`. That collection supports `$expand`, `$top`, `$filter` and `$orderby` only. It has
+no `$select`, so the field could not be requested even if it were absent. Neither the chat id nor
+the chat `webUrl` is a route.
 
-Verified: meeting chats are enumerable with `topic` and recency. Graph documents `joinWebUrl` as
-empty when the chat is not a meeting's chat at all. **Not verified**: `joinWebUrl` is populated
-when the chat is a meeting's chat, especially for non-organisers. Null join URL is first-class
-outcome, not impossible.
-No fallback or second route documented. `onlineMeeting.chatInfo.threadId` is filterable in code but
-not in Graph docs, so we skip that invented path.
+Verified: meeting chats are enumerable with `topic` and recency, and Graph documents `joinWebUrl` as
+empty when the chat is not a meeting's chat at all. **Not verified**: that `joinWebUrl` is populated
+when the chat is a meeting's chat, especially for non-organisers. A null join URL is a first-class
+outcome rather than an impossible one. Graph documents no fallback and no second route, and
+`onlineMeeting.chatInfo.threadId` is filterable in code but not in Graph's docs, so that invented
+path is not taken.
 
-Two limits belong to caller: resolve is documented for attendees; transcript list is not (may refuse
-non-organisers). Every artifact API works only if meeting has not expired, depending on tenant
-policy roughly 60 days after a one-off
+Two limits belong to the caller. The resolve is documented for attendees and the transcript list is
+not, so the list may refuse a non-organiser. Every artifact API works only while the meeting has not
+expired. Tenant policy puts expiry at roughly 60 days after a one-off
 (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams#meeting-expiration).
 
 ## The `$filter` on the join URL, and the bug class around it
 
-Graph: "joinWebUrl must be URL encoded". A `%3a` in the stored URL arrives as `%253a` (% is
-escaped). `services/teams-mcp` has this defect today, in
-`src/transcript/tools/ingest-meeting.tool.ts`. It doubles the quote. Then it hands the raw URL to a
-JavaScript SDK that does not encode query parameters. A join URL with `&` or `#` then parses as a
+Graph: "joinWebUrl must be URL encoded". Encode it twice and a `%3a` in the stored URL arrives as
+`%253a`, because the `%` is itself escaped. `services/teams-mcp` has that defect today, in
+`src/transcript/tools/ingest-meeting.tool.ts`: it doubles the quoting, then hands the raw URL to a
+JavaScript SDK that does not encode query parameters, so a join URL carrying `&` or `#` parses as a
 truncated filter. Graph answers `200 OK` with an empty `value`, indistinguishable from "no such
-meeting" (silent failure).
+meeting", so the failure is silent.
 
-Two transforms, only the first ours:
-1. OData literal escape: double single quotes inside string literals. Required for correctness and
-to stop a crafted URL closing the literal and injecting predicates.
-2. Percent-encoding: Python SDK does it correctly, so we do not repeat it. Query parameters use
-form-style expansion, escaping everything outside unreserved set. Double-encoding produces `%2525…`
-and again an empty value. Tests pin bytes on the wire because this is the failure that looks like
+Two transforms, and only the first is ours. The OData literal escape doubles single quotes inside a
+string literal. It is required for correctness, and it stops a crafted URL closing the literal and
+injecting predicates. Percent-encoding is the Python SDK's: it expands query parameters form-style,
+escaping everything outside the unreserved set, so encoding here as well produces `%2525…` and again
+an empty value. The tests pin the bytes on the wire, because this is the failure that looks like
 success.
 
-`200 OK` with `value: []` is Graph's documented "no match" for this filter (never 404s). Reported as
-its own outcome, not an error.
+`200 OK` with `value: []` is Graph's documented "no match" for this filter. Graph never 404s here,
+and the empty value is reported as its own outcome rather than as an error.
 
 ## The occurrence window, and the shapes a model actually sends
 
-`started_after`/`started_before` exist because recurring series are one meeting to Graph, so
-occurrences share one collection distinguished only by artifact start time. Models write in any
-shape: `2026-08-11T09:00:00+02:00`, `2026-08-11T09:00:00`, or `2026-08-11`. All three accepted,
+`started_after` and `started_before` exist because a recurring series is one meeting to Graph, so
+its occurrences share one collection and are told apart only by artifact start time. Models write
+any of `2026-08-11T09:00:00+02:00`, `2026-08-11T09:00:00`, or `2026-08-11`, and all three are
 resolved against UTC in `OccurrenceWindow` and nowhere else: Graph timestamps artifacts in UTC, so
-UTC is the assumption needing no second info. Resolving once at the edge stops downstream comparing
-naive with aware datetime (TypeError to caller). Bare date is whole UTC day, not first instant:
-same date in both bounds brackets one occurrence; midnight-to-midnight would be empty. The
-assumption is stated in each tool's parameter descriptions: `09:00` is different in Zurich; a
-window quietly built in wrong zone is worse than one refused.
+UTC is the assumption that needs no second piece of information, and resolving once at the edge
+stops anything downstream comparing a naive datetime with an aware one, a comparison that raises
+`TypeError` at the caller. A bare date is the whole UTC day rather than its first instant, so the
+same date in both bounds brackets one occurrence where midnight to midnight would be empty. Each
+tool's parameter descriptions state the assumption: `09:00` is a different instant in Zurich, and a
+window quietly built in the wrong zone is worse than one refused.
 
 ## Newest first, exactly as far as it is true
 
-"The latest transcript" is why a lister exists. Order must be a property of what was read, not the
-page Graph happened to return. Graph documents `$select`, `$filter`, `$top` on transcripts but no
-`$orderby`. A walk stopped at limit before sorting returns arbitrary limit artifacts sorted among
-themselves, wrong answer with right shape. That is why `newest_in_window` is a named function not
-four lines in a tool: the mistake is invisible, so the place it is not made must be one place.
+"The latest transcript" is why a lister exists, so the order has to be a property of what was read
+rather than of the page Graph happened to return. Graph documents `$select`, `$filter` and `$top` on
+transcripts but no `$orderby`, and a walk stopped at `limit` before sorting returns an arbitrary
+`limit` artifacts sorted among themselves: the wrong answer in the right shape. That is why
+`newest_in_window` is a named function rather than four lines in a tool: the mistake is invisible,
+so the place it is not made has to be one place.
 
-Promise bounded by `MAX_ARTIFACT_SCAN`; sentences worded to that, not "newest of this meeting". Up
-to that many artifacts read in whatever order Graph chose. Meetings under the cap: these are the
-whole collection, first entry is latest. Series recorded daily for most of a year exceed the cap;
-first entry is newest of the read ones; newer ones sit unread. Raising the cap moves the boundary,
-not removes it: without `$orderby`, only reading the whole collection makes "newest" exact. Graph
+`MAX_ARTIFACT_SCAN` bounds the promise, and the sentences are worded to that rather than to "newest
+of this meeting". Up to that many artifacts are read, in whatever order Graph chose. For a meeting
+under the cap those are the whole collection and the first entry is the latest. A series recorded
+daily for most of a year exceeds the cap, so the first entry is the newest of the ones read and
+newer ones sit unread. Raising the cap moves that boundary rather than removing it, and Graph
 publishes no ceiling on collection size.
 
 ## Whether an empty answer means "wait" or "there is none"
 
-`settled` is that inference; deliberately not the verdict. Verdict is different per artifact; tool
-owns vocabulary. The *inference* must not exist twice. Reading off meeting instead of window was
-wrong answer no caller could detect: series with future `endDateTime` made every empty window
-"still processing", including one bracketing an ended occurrence never transcribed — instruction
-to poll forever.
+`settled` is that inference, and deliberately not the verdict: the verdict differs per artifact and
+each tool owns its own vocabulary. The inference must not exist twice, because reading it off the
+meeting instead of the window was a wrong answer no caller could detect, and the instruction it gave
+a caller was to poll forever.
 """
 
 from dataclasses import dataclass
@@ -103,33 +97,38 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
 from office_mcp.shared.handles import MeetingHandle
 
-# Resolving join URL to meeting: OnlineMeetings.Read, least privilege for filter, no admin consent.
-# Lives with resolve, not tool file, because resolve_meeting pays it regardless of artifact type.
+# Resolving a join URL to a meeting: `OnlineMeetings.Read` is least privilege for the filter and
+# needs no admin consent. It lives with the resolve rather than in a tool file, because
+# `resolve_meeting` pays it whatever artifact the tool went on to ask for.
 MEETING_PERMISSION = "OnlineMeetings.Read"
 
 # What the resolve request is counted as, declared here for the same reason the permission above is:
 # both meeting tools pay it, and a step named by each of them would be one request under two names.
-# `newest_in_window` deliberately declares none — it is the walk of a collection the *tool* named,
-# so it is counted under that tool's own step rather than splitting one listing in two.
+# `newest_in_window` deliberately declares none. It walks a collection the *tool* named, so one
+# listing is counted under that tool's own step rather than split in two.
 STEP_RESOLVE_MEETING = "resolve_meeting"
 
-# Reading a transcript resource: admin-consented, independent from resolve. Spelled here because
-# it is resource cost, not request cost, and two tools read it. Rule 4 forbids tool files sharing
-# constants. Tool's GRAPH_PERMISSIONS tuple names its request permissions; gets name from here.
-# Typo in one is Entra scope rejection, sign-in fails for everybody.
+# Reading a transcript or a recording resource: admin-consented, independent of the resolve, and a
+# resource cost rather than a request cost. Each tool's `GRAPH_PERMISSIONS` names its request
+# permissions by taking the name from here. A typo in a second spelling is a scope Entra rejects,
+# and sign-in then fails for everybody. `TRANSCRIPT_PERMISSION` is the one two tools read,
+# `list_meeting_transcripts` and `read_transcript`, and rule 4 forbids tool files sharing a
+# constant. `RECORDING_PERMISSION` has one reader, `list_meeting_recordings`, and is spelled beside
+# `TRANSCRIPT_PERMISSION` because it is the same kind of cost. `read_transcript` takes
+# `TRANSCRIPT_PERMISSION` and nothing else from this module: its handle carries the resolved id, so
+# it does not resolve, and `list_meeting_transcripts` already ordered, so it does not order.
 TRANSCRIPT_PERMISSION = "OnlineMeetingTranscript.Read.All"
 RECORDING_PERMISSION = "OnlineMeetingRecording.Read.All"
 
-# Artifacts one listing may scan. This is "newest first" cost: no orderby, only looking at the
-# collection reveals newest. Bound on artifacts not requests (what collect_pages can bound). Graph
-# chooses page size. 200 is 4x largest limit offered; meets/series recorded daily for most of a
-# year hit the cap. Exceeding it: scan incomplete, no guess, "newest" of the read ones.
+# How many artifacts one listing may scan, and what "newest first" costs. A bound on artifacts
+# rather than on requests, because that is what `collect_pages` can bound and Graph chooses the page
+# size. 200 is four times the largest limit offered.
 MAX_ARTIFACT_SCAN = 200
 
-# How long after window closes or meeting ends does missing artifact stay "not ready" not "never
-# made". Microsoft publishes no SLA or "processing" status. Generous: wait once when nothing
-# arrives (one call cost) beats saying "no transcript" when it arrives in ten minutes
-# (undetectable wrong).
+# How long after the window closes, or the meeting ends, a missing artifact still counts as "not
+# ready" rather than "never made". Microsoft publishes no SLA and no "processing" status. Generous
+# on purpose: waiting once when nothing has arrived costs one call, and saying "no transcript" ten
+# minutes before it arrives is wrong in a way nobody detects.
 ARTIFACT_DELAY_ALLOWANCE = timedelta(hours=4)
 
 type _MeetingsQuery = OnlineMeetingsRequestBuilder.OnlineMeetingsRequestBuilderGetQueryParameters
@@ -138,8 +137,8 @@ type _MeetingsQuery = OnlineMeetingsRequestBuilder.OnlineMeetingsRequestBuilderG
 class MeetingArtifact(Protocol):
     """The two properties this module needs: when an artifact began, and which artifact it is.
 
-    Structural not nominal: callTranscript and callRecording are unrelated generated classes, both
-    carrying createdDateTime and both entities, so both carry an id.
+    Structural rather than nominal, because `callTranscript` and `callRecording` are unrelated
+    generated classes. Both carry `createdDateTime`, and both are entities, so both carry an id.
     """
 
     @property
@@ -153,8 +152,8 @@ class MeetingArtifact(Protocol):
 class OccurrenceWindow:
     """Which occurrence was asked about, as two timezone-aware instants.
 
-    Type not two args because window decides what is kept and whether empty means "wait" or "never
-    made". Use `of` constructor.
+    A type rather than two arguments, because the window decides what is kept and whether an empty
+    answer means "wait" or "never made". Build it with `of`.
     """
 
     started_after: datetime | None
@@ -164,46 +163,47 @@ class OccurrenceWindow:
     def of(
         cls, started_after: date | datetime | None, started_before: date | datetime | None
     ) -> Self:
-        """Window from bounds, resolving naive datetimes against UTC. Bare date is whole UTC day."""
+        """Window from these bounds. A naive datetime is UTC. A bare date is a whole UTC day."""
         return cls(_first_instant(started_after), _last_instant(started_before))
 
     def holds(self, artifact: MeetingArtifact) -> bool:
-        """Whether artifact began inside window.
+        """Whether the artifact began inside the window.
 
-        Missing createdDateTime kept when no window asked for, dropped when one was.
+        A missing `createdDateTime` is kept when no window was asked for, dropped when one was.
         """
         if self.started_after is None and self.started_before is None:
             return True
         began = artifact.created_date_time
         if began is None:
             return False
-        # Aware even though Graph's own timestamps carry `Z`: this comparison is the one that used
-        # to raise, and it must not depend on a payload's punctuation to stay safe.
+        # Aware even though Graph's own timestamps carry `Z`: this is the comparison that used to
+        # raise, and it must not depend on a payload's punctuation to stay safe.
         began = as_utc(began)
         if self.started_after is not None and began < self.started_after:
             return False
         return not (self.started_before is not None and began > self.started_before)
 
     def settled(self, meeting: OnlineMeeting) -> bool:
-        """Whether empty answer means "there is none" not "not yet".
+        """Whether an empty answer means "there is none" rather than "not yet".
 
-        Two independent pieces of evidence either settles it: window's end far past (anything
-        falling in would land) or meeting's end far past. Answers caller who asked no window.
-        Absent evidence never settles (that is cheaper wrong answer).
+        Either piece of evidence settles it: the window's end is far enough past that anything
+        falling inside it would have landed, or the meeting's end is far enough past. The second
+        answers a caller who asked for no window. Absent evidence never settles it, because an
+        unsettled answer is the cheaper wrong one.
 
-        Trap: a series with future `endDateTime` makes any empty window "still processing"
-        including one bracketing an ended occurrence never transcribed — check window settlement
-        separately.
+        Trap: a series with a future `endDateTime` makes any empty window "still processing",
+        including one bracketing an ended occurrence that was never transcribed, so the window is
+        checked for settlement separately.
         """
         now = datetime.now(UTC)
         return _settled_by(self.started_before, now) or _settled_by(meeting.end_date_time, now)
 
 
 def as_utc(moment: datetime) -> datetime:
-    """Moment as aware datetime, reading naive as UTC.
+    """The moment as an aware datetime, reading a naive one as UTC.
 
-    UTC assumption belongs to window; resolving here prevents downstream naive-aware comparison
-    TypeError.
+    The UTC assumption belongs to the window. Resolving here stops anything downstream comparing a
+    naive datetime with an aware one, a comparison that raises `TypeError`.
     """
     return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
 
@@ -211,9 +211,10 @@ def as_utc(moment: datetime) -> datetime:
 async def resolve_meeting(
     client: GraphServiceClient, handle: MeetingHandle
 ) -> OnlineMeeting | None:
-    """Meeting whose joinWebUrl is handle's, or None if Graph matched none.
+    """The meeting whose `joinWebUrl` is the handle's, or None if Graph matched none.
 
-    One request. Filter must exist exactly once. 200 OK with empty value is "no match", not 404.
+    One request. The filter must exist exactly once. `200 OK` with an empty value is "no match",
+    not a 404.
     """
     escaped = handle.join_web_url.replace("'", "''")
     configuration = RequestConfiguration[_MeetingsQuery](
@@ -235,15 +236,13 @@ async def newest_in_window[T: MeetingArtifact](
     window: OccurrenceWindow,
     limit: int,
 ) -> CollectedItems[T]:
-    """Limit newest artifacts of meeting in window, newest first.
+    """The newest `limit` artifacts of the meeting inside `window`, newest first.
 
-    Read everything window holds, sort, cut to limit — Graph has no orderby. Stop-at-limit-before-
-    sort is undetectable wrong answer. `capped` means only that the scan hit `MAX_ARTIFACT_SCAN`.
-    It does not mean the window held more than `limit` artifacts. Read the returned count for that.
-
-    Where promise stops being "newest of this meeting" and starts being "newest of read ones". With
-    no orderby, only reading everything makes newest exact. Cap prevents unbounded walk on
-    unceilinged collection.
+    Everything the window holds is read, then sorted, then cut to `limit`. Graph has no `$orderby`,
+    and stopping at `limit` before the sort is a wrong answer nobody can detect. `capped` means only
+    that the scan hit `MAX_ARTIFACT_SCAN`, which is where the promise stops being "newest of this
+    meeting" and starts being "newest of the ones read". It does not mean the window held more than
+    `limit` artifacts. Read the returned count for that.
     """
     collected = await collect_pages(
         first_page,
@@ -263,13 +262,13 @@ def _told_apart[T: MeetingArtifact](artifacts: list[T]) -> list[T]:
     documented to do (https://learn.microsoft.com/en-us/graph/known-issues, Teamwork and
     communications): "Continue following `@odata.nextLink` even when the collection is empty.
     De-duplicate subsequent items by tracking the **id** property of each recording or transcript."
-    `graph_client/pagination.py` does the following; this does the de-duplicating.
+    `graph_client/pagination.py` does the following. This function does the de-duplicating.
 
-    Here rather than in `collect_pages`, because it is not a property of paging. It is a property of
-    these two Graph collections, which is also the scope Microsoft gives it — a general walk has no
-    business assuming its items have an id or that two with the same one are the same thing.
+    Here rather than in `collect_pages`, because it is a property of these two Graph collections
+    rather than of paging, and that is also the scope Microsoft gives it. A general walk has no
+    business assuming its items have an id, or that two with the same one are the same thing.
 
-    Before the sort, not after the cut. A repeat that survived into the sort would take one of the
+    Before the sort, not after the cut: a repeat that survived into the sort would take one of the
     `limit` places a distinct artifact was owed, so a caller asking for the newest three could be
     handed the same recording twice and never learn there was a third.
 
@@ -289,7 +288,7 @@ def _told_apart[T: MeetingArtifact](artifacts: list[T]) -> list[T]:
 
 
 def _first_instant(bound: date | datetime | None) -> datetime | None:
-    """Earliest instant bound includes, or None."""
+    """The earliest instant the bound includes, or None."""
     if bound is None:
         return None
     if isinstance(bound, datetime):
@@ -298,7 +297,7 @@ def _first_instant(bound: date | datetime | None) -> datetime | None:
 
 
 def _last_instant(bound: date | datetime | None) -> datetime | None:
-    """Latest instant bound includes, or None."""
+    """The latest instant the bound includes, or None."""
     if bound is None:
         return None
     if isinstance(bound, datetime):
@@ -307,14 +306,14 @@ def _last_instant(bound: date | datetime | None) -> datetime | None:
 
 
 def _settled_by(moment: datetime | None, now: datetime) -> bool:
-    """Whether moment is far past enough that artifact would have arrived."""
+    """Whether the moment is far enough past that an artifact would have arrived."""
     return moment is not None and as_utc(moment) + ARTIFACT_DELAY_ALLOWANCE < now
 
 
 def _began_at(artifact: MeetingArtifact) -> datetime:
-    """Sort key: when artifact began, or epoch if Graph didn't say.
+    """Sort key: when the artifact began, or the epoch if Graph did not say.
 
-    Aware (prevents sort TypeError).
+    Aware, so the sort cannot raise `TypeError`.
     """
     began = artifact.created_date_time
     return as_utc(began) if began is not None else datetime.min.replace(tzinfo=UTC)

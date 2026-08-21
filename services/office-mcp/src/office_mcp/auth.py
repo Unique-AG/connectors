@@ -1,11 +1,11 @@
 """Microsoft Entra auth via FastMCP's AzureProvider with durable state.
 
-This module holds no OAuth code — AzureProvider is a full OAuth 2.1 proxy that owns the authorize
+This module holds no OAuth code. AzureProvider is a full OAuth 2.1 proxy that owns the authorize
 endpoint, PKCE on both hops, redirect callback, token refresh, and On-Behalf-Of exchange. This
 service only decides which app registration and state store to use.
 
-The state store is critical. Every token is a reference token re-validated on each request. The
-default store is an encrypted file tree in the process's home directory, which logs users out on
+The state store is critical, because every token is a reference token re-validated on each request.
+The default store is an encrypted file tree in the process's home directory, which logs users out on
 each pod restart and breaks at the second replica. Postgres, which this service already runs, makes
 the deployment horizontally scalable.
 """
@@ -33,15 +33,14 @@ _ENCRYPTION_SALT = "office-mcp-oauth-storage"
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
     """Durable encrypted OAuth state storage for Entra tokens.
 
-    This store holds users' Entra access tokens and refresh tokens. It stays encrypted even
-    though the rows never leave our own database. Encryption is mandatory, not optional. FastMCP's
-    default store encrypts. Handing a bare table would disable at-rest encryption silently while
-    looking like configuration.
+    This store holds users' Entra access tokens and refresh tokens, and stays encrypted even though
+    the rows never leave our own database. FastMCP's default store encrypts, so handing it a bare
+    table would silently disable at-rest encryption while looking like configuration.
 
-    The client secret is the key material (derived via PBKDF2). No second secret is needed. Rotating
-    the secret makes existing rows unreadable. Decryption errors are treated as cache misses, so
-    users re-authenticate once instead of the server failing. This trade-off avoids a separate
-    secret provisioning path.
+    The client secret is the key material, derived via PBKDF2, so no second secret is needed and
+    there is no separate secret-provisioning path. Rotating the secret makes existing rows
+    unreadable. Decryption errors are treated as cache misses, so users re-authenticate once instead
+    of the server failing.
     """
     return FernetEncryptionWrapper(
         key_value=PostgreSQLStore(
@@ -72,13 +71,13 @@ def build_auth(
     proving the provider's connection to Postgres works. A separate readiness connection would pass
     while the provider's connection fails, masking sign-in outages.
 
-    `graph_scopes` are the Microsoft Graph permissions the tools need, which is why they arrive
-    from outside rather than being listed here — the tools decide them. They ride the authorize
-    request only: Entra issues one token per resource (AADSTS28000), so the code exchange asks
-    only for this API's own scope, and the Graph ones are redeemed later, per tool call, by the
-    On-Behalf-Of exchange. Sending them at authorize time is what makes that possible at all —
-    OBO can only redeem a permission the user or an administrator has already consented to, and
-    a permission that is never requested is never consented to.
+    `graph_scopes` are the Microsoft Graph permissions the tools need. The tools decide them, so
+    they arrive from outside rather than being listed here. They ride the authorize request only:
+    Entra issues one token per resource (AADSTS28000), so the code exchange asks only for this API's
+    own scope, and the Graph ones are redeemed later, per tool call, by the On-Behalf-Of exchange.
+    Sending them at authorize time is what makes that possible at all, because OBO can only redeem a
+    permission the user or an administrator has already consented to, and a permission that is never
+    requested is never consented to.
     """
     return AzureProvider(
         client_id=entra.client_id,

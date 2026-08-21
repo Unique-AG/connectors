@@ -6,9 +6,9 @@ succeed, or give up on one that would have worked a second later.
 
 Both routes to a message are driven here: `graph_tool_errors`, which maps a failure where it
 happens, and `GraphAdviceMiddleware`, which covers every registered tool and the dependency
-resolution no block could reach. No tool opens a block any more, so the first route is now the
-mapping asked directly — which is what makes it worth comparing the second against. Whether the two
-agree end to end is `tests/test_error_mapping.py`'s subject, over the real stack.
+resolution no block could reach. No tool opens a block any more, so the first route is the mapping
+asked directly, which is what makes it worth comparing the second against. Whether the two agree end
+to end is `tests/test_error_mapping.py`'s subject.
 """
 
 import pytest
@@ -78,7 +78,7 @@ def _as_fastmcp_delivers_it(failure: BaseException) -> ToolError:
     The dependency engine reports anything that is not a `FastMCPError` as a `RuntimeError` naming
     the parameter (fastmcp 3.4.5, `fastmcp/server/dependencies.py:686`) and the tool caller
     re-raises that as a `ToolError` naming the tool (`fastmcp/server/server.py:1357`). Built here
-    rather than reached for, so that this file needs no server; that the real chain is this shape is
+    rather than reached for, so that this file needs no server. That the real chain is this shape is
     pinned end to end in `tests/test_error_mapping.py` and `tests/test_mcp_tools.py`.
     """
     dependency = RuntimeError(f"Failed to resolve dependency 'client' for {_TOOL}")
@@ -123,7 +123,7 @@ class TestTheTwoRemediesGraphCannotTellApart:
         a permission at all: Graph access to Teams meeting transcripts is a tenant-wide Teams
         setting, off by default, that no app can turn on. Naming a permission here would send an
         administrator after one that was never missing, and telling the user to sign in again would
-        cost a re-consent that changes nothing — so the remedy names the Teams admin centre and the
+        cost a re-consent that changes nothing, so the remedy names the Teams admin centre and the
         cmdlet, and rules re-consent out in as many words.
         """
         message = _message(
@@ -156,7 +156,7 @@ class TestTheTwoRemediesGraphCannotTellApart:
 
 class TestRetryAdvice:
     def test_throttling_passes_graphs_own_delay_through(self) -> None:
-        """Graph's `Retry-After` is the documented fastest way out of throttling; an eager retry
+        """Graph's `Retry-After` is the documented fastest way out of throttling. An eager retry
         makes it last longer, so the number has to survive into the message."""
         message = _message(
             GraphThrottled(
@@ -173,7 +173,7 @@ class TestRetryAdvice:
     def test_a_5xx_that_named_a_delay_passes_it_on_without_naming_a_cause(self) -> None:
         """`GraphThrottled` is not only 429: Graph holds a caller off with a 503 carrying
         `Retry-After` too, and that one may equally be a service too busy to answer. The delay is
-        the remedy for both, which is why they share a class — but only the 429 can be called rate
+        the remedy for both, which is why they share a class. Only the 429 can be called rate
         limiting, and a message that called the other one that would send an operator looking for a
         quota that was never spent.
         """
@@ -204,7 +204,7 @@ class TestRetryAdvice:
     def test_a_collection_graph_will_not_end_reaches_the_caller_as_advice(self) -> None:
         """The one failure here that no request produced: Graph answering page after empty page
         while still advertising more, which `collect_pages` refuses. It is a `GraphFailure` so that
-        it arrives the way a 429 or a 403 does — as a tool error a model can act on — and the count
+        it arrives the way a 429 or a 403 does, as a tool error a model can act on, and the count
         has to survive into the message, because it is the only evidence there is.
         """
         message = _message(
@@ -229,11 +229,11 @@ class TestRetryAdvice:
         assert "not allowed to know it exists" in message
 
     def test_a_tool_whose_id_came_from_another_tool_can_say_so_instead(self) -> None:
-        """The default advice — check the id came from a tool response verbatim — is the right
-        first guess when a caller supplied an id, and wrong for a handle another tool just
-        produced: it sends the model to re-check the one thing that cannot be the cause. Only the
-        404 advice is replaceable, because it is the only one whose remedy depends on where the
-        argument came from.
+        """The default advice, check the id came from a tool response verbatim, is the right first
+        guess when a caller supplied an id, and wrong for a handle another tool just produced: it
+        sends the model to re-check the one thing that cannot be the cause. Only the 404 advice is
+        replaceable, because it is the only one whose remedy depends on where the argument came
+        from.
         """
         with pytest.raises(ToolError) as raised, graph_tool_errors(_PERMISSION, not_found="Gone."):
             raise GraphNotFound("gone", status=404, code=None, request_id="req-7")
@@ -251,7 +251,7 @@ class TestRetryAdvice:
 class TestDiagnostics:
     def test_the_graph_request_id_survives(self) -> None:
         """It exists only in that one response, and it is the first thing Microsoft support asks
-        for — losing it makes a production failure untraceable afterwards."""
+        for. Losing it makes a production failure untraceable afterwards."""
         message = _message(
             GraphUnavailable("boom", status=500, code="internalError", request_id="req-42")
         )
@@ -275,12 +275,10 @@ class TestDiagnostics:
 class TestTheRefusalThatHappensBeforeGraph:
     """A permission nobody consented to fails in the On-Behalf-Of exchange, not in Graph.
 
-    Same remedy as the 403 above, reached a step earlier — and the step matters, because this one
-    happens while FastMCP is resolving the client the tool is handed, where the default report is
-    "Failed to resolve dependency 'client'". The token dependency inside it raises
-    `TokenExchangeFailed`, which
-    arrives at the middleware under two wrappers; the assertions are what a model reads at the end
-    of that.
+    Same remedy as the 403 above, reached a step earlier, and the step matters: this one happens
+    while FastMCP is resolving the client the tool is handed, where the default report is "Failed to
+    resolve dependency 'client'". The token dependency inside it raises `TokenExchangeFailed`, which
+    arrives at the middleware under two wrappers. The assertions are what a model reads at the end.
     """
 
     async def test_an_unconsented_permission_names_the_permission_and_the_remedy(self) -> None:
@@ -293,8 +291,8 @@ class TestTheRefusalThatHappensBeforeGraph:
         assert "retrying will not help" in message.lower()
 
     async def test_it_says_the_call_never_happened(self) -> None:
-        """Unlike every Graph failure above, nothing was asked of Microsoft 365 here — a model
-        that believes otherwise reports the read as attempted-and-refused."""
+        """Unlike every Graph failure above, nothing was asked of Microsoft 365 here. A model that
+        believes otherwise reports the read as attempted-and-refused."""
         message = await _token_message(RuntimeError(_UNCONSENTED))
 
         assert "never reached Microsoft Graph" in message
@@ -317,7 +315,7 @@ class TestTheRefusalThatHappensBeforeGraph:
         )
 
     async def test_a_failure_entra_never_answered_is_still_actionable(self) -> None:
-        """No AADSTS code means the exchange never got as far as Entra — a broken connector, not
+        """No AADSTS code means the exchange never got as far as Entra: a broken connector, not
         a refused user. The permission is still named, because it is still what was being asked
         for, and the exception type is the only evidence there is."""
         message = await _token_message(ValueError("no access token available"))
@@ -370,11 +368,9 @@ class TestWhatTheMiddlewareLeavesAlone:
     async def test_a_refusal_already_worded_by_the_mapping_is_passed_through_unchanged(
         self,
     ) -> None:
-        """The double mapping, and the reason it is harmless: whatever `graph_tool_errors` worded
-        arrives as a type the middleware recognises rather than re-derives. No tool opens a block
-        today, so this is the guard on the escape rather than on the ten bodies it replaced — and
-        it matters exactly where the two wordings would differ, a call naming fewer permissions
-        than its tool declares."""
+        """The double mapping, and why it is harmless: whatever `graph_tool_errors` worded arrives
+        as a type the middleware recognises rather than re-derives. It matters exactly where the two
+        wordings would differ, a call naming fewer permissions than its tool declares."""
         with pytest.raises(ToolError) as raised, graph_tool_errors(_CHANNELS):
             raise GraphForbidden("nope", status=403, code=None, request_id=None)
         advised = raised.value

@@ -18,10 +18,10 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PKG_VERSION = pkg_version("office-mcp")
 
-# libpq `sslmode` values asyncpg accepts. Only `verify` (libpq's alias for
-# `verify-full`) is rewritten, because asyncpg does not accept the short spelling.
-# Trap: verify-ca is a genuinely weaker mode. Never widen it to verify-full—that
-# silently changes what the connection checks.
+# libpq `sslmode` values asyncpg accepts. Only `verify` (libpq's alias for `verify-full`) is
+# rewritten, because asyncpg does not accept the short spelling. Trap: verify-ca is a genuinely
+# weaker mode. Never widen it to verify-full: the wider mode silently changes what the connection
+# checks.
 _ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
 
 # Trap: asyncpg forwards unknown params as server settings, causing Postgres errors.
@@ -32,10 +32,10 @@ _UNSUPPORTED_PARAMS = frozenset({"channel_binding"})
 def asyncpg_dsn(url: str) -> str:
     """Convert a libpq PostgreSQL URL to asyncpg DSN format.
 
-    Trap: `urlsplit` keeps `netloc` intact, so a percent-encoded password, a bracketed IPv6
-    host, and a missing port all survive unchanged. A library that decodes and reassembles
-    the parts would corrupt them. Only the scheme and the query change.
-    There is no second connection shape that can negotiate TLS differently from the first.
+    Trap: `urlsplit` keeps `netloc` intact, so a percent-encoded password, a bracketed IPv6 host and
+    a missing port all survive unchanged. A library that decodes and reassembles the parts would
+    corrupt them. Only the scheme and the query change. There is no second connection shape that
+    can negotiate TLS differently from the first, and `server/readiness.py` records the incident.
     """
     parts = urlsplit(url)
     scheme = parts.scheme
@@ -89,19 +89,19 @@ class ToolsPreset(StrEnum):
     """The named tool surfaces an operator may deploy — the names only, never their contents.
 
     Here rather than in `tools/` so that a misspelled `TOOLS_PRESET` is a startup error listing the
-    values that would have worked, exactly as `AppEnv` and `LogLevel` above already are, and so the
-    Helm chart's schema can carry the same `enum` and fail a `helm install` at validation instead of
+    values that would have worked, exactly as `AppEnv` and `LogLevel` above are, and so the Helm
+    chart's schema can carry the same `enum` and fail a `helm install` at validation instead of
     crash-looping a pod.
 
     Unlike `AppEnv` and `LogLevel`, an uppercase spelling is *not* accepted here, and the shared
     `enum` is why: the chart's schema matches these values exactly and JSON Schema has no
     case-insensitive enum, so a server taking `TOOLS_PRESET=TEAMS` would accept a value `helm
-    install` rejects. Failing identically in both places beats absorbing the shift key.
+    install` rejects.
 
     What each name expands to belongs to `tools/__init__.py`, the one module that knows which tools
     exist. Config is upstream of everything, so a config that knew the tool set would invert that
-    dependency and be a second place the tool list lives — which is the duplication this whole
-    feature is built to avoid. One test asserts the two sides agree in both directions.
+    dependency and be a second place the tool list lives, which is the duplication this feature is
+    built to avoid. One test asserts the two sides agree in both directions.
 
     The names carry a product axis (`teams-`) from the start, because this connector grows to
     Outlook and SharePoint, and `outlook-*` names then join the table without re-cutting these. They
@@ -129,20 +129,20 @@ class AppConfig(BaseSettings):
     # and scheme are parsed once and reused downstream.
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
-    # The Graph timeout budget, which `create_app` translates into the frozen `GraphSettings` the
-    # transport is built from — `graph_client/` is told these and never reads them, so this is the
+    # The Graph timeout budget. `create_app` translates these into the frozen `GraphSettings` the
+    # transport is built from. `graph_client/` is told them and never reads them, so this is the
     # only place they exist. The defaults are sized for an interactive MCP client rather than for a
-    # batch job; `GraphSettings` carries the reasoning for each one.
+    # batch job, and `GraphSettings` carries the reasoning for each one.
     #
-    # What an operator is actually turning is the worst case of one tool call: a request timeout
-    # times `graph_max_retries + 1` attempts, before any Retry-After wait, per Graph call — and a
-    # paged walk makes several. Raising either past what the client on the other end will wait for
-    # buys a slower failure and nothing else.
+    # What an operator is turning is the worst case of one tool call: a request timeout times
+    # `graph_max_retries + 1` attempts, before any Retry-After wait, per Graph call, and a paged
+    # walk makes several. Raising either past what the client on the other end will wait for buys a
+    # slower failure and nothing else.
     #
-    # Zero retries is allowed, and is a real choice: it gives up on the first 429 instead of
-    # waiting out the Retry-After, which accrues quota without getting an answer. Zero timeouts are
-    # refused, because httpx reads a timeout as a deadline and not as "unbounded" — `0` would time
-    # every Graph call out before it left the process, which is not what anyone typing it means.
+    # Zero retries is allowed and is a real choice: it gives up on the first 429 instead of waiting
+    # out the Retry-After, which accrues quota without getting an answer. Zero timeouts are refused,
+    # because httpx reads a timeout as a deadline and not as "unbounded", so `0` would time every
+    # Graph call out before it left the process.
     #
     # TRAP: the retry ceiling is the SDK's, not a preference. `RetryHandlerOption.__init__` raises
     # `ValueError: MaxLimitExceeded. MaxRetries should not be more than $10` above
@@ -162,8 +162,8 @@ class AppConfig(BaseSettings):
     def _lowercase(cls, value: object) -> object:
         """Accept uppercase `LOG_LEVEL=INFO` and `APP_ENV=PRODUCTION` from operators.
 
-        Trap: pydantic's `StrEnum` coercion is case-sensitive. Without this step, an
-        uppercase value aborts startup instead.
+        Trap: pydantic's `StrEnum` coercion is case-sensitive, so without this step an uppercase
+        value aborts startup instead.
         """
         return value.lower() if isinstance(value, str) else value
 
@@ -171,8 +171,8 @@ class AppConfig(BaseSettings):
     def _reject_local_base_url_in_production(self) -> Self:
         """Reject loopback URLs in production. Clients cannot reach localhost or 127.0.0.1.
 
-        Trap: without this check, the server logs no error here. Clients simply fail to
-        connect, with no signal anywhere that explains why.
+        Trap: without this check the server logs no error. Clients fail to connect, with no
+        signal anywhere that explains why.
         """
         if self.app_env != AppEnv.PRODUCTION:
             return self
@@ -190,8 +190,8 @@ class AppConfig(BaseSettings):
     def _reject_cleartext_base_url_in_production(self) -> Self:
         """Reject http URLs in production. The OAuth endpoints are published under this URL.
 
-        Trap: nothing downstream fails closed. The auth provider reads the scheme, logs a
-        warning for http, and then drops `Secure` from its OAuth consent cookies.
+        Trap: nothing downstream fails closed. The auth provider reads the scheme, logs a warning
+        for http, and then drops `Secure` from its OAuth consent cookies.
         """
         if self.app_env != AppEnv.PRODUCTION:
             return self
@@ -205,11 +205,11 @@ class AppConfig(BaseSettings):
 
     @property
     def issuer(self) -> str:
-        """Return `public_base_url` as a string without trailing slash for path joins.
+        """`public_base_url` as a string without the trailing slash, for path joins.
 
         Trap: `HttpUrl` renders with a trailing slash, so joining a path onto it gives
-        `https://host//authorize`. The OAuth discovery document re-parses the issuer on its
-        own and restores the slash there.
+        `https://host//authorize`. The OAuth discovery document re-parses the issuer on its own and
+        restores the slash there.
         """
         return str(self.public_base_url).rstrip("/")
 
@@ -238,15 +238,14 @@ class SurfaceConfig(BaseSettings):
     def _split_the_list_an_operator_writes(cls, value: object) -> object:
         """Read `TOOLS_ENABLED=get_me,list_chats` as the list it looks like.
 
-        Trap: pydantic-settings JSON-decodes an env var whose field is a collection, and does it in
-        the settings source *before* any validator here runs. `NoDecode` above is what turns that
-        off, and it is deliberate rather than defensive: at the pinned version the decode failure is
-        *tolerated* because the field is a union, so the raw string reaches this validator either
-        way — but drop the `| None` and the same value becomes a `SettingsError` naming a field an
-        operator has never heard of. The annotation is what makes the spelling every operator writes
-        work on purpose instead of by accident.
+        Trap: pydantic-settings JSON-decodes an env var whose field is a collection, in the settings
+        source *before* any validator here runs. `NoDecode` above turns that off, and it is
+        deliberate rather than defensive: at the pinned version the decode failure is *tolerated*
+        because the field is a union, so the raw string reaches this validator either way. Drop the
+        `| None` and the same value becomes a `SettingsError` naming a field an operator has never
+        heard of.
 
-        Blanks around the commas and a trailing one are absorbed; a value that names nothing at all
+        Blanks around the commas and a trailing one are absorbed. A value that names nothing at all
         is left as an empty tuple, for the validator below to refuse by name rather than to silently
         mean "no tools".
         """
@@ -258,10 +257,10 @@ class SurfaceConfig(BaseSettings):
     def _require_exactly_one_selection(self) -> Self:
         """Refuse to start on any of the three ways the two variables say nothing usable.
 
-        Every one of them is a deployment whose consent screen would not be what its operator
-        believes, and none of them is fixable after the fact: a permission not requested at sign-in
-        cannot be redeemed later, and one requested that the app registration does not carry fails
-        the authorize hop for every user — with nothing in this server's logs either way.
+        Every one is a deployment whose consent screen would not be what its operator believes, and
+        none is fixable after the fact: a permission not requested at sign-in cannot be redeemed
+        later, and one requested that the app registration does not carry fails the authorize hop
+        for every user, with nothing in this server's logs either way.
         """
         if self.tools_preset is not None and self.tools_enabled is not None:
             raise ValueError(
@@ -379,8 +378,8 @@ class DatabaseConfig(BaseSettings):
             "the missing-field check above must leave every discrete part set"
         )
 
-        # Escape all reserved characters in user and password; unescaped delimiters reparse the DSN.
-        # `quote`'s default leaves `/` unescaped, so `safe=""` forces full escaping here.
+        # Escape every reserved character in user and password. An unescaped delimiter reparses
+        # the DSN, and `quote`'s default leaves `/` alone, so `safe=""` forces full escaping.
         userinfo = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}"
         database = quote(self.name, safe="")
         # The host is written as given, so a bracketed IPv6 literal keeps its brackets.

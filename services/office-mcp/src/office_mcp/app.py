@@ -35,12 +35,11 @@ logger = logging.getLogger(__name__)
 # contains a tool call and every Graph call that tool made, and the Graph timeout budget says how
 # long that is: 30 s per request times four attempts is 120 s before any Retry-After wait, and a
 # paged walk is several requests. Both numbers are `AppConfig` defaults an operator may raise
-# (`graph_request_timeout_seconds`, `graph_max_retries`), which only lengthens that tail. Left
-# to the default, whose top finite bucket is 10 s, every one of those lands in `+Inf` and p95 and
-# p99 both read 10 — the slow tail this histogram exists to show becomes the one thing it cannot
-# say. This is also the only one of the three latency histograms whose buckets this service gets to
-# choose: the Graph one is a view in `metrics.py`, and `unique_mcp`'s tool-call one is fixed
-# upstream.
+# (`graph_request_timeout_seconds`, `graph_max_retries`), which only lengthens that tail. Left to
+# the default, whose top finite bucket is 10 s, every one of those lands in `+Inf` and p95 and p99
+# both read 10, so the slow tail this histogram exists to show becomes the one thing it cannot say.
+# This is also the only one of the three latency histograms whose buckets this service chooses: the
+# Graph one is a view in `metrics.py`, and `unique_mcp`'s tool-call one is fixed upstream.
 #
 # Trap: the histogram is registered once per process and the first middleware to declare it wins its
 # buckets, so this has to travel on the `setup_ops` call and cannot be corrected later.
@@ -80,25 +79,26 @@ def create_app(
 
     configure_logging(config)
     configure_metrics(config)
-    # Here, beside configure_metrics, rather than in main.py where kb-mcp puts it: everything that
-    # depends on a tracer provider — OpenTelemetryMiddleware, the two middlewares below, FastMCP's
-    # own spans — is assembled in this function, and main.py is not the only caller of it. Installed
-    # from main.py, `create_app()` would compose an instrumented app against a provider only the CLI
-    # entrypoint had installed. kb-mcp's main() *is* its composition root, so its placement is the
-    # same decision, not a different one.
-    # The version is passed rather than left to TracingSettings, which would read the bare VERSION
-    # env var: config.version is this service's one source of truth for it, as in metrics.py.
-    # Self-disabling when no OTEL_* variable is set, so a test process stays untraced.
+    # `configure_tracing` goes here, beside `configure_metrics`, rather than in `main.py` where
+    # kb-mcp puts it. This function assembles everything that depends on a tracer provider:
+    # `OpenTelemetryMiddleware`, the two middlewares below, and FastMCP's own spans. Tests call
+    # `create_app()` too, so `main.py` is not the only caller.
+    # Installed from `main.py`, `create_app()` would compose an instrumented app against a provider
+    # only the CLI entrypoint had installed. kb-mcp's `main()` *is* its composition root, so its
+    # placement is the same decision.
+    # The version is passed rather than left to `TracingSettings`, which would read the bare
+    # `VERSION` env var: `config.version` is this service's one source of truth, as in `metrics.py`.
+    # `configure_tracing` disables itself when no `OTEL_*` variable is set, so tests stay untraced.
     configure_tracing(service_name="office-mcp", service_version=config.version)
 
-    # Design decision: the tool surface is resolved once, here, and both halves of it come from that
-    # one resolution — the scopes sign-in asks for, and the modules that get registered. Resolving
-    # twice would be two chances to disagree about a tool, and the disagreement is unfixable after
-    # the fact: a permission not requested at sign-in cannot be redeemed by a later call.
+    # The tool surface is resolved once, here, and both halves of it come from that one resolution:
+    # the scopes sign-in asks for, and the modules that get registered. Resolving twice would be two
+    # chances to disagree about a tool, and the disagreement is unfixable after the fact, because a
+    # permission not requested at sign-in cannot be redeemed by a later call.
     selection = resolve(preset=surface_config.tools_preset, enabled=surface_config.tools_enabled)
 
-    # Design decision: oauth_storage is built in the composition root because it serves both the
-    # auth provider and the readiness probe.
+    # Built in the composition root because it serves both the auth provider and the readiness
+    # probe.
     oauth_storage = build_oauth_storage(entra_config, database_config)
     auth = build_auth(
         entra_config,
@@ -106,11 +106,11 @@ def create_app(
         client_storage=oauth_storage,
         graph_scopes=selection.graph_scopes,
     )
-    # Architectural rationale: GraphSettings is built here, not inside graph_client, because the
-    # composition root is the one place allowed to read config — `graph_client/` may be told its
-    # timeout budget but never configured (see rule 2 in tests/test_layering.py). This is the
-    # translation that makes that seam real: the three values are `AppConfig` fields an operator
-    # sets, and the field names on both sides are the same so the mapping cannot be misread.
+    # `GraphSettings` is built here, not inside `graph_client/`, because the composition root is the
+    # one place allowed to read config: `graph_client/` may be told its timeout budget but never
+    # configured (rule 2 in `tests/test_layering.py`). The three values are `AppConfig` fields an
+    # operator sets, and the field names on both sides are the same, so the mapping cannot be
+    # misread.
     graph_transport = create_graph_transport(
         GraphSettings(
             request_timeout_seconds=config.graph_request_timeout_seconds,
@@ -119,8 +119,8 @@ def create_app(
         )
     )
 
-    # Architectural constraint: Nothing downstream re-reads the environment. Configuration is
-    # captured at startup and injected. This makes behavior deterministic and testable.
+    # Nothing downstream re-reads the environment. Configuration is captured at startup and
+    # injected, which makes behaviour deterministic and testable.
 
     @asynccontextmanager
     async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
@@ -132,25 +132,23 @@ def create_app(
             yield
         finally:
             await auth.close_obo_credentials()
-            # This closes neither graph_transport nor oauth_storage, for one reason each and the
-            # same conclusion. `graph_transport.aclose()` is a no-op: the SDK wraps the pool in
-            # `AsyncGraphTransport`, which defines no `aclose` and so inherits httpx's, whose body
-            # is `pass` (microsoft/kiota-python#494, open and unfixed) — calling it only looks like
-            # cleanup. Reaching through oauth_storage's encryption wrapper is real but not worth
-            # it. Both connection pools end when the process does, which is the whole of what
-            # either call would have bought.
+            # Neither `graph_transport` nor `oauth_storage` is closed. `graph_transport.aclose()`
+            # is a no-op: the SDK wraps the pool in `AsyncGraphTransport`, which defines no `aclose`
+            # and so inherits httpx's, whose body is `pass` (microsoft/kiota-python#494, open and
+            # unfixed). Closing through `oauth_storage`'s encryption wrapper would be real but is
+            # not worth it. Both connection pools end when the process does.
 
     mcp = FastMCP(
         "Office MCP",
         version=config.version,
         auth=auth,
-        # A middleware passed here ends up outermost, ahead of FastMCP's own and of the
-        # operations layer `setup_ops` appends below — `add_middleware` appends and the chain is
-        # built over `reversed(middleware)`, so earlier in this list is further out. The first two
-        # below are here for that and not for tidiness.
+        # A middleware passed here ends up outermost, ahead of FastMCP's own and of the operations
+        # layer `setup_ops` appends below: `add_middleware` appends and the chain is built over
+        # `reversed(middleware)`, so earlier in this list is further out. The first two below are
+        # here for that and not for tidiness.
         #
-        # The name one is first, so nothing in this process — ours or upstream's — ever reads a
-        # tool name the server cannot resolve. What makes it load-bearing is `setup_ops`' metrics
+        # The name one is first, so nothing in this process, ours or upstream's, ever reads a tool
+        # name the server cannot resolve. What makes it load-bearing is `setup_ops`' metrics
         # middleware, which labels a Prometheus counter with the name the *client* sent before
         # anything has resolved it. See `cardinality.py`.
         #
@@ -201,12 +199,12 @@ def create_app(
             # internet, so both are reachable without a credential.
             Middleware(BoundedRequestMiddleware),
             # A no-op meter provider on purpose. Left to the global one, this middleware's own
-            # instruments resolve against the provider metrics.py aims at the toolkit registry, and
-            # /metrics then serves two histograms for one latency: http_server_duration_milliseconds
-            # beside unique_toolkit's python_http_request_duration_seconds. The toolkit series is
-            # the one the house dashboards read, and its python_http_requests_in_progress covers
-            # what http_server_active_requests would have said, so the toolkit series stays the only
-            # one. Spans are unaffected — the tracer provider is untouched.
+            # instruments resolve against the provider `metrics.py` aims at the toolkit registry,
+            # and `/metrics` then serves two histograms for one latency:
+            # `http_server_duration_milliseconds` beside unique_toolkit's
+            # `python_http_request_duration_seconds`. The house dashboards read the toolkit series,
+            # and its `python_http_requests_in_progress` covers what `http_server_active_requests`
+            # would have said. Spans are unaffected: the tracer provider is untouched.
             Middleware(OpenTelemetryMiddleware, meter_provider=NoOpMeterProvider()),
             Middleware(TraceContextCaptureMiddleware),
             ops_middleware,

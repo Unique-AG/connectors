@@ -1,13 +1,13 @@
 """What an operator is told this deployment resolved to.
 
-The manifest is not a nicety. Nothing in this server can check its own ask against the app
-registration — Azure omits Graph scopes from the session token's `scp`, so the grants are invisible
-here — and a mismatch fails at the *authorize* hop, which is a login no user can complete, with
-nothing in this server's logs to explain it. The exact permission list, and which of it needs an
-administrator, exists in one place only, and this is it.
+Nothing in this server can check its own ask against the app registration, because Azure omits
+Graph scopes from the session token's `scp` and the grants are invisible here. A mismatch fails at
+the *authorize* hop, which is a login no user can complete, with nothing in this server's logs to
+explain it. The exact permission list, and which of it needs an administrator, exists in one place
+only, and this is it.
 
-So what is asserted here is that the list is right and that it says who has to sign off. The
-wrapping is not: an assertion on where a line breaks is one that fails the day a tool name grows.
+So these tests assert that the list is right and that it says who has to sign off. The wrapping is
+not asserted: a test of where a line breaks fails the day a tool name grows.
 """
 
 import re
@@ -34,9 +34,8 @@ _THIRD = "third_tool"
 def registry_of_three(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """The registry the scan compares prose against, widened to three tools.
 
-    The scan reports names of tools *this server has* that this deployment did not select, so with
-    one tool in the tree — and that one always on — there is never anything to report. Patched where
-    the manifest reads it, which is that module's own binding.
+    The scan reports names of tools *this server has* that this deployment did not select. Patched
+    where the manifest reads it, which is that module's own binding.
     """
     monkeypatch.setattr(manifest_module, "TOOL_NAMES", (ALWAYS_ON, _SECOND, _THIRD))
     yield
@@ -46,7 +45,7 @@ async def _manifest_of(selection: Selection, *, tools: Mapping[str, str] | None 
     """The manifest for `selection`, over a server carrying `tools` and their descriptions.
 
     A real `FastMCP` rather than a stub, because the description scan reads the registered tools'
-    own prose and reading it off the server is the whole of what makes the scan true.
+    own prose off the server, which is what makes the scan true.
     """
     mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
     for name, description in (tools or {}).items():
@@ -58,7 +57,7 @@ def _flat(manifest: str) -> str:
     """The manifest with its wrapping collapsed, so an assertion is about content, not layout.
 
     A note is a whole sentence and the block is wrapped, so the words an assertion looks for are
-    routinely split across two lines — and where the break falls moves the day a tool name grows.
+    routinely split across two lines, and where the break falls moves the day a tool name grows.
     """
     return " ".join(manifest.split())
 
@@ -78,9 +77,8 @@ class TestTheTableAnswersForEveryPermissionAToolCanDeclare:
 
     def test_every_permission_this_connector_may_ask_for_has_a_verdict(self) -> None:
         """A permission added without one would make the manifest tell an operator no administrator
-        is needed when one is — and then every sign-in stops at "Need admin approval", for a reason
-        this server never logs. The `False` entries are what make the difference between "no" and
-        "nobody said" visible at all.
+        is needed when one is, and then every sign-in stops at "Need admin approval", for a reason
+        this server never logs. The `False` entries are what tell "no" apart from "nobody said".
         """
         unanswered = sorted(REQUESTABLE_PERMISSIONS - set(NEEDS_ADMIN_CONSENT))
 
@@ -91,14 +89,10 @@ class TestTheTableAnswersForEveryPermissionAToolCanDeclare:
         )
 
     def test_it_answers_for_nothing_else(self) -> None:
-        """The other direction, which only became assertable in this PR.
+        """The other direction.
 
-        The table was written complete while most of the permissions in it were still ahead of the
-        tools that declare them, so for most of this stack a misspelled entry sat unchecked: the
-        totality test above is satisfied by the names that *are* requestable, and a wrong one
-        simply waits — it would have failed for most of the commits behind this one. The eighth and
-        last permission arrives with the recordings tool, in this same PR, so the two sides can now
-        be pinned to each other — and a name in the table no tool can declare is now a failing test
+        The totality test above is satisfied by the names that *are* requestable, so a misspelled
+        entry sits unchecked there. Here, a name in the table no tool can declare is a failing test
         rather than an `AssertionError` from the manifest the day its tool lands.
         """
         unrequestable = sorted(set(NEEDS_ADMIN_CONSENT) - REQUESTABLE_PERMISSIONS)
@@ -176,8 +170,8 @@ class TestWhatTheManifestSays:
     async def test_it_carries_no_consent_url(self) -> None:
         """Deliberately: `/.default` would consent to whatever the registration happens to carry
         rather than to what this deployment asks for, and a scope-matched admin-consent URL needs a
-        `redirect_uri` matching a registered one — and the only one office-mcp registers is
-        FastMCP's OAuth callback, which would render a successful consent as an error."""
+        `redirect_uri` matching a registered one. The only one office-mcp registers is FastMCP's
+        OAuth callback, which would render a successful consent as an error."""
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
 
         manifest = await _manifest_of(selection)
@@ -197,8 +191,8 @@ class TestWhatTheManifestSays:
 class TestTheDescriptionScanWarnsAboutStalePromises:
     """A tool named in an exposed tool's prose that this deployment does not expose. It warns and
     never aborts: the references are dense and mutual, so requiring every mention would drag
-    `search_messages` — and with it an administrator's signature on `ChannelMessage.Read.All` — into
-    a deployment that asked for nothing but `list_chats`.
+    `search_messages`, and with it an administrator's signature on `ChannelMessage.Read.All`, into a
+    deployment that asked for nothing but `list_chats`.
     """
 
     @pytest.mark.usefixtures("registry_of_three")
@@ -241,8 +235,8 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
         assert f"{_SECOND}'s description mentions {_THIRD}" in _flat(manifest)
 
     async def test_a_deployment_that_exposes_everything_is_told_nothing(self) -> None:
-        """Nothing is missing, so there is nothing to warn about — and the real registry is what
-        proves it, because a note here would be a note in production."""
+        """Nothing is missing, so there is nothing to warn about. The real registry is what proves
+        it, because a note here would be a note in production."""
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
 
@@ -256,7 +250,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
     async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
         """A tool name is one word, here as to a reader. `read_message` is not mentioned by prose
         saying `read_messages`, and a note about it would send an operator looking for a reference
-        nobody wrote — in a report whose whole value is that every line of it is true."""
+        nobody wrote, in a report whose whole value is that every line of it is true."""
         selection = Selection(
             preset=None, tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
         )

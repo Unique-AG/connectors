@@ -1,11 +1,11 @@
 """`list_teams` — the teams the signed-in user is a member of.
 
-This tool complements `list_chats`. A chat is joined. A channel is browsed inside a team. No
+This tool complements `list_chats`: a user joins a chat and browses a channel inside a team. No
 tool reaches a channel without a team id first.
 
-TRAP: Graph accepts no OData query on this collection. `$top`, `$select`, and `$filter` all
-return 400. services/teams-mcp shipped `$top` and had to remove it. This tool sends no request
-configuration.
+TRAP: Graph accepts no OData query on this collection. `$top`, `$select`, and `$filter` all return
+400, so this tool sends no request configuration. services/teams-mcp shipped `$top` and had to
+remove it.
 
 Only five properties populate: `id`, `displayName`, `description`, `isArchived`, `tenantId`.
 """
@@ -31,11 +31,10 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
 # `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
-# there is exactly one call to make.
+# the one call needs none.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-# A safety valve on Graph request count, not a Graph-imposed page size. Graph accepts no page
-# size on this collection.
+# Caps `limit` and bounds Graph requests per call. Graph accepts no page size here.
 MAX_TEAMS = 200
 
 _DESCRIPTION = """\
@@ -72,7 +71,6 @@ class TeamSummary(BaseModel):
 
     @classmethod
     def from_team(cls, team: Team) -> Self:
-        """Map Graph team to TeamSummary, renaming id→team_id."""
         assert team.id is not None
         return cls(
             team_id=team.id,
@@ -105,8 +103,10 @@ async def list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool."""
-    # Built here because this is where `transport` is, and named rather than called in the default.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

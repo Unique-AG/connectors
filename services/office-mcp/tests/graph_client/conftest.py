@@ -1,6 +1,6 @@
 """Fixtures for the Graph transport tests: a mocked graph.microsoft.com and a client on it.
 
-Every response body here is synthesised. Nothing in this directory came from a real tenant.
+Every response body here is synthesised. None came from a real tenant.
 """
 
 from collections.abc import AsyncGenerator, Iterator
@@ -15,7 +15,7 @@ from office_mcp.graph_client import GraphSettings, create_graph_transport, graph
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
-# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters here.
+# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters.
 CALLER_TOKEN = "synthetic-graph-access-token"
 
 
@@ -40,11 +40,9 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
 class RecordedSleeps:
     """Stands in for the `asyncio` module inside the SDK's retry handler.
 
-    The handler's only use of it is `await asyncio.sleep(delay)`, so swapping the module
-    reference for this records exactly the delays it decided to wait — which is the assertion
-    worth making about `Retry-After` — and keeps a test that exercises a 10-second backoff
-    instant. Patching `asyncio.sleep` globally instead would slow down or break anything else
-    the loop is doing.
+    The handler only calls `await asyncio.sleep(delay)`, so this records the delays it chose and
+    a 10-second backoff runs instantly. Those delays are the `Retry-After` assertion worth
+    making. Patching `asyncio.sleep` globally would slow or break everything else on the loop.
     """
 
     def __init__(self) -> None:

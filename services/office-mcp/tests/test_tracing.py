@@ -72,7 +72,7 @@ def _headers(traceparent: str, session: str | None = None) -> dict[str, str]:
 
 
 def _context(span: ReadableSpan) -> SpanContext:
-    """A finished span always has one; the SDK types it as optional."""
+    """A finished span always has one. The SDK types it as optional."""
     context = span.get_span_context()
     assert context is not None, f"{span.name} has no span context"
     return context
@@ -94,8 +94,8 @@ def entra(monkeypatch: pytest.MonkeyPatch) -> None:
     that only patches is nothing a test would otherwise name.
 
     Only the token check is stubbed. The session-owner check inside the transport still runs against
-    what this returns, which is what lets a second request reuse the session the first one created —
-    and reusing that session is the condition the defect lives in.
+    what this returns, which is what lets a second request reuse the session the first one created.
+    Reusing that session is the condition the defect lives in.
     """
 
     async def verify_token(_self: AzureProvider, token: str) -> AccessToken:
@@ -127,9 +127,8 @@ def app() -> Starlette:
 def exporter() -> Iterator[InMemorySpanExporter]:
     """An in-memory exporter on the process's tracer provider.
 
-    A tracer provider can only be installed once per process, so this reuses an SDK provider when
-    one is already there and installs one when it is not — the same shape `test_mcp_tools.py` uses
-    for the same reason.
+    The tracer provider is process-wide and can be set only once, so the exporter attaches to
+    whichever provider is in play, the same shape `test_mcp_tools.py` uses.
     """
     exporter = InMemorySpanExporter()
     provider = trace.get_tracer_provider()
@@ -150,7 +149,7 @@ def session_spans(app: Starlette, exporter: InMemorySpanExporter) -> Sequence[Re
     with TestClient(app) as client:
         # Cleared after the lifespan has run, not before. The startup manifest calls the server's
         # own list_tools with no request to parent it, which is a benign root trace of two
-        # `tools/list` spans — and is exactly what a reader mistakes for the defect.
+        # `tools/list` spans, and is exactly what a reader mistakes for the defect.
         exporter.clear()
 
         initialize = _post(

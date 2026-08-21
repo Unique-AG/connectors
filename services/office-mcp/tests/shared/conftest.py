@@ -1,10 +1,11 @@
 """A mocked graph.microsoft.com, and a Graph client that calls it as a synthetic user.
 
-The same three fixtures the other test directories build, built here too rather than imported
-across: what `shared/` promises is tested against `shared/` alone, and a test package that imported
-another test package's fixtures would make the directories as tangled as the modules used to be.
-Every payload in this directory is invented — the ids are obviously fake, the domains are
-`.invalid`, and the names are from the public domain.
+The other test directories build the same three fixtures. They are duplicated here rather than
+imported across, so that `shared/` is tested against `shared/` alone and no test package depends
+on another one's fixtures.
+
+Every payload in this directory is invented: the ids are fake, the domains are `.invalid`, and
+the names are from the public domain.
 """
 
 from collections.abc import AsyncGenerator, Iterator
@@ -18,7 +19,7 @@ from office_mcp.graph_client import GraphSettings, create_graph_transport, graph
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
-# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters here.
+# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters.
 CALLER_TOKEN = "synthetic-graph-access-token"
 
 

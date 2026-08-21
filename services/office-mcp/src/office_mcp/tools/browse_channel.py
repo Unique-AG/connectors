@@ -1,33 +1,28 @@
 """`browse_channel` — one Teams channel's posts with their newest replies.
 
-Walk one channel — the only message tool that can. `search_messages` finds messages by keyword
-across every chat and channel, not one. `read_message` reads a message by handle.
-
-Four design decisions:
+This is the only message tool that walks one channel. `search_messages` finds messages by keyword
+across every chat and channel, not one. `read_message` reads one message by handle.
 
 **Order is thread activity, not post date.** Graph sorts by reply-chain last modified, so a
-two-year-old post moves to the first page when someone replies to it. This order is kept, not
-corrected — re-sorting would invent an order Graph never gave. Read `created_at` to know when a
-post was written, not its position here. The same order rules out paging by date: a walk could
-never tell when it had gone back far enough.
+two-year-old post moves to the first page when someone replies to it. That order is kept, because
+re-sorting would invent an order Graph never gave. Read `created_at` to know when a post was
+written. The same order rules out paging by date: a walk could never tell when it had gone back
+far enough.
 
-**One request only.** Graph rate-limits channel reads to one request per second for this app
-across the tenant. This tool makes one request: `$top` is the window, the single page Graph
-answers with is the result.
+**One request only.** Graph rate-limits channel reads to one request per second for this app across
+the tenant. `$top` is the window, and the single page Graph answers with is the result.
 
-**No date filter.** This collection accepts only `$top` and `$expand=replies`, no `$filter`.
-Graph documents no `$orderby` for it either. Use `search_messages` with
-`sent_after`/`sent_before` to search by date.
+**No date filter.** This collection accepts only `$top` and `$expand=replies`, and Graph documents
+no `$orderby` for it. Use `search_messages` with `sent_after` and `sent_before` to search by date.
 
 **Cannot tell if a page is the whole channel.** System messages are dropped after Graph counts them,
-so a short page is not proof the channel is empty. Graph's `@odata.nextLink` on the page says if
-more exists — reported via `include_window_completeness`.
+so a short page is not proof the channel is empty. Graph's `@odata.nextLink` on the page says
+whether more exists, reported as `more_posts_in_channel` when `include_window_completeness` is set.
 
-This file owns the name, description, permission, arguments, answer shape and request. The handle
-grammar lives in `shared/handles.py` (so the reply handle this tool mints is what `read_message`
-resolves and this is the only tool that can mint it). The message shape and Teams HTML normaliser
-live in `shared/messages.py` (so a post browsed and a message read are the same type). Token and
-error text live in `shared/seam.py`.
+Owned elsewhere: the handle grammar in `shared/handles.py`, so the reply handle minted here is the
+one `read_message` resolves and no other tool mints. The message shape and the Teams HTML normaliser
+live in `shared/messages.py`, so a browsed post and a read message are one type. Token and error
+text live in `shared/seam.py`.
 """
 
 from collections.abc import Mapping
@@ -54,20 +49,19 @@ TOOL_NAME = "browse_channel"
 # The one Graph call this tool makes, as the step instruments count it.
 STEP = "channel_messages"
 
-# Import CHANNEL_PERMISSION to avoid misspelling — handle vocabulary owns surface permissions.
-# Several tools declare one permission; deduplication is the registry's job.
+# `CHANNEL_PERMISSION` is imported rather than spelled out: the handle vocabulary owns surface
+# permissions. Several tools declare the same one, and deduplication is the registry's job.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented; what
-# matters is that the shape is one this tool accepts, because an argument it rejects is refused here
-# and never reaches Graph, which would leave its Graph refusals unchecked.
+# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
+# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
     "channel_id": "19:general@thread.tacv2",
 }
 
-# Graph's documented ceiling on `$top` for a channel's messages — the whole of one request.
+# Graph's documented ceiling on `$top` for a channel's messages, and the most one request holds.
 MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
@@ -151,29 +145,26 @@ async def browse_channel(
     limit: int,
     include_window_completeness: bool,
 ) -> ChannelPosts:
-    """Return up to `limit` posts from a channel's first page, each with its newest replies.
+    """Up to `limit` posts from a channel's first page, each with its newest replies.
 
-    One Graph request, always. Graph rate-limits a given channel to one request per second for this
-    app across the tenant. Neither cursor is followed: not `@odata.nextLink` on the collection or
-    `replies@odata.nextLink` on a post. `$top=limit` is the window; `$expand=replies` brings
-    threads into one request instead of one per post. A caller who needs more raises `limit`
-    instead of this tool spending the tenant's budget.
+    One Graph request, always. Neither cursor is followed: not `@odata.nextLink` on the collection,
+    not `replies@odata.nextLink` on a post. `$top=limit` is the window, and `$expand=replies` brings
+    threads into that request instead of one request per post.
 
-    System messages (joins, call ends, renames) are dropped. Graph has no `$filter` to drop them
-    at the source, so they are filtered out of the page Graph counted them into. This means a page
-    can be shorter than `limit` without the channel being empty. This is the one tool whose answer
-    cannot say if it is everything — that is why `include_window_completeness` exists. Elsewhere
-    a short answer means the end of the collection (paging reached it); here nothing was followed,
-    so a short answer says nothing.
+    System messages (joins, call ends, renames) are dropped from the page Graph counted them into,
+    because Graph has no `$filter` to drop them at the source, so a page can be shorter than `limit`
+    without the channel being empty. Elsewhere a short answer means paging reached the end of the
+    collection. Here nothing was followed, so a short answer says nothing, and that is why
+    `include_window_completeness` exists.
 
-    Two facts are reported separately because their remedies differ and one boolean over both would
-    be ambiguous. `more_posts_in_channel`: Graph's `@odata.nextLink` as-is. The channel holds more,
-    and nothing here reaches it — raise `limit` for more of the same page, `search_messages` for
-    older posts. `posts_cut_to_limit`: this function's window closing over posts Graph did send;
-    raise `limit` to get them. Both are null unless asked for.
+    The two reported facts are separate because their remedies differ, and one boolean over both
+    would be ambiguous. `more_posts_in_channel` is Graph's `@odata.nextLink` as-is: the channel
+    holds more and nothing here reaches it, so raise `limit` for more of the same page or use
+    `search_messages` for older posts. `posts_cut_to_limit` is this function's window closing over
+    posts Graph did send, so raise `limit` to get them. Both are null unless asked for.
 
-    Reply window is deliberately not a third fact. Older replies on a post are unreachable either
-    way, so nothing acts on it — see `_replies` function.
+    The reply window is deliberately not a third fact: older replies are unreachable either way, so
+    nothing acts on it. See `_replies`.
     """
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
@@ -190,8 +181,8 @@ async def browse_channel(
         )
         assert page is not None, "Graph answered a channel message listing with no collection"
 
-    # `$top` is `limit`, so Graph should never send back more than that — but the window is
-    # this tool's promise, not Graph's, so apply it rather than trust it.
+    # `$top` is `limit`, so Graph should send back no more than that. The window is this tool's
+    # promise, not Graph's, so apply it rather than trust it.
     posts = [message for message in (page.value or []) if _is_a_post(message)]
     kept = posts[:limit]
 
@@ -228,13 +219,12 @@ def _is_a_post(message: ChatMessage) -> bool:
 def _replies(post: ChatMessage) -> list[ChatMessage]:
     """Newest `MAX_REPLIES_PER_POST` replies to `post`, oldest first.
 
-    Sorted here because Graph does not order replies — the reply collection documents `$top`
-    only, so the arrival order is not a contract to preserve. Keep the newest: a thread's recent
-    turns are usually what a question needs. Whether older replies were left behind is not
-    reported, because a full window already says it: Graph expands up to 200 replies per post, so
-    a thread it paged had more than 200 and the window is full either way. That leaves the same
-    reading as everywhere here: this many replies means there may be more, fewer means that was
-    the thread.
+    Sorted here because Graph does not order replies: the reply collection documents `$top` only,
+    so the arrival order is no contract to preserve. The newest are kept, because a thread's recent
+    turns are usually what a question needs. Whether older replies were left behind is not reported,
+    because a full window already says it. Graph expands up to 200 replies per post, so a thread it
+    paged had more than 200 and the window is full either way. The reading is the same as everywhere
+    here: this many replies means there may be more, fewer means that was the thread.
     """
     replies = sorted((reply for reply in post.replies or [] if _is_a_post(reply)), key=_sent_at)
     return replies[-MAX_REPLIES_PER_POST:]
@@ -251,12 +241,10 @@ def _reply_id(reply: ChatMessage) -> str:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Declare this tool against the shared Graph transport.
-
-    `transport` is the long-lived `httpx.AsyncClient` from `create_graph_transport`; the tool
-    borrows it per call and never owns it. `create_app` closes it on shutdown.
-    """
-    # Built here because this is where `transport` is, and named rather than called in the default.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

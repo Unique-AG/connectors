@@ -2,10 +2,10 @@
 
 Kiota labels a Graph URL as EUII and sets it as `url.full` by default, in two places: the request
 span the adapter opens, and the span `UrlReplaceHandler` opens for itself. In this service a Graph
-URL carries chat ids, message ids and meeting/transcript ids, so with tracing switched on those ids
-would be exported to a trace backend and kept there. `graph_client_for` closes the first,
-`_QuietUrlReplaceHandler` the second; these tests are what says so, over real SDK calls rather than
-over the option object.
+URL carries chat ids, message ids, meeting ids and transcript ids, so with tracing switched on those
+ids would be exported to a trace backend and kept there. `graph_client_for` closes the first and
+`_QuietUrlReplaceHandler` closes the second. These tests are what says so, over real SDK calls
+rather than over the option object.
 
 Asserted as a property of the whole trace rather than of the two mechanisms, because the mechanisms
 are the part an SDK bump can move. A handler added upstream that exports a URL, a spelling of the
@@ -36,7 +36,7 @@ _REQUEST_PATH = "/chats/19%3Aleak-detector%40thread.v2/messages/1770000000042"
 # The span the URL replacer opens for itself. It is named here because it is the one span this
 # service replaces a handler to clean: `UrlReplaceHandler.send` sets `url.full` on it without
 # consulting `ObservabilityOptions` at all (kiota_http/middleware/url_replace_handler.py:44), so the
-# option the adapter is given cannot reach it. The span itself is wanted and is asserted below —
+# option the adapter is given cannot reach it. The span itself is wanted and is asserted below:
 # the fix drops one attribute, not the telemetry.
 _URL_REPLACER_SPAN = "UrlReplaceHandler_send"
 
@@ -45,9 +45,9 @@ _URL_REPLACER_SPAN = "UrlReplaceHandler_send"
 def recorded_spans() -> Iterator[InMemorySpanExporter]:
     """Every span this process finishes from here on, collected in memory.
 
-    The tracer provider is process-wide and can only be set once, so the exporter is attached to
-    whichever one is already in play and the collection is emptied on the way in rather than torn
-    down — a span from an earlier test would otherwise read as one of this test's own.
+    The tracer provider is process-wide and can be set only once, so the exporter attaches to
+    whichever provider is in play. The collection is emptied on the way in rather than torn down. A
+    span from an earlier test would otherwise read as one of this test's own.
     """
     exporter = InMemorySpanExporter()
     provider = trace.get_tracer_provider()
@@ -89,7 +89,7 @@ class TestAGraphRequestSpanNamesTheTemplateAndNotTheResource:
         """The span a trace backend shows as "the Graph request" is the one this is about.
 
         Both halves matter. The template has to still be there, or the way to make this test pass
-        would be to stop tracing Graph calls at all — and grouping a latency breakdown by URL
+        would be to stop tracing Graph calls at all, and grouping a latency breakdown by URL
         template is the whole reason the span is worth having.
         """
         await _read_one_message(client, graph)
@@ -138,8 +138,8 @@ class TestTheUrlReplacerIsQuietenedAndNotSwitchedOff:
     ) -> None:
         """Both of the things a shortcut would have cost.
 
-        Dropping the handler, or disabling it, would also silence the leak — and would take the
-        `/users/me-token-to-replace` → `/me` rewrite with it, which every `client.me` call depends
+        Dropping the handler, or disabling it, would also silence the leak and would take the
+        `/users/me-token-to-replace` to `/me` rewrite with it, which every `client.me` call depends
         on. Dropping its span instead of its one attribute would silence the leak by exporting
         less telemetry. The route below is asserted called because it is mounted on `/me`: the SDK
         asks for `/users/me-token-to-replace` and only the handler turns that into `/me`.

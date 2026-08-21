@@ -1,12 +1,8 @@
 """`get_me` — return the signed-in user's own profile.
 
-The name is `get_me`, not the shell idiom `whoami`, to keep the verb_noun pattern every tool
-name follows. A tool name cannot change later: every caller that learned it must learn it
-again. Microsoft's own M365 connector uses the same name.
-
-**Trap:** `email`, `user_principal_name`, and `user_id` are not interchangeable. Use email to match
-sender and recipient addresses. Use user_principal_name only when email is null (guest or unlicensed
-accounts). Compare user_id only against another user_id—it is the immutable Entra object id.
+Named `get_me`, not the shell idiom `whoami`, to keep the verb_noun pattern every tool name uses.
+Microsoft's own M365 connector uses the same name. A tool name cannot change later: every caller
+that learned it must learn it again.
 """
 
 from collections.abc import Mapping
@@ -28,7 +24,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 
 # One call that reaches Graph, read by `tools/__init__.py` into the coverage table
 # `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
-# there is exactly one call to make.
+# the one call needs none.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
@@ -76,7 +72,6 @@ class SignedInUser(BaseModel):
 
     @classmethod
     def from_user(cls, user: User) -> Self:
-        """Map Graph user to SignedInUser, renaming id→user_id and mail→email."""
         assert user.id is not None, "Graph answered GET /me with a user that has no id"
         return cls(
             user_id=user.id,
@@ -88,26 +83,23 @@ class SignedInUser(BaseModel):
 
 
 async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
-    """Return the caller's profile with the five properties this tool promises.
+    """Return the caller's profile.
 
-    The `graph_errors` block here does nothing about failures — `shared/identity.py` opens its own
-    `graph_step`, which classifies them and names the call — and everything about naming the
-    *operation*: that is the tool's own name, and a tool file is the only thing that knows it. Every
-    other tool opens its named block at its own Graph call; this one's Graph call is in `shared/`,
-    so the block comes out one level up rather than the name going one level down.
+    `graph_errors` here names the operation and nothing else: the name is the tool's own, and a
+    tool file is the only thing that knows it. `shared/identity.py` opens its own `graph_step`,
+    which classifies the failures and names the call. Every other tool opens its named block at
+    its own Graph call. This one's Graph call is in `shared/`, so the block comes out one level up
+    rather than the name going one level down.
     """
     with graph_errors(TOOL_NAME):
         return SignedInUser.from_user(await identity.signed_in_user(client))
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool with the shared Graph transport.
-
-    The tool borrows the transport per call.
-    """
-    # Here rather than at module level, because this is where `transport` is: the dependency closes
-    # over it, and a default is evaluated when the `def` below runs, which is inside this call. A
-    # name in the default rather than the call itself — a call there is ruff's B008.
+    """Register this tool. The tool borrows `transport` per call."""
+    # Built here because this is where `transport` is: the dependency closes over it, and the
+    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
+    # not a call. A call there is ruff's B008.
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

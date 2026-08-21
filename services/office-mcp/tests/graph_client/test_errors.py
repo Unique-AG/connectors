@@ -103,9 +103,9 @@ async def test_a_5xx_is_throttling_when_it_named_a_delay_and_an_outage_when_it_d
 
     Graph rate limits with a 503 as well as with a 429, and the only thing that says which it did is
     `Retry-After`: a service naming the second it will answer again is holding a caller off, not
-    falling over. The remedies are opposite — wait exactly that long and then look at quota, versus
-    retry once and then report an outage — so a 503 with the header has to land on the throttling
-    side of that split and a 503 without it on the outage side. The SDK's own retry handler reads
+    falling over. The remedies are opposite: wait exactly that long and then look at quota, or retry
+    once and then report an outage. So a 503 with the header has to land on the throttling side of
+    that split and a 503 without it on the outage side. The SDK's own retry handler reads
     the header on a 503 the same way, which is what makes the `retried` label on
     `graph_throttled_total` true of the result.
 
@@ -172,9 +172,9 @@ async def test_a_throttle_without_a_retry_after_says_so_rather_than_guessing(
 async def test_the_inner_code_is_carried_because_it_is_the_only_thing_that_differs(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:
-    """Two Teams transcript refusals share a status and an outer code and have opposite remedies —
-    one is a tenant switch only a Teams administrator can flip, the other is a format to ask for
-    again — so `innerError.code` is the whole of the difference. It is not one of the SDK's typed
+    """Two Teams transcript refusals share a status and an outer code and have opposite remedies.
+    One is a tenant switch only a Teams administrator can flip, the other is a format to ask for
+    again, so `innerError.code` is the whole of the difference. It is not one of the SDK's typed
     inner-error fields, so it arrives in `additional_data` and would be dropped without this.
     """
     graph.get("/me").mock(
@@ -213,7 +213,7 @@ async def test_an_error_without_an_inner_code_reports_none_rather_than_the_outer
 async def test_never_reaching_graph_is_reported_as_upstream_not_as_a_bad_request(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:
-    """A connection failure never becomes an `APIError` — there is no response to build one from."""
+    """A connection failure never becomes an `APIError`: there is no response to build one from."""
     graph.get("/me").mock(side_effect=httpx.ConnectError("name resolution failed"))
 
     with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
@@ -228,10 +228,10 @@ async def test_a_redirect_the_sdk_gave_up_on_is_worded_rather_than_escaping_unwo
 ) -> None:
     """The SDK raises its own exceptions that are not `APIError`, and they used to escape.
 
-    `kiota_http` has a family for the failures that happen outside the request/response cycle
-    `_classify` describes — too many redirects, a response it could not read, a body it could not
+    `kiota_http` has a family for the failures that happen outside the request and response cycle
+    `_classify` describes: too many redirects, a response it could not read, a body it could not
     deserialize. None carries a status, a code or a request id, so none can be classified from a
-    response; without a clause for them a caller got an unworded `ToolError` and the call was
+    response. Without a clause for them a caller got an unworded `ToolError` and the call was
     counted under the `error` sentinel that means "an exception this seam cannot describe".
     """
     graph.get("/me").mock(return_value=httpx.Response(302, headers={"location": f"{GRAPH_V1}/me"}))
@@ -244,10 +244,10 @@ async def test_a_redirect_the_sdk_gave_up_on_is_worded_rather_than_escaping_unwo
 
 
 def test_a_cancelled_call_stays_cancelled_and_is_not_reported_as_a_graph_failure() -> None:
-    """The caller went away; Graph did nothing wrong.
+    """The caller went away. Graph did nothing wrong.
 
-    Re-raised untranslated, because the task group that cancelled this has to learn it was obeyed —
-    a `CancelledError` swallowed into a `GraphUnavailable` is a task that reports success to a
+    Re-raised untranslated, because the task group that cancelled this has to learn it was obeyed. A
+    `CancelledError` swallowed into a `GraphUnavailable` is a task that reports success to a
     cancellation. It also stops being counted as a Graph failure, which is what an MCP client
     hanging up used to look like on a dashboard.
 
@@ -264,7 +264,7 @@ async def test_a_body_the_sdk_cannot_read_is_worded_rather_than_escaping_unworde
     """A gateway in front of Graph answering `text/html` on a 500 is the shape this covers.
 
     The parse-node registry raises a bare `Exception` for a content type it has no parser for, so no
-    `error_map` can describe it — the body never became a model. Before this was classified, it
+    `error_map` can describe it: the body never became a model. Before this was classified, it
     reached a caller as an unworded `ToolError` and was counted under the `error` sentinel.
     """
     graph.get("/me").mock(
@@ -285,7 +285,7 @@ def test_a_bug_of_our_own_is_not_reported_as_graph_being_unavailable() -> None:
 
     An `Exception` subclass raised inside the block is this connector's own fault. Translated to
     `GraphUnavailable` it would tell an operator to retry, and blame Microsoft for a defect that is
-    ours — so a subclass travels untranslated and stays under the unclassified label.
+    ours, so a subclass travels untranslated and stays under the unclassified label.
     """
     for ours in (AssertionError("an invariant of ours"), TypeError("a bug of ours")):
         with pytest.raises(type(ours)), graph_errors("a_test"):

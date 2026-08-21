@@ -1,31 +1,29 @@
 """One refused Graph call per registered tool, read the way a model reads it.
 
-This file exists because of a gap between the two suites that look like they already cover it.
-`tests/shared/test_seam.py` drives the mapping directly and pins the prose. `tests/tools/` calls
-each tool's inner function and asserts the raw `GraphFailure` — the word `ToolError` does not appear
-in that directory at all. Neither crosses `register()`, so neither resolves a dependency and neither
-enters middleware. A tool whose refusals reach the client untranslated satisfies both of them, and
-what the model would then read is `Error calling tool 'list_chats': Microsoft Graph returned 403`,
-which names no remedy and no permission.
+Two suites look like they already cover this. `tests/shared/test_seam.py` drives the mapping
+directly and pins the prose. `tests/tools/` calls each tool's inner function and asserts the raw
+`GraphFailure`. The word `ToolError` does not appear in that directory at all. Neither suite crosses
+`register()`, so neither resolves a dependency and neither enters middleware. A tool whose refusals
+reach the client untranslated satisfies both, and the model then reads
+`Error calling tool 'list_chats': Microsoft Graph returned 403`, which names no remedy and no
+permission.
 
 So every case here goes through an in-memory FastMCP client against the real composed app:
 dependency resolution, middleware, and the tool body. The assertion is byte equality with what
-`shared/seam.py` says about the same failure, computed here through the mapping directly — the two
-routes to one message are the property, and the prose those messages contain is
-`tests/shared/test_seam.py`'s subject rather than this file's.
+`shared/seam.py` says about the same failure, computed here through the mapping directly. Two routes
+to one message is the property. The prose in those messages is `tests/shared/test_seam.py`'s
+subject.
 
-Every case is derived from the registered surface: `graph_call_examples` reads one refusable call
-off each selected tool module — the arguments it accepts, and the permissions a refusal of that call
-has to name — so the cases are the deployment's own tool list and cannot be one tool short of it. A
+Every case is derived from the registered surface. `graph_call_examples` reads one refusable call
+off each selected tool module: the arguments it accepts, and the permissions a refusal of that call
+has to name. So the cases are the deployment's own tool list and cannot be one tool short of it. A
 tool file that publishes no such call fails the type checker, not this file (`ToolModule` in
-`tools/__init__.py`). The hand-written table this replaced was the second list of the tools in the
-repository, and a tool registered before its row existed left this file silently one tool short —
-which is the failure the file exists to prevent, one level up.
+`tools/__init__.py`). The hand-written table this replaced was a second list of the tools in the
+repository, and a tool registered before its row existed left this file one tool short.
 
 The three stubs (Entra's exchange, a mocked Graph, the in-process client) are this file's own, as
-they are `test_mcp_tools.py`'s own: a fixture shared between the two would make either file's
-failure the other's to diagnose, and this one deliberately refuses every Graph request rather than
-answering it.
+they are `test_mcp_tools.py`'s own: a shared fixture would make either file's failure the other's to
+diagnose, and this one refuses every Graph request rather than answering it.
 """
 
 import logging
@@ -60,8 +58,8 @@ _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _OBO_TOKEN = "synthetic-obo-graph-token"
 
 # The refusal every tool here meets, and the evidence an operator needs out of it. A 403 rather than
-# any other status because its remedy is the one worded per tool: the permission named in it is the
-# whole of what a caller hands their administrator.
+# any other status because its remedy is worded per tool: the permission it names is the whole of
+# what a caller hands their administrator.
 _REQUEST_ID = "synthetic-request-id-every-tool"
 _REFUSED = {"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
 
@@ -85,9 +83,9 @@ _NAMES_SEVERAL: tuple[str, ...] = tuple(
 # `unique_mcp`'s own private class, and importing it here to compare types would be reaching past
 # its front door for the sake of a name it already answers to.
 #
-# `BoundedNameMiddleware` is outermost of all, and that position is its whole point rather than a
-# preference — it has to normalise an unresolvable tool name before `_McpMetrics` reads it. See
-# `tests/test_app.py` for the rule that pins the two relative to each other.
+# `BoundedNameMiddleware` is outermost of all, because it has to normalise an unresolvable tool name
+# before `_McpMetrics` reads it. `tests/test_app.py` holds the rule that pins the two relative to
+# each other.
 _CHAIN = (
     "BoundedNameMiddleware",
     "GraphAdviceMiddleware",
@@ -120,8 +118,8 @@ class _StubOboCredential:
 def obo(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub the On-Behalf-Of exchange and authenticate the in-process client.
 
-    The exchange succeeding is the point: what is being tested is the failure after it, and a
-    refusal here would answer every tool with the token advice instead.
+    The exchange has to succeed: what is tested is the failure after it, and a refusal here would
+    answer every tool with the token advice instead.
     """
     credential = _StubOboCredential()
 
@@ -143,8 +141,8 @@ def graph() -> Iterator[respx.MockRouter]:
     """A Graph that refuses everything, whatever the path and whatever the method.
 
     A catch-all rather than a route per tool: the path a tool reaches for is the tool's own
-    knowledge, and a table of them here would be a second copy of it that goes stale silently — a
-    tool whose path moved would stop being refused and start passing for the wrong reason.
+    knowledge, and a table of them here would go stale silently. A tool whose path moved would stop
+    being refused and start passing for the wrong reason.
     """
     with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as router:
         _ = router.route().mock(
@@ -157,11 +155,10 @@ def graph() -> Iterator[respx.MockRouter]:
 def two_tools() -> FastMCP[None]:
     """One server, the advice middleware, and one refusal raised on either side of a `with` block.
 
-    Every registered tool is now on the middleware's side of that block, which is what the rest of
-    this file drives. These two are what keeps the other side honest: a tool that words its own
-    refusal is still passed through untouched, and reads identically to one the middleware words —
-    so the escape stays available, and moving a mapping in either direction stays a change nobody
-    calling this server can see.
+    Every registered tool sits on the middleware's side of that block, which is what the rest of
+    this file drives. These two keep the other side honest: a tool that words its own refusal is
+    passed through untouched and reads identically to one the middleware words, so moving a mapping
+    in either direction stays a change nobody calling this server can see.
     """
     mcp: FastMCP[None] = FastMCP(
         "Two Tools",
@@ -239,13 +236,12 @@ def _chain(error: BaseException) -> list[BaseException]:
 
 class TestEveryToolTranslatesItsOwnRefusal:
     def test_every_registered_tool_brings_its_own_refusable_call(self) -> None:
-        """The guard on the guard, which is now the derivation rather than a table here.
+        """The guard on the guard, now that the cases are derived rather than tabled here.
 
-        Coverage is no longer something this file can be short of: the cases are the registered
-        surface, keyed by it, and a tool file that publishes no call for itself is a type error
-        rather than a red test. What is left to check is that the derivation produced anything at
-        all — against an empty mapping every parametrised test below is silently uncollected, and a
-        file that runs no cases passes.
+        This file cannot be short of coverage: the cases are the registered surface, keyed by it,
+        and a tool file that publishes no call for itself is a type error rather than a red test.
+        What is left to check is that the derivation produced anything. Against an empty mapping
+        every parametrised test below is silently uncollected, and a file that runs no cases passes.
         """
         assert set(_EVERY_TOOL) == set(_SELECTION.tools), (
             "the derived cases are the registered surface — they cannot be a subset of it"
@@ -257,15 +253,14 @@ class TestEveryToolTranslatesItsOwnRefusal:
     async def test_a_refused_call_reaches_the_client_as_advice(
         self, mcp_client: Client[FastMCPTransport], graph: respx.MockRouter, tool: str
     ) -> None:
-        """The message a model reads is the advice, exactly — not FastMCP's report of an exception.
+        """The message a model reads is the advice, exactly, not FastMCP's report of an exception.
 
         Byte equality rather than a keyword: "administrator" appearing somewhere in a message that
         also carries a stack-shaped prefix is what an un-mapped tool looks like.
 
-        That Graph was reached is asserted rather than assumed. A tool whose example arguments it
-        refuses itself — a handle of the wrong shape, a query it will not run — never makes a Graph
-        request, so nothing about its Graph refusals would be under test and the case would be
-        worth nothing while looking like coverage.
+        That Graph was reached is asserted rather than assumed. A tool that refuses its own example
+        arguments, for a handle of the wrong shape or a query it will not run, never makes a Graph
+        request, so the case would look like coverage while proving nothing.
         """
         refused = _EVERY_TOOL[tool]
 
@@ -281,9 +276,9 @@ class TestEveryToolTranslatesItsOwnRefusal:
         self, mcp_client: Client[FastMCPTransport], tool: str
     ) -> None:
         """The other half of the same rule, asserted directly rather than through the comparison
-        above: a message worded from the registry's union would pass byte equality nowhere and
-        would name permissions this call never used, which is what sends an administrator after a
-        permission that was never missing.
+        above. A message worded from the registry's union would pass byte equality nowhere and
+        would name permissions this call never used. That sends an administrator after a permission
+        that was never missing.
         """
         refused = _EVERY_TOOL[tool]
         unrelated = tuple(
@@ -308,10 +303,10 @@ class TestEveryToolTranslatesItsOwnRefusal:
         """`read_message` is the one tool that tells the middleware its call used fewer permissions
         than it declares, and it says so on the state of that one call.
 
-        Said on the session's state instead — one keyword apart, and a day's lifetime — every later
+        Said on the session's state instead, one keyword apart and a day's lifetime, every later
         refusal in the session would be worded from this handle: the refused search below would name
         `Chat.Read` alone, and the permission that was actually missing would never be asked for.
-        Two calls on one client, because a fresh client per call is exactly what would hide it.
+        Two calls on one client, because a fresh client per call would hide that.
         """
         with pytest.raises(ToolError) as narrowed:
             _ = await mcp_client.call_tool(
@@ -376,9 +371,9 @@ class TestWhereTheMappingSits:
     ) -> None:
         """What being outside it buys, asserted on the record rather than on the order.
 
-        The exception type in that record is whichever layer worded the refusal and is not pinned
-        here; the Graph failure under it is what has to survive, because it carries the status and
-        the request id that make a production 403 traceable.
+        The exception type in that record is whichever layer worded the refusal, and is not pinned
+        here. The Graph failure under it has to survive, because it carries the status and the
+        request id that make a production 403 traceable.
         """
         with caplog.at_level(logging.ERROR, logger="unique_mcp"), pytest.raises(ToolError):
             _ = await mcp_client.call_tool("list_chats", {})
@@ -396,10 +391,10 @@ class TestMappingTwiceChangesNothing:
     async def test_a_tool_block_and_the_middleware_agree_word_for_word(
         self, two_tools: FastMCP[None]
     ) -> None:
-        """What made this stack rebasable one tool at a time, and what keeps a tool free to word one
-        refusal for itself: the mapping moves without the message moving. The tool that maps its own
-        refusal is mapped twice — by its block, then by the middleware that sees the result — and
-        reads identically to the tool the middleware alone maps.
+        """What keeps a tool free to word one refusal for itself: the mapping moves without the
+        message moving. The tool that maps its own refusal is mapped twice, by its block and then by
+        the middleware that sees the result, and reads identically to the tool the middleware alone
+        maps.
         """
         async with Client(FastMCPTransport(two_tools)) as client:
             with pytest.raises(ToolError) as doubly:
@@ -414,17 +409,17 @@ class TestMappingTwiceChangesNothing:
 class TestTheOrderThePermissionsAreNamed:
     """A refusal names the permissions in the order the tool declares them, and that order is prose.
 
-    This is the stated reason `GraphAdviceMiddleware` is handed a table instead of reading a tool's
-    own `tags`: a tag set loses the order, and the order is the sentence — "OnlineMeetings.Read and
-    OnlineMeetingTranscript.Read.All" reads as resolve-the-meeting-then-read-its-transcript, which
-    is the order the two calls actually happen in and the order an administrator grants them in.
-    Sorted, the same message asks for the transcript first and names a dependency backwards.
+    That is why `GraphAdviceMiddleware` is handed a table instead of reading a tool's own `tags`: a
+    tag set loses the order. "OnlineMeetings.Read and OnlineMeetingTranscript.Read.All" reads as
+    resolve the meeting, then read its transcript, which is the order the two calls happen in and
+    the order an administrator grants them in. Sorted, the same message asks for the transcript
+    first and names a dependency backwards.
 
-    Nothing pinned it. Both routes to a message pass the permissions through the same `_named`, so
-    sorting *there* left every byte-equality assertion in this file agreeing with itself, and
-    `tests/shared/test_seam.py` asserts of its two-permission case only that both names appear.
-    What is compared here is therefore the message against the tuple the tool module declares,
-    which is the one statement of the intended order that is not downstream of the wording.
+    Both routes to a message pass the permissions through the same `_named`, so sorting *there*
+    left every byte-equality assertion in this file agreeing with itself, and
+    `tests/shared/test_seam.py` asserts of its two-permission case only that both names appear. So
+    the comparison here is the message against the tuple the tool module declares, the one statement
+    of the intended order that is not downstream of the wording.
     """
 
     def test_a_sort_would_be_visible_in_at_least_one_of_them(self) -> None:

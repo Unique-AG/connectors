@@ -9,29 +9,28 @@ Six series, and the two labels that decide whether they are readable:
 * `graph_steps_total{operation, step, status}` — one Graph call inside an operation, by outcome.
 * `graph_step_duration_seconds{operation, step}` — how long that one call took.
 
-An **operation** is one tool call. A **step** is one Graph call inside it. The distinction is the
-whole point of having both: `list_meeting_recordings` resolves a meeting, reads recordings and
-checks who is signed in, and an operation-level latency spike says only that the tool got slower.
-The step says which of the three did. The operation families are named for what they count —
-`graph_operations_total` counts operations served, not HTTP requests, and a name that said
-`requests` would be read as a request rate on every dashboard it appears in.
+An **operation** is one tool call. A **step** is one Graph call inside it. Having both is the whole
+point: `list_meeting_recordings` resolves a meeting, reads recordings and checks who is signed in,
+and an operation-level latency spike says only that the tool got slower. The step says which of the
+three did. `graph_operations_total` counts operations served, not HTTP requests, and a name that
+said `requests` would be read as a request rate on every dashboard it appears in.
 
 Both labels are names this code chose — `list_chats`, `search_messages`, `resolve_meeting` — and
-never a URL or a path. That is the whole rule and it is not a style preference: a label taken off a
-Graph URL is a new time series per chat, per message and per meeting, and an unbounded label set
-takes a Prometheus down rather than showing up as a bad dashboard. Graph URLs here are made of
-almost nothing else, so the names have to come from the caller, which is why `graph_errors` and
-`graph_step` take them and this module never derives them. `tests/test_graph_metrics.py` enforces
-that over every module in `src/`, and pins the step vocabulary to an exact set so that adding one is
-a deliberate act with a reviewer attached.
+never a URL or a path. That is not a style preference: a label taken off a Graph URL is a new time
+series per chat, per message and per meeting, and an unbounded label set takes a Prometheus down
+rather than showing up as a bad dashboard. Graph URLs here are made of almost nothing else, so the
+names have to come from the caller, which is why `graph_errors` and `graph_step` take them and this
+module never derives them. `tests/test_graph_metrics.py` enforces that over every module in `src/`,
+and pins the step vocabulary to an exact set, so adding one is a deliberate act with a reviewer
+attached.
 
-Architectural rationale: the instruments live here rather than in `office_mcp/metrics.py`, where
-this service installs its meter provider, because `graph_client/` imports nothing of this
-application and an instrument is not a knob `GraphSettings` could carry. They are created on the
-OpenTelemetry *API*, which buffers instrument creation until `configure_metrics` installs a
-provider, so nothing depends on import order. What `metrics.py` still owns is the aggregation —
-the histogram buckets are views there, matched by instrument name, which needs no import either
-way.
+The instruments live here rather than in `office_mcp/metrics.py` with the rest of this service's
+domain instruments, because `graph_client/` imports nothing of this application and an instrument
+is not a knob `GraphSettings` could carry. They are created on the OpenTelemetry *API* under the
+meter name `metrics.py` uses, so both halves land in one instrumentation scope, and the API buffers
+instrument creation until `configure_metrics` installs a provider, so nothing depends on import
+order. `metrics.py` still owns the aggregation: the histogram buckets are views there, matched by
+instrument name, which needs no import either way.
 """
 
 from collections.abc import Generator
@@ -125,9 +124,9 @@ _pages_scanned = _meter.create_histogram(
 )
 
 # How `collect_pages` learns which operation it is walking for. Set by `graph_errors` around the
-# block that makes the call; a walk is always inside one, because a walk outside one lets an
-# unclassified SDK error escape to a tool. Threading the name through `collect_pages` as well would
-# be a second argument to keep in agreement with the first, for a value that is already in scope.
+# block that makes the call. A walk is always inside one, because a walk outside one lets an
+# unclassified SDK error escape to a tool. Passing the name to `collect_pages` as well would be a
+# second argument to keep in agreement with the first, for a value already in scope.
 _OPERATION: ContextVar[str | None] = ContextVar("office_mcp_graph_operation", default=None)
 
 
@@ -136,9 +135,9 @@ def graph_operation(operation: str | None) -> Generator[None]:
     """Name the operation every Graph call inside this block is counted under.
 
     No name leaves the one already in scope alone rather than clearing it. `graph_errors` requires
-    its operation, so the nameless case is `graph_step` — which is every step block, because a step
-    names the call and never the tool. Clearing here would make the operation unreadable to
-    `collect_pages` for the whole of a walk that runs inside one.
+    its operation, so the nameless case is every `graph_step` block: a step names the call and never
+    the tool. Clearing here would make the operation unreadable to `collect_pages` for the whole of
+    a walk that runs inside one.
     """
     if operation is None:
         yield
@@ -173,10 +172,10 @@ def record_graph_step(
 ) -> None:
     """Count one Graph call inside an operation and how long it took.
 
-    Both names are required for the same reason `record_graph_call` requires one: a step with no
+    Both names are required, for the reason `record_graph_call` requires one: a step with no
     operation cannot be attributed to the tool that spent it, and an operation with no step is
-    already counted by the operation instruments. Either one missing means this observation would
-    land in a bucket that reads like a real measurement and is not one, so nothing is recorded.
+    already counted by the operation instruments. Either one missing would land this observation in
+    a bucket that reads like a real measurement and is not one, so nothing is recorded.
     """
     if operation is None or step is None:
         return
@@ -192,7 +191,7 @@ def record_graph_throttled(operation: str | None, *, retried: bool) -> None:
 
 
 def record_pages_scanned(operation: str | None, pages: int) -> None:
-    """Record how many pages one walk read."""
+    """Record how many pages one walk read, under the operation it was walking for."""
     if operation is None:
         return
     _pages_scanned.record(pages, {"operation": operation})
