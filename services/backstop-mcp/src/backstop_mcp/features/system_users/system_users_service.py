@@ -11,6 +11,9 @@ class SystemUsersService(CachedCatalog[SystemUserDto]):
 
     Users come from a real Backstop fetch and live in one in-memory dict keyed by user id.
     Until a fetch succeeds this service has nothing to serve. Constructed by
+    `/system-users` has no search filter. A name or login lookup would otherwise dump the
+    whole roster, so this service walks once, caches `{id: dto}`, and callers substring-filter
+    that map in memory. Until a fetch succeeds there is nothing to serve. Constructed by
     `get_system_users_service` in this feature's `dependencies.py`.
 
     The TTL, single-flight and serve-stale protocol behind `get` is `CachedCatalog`.
