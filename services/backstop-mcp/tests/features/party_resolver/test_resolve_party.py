@@ -114,6 +114,7 @@ class TestEmailSearch:
         assert email2.call_count == 1
         assert email3.call_count == 1
         assert quick.call_count == 0
+        assert email1.calls.last.request.url.params["fields[people]"] == "name,firstName,lastName"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -179,6 +180,7 @@ class TestEmailSearch:
         assert result.value.id == "o1"
         assert orgs.call_count == 1
         assert orgs.calls.last.request.url.params["filter[email][eq]"] == email
+        assert orgs.calls.last.request.url.params["fields[organizations]"] == "name"
         assert "filter[email2][eq]" not in orgs.calls.last.request.url.params
         assert quick.call_count == 0
 

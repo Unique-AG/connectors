@@ -14,6 +14,7 @@ class TestInstructions:
         assert "numberOfEmployees" in INSTRUCTIONS
         assert "search_activities" in INSTRUCTIONS
         assert "get_activity_history" in INSTRUCTIONS
+        assert "filtered search" in INSTRUCTIONS
         assert "get_activity_detail" in INSTRUCTIONS
         history = INSTRUCTIONS.index("get_activity_history")
         assert INSTRUCTIONS.index("search_activities") < history

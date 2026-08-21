@@ -74,13 +74,14 @@ async def get_activity_history(
     client: BackstopClient = Depends(get_backstop_client),
     activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
 ) -> GetActivityHistoryResponse:
-    """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
+    """Party-scoped stream pages. Not the filtered activity search — use `search_activities`.
 
     Documented fallback when `search_activities` is unavailable (that primary is an undocumented
-    UI search and may 404 on another tenant). Party-scoped only — there is no documented
-    firm-wide activity collection. Not the recommended way to read note text: prefer
-    `search_activities` with `include_description`. REST `activity_tag_ids` are AND;
-    `search_activities` tag filters are OR.
+    UI search and may 404 on another tenant). Use `search_activities` for a date window, activity
+    types, tags, authors, or a firm-wide question. This tool pages one party's streams when that
+    primary is missing. REST `activity_tag_ids` are AND; `search_activities` tag filters are OR.
+    Not the recommended way to read note text: prefer `search_activities` with
+    `include_description`.
 
     Pass `request.type="first"` with `search_type` plus a trusted `party_id` (from a prior resolve
     echo — never invent or guess one) or `search` to start. When retrying with `party_id`, pass

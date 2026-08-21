@@ -36,9 +36,11 @@ Share class lives on the original subscription; the window must include that \
 subscription date, not only the period you are asking about. A redemption with no \
 account through originalSubscription is unattributed, not missing.
 
-Meetings, calls, notes, emails, documents: search_activities first. That primary is an \
-undocumented UI search and may 404 — that is not "no activity exists". Fall back to \
-get_activity_history (party-scoped only), then get_activity_detail for the full \
+Meetings, calls, notes, emails, documents: search_activities first — that is the filtered \
+search (mandatory start_date/end_date, optional types, activity_tag_ids, authors, party). \
+That primary is an undocumented UI search and may 404 — that is not "no activity exists". \
+get_activity_history is the party-scoped fallback for paging one stream when the primary \
+is missing; do not use it as the filtered search. Then get_activity_detail for the full \
 untruncated body and the attachment list. Prefer search_activities with include_description \
 for note text while the primary answers. Do not look for those on get_person / \
 get_organization.

@@ -24,6 +24,16 @@ EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
     "employees": ("email", "email2", "email3"),
 }
 
+# Same sparse fieldsets as the LIKE fallback. `/contacts` rejects firstName/lastName (400);
+# people/employees accept them. Without this, an unfiltered `/people` row drags custom fields
+# and the three-way email fan-out can hit the 30s read timeout.
+PARTY_SPARSE_FIELDS: Mapping[SearchType, str] = {
+    "organizations": "name",
+    "contacts": "name",
+    "people": "name,firstName,lastName",
+    "employees": "name,firstName,lastName",
+}
+
 # Backstop's `/quick-search` rejects our lowercase `SearchType` outright (400
 # InvalidParameterException: valid options are [ALL, ACCOUNT, ..., ORGANIZATION,
 # PERSON_FIRST_NAME, PERSON_LAST_NAME, ..., EMAIL_ADDRESS, ...]) — these are the mapped values.
