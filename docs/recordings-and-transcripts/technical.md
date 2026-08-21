@@ -437,11 +437,10 @@ Source: [Limits and specifications for Microsoft Teams](https://learn.microsoft.
 
 ## Required Microsoft Graph permissions
 
-Capture requires four delegated scopes **in addition to** the chat and messaging scopes every Teams MCP server requests. A chat-only deployment requests none of these four — they exist only when `UNIQUE_INTEGRATION=enabled`.
+Capture requires three delegated scopes **in addition to** the chat and messaging scopes every Teams MCP server requests. A chat-only deployment requests none of these three — they exist only when `UNIQUE_INTEGRATION=enabled`.
 
 | Permission | Type | ID | Admin consent | Why it is needed |
 |------------|------|-----|---------------|------------------|
-| `Calendars.Read` | Delegated | `465a38f9-76ea-45b9-9f34-9e8b0d4b0b42` | No | Resolve meeting details and participants for a transcript |
 | `OnlineMeetings.Read` | Delegated | `9be106e1-f4e3-4df5-bdff-e4bc531cbe43` | No | Read online meeting metadata by id |
 | `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | **Yes** | Read transcript content |
 | `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | **Yes** | Read recording content |
@@ -449,15 +448,6 @@ Capture requires four delegated scopes **in addition to** the chat and messaging
 Grant admin consent for the two privileged scopes with the URL in [Grant admin consent](./operator.md#Grant-admin-consent).
 
 ### Least-privilege justification
-
-#### `Calendars.Read`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read the user's calendar events |
-| **Used For** | Determining if a meeting is recurring by querying the calendar event associated with an online meeting |
-| **Why Not Less** | No narrower permission exists for reading calendar events |
-| **Why Not `Calendars.ReadWrite`** | We don't create or modify calendar events, only read them |
 
 #### `OnlineMeetings.Read`
 
@@ -506,4 +496,3 @@ The chat and messaging scopes, and the rationale for using delegated rather than
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Permission details
 - [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All) - Third-party permission explorer
 - [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All) - Third-party permission explorer
-- [Calendars.Read](https://graphpermissions.merill.net/permission/Calendars.Read) - Third-party permission explorer
