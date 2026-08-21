@@ -11,8 +11,23 @@ Backstop CRM. People and organizations are the records; tools own different ques
 Contact details (emails, locations, primary contact, the organization a person works at): \
 get_person / get_organization with `include`. `representative` is our internal account owner, \
 not a way to reach the investor. Retired email addresses are flagged — do not write to them. \
-People at an organization, with employment status there: get_people_for_party. \
-`numberOfEmployees` on the organization record is not a roster.
+People at an organization, with employment status and categories there: get_people_for_party. \
+`numberOfEmployees` on the organization record is not a roster. Custom-field values live on \
+the party (get_organization / get_person), not on get_people_for_party.
+
+Holdings: get_accounts_for_party first (undocumented table-data; may 404 — that is not \
+"holds nothing"). Fall back to get_time_series on a specific account. Dated NAV, ITD, \
+share of fund, lifetime in/out: get_time_series on one account or one product, one series \
+per call. A missing value on a dated point is "not in yet", not zero. `aums` is the \
+product's total assets under management, not one investor's balance.
+
+Product chain: resolve a product, then get_product_investors for who is in it (owners only, \
+no figures), then get_time_series for the specific accounts in question. Do not iterate \
+every account in a fund. Fund-level totals are get_time_series on the product's `aums`.
+
+Subscriptions, redemptions, and share class: get_capital_flows with a mandatory date \
+window. A redemption with no account through originalSubscription is unattributed, not \
+missing.
 
 Meetings, calls, notes, emails, documents: search_activities first. That primary is an \
 undocumented UI search and may 404 — that is not "no activity exists". Fall back to \
@@ -20,18 +35,15 @@ get_activity_history (party-scoped only), then get_activity_detail for the full 
 untruncated body. Prefer search_activities with include_description for note text \
 while the primary answers. Do not look for those on get_person / get_organization.
 
-Pipeline stage and timing: get_opportunities. `previous_stage` is the stage the deal just \
-left, not where it is now. There is no cursor; the whole party's pipeline is returned. \
-Stage names are this instance's vocabulary, returned on each deal.
+Firm-wide pipeline: look up a colleague's login with list_system_users, then \
+search_opportunities. filter[representative.name] takes that login, not a display name. \
+A disabled login returning empty is not "no coverage". One party's deals: \
+get_opportunities (cheap; do not walk the firm for that). `previous_stage` is the stage \
+the deal just left, not where it is now.
 
-Dated NAV, ITD performance, share of fund, lifetime in/out, and fund AUM: \
-get_time_series on one account or one product, one series per call. A missing value \
-on a dated point is "not in yet", not zero. `aums` is the product's total assets \
-under management, not one investor's balance. Party holdings with snapshot balances: \
-get_accounts_for_party. Prefer that for "how much does X have"; use get_time_series \
-when the as-of date or ACTUAL/ESTIMATE status matters. Who is in a product, owners \
-only, no figures: get_product_investors. Do not loop get_time_series over every \
-account in a fund — fund-level AUM is get_time_series on the product's `aums`.
+Open follow-ups: get_tasks_for_party. Both entity filters are required; status is \
+client-side.
 
-Custom-field names and types: list_custom_fields.
+Custom-field names and types: list_custom_fields. Read values through the party tools, \
+not through people-for-party.
 """

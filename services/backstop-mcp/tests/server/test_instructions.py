@@ -20,3 +20,13 @@ class TestInstructions:
         assert "representative" in INSTRUCTIONS
         assert "list_custom_fields" in INSTRUCTIONS
         assert "describe_data_model" not in INSTRUCTIONS
+        assert "get_accounts_for_party" in INSTRUCTIONS
+        assert INSTRUCTIONS.index("get_accounts_for_party") < INSTRUCTIONS.index("get_time_series")
+        assert "Do not iterate every account in a fund" in INSTRUCTIONS
+        assert "list_system_users" in INSTRUCTIONS
+        assert "search_opportunities" in INSTRUCTIONS
+        assert INSTRUCTIONS.index("list_system_users") < INSTRUCTIONS.index("search_opportunities")
+        assert "takes that login, not a display name" in INSTRUCTIONS
+        assert "get_capital_flows" in INSTRUCTIONS
+        assert "get_tasks_for_party" in INSTRUCTIONS
+        assert "not on get_people_for_party" in INSTRUCTIONS
