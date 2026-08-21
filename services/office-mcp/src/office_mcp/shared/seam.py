@@ -14,12 +14,13 @@ scopes. It is a dependency default—models never see it.
 
 `GraphToken` wraps it for one reason: a dependency is resolved *outside* the tool body, so an
 exchange Entra refuses never enters the body and never reaches the mapping inside it. FastMCP
-reports it as "Failed to resolve dependency 'graph_token' for get_me", which tells a model nothing
-it can act on. So the wrapper raises `TokenExchangeFailed`, which carries the permissions the
-exchange asked for and is deliberately NOT a `FastMCPError`: `fastmcp.server.dependencies` lets
-`FastMCPError` subclasses out of dependency resolution unwrapped and wraps everything else, and
-being wrapped is what lets the middleware below recognise it by type. That is what makes an
-unconsented permission as fixable before the Graph call as a 403 is after it.
+reports it as "Failed to resolve dependency 'client' for get_me" — the parameter it could not
+resolve, which tells a model nothing it can act on. So the wrapper raises `TokenExchangeFailed`,
+which carries the permissions the exchange asked for and is deliberately NOT a `FastMCPError`:
+`fastmcp.server.dependencies` lets `FastMCPError` subclasses out of dependency resolution
+unwrapped and wraps everything else, and being wrapped is what lets the middleware below recognise
+it by type. That is what makes an unconsented permission as fixable before the Graph call as a 403
+is after it.
 
 One instance covers one exchange, however many permissions that exchange asks for, because Entra
 redeems them together and refuses them together: a tool needing two gets one token or none. Naming
@@ -218,9 +219,18 @@ class GraphToken(Dependency[str]):
         await self._exchange.__aexit__(exc_type, exc_value, traceback)
 
 
-def graph_token(*permissions: str) -> str:
-    """GraphToken typed as string for tool injection. Build once at module level."""
-    return cast("str", cast("object", GraphToken(*permissions)))
+def _graph_token(*permissions: str) -> str:
+    """The exchange for these permissions, as the string a tool signature can hold it by.
+
+    `Depends` is annotated to unwrap a factory returning an async context manager, and
+    `GraphToken.__aenter__` produces a `str`, so the parameter default is typed as the token a
+    dependent actually receives.
+
+    The exchange is bound outside the factory deliberately: one `GraphToken` per registration.
+    Constructing it inside the lambda would build a new one on every call.
+    """
+    exchange = GraphToken(*permissions)
+    return Depends(lambda: exchange)
 
 
 def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> GraphServiceClient:
@@ -234,12 +244,8 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
     Trap: the result goes in a parameter default by NAME — `client: GraphServiceClient = graph` —
     never as the call itself. A call in a default is ruff's B008, and it would build a second
     exchange on every registration.
-
-    No cast, unlike `graph_token` above: `Depends` is annotated to return the factory's own type, so
-    the value is already the client as far as a tool body is concerned, and a real one as far as the
-    resolution engine is.
     """
-    token = graph_token(*permissions)
+    token = _graph_token(*permissions)
 
     def client_for_this_call(access_token: str = token) -> GraphServiceClient:
         return graph_client_for(transport, access_token)
