@@ -21,16 +21,18 @@ from backstop_mcp.backstop_client import (
     follow_included,
     included_resource,
 )
-from backstop_mcp.features.accounts.types import (
+from backstop_mcp.features.accounts.api_responses import (
     AccountAttributes,
-    AccountListing,
-    AccountOwner,
-    AccountRecord,
-    InvestorType,
     InvestorTypeAttributes,
     OwnerAttributes,
     ProductAttributes,
-    ResolvedProduct,
+)
+from backstop_mcp.features.accounts.internal_dto import (
+    AccountListingDto,
+    AccountOwnerDto,
+    AccountRecordDto,
+    InvestorTypeDto,
+    ResolvedProductDto,
 )
 
 _OWNER = "owner"
@@ -50,7 +52,7 @@ def account_is_open(attributes: AccountAttributes) -> bool:
     return "closed_date" not in attributes.model_fields_set
 
 
-def project_owner(raw: dict[str, object] | None) -> AccountOwner | None:
+def project_owner(raw: dict[str, object] | None) -> AccountOwnerDto | None:
     """The `owner` side-load as an identity.
 
     `specificResource` wins over the JSON:API envelope: an organization owner arrives as a
@@ -65,51 +67,47 @@ def project_owner(raw: dict[str, object] | None) -> AccountOwner | None:
         return None
     specific = owner.attributes.specific_resource
     if specific is not None and specific.resource_type is not None:
-        return AccountOwner(
+        return AccountOwnerDto(
             id=specific.resource_id,
             name=owner.attributes.name,
             resource_type=specific.resource_type,
         )
-    return AccountOwner(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
+    return AccountOwnerDto(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
 
 
 def account_owner(
     resource: AccountApiResponse, *, included: Sequence[dict[str, object]]
-) -> AccountOwner | None:
+) -> AccountOwnerDto | None:
     """The projected owner of one account, or `None` when the include is absent."""
     return project_owner(_first_included(included, resource, _OWNER))
 
 
-def project_investor_type(raw: dict[str, object] | None) -> InvestorType | None:
+def project_investor_type(raw: dict[str, object] | None) -> InvestorTypeDto | None:
     investor_type = included_resource(raw, schema=_InvestorTypeInclude)
     if investor_type is None:
         return None
-    return InvestorType(id=investor_type.id, name=investor_type.attributes.name)
+    return InvestorTypeDto(id=investor_type.id, name=investor_type.attributes.name)
 
 
-def project_included_product(raw: dict[str, object] | None) -> ResolvedProduct | None:
+def project_included_product(raw: dict[str, object] | None) -> ResolvedProductDto | None:
     product = included_resource(raw, schema=_ProductInclude)
     if product is None:
         return None
-    return ResolvedProduct.from_attributes(product.id, product.attributes)
+    return ResolvedProductDto.from_attributes(product.id, product.attributes)
 
 
 def project_account(
     resource: AccountApiResponse,
     *,
     included: Sequence[dict[str, object]],
-) -> AccountRecord:
-    return AccountRecord.model_validate(
-        {
-            **resource.attributes.model_dump(),
-            "id": resource.id,
-            "owner": account_owner(resource, included=included),
-            "investor_type": project_investor_type(
-                _first_included(included, resource, _INVESTOR_TYPE)
-            ),
-            "product": project_included_product(_first_included(included, resource, _PRODUCT)),
-            "is_open": account_is_open(resource.attributes),
-        }
+) -> AccountRecordDto:
+    return AccountRecordDto.from_attributes(
+        resource.id,
+        resource.attributes,
+        owner=account_owner(resource, included=included),
+        investor_type=project_investor_type(_first_included(included, resource, _INVESTOR_TYPE)),
+        product=project_included_product(_first_included(included, resource, _PRODUCT)),
+        is_open=account_is_open(resource.attributes),
     )
 
 
@@ -117,15 +115,15 @@ def project_accounts(
     resources: Sequence[AccountApiResponse],
     *,
     included: Sequence[dict[str, object]],
-) -> tuple[AccountRecord, ...]:
+) -> tuple[AccountRecordDto, ...]:
     return tuple(project_account(resource, included=included) for resource in resources)
 
 
-def split_open(records: Sequence[AccountRecord], *, include_closed: bool) -> AccountListing:
+def split_open(records: Sequence[AccountRecordDto], *, include_closed: bool) -> AccountListingDto:
     if include_closed:
-        return AccountListing(accounts=tuple(records), closed_omitted=0)
+        return AccountListingDto(accounts=tuple(records), closed_omitted=0)
     open_accounts = tuple(record for record in records if record.is_open)
-    return AccountListing(
+    return AccountListingDto(
         accounts=open_accounts,
         closed_omitted=len(records) - len(open_accounts),
     )

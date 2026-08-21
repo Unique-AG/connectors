@@ -5,12 +5,12 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
+from backstop_mcp.features.accounts.internal_dto import SeriesFigureDto, SeriesPointDto
 from backstop_mcp.features.accounts.latest import (
     SeriesPointResource,
     fetch_latest_figure,
     latest_figure,
 )
-from backstop_mcp.features.accounts.types import SeriesFigure, SeriesPoint
 from tests.helpers import BASE_URL
 
 _PATH = "/accounts/27871657/values"
@@ -39,8 +39,8 @@ class TestLatestFigure:
             )
         )
 
-        latest = SeriesPoint(date=date(2026, 6, 30), value=12.0, value_status="ACTUAL")
-        assert point == SeriesFigure(latest=latest, valued=latest)
+        latest = SeriesPointDto(date=date(2026, 6, 30), value=12.0, value_status="ACTUAL")
+        assert point == SeriesFigureDto(latest=latest, valued=latest)
 
     def test_a_mid_month_point_after_month_end_wins(self) -> None:
         point = latest_figure(
@@ -59,8 +59,8 @@ class TestLatestFigure:
     def test_omits_value_status_when_backstop_omits_it(self) -> None:
         point = latest_figure((_resource("1", date="2026-06-30", value=50.0),))
 
-        latest = SeriesPoint(date=date(2026, 6, 30), value=50.0, value_status=None)
-        assert point == SeriesFigure(latest=latest, valued=latest)
+        latest = SeriesPointDto(date=date(2026, 6, 30), value=50.0, value_status=None)
+        assert point == SeriesFigureDto(latest=latest, valued=latest)
 
     def test_skips_points_without_a_date(self) -> None:
         point = latest_figure(
@@ -123,8 +123,8 @@ class TestFetchLatestFigure:
         assert route.call_count == 1
         assert params["sort"] == "-date"
         assert params["page[limit]"] == "10"
-        latest = SeriesPoint(date=date(2026, 7, 31), value=9.0, value_status="ESTIMATE")
-        assert point == SeriesFigure(latest=latest, valued=latest)
+        latest = SeriesPointDto(date=date(2026, 7, 31), value=9.0, value_status="ESTIMATE")
+        assert point == SeriesFigureDto(latest=latest, valued=latest)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -173,8 +173,26 @@ class TestFetchLatestFigure:
     @respx.mock
     async def test_a_malformed_point_fails_the_page(self, client: BackstopClient) -> None:
         respx.get(_URL).mock(
-            return_value=_page(_point("bad", date="2026-07-31", value="not-a-number"))
+            return_value=_page(
+                {"type": "values", "attributes": {"date": "2026-07-31", "value": 1.0}}
+            )
         )
 
         with pytest.raises(BackstopResponseSchemaError):
             await fetch_latest_figure(client, _PATH)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_non_numeric_value_is_unvalued_not_a_failed_page(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_URL).mock(
+            return_value=_page(_point("1", date="2026-07-31", value="not-a-number"))
+        )
+
+        point = await fetch_latest_figure(client, _PATH)
+
+        assert point is not None
+        assert point.latest.date == date(2026, 7, 31)
+        assert point.latest.value is None
+        assert point.valued is None

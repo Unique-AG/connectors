@@ -22,7 +22,7 @@ from backstop_mcp.backstop_client.errors import (
     BackstopAuthError,
     BackstopUnreachableError,
 )
-from backstop_mcp.backstop_client.retry import RetryPolicy, build_retry_policy
+from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class BackstopClientFactory:
         # Built once, here, rather than per request: the predicate and wait strategy are pure
         # closures over immutable settings. See `retry.RetryPolicy` for why the `AsyncRetrying`
         # wrapper it hands out is still per-request.
-        self._retry_policy: RetryPolicy = build_retry_policy(retry_settings)
+        self._retry_policy: RetryPolicy = RetryPolicy.from_settings(retry_settings)
         self._http_client: httpx.AsyncClient | None = None
         self._http_client_lock: asyncio.Lock = asyncio.Lock()
 

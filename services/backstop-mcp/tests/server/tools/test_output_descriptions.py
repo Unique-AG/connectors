@@ -70,10 +70,10 @@ def test_the_walker_reaches_nested_payload_models() -> None:
     assert {
         "ActivityDetailResponse",
         "ActivityRecordResponse",
-        "AsOf",
+        "AsOfResponse",
         "AccountRowResponse",
         "ContactEmailResponse",
-        "CustomFieldDefinition",
+        "CustomFieldDefinitionDto",
         "EmailRecordResponse",
         "EmploymentLinkResponse",
         "OpportunityResponse",

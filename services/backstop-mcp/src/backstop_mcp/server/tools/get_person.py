@@ -9,13 +9,11 @@ from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
-    AsOf,
+    AsOfResponse,
     EmploymentLinkResponse,
     EntityRelationshipInclude,
-    ProvenanceFields,
-    as_of_response,
+    ProvenanceAttributes,
     entity_relationships,
-    extract_as_of,
 )
 from backstop_mcp.features.includes import (
     PersonInclude,
@@ -25,7 +23,6 @@ from backstop_mcp.features.includes import (
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -34,7 +31,7 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
 
 
-class PersonAttributes(OmitNoneModel, ProvenanceFields):
+class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
     """Person resource attributes; extras preserved for the tool payload."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
@@ -58,7 +55,7 @@ class PersonResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the person was found and fetched.",
     )
-    person: PersonAttributes = Field(
+    person: PersonRecordResponse = Field(
         description=(
             "The person's own Backstop attributes. Known keys (`name`, `modifiedTimestamp`, "
             "`modifiedBy`) are documented; other keys are this instance's fields passed "
@@ -72,7 +69,7 @@ class PersonResolvedResponse(OmitNoneModel):
             "`party_id` later — never invent them."
         )
     )
-    as_of: AsOf | None = Field(
+    as_of: AsOfResponse | None = Field(
         default=None,
         description=(
             "When and by whom the person record was last saved. Omitted when unknown. "
@@ -202,17 +199,21 @@ async def get_person(
     document = await client.get(
         path,
         params={"include": include_param} if include_param else None,
-        schema=BackstopApiResourceDocument[PersonAttributes],
+        schema=BackstopApiResourceDocument[PersonRecordResponse],
     )
     attributes = document.require_data(path=path).attributes
-    index = get_employment_index_factory().index(**entity_relationships(document))
+    loaded = entity_relationships(document)
+    index = get_employment_index_factory().index(
+        relationships=loaded.relationships,
+        relationship_types=loaded.relationship_types,
+    )
 
     return PersonResolvedResponse(
         person=attributes,
-        resolved=party_response(
+        resolved=ResolvedPartyResponse.from_party(
             party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=as_of_response(extract_as_of(attributes)),
+        as_of=AsOfResponse.from_attributes(attributes),
         employments=index.links(),
         included=plan.project(document=document) if plan.planned else None,
     )

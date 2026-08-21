@@ -10,9 +10,10 @@ deliberate and is explained on `RetryPolicy`.
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from typing import ClassVar, Self
 
 import tenacity
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client.errors import BackstopRateLimitError
 from backstop_mcp.backstop_client.settings import RetrySettings
@@ -130,8 +131,7 @@ def _before_sleep(retry_state: tenacity.RetryCallState) -> None:
     )
 
 
-@dataclass(frozen=True)
-class RetryPolicy:
+class RetryPolicy(BaseModel):
     """The config-derived half of retrying, built once and shared by every request.
 
     The decision functions are pure closures over immutable settings, so one set is safe to
@@ -145,6 +145,8 @@ class RetryPolicy:
     instance would reset each other's `retry_run_result` mid-decision and a retryable 429 could
     be re-raised as final. Hence one cheap wrapper per request, over a policy computed once.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     predicate: RetryPredicate
     wait: WaitStrategy
@@ -163,11 +165,11 @@ class RetryPolicy:
             reraise=True,
         )
 
-
-def build_retry_policy(settings: RetrySettings) -> RetryPolicy:
-    """Derive the shareable retry policy from settings. Called once, from the factory."""
-    return RetryPolicy(
-        predicate=_build_retry_predicate(settings),
-        wait=_build_wait_strategy(),
-        max_attempts=settings.max_attempts,
-    )
+    @classmethod
+    def from_settings(cls, settings: RetrySettings) -> Self:
+        """Derive the shareable retry policy from settings. Called once, from the factory."""
+        return cls(
+            predicate=_build_retry_predicate(settings),
+            wait=_build_wait_strategy(),
+            max_attempts=settings.max_attempts,
+        )

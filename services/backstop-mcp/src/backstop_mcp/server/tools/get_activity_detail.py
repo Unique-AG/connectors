@@ -34,7 +34,6 @@ from backstop_mcp.features.activity_history import (
     fetch_attendees,
     fetch_meeting_specifics,
     parse_activity_handle,
-    to_activity_detail_response,
 )
 from backstop_mcp.models import published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
@@ -109,6 +108,6 @@ async def get_activity_detail(
             "has_body": detail.description is not None,
         },
     )
-    return to_activity_detail_response(
+    return ActivityDetailResponse.from_detail(
         activity_id=activity_id, detail=detail, specifics=specifics, attendees=attendees
     )

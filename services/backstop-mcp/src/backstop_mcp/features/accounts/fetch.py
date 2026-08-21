@@ -25,6 +25,7 @@ matching what the same accounts return unfiltered.
 from collections.abc import Sequence
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.accounts.internal_dto import AccountListingDto, AccountRecordDto
 from backstop_mcp.features.accounts.project import (
     AccountApiResponse,
     account_owner,
@@ -32,7 +33,6 @@ from backstop_mcp.features.accounts.project import (
     project_accounts,
     split_open,
 )
-from backstop_mcp.features.accounts.types import AccountListing, AccountRecord
 
 _ACCOUNTS_PATH = "/accounts"
 _PAGE_SIZE = 100
@@ -64,7 +64,7 @@ async def fetch_accounts_for_product(
     *,
     product_id: str,
     include_closed: bool = False,
-) -> AccountListing:
+) -> AccountListingDto:
     page = await client.paginate(
         _ACCOUNTS_PATH,
         schema=AccountApiResponse,
@@ -88,7 +88,7 @@ async def fetch_accounts_for_party(
     *,
     owner_id: str,
     include_closed: bool = False,
-) -> AccountListing:
+) -> AccountListingDto:
     page = await client.paginate(
         _ACCOUNTS_PATH,
         schema=AccountApiResponse,
@@ -108,7 +108,7 @@ def _owned_accounts(
     *,
     included: Sequence[dict[str, object]],
     owner_id: str,
-) -> tuple[AccountRecord, ...]:
+) -> tuple[AccountRecordDto, ...]:
     return tuple(
         project_account(resource, included=included)
         for resource in resources

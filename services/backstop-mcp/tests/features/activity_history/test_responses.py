@@ -10,19 +10,18 @@ gist rather than an error.
 from datetime import UTC, date, datetime
 
 from backstop_mcp.features.activity_history import (
-    ActivityGroup,
+    ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
-    ActivityItem,
+    ActivityItemDto,
     ActivityRecordResponse,
-    EmailItem,
+    EmailItemDto,
     EmailRecordResponse,
     ResolvedPartyAsOfResponse,
-    resolved_party_as_of_response,
     to_timeline_record,
 )
 from backstop_mcp.features.activity_history.fetch_activities import BackstopActivityType
-from backstop_mcp.features.data_hygiene import AsOf, ProvenanceFields
-from backstop_mcp.features.party_resolver import ResolvedParty
+from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceAttributes
+from backstop_mcp.features.party_resolver import ResolvedPartyDto
 
 _DEFAULT_ACTIVITY_DATE = date(2026, 1, 15)
 _DEFAULT_EMAIL_TIMESTAMP = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
@@ -36,8 +35,8 @@ def _activity_item(
     description: str | None = "<p>hello</p>",
     effective_date: date | None = _DEFAULT_ACTIVITY_DATE,
     resource_id: str | None = "76280387",
-) -> ActivityItem:
-    return ActivityItem(
+) -> ActivityItemDto:
+    return ActivityItemDto(
         id=item_id,
         stream=stream,
         title=title,
@@ -59,8 +58,8 @@ def _email_item(
     to_emails: tuple[str, ...] = ("a@example.com",),
     cc_emails: tuple[str, ...] = (),
     has_attachments: bool | None = False,
-) -> EmailItem:
-    return EmailItem(
+) -> EmailItemDto:
+    return EmailItemDto(
         id=item_id,
         subject=subject,
         sent_timestamp=sent_timestamp,
@@ -158,7 +157,7 @@ class TestEmailRecord:
 class TestActivityHistoryResolvedResponse:
     def test_accepts_groups_and_has_no_flat_records_or_cursor(self) -> None:
         record = to_timeline_record(_activity_item(), gist_max_chars=300)
-        group = ActivityGroup(
+        group = ActivityGroupResponse(
             activity_type="meeting",
             items=(record,),
             date_range=None,
@@ -176,9 +175,9 @@ class TestActivityHistoryResolvedResponse:
         assert not hasattr(response, "as_of")
 
     def test_merges_party_identity_and_as_of(self) -> None:
-        resolved = resolved_party_as_of_response(
-            ResolvedParty(id="1", search_type="people", name="Ada"),
-            ProvenanceFields.model_validate(
+        resolved = ResolvedPartyAsOfResponse.from_party(
+            ResolvedPartyDto(id="1", search_type="people", name="Ada"),
+            attributes=ProvenanceAttributes.model_validate(
                 {"modifiedTimestamp": "2024-01-01", "modifiedBy": "alice"}
             ),
         )
@@ -187,5 +186,5 @@ class TestActivityHistoryResolvedResponse:
             id="1",
             search_type="people",
             name="Ada",
-            as_of=AsOf(modified_timestamp="2024-01-01", modified_by="alice"),
+            as_of=AsOfResponse(modified_timestamp="2024-01-01", modified_by="alice"),
         )

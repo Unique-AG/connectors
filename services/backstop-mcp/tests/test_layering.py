@@ -39,7 +39,18 @@
    not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
    and `server.runtime` are themselves the unit being imported.
 
-All four are asserted by walking the AST rather than importing anything, so a violation is
+5. **Feature model layers flow downward.** A `*Attributes` class lives in `api_responses*`, a
+   `*Dto` class in `internal_dto*`, and a `*Response` class in `responses*`. Imports among those
+   three modules run one way only (`responses` → `internal_dto` → `api_responses`) within a
+   feature. No model declares `extra="forbid"`. `*Attributes` declare `extra="ignore"`;
+   `extra="allow"` is only where passthrough is the point (`PersonRecordResponse`,
+   `OrganizationRecordResponse`, `SystemInfoResponse`). `features/includes/` is exempt from
+   the layer filenames: its
+   projection models intentionally combine camelCase aliases with FastMCP descriptions, so the
+   response class *is* the wire shape. `features/resolution.py` is cross-cutting rather than
+   per-feature and keeps its filename.
+
+All five are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
 """
 
@@ -158,6 +169,180 @@ def _internal_module_violations(source: pathlib.Path) -> list[str]:
     ]
 
 
+_MODEL_LAYERS: tuple[str, ...] = ("api_responses", "internal_dto", "responses")
+_MODEL_LAYER_RANK = {name: index for index, name in enumerate(_MODEL_LAYERS)}
+_MODEL_LAYER_EXEMPT_FEATURES = frozenset({"includes"})
+_MODEL_LAYER_EXEMPT_FILES = frozenset({"resolution.py"})
+
+
+def _feature_relative(source: pathlib.Path) -> pathlib.Path | None:
+    try:
+        return source.relative_to(_FEATURES)
+    except ValueError:
+        return None
+
+
+def _is_governed_model_source(source: pathlib.Path) -> bool:
+    relative = _feature_relative(source)
+    if relative is None or not relative.parts:
+        return False
+    return (
+        relative.parts[0] not in _MODEL_LAYER_EXEMPT_FEATURES
+        and relative.name not in _MODEL_LAYER_EXEMPT_FILES
+    )
+
+
+def _model_layer_for_path(source: pathlib.Path) -> str | None:
+    relative = _feature_relative(source)
+    if relative is None:
+        return None
+    parts = relative.with_suffix("").parts[1:]
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    for part in parts:
+        for layer in _MODEL_LAYERS:
+            if part.startswith(layer):
+                return layer
+    return None
+
+
+def _model_layer_for_module(module: str) -> str | None:
+    prefix = f"{_FEATURES_PREFIX}."
+    if not (module == prefix[:-1] or module.startswith(prefix)):
+        return None
+    parts = module[len(prefix) :].split(".")
+    if not parts or parts[0] in _MODEL_LAYER_EXEMPT_FEATURES:
+        return None
+    for part in parts[1:]:
+        for layer in _MODEL_LAYERS:
+            if part.startswith(layer):
+                return layer
+    return None
+
+
+def _expected_model_layer(class_name: str) -> str | None:
+    if class_name.endswith("Attributes"):
+        return "api_responses"
+    if class_name.endswith("Dto"):
+        return "internal_dto"
+    if class_name.endswith("Response"):
+        return "responses"
+    return None
+
+
+def _class_layer_violations(source: str, path: pathlib.Path) -> list[str]:
+    tree = ast.parse(source, filename=str(path))
+    actual = _model_layer_for_path(path)
+    return [
+        f"{path.relative_to(_SRC)}:{node.lineno} class {node.name} belongs in {expected}*"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        and (expected := _expected_model_layer(node.name)) is not None
+        and actual != expected
+    ]
+
+
+def _layer_import_violations(source: str, path: pathlib.Path) -> list[str]:
+    from_layer = _model_layer_for_path(path)
+    if from_layer is None:
+        return []
+    from_rank = _MODEL_LAYER_RANK[from_layer]
+    feature = _feature_relative(path)
+    assert feature is not None
+    feature_name = feature.parts[0]
+    prefix = f"{_FEATURES_PREFIX}.{feature_name}."
+    return [
+        f"{path.relative_to(_SRC)}:{line} imports {module} (upward from {from_layer})"
+        for module, line in _imported_modules(ast.parse(source, filename=str(path)))
+        if module.startswith(prefix)
+        and (to_layer := _model_layer_for_module(module)) is not None
+        and _MODEL_LAYER_RANK[to_layer] > from_rank
+    ]
+
+
+def _keyword_extra_is_forbid(keyword: ast.keyword) -> bool:
+    return (
+        keyword.arg == "extra"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value == "forbid"
+    )
+
+
+def _dict_extra_is_forbid(node: ast.Dict) -> bool:
+    return any(
+        isinstance(key, ast.Constant)
+        and key.value == "extra"
+        and isinstance(value, ast.Constant)
+        and value.value == "forbid"
+        for key, value in zip(node.keys, node.values, strict=True)
+    )
+
+
+def _declares_extra_forbid(node: ast.AST) -> bool:
+    if isinstance(node, ast.Call):
+        return any(_keyword_extra_is_forbid(keyword) for keyword in node.keywords)
+    return isinstance(node, ast.Dict) and _dict_extra_is_forbid(node)
+
+
+def _extra_forbid_violations(source: str, path: pathlib.Path) -> list[str]:
+    tree = ast.parse(source, filename=str(path))
+    return [
+        f'{path.relative_to(_SRC)}:{node.lineno} declares extra="forbid"'
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Call, ast.Dict)) and _declares_extra_forbid(node)
+    ]
+
+
+def _model_config_value(stmt: ast.stmt) -> ast.expr | None:
+    if (
+        isinstance(stmt, ast.AnnAssign)
+        and isinstance(stmt.target, ast.Name)
+        and stmt.target.id == "model_config"
+    ):
+        return stmt.value
+    if isinstance(stmt, ast.Assign) and any(
+        isinstance(target, ast.Name) and target.id == "model_config" for target in stmt.targets
+    ):
+        return stmt.value
+    return None
+
+
+def _config_extra(node: ast.ClassDef) -> str | None:
+    for stmt in node.body:
+        value = _model_config_value(stmt)
+        if isinstance(value, ast.Call):
+            for keyword in value.keywords:
+                if (
+                    keyword.arg == "extra"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ):
+                    return keyword.value.value
+    return None
+
+
+def _attributes_extra_violations(source: str, path: pathlib.Path) -> list[str]:
+    tree = ast.parse(source, filename=str(path))
+    return [
+        (
+            f"{path.relative_to(_SRC)}:{node.lineno} class {node.name} declares "
+            + f'extra={extra!r}, expected "ignore"'
+        )
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        and node.name.endswith("Attributes")
+        and (extra := _config_extra(node)) != "ignore"
+    ]
+
+
+def _governed_model_sources() -> list[pathlib.Path]:
+    return sorted(source for source in _FEATURES.rglob("*.py") if _is_governed_model_source(source))
+
+
+def _governed_model_layer_sources() -> list[pathlib.Path]:
+    return [source for source in _governed_model_sources() if _model_layer_for_path(source)]
+
+
 class TestTheDetectionItself:
     """The rules are only worth having if they fail on the things they're meant to catch."""
 
@@ -228,6 +413,92 @@ class TestTheDetectionItself:
         assert not _imports_under("from backstop_mcp.serverless import thing", _SERVER_PREFIX)
         assert not _imports_under("from backstop_mcp.featureset import thing", _FEATURES_PREFIX)
         assert not _imports_under("from backstop_mcp.configuration import thing", _CONFIG_MODULE)
+
+    def test_catches_an_attributes_class_outside_api_responses(self) -> None:
+        assert _class_layer_violations(
+            "class PartyAttributes: ...\n",
+            _FEATURES / "party_resolver" / "internal_dto.py",
+        ) == [
+            "features/party_resolver/internal_dto.py:1 class PartyAttributes belongs in "
+            + "api_responses*"
+        ]
+
+    def test_catches_a_dto_class_outside_internal_dto(self) -> None:
+        assert _class_layer_violations(
+            "class AccountRecordDto: ...\n",
+            _FEATURES / "accounts" / "api_responses.py",
+        ) == [
+            "features/accounts/api_responses.py:1 class AccountRecordDto belongs in internal_dto*"
+        ]
+
+    def test_catches_a_response_class_outside_responses(self) -> None:
+        assert _class_layer_violations(
+            "class AsOfResponse: ...\n",
+            _FEATURES / "data_hygiene" / "api_responses.py",
+        ) == ["features/data_hygiene/api_responses.py:1 class AsOfResponse belongs in responses*"]
+
+    def test_accepts_a_class_in_its_own_layer_including_a_responses_package(self) -> None:
+        assert not _class_layer_violations(
+            "class AccountRowResponse: ...\n",
+            _FEATURES / "accounts" / "responses" / "shared.py",
+        )
+
+    def test_catches_an_upward_layer_import(self) -> None:
+        assert _layer_import_violations(
+            "from backstop_mcp.features.accounts.responses import AccountRowResponse\n",
+            _FEATURES / "accounts" / "internal_dto.py",
+        ) == [
+            "features/accounts/internal_dto.py:1 imports "
+            + "backstop_mcp.features.accounts.responses (upward from internal_dto)"
+        ]
+
+    def test_allows_a_downward_layer_import(self) -> None:
+        assert not _layer_import_violations(
+            "from backstop_mcp.features.accounts.api_responses import AccountAttributes\n",
+            _FEATURES / "accounts" / "internal_dto.py",
+        )
+
+    def test_does_not_police_non_layer_files_importing_responses(self) -> None:
+        assert not _layer_import_violations(
+            "from backstop_mcp.features.data_hygiene.responses import AsOfResponse\n",
+            _FEATURES / "data_hygiene" / "employment.py",
+        )
+
+    def test_catches_extra_forbid_on_a_configdict_call(self) -> None:
+        assert _extra_forbid_violations(
+            'model_config = ConfigDict(extra="forbid")\n',
+            _FEATURES / "accounts" / "api_responses.py",
+        ) == ['features/accounts/api_responses.py:1 declares extra="forbid"']
+
+    def test_does_not_fire_on_extra_ignore(self) -> None:
+        assert not _extra_forbid_violations(
+            'model_config = ConfigDict(extra="ignore")\n',
+            _FEATURES / "accounts" / "api_responses.py",
+        )
+
+    def test_catches_attributes_class_missing_extra_ignore(self) -> None:
+        assert _attributes_extra_violations(
+            "class PartyAttributes:\n    model_config = ConfigDict(extra='allow')\n",
+            _FEATURES / "party_resolver" / "api_responses.py",
+        ) == [
+            "features/party_resolver/api_responses.py:1 class PartyAttributes declares "
+            + "extra='allow', expected \"ignore\""
+        ]
+
+    def test_catches_attributes_class_with_no_extra(self) -> None:
+        assert _attributes_extra_violations(
+            "class PartyAttributes:\n    pass\n",
+            _FEATURES / "party_resolver" / "api_responses.py",
+        ) == [
+            "features/party_resolver/api_responses.py:1 class PartyAttributes declares "
+            + 'extra=None, expected "ignore"'
+        ]
+
+    def test_accepts_attributes_class_with_extra_ignore(self) -> None:
+        assert not _attributes_extra_violations(
+            'class PartyAttributes:\n    model_config = ConfigDict(extra="ignore")\n',
+            _FEATURES / "party_resolver" / "api_responses.py",
+        )
 
 
 class TestFeaturesDoNotImportServer:
@@ -312,5 +583,51 @@ class TestPackagesAreEnteredThroughTheirInit:
             + "is responsible for assembling (which is how a tool came to re-read "
             + "BackstopConfig() and ignore what create_app was given). Export the name from that "
             + "package's __init__ and import it from there:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestFeatureModelLayers:
+    def test_the_layer_files_are_actually_there(self) -> None:
+        """Guards the guard: a vacated tree must not silently skip the assertions below."""
+        sources = _governed_model_layer_sources()
+        assert sources, "no api_responses/internal_dto/responses sources found under features/"
+        layers = {_model_layer_for_path(source) for source in sources}
+        assert layers == set(_MODEL_LAYERS)
+
+    def test_includes_is_exempt(self) -> None:
+        includes = _FEATURES / "includes" / "responses.py"
+        assert includes.is_file()
+        assert not _is_governed_model_source(includes)
+        assert not _class_layer_violations(includes.read_text(), includes)
+
+    @pytest.mark.parametrize("source", _governed_model_sources(), ids=_source_id)
+    def test_suffixed_classes_live_in_their_layer(self, source: pathlib.Path) -> None:
+        violations = _class_layer_violations(source.read_text(), source)
+        assert not violations, (
+            "a *Attributes class lives in api_responses*, a *Dto class in internal_dto*, "
+            + "and a *Response class in responses*:\n  "
+            + "\n  ".join(violations)
+        )
+
+    @pytest.mark.parametrize("source", _governed_model_layer_sources(), ids=_source_id)
+    def test_layer_imports_run_downward(self, source: pathlib.Path) -> None:
+        violations = _layer_import_violations(source.read_text(), source)
+        assert not violations, (
+            "model-layer imports run responses → internal_dto → api_responses, never upward:\n  "
+            + "\n  ".join(violations)
+        )
+
+    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
+    def test_no_model_declares_extra_forbid(self, source: pathlib.Path) -> None:
+        violations = _extra_forbid_violations(source.read_text(), source)
+        assert not violations, 'no model may declare extra="forbid":\n  ' + "\n  ".join(violations)
+
+    @pytest.mark.parametrize("source", _governed_model_layer_sources(), ids=_source_id)
+    def test_attributes_declare_extra_ignore(self, source: pathlib.Path) -> None:
+        violations = _attributes_extra_violations(source.read_text(), source)
+        assert not violations, (
+            '*Attributes default to extra="ignore"; extra="allow" is only for passthrough '
+            + "responses:\n  "
             + "\n  ".join(violations)
         )

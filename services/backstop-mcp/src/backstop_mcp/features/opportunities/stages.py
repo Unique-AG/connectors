@@ -1,11 +1,10 @@
 import asyncio
 import logging
 from datetime import timedelta
-from typing import Annotated, ClassVar
-
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
@@ -18,57 +17,8 @@ _STAGES_PAGE_SIZE = 100
 # that a recovered instance is picked up without an operator waiting on the TTL.
 _FAILURE_COOLDOWN = timedelta(seconds=30)
 
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
-
-class OpportunityStageAttributes(BaseModel):
-    """Wire shape for `opportunity-stages` attributes (the vocabulary subset).
-
-    Every field is optional because `client.paginate` deserializes a whole page in one pass: a
-    required field would fail the entire seven-row fetch over one malformed row. Optional fields
-    plus the drop in `stage_from_resource` keep one bad row from costing the other six.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    name: _StrippedStr | None = None
-    sort_order: int | None = Field(default=None, alias="sortOrder")
-    closed: bool | None = None
-
-
-class OpportunityStage(BaseModel):
-    """One row of the instance's opportunity-stage vocabulary."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    id: str
-    name: str
-    closed: bool = False
-    sort_order: int | None = None
-
-
-type StageResource = BackstopApiResource[OpportunityStageAttributes]
-
-
-def stage_from_resource(resource: StageResource) -> OpportunityStage | None:
-    """Map one `opportunity-stages` resource onto the vocabulary shape.
-
-    Returns None when `name` is missing — naming a stage is the whole point of this vocabulary,
-    so an unnamed row would only masquerade as a resolution.
-    """
-    name = resource.attributes.name
-    if not name:
-        return None
-
-    return OpportunityStage(
-        id=resource.id,
-        name=name,
-        closed=bool(resource.attributes.closed),
-        sort_order=resource.attributes.sort_order,
-    )
-
-
-async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, OpportunityStage]:
+async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, OpportunityStageDto]:
     """Fetch the instance's opportunity-stage vocabulary, keyed by stage id."""
     page = await client.paginate(
         _STAGES_PATH,
@@ -77,9 +27,9 @@ async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, Opportun
         page_size=_STAGES_PAGE_SIZE,
     )
 
-    stages: dict[str, OpportunityStage] = {}
+    stages: dict[str, OpportunityStageDto] = {}
     for resource in page.items:
-        stage = stage_from_resource(resource)
+        stage = OpportunityStageDto.from_resource(resource)
         if stage is not None:
             stages[stage.id] = stage
     return stages
@@ -106,13 +56,13 @@ class OpportunityStagesService:
     """
 
     def __init__(self, *, ttl: timedelta) -> None:
-        self._stages: dict[str, OpportunityStage] | None = None
+        self._stages: dict[str, OpportunityStageDto] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._cooldown: TimedGate = TimedGate(duration=_FAILURE_COOLDOWN)
         self._failure: Exception | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
 
-    async def get(self, client: BackstopClient) -> dict[str, OpportunityStage]:
+    async def get(self, client: BackstopClient) -> dict[str, OpportunityStageDto]:
         cached = self._stages
         if cached is not None and self._freshness.within():
             return dict(cached)

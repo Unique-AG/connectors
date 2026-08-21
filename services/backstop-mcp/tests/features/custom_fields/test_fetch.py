@@ -8,12 +8,12 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, BackstopClientFactory
-from backstop_mcp.features.custom_fields.fetch import definition_from_resource
+from backstop_mcp.features.custom_fields.api_responses import CustomFieldDefinitionAttributes
+from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
 from backstop_mcp.features.custom_fields.service import (
     CustomFieldsService,
     create_custom_fields_service,
 )
-from backstop_mcp.features.custom_fields.types import CustomFieldDefinitionAttributes
 from tests.helpers import BASE_URL, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
@@ -72,16 +72,19 @@ def _definition_resource(
 class TestDefinitionFromResource:
     def test_skips_unknown_bean(self) -> None:
         row = _definition_resource("1", entity_type="ContactBean")
-        assert definition_from_resource(row) is None
+        assert CustomFieldDefinitionDto.from_resource(row) is None
 
     def test_skips_missing_name(self) -> None:
-        assert definition_from_resource(_definition_resource("1", name=None)) is None
+        assert CustomFieldDefinitionDto.from_resource(_definition_resource("1", name=None)) is None
 
     def test_skips_missing_entity_type(self) -> None:
-        assert definition_from_resource(_definition_resource("1", entity_type=None)) is None
+        assert (
+            CustomFieldDefinitionDto.from_resource(_definition_resource("1", entity_type=None))
+            is None
+        )
 
     def test_keeps_organization_bean_and_maps_layout_fields(self) -> None:
-        definition = definition_from_resource(
+        definition = CustomFieldDefinitionDto.from_resource(
             _definition_resource(
                 "42",
                 name="Grade",
@@ -119,31 +122,33 @@ class TestDefinitionFromResource:
         assert definition.description == "Investor grade"
 
     def test_missing_select_options_become_empty_list(self) -> None:
-        definition = definition_from_resource(_definition_resource("1"))
+        definition = CustomFieldDefinitionDto.from_resource(_definition_resource("1"))
         assert definition is not None
         assert definition.select_options == []
 
     def test_null_select_options_become_empty_list(self) -> None:
-        definition = definition_from_resource(_definition_resource("1", selectOptions=None))
+        definition = CustomFieldDefinitionDto.from_resource(
+            _definition_resource("1", selectOptions=None)
+        )
         assert definition is not None
         assert definition.select_options == []
 
     def test_object_select_options_under_collection_key(self) -> None:
-        definition = definition_from_resource(
+        definition = CustomFieldDefinitionDto.from_resource(
             _definition_resource("1", selectOptions={"options": [{"id": "1", "label": "Active"}]})
         )
         assert definition is not None
         assert definition.select_options == [{"id": "1", "label": "Active"}]
 
     def test_object_select_options_under_data_list(self) -> None:
-        definition = definition_from_resource(
+        definition = CustomFieldDefinitionDto.from_resource(
             _definition_resource("1", selectOptions={"data": [{"id": "1", "label": "Active"}]})
         )
         assert definition is not None
         assert definition.select_options == [{"id": "1", "label": "Active"}]
 
     def test_object_select_options_under_data_resource(self) -> None:
-        definition = definition_from_resource(
+        definition = CustomFieldDefinitionDto.from_resource(
             _definition_resource("1", selectOptions={"data": {"id": "1", "label": "Active"}})
         )
         assert definition is not None

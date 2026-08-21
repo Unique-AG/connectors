@@ -40,10 +40,10 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Iterable, Mapping, Sequence
 from datetime import date
-from typing import ClassVar, Literal
+from typing import Literal
 from urllib.parse import quote
 
-from pydantic import ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
@@ -53,15 +53,13 @@ from backstop_mcp.backstop_client import (
     included_by_type,
 )
 from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.responses import (
+    OpportunityFetchResponse,
     OpportunityResponse,
     StageChangeResponse,
 )
-from backstop_mcp.features.opportunities.stages import (
-    OpportunityStage,
-    OpportunityStageAttributes,
-)
-from backstop_mcp.models import OmitNoneModel
 
 logger = logging.getLogger(__name__)
 
@@ -89,40 +87,6 @@ def stage_ref_id(value: object) -> str | None:
         return ResourceRef.model_validate(value).resource_id
     except ValidationError:
         return None
-
-
-class OpportunityFetchResult(OmitNoneModel):
-    """One party's opportunities after filtering and ordering, plus what the whole set says.
-
-    `total` and the two counts are over everything fetched — the party's complete set, since the
-    fetch walks their whole sub-collection — so `status="open"` still reports how many closed
-    deals exist.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    opportunities: tuple[OpportunityResponse, ...] = Field(
-        description=(
-            "The deals matching the requested status, newest first by the day each entered its "
-            + "current stage."
-        )
-    )
-    total: int = Field(
-        description=(
-            "Every opportunity fetched for this party, before filtering by status — so the "
-            + "number they have in total. Counted here rather than read from Backstop's own "
-            + "`meta.totalResourceCount`."
-        )
-    )
-    open_count: int = Field(
-        description=(
-            "How many of those are open, whatever status was asked for — so an answer about "
-            + "open deals still says how many exist."
-        )
-    )
-    closed_count: int = Field(
-        description="How many of those are closed, counted the same way as `open_count`."
-    )
 
 
 def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
@@ -156,7 +120,7 @@ def resolve_stage_name(
     stage_id: str | None,
     *,
     side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> str | None:
     """Name a stage from this response's side-loads, then from the cached vocabulary.
 
@@ -225,7 +189,7 @@ def stage_history(
     *,
     included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> tuple[StageChangeResponse, ...]:
     """One deal's stage moves, in the order Backstop links them.
 
@@ -262,38 +226,11 @@ def stage_history(
     return tuple(changes)
 
 
-def to_opportunity_response(
-    resource: OpportunityResource,
-    *,
-    included: Sequence[dict[str, object]],
-    side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStage],
-) -> OpportunityResponse:
-    """Project one `opportunities` resource, naming its current stage and its history.
-
-    The response model reads the record's attributes through its own aliases, so the four things
-    Backstop does not put in `attributes` are all that is supplied here. Raises `ValidationError`
-    for a record the model cannot read, which the caller drops on its own.
-    """
-    stage_id = current_stage_id(resource)
-    return OpportunityResponse.model_validate(
-        {
-            **resource.attributes,
-            "id": resource.id,
-            "stage": resolve_stage_name(stage_id, side_loaded=side_loaded, vocabulary=vocabulary),
-            "stage_id": stage_id,
-            "stage_history": stage_history(
-                resource, included=included, side_loaded=side_loaded, vocabulary=vocabulary
-            ),
-        }
-    )
-
-
 def project_opportunities(
     resources: Sequence[OpportunityResource],
     *,
     included: Sequence[dict[str, object]],
-    vocabulary: Mapping[str, OpportunityStage],
+    vocabulary: Mapping[str, OpportunityStageDto],
 ) -> tuple[OpportunityResponse, ...]:
     """Project the fetched resources, indexing the side-loaded stages once for all of them.
 
@@ -308,9 +245,20 @@ def project_opportunities(
     projected: list[OpportunityResponse] = []
     for resource in resources:
         try:
+            stage_id = current_stage_id(resource)
             projected.append(
-                to_opportunity_response(
-                    resource, included=included, side_loaded=side_loaded, vocabulary=vocabulary
+                OpportunityResponse.from_resource(
+                    resource,
+                    stage=resolve_stage_name(
+                        stage_id, side_loaded=side_loaded, vocabulary=vocabulary
+                    ),
+                    stage_id=stage_id,
+                    stage_history=stage_history(
+                        resource,
+                        included=included,
+                        side_loaded=side_loaded,
+                        vocabulary=vocabulary,
+                    ),
                 )
             )
         except ValidationError as exc:
@@ -323,8 +271,8 @@ def project_opportunities(
 
 
 async def _resolved_vocabulary(
-    vocabulary: Mapping[str, OpportunityStage] | Awaitable[Mapping[str, OpportunityStage]],
-) -> dict[str, OpportunityStage]:
+    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
+) -> dict[str, OpportunityStageDto]:
     """The vocabulary mapping, whether the caller already had it or is still fetching it.
 
     A Mapping is returned as a new dict; an awaitable is awaited. `fetch_opportunities` gathers
@@ -342,8 +290,8 @@ async def fetch_opportunities(
     segment: SearchType,
     entity_id: str,
     status: OpportunityStatus = "all",
-    vocabulary: Mapping[str, OpportunityStage] | Awaitable[Mapping[str, OpportunityStage]],
-) -> OpportunityFetchResult:
+    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
+) -> OpportunityFetchResponse:
     """Every opportunity for one party, `status`-filtered and newest stage move first.
 
     Walks the party's whole sub-collection: both the filter and the ordering are over the
@@ -375,7 +323,7 @@ async def fetch_opportunities(
     selected = order_by_date_entered(
         opportunity for opportunity in fetched if matches_status(opportunity, status)
     )
-    result = OpportunityFetchResult(
+    result = OpportunityFetchResponse(
         opportunities=selected,
         total=len(fetched),
         open_count=sum(1 for opportunity in fetched if opportunity.is_open is True),

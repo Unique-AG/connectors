@@ -5,6 +5,14 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.features.accounts.internal_dto import (
+    AccountListingDto,
+    AccountPositionDto,
+    AccountRecordDto,
+    ResolvedProductDto,
+    SeriesFigureDto,
+    SeriesPointDto,
+)
 from backstop_mcp.features.accounts.positions import (
     MAX_POSITION_ACCOUNTS,
     fetch_positions,
@@ -12,22 +20,14 @@ from backstop_mcp.features.accounts.positions import (
     fetch_product_positions,
     reconcile,
 )
-from backstop_mcp.features.accounts.types import (
-    AccountListing,
-    AccountPosition,
-    AccountRecord,
-    ResolvedProduct,
-    SeriesFigure,
-    SeriesPoint,
-)
 from tests.helpers import BASE_URL
 
 _ACCOUNT_A = "27871657"
 _ACCOUNT_B = "28124025"
 
 
-def _record(account_id: str, *, name: str = "Row") -> AccountRecord:
-    return AccountRecord(id=account_id, name=name, is_open=True)
+def _record(account_id: str, *, name: str = "Row") -> AccountRecordDto:
+    return AccountRecordDto(id=account_id, name=name, is_open=True)
 
 
 def _point(point_id: str, **attributes: object) -> dict[str, object]:
@@ -63,11 +63,11 @@ class TestFetchPositions:
 
         assert position.account.id == _ACCOUNT_A
         assert position.balance is not None
-        assert position.balance.valued == SeriesPoint(
+        assert position.balance.valued == SeriesPointDto(
             date=date(2026, 7, 31), value=11.0, value_status="ESTIMATE"
         )
         assert position.invested is not None
-        assert position.invested.valued == SeriesPoint(
+        assert position.invested.valued == SeriesPointDto(
             date=date(2026, 7, 31), value=100.0, value_status=None
         )
         assert position.redemptions is not None
@@ -143,21 +143,21 @@ class TestFetchPositions:
         assert await fetch_positions(client, ()) == ()
 
 
-_PRODUCT = ResolvedProduct(id="1292283", name="CGUP", short_name="CGUP")
+_PRODUCT = ResolvedProductDto(id="1292283", name="CGUP", short_name="CGUP")
 _AUM_URL = f"{BASE_URL}/products/1292283/aums"
 
 
-def _figure(value: float | None, *, day: int = 31) -> SeriesFigure:
-    point = SeriesPoint(date=date(2026, 7, day), value=value)
-    return SeriesFigure(latest=point, valued=point if value is not None else None)
+def _figure(value: float | None, *, day: int = 31) -> SeriesFigureDto:
+    point = SeriesPointDto(date=date(2026, 7, day), value=value)
+    return SeriesFigureDto(latest=point, valued=point if value is not None else None)
 
 
 def _position(
     account_id: str,
     *,
-    balance: SeriesFigure | None = None,
-) -> AccountPosition:
-    return AccountPosition(account=_record(account_id), balance=balance)
+    balance: SeriesFigureDto | None = None,
+) -> AccountPositionDto:
+    return AccountPositionDto(account=_record(account_id), balance=balance)
 
 
 class TestReconcile:
@@ -228,7 +228,7 @@ class TestFetchProductAum:
         aum = await fetch_product_aum(client, "1292283")
 
         assert aum is not None
-        assert aum.valued == SeriesPoint(date=date(2026, 7, 31), value=1000.0, value_status=None)
+        assert aum.valued == SeriesPointDto(date=date(2026, 7, 31), value=1000.0, value_status=None)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -255,7 +255,7 @@ class TestFetchProductPositions:
 
         result = await fetch_product_positions(
             client,
-            AccountListing(accounts=(_record(_ACCOUNT_A),), closed_omitted=2),
+            AccountListingDto(accounts=(_record(_ACCOUNT_A),), closed_omitted=2),
             product=_PRODUCT,
         )
 
@@ -283,7 +283,7 @@ class TestFetchProductPositions:
 
         result = await fetch_product_positions(
             client,
-            AccountListing(accounts=listed),
+            AccountListingDto(accounts=listed),
             product=_PRODUCT,
         )
 

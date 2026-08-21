@@ -5,13 +5,13 @@ from typing import Literal
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
-from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
+from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
 
-type CatalogResult = tuple[list[CustomFieldDefinition], Literal["ok", "stale"]]
+type CatalogResult = tuple[list[CustomFieldDefinitionDto], Literal["ok", "stale"]]
 
 
 class CustomFieldsService:
@@ -23,14 +23,14 @@ class CustomFieldsService:
     """
 
     def __init__(self, *, ttl: timedelta) -> None:
-        self._definitions: list[CustomFieldDefinition] | None = None
+        self._definitions: list[CustomFieldDefinitionDto] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._lock: asyncio.Lock = asyncio.Lock()
         self._in_flight: asyncio.Future[CatalogResult] | None = None
 
     async def get(
         self, client: BackstopClient, *, refresh: bool = False
-    ) -> tuple[list[CustomFieldDefinition], Literal["ok", "stale"]]:
+    ) -> tuple[list[CustomFieldDefinitionDto], Literal["ok", "stale"]]:
         cached = self._definitions
         if cached is not None and self._freshness.within() and not refresh:
             return list(cached), "ok"

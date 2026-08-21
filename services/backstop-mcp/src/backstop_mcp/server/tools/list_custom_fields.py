@@ -5,7 +5,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from backstop_mcp.features.custom_fields import (
-    CustomFieldDefinition,
+    CustomFieldDefinitionDto,
     CustomFieldEntityType,
     custom_field_entity_type_from_bean,
 )
@@ -22,7 +22,7 @@ class ListCustomFieldsResponse(BaseModel):
             "previous catalog is served because refresh failed."
         )
     )
-    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinition]] = Field(
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinitionDto]] = Field(
         description=(
             "Custom-field definitions keyed by the requested entity type. An entity with "
             "none on file is still present with an empty list."
@@ -31,8 +31,8 @@ class ListCustomFieldsResponse(BaseModel):
 
 
 def _definitions_for(
-    catalog: list[CustomFieldDefinition], entity_type: CustomFieldEntityType
-) -> list[CustomFieldDefinition]:
+    catalog: list[CustomFieldDefinitionDto], entity_type: CustomFieldEntityType
+) -> list[CustomFieldDefinitionDto]:
     return [
         definition
         for definition in catalog

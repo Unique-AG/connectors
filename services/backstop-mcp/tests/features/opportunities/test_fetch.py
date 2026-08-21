@@ -16,7 +16,6 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.opportunities.fetch import (
-    OpportunityFetchResult,
     OpportunityStatus,
     date_entered_order_key,
     fetch_opportunities,
@@ -25,21 +24,24 @@ from backstop_mcp.features.opportunities.fetch import (
     resolve_stage_name,
     stage_names_from_included,
 )
-from backstop_mcp.features.opportunities.responses import OpportunityResponse
-from backstop_mcp.features.opportunities.stages import OpportunityStage
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
+from backstop_mcp.features.opportunities.responses import (
+    OpportunityFetchResponse,
+    OpportunityResponse,
+)
 from tests.helpers import BASE_URL, resource
 
 # The instance's whole vocabulary, as `OpportunityStagesService` hands it over.
-VOCABULARY: dict[str, OpportunityStage] = {
+VOCABULARY: dict[str, OpportunityStageDto] = {
     stage.id: stage
     for stage in (
-        OpportunityStage(id="42478", name="Prospect", closed=False, sort_order=1),
-        OpportunityStage(id="42480", name="Project", closed=False, sort_order=2),
-        OpportunityStage(id="42482", name="IDD", closed=False, sort_order=3),
-        OpportunityStage(id="85446", name="Client Approval", closed=False, sort_order=4),
-        OpportunityStage(id="85444", name="Execution", closed=False, sort_order=5),
-        OpportunityStage(id="96016", name="Invested", closed=True, sort_order=6),
-        OpportunityStage(id="96018", name="Closed", closed=True, sort_order=7),
+        OpportunityStageDto(id="42478", name="Prospect", closed=False, sort_order=1),
+        OpportunityStageDto(id="42480", name="Project", closed=False, sort_order=2),
+        OpportunityStageDto(id="42482", name="IDD", closed=False, sort_order=3),
+        OpportunityStageDto(id="85446", name="Client Approval", closed=False, sort_order=4),
+        OpportunityStageDto(id="85444", name="Execution", closed=False, sort_order=5),
+        OpportunityStageDto(id="96016", name="Invested", closed=True, sort_order=6),
+        OpportunityStageDto(id="96018", name="Closed", closed=True, sort_order=7),
     )
 }
 
@@ -129,8 +131,8 @@ async def _fetch(
     client: BackstopClient,
     *,
     status: OpportunityStatus = "all",
-    vocabulary: dict[str, OpportunityStage] | None = None,
-) -> OpportunityFetchResult:
+    vocabulary: dict[str, OpportunityStageDto] | None = None,
+) -> OpportunityFetchResponse:
     return await fetch_opportunities(
         client,
         segment="organizations",

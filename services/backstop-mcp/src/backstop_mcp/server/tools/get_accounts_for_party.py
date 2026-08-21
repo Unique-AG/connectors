@@ -16,12 +16,11 @@ from pydantic import Field
 from backstop_mcp.features.accounts import (
     PartyAccountsResolvedResponse,
     fetch_accounts_for_party,
-    party_accounts_response,
 )
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    party_response,
+    ResolvedPartyResponse,
     resolve_party,
     unresolved_party_response,
 )
@@ -133,4 +132,6 @@ async def get_accounts_for_party(
             "closed_omitted": listing.closed_omitted,
         },
     )
-    return party_accounts_response(resolved=party_response(party), listing=listing)
+    return PartyAccountsResolvedResponse.from_listing(
+        listing, resolved=ResolvedPartyResponse.from_party(party)
+    )

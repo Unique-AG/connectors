@@ -1,8 +1,9 @@
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from typing import ClassVar
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_access_token
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopCredentialSecret
@@ -24,14 +25,15 @@ def current_subject() -> str | None:
     return access_token.subject if access_token is not None else None
 
 
-@dataclass(frozen=True)
-class BackstopAuthContext:
+class BackstopAuthContext(BaseModel):
     """Resolves "whose Backstop credential" for the in-flight MCP request.
 
     The concrete implementation of `backstop_client.credential.CallerAuthContext` — satisfied
     structurally, so the transport layer never imports this module. Constructed once in
     `create_app()` and handed to `BackstopClientFactory`; there is no module-level instance.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     session_factory: async_sessionmaker[AsyncSession]
     encryption_key: bytes

@@ -41,11 +41,8 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
-from backstop_mcp.features.accounts.types import (
-    ProductAttributes,
-    ProductResolution,
-    ResolvedProduct,
-)
+from backstop_mcp.features.accounts.api_responses import ProductAttributes
+from backstop_mcp.features.accounts.internal_dto import ProductResolution, ResolvedProductDto
 from backstop_mcp.features.resolution import (
     Ambiguous,
     Candidate,
@@ -71,7 +68,7 @@ _ProductResource = BackstopApiResource[ProductAttributes]
 _ProductDocument = BackstopApiResourceDocument[ProductAttributes]
 
 
-def product_label(product: ResolvedProduct) -> str:
+def product_label(product: ResolvedProductDto) -> str:
     if product.name is not None and product.short_name is not None:
         return f"{product.name} ({product.short_name})"
     if product.name is not None:
@@ -81,7 +78,7 @@ def product_label(product: ResolvedProduct) -> str:
     return product.id
 
 
-def _resolution(hits: Sequence[ResolvedProduct], *, query: str) -> ProductResolution:
+def _resolution(hits: Sequence[ResolvedProductDto], *, query: str) -> ProductResolution:
     return from_candidates(
         tuple(
             Candidate(key=product.id, label=product_label(product), value=product)
@@ -92,7 +89,7 @@ def _resolution(hits: Sequence[ResolvedProduct], *, query: str) -> ProductResolu
     )
 
 
-def match_product(products: Sequence[ResolvedProduct], query: str) -> ProductResolution:
+def match_product(products: Sequence[ResolvedProductDto], query: str) -> ProductResolution:
     """Match `query` against a parsed product index.
 
     Order: exact id, exact short name, exact name, name substring. A caller can type an id into
@@ -156,7 +153,7 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
         return NotFound(query=product_id, scope=_SCOPE)
 
     return _resolution(
-        (ResolvedProduct.from_attributes(resource.id, resource.attributes),), query=product_id
+        (ResolvedProductDto.from_attributes(resource.id, resource.attributes),), query=product_id
     )
 
 
@@ -188,7 +185,8 @@ async def resolve_product(
         page_size=_PRODUCT_INDEX_PAGE_SIZE,
     )
     products = tuple(
-        ResolvedProduct.from_attributes(resource.id, resource.attributes) for resource in page.items
+        ResolvedProductDto.from_attributes(resource.id, resource.attributes)
+        for resource in page.items
     )
     if len(products) > LARGE_CATALOG:
         logger.warning(

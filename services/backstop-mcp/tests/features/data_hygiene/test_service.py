@@ -15,7 +15,7 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     create_employment_index_factory,
 )
-from backstop_mcp.features.data_hygiene.types import (
+from backstop_mcp.features.data_hygiene.api_responses import (
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
 )

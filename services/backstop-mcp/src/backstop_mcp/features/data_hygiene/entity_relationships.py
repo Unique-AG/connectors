@@ -1,12 +1,11 @@
 """Pull `entityRelationships` (+ nested types) out of a by-id JSON:API document.
 
 Relationships are followed from the primary resource's linkage; types are selected by resource
-type because a nested include leaves nothing on the primary pointing at them. Callers unpack the
+type because a nested include leaves nothing on the primary pointing at them. Callers pass the
 result into `EmploymentIndexFactory.index`.
 """
 
 import logging
-from typing import TypedDict
 
 from pydantic import ValidationError
 
@@ -16,21 +15,17 @@ from backstop_mcp.backstop_client import (
     follow_included,
     included_by_type,
 )
-from backstop_mcp.features.data_hygiene.types import (
+from backstop_mcp.features.data_hygiene.api_responses import (
     EntityRelationshipAttributes,
     EntityRelationshipRef,
     RelationshipTypeAttributes,
 )
+from backstop_mcp.features.data_hygiene.internal_dto import EntityRelationshipsDto
 
 logger = logging.getLogger(__name__)
 
 type RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
 type RelationshipTypeResource = BackstopApiResource[RelationshipTypeAttributes]
-
-
-class EntityRelationships(TypedDict):
-    relationships: list[RelationshipResource]
-    relationship_types: list[RelationshipTypeResource]
 
 
 def _parse_resources[AttrT](
@@ -54,17 +49,17 @@ def _parse_resources[AttrT](
 
 def entity_relationships[AttrT](
     document: BackstopApiResourceDocument[AttrT],
-) -> EntityRelationships:
+) -> EntityRelationshipsDto:
     """`relationships` and `relationship_types` for an employment index, from one document."""
-    return {
-        "relationships": _parse_resources(
+    return EntityRelationshipsDto(
+        relationships=_parse_resources(
             follow_included(document.included, document.data, EntityRelationshipRef.RELATIONSHIPS),
             schema=EntityRelationshipAttributes,
             kind="entityRelationships",
         ),
-        "relationship_types": _parse_resources(
+        relationship_types=_parse_resources(
             included_by_type(document.included, EntityRelationshipRef.TYPES_RESOURCE),
             schema=RelationshipTypeAttributes,
             kind="entity-relationship-types",
         ),
-    }
+    )

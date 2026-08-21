@@ -8,7 +8,7 @@ Both models are validated straight from a record's raw `attributes` — the came
 `extra="ignore"` below are what make that possible, and are the reason there is no separate wire
 model to copy field for field. The few things Backstop does not put in `attributes` (the resource
 id, the resolved stage name and id, the stage history) are supplied alongside by
-`fetch.to_opportunity_response`. Validating one record at a time is deliberate: it is what keeps
+`OpportunityResponse.from_resource`. Validating one record at a time is deliberate: it is what keeps
 a single malformed deal from costing a party their whole pipeline.
 
 Backstop's names arrive as `validation_alias`, not `alias`, so they are read on the way in without
@@ -22,10 +22,11 @@ both `OpportunityResponse.stage` and `StageChangeResponse.stage`, because a move
 still a fact even when the vocabulary has moved on.
 """
 
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Self
 
 from pydantic import BeforeValidator, ConfigDict, Field, StringConstraints
 
+from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.models import OmitNoneModel
 
@@ -179,4 +180,63 @@ class OpportunityResponse(OmitNoneModel):
             "Every stage this deal has entered, in the order Backstop links them — the trail "
             + "behind `stage`."
         ),
+    )
+
+    @classmethod
+    def from_resource(
+        cls,
+        resource: BackstopApiResource[dict[str, object]],
+        *,
+        stage: str | None,
+        stage_id: str | None,
+        stage_history: tuple[StageChangeResponse, ...],
+    ) -> Self:
+        """Project one `opportunities` resource, naming its current stage and its history.
+
+        The response model reads the record's attributes through its own aliases, so the four
+        things Backstop does not put in `attributes` are all that is supplied here. Raises
+        `ValidationError` for a record the model cannot read, which the caller drops on its own.
+        """
+        return cls.model_validate(
+            {
+                **resource.attributes,
+                "id": resource.id,
+                "stage": stage,
+                "stage_id": stage_id,
+                "stage_history": stage_history,
+            }
+        )
+
+
+class OpportunityFetchResponse(OmitNoneModel):
+    """One party's opportunities after filtering and ordering, plus what the whole set says.
+
+    `total` and the two counts are over everything fetched — the party's complete set, since the
+    fetch walks their whole sub-collection — so `status="open"` still reports how many closed
+    deals exist.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    opportunities: tuple[OpportunityResponse, ...] = Field(
+        description=(
+            "The deals matching the requested status, newest first by the day each entered its "
+            + "current stage."
+        )
+    )
+    total: int = Field(
+        description=(
+            "Every opportunity fetched for this party, before filtering by status — so the "
+            + "number they have in total. Counted here rather than read from Backstop's own "
+            + "`meta.totalResourceCount`."
+        )
+    )
+    open_count: int = Field(
+        description=(
+            "How many of those are open, whatever status was asked for — so an answer about "
+            + "open deals still says how many exist."
+        )
+    )
+    closed_count: int = Field(
+        description="How many of those are closed, counted the same way as `open_count`."
     )

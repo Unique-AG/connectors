@@ -24,24 +24,30 @@ request it.
 """
 
 import logging
-from datetime import datetime
-from typing import ClassVar
 from urllib.parse import quote
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
     BackstopApiResourceDocument,
     BackstopClient,
 )
+from backstop_mcp.features.activity_history.api_responses import (
+    ActivityDetailAttributes,
+    AttendeeAttributes,
+    MeetingSpecificAttributes,
+)
+from backstop_mcp.features.activity_history.internal_dto import (
+    ActivityDetailDto,
+    AttendeeDto,
+    MeetingSpecificsDto,
+)
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "ActivityDetail",
-    "Attendee",
-    "MeetingSpecifics",
+    "ActivityDetailDto",
+    "AttendeeDto",
+    "MeetingSpecificsDto",
     "fetch_activity_detail",
     "fetch_attendees",
     "fetch_meeting_specifics",
@@ -51,75 +57,11 @@ _ATTENDEE_FIELDS = "name,firstName,lastName"
 _MEETING_SPECIFIC_FIELDS = "startTimestamp,stopTimestamp,location,timeZone"
 
 
-class _ActivityDetailAttributes(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    type: str | None = None
-    title: str | None = None
-    description: str | None = None
+_ActivityDetailDocument = BackstopApiResourceDocument[ActivityDetailAttributes]
+_MeetingSpecificDocument = BackstopApiResourceDocument[MeetingSpecificAttributes]
 
 
-class _MeetingSpecificAttributes(BaseModel):
-    # `populate_by_name` so the aliased fields can also be set by their Python name in a plain
-    # keyword constructor call, not only through `model_validate` of a wire payload.
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    start: datetime | None = Field(default=None, validation_alias="startTimestamp")
-    stop: datetime | None = Field(default=None, validation_alias="stopTimestamp")
-    location: str | None = None
-    time_zone: str | None = Field(default=None, validation_alias="timeZone")
-
-
-class _AttendeeAttributes(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    name: str | None = None
-    first_name: str | None = Field(default=None, validation_alias="firstName")
-    last_name: str | None = Field(default=None, validation_alias="lastName")
-
-    def display_name(self) -> str | None:
-        """Same "name, else first+last" fallback as `PartyAttributes.display_name()`."""
-        if self.name:
-            return self.name
-        composed = " ".join(part for part in (self.first_name, self.last_name) if part)
-        return composed or None
-
-
-_ActivityDetailDocument = BackstopApiResourceDocument[_ActivityDetailAttributes]
-_MeetingSpecificDocument = BackstopApiResourceDocument[_MeetingSpecificAttributes]
-
-
-class ActivityDetail(BaseModel):
-    """One `entity-activity-details` record — what Backstop stores for any activity kind."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    resource_id: str
-    type: str | None
-    title: str | None
-    description: str | None
-
-
-class MeetingSpecifics(BaseModel):
-    """When and where one meeting/call happened, from `/meeting-or-calls/{resource_id}`."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    start: datetime | None
-    stop: datetime | None
-    location: str | None
-    time_zone: str | None
-
-
-class Attendee(BaseModel):
-    """One trimmed attendee: a single display name, "name, else first+last" (see above)."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    name: str | None
-
-
-async def fetch_activity_detail(client: BackstopClient, *, resource_id: str) -> ActivityDetail:
+async def fetch_activity_detail(client: BackstopClient, *, resource_id: str) -> ActivityDetailDto:
     """Fetch one activity's detail record by its bare resource id.
 
     No `fields=` sparse fieldset: the record is five attributes wide, so restricting it saves
@@ -132,7 +74,7 @@ async def fetch_activity_detail(client: BackstopClient, *, resource_id: str) -> 
     # 404 for an id it cannot resolve, including a composite handle passed through by mistake.
     resource = document.require_data(path=path)
     attributes = resource.attributes
-    detail = ActivityDetail(
+    detail = ActivityDetailDto(
         resource_id=resource.id,
         type=attributes.type,
         title=attributes.title,
@@ -149,7 +91,9 @@ async def fetch_activity_detail(client: BackstopClient, *, resource_id: str) -> 
     return detail
 
 
-async def fetch_meeting_specifics(client: BackstopClient, *, resource_id: str) -> MeetingSpecifics:
+async def fetch_meeting_specifics(
+    client: BackstopClient, *, resource_id: str
+) -> MeetingSpecificsDto:
     """Fetch one meeting/call's timings and location. Only call for a meeting-or-calls handle."""
     logger.debug("activity_history.meeting_specifics.fetch", extra={"resource_id": resource_id})
     path = f"/meeting-or-calls/{quote(resource_id, safe='')}"
@@ -159,7 +103,7 @@ async def fetch_meeting_specifics(client: BackstopClient, *, resource_id: str) -
         schema=_MeetingSpecificDocument,
     )
     attributes = document.require_data(path=path).attributes
-    specifics = MeetingSpecifics(
+    specifics = MeetingSpecificsDto(
         start=attributes.start,
         stop=attributes.stop,
         location=attributes.location,
@@ -176,16 +120,18 @@ async def fetch_meeting_specifics(client: BackstopClient, *, resource_id: str) -
     return specifics
 
 
-async def fetch_attendees(client: BackstopClient, *, resource_id: str) -> tuple[Attendee, ...]:
+async def fetch_attendees(client: BackstopClient, *, resource_id: str) -> tuple[AttendeeDto, ...]:
     """Fetch the trimmed attendee list for one meeting/call by its bare resource id."""
     logger.debug("activity_history.attendees.fetch", extra={"resource_id": resource_id})
     page = await client.paginate(
         f"/meeting-or-calls/{quote(resource_id, safe='')}/attendees",
         params={"fields": _ATTENDEE_FIELDS},
-        schema=BackstopApiResource[_AttendeeAttributes],
+        schema=BackstopApiResource[AttendeeAttributes],
         max_records=None,
     )
-    attendees = tuple(Attendee(name=resource.attributes.display_name()) for resource in page.items)
+    attendees = tuple(
+        AttendeeDto(name=resource.attributes.display_name()) for resource in page.items
+    )
     nameless = sum(1 for attendee in attendees if not attendee.name)
     if nameless:
         logger.debug(

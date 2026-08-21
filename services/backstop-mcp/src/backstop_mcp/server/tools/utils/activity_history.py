@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, ClassVar, Literal, Self
 
@@ -19,15 +18,15 @@ from pydantic import (
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
-    ActivityContinuation,
+    ActivityContinuationResponse,
     ActivityType,
     Segment,
 )
-from backstop_mcp.features.data_hygiene import ProvenanceFields
+from backstop_mcp.features.data_hygiene import ProvenanceAttributes
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    ResolvedParty,
+    ResolvedPartyDto,
     resolve_party,
     unresolved_party_response,
 )
@@ -168,7 +167,7 @@ class ActivityHistoryNextPageInput(BaseModel):
         ),
     ]
     next: Annotated[
-        dict[ActivityType, ActivityContinuation],
+        dict[ActivityType, ActivityContinuationResponse],
         Field(
             min_length=1,
             description=(
@@ -194,13 +193,13 @@ type ActivityHistoryPageInput = Annotated[
 ]
 
 
-class PartyAttributes(ProvenanceFields):
+class PartyRecordResponse(ProvenanceAttributes):
     """Minimal attributes this tool needs from the party fetch: a display name plus provenance.
 
     `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
     surfaces the raw attribute dump, only `name` (for the resolve echo) and provenance (for
     `as_of`). People records often omit `name` and send `firstName`/`lastName` instead; keep
-    those so a `type="next"` page (where `ResolvedParty.name` is None) can still rebuild it.
+    those so a `type="next"` page (where `ResolvedPartyDto.name` is None) can still rebuild it.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
@@ -214,14 +213,15 @@ class PartyAttributes(ProvenanceFields):
     )
 
 
-@dataclass(frozen=True, slots=True)
-class FetchArgs:
+class FetchArgs(BaseModel):
     """Mode-agnostic inputs for the concurrent party + activity-type fan-out."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     segment: Segment
     entity_id: str
-    party: ResolvedParty
-    continuations: Mapping[ActivityType, ActivityContinuation]
+    party: ResolvedPartyDto
+    continuations: Mapping[ActivityType, ActivityContinuationResponse]
 
 
 def effective_activity_types(
@@ -250,7 +250,7 @@ async def extract_fetch_activity_history_args(
             args = FetchArgs(
                 segment=search_type,
                 entity_id=entity_id,
-                party=ResolvedParty(id=entity_id, search_type=search_type, name=None),
+                party=ResolvedPartyDto(id=entity_id, search_type=search_type, name=None),
                 continuations=dict(continuations),
             )
             logger.info(
@@ -299,7 +299,7 @@ async def extract_fetch_activity_history_args(
                 entity_id=party.id,
                 party=party,
                 continuations={
-                    activity_type: ActivityContinuation(
+                    activity_type: ActivityContinuationResponse(
                         limit=page_size,
                         offset=0,
                         since=since,

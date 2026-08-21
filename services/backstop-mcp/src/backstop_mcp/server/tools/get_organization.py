@@ -9,10 +9,8 @@ from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
-    AsOf,
-    ProvenanceFields,
-    as_of_response,
-    extract_as_of,
+    AsOfResponse,
+    ProvenanceAttributes,
 )
 from backstop_mcp.features.includes import (
     OrganizationInclude,
@@ -22,7 +20,6 @@ from backstop_mcp.features.includes import (
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -31,11 +28,12 @@ from backstop_mcp.models import OmitNoneModel, published_output_schema
 from backstop_mcp.server.runtime import get_backstop_client
 
 
-class OrganizationAttributes(OmitNoneModel, ProvenanceFields):
+class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
     """Shape of an organization resource's `attributes` in `get_organization`'s response.
 
     `extra="allow"` so unrecognized Backstop fields survive on the typed payload, and so
-    `extract_as_of` can read provenance from the model rather than string keys on a dump.
+    `AsOfResponse.from_attributes` can read provenance from the model rather than string keys
+    on a dump.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", populate_by_name=True)
@@ -59,7 +57,7 @@ class OrganizationResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the organization was found and fetched.",
     )
-    organization: OrganizationAttributes = Field(
+    organization: OrganizationRecordResponse = Field(
         description=(
             "The organization's own Backstop attributes. Known keys (`name`, "
             "`modifiedTimestamp`, `modifiedBy`) are documented; other keys are this "
@@ -73,7 +71,7 @@ class OrganizationResolvedResponse(OmitNoneModel):
             "`party_id` later — never invent them."
         )
     )
-    as_of: AsOf | None = Field(
+    as_of: AsOfResponse | None = Field(
         default=None,
         description=(
             "When and by whom the organization record was last saved. Omitted when "
@@ -176,14 +174,14 @@ async def get_organization(
     document = await client.get(
         path,
         params={"include": plan.param} if plan.param else None,
-        schema=BackstopApiResourceDocument[OrganizationAttributes],
+        schema=BackstopApiResourceDocument[OrganizationRecordResponse],
     )
     attributes = document.require_data(path=path).attributes
     return OrganizationResolvedResponse(
         organization=attributes,
-        resolved=party_response(
+        resolved=ResolvedPartyResponse.from_party(
             party, attributes=attributes.model_dump(by_alias=True, exclude_none=True)
         ),
-        as_of=as_of_response(extract_as_of(attributes)),
+        as_of=AsOfResponse.from_attributes(attributes),
         included=plan.project(document=document) if plan.planned else None,
     )

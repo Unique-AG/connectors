@@ -8,43 +8,48 @@ person fetch returns the person with employment links rather than hiding the rec
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import date
-from typing import TypeGuard
+from typing import ClassVar, TypeGuard
+
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.data_hygiene.responses import EmploymentLinkResponse
-from backstop_mcp.features.data_hygiene.types import (
+from backstop_mcp.features.data_hygiene.api_responses import (
     ORG_SIDE_TYPES,
     PERSON_SIDE_TYPES,
-    DepartedEmployment,
-    DepartureSignal,
-    EmploymentEdge,
-    EmploymentRecord,
-    EmploymentRules,
-    EmploymentStatus,
     EntityRefAttributes,
     EntityRelationshipAttributes,
     EntityRelationshipRef,
     RelationshipTypeAttributes,
 )
+from backstop_mcp.features.data_hygiene.internal_dto import (
+    DepartedEmploymentDto,
+    DepartureSignal,
+    EmploymentEdgeDto,
+    EmploymentRecordDto,
+    EmploymentRulesDto,
+    EmploymentStatus,
+)
+from backstop_mcp.features.data_hygiene.responses import EmploymentLinkResponse
 from backstop_mcp.features.entity_types import normalize_entity_type
 
 type RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
 type RelationshipTypeResource = BackstopApiResource[RelationshipTypeAttributes]
 
 
-@dataclass(frozen=True)
-class _Employer:
+class _Employer(BaseModel):
     """The organization side of one person→org relationship, once it is known to have both."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     organization_id: str
     organization_type: str
 
 
-@dataclass(frozen=True)
-class _Person:
+class _Person(BaseModel):
     """The person side of one person→org relationship, once it is known to have both."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     person_id: str
     person_type: str
@@ -65,18 +70,18 @@ class EmploymentIndex:
     edge for that pair.
     """
 
-    def __init__(self, edges: Sequence[EmploymentEdge]) -> None:
-        winners: dict[tuple[str, str], EmploymentEdge] = {}
+    def __init__(self, edges: Sequence[EmploymentEdgeDto]) -> None:
+        winners: dict[tuple[str, str], EmploymentEdgeDto] = {}
         for edge in edges:
             key = (edge.person_id, edge.organization_id)
             current = winners.get(key)
             if current is None or _outranks(edge, current):
                 winners[key] = edge
-        self._records: dict[tuple[str, str], EmploymentRecord] = {
+        self._records: dict[tuple[str, str], EmploymentRecordDto] = {
             key: _to_record(edge) for key, edge in winners.items()
         }
 
-    def get(self, *, person_id: str, organization_id: str) -> EmploymentRecord | None:
+    def get(self, *, person_id: str, organization_id: str) -> EmploymentRecordDto | None:
         """The winning record for this pair, or `None` when the index has no employment evidence."""
         return self._records.get((person_id, organization_id))
 
@@ -88,22 +93,22 @@ class EmploymentIndex:
         record = self.get(person_id=person_id, organization_id=organization_id)
         return None if record is None else record.status
 
-    def departure(self, *, person_id: str, organization_id: str) -> DepartedEmployment | None:
+    def departure(self, *, person_id: str, organization_id: str) -> DepartedEmploymentDto | None:
         """The winning edge's departure evidence, when the pair's resolved status is `FORMER`."""
         record = self.get(person_id=person_id, organization_id=organization_id)
         if record is None or record.status is not EmploymentStatus.FORMER:
             return None
         return record.departure
 
-    def current(self) -> tuple[EmploymentRecord, ...]:
+    def current(self) -> tuple[EmploymentRecordDto, ...]:
         """Every resolved pair whose winning status is `CURRENT`."""
         return self.pairs(status=EmploymentStatus.CURRENT)
 
-    def former(self) -> tuple[EmploymentRecord, ...]:
+    def former(self) -> tuple[EmploymentRecordDto, ...]:
         """Every resolved pair whose winning status is `FORMER`."""
         return self.pairs(status=EmploymentStatus.FORMER)
 
-    def pairs(self, *, status: EmploymentStatus) -> tuple[EmploymentRecord, ...]:
+    def pairs(self, *, status: EmploymentStatus) -> tuple[EmploymentRecordDto, ...]:
         """Every resolved pair whose winning status matches `status`, for list annotation."""
         return tuple(record for record in self._records.values() if record.status is status)
 
@@ -112,7 +117,7 @@ class EmploymentIndex:
         return [_to_link(record) for record in (*self.current(), *self.former())]
 
 
-def _to_link(record: EmploymentRecord) -> EmploymentLinkResponse:
+def _to_link(record: EmploymentRecordDto) -> EmploymentLinkResponse:
     if record.status is EmploymentStatus.CURRENT:
         status = "current"
     elif record.status is EmploymentStatus.FORMER:
@@ -135,7 +140,7 @@ def _to_link(record: EmploymentRecord) -> EmploymentLinkResponse:
     )
 
 
-def _outranks(edge: EmploymentEdge, current: EmploymentEdge) -> bool:
+def _outranks(edge: EmploymentEdgeDto, current: EmploymentEdgeDto) -> bool:
     """Whether `edge` beats `current` as the winner for their shared pair.
 
     Compared as `(has a date, date, is departed)` tuples so a dated edge always beats an undated
@@ -144,7 +149,7 @@ def _outranks(edge: EmploymentEdge, current: EmploymentEdge) -> bool:
     return _rank(edge) > _rank(current)
 
 
-def _rank(edge: EmploymentEdge) -> tuple[bool, date, bool]:
+def _rank(edge: EmploymentEdgeDto) -> tuple[bool, date, bool]:
     return (
         edge.effective_date is not None,
         edge.effective_date if edge.effective_date is not None else date.min,
@@ -152,8 +157,8 @@ def _rank(edge: EmploymentEdge) -> tuple[bool, date, bool]:
     )
 
 
-def _to_record(edge: EmploymentEdge) -> EmploymentRecord:
-    return EmploymentRecord(
+def _to_record(edge: EmploymentEdgeDto) -> EmploymentRecordDto:
+    return EmploymentRecordDto(
         person_id=edge.person_id,
         person_type=edge.person_type,
         organization_id=edge.organization_id,
@@ -170,7 +175,7 @@ def classify_employment(
     *,
     type_id: str | None,
     type_name: str | None,
-    rules: EmploymentRules,
+    rules: EmploymentRulesDto,
 ) -> EmploymentStatus:
     """What one relationship's type says about employment at the organization.
 
@@ -285,9 +290,9 @@ def _employment_edges(
     *,
     relationships: Sequence[RelationshipResource],
     relationship_types: Sequence[RelationshipTypeResource],
-    rules: EmploymentRules,
+    rules: EmploymentRulesDto,
     today: date,
-) -> list[EmploymentEdge]:
+) -> list[EmploymentEdgeDto]:
     """Every person↔organization relationship, normalised into one `EmploymentEdge` each.
 
     Structural matching is direction-agnostic: `_employer_side`'s type-based check already tells
@@ -299,7 +304,7 @@ def _employment_edges(
     outright, so it still wins when it is the only edge for its pair.
     """
     type_names = _relationship_type_names(resources=relationship_types)
-    edges: list[EmploymentEdge] = []
+    edges: list[EmploymentEdgeDto] = []
 
     for resource in relationships:
         attrs = resource.attributes
@@ -321,10 +326,10 @@ def _employment_edges(
         started = attrs.start_date
         ended = attrs.end_date
 
-        departure: DepartedEmployment | None = None
+        departure: DepartedEmploymentDto | None = None
         if status is EmploymentStatus.FORMER:
             effective_date = ended if ended is not None else created
-            departure = DepartedEmployment(
+            departure = DepartedEmploymentDto(
                 signal=DepartureSignal.FORMER_TYPE,
                 organization_id=employer.organization_id,
                 organization_type=employer.organization_type,
@@ -337,7 +342,7 @@ def _employment_edges(
             # departure dated at that `endDate`.
             status = EmploymentStatus.FORMER
             effective_date = ended
-            departure = DepartedEmployment(
+            departure = DepartedEmploymentDto(
                 signal=DepartureSignal.END_DATE,
                 organization_id=employer.organization_id,
                 organization_type=employer.organization_type,
@@ -349,7 +354,7 @@ def _employment_edges(
             effective_date = started if started is not None else created
 
         edges.append(
-            EmploymentEdge(
+            EmploymentEdgeDto(
                 person_id=person.person_id,
                 person_type=person.person_type,
                 organization_id=employer.organization_id,
@@ -369,7 +374,7 @@ def build_employment_index(
     *,
     relationships: Sequence[RelationshipResource],
     relationship_types: Sequence[RelationshipTypeResource],
-    rules: EmploymentRules,
+    rules: EmploymentRulesDto,
     today: date,
 ) -> EmploymentIndex:
     """The `EmploymentIndex` for `entityRelationships` side-loaded off a person or organization."""

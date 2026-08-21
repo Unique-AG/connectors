@@ -1,7 +1,6 @@
 from typing import Annotated, ClassVar, Self
 
 from pydantic import (
-    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -17,64 +16,18 @@ __all__ = [
     "BatchPartyResolution",
     "PartyCandidate",
     "PartyResolution",
-    "PartyResolveItem",
-    "QuickSearchOptions",
-    "ResolvedParty",
-    "SearchType",
+    "PartyResolveItemDto",
+    "QuickSearchOptionsDto",
+    "ResolvedPartyDto",
 ]
 
 
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
-# Blank/whitespace inputs become `None` via `field_validator` on `PartyResolveItem` — putting
+# Blank/whitespace inputs become `None` via `field_validator` on `PartyResolveItemDto` — putting
 # a BeforeValidator that returns `None` on `Annotated[str, ...]` alone fails union matching.
 _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
-class PartyAttributes(BaseModel):
-    """Shape of a party resource's `attributes` in `search.py`'s JSON:API responses.
-
-    Deserialized straight off the wire via `BackstopApiCollectionDocument[PartyAttributes]` /
-    `BackstopApiResourceDocument[PartyAttributes]` — see `backstop_client.json_api`.
-    `extra="ignore"` since only `id`/`name`/`label` (derived here) ever leave `search.py`.
-    Names are stripped here so `search.py`'s display-name fallback can use plain truthiness
-    checks instead of re-stripping at point of use.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    name: _StrippedStr | None = None
-    first_name: _StrippedStr | None = Field(
-        default=None, validation_alias=AliasChoices("firstName", "first_name")
-    )
-    last_name: _StrippedStr | None = Field(
-        default=None, validation_alias=AliasChoices("lastName", "last_name")
-    )
-    # Quick-search's `id` comes back prefixed (`organizations_341208613`), unusable against
-    # `/organizations/{id}`; `resourceId` is the real id. Other party endpoints don't send this
-    # attribute, so it's optional and `search.py` falls back to stripping the `id` prefix.
-    # `_NonEmptyStr` (not `_StrippedStr`) so a blank/whitespace-only value can't bind to `""` and
-    # slip past `search.py`'s `is not None` check — that would return `""` as the id instead of
-    # falling through to the prefix-strip fallback. Needs the same blank→None coercion as
-    # `PartyResolveItem` since `_NonEmptyStr` alone rejects (rather than coerces) blank input.
-    resource_id: _NonEmptyStr | None = Field(
-        default=None, validation_alias=AliasChoices("resourceId", "resource_id")
-    )
-
-    @field_validator("resource_id", mode="before")
-    @classmethod
-    def _blank_resource_id_to_none(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
-
-    def display_name(self) -> str | None:
-        if self.name:
-            return self.name
-        composed = " ".join(part for part in (self.first_name, self.last_name) if part)
-        return composed or None
-
-
-class ResolvedParty(BaseModel):
+class ResolvedPartyDto(BaseModel):
     """A party identity after successful resolution."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -86,12 +39,12 @@ class ResolvedParty(BaseModel):
 
 # Party resolution is an instance of the shared algebra in `resolution.py`: same result types,
 # same ambiguity policy, same status strings.
-type PartyCandidate = Candidate[ResolvedParty]
-type PartyResolution = Resolution[ResolvedParty]
-type BatchPartyResolution = BatchResolution[ResolvedParty]
+type PartyCandidate = Candidate[ResolvedPartyDto]
+type PartyResolution = Resolution[ResolvedPartyDto]
+type BatchPartyResolution = BatchResolution[ResolvedPartyDto]
 
 
-class PartyResolveItem(BaseModel):
+class PartyResolveItemDto(BaseModel):
     """One batch input: exactly one of `party_id` or `search` must be set.
 
     When `party_id` is set, optional `name` is passed through on the trusted-id short-circuit
@@ -99,7 +52,7 @@ class PartyResolveItem(BaseModel):
 
     `party_id` is interpolated into a Backstop path (e.g. `/organizations/{id}`) after
     `quote(..., safe='')`; rejecting `/` here keeps defence-in-depth consistent for every entry
-    point that builds a `PartyResolveItem`.
+    point that builds a `PartyResolveItemDto`.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -126,7 +79,7 @@ class PartyResolveItem(BaseModel):
         return self
 
 
-class QuickSearchOptions(BaseModel):
+class QuickSearchOptionsDto(BaseModel):
     """Caller-overridable knobs for `GET /quick-search`.
 
     `full_email_match=None` means auto: true when the search looks like an email, else omit/false.

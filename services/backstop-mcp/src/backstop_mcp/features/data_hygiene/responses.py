@@ -1,14 +1,54 @@
 """Tool-facing responses for provenance and employment links."""
 
+from collections.abc import Mapping
 from datetime import date
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
+from backstop_mcp.features.data_hygiene.api_responses import CleanStr, ProvenanceAttributes
+from backstop_mcp.features.data_hygiene.internal_dto import (
+    DepartedEmploymentDto,
+    DepartureSignal,
+)
 from backstop_mcp.models import OmitNoneModel
 
 type EmploymentLinkStatus = Literal["current", "former"]
+
+
+class AsOfResponse(OmitNoneModel):
+    """Plain provenance from a Backstop record. No staleness verdict attached."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    modified_timestamp: CleanStr = Field(
+        default=None,
+        description=(
+            "When the record was last saved in Backstop. Omitted when unknown. Relay this; "
+            "do not treat age as a staleness verdict."
+        ),
+    )
+    modified_by: CleanStr = Field(
+        default=None,
+        description="Who last saved the record, as Backstop stores it. Omitted when unknown.",
+    )
+
+    @classmethod
+    def from_attributes(cls, attributes: ProvenanceAttributes | None) -> Self | None:
+        """Build provenance from `modified_timestamp` / `modified_by` when either is present.
+
+        Returns `None` when both are missing so callers can omit an empty envelope rather than
+        echo `{null, null}`. No verdict is attached — age is left for the user to interpret.
+        """
+        if attributes is None:
+            return None
+        modified_by = _actor_name(attributes.modified_by)
+        if attributes.modified_timestamp is None and modified_by is None:
+            return None
+        return cls(
+            modified_timestamp=attributes.modified_timestamp,
+            modified_by=modified_by,
+        )
 
 
 class DepartedContactResponse(BaseModel):
@@ -43,6 +83,19 @@ class DepartedContactResponse(BaseModel):
             "'is a former employee of'."
         ),
     )
+
+    @classmethod
+    def from_departure(cls, departure: DepartedEmploymentDto | None) -> Self | None:
+        if departure is None:
+            return None
+        return cls(
+            signal=departure.signal,
+            organization_id=departure.organization_id,
+            organization_type=departure.organization_type,
+            end_date=departure.end_date,
+            relationship_type_id=departure.relationship_type_id,
+            relationship_type_name=departure.relationship_type_name,
+        )
 
 
 class EmploymentLinkResponse(OmitNoneModel):
@@ -92,11 +145,22 @@ class EmploymentLinkResponse(OmitNoneModel):
     )
 
 
-def as_of_response(as_of: AsOf | None) -> AsOf | None:
-    return as_of
+def _actor_name(value: object) -> str | None:
+    """The actor as a name, whether Backstop sent a string or an object.
 
-
-def departed_response(departure: DepartedEmployment | None) -> DepartedContactResponse | None:
-    if departure is None:
+    `AsOfResponse.modified_by` cleans whatever this returns, so blank strings pulled out of a
+    nested actor are absence there rather than a check here.
+    """
+    if isinstance(value, str):
+        return value.strip() or None
+    if not isinstance(value, Mapping):
         return None
-    return DepartedContactResponse.model_validate(departure)
+    actor = cast("Mapping[str, object]", value)
+    return next(
+        (
+            text.strip()
+            for key in ("name", "displayName", "display_name", "id")
+            if isinstance(text := actor.get(key), str) and text.strip()
+        ),
+        None,
+    )

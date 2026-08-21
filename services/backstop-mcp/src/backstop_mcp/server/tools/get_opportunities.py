@@ -21,7 +21,7 @@ from pydantic import Field
 
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
-    OpportunityFetchResult,
+    OpportunityFetchResponse,
     OpportunityResponse,
     OpportunityStatus,
     fetch_opportunities,
@@ -29,7 +29,6 @@ from backstop_mcp.features.opportunities import (
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
-    party_response,
     resolve_party,
     unresolved_party_response,
 )
@@ -87,7 +86,7 @@ type GetOpportunitiesResponse = (
 
 
 def _resolved_response(
-    *, resolved: ResolvedPartyResponse, fetched: OpportunityFetchResult
+    *, resolved: ResolvedPartyResponse, fetched: OpportunityFetchResponse
 ) -> OpportunitiesResolvedResponse:
     return OpportunitiesResolvedResponse(
         resolved=resolved,
@@ -198,4 +197,4 @@ async def get_opportunities(
             "returned": len(fetched.opportunities),
         },
     )
-    return _resolved_response(resolved=party_response(party), fetched=fetched)
+    return _resolved_response(resolved=ResolvedPartyResponse.from_party(party), fetched=fetched)

@@ -5,7 +5,7 @@ its helpers) they rest on.
 Each test below is meant to read as a mini walkthrough:
 
 1. **Configure the checks** — which relationship types count as employment / former
-   employment (`EmploymentRules` / `TypeVocabulary`).
+   employment (`EmploymentRulesDto` / `TypeVocabularyDto`).
 2. **Prepare the side-loaded record** — `entityRelationships` plus their types, via
    `helpers.person_org` / `helpers.relationship_types`.
 3. **Run verification** — `build_employment_index`
@@ -24,16 +24,22 @@ import pytest
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.data_hygiene import DepartureSignal, EmploymentRules, TypeVocabulary
+from backstop_mcp.features.data_hygiene import (
+    DepartureSignal,
+    EmploymentRulesDto,
+    TypeVocabularyDto,
+)
+from backstop_mcp.features.data_hygiene.api_responses import (
+    EntityRelationshipAttributes,
+    RelationshipTypeAttributes,
+)
 from backstop_mcp.features.data_hygiene.employment import (
     EmploymentIndex,
     build_employment_index,
     classify_employment,
 )
-from backstop_mcp.features.data_hygiene.types import (
+from backstop_mcp.features.data_hygiene.internal_dto import (
     EmploymentStatus,
-    EntityRelationshipAttributes,
-    RelationshipTypeAttributes,
 )
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_MIRROR_TYPE,
@@ -85,18 +91,18 @@ def configure_checks(
     employment_markers: frozenset[str] = DEFAULT_EMPLOYMENT_MARKERS,
     former_type_ids: frozenset[str] = EMPTY_TYPE_IDS,
     former_markers: frozenset[str] = DEFAULT_FORMER_MARKERS,
-) -> EmploymentRules:
+) -> EmploymentRulesDto:
     """Build the vocabulary the index uses — same shape create_app injects."""
-    return EmploymentRules(
-        employment=TypeVocabulary(type_ids=employment_type_ids, name_markers=employment_markers),
-        former=TypeVocabulary(type_ids=former_type_ids, name_markers=former_markers),
+    return EmploymentRulesDto(
+        employment=TypeVocabularyDto(type_ids=employment_type_ids, name_markers=employment_markers),
+        former=TypeVocabularyDto(type_ids=former_type_ids, name_markers=former_markers),
     )
 
 
 def person_index(
     relationships: list[dict[str, object]],
     *,
-    checks: EmploymentRules,
+    checks: EmploymentRulesDto,
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> EmploymentIndex:
@@ -113,7 +119,7 @@ def person_index(
 def organization_index(
     relationships: list[dict[str, object]],
     *,
-    checks: EmploymentRules,
+    checks: EmploymentRulesDto,
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> EmploymentIndex:

@@ -4,19 +4,19 @@ from collections.abc import Sequence
 from fastmcp import Context
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.party_resolver.internal_dto import (
+    BatchPartyResolution,
+    PartyResolution,
+    PartyResolveItemDto,
+    QuickSearchOptionsDto,
+    ResolvedPartyDto,
+)
 from backstop_mcp.features.party_resolver.search import (
     fetch_party_name,
     normalized_email,
     quick_search,
     search_by_email,
-)
-from backstop_mcp.features.party_resolver.types import (
-    BatchPartyResolution,
-    PartyResolution,
-    PartyResolveItem,
-    QuickSearchOptions,
-    ResolvedParty,
-    SearchType,
 )
 from backstop_mcp.features.resolution import (
     Ambiguous,
@@ -31,9 +31,9 @@ async def _resolve_one(
     client: BackstopClient,
     *,
     search_type: SearchType,
-    item: PartyResolveItem,
+    item: PartyResolveItemDto,
     confirm_name: bool = False,
-    quick_search_options: QuickSearchOptions | None = None,
+    quick_search_options: QuickSearchOptionsDto | None = None,
 ) -> PartyResolution:
     if item.party_id is not None:
         resolved_name = item.name
@@ -42,7 +42,7 @@ async def _resolve_one(
                 client, search_type=search_type, party_id=item.party_id
             )
         return Resolved(
-            value=ResolvedParty(id=item.party_id, search_type=search_type, name=resolved_name)
+            value=ResolvedPartyDto(id=item.party_id, search_type=search_type, name=resolved_name)
         )
 
     assert item.search is not None
@@ -69,7 +69,7 @@ async def resolve_party(
     search: str | None = None,
     name: str | None = None,
     confirm_name: bool = False,
-    quick_search_options: QuickSearchOptions | None = None,
+    quick_search_options: QuickSearchOptionsDto | None = None,
 ) -> PartyResolution:
     """Resolve one party from a name, an email, or a trusted Party ID.
 
@@ -78,7 +78,7 @@ async def resolve_party(
     makes a wrong id visible instead of silent. Callers that fetch the record anyway (e.g.
     `get_organization`) leave it off and backfill from their own response.
     """
-    item = PartyResolveItem(party_id=party_id, search=search, name=name)
+    item = PartyResolveItemDto(party_id=party_id, search=search, name=name)
     outcome = await _resolve_one(
         client,
         search_type=search_type,
@@ -99,9 +99,9 @@ async def resolve_parties(
     client: BackstopClient,
     *,
     search_type: SearchType,
-    items: Sequence[PartyResolveItem],
+    items: Sequence[PartyResolveItemDto],
     confirm_name: bool = False,
-    quick_search_options: QuickSearchOptions | None = None,
+    quick_search_options: QuickSearchOptionsDto | None = None,
 ) -> BatchPartyResolution:
     """Resolve several parties, returning one combined payload if anything is unresolved.
 

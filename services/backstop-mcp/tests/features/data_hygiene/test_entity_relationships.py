@@ -46,6 +46,6 @@ class TestEntityRelationships:
 
         result = entity_relationships(document)
 
-        assert [item.id for item in result["relationships"]] == ["er2", "er1"]
-        assert [item.id for item in result["relationship_types"]] == ["t1"]
-        assert result["relationship_types"][0].attributes.name == "is employee of"
+        assert [item.id for item in result.relationships] == ["er2", "er1"]
+        assert [item.id for item in result.relationship_types] == ["t1"]
+        assert result.relationship_types[0].attributes.name == "is employee of"

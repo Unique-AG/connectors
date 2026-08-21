@@ -2,12 +2,14 @@ from collections.abc import Callable, Sequence
 from datetime import date
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
-from backstop_mcp.features.data_hygiene.types import (
-    EmploymentRules,
+from backstop_mcp.features.data_hygiene.api_responses import (
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
-    TypeVocabulary,
+)
+from backstop_mcp.features.data_hygiene.employment import EmploymentIndex, build_employment_index
+from backstop_mcp.features.data_hygiene.internal_dto import (
+    EmploymentRulesDto,
+    TypeVocabularyDto,
 )
 
 type RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
@@ -28,14 +30,14 @@ class EmploymentIndexFactory:
     def __init__(
         self,
         *,
-        rules: EmploymentRules,
+        rules: EmploymentRulesDto,
         clock: Callable[[], date] = date.today,
     ) -> None:
-        self._rules: EmploymentRules = rules
+        self._rules: EmploymentRulesDto = rules
         self._clock: Callable[[], date] = clock
 
     @property
-    def rules(self) -> EmploymentRules:
+    def rules(self) -> EmploymentRulesDto:
         """The vocabulary this factory was built with. Read-only; set once at composition."""
         return self._rules
 
@@ -69,12 +71,12 @@ def create_employment_index_factory(
 ) -> EmploymentIndexFactory:
     """Build the factory from configured values, translating them into the feature's own type."""
     return EmploymentIndexFactory(
-        rules=EmploymentRules(
-            employment=TypeVocabulary(
+        rules=EmploymentRulesDto(
+            employment=TypeVocabularyDto(
                 type_ids=frozenset(employment_type_ids),
                 name_markers=frozenset(employment_type_markers),
             ),
-            former=TypeVocabulary(
+            former=TypeVocabularyDto(
                 type_ids=frozenset(former_type_ids),
                 name_markers=frozenset(former_type_markers),
             ),

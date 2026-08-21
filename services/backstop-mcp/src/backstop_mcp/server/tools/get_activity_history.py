@@ -22,26 +22,26 @@ from mcp.types import ToolAnnotations
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.activity_history import (
-    ActivityGroup,
+    ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
-    ActivityPage,
+    ActivityPageDto,
     ActivityType,
-    EmailPage,
+    EmailPageDto,
     GetActivityHistoryResponse,
+    ResolvedPartyAsOfResponse,
     TimelineRecord,
     fetch_activities_page_by_type,
     group_page,
-    resolved_party_as_of_response,
     to_timeline_record,
 )
 from backstop_mcp.models import published_output_schema
 from backstop_mcp.server.runtime import get_activity_history_settings, get_backstop_client
-from backstop_mcp.server.tools.utils.get_activity_history_utils import (
+from backstop_mcp.server.tools.utils.activity_history import (
     ActivityHistoryFirstPageInput,
     ActivityHistoryNextPageInput,
     ActivityHistoryPageInput,
     FetchArgs,
-    PartyAttributes,
+    PartyRecordResponse,
     extract_fetch_activity_history_args,
 )
 
@@ -109,9 +109,9 @@ async def get_activity_history(
     party_path = f"/{args.segment}/{quote(args.entity_id, safe='')}"
     document = await client.get(
         party_path,
-        schema=BackstopApiResourceDocument[PartyAttributes],
+        schema=BackstopApiResourceDocument[PartyRecordResponse],
     )
-    page_calls: dict[ActivityType, Coroutine[None, None, ActivityPage | EmailPage]] = {
+    page_calls: dict[ActivityType, Coroutine[None, None, ActivityPageDto | EmailPageDto]] = {
         activity_type: fetch_activities_page_by_type(
             client,
             activity_type=activity_type,
@@ -125,12 +125,12 @@ async def get_activity_history(
         for activity_type, continuation in args.continuations.items()
     }
     activities = await asyncio.gather(*page_calls.values())
-    pages: dict[ActivityType, ActivityPage | EmailPage] = dict(
+    pages: dict[ActivityType, ActivityPageDto | EmailPageDto] = dict(
         zip(page_calls.keys(), activities, strict=True)
     )
 
     gist_max_chars = get_activity_history_settings().gist_max_chars
-    groups: dict[ActivityType, ActivityGroup[TimelineRecord]] = {}
+    groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
     for activity_type, continuation in args.continuations.items():
         page = pages[activity_type]
         grouped = group_page(
@@ -145,7 +145,7 @@ async def get_activity_history(
         wire_items = tuple(
             to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items
         )
-        groups[activity_type] = ActivityGroup(
+        groups[activity_type] = ActivityGroupResponse(
             activity_type=grouped.activity_type,
             items=wire_items,
             date_range=grouped.date_range,
@@ -167,6 +167,6 @@ async def get_activity_history(
         },
     )
     return ActivityHistoryResolvedResponse(
-        resolved=resolved_party_as_of_response(args.party, attributes),
+        resolved=ResolvedPartyAsOfResponse.from_party(args.party, attributes=attributes),
         groups=groups,
     )

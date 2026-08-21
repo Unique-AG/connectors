@@ -8,39 +8,21 @@ from datetime import date
 from typing import cast
 
 from backstop_mcp.features.data_hygiene import (
-    AsOf,
     DepartedContactResponse,
-    DepartedEmployment,
+    DepartedEmploymentDto,
     DepartureSignal,
     EmploymentStatus,
-    as_of_response,
-    departed_response,
 )
 from backstop_mcp.features.data_hygiene.employment import EmploymentIndex
-from backstop_mcp.features.data_hygiene.types import EmploymentEdge
-
-
-class TestAsOf:
-    def test_nothing_to_echo_stays_none(self) -> None:
-        assert as_of_response(None) is None
-
-    def test_both_fields_are_carried(self) -> None:
-        assert as_of_response(
-            AsOf(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
-        ) == AsOf(modified_timestamp="2024-01-01T00:00:00Z", modified_by="alice")
-
-    def test_a_partial_signal_is_carried_as_is(self) -> None:
-        assert as_of_response(AsOf(modified_timestamp="2024-01-01")) == AsOf(
-            modified_timestamp="2024-01-01", modified_by=None
-        )
+from backstop_mcp.features.data_hygiene.internal_dto import EmploymentEdgeDto
 
 
 class TestDepartedResponse:
     def test_a_current_person_has_nothing_to_echo(self) -> None:
-        assert departed_response(None) is None
+        assert DepartedContactResponse.from_departure(None) is None
 
     def test_every_field_is_carried(self) -> None:
-        departed = DepartedEmployment(
+        departed = DepartedEmploymentDto(
             signal=DepartureSignal.FORMER_TYPE,
             organization_id="o1",
             organization_type="organizations",
@@ -49,7 +31,7 @@ class TestDepartedResponse:
             relationship_type_name="is a former employee of",
         )
 
-        assert departed_response(departed) == DepartedContactResponse(
+        assert DepartedContactResponse.from_departure(departed) == DepartedContactResponse(
             signal=DepartureSignal.FORMER_TYPE,
             organization_id="o1",
             organization_type="organizations",
@@ -59,8 +41,8 @@ class TestDepartedResponse:
         )
 
     def test_the_signal_serializes_as_the_word_the_user_sees(self) -> None:
-        response = departed_response(
-            DepartedEmployment(
+        response = DepartedContactResponse.from_departure(
+            DepartedEmploymentDto(
                 signal=DepartureSignal.END_DATE,
                 organization_id="o1",
                 organization_type="organizations",
@@ -90,7 +72,7 @@ class TestEmploymentIndexLinks:
     def test_current_link_carries_both_sides_without_a_signal(self) -> None:
         index = EmploymentIndex(
             [
-                EmploymentEdge(
+                EmploymentEdgeDto(
                     person_id="p1",
                     person_type="people",
                     organization_id="o1",
@@ -120,7 +102,7 @@ class TestEmploymentIndexLinks:
     def test_former_link_carries_the_departure_signal(self) -> None:
         index = EmploymentIndex(
             [
-                EmploymentEdge(
+                EmploymentEdgeDto(
                     person_id="p1",
                     person_type="people",
                     organization_id="o1",
@@ -129,7 +111,7 @@ class TestEmploymentIndexLinks:
                     relationship_type_name="is a former employee of",
                     status=EmploymentStatus.FORMER,
                     effective_date=date(2022, 12, 31),
-                    departure=DepartedEmployment(
+                    departure=DepartedEmploymentDto(
                         signal=DepartureSignal.END_DATE,
                         organization_id="o1",
                         organization_type="organizations",
@@ -149,7 +131,7 @@ class TestEmploymentIndexLinks:
     def test_links_lists_current_then_former(self) -> None:
         index = EmploymentIndex(
             [
-                EmploymentEdge(
+                EmploymentEdgeDto(
                     person_id="p1",
                     person_type="people",
                     organization_id="orgB",
@@ -160,7 +142,7 @@ class TestEmploymentIndexLinks:
                     effective_date=date(2024, 1, 1),
                     departure=None,
                 ),
-                EmploymentEdge(
+                EmploymentEdgeDto(
                     person_id="p1",
                     person_type="people",
                     organization_id="orgA",
@@ -169,7 +151,7 @@ class TestEmploymentIndexLinks:
                     relationship_type_name="is a former employee of",
                     status=EmploymentStatus.FORMER,
                     effective_date=date(2020, 1, 1),
-                    departure=DepartedEmployment(
+                    departure=DepartedEmploymentDto(
                         signal=DepartureSignal.FORMER_TYPE,
                         organization_id="orgA",
                         organization_type="organizations",

@@ -1,14 +1,15 @@
 """Party-shaped views of the shared resolution responses (`resolution.py`)."""
 
 from collections.abc import Mapping
+from typing import Self
 
 from pydantic import Field
 
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.party_resolver.types import (
-    PartyAttributes,
+from backstop_mcp.features.party_resolver.api_responses import PartyAttributes
+from backstop_mcp.features.party_resolver.internal_dto import (
     PartyCandidate,
-    ResolvedParty,
+    ResolvedPartyDto,
 )
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
@@ -58,6 +59,17 @@ class PartyCandidateResponse(CandidateResponse):
         description="Display name as Backstop stores it. Omitted when resolve did not learn one.",
     )
 
+    @classmethod
+    def from_candidate(cls, candidate: PartyCandidate) -> Self:
+        party = candidate.value
+        return cls(
+            key=candidate.key,
+            label=candidate.label,
+            id=party.id,
+            search_type=party.search_type,
+            name=party.name,
+        )
+
 
 class ResolvedPartyResponse(OmitNoneModel):
     """The id/search_type/name a caller must pass back verbatim as a trusted `party_id` later.
@@ -85,6 +97,21 @@ class ResolvedPartyResponse(OmitNoneModel):
         description="Display name as Backstop stores it. Omitted when resolve did not learn one.",
     )
 
+    @classmethod
+    def from_party(
+        cls,
+        party: ResolvedPartyDto,
+        *,
+        attributes: Mapping[str, object] | None = None,
+    ) -> Self:
+        """Build a resolved-party response. When resolve left `name` blank and `attributes` are
+        given, fill it from that record's `name` / `firstName`+`lastName`.
+        """
+        name = party.name
+        if name is None and attributes is not None:
+            name = PartyAttributes.model_validate(attributes).display_name()
+        return cls(id=party.id, search_type=party.search_type, name=name)
+
 
 # Concrete parameterizations of the shared models. Plain assignments, not subclasses: pydantic
 # resolves the subscript to a real model class, which is what FastMCP needs for output schemas.
@@ -94,44 +121,19 @@ PartyBatchResolvedResponse = BatchResolvedResponse[ResolvedPartyResponse]
 PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateResponse, ResolvedPartyResponse]
 
 
-def party_response(
-    party: ResolvedParty,
-    *,
-    attributes: Mapping[str, object] | None = None,
-) -> ResolvedPartyResponse:
-    """Build a resolved-party response. When resolve left `name` blank and `attributes` are
-    given, fill it from that record's `name` / `firstName`+`lastName`.
-    """
-    name = party.name
-    if name is None and attributes is not None:
-        name = PartyAttributes.model_validate(attributes).display_name()
-    return ResolvedPartyResponse(id=party.id, search_type=party.search_type, name=name)
-
-
-def party_candidate_response(candidate: PartyCandidate) -> PartyCandidateResponse:
-    party = candidate.value
-    return PartyCandidateResponse(
-        key=candidate.key,
-        label=candidate.label,
-        id=party.id,
-        search_type=party.search_type,
-        name=party.name,
-    )
-
-
 def unresolved_party_response(
-    result: Unresolved[ResolvedParty],
+    result: Unresolved[ResolvedPartyDto],
 ) -> PartyAmbiguousResponse | NotFoundResponse:
     """Convert a non-`Resolved` `resolve_party` outcome into the standard tool response."""
     return unresolved_response(
         result,
         ambiguous_model=PartyAmbiguousResponse,
-        to_candidate=party_candidate_response,
+        to_candidate=PartyCandidateResponse.from_candidate,
     )
 
 
 def unresolved_parties_response(
-    result: BatchAmbiguous[ResolvedParty],
+    result: BatchAmbiguous[ResolvedPartyDto],
 ) -> PartyBatchAmbiguousResponse:
     """One combined payload for a batch where at least one party didn't resolve."""
     return batch_ambiguous_response(
@@ -139,8 +141,8 @@ def unresolved_parties_response(
         batch_model=PartyBatchAmbiguousResponse,
         unresolved_model=PartyBatchUnresolvedResponse,
         resolved_model=PartyBatchResolvedResponse,
-        to_candidate=party_candidate_response,
-        to_resolved=party_response,
+        to_candidate=PartyCandidateResponse.from_candidate,
+        to_resolved=ResolvedPartyResponse.from_party,
     )
 
 
@@ -151,8 +153,6 @@ __all__ = [
     "PartyBatchUnresolvedResponse",
     "PartyCandidateResponse",
     "ResolvedPartyResponse",
-    "party_candidate_response",
-    "party_response",
     "unresolved_parties_response",
     "unresolved_party_response",
 ]

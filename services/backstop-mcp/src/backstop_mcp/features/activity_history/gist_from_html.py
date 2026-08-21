@@ -8,9 +8,10 @@ summarize. See `to_gist` for the library choice this rests on.
 
 import logging
 import re
-from dataclasses import dataclass
+from typing import ClassVar
 
 from markdownify import markdownify
+from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,15 @@ _SEPARATOR_CELL_RE = re.compile(r"^:?-+:?$")
 _WHITESPACE_RE = re.compile(r"\s")
 
 
-@dataclass(frozen=True)
-class Gist:
+class Gist(BaseModel):
     """A squeezed, word-boundary-truncated Markdown rendering of an HTML activity body.
 
     `full_length` is the length of the converted-and-squeezed Markdown *before* truncation,
     always populated (equal to `len(text)` when `truncated` is False) so a caller can decide,
     without recomputing anything, whether "more" exists to drill into.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     text: str
     truncated: bool
