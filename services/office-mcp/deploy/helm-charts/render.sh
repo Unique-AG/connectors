@@ -1,7 +1,7 @@
 #!/bin/bash
 # Local helper to quick-render the chart locally to see its output.
-# ci-values.yaml supplies the placeholder PUBLIC_BASE_URL that office-mcp.validateValues
-# demands and drops the Postgres connection the values schema demands. CI passes the same
+# ci-values.yaml supplies the placeholder PUBLIC_BASE_URL, ENTRA_TENANT_ID and ENTRA_CLIENT_ID
+# that office-mcp.validateValues demands and drops the Postgres connection the values schema demands. CI passes the same
 # file, so chart defaults alone never render.
 helm template \
     office-mcp \
