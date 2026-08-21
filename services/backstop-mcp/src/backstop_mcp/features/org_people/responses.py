@@ -71,6 +71,10 @@ class PersonAtOrganizationResponse(OmitNoneModel):
     company_name: str | None = Field(
         default=None, description="Company name on the person record, when Backstop has one."
     )
+    categories: tuple[str, ...] | None = Field(
+        default=None,
+        description="CRM categories on this person — investor type, role, or similar labels.",
+    )
     employment: EmploymentLinkResponse = Field(
         description=(
             "Employment at *this* organization, from `EmploymentIndex`: `status` is `current` "
@@ -91,6 +95,7 @@ class PersonAtOrganizationResponse(OmitNoneModel):
             email=None if card is None else card.email,
             phone=None if card is None else card.phone,
             company_name=None if card is None else card.company_name,
+            categories=None if card is None else card.categories,
             employment=employment,
         )
 

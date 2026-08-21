@@ -9,7 +9,7 @@ false they are counted on `former_omitted` rather than listed.
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
@@ -73,6 +73,15 @@ async def get_people_for_party(
             ),
         ),
     ] = None,
+    search_type: Annotated[
+        Literal["organizations"] | None,
+        Field(
+            description=(
+                "Echo `search_type` from a prior resolve. This tool only reads an "
+                "organization's roster; omit it or pass `organizations`."
+            ),
+        ),
+    ] = None,
     include_former: Annotated[
         bool,
         Field(
@@ -93,13 +102,13 @@ async def get_people_for_party(
     even when people are on file. Name and email come from `/employees` (same ids as people)
     side-loaded with employment relationships on that walk — not a fetch per person.
 
-    Each row is identity (`id` / `search_type` / name / email) plus `employment` from
-    `EmploymentIndex` — `status` is `current` or `former` at this organization. Default is
-    current only. `/employees` does not list former staff; those links are on the
-    organization's `entityRelationships`. When they are omitted, `former_omitted` and
-    `include_former_hint` say so — pass `include_former=true` to include them (contact
-    fields may be absent). Call `get_person` with that row's `id` and `search_type` for
-    the full record.
+    Each row is identity (`id` / `search_type` / name / email / `categories`) plus
+    `employment` from `EmploymentIndex` — `status` is `current` or `former` at this
+    organization. Default is current only. `/employees` does not list former staff; those
+    links are on the organization's `entityRelationships`. When they are omitted,
+    `former_omitted` and `include_former_hint` say so — pass `include_former=true` to
+    include them (contact fields may be absent). Call `get_person` with that row's `id`
+    and `search_type` for the full record.
     """
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")
@@ -107,7 +116,7 @@ async def get_people_for_party(
     result = await resolve_party(
         ctx,
         client,
-        search_type="organizations",
+        search_type=search_type if search_type is not None else "organizations",
         party_id=party_id,
         search=search,
     )

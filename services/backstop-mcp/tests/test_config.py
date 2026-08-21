@@ -79,8 +79,16 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 30_000
         assert config.default_page_size == 100
         assert config.report_page_size == 500
-        assert config.custom_field_schema_ttl_minutes == 60
+        assert config.custom_field_schema_ttl_minutes == 24 * 60
         assert config.opportunity_stage_ttl_minutes == 60
+        assert config.activity_tag_ttl_minutes == 24 * 60
+        assert config.system_user_ttl_minutes == 24 * 60
+        # Every catalog cache ships off. A TTL is only worth its staleness once the two
+        # `catalog_*_duration_seconds` histograms say what it saves, so the default is measure,
+        # not assume — see `features/cached_catalog.py`.
+        assert config.custom_field_schema_cache_enabled is False
+        assert config.activity_tag_cache_enabled is False
+        assert config.system_user_cache_enabled is False
         assert config.employment_relationship_type_ids == ()
         assert config.employment_relationship_type_markers == ("employ",)
         assert config.former_employment_relationship_type_ids == ()
@@ -114,6 +122,11 @@ class TestBackstopConfigDefaults:
         monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "250")
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "120")
         monkeypatch.setenv("BACKSTOP_OPPORTUNITY_STAGE_TTL_MINUTES", "30")
+        monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_TTL_MINUTES", "90")
+        monkeypatch.setenv("BACKSTOP_SYSTEM_USER_TTL_MINUTES", "45")
+        monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "true")
+        monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED", "1")
+        monkeypatch.setenv("BACKSTOP_SYSTEM_USER_CACHE_ENABLED", "yes")
 
         config = BackstopConfig()
 
@@ -126,6 +139,13 @@ class TestBackstopConfigDefaults:
         assert config.report_page_size == 250
         assert config.custom_field_schema_ttl_minutes == 120
         assert config.opportunity_stage_ttl_minutes == 30
+        assert config.activity_tag_ttl_minutes == 90
+        assert config.system_user_ttl_minutes == 45
+        # Each catalog cache is turned on per feature, and pydantic-settings accepts the several
+        # spellings an operator or a Helm values file is likely to produce.
+        assert config.custom_field_schema_cache_enabled is True
+        assert config.activity_tag_cache_enabled is True
+        assert config.system_user_cache_enabled is True
 
     def test_employment_relationship_types_parse_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "1, 2,3")
@@ -167,6 +187,22 @@ class TestBackstopConfigDefaults:
     def test_custom_field_schema_ttl_rejects_zero(self) -> None:
         with pytest.raises(ValueError, match="custom_field_schema_ttl_minutes"):
             BackstopConfig(custom_field_schema_ttl_minutes=0)
+
+    def test_activity_tag_ttl_rejects_values_over_24_hours(self) -> None:
+        with pytest.raises(ValueError, match="activity_tag_ttl_minutes"):
+            BackstopConfig(activity_tag_ttl_minutes=24 * 60 + 1)
+
+    def test_activity_tag_ttl_rejects_zero(self) -> None:
+        with pytest.raises(ValueError, match="activity_tag_ttl_minutes"):
+            BackstopConfig(activity_tag_ttl_minutes=0)
+
+    def test_system_user_ttl_rejects_values_over_24_hours(self) -> None:
+        with pytest.raises(ValueError, match="system_user_ttl_minutes"):
+            BackstopConfig(system_user_ttl_minutes=24 * 60 + 1)
+
+    def test_system_user_ttl_rejects_zero(self) -> None:
+        with pytest.raises(ValueError, match="system_user_ttl_minutes"):
+            BackstopConfig(system_user_ttl_minutes=0)
 
 
 class TestActivityHistoryConfig:

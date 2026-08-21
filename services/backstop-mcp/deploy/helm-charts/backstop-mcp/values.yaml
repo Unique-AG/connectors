@@ -18,6 +18,32 @@ env:
   # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
   # BACKSTOP_BASE_URL defaults to https://api.backstopsolutions.com inside the app.
 
+  # In-memory catalog caches, one flag per feature, all off. A catalog is a small instance-wide
+  # `{id: dto}` map (custom-field definitions and groups, activity tags, system users) that many
+  # tool calls read and nothing writes; with a flag off, every read re-walks Backstop instead.
+  #
+  # They ship off on purpose. A TTL trades staleness for saved requests, and until this ran in
+  # production nothing measured either side of that trade. Two histograms on /metrics do, and an
+  # overlay should read them before flipping one of these to "true":
+  #
+  #   sum by (catalog) (rate(catalog_get_duration_seconds_count[5m]))       # demand
+  #     - sum by (catalog) (rate(catalog_fetch_duration_seconds_count[5m])) # walks avoided already
+  #
+  # `catalog_get_duration_seconds{served=...}` splits demand by what answered it, and
+  # `catalog_fetch_duration_seconds` buckets what one walk costs. High demand plus an expensive
+  # walk is the case for turning a flag on; then confirm `served="cache"` rises and the walk rate
+  # falls. Set here rather than left to the app so an overlay can flip one without knowing the
+  # env var name; the app's own default is false either way.
+  #
+  # How long an enabled cache holds is a separate knob per feature, defaulted in the app and
+  # capped at 24h: BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES (1440),
+  # BACKSTOP_ACTIVITY_TAG_TTL_MINUTES (1440), BACKSTOP_SYSTEM_USER_TTL_MINUTES (1440).
+  #
+  # Covers both custom-field catalogs (definitions and groups), which share a TTL.
+  BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED: "false"
+  BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED: "false"
+  BACKSTOP_SYSTEM_USER_CACHE_ENABLED: "false"
+
 envVars: []
 # Required secrets (provide via envVars in overlay):
 # - BACKSTOP_MCP_ENCRYPTION_KEY: Fernet key for credential encryption

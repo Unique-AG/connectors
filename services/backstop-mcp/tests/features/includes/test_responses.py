@@ -9,6 +9,8 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.features.includes import (
+    ActivityInclude,
+    ActivityIncludesResponse,
     CompanyRefResponse,
     ContactCardResponse,
     ContactEmailResponse,
@@ -235,7 +237,7 @@ class TestContactEmail:
 
 
 class TestContactCard:
-    def test_keeps_five_of_the_thirty_one_person_attributes(self) -> None:
+    def test_keeps_five_person_attributes_when_categories_are_absent(self) -> None:
         card = ContactCardResponse.model_validate(_PERSON)
 
         assert card.model_dump() == {
@@ -245,6 +247,20 @@ class TestContactCard:
             "phone": "(480) 419-3625",
             "company_name": "Koch Industries Employees' Pension Plan",
         }
+
+    def test_projects_categories_from_names_or_name_objects(self) -> None:
+        from_strings = ContactCardResponse.model_validate(
+            {"name": "Glenn, Phil", "categories": ["Investor", "Decision Maker"]}
+        )
+        from_objects = ContactCardResponse.model_validate(
+            {
+                "name": "Glenn, Phil",
+                "categories": [{"name": "Investor"}, {"name": "  Decision Maker  "}, {"name": ""}],
+            }
+        )
+
+        assert from_strings.categories == ("Investor", "Decision Maker")
+        assert from_objects.categories == ("Investor", "Decision Maker")
 
 
 class TestCompanyRef:
@@ -262,7 +278,7 @@ class TestCompanyRef:
 
 
 class TestInternalOwner:
-    def test_keeps_four_of_the_thirteen_system_user_attributes(self) -> None:
+    def test_keeps_five_of_the_thirteen_system_user_attributes(self) -> None:
         owner = InternalOwnerResponse.model_validate(_SYSTEM_USER)
 
         assert owner.model_dump() == {
@@ -270,6 +286,7 @@ class TestInternalOwner:
             "user_name": "mlucas",
             "email": "margaret.lucas@capstoneco.com",
             "phone": "12122321462",
+            "disabled": False,
         }
 
     def test_is_documented_as_our_own_staff_rather_than_a_way_to_reach_the_investor(self) -> None:
@@ -313,6 +330,18 @@ class TestTheIncludesModelsAreTheAllowlist:
     def test_the_person_literal_lists_exactly_the_model_fields(self) -> None:
         assert _literal_names(PersonInclude) == tuple(PersonIncludesResponse.model_fields)
 
+    def test_the_activity_literal_lists_exactly_the_model_fields(self) -> None:
+        assert _literal_names(ActivityInclude) == tuple(ActivityIncludesResponse.model_fields)
+
+    def test_every_activity_field_asks_backstop_for_one_named_relationship(self) -> None:
+        assert {
+            name: (include.relationship, include.resource_type)
+            for name, include in _includes(ActivityIncludesResponse).items()
+        } == {
+            "activity_tags": ("activityTags", "activity-tags"),
+            "attendees": ("attendees", "people"),
+        }
+
     def test_every_organization_field_asks_backstop_for_one_named_relationship(self) -> None:
         assert {
             name: (include.relationship, include.resource_type)
@@ -339,7 +368,11 @@ class TestTheIncludesModelsAreTheAllowlist:
         """`activities` is unreachable by construction, which is the point of the allowlist."""
         relationships = {
             include.relationship
-            for model in (OrganizationIncludesResponse, PersonIncludesResponse)
+            for model in (
+                OrganizationIncludesResponse,
+                PersonIncludesResponse,
+                ActivityIncludesResponse,
+            )
             for include in _includes(model).values()
         }
 
@@ -361,11 +394,15 @@ class TestTheIncludesModelsAreTheAllowlist:
         """
         empty_org = OrganizationIncludesResponse()
         empty_person = PersonIncludesResponse()
+        empty_activity = ActivityIncludesResponse()
         assert all(
             getattr(empty_org, name) is None for name in OrganizationIncludesResponse.model_fields
         )
         assert all(
             getattr(empty_person, name) is None for name in PersonIncludesResponse.model_fields
+        )
+        assert all(
+            getattr(empty_activity, name) is None for name in ActivityIncludesResponse.model_fields
         )
         assert empty_org.model_dump() == {}
         assert empty_person.model_dump() == {}
@@ -399,7 +436,10 @@ class TestTheIncludeMetadataStaysOutOfThePublishedSchema:
 
         assert company["anyOf"] == [{"$ref": "#/$defs/CompanyRefResponse"}, {"type": "null"}]
 
-    @pytest.mark.parametrize("model", [OrganizationIncludesResponse, PersonIncludesResponse])
+    @pytest.mark.parametrize(
+        "model",
+        [OrganizationIncludesResponse, PersonIncludesResponse, ActivityIncludesResponse],
+    )
     def test_the_metadata_itself_is_not_a_published_definition(
         self, model: type[BaseModel]
     ) -> None:

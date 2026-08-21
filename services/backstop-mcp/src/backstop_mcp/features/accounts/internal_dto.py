@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import date
-from typing import ClassVar, Literal, Self
+from typing import ClassVar, Literal, Self, cast, get_args
 
 from pydantic import BaseModel, ConfigDict
 
@@ -12,34 +12,101 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.features.accounts.api_responses import (
     AccountApiResponse,
     AccountAttributes,
+    AccountTableRowAttributes,
     InvestorQualificationAttributes,
     InvestorTypeAttributes,
     OwnerAttributes,
     ProductAttributes,
     SeriesPointAttributes,
+    TableDataMoneyAttributes,
+    TableDataShareAttributes,
 )
 from backstop_mcp.features.resolution import Candidate, Resolution
 
 __all__ = [
+    "ACCOUNT_SERIES",
     "AccountListingDto",
     "AccountOwnerDto",
-    "AccountPositionDto",
     "AccountRecordDto",
-    "AumReconciliationDto",
+    "AccountSeries",
+    "CapitalFlowDto",
+    "CapitalFlowPartyDto",
+    "CapitalFlowWalkDto",
+    "CapitalFlowsFetchDto",
+    "HoldingFigureErrorDto",
+    "HoldingListingDto",
+    "HoldingRowDto",
+    "HoldingsSource",
     "InvestorTypeDto",
+    "MoneyDto",
+    "PRODUCT_SERIES",
     "ProductCandidate",
-    "ProductPositionsDto",
+    "ProductCatalogFetchDto",
+    "ProductFetchDto",
     "ProductResolution",
+    "ProductSeries",
     "ResolvedProductDto",
-    "SeriesErrorDto",
     "SeriesFigureDto",
-    "SeriesName",
     "SeriesPointDto",
+    "ShareDto",
+    "TimeSeriesEntityType",
+    "TimeSeriesName",
 ]
 
 _OWNER = "owner"
 _INVESTOR_TYPE = "investorType"
 _PRODUCT = "product"
+
+# Swagger enums for `GET /{accounts|products}/{id}/{timeSeries}`. Keep Backstop's
+# `currentMonthNetAssests` spelling. Membership sets are derived from the Literals so a
+# typo cannot accept a path segment pydantic would reject, or the other way around.
+type TimeSeriesEntityType = Literal["accounts", "products"]
+type AccountSeries = Literal[
+    "currentMonthIrrs",
+    "currentMonthNetAssests",
+    "earnings",
+    "grossValues",
+    "highwaterMarks",
+    "incentiveFees",
+    "incentiveFeesCharged",
+    "irrs",
+    "managementFees",
+    "newIssueIncomes",
+    "percentageOfFundHistory",
+    "performanceFeeAccrued",
+    "returns",
+    "startingValues",
+    "totalInvested",
+    "totalRedemptions",
+    "values",
+]
+type ProductSeries = Literal[
+    "aums",
+    "benchmarkAReturns",
+    "benchmarkBReturns",
+    "benchmarkCReturns",
+    "benchmarkDReturns",
+    "benchmarkEReturns",
+    "benchmarkFReturns",
+    "benchmarkGReturns",
+    "benchmarkHReturns",
+    "expenseDataPoints",
+    "incomeDataPoints",
+]
+type TimeSeriesName = AccountSeries | ProductSeries
+
+
+def _literal_strings(alias: object) -> frozenset[str]:
+    """String members of a PEP 695 `Literal` alias."""
+    value: object = getattr(alias, "__value__", alias)
+    members = cast("tuple[object, ...]", get_args(value))
+    names = tuple(member for member in members if isinstance(member, str))
+    assert names and len(names) == len(members), f"{alias} is not a non-empty string Literal"
+    return frozenset(names)
+
+
+ACCOUNT_SERIES: frozenset[str] = _literal_strings(AccountSeries)
+PRODUCT_SERIES: frozenset[str] = _literal_strings(ProductSeries)
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _OwnerInclude = IncludedResource[OwnerAttributes]
@@ -97,6 +164,15 @@ class ResolvedProductDto(BaseModel):
 
 type ProductCandidate = Candidate[ResolvedProductDto]
 type ProductResolution = Resolution[ResolvedProductDto]
+
+
+class ProductFetchDto(BaseModel):
+    """A product identity plus the raw custom-field dump `get_product` joins to the catalog."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    product: ResolvedProductDto
+    stored_custom_field_values: object = None
 
 
 class AccountOwnerDto(BaseModel):
@@ -218,7 +294,7 @@ class AccountRecordDto(BaseModel):
         utility, and does not fit. It plans a caller-selected set of include *names* (the three
         here are fixed and unconditional), it projects a by-id document (this is a collection walk
         over one shared `included` array), and it keeps `attributes` only — while the ids are part
-        of the answer here, `product.id` being what `get_product_positions` takes back. What the
+        of the answer here, `product.id` being what `get_time_series` takes back. What the
         two do share is the layer below: `follow_included` and `IncludedResource`.
         """
         return cls.from_attributes(
@@ -255,11 +331,161 @@ class AccountListingDto(BaseModel):
     closed_omitted: int = 0
 
 
+# Which endpoint produced a holdings listing: the undocumented `bsg-account-table-data` or the
+# documented `/accounts` walk plus series. They answer the same question with different
+# completeness, and the name says which endpoint rather than passing judgement on it.
+type HoldingsSource = Literal["table-api", "accounts-api"]
+
+
+class MoneyDto(BaseModel):
+    """A money figure carried with Backstop's own rendering.
+
+    `formatted` is kept because it is the only thing that distinguishes "no figure recorded"
+    from a real zero: Backstop renders the former as `"-"` and the latter as `"$0.00"`, while
+    `amount` is `0.0` in both cases. Callers that need the distinction read `formatted`.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    amount: float | None = None
+    currency: str | None = None
+    formatted: str | None = None
+
+    @classmethod
+    def from_attributes(cls, attrs: TableDataMoneyAttributes | None) -> Self | None:
+        if attrs is None:
+            return None
+        if attrs.amount is None and attrs.formatted_value is None:
+            return None
+        return cls(
+            amount=attrs.amount,
+            currency=attrs.currency,
+            formatted=attrs.formatted_value,
+        )
+
+
+class ShareDto(BaseModel):
+    """A share-of-fund figure. `fraction` is a fraction (`0.796`), not a percentage."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    fraction: float | None = None
+    formatted: str | None = None
+
+    @classmethod
+    def from_attributes(cls, attrs: TableDataShareAttributes | None) -> Self | None:
+        if attrs is None:
+            return None
+        if attrs.value is None and attrs.formatted_value is None:
+            return None
+        return cls(fraction=attrs.value, formatted=attrs.formatted_value)
+
+
+class HoldingFigureErrorDto(BaseModel):
+    """A figure that could not be fetched, and why.
+
+    Without this, "we asked and the request failed" and "Backstop publishes no number" are the
+    same `None`. The fallback holdings walk uses it per figure rather than dropping the row.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    figure: str
+    message: str
+
+
+class HoldingRowDto(BaseModel):
+    """One account a party holds, with the snapshot figures from the UI table endpoint.
+
+    `balance_as_of` and `balance_status` are the difference between the two source endpoints, and
+    the reason they are published rather than smoothed over. On `table-api` both are `None`: the
+    balance matched the **newest** `/accounts/{id}/values` point exactly on a measured account,
+    including when that point was an `ESTIMATE`, and the endpoint does not say which. On
+    `accounts-api` the balance is the newest point that carries a **number**, which can be months
+    older than the newest point — so the same field means "current" on one path and "last known"
+    on the other, and only the date says which. `figure_errors` separates "the request failed"
+    from "Backstop publishes no number", which are otherwise the same `None`.
+
+    `account_id` is the id every follow-up call needs, so a row without one is not projected at
+    all: it cannot be used for anything a caller would do next.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    account_id: str
+    product_id: str | None = None
+    product_short_name: str | None = None
+    investor_id: str | None = None
+    investor_resource_type: str | None = None
+    account_term_id: str | None = None
+    other_id: str | None = None
+    funded_date: date | None = None
+    closed_date: date | None = None
+    closed: bool = False
+    balance: MoneyDto | None = None
+    balance_as_of: date | None = None
+    balance_status: str | None = None
+    commitment: MoneyDto | None = None
+    unfunded_commitment: MoneyDto | None = None
+    percentage_of_product: ShareDto | None = None
+    percentage_of_master: ShareDto | None = None
+    figure_errors: tuple[HoldingFigureErrorDto, ...] = ()
+
+    @classmethod
+    def from_attributes(cls, attrs: AccountTableRowAttributes) -> Self | None:
+        """Project one table row, or `None` when it carries no usable account id."""
+        if attrs.account is None:
+            return None
+        return cls(
+            account_id=attrs.account.resource_id,
+            product_id=attrs.product.resource_id if attrs.product else None,
+            product_short_name=attrs.product.short_name if attrs.product else None,
+            investor_id=attrs.investor.resource_id if attrs.investor else None,
+            investor_resource_type=attrs.investor.resource_type if attrs.investor else None,
+            account_term_id=attrs.account_term.resource_id if attrs.account_term else None,
+            other_id=attrs.other_id,
+            funded_date=attrs.funded_date,
+            closed_date=attrs.closed_date,
+            closed=bool(attrs.closed),
+            balance=MoneyDto.from_attributes(attrs.balance),
+            commitment=MoneyDto.from_attributes(attrs.commitment),
+            unfunded_commitment=MoneyDto.from_attributes(attrs.unfunded_commitment),
+            percentage_of_product=ShareDto.from_attributes(attrs.percentage_of_product),
+            percentage_of_master=ShareDto.from_attributes(attrs.percentage_of_master),
+        )
+
+
+class HoldingListingDto(BaseModel):
+    """A party's holdings after the open/closed split.
+
+    The three counts are Backstop's own, covering the **whole** table before `include_closed`
+    filtering — so `all_count` can exceed `len(rows)` legitimately. `rows_dropped` is how many
+    rows carried no account id and were skipped; non-zero means the endpoint's shape moved and is
+    worth surfacing rather than silently under-reporting.
+
+    `source` and `omitted_fields` are facts about which path produced this, not the sentence a
+    caller reads: the response layer turns them into the caveat the model is shown. `omitted_fields`
+    is empty on the table path and names what the documented walk cannot produce on the other.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[HoldingRowDto, ...]
+    source: HoldingsSource = "table-api"
+    omitted_fields: tuple[str, ...] = ()
+    closed_omitted: int = 0
+    rows_dropped: int = 0
+    open_count: int | None = None
+    all_count: int | None = None
+    closed_count: int | None = None
+
+
 class SeriesPointDto(BaseModel):
-    """The latest usable point in a series: `max(date)`, never 'last of month'.
+    """One dated point on a series. A missing `value` is "not in yet", never a silent skip.
 
     `value_status` is whatever Backstop sent (`ESTIMATE` on recent `values`, often absent on
-    `totalInvested` / `aums`). It is not defaulted to `ACTUAL`.
+    `totalInvested` / `aums`). It is not defaulted to `ACTUAL`. `source` is the product-`aums`
+    extra and is omitted on every other series.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -267,13 +493,19 @@ class SeriesPointDto(BaseModel):
     date: date
     value: float | None = None
     value_status: str | None = None
+    source: str | None = None
 
     @classmethod
     def from_attributes(cls, attributes: SeriesPointAttributes) -> Self | None:
         point_date = attributes.date
         if point_date is None:
             return None
-        return cls(date=point_date, value=attributes.value, value_status=attributes.value_status)
+        return cls(
+            date=point_date,
+            value=attributes.value,
+            value_status=attributes.value_status,
+            source=attributes.source,
+        )
 
 
 class SeriesFigureDto(BaseModel):
@@ -293,63 +525,74 @@ class SeriesFigureDto(BaseModel):
     valued: SeriesPointDto | None = None
 
 
-type SeriesName = Literal["values", "totalInvested", "totalRedemptions"]
-
-
-class SeriesErrorDto(BaseModel):
-    """One series that failed for an account — siblings on the same row still stand."""
+class CapitalFlowPartyDto(BaseModel):
+    """Account or owner chip on a capital-flow row."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    series: SeriesName
-    message: str
+    id: str
+    name: str | None = None
+    resource_type: str | None = None
 
 
-class AccountPositionDto(BaseModel):
-    """One listed account with the three series attached.
+class CapitalFlowDto(BaseModel):
+    """One subscription or redemption after includes are resolved."""
 
-    A missing figure is `None` (empty series), never `0.0`. A `0.0` that Backstop published is
-    kept. Failures go in `errors` so one 500 does not drop the row or its siblings.
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    kind: Literal["subscription", "redemption"]
+    amount: float | None = None
+    transaction_date: date | None = None
+    notice_date: date | None = None
+    status: str | None = None
+    description: str | None = None
+    share_class: str | None = None
+    share_series: str | None = None
+    liquidating: bool | None = None
+    account: CapitalFlowPartyDto | None = None
+    owner: CapitalFlowPartyDto | None = None
+    unattributed: bool = False
+
+
+class ProductCatalogFetchDto(BaseModel):
+    """The product catalog walk, and whether it read all of it.
+
+    `scan_truncated` is the walk's scan ceiling firing, which turns "the catalog" into "the
+    first N products" — the difference between "no product has this Strategy" and "none of the
+    ones I looked at did".
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    account: AccountRecordDto
-    balance: SeriesFigureDto | None = None
-    invested: SeriesFigureDto | None = None
-    redemptions: SeriesFigureDto | None = None
-    errors: tuple[SeriesErrorDto, ...] = ()
+    products: tuple[ProductFetchDto, ...]
+    scan_truncated: bool = False
 
 
-class AumReconciliationDto(BaseModel):
-    """Latest assets under management (AUM) against the sum of returned account balances.
+class CapitalFlowWalkDto(BaseModel):
+    """One capital-flow collection walk: what it kept, what it cost, and what it missed."""
 
-    The two are never expected to agree to the cent: they are as-of different dates, the open
-    default excludes closed-but-still-valued accounts, and balances are summed without currency
-    conversion. So `diverges` is a *tolerance* verdict, not an equality test, and `difference`
-    is published so the caller can judge the magnitude itself rather than trust a bare flag.
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[CapitalFlowDto, ...]
+    non_actuals_dropped: int
+    request_count: int
+    scan_truncated: bool
+
+
+class CapitalFlowsFetchDto(BaseModel):
+    """Both walks, merged newest-first, with the cost and the coverage of the pair.
+
+    `rows_dropped` is how many rows in the window were not actuals (`status != COMPLETED`) and
+    so are absent from `rows` and from every count derived from it. `request_count` is pages
+    actually fetched across both collections, not a constant. `scan_truncated` is true when
+    either walk stopped at its scan ceiling, which makes `rows` a prefix of the window rather
+    than the window.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    balance_total: float | None = None
-    difference: float | None = None
-    diverges: bool = False
-
-
-class ProductPositionsDto(BaseModel):
-    """Listed accounts with figures, plus product assets under management (AUM).
-
-    AUM is the product's total reported value, not one investor's balance. `accounts_omitted`
-    is how many listed open accounts were dropped before the series fan-out because the product
-    exceeded the per-call cap.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    product: ResolvedProductDto
-    accounts: tuple[AccountPositionDto, ...]
-    closed_omitted: int = 0
-    accounts_omitted: int = 0
-    aum: SeriesFigureDto | None = None
-    reconciliation: AumReconciliationDto = AumReconciliationDto()
+    rows: tuple[CapitalFlowDto, ...]
+    rows_dropped: int
+    request_count: int
+    scan_truncated: bool = False

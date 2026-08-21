@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": null,
+      "type": "bsg-account-table-data",
+      "attributes": {
+        "accounts": [],
+        "openCount": 0,
+        "allCount": 0,
+        "closedCount": 0
+      },
+      "links": {
+        "self": "https://example.backstopsolutions.com/backstop/api/bsg-account-table-data/null"
+      }
+    }
+  ],
+  "included": [],
+  "meta": {
+    "totalResourceCount": 0
+  }
+}

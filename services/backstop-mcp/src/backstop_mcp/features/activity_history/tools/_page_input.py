@@ -110,6 +110,17 @@ class ActivityHistoryFirstPageInput(BaseModel):
             ),
         ),
     ] = None
+    activity_tag_ids: Annotated[
+        list[str] | None,
+        Field(
+            min_length=1,
+            description=(
+                "Only include activities that carry all of these tag ids (intersection). Echo "
+                "ids from list_activity_tags; never invent them. Emails have no tags and are "
+                "omitted from the result when this is set."
+            ),
+        ),
+    ] = None
     limit: Annotated[
         int | None,
         Field(
@@ -140,6 +151,19 @@ class ActivityHistoryFirstPageInput(BaseModel):
     def _since_not_after_until(self) -> Self:
         if self.since is not None and self.until is not None and self.since > self.until:
             raise ValueError("since must not be after until")
+        return self
+
+    @model_validator(mode="after")
+    def _tag_filter_leaves_a_tagged_stream(self) -> Self:
+        if not self.activity_tag_ids:
+            return self
+        remaining = [
+            item for item in effective_activity_types(self.activity_types) if item != "email"
+        ]
+        if not remaining:
+            raise ValueError(
+                "activity_tag_ids cannot be used with only the email stream; emails have no tags"
+            )
         return self
 
 
@@ -225,10 +249,13 @@ class FetchArgs(BaseModel):
 
 def effective_activity_types(
     activity_types: list[ActivityType] | None,
+    *,
+    activity_tag_ids: list[str] | None = None,
 ) -> tuple[ActivityType, ...]:
-    if not activity_types:
-        return _DEFAULT_ACTIVITY_TYPES
-    return tuple(dict.fromkeys(activity_types))
+    types = _DEFAULT_ACTIVITY_TYPES if not activity_types else tuple(dict.fromkeys(activity_types))
+    if activity_tag_ids:
+        return tuple(item for item in types if item != "email")
+    return types
 
 
 async def extract_fetch_activity_history_args(
@@ -271,6 +298,7 @@ async def extract_fetch_activity_history_args(
             since=since,
             until=until,
             limit=limit,
+            activity_tag_ids=activity_tag_ids,
         ):
             result = await resolve_party(
                 ctx,
@@ -291,7 +319,10 @@ async def extract_fetch_activity_history_args(
                 )
                 return unresolved_party_response(result)
             party = result.value
-            effective_types = effective_activity_types(activity_types)
+            tag_ids = tuple(activity_tag_ids) if activity_tag_ids else None
+            effective_types = effective_activity_types(
+                activity_types, activity_tag_ids=activity_tag_ids
+            )
             effective_page_size = limit if limit is not None else page_size
             # Person quick-search uses shared PERSON_* types, so a hit may be contacts/
             # employees — follow `party.search_type` like `get_person`, not the requested one.
@@ -305,6 +336,7 @@ async def extract_fetch_activity_history_args(
                         offset=0,
                         since=since,
                         until=until,
+                        activity_tag_ids=tag_ids,
                     )
                     for activity_type in effective_types
                 },

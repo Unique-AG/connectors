@@ -168,7 +168,11 @@ async def get_opportunities(
 
     `stage` is where the deal is now. `previous_stage` is the stage it most recently LEFT, and
     is omitted until the deal has moved at all — do not read it as the current stage. Stage
-    names are this instance's vocabulary, returned on each deal.
+    names are this instance's vocabulary, returned on each deal. `weighted_value` /
+    `weighted_allocated_value` are Backstop's own products of amount and probability.
+    `probability` is the standard attribute; a rep-entered probability custom field stays in
+    `custom_field_values` under its own name. Master Pipeline fields are those custom-field
+    entries — call `list_custom_fields` with entity_types opportunities for definitions.
     """
     result = await resolve_party(
         ctx,

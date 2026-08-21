@@ -45,6 +45,25 @@ class TestRenderLoginForm:
 
         assert "<script>" not in html
 
+    def test_uses_unique_backstop_mcp_title(self) -> None:
+        html = render_login_form("req-123", "csrf-abc")
+
+        assert "<title>Unique Backstop Mcp</title>" in html
+        assert "<h1>Unique Backstop Mcp</h1>" in html
+
+    def test_labels_token_field_as_api_token(self) -> None:
+        html = render_login_form("req-123", "csrf-abc")
+
+        assert 'for="api_token">API token</label>' in html
+        assert ">Password<" not in html
+
+    def test_explains_how_to_get_an_api_token(self) -> None:
+        html = render_login_form("req-123", "csrf-abc")
+
+        assert "How to get an API token" in html
+        assert "Generate New Token" in html
+        assert "https://backstopsolutions.elevio.help/en/articles/236" in html
+
     def test_includes_csrf_token_as_hidden_field(self) -> None:
         """The other half of the double-submit check in `login_csrf.py`."""
         html = render_login_form("req-123", "csrf-abc")

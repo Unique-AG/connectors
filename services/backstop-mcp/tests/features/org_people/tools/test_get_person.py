@@ -1,8 +1,11 @@
+from typing import cast
+
 import httpx
 import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     DepartureSignal,
@@ -14,6 +17,7 @@ from backstop_mcp.features.party_resolver import (
     PartyCandidateResponse,
     ResolvedPartyResponse,
 )
+from backstop_mcp.models import CoercedId
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
     FORMER_TYPE,
@@ -27,10 +31,22 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
-from tests.helpers import build_employment_index_factory
-from tests.server.tools.helpers import object_dict, tool_model, tool_payload
+from tests.helpers import build_employment_index_factory, custom_fields_service
+from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _INDEX = build_employment_index_factory()
+_EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+
+
+@pytest.fixture(autouse=True)
+def _empty_custom_field_definitions() -> None:
+    respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+        return_value=httpx.Response(200, json=_EMPTY_DEFINITIONS)
+    )
+
+
+def _catalog() -> CustomFieldsService:
+    return custom_fields_service()
 
 
 # The measured trio on one live person: two retired addresses from previous firms alongside the
@@ -120,6 +136,7 @@ class TestGetPerson:
                 ctx_never_elicit(),
                 search="Jane Doe",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -174,6 +191,7 @@ class TestGetPerson:
                 ctx_never_elicit(),
                 search="Jane Doe",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -219,6 +237,7 @@ class TestGetPerson:
                 ctx_never_elicit(),
                 search="Jane Contact",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -260,6 +279,7 @@ class TestGetPerson:
                 party_id="c9",
                 search_type="contacts",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -293,6 +313,7 @@ class TestGetPerson:
                 ctx_decline(),
                 search="Jane",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PartyAmbiguousResponse,
@@ -344,6 +365,7 @@ class TestGetPerson:
                 ctx_never_elicit(),
                 search="Jane Doe",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -385,6 +407,7 @@ class TestGetPersonIncludes:
                 party_id="p9",
                 include=["email_addresses"],
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -440,6 +463,7 @@ class TestGetPersonIncludes:
                 party_id="p9",
                 include=["email_addresses", "company"],
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -471,6 +495,7 @@ class TestGetPersonIncludes:
                 ctx_never_elicit(),
                 party_id="p9",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             )
         )
@@ -534,6 +559,7 @@ class TestGetPersonIncludes:
                 party_id="p9",
                 include=["locations", "representative"],
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             ),
             PersonResolvedResponse,
@@ -584,6 +610,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="p9",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             )
         )
@@ -594,12 +621,10 @@ class TestGetPersonOmitsNullsFromTheWire:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_custom_field_values_survive_intact(self, client: BackstopClient) -> None:
-        """A plain dict, not a model, so nothing prunes it — write-back still round-trips."""
+    async def test_raw_custom_field_dump_is_absent_from_the_record(
+        self, client: BackstopClient
+    ) -> None:
 
-        custom_fields = [
-            {"definitionId": 343439, "name": "Status", "value": "Attended - Web & Adio"}
-        ]
         respx.get(f"{BASE_URL}/people/p9").mock(
             return_value=httpx.Response(
                 200,
@@ -607,7 +632,9 @@ class TestGetPersonOmitsNullsFromTheWire:
                     EMPLOYEE_TYPE,
                     attributes={
                         "name": "Jane Doe",
-                        "regularCustomFieldValues": custom_fields,
+                        "regularCustomFieldValues": [
+                            {"definitionId": 202, "name": "Party Field", "value": "party-value"}
+                        ],
                         "modifiedTimestamp": "2023-01-01T00:00:00Z",
                         "modifiedBy": "crm-admin",
                     },
@@ -620,11 +647,15 @@ class TestGetPersonOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="p9",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             )
         )
 
-        assert object_dict(payload["person"])["regularCustomFieldValues"] == custom_fields
+        person = object_dict(payload["person"])
+        assert "regularCustomFieldValues" not in person
+        assert "regular_custom_field_values" not in person
+        assert object_list(payload["custom_field_values"]) == []
 
     @pytest.mark.asyncio
     @respx.mock
@@ -643,6 +674,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="p9",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             )
         )
@@ -673,6 +705,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="p9",
                 client=client,
+                custom_fields=_catalog(),
                 employment_index_factory=_INDEX,
             )
         )
@@ -680,3 +713,89 @@ class TestGetPersonOmitsNullsFromTheWire:
         resolved = object_dict(payload["resolved"])
         assert resolved["id"] == "p9"
         assert "name" not in resolved
+
+
+class TestGetPersonCustomFields:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_party_bean_value_resolves_without_a_person_bean_definition(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "202",
+                            "custom-field-definitions",
+                            name="Party Field",
+                            entityType="PartyBean",
+                            fieldType="text",
+                            tabName="Party Tab",
+                            groupName="Party Group",
+                            groupId=22,
+                            layoutName="Party Layout",
+                        )
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(
+                200,
+                json=_person_document(
+                    EMPLOYEE_TYPE,
+                    attributes={
+                        "name": "Jane Doe",
+                        "regularCustomFieldValues": [
+                            {"definitionId": 202, "name": "Party Field", "value": "party-value"}
+                        ],
+                        "modifiedTimestamp": "2023-01-01T00:00:00Z",
+                        "modifiedBy": "crm-admin",
+                    },
+                ),
+            )
+        )
+
+        payload = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                client=client,
+                custom_fields=_catalog(),
+                employment_index_factory=_INDEX,
+            )
+        )
+
+        values = [object_dict(item) for item in object_list(payload["custom_field_values"])]
+        assert values == [
+            {
+                "definition_id": "202",
+                "name": "Party Field",
+                "layout_name": "Party Layout",
+                "group_name": "Party Group",
+                "field_type": "text",
+                "tab_name": "Party Tab",
+                "group_id": 22,
+                "entity_type": "PartyBean",
+                "value": "party-value",
+            }
+        ]
+        assert "regularCustomFieldValues" not in object_dict(payload["person"])
+
+        filtered = tool_payload(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                custom_field_definition_ids=cast(list[CoercedId], [202]),
+                client=client,
+                custom_fields=_catalog(),
+                employment_index_factory=_INDEX,
+            )
+        )
+        assert [
+            object_dict(item)["definition_id"]
+            for item in object_list(filtered["custom_field_values"])
+        ] == ["202"]

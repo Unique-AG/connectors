@@ -5,6 +5,7 @@ from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver._party_search_types import (
     EMAIL_FIELDS,
+    PARTY_SPARSE_FIELDS,
     PartyCollectionDocument,
     candidates_from_document,
 )
@@ -31,11 +32,15 @@ async def search_by_email(
     breaching it.
     """
     fields = EMAIL_FIELDS[search_type]
+    sparse = PARTY_SPARSE_FIELDS[search_type]
     documents = await asyncio.gather(
         *(
             client.get(
                 f"/{search_type}",
-                params={f"filter[{field}][eq]": email},
+                params={
+                    f"filter[{field}][eq]": email,
+                    f"fields[{search_type}]": sparse,
+                },
                 schema=PartyCollectionDocument,
             )
             for field in fields

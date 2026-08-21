@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from backstop_mcp.lenient import LenientBool, LenientInt
 
-__all__ = ["OpportunityStageAttributes"]
+__all__ = ["OpportunityStageAttributes", "SearchContactAttributes", "SearchProductAttributes"]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
@@ -23,3 +23,22 @@ class OpportunityStageAttributes(BaseModel):
     name: _StrippedStr | None = None
     sort_order: LenientInt = Field(default=None, alias="sortOrder")
     closed: LenientBool = None
+
+
+class SearchContactAttributes(BaseModel):
+    """Sparse `contacts` attributes from the investor include on `GET /opportunities`."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    name: str | None = None
+    country: str | None = None
+    state: str | None = None
+    city: str | None = None
+
+
+class SearchProductAttributes(BaseModel):
+    """Sparse `products` attributes from the product include on `GET /opportunities`."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    name: str | None = None

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from typing import Annotated, ClassVar
 
@@ -21,6 +21,10 @@ _NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_lengt
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 _CleanStr: TypeAdapter[str] = TypeAdapter(_NonEmptyStr)
+
+# JSON:API identity -> the `included` entry carrying it. Read-only by design: a caller
+# builds one with `index_included` and follows relationships against it.
+type IncludedIndex = Mapping[tuple[str | None, str], dict[str, object]]
 
 
 def _clean_str(value: object) -> str | None:
@@ -177,21 +181,36 @@ class ResourceRef(BaseModel):
     )
 
 
-def follow_included[AttrT](
+def index_included(
     included: Sequence[dict[str, object]],
+) -> dict[tuple[str | None, str], dict[str, object]]:
+    """`included` keyed by JSON:API identity `(type, id)`, built once.
+
+    Keyed by the pair rather than by id alone: ids are not unique across resource types in the
+    same `included` array (e.g. entity-relationships and entity-relationship-types can share
+    numeric ids).
+
+    `follow_included` builds this per call, which is the right trade for a single-party document
+    and the wrong one for a firm-wide walk that follows two relationships on each of a thousand
+    rows against one accumulated array. Such a caller indexes once and uses `follow_indexed`.
+    """
+    return {
+        (_clean_str(item.get("type")), item_id): item
+        for item in included
+        if (item_id := _clean_str(item.get("id"))) is not None
+    }
+
+
+def follow_indexed[AttrT](
+    index: IncludedIndex,
     resource: BackstopApiResource[AttrT] | None,
     relationship_name: str,
 ) -> list[dict[str, object]]:
-    """The entries of `included` linked from `resource` via `relationship_name`.
+    """`follow_included` against a prebuilt `index_included` map — same result, same order.
 
-    Takes the side-loaded resources rather than the document they arrived in, so a paginated walk
-    can hand over its accumulated `included` without building an intermediate document. A `None`
-    resource — a document whose primary data was null — has no linkage to follow, so it yields
-    nothing rather than forcing every caller to narrow before asking.
-
-    Matches entries by JSON:API identity `(type, id)` — ids alone are not unique across resource
-    types in the same `included` array (e.g. entity-relationships and entity-relationship-types
-    can share numeric ids). Order follows the relationship linkage, not the `included` order.
+    A `None` resource — a document whose primary data was null — has no linkage to follow, so it
+    yields nothing rather than forcing every caller to narrow before asking. Order follows the
+    relationship linkage, not the `included` order.
     """
     if resource is None:
         return []
@@ -204,14 +223,24 @@ def follow_included[AttrT](
         for ref in refs
         if (related_id := _clean_str(ref.id)) is not None
     )
-    if not wanted:
-        return []
-    by_identity = {
-        (_clean_str(item.get("type")), item_id): item
-        for item in included
-        if (item_id := _clean_str(item.get("id"))) is not None
-    }
-    return [by_identity[key] for key in wanted if key in by_identity]
+    return [index[key] for key in wanted if key in index]
+
+
+def follow_included[AttrT](
+    included: Sequence[dict[str, object]],
+    resource: BackstopApiResource[AttrT] | None,
+    relationship_name: str,
+) -> list[dict[str, object]]:
+    """The entries of `included` linked from `resource` via `relationship_name`.
+
+    Takes the side-loaded resources rather than the document they arrived in, so a paginated walk
+    can hand over its accumulated `included` without building an intermediate document.
+
+    Indexes `included` on every call. That is one pass per relationship followed, which is free
+    for a by-id document and quadratic for a walk projecting many rows out of one array — those
+    callers hold an `index_included` map and call `follow_indexed`.
+    """
+    return follow_indexed(index_included(included), resource, relationship_name)
 
 
 def included_by_type(

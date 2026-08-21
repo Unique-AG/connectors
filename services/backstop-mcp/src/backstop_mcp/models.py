@@ -1,8 +1,32 @@
 """Shared pydantic bases used by tool-facing response models."""
 
-from typing import cast
+from collections.abc import Sequence
+from typing import Annotated, cast
 
-from pydantic import BaseModel, SerializerFunctionWrapHandler, TypeAdapter, model_serializer
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    SerializerFunctionWrapHandler,
+    TypeAdapter,
+    model_serializer,
+)
+
+
+def _coerce_id(value: object) -> object:
+    """MCP clients echo numeric Backstop ids as JSON numbers, not strings."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return str(value)
+    return value
+
+
+CoercedId = Annotated[str, BeforeValidator(_coerce_id)]
+
+
+def coerce_ids(values: Sequence[str | int]) -> tuple[str, ...]:
+    """Normalize tool id lists so a JSON number matches a catalog string id."""
+    return tuple(str(value) for value in values)
 
 
 class OmitNoneModel(BaseModel):

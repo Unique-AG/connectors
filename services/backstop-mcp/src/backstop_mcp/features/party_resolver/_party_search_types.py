@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from pydantic import validate_email
 from pydantic_core import PydanticCustomError
@@ -22,6 +22,16 @@ EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
     "contacts": ("email",),
     "people": ("email", "email2", "email3"),
     "employees": ("email", "email2", "email3"),
+}
+
+# Same sparse fieldsets as the LIKE fallback. `/contacts` rejects firstName/lastName (400);
+# people/employees accept them. Without this, an unfiltered `/people` row drags custom fields
+# and the three-way email fan-out can hit the 30s read timeout.
+PARTY_SPARSE_FIELDS: Mapping[SearchType, str] = {
+    "organizations": "name",
+    "contacts": "name",
+    "people": "name,firstName,lastName",
+    "employees": "name,firstName,lastName",
 }
 
 # Backstop's `/quick-search` rejects our lowercase `SearchType` outright (400
@@ -63,8 +73,14 @@ def normalized_email(value: str) -> str | None:
 def candidates_from_document(
     document: PartyCollectionDocument, *, search_type: SearchType
 ) -> tuple[PartyCandidate, ...]:
+    return candidates_from_resources(document.data, search_type=search_type)
+
+
+def candidates_from_resources(
+    resources: Sequence[_PartyResource], *, search_type: SearchType
+) -> tuple[PartyCandidate, ...]:
     return tuple(
-        _candidate_from_resource(resource, search_type=search_type) for resource in document.data
+        _candidate_from_resource(resource, search_type=search_type) for resource in resources
     )
 
 

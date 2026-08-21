@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
@@ -9,6 +10,7 @@ from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.custom_fields import (
     CustomFieldDefinitionDto,
+    CustomFieldDefinitionResponse,
     CustomFieldEntityType,
     CustomFieldsService,
     custom_field_entity_type_from_bean,
@@ -26,20 +28,22 @@ class ListCustomFieldsResponse(BaseModel):
             "previous catalog is served because refresh failed."
         )
     )
-    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinitionDto]] = Field(
+    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinitionResponse]] = Field(
         description=(
-            "Custom-field definitions keyed by the requested entity type. An entity with "
-            "none on file is still present with an empty list."
+            "Custom-field definitions keyed by the requested standard Backstop entity type. "
+            "An entity with no definitions is still present with an empty list. Definitions may "
+            "be associated with a party or a concrete Backstop entity resource and include layout "
+            "group metadata such as group_id when available."
         )
     )
 
 
 def _definitions_for(
-    catalog: list[CustomFieldDefinitionDto], entity_type: CustomFieldEntityType
-) -> list[CustomFieldDefinitionDto]:
+    catalog: Mapping[str, CustomFieldDefinitionDto], entity_type: CustomFieldEntityType
+) -> list[CustomFieldDefinitionResponse]:
     return [
-        definition
-        for definition in catalog
+        CustomFieldDefinitionResponse.from_definition(definition)
+        for definition in catalog.values()
         if custom_field_entity_type_from_bean(definition.entity_type) == entity_type
     ]
 
@@ -58,7 +62,7 @@ async def list_custom_fields(
         Field(
             min_length=1,
             description=(
-                "Backstop entity types whose custom-field definitions to list: "
+                "Standard Backstop entity types whose custom-field definitions to list: "
                 "organizations, people, accounts, opportunities, products, or party."
             ),
         ),
@@ -70,10 +74,12 @@ async def list_custom_fields(
     client: BackstopClient = Depends(get_backstop_client),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> ListCustomFieldsResponse:
-    """List custom-field definitions for the requested Backstop entity types.
+    """List custom-field definitions for the requested standard Backstop entity types.
 
-    Use when you need the custom-field catalog (ids, types, layout, select options)
-    for one or more of organizations, people, accounts, opportunities, products, or party.
+    Use when you need the standard Backstop custom-field catalog (ids, types, layout, groups,
+    group_id, select options) for one or more of organizations, people, accounts, opportunities,
+    products, or party. Definitions may belong to a party or a concrete Backstop entity resource.
+    A definition's group_id identifies its Backstop layout group when available.
     Pass refresh=true only when the user reports a missing field.
     """
     catalog, cache = await custom_fields.get(client, refresh=refresh)

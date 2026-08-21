@@ -1,0 +1,807 @@
+{
+  "data": [
+    {
+      "id": null,
+      "type": "bsg-account-table-data",
+      "attributes": {
+        "accounts": [
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001665",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001665",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND1",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000777",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000777",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2017-01-01T00:00:00.000-0500",
+            "closedDate": "2022-02-01T00:00:00.000-0500",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002664",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002664",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001665",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001665",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND1",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000666",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000666",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2015-12-01T00:00:00.000-0500",
+            "closedDate": "2022-02-01T00:00:00.000-0500",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002220",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002220",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001776",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001776",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND2",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10001110",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10001110",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2013-06-01T00:00:00.000-0400",
+            "closedDate": "2015-06-30T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002109",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002109",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001887",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001887",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND3",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000333",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000333",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "closedDate": "2025-10-31T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002331",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002331",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001554",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001554",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND4",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10001221",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10001221",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2013-06-01T00:00:00.000-0400",
+            "closedDate": "2016-06-30T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002553",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002553",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001887",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001887",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND3",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000888",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000888",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "closedDate": "2025-10-31T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002331",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002331",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001887",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001887",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND3",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10001332",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10001332",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "closedDate": "2025-10-31T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002331",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002331",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001665",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001665",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND1",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000111",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000111",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2016-05-01T00:00:00.000-0400",
+            "closedDate": "2022-02-01T00:00:00.000-0500",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10001998",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10001998",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001443",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001443",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND5",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000999",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000999",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2022-05-16T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002442",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002442",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.7960328670615843,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.2659280279988749,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 3619868606.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$3,619,868,606.00"
+            },
+            "closed": false,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001443",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001443",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND5",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000555",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000555",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2022-05-16T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002442",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002442",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.20396713293841576,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.06813861548093716,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 1000.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": false,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001887",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001887",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND3",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000222",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000222",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2014-10-01T00:00:00.000-0400",
+            "closedDate": "2025-12-31T00:00:00.000-0500",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002331",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002331",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": true,
+            "otherId": "ACCT-REDACTED",
+            "customFieldValues": {}
+          },
+          {
+            "investor": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "product": {
+              "resourceType": "hedge-fund-products",
+              "resourceId": "10001443",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-products/10001443",
+              "resourceIconName": "entity-class-product",
+              "shortName": "FUND5",
+              "restricted": false
+            },
+            "account": {
+              "resourceType": "hedge-fund-accounts",
+              "resourceId": "10000444",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/hedge-fund-accounts/10000444",
+              "restricted": false
+            },
+            "organization": {
+              "resourceType": "organizations",
+              "resourceId": "10000000",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/organizations/10000000",
+              "restricted": false
+            },
+            "associationType": "0",
+            "commitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "unfundedCommitment": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "-"
+            },
+            "fundedDate": "2025-06-09T00:00:00.000-0400",
+            "accountTerm": {
+              "resourceType": "account-terms",
+              "resourceId": "10002442",
+              "resourceLink": "https://example.backstopsolutions.com/backstop/api/account-terms/10002442",
+              "restricted": false
+            },
+            "percentageOfProduct": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "percentageOfMaster": {
+              "value": 0.0,
+              "formattedValue": "$1,000.00"
+            },
+            "balance": {
+              "amount": 0.0,
+              "currency": "USD",
+              "currencySymbol": "$",
+              "formattedValue": "$1,000.00"
+            },
+            "closed": false,
+            "customFieldValues": {}
+          }
+        ],
+        "openCount": 3,
+        "allCount": 12,
+        "closedCount": 9
+      },
+      "links": {
+        "self": "https://example.backstopsolutions.com/backstop/api/bsg-account-table-data/null"
+      }
+    }
+  ],
+  "included": [],
+  "meta": {
+    "totalResourceCount": 0
+  }
+}

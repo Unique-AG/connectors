@@ -7,8 +7,9 @@ from a prior response — no resolve, no `/quick-search` round trip — and only
 re-fetched.
 
 The party record is fetched first (name + `as_of` provenance). Active stream fetches then go
-through one `asyncio.gather` call so a partial upstream failure fails the whole tool call rather
-than silently dropping a stream (see the design doc's Error Handling section).
+through one `asyncio.gather` call. A 5xx or transport failure still fails the whole call.
+A 403 on one stream (Backstop refusing a linked entity) is reported on that group and the
+other streams are kept — otherwise a forbidden document/email wipes a successful calls page.
 """
 
 import asyncio
@@ -21,7 +22,11 @@ from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopApiResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
     ActivityGroupResponse,
@@ -74,7 +79,14 @@ async def get_activity_history(
     client: BackstopClient = Depends(get_backstop_client),
     activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
 ) -> GetActivityHistoryResponse:
-    """Fetch a party's activity streams: meetings, calls, notes, emails, and documents.
+    """Party-scoped stream pages. Do not start here — always use `search_activities` first.
+
+    Documented fallback when `search_activities` is unavailable (that primary is an undocumented
+    UI search and may 404 on another tenant). Use `search_activities` for a date window, activity
+    types, tags, authors, note text, or a firm-wide question. This tool pages one party's REST
+    streams only when that primary is missing. REST `activity_tag_ids` are AND;
+    `search_activities` tag filters are OR. A 403 on one stream (empty `items` plus `error`) is
+    not "no notes" — retry those types on `search_activities` with `include_description`.
 
     Pass `request.type="first"` with `search_type` plus a trusted `party_id` (from a prior resolve
     echo — never invent or guess one) or `search` to start. When retrying with `party_id`, pass
@@ -96,8 +108,19 @@ async def get_activity_history(
     each requested stream regardless of age, which may be old — activity history in this CRM is
     often sparse.
 
+    Each meeting, call, note, and document row includes `tags` when Backstop side-loads them.
+    `/activities` does not publish `regarding` or `attendees` on this collection (those field
+    and include names 400); they stay empty on history rows. Pass `activity_tag_ids` from
+    list_activity_tags to keep only rows that carry all of those tags. Emails have no tags and
+    no includes; they are omitted when `activity_tag_ids` is set.
+
     `resolved.as_of` is plain provenance from the party's own record; relay it, do not treat
     record age as a staleness verdict.
+
+    Pass a meeting, call, note, or document row's `activity_id` to `get_activity_detail` for
+    the full untruncated body and the attachment list. History email ids are from `/emails`
+    and do not work there — use `search_activities` for email body. `search_activities` rows
+    use the same argument.
     """
     args = await extract_fetch_activity_history_args(
         ctx, client, request, page_size=activity_history.page_size
@@ -128,26 +151,44 @@ async def get_activity_history(
             offset=continuation.offset,
             since=continuation.since,
             until=continuation.until,
+            activity_tag_ids=continuation.activity_tag_ids or (),
         )
         for activity_type, continuation in args.continuations.items()
     }
-    activities = await asyncio.gather(*page_calls.values())
-    pages: dict[ActivityType, ActivityPageDto | EmailPageDto] = dict(
-        zip(page_calls.keys(), activities, strict=True)
-    )
+    settled = await asyncio.gather(*page_calls.values(), return_exceptions=True)
 
     gist_max_chars = activity_history.gist_max_chars
     groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
-    for activity_type, continuation in args.continuations.items():
-        page = pages[activity_type]
+    for (activity_type, continuation), result in zip(
+        args.continuations.items(), settled, strict=True
+    ):
+        if isinstance(result, BackstopApiError) and result.status_code == 403:
+            logger.warning(
+                "activity_history.stream.forbidden",
+                extra={
+                    "segment": args.segment,
+                    "entity_id": args.entity_id,
+                    "stream": activity_type,
+                    "detail": result.detail,
+                },
+            )
+            groups[activity_type] = ActivityGroupResponse(
+                activity_type=activity_type,
+                items=(),
+                error=result.detail,
+            )
+            continue
+        if isinstance(result, BaseException):
+            raise result
         grouped = group_activity_page(
-            page.items,
+            result.items,
             activity_type=activity_type,
-            end_of_stream=page.end_of_stream,
+            end_of_stream=result.end_of_stream,
             limit=continuation.limit,
             offset=continuation.offset,
             since=continuation.since,
             until=continuation.until,
+            activity_tag_ids=continuation.activity_tag_ids,
         )
         wire_items = tuple(
             to_timeline_record(item, gist_max_chars=gist_max_chars) for item in grouped.items

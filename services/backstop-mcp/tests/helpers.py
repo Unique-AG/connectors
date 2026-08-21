@@ -5,6 +5,7 @@ a runtime holder. Tests that need a client go through the factory exactly as pro
 so the concurrency gate and config injection under test are the real ones.
 """
 
+import json
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import date
@@ -21,13 +22,15 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import retry_settings, transport_settings
-from backstop_mcp.features.custom_fields import CustomFieldsService
+from backstop_mcp.features.activity_tags import ActivityTagsService
+from backstop_mcp.features.custom_fields import CustomFieldGroupsService, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     EmploymentRulesDto,
     TypeVocabularyDto,
 )
 from backstop_mcp.features.opportunities import OpportunityStagesService
+from backstop_mcp.features.system_users import SystemUsersService
 
 BASE_URL = "https://example.backstopsolutions.com"
 
@@ -110,8 +113,20 @@ def build_employment_index_factory(
     )
 
 
+def activity_tags_service(*, ttl_minutes: int = 60) -> ActivityTagsService:
+    return ActivityTagsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+
+
+def system_users_service(*, ttl_minutes: int = 60) -> SystemUsersService:
+    return SystemUsersService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+
+
 def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
     return CustomFieldsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+
+
+def custom_field_groups_service(*, ttl_minutes: int = 60) -> CustomFieldGroupsService:
+    return CustomFieldGroupsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def opportunity_stages_service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
@@ -137,6 +152,11 @@ def recorded_requests(calls: object) -> list[httpx.Request]:
 def recorded_params(route: respx.Route) -> list[httpx.QueryParams]:
     """Query params of every call one respx route recorded, in call order."""
     return [request.url.params for request in recorded_requests(route.calls)]
+
+
+def recorded_json_bodies(route: respx.Route) -> list[dict[str, object]]:
+    """JSON bodies of every call one respx route recorded, in call order."""
+    return [json.loads(request.content) for request in recorded_requests(route.calls)]
 
 
 def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:

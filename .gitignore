@@ -111,3 +111,7 @@ services/**/src/tenant-configs/*
 # Local docs used by llm for apis which give us no other option
 *.docs-local
 services/backstop-mcp/.coverage
+docs/json
+docs/plans
+docs/pr-proposals
+docs/drafts

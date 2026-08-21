@@ -40,6 +40,21 @@ def parse_lenient_date(value: object) -> date | None:
             return date(year, month, day)
         except ValueError:
             return None
+    # Backstop's entity-activities search returns US `M/D/YYYY` on createdAt /
+    # modifiedAt / effectiveDate, beside ISO `startDate` / `stopDate` on the same row.
+    # Four digits of year, deliberately: a two-digit `1/1/26` has no unambiguous reading, and
+    # `date(26, 1, 1)` — the year 26 AD — is a worse answer than "unparseable".
+    slash_parts = text.split("/")
+    if (
+        len(slash_parts) == 3
+        and all(part.isdigit() for part in slash_parts)
+        and len(slash_parts[2]) == 4
+    ):
+        month, day, year = (int(part) for part in slash_parts)
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
     return None
 
 
@@ -64,7 +79,11 @@ def parse_lenient_datetime(value: object) -> datetime | None:
     try:
         return _datetime_adapter.validate_python(text)
     except ValidationError:
-        return None
+        pass
+    parsed_date = parse_lenient_date(text)
+    if parsed_date is not None:
+        return datetime.combine(parsed_date, time.min)
+    return None
 
 
 LenientDate = Annotated[date | None, BeforeValidator(parse_lenient_date)]

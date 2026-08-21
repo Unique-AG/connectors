@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 .basedpyright_cache/
 .env
+.probe-cache/
+explore.py
+probe_entity_activities.py

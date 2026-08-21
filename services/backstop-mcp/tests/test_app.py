@@ -321,6 +321,8 @@ class TestConfigTranslation:
         field_names = set(type(transport_settings(BackstopConfig())).model_fields)
 
         assert not field_names & {
+            "activity_tag_ttl_minutes",
             "custom_field_schema_ttl_minutes",
             "opportunity_stage_ttl_minutes",
+            "system_user_ttl_minutes",
         }

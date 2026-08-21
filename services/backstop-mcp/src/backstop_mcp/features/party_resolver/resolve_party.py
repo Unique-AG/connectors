@@ -16,6 +16,7 @@ from backstop_mcp.features.party_resolver.internal_dto import (
 )
 from backstop_mcp.features.party_resolver.quick_search import quick_search
 from backstop_mcp.features.party_resolver.search_by_email import search_by_email
+from backstop_mcp.features.party_resolver.search_by_like import search_by_like
 from backstop_mcp.features.resolution import (
     Ambiguous,
     Resolved,
@@ -54,6 +55,8 @@ async def _resolve_one(
             search=item.search,
             options=quick_search_options,
         )
+        if not candidates:
+            candidates = await search_by_like(client, search_type=search_type, search=item.search)
 
     return from_candidates(candidates, query=item.search, scope=search_type)
 

@@ -13,7 +13,7 @@ it. The ids are in the right space for that — `primary_contact` side-loads `pe
 side-loads `organizations`, which is what those two tools resolve against.
 
 `extra="ignore"` does the trimming: a `contact-locations` resource ships 17 attributes and
-`ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 5. Where
+`ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 6. Where
 Backstop stores one fact twice — `city`/`cityResolvedName`, `state`/`stateResolvedName`,
 `country`/`countryResolvedName`, `isPrimaryLocation`/`primaryLocation` — only the plain name is
 bound and the twin is dropped, so a reader is never left deciding which of two spellings to
@@ -33,7 +33,8 @@ An include literally named `emails` would invite a model to pull hundreds of mes
 looking for an address, so it is exposed as `email_addresses`.
 """
 
-from typing import Annotated, ClassVar, Literal
+from collections.abc import Mapping, Sequence
+from typing import Annotated, ClassVar, Literal, cast
 
 from pydantic import BeforeValidator, ConfigDict, Field
 
@@ -44,6 +45,30 @@ from backstop_mcp.models import OmitNoneModel
 def _blank_to_none(value: object) -> object:
     """Backstop sends `""` where it means "unset" — `fax` and `secondaryPhoneNumber` both do."""
     return (value.strip() or None) if isinstance(value, str) else value
+
+
+def _mapping_name(item: Mapping[object, object]) -> str | None:
+    raw_name = item.get("name")
+    if isinstance(raw_name, str) and raw_name.strip():
+        return raw_name.strip()
+    return None
+
+
+def _categories(value: object) -> object:
+    """Accept a list of strings or `{name}` objects; empty becomes None."""
+    if value is None:
+        return None
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return None
+    names: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+        elif isinstance(item, Mapping):
+            raw_name = _mapping_name(cast("Mapping[object, object]", item))
+            if raw_name is not None:
+                names.append(raw_name)
+    return tuple(names) or None
 
 
 # Annotated on the *union*, not on the `str` arm: a `BeforeValidator` inside
@@ -166,6 +191,13 @@ class ContactCardResponse(OmitNoneModel):
         alias="companyName",
         description="Name of the organization the person works at.",
     )
+    categories: Annotated[tuple[str, ...] | None, BeforeValidator(_categories)] = Field(
+        default=None,
+        description=(
+            "CRM categories on this person — investor type, role, or similar labels. "
+            "Omitted when Backstop sends none."
+        ),
+    )
 
 
 class CompanyRefResponse(OmitNoneModel):
@@ -221,6 +253,13 @@ class InternalOwnerResponse(OmitNoneModel):
     )
     phone: _CleanStr = Field(
         default=None, alias="phoneNumber", description="Their office phone number at our firm."
+    )
+    disabled: bool | None = Field(
+        default=None,
+        description=(
+            "True when this colleague's login is disabled. Do not treat their empty pipeline "
+            "as 'no coverage' — the filter matched a departed login."
+        ),
     )
 
 
@@ -337,5 +376,67 @@ class PersonIncludesResponse(OmitNoneModel):
             "The colleague at our own firm who owns this relationship, from "
             + "`include=representative` — not a way to contact the person. Omitted when that "
             + "include was not asked for and equally when it was and nobody is assigned."
+        ),
+    )
+
+
+class ActivityTagChipResponse(OmitNoneModel):
+    """One activity tag side-loaded onto an activity row."""
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    id: _CleanStr = Field(
+        default=None,
+        description=(
+            "Backstop id of this activity tag. Echo it into activity_tag_ids; never invent one."
+        ),
+    )
+    name: _CleanStr = Field(default=None, description="Tag name as Backstop publishes it.")
+
+
+class ActivityAttendeeResponse(OmitNoneModel):
+    """A person listed on a meeting or call, side-loaded from `include=attendees`."""
+
+    model_config: ClassVar[ConfigDict] = _PROJECTION_CONFIG
+
+    id: _CleanStr = Field(
+        default=None,
+        description=(
+            "Backstop people id. Pass it as party_id to get_person for the full record. "
+            "Omitted when the side-load has no id."
+        ),
+    )
+    name: _CleanStr = Field(default=None, description="Display name as Backstop stores it.")
+
+
+type ActivityInclude = Literal["activity_tags", "attendees"]
+
+
+class ActivityIncludesResponse(OmitNoneModel):
+    """Related records side-loaded with an activity row, one field per include.
+
+    Always requested on get_activity_history's meeting/call/note/document pages. `/activities`
+    rejects `include=attendees` (400), so this plan only asks for tags. Attendees stay empty
+    on history rows; emails do not support includes and are not projected through this model.
+    """
+
+    activity_tags: Annotated[
+        list[ActivityTagChipResponse] | None,
+        Include(relationship="activityTags", resource_type="activity-tags"),
+    ] = Field(
+        default=None,
+        description=(
+            "Tags on this activity, from include=activityTags. Omitted when that include was "
+            "not asked for; [] when it was and the activity has no tags."
+        ),
+    )
+    attendees: Annotated[
+        list[ActivityAttendeeResponse] | None,
+        Include(relationship="attendees", resource_type="people"),
+    ] = Field(
+        default=None,
+        description=(
+            "People listed on a meeting or call. Omitted when that include was not asked for; "
+            "[] when it was. `/activities` cannot side-load attendees, so history rows are []."
         ),
     )

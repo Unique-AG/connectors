@@ -2,9 +2,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-_PROFILE_INSTRUCTIONS = (
-    "Main Menu > System Tools > Administrative > Update Your Profile > API Security"
-)
+_PROFILE_INSTRUCTIONS = "Main Menu > System Tools > Administrative > Update Your Profile"
+_DOCS_URL = "https://backstopsolutions.elevio.help/en/articles/236"
 
 _ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent / "templates"),
@@ -37,4 +36,5 @@ def render_login_form(
         username=username,
         error=error,
         profile_instructions=_PROFILE_INSTRUCTIONS,
+        docs_url=_DOCS_URL,
     )
