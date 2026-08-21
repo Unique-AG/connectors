@@ -10,6 +10,7 @@ a readiness probe exists to prevent. So the probe now asks the store itself thro
 wrapper chain.
 """
 
+import asyncio
 import logging
 
 from key_value.aio.protocols import AsyncKeyValue
@@ -23,15 +24,32 @@ logger = logging.getLogger(__name__)
 _PROBE_COLLECTION = "readiness"
 _PROBE_KEY = "probe"
 
+# Trap: nothing below this call has a deadline. The store hands asyncpg a bare DSN, so there is no
+# command_timeout, and pool acquisition with timeout=None waits on the queue forever. uvicorn does
+# not cancel the handler when kubelet stops waiting, so an unbounded probe would park a waiter for
+# the process's lifetime—and, worse, hold BaseStore.setup's lock, queueing every later probe and
+# every per-request token validation behind it. Cancelling here leaves that lock released and
+# setup incomplete, so the next probe retries.
+#
+# Kept below the chart's readiness timeoutSeconds (3) so this deadline is the one that fires: the
+# handler answers 503 itself instead of kubelet abandoning a request nothing ends.
+_PROBE_TIMEOUT_SECONDS = 2.0
+
 
 async def ready_response(oauth_storage: AsyncKeyValue) -> JSONResponse:
     """Readiness response reporting checks run.
 
-    Postgres is a hard dependency, so an unreachable database means not ready.
+    Postgres is a hard dependency, so an unreachable database means not ready. A database too slow
+    to answer within `_PROBE_TIMEOUT_SECONDS` is reported the same way—not ready is the honest
+    answer when no sign-in would complete either.
     """
     database_ok = True
     try:
-        _ = await oauth_storage.get(_PROBE_KEY, collection=_PROBE_COLLECTION)
+        async with asyncio.timeout(_PROBE_TIMEOUT_SECONDS):
+            _ = await oauth_storage.get(_PROBE_KEY, collection=_PROBE_COLLECTION)
+    except TimeoutError:
+        database_ok = False
+        logger.warning("ready.database_timeout", extra={"timeout_seconds": _PROBE_TIMEOUT_SECONDS})
     except Exception:
         database_ok = False
         logger.warning("ready.database_unreachable", exc_info=True)

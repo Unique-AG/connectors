@@ -113,6 +113,10 @@ probes:
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
+    # /ready gives its Postgres check a 2s deadline of its own. The Kubernetes default here is 1s,
+    # which would abandon the request before that deadline is ever reached; 3s lets the handler
+    # answer 503 itself. Keep the two in step — see _PROBE_TIMEOUT_SECONDS in server/readiness.py.
+    timeoutSeconds: 3
   startup:
     failureThreshold: 30
     httpGet:

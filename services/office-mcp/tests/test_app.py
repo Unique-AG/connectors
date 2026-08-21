@@ -10,8 +10,10 @@ before any upstream call would happen.
 """
 
 import ast
+import asyncio
 import importlib
 import inspect
+import json
 import logging
 import os
 import pathlib
@@ -28,6 +30,7 @@ from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.server.auth.providers.azure import AzureProvider
 from key_value.aio.protocols import AsyncKeyValue
+from key_value.aio.stores.memory import MemoryStore
 from key_value.aio.stores.postgresql import PostgreSQLStore
 from key_value.aio.wrappers.base import BaseWrapper
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
@@ -49,6 +52,7 @@ from office_mcp.cardinality import (
 )
 from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_mcp.graph_client import GraphSettings, create_graph_transport
+from office_mcp.server import readiness
 from office_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
 from office_mcp.tools import ALWAYS_ON, Selection, register_tools, resolve
 
@@ -629,6 +633,22 @@ class TestReadyProbesTheConnectionSignInDependsOn:
         assert store._url == database_config.driver_dsn  # pyright: ignore[reportPrivateUsage]
 
 
+class _NeverAnswers(BaseWrapper):
+    """An OAuth store whose read never completes.
+
+    A `MemoryStore` underneath so the wrapper is a real one, and a `get` that never delegates to
+    it: what is under test is the deadline, and any store that could answer would not exercise it.
+    """
+
+    def __init__(self) -> None:
+        self.key_value: AsyncKeyValue = MemoryStore()
+
+    @override
+    async def get(self, key: str, *, collection: str | None = None) -> dict[str, object] | None:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable: the wait above never returns")
+
+
 class TestReadyReportsDatabaseUnreachable:
     def test_ready_is_503_when_postgres_is_unreachable(self) -> None:
         app = create_app(
@@ -644,6 +664,27 @@ class TestReadyReportsDatabaseUnreachable:
 
         assert response.status_code == 503
         body = response.json()
+        assert body["status"] == "unhealthy"
+        assert _checks(body)["database"] is False
+
+    async def test_ready_is_503_when_postgres_never_answers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A database that hangs must not hang the probe.
+
+        Nothing under `oauth_storage.get` carries a deadline of its own: the store hands asyncpg a
+        bare DSN, so there is no `command_timeout`, and pool acquisition with `timeout=None` waits
+        on its queue forever. uvicorn does not cancel the handler when kubelet stops waiting, so
+        without the deadline this call never returns and the waiter it left is permanent. The
+        assertion is therefore first that it returns at all — the test hangs rather than fails if
+        the deadline is removed — and then that a database too slow to answer reads as not ready.
+        """
+        monkeypatch.setattr(readiness, "_PROBE_TIMEOUT_SECONDS", 0.01)
+
+        response = await readiness.ready_response(_NeverAnswers())
+
+        assert response.status_code == 503
+        body = cast("dict[str, object]", json.loads(bytes(response.body)))
         assert body["status"] == "unhealthy"
         assert _checks(body)["database"] is False
 
