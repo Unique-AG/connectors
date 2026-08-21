@@ -45,6 +45,9 @@ __all__ = [
     "ShareDto",
     "TimeSeriesEntityType",
     "TimeSeriesName",
+    "CapitalFlowDto",
+    "CapitalFlowPartyDto",
+    "CapitalFlowsFetchDto",
 ]
 
 _OWNER = "owner"
@@ -508,3 +511,44 @@ class SeriesFigureDto(BaseModel):
 
     latest: SeriesPointDto
     valued: SeriesPointDto | None = None
+
+
+class CapitalFlowPartyDto(BaseModel):
+    """Account or owner chip on a capital-flow row."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    name: str | None = None
+    resource_type: str | None = None
+
+
+class CapitalFlowDto(BaseModel):
+    """One subscription or redemption after includes are resolved."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    kind: Literal["subscription", "redemption"]
+    amount: float | None = None
+    transaction_date: date | None = None
+    notice_date: date | None = None
+    status: str | None = None
+    description: str | None = None
+    share_class: str | None = None
+    share_series: str | None = None
+    liquidating: bool | None = None
+    account: CapitalFlowPartyDto | None = None
+    owner: CapitalFlowPartyDto | None = None
+    unattributed: bool = False
+
+
+class CapitalFlowsFetchDto(BaseModel):
+    """Both walks, merged, with a request count and drop count."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[CapitalFlowDto, ...]
+    rows_dropped: int
+    request_count: int
+

@@ -10,6 +10,7 @@ except `get_time_series`, which paginates the dated series.
 from backstop_mcp.features.accounts.api_responses import AccountApiResponse
 from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
 from backstop_mcp.features.accounts.fetch_accounts_for_product import fetch_accounts_for_product
+from backstop_mcp.features.accounts.fetch_capital_flows import fetch_capital_flows
 from backstop_mcp.features.accounts.fetch_holdings import (
     FALLBACK_OMITTED_FIELDS,
     fetch_holdings,
@@ -28,6 +29,8 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
+    CapitalFlowDto,
+    CapitalFlowsFetchDto,
     HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
@@ -58,6 +61,8 @@ from backstop_mcp.features.accounts.split_open import split_open
 __all__ = [
     "ACCOUNT_SERIES",
     "AccountApiResponse",
+    "CapitalFlowDto",
+    "CapitalFlowsFetchDto",
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
@@ -86,6 +91,7 @@ __all__ = [
     "TimeSeriesName",
     "TimeSeriesResolvedResponse",
     "fetch_accounts_for_party",
+    "fetch_capital_flows",
     "fetch_accounts_for_product",
     "fetch_holdings",
     "fetch_holdings_table",

@@ -1,0 +1,194 @@
+from datetime import date
+
+import httpx
+import pytest
+import respx
+
+from backstop_mcp.features.accounts.tools.get_capital_flows import (
+    CapitalFlowsResolvedResponse,
+    get_capital_flows,
+)
+from backstop_mcp.server.tools import TOOLS
+from tests.helpers import BASE_URL, recorded_requests, resource, tool_client
+from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+
+
+def tenant(name: str) -> str:
+    return f"{BASE_URL}/{name}"
+
+
+def _page(
+    *items: dict[str, object], included: list[dict[str, object]] | None = None
+) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={"data": list(items), "included": included or [], "links": {"next": None}},
+    )
+
+
+def _sub(
+    sub_id: str,
+    *,
+    account_id: str | None = "a1",
+    amount: float = 100.0,
+    status: str = "COMPLETED",
+    share_class: str | None = "A",
+    **attrs: object,
+) -> dict[str, object]:
+    relationships: dict[str, object] = {}
+    if account_id is not None:
+        relationships["fundAccount"] = {"data": {"id": account_id, "type": "accounts"}}
+    payload: dict[str, object] = {
+        "amount": amount,
+        "transactionDate": "2026-02-01T00:00:00.000-0500",
+        "status": status,
+        "legacyTransactionType": "SUBSCRIPTION",
+    }
+    if share_class is not None:
+        payload["shareClass"] = share_class
+        payload["shareSeries"] = "1"
+    payload.update(attrs)
+    return {
+        "id": sub_id,
+        "type": "hedge-fund-account-subscriptions",
+        "attributes": payload,
+        "relationships": relationships,
+    }
+
+
+def _red(
+    red_id: str,
+    *,
+    original_id: str | None = None,
+    amount: float = 50.0,
+    status: str = "COMPLETED",
+) -> dict[str, object]:
+    relationships: dict[str, object] = {}
+    if original_id is not None:
+        relationships["originalSubscription"] = {
+            "data": {"id": original_id, "type": "hedge-fund-account-subscriptions"}
+        }
+    return {
+        "id": red_id,
+        "type": "hedge-fund-account-redemptions",
+        "attributes": {
+            "amount": amount,
+            "transactionDate": "2026-03-01T00:00:00.000-0500",
+            "status": status,
+            "legacyTransactionType": "REDEMPTION",
+            "liquidating": True,
+        },
+        "relationships": relationships,
+    }
+
+
+class TestGetCapitalFlows:
+    def test_is_registered_and_requires_a_date_window(self) -> None:
+        assert get_capital_flows in TOOLS
+        doc = get_capital_flows.__doc__ or ""
+        assert "share_class" in doc or "share class" in doc
+        assert "unattributed" in doc or "originalSubscription" in doc
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_two_calls_pin_date_filters_and_includes(self) -> None:
+        base_url = tenant("cf-pin")
+        subs = respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
+            return_value=_page(
+                _sub("s1"),
+                included=[
+                    {
+                        **resource("a1", "accounts", name="Koch acct"),
+                        "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
+                    },
+                    resource("o1", "contacts", name="Koch"),
+                ],
+            )
+        )
+        reds = respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(
+            return_value=_page(
+                _red("r1", original_id="s1"),
+                included=[
+                    {
+                        **_sub("s1"),
+                        "relationships": {
+                            "fundAccount": {"data": {"id": "a1", "type": "accounts"}}
+                        },
+                    },
+                    resource("a1", "accounts", name="Koch acct"),
+                ],
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        assert subs.call_count == 1
+        assert reds.call_count == 1
+        sub_params = recorded_requests(subs.calls)[0].url.params
+        red_params = recorded_requests(reds.calls)[0].url.params
+        assert sub_params["filter[transactionDate][ge]"] == "2026-01-01"
+        assert sub_params["filter[transactionDate][le]"] == "2026-12-31"
+        assert sub_params["include"] == "fundAccount.owner"
+        assert red_params["include"] == "originalSubscription.fundAccount"
+        assert result.request_count == 2
+        payload = tool_payload(result)
+        flows = [object_dict(item) for item in object_list(payload["flows"])]
+        kinds = {item["kind"]: item for item in flows}
+        assert kinds["subscription"]["share_class"] == "A"
+        assert object_dict(kinds["subscription"]["account"])["id"] == "a1"
+        assert kinds["redemption"]["unattributed"] is False
+        assert object_dict(kinds["redemption"]["account"])["id"] == "a1"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_orphan_redemption_is_unattributed_not_dropped(self) -> None:
+        base_url = tenant("cf-orphan")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(return_value=_page())
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(
+            return_value=_page(_red("r-orphan"))
+        )
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
+        assert len(flows) == 1
+        assert flows[0]["unattributed"] is True
+        assert result.unattributed_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_estimates_are_omitted(self) -> None:
+        base_url = tenant("cf-est")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
+            return_value=_page(_sub("s-est", status="ESTIMATED"), _sub("s-ok"))
+        )
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(return_value=_page())
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
+        assert [item["id"] for item in flows] == ["s-ok"]
