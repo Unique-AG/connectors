@@ -2,8 +2,9 @@
 
 Each test targets one behaviour from the task: the default-stream fan-out (all five streams,
 including `document`), that a resumed call (`type="next"`) skips resolution and only re-fetches
-streams present in `next`, that invalid `next` inputs raise pydantic `ValidationError`, and that
-one failing stream fails the whole call.
+streams present in `next`, that invalid `next` inputs raise pydantic `ValidationError`, that a
+5xx on one stream fails the whole call, and that a 403 on one stream is reported on that group
+without discarding the others.
 """
 
 from collections.abc import Sequence
@@ -681,6 +682,55 @@ class TestPartialFailurePropagates:
                 client=client,
                 activity_history=_SETTINGS,
             )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_forbidden_stream_is_reported_without_discarding_the_others(
+        self, client: BackstopClient
+    ) -> None:
+        """A 403 on documents must not wipe a successful calls page.
+
+        Backstop names a linked entity the caller cannot operate, not the party being listed.
+        """
+        respx.get(f"{BASE_URL}/organizations/o5").mock(
+            return_value=httpx.Response(200, json=_org_document(org_id="o5"))
+        )
+        _activities_route("organizations", "o5", "calls").mock(
+            return_value=httpx.Response(200, json=collection(_activity("c1", "2026-01-04")))
+        )
+        _activities_route("organizations", "o5", "documents").mock(
+            return_value=httpx.Response(
+                403,
+                json={
+                    "errors": [
+                        {
+                            "title": "You don't have permission to operate the entity 19759583",
+                            "code": "AccessDeniedException",
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_activity_history(
+                ctx_never_elicit(),
+                _first(
+                    search_type="organizations",
+                    party_id="o5",
+                    activity_types=["call", "document"],
+                ),
+                client=client,
+                activity_history=_SETTINGS,
+            ),
+            ActivityHistoryResolvedResponse,
+        )
+
+        assert _record_keys(result.groups["call"].items) == [("call", "c1")]
+        assert result.groups["call"].error is None
+        assert result.groups["document"].items == ()
+        assert result.groups["document"].next is None
+        assert "19759583" in (result.groups["document"].error or "")
 
 
 class TestDocumentInclusion:

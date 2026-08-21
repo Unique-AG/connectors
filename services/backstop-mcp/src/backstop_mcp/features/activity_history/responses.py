@@ -214,6 +214,17 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
             ),
         ),
     ] = None
+    error: Annotated[
+        str | None,
+        Field(
+            description=(
+                "When this stream could not be read (Backstop 403 on a linked entity the "
+                "caller cannot operate). `items` is empty and `next` is omitted. Other "
+                "groups in this response were still fetched — do not treat this as no "
+                "activity on those streams. Prefer search_activities for a filtered read."
+            ),
+        ),
+    ] = None
 
 
 class ActivityRegardingResponse(OmitNoneModel):

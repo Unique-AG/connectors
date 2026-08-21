@@ -7,8 +7,9 @@ from a prior response — no resolve, no `/quick-search` round trip — and only
 re-fetched.
 
 The party record is fetched first (name + `as_of` provenance). Active stream fetches then go
-through one `asyncio.gather` call so a partial upstream failure fails the whole tool call rather
-than silently dropping a stream (see the design doc's Error Handling section).
+through one `asyncio.gather` call. A 5xx or transport failure still fails the whole call.
+A 403 on one stream (Backstop refusing a linked entity) is reported on that group and the
+other streams are kept — otherwise a forbidden document/email wipes a successful calls page.
 """
 
 import asyncio
@@ -21,7 +22,11 @@ from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 
-from backstop_mcp.backstop_client import BackstopApiResourceDocument, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopApiResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
     ActivityGroupResponse,
@@ -145,19 +150,35 @@ async def get_activity_history(
         )
         for activity_type, continuation in args.continuations.items()
     }
-    activities = await asyncio.gather(*page_calls.values())
-    pages: dict[ActivityType, ActivityPageDto | EmailPageDto] = dict(
-        zip(page_calls.keys(), activities, strict=True)
-    )
+    settled = await asyncio.gather(*page_calls.values(), return_exceptions=True)
 
     gist_max_chars = activity_history.gist_max_chars
     groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
-    for activity_type, continuation in args.continuations.items():
-        page = pages[activity_type]
+    for (activity_type, continuation), result in zip(
+        args.continuations.items(), settled, strict=True
+    ):
+        if isinstance(result, BackstopApiError) and result.status_code == 403:
+            logger.warning(
+                "activity_history.stream.forbidden",
+                extra={
+                    "segment": args.segment,
+                    "entity_id": args.entity_id,
+                    "stream": activity_type,
+                    "detail": result.detail,
+                },
+            )
+            groups[activity_type] = ActivityGroupResponse(
+                activity_type=activity_type,
+                items=(),
+                error=result.detail,
+            )
+            continue
+        if isinstance(result, BaseException):
+            raise result
         grouped = group_activity_page(
-            page.items,
+            result.items,
             activity_type=activity_type,
-            end_of_stream=page.end_of_stream,
+            end_of_stream=result.end_of_stream,
             limit=continuation.limit,
             offset=continuation.offset,
             since=continuation.since,
