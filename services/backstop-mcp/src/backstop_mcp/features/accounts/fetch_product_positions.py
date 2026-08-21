@@ -50,7 +50,7 @@ _FIELD: dict[SeriesName, Literal["balance", "invested", "redemptions"]] = {
 }
 
 
-async def fetch_positions(
+async def _fetch_positions(
     client: BackstopClient,
     accounts: Sequence[AccountRecordDto],
 ) -> tuple[AccountPositionDto, ...]:
@@ -114,8 +114,8 @@ async def fetch_product_positions(
             },
         )
     accounts, aum = await asyncio.gather(
-        fetch_positions(client, fanned),
-        fetch_product_aum(client, product.id),
+        _fetch_positions(client, fanned),
+        _fetch_product_aum(client, product.id),
     )
     return ProductPositionsDto(
         product=product,
@@ -123,11 +123,11 @@ async def fetch_product_positions(
         closed_omitted=listing.closed_omitted,
         accounts_omitted=accounts_omitted,
         aum=aum,
-        reconciliation=reconcile(accounts, aum),
+        reconciliation=_reconcile(accounts, aum),
     )
 
 
-async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFigureDto | None:
+async def _fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFigureDto | None:
     try:
         return await fetch_series(client, f"/products/{product_id}/aums")
     except BackstopAuthError:
@@ -137,7 +137,7 @@ async def fetch_product_aum(client: BackstopClient, product_id: str) -> SeriesFi
         return None
 
 
-def reconcile(
+def _reconcile(
     accounts: Sequence[AccountPositionDto], aum: SeriesFigureDto | None
 ) -> AumReconciliationDto:
     """Sum the returned balances and compare them to latest assets under management.

@@ -5,7 +5,7 @@ import httpx
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from backstop_mcp.backstop_client.errors import (
+from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopRateLimitError,
     BackstopResponseSchemaError,

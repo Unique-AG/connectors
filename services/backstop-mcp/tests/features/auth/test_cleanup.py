@@ -6,13 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.config import AuthConfig
-from backstop_mcp.db.engine import read_session, transaction
-from backstop_mcp.db.models import (
+from backstop_mcp.db import (
     AuthorizationCode,
     LoginAttempt,
     OAuthClient,
     OAuthToken,
     PendingAuthorization,
+    read_session,
+    transaction,
 )
 from backstop_mcp.features.auth.cleanup import purge_expired_auth_rows
 

@@ -1,9 +1,9 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from backstop_mcp.backstop_client.errors import BackstopApiError
-from backstop_mcp.backstop_client.json_api import (
+from backstop_mcp.backstop_client import (
     BackstopApiCollectionDocument,
+    BackstopApiError,
     BackstopApiResource,
     BackstopApiResourceDocument,
     IncludedResource,

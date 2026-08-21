@@ -11,6 +11,7 @@ returned.
 """
 
 from backstop_mcp.features.org_people.fetch_people_for_organization import (
+    MAX_ORG_PEOPLE,
     fetch_people_for_organization,
 )
 from backstop_mcp.features.org_people.internal_dto import (
@@ -23,6 +24,7 @@ from backstop_mcp.features.org_people.responses import (
 )
 
 __all__ = [
+    "MAX_ORG_PEOPLE",
     "OrgPeopleListingDto",
     "OrgPeopleResolvedResponse",
     "PersonAtOrganizationDto",

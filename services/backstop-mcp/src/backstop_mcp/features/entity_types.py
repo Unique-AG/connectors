@@ -74,8 +74,3 @@ def party_search_type(entity_type: str) -> SearchType | None:
     if normalized is None or normalized not in PARTY_SEARCH_TYPES:
         return None
     return cast(SearchType, normalized.value)
-
-
-def is_party_search_type(entity_type: str) -> bool:
-    """Whether `entity_type` normalizes to a party-searchable resource type."""
-    return party_search_type(entity_type) is not None

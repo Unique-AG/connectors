@@ -33,6 +33,7 @@ and the pure conversion into it. See `responses.py`.
 The MCP tool surface itself lives in a later `activity_history` module.
 """
 
+from backstop_mcp.features.activity_history.api_responses import ActivityAttributes
 from backstop_mcp.features.activity_history.extract_gist_from_html import (
     Gist,
     extract_gist_from_html,
@@ -78,6 +79,7 @@ from backstop_mcp.features.activity_history.responses import (
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
 
 __all__ = [
+    "ActivityAttributes",
     "ActivityContinuationResponse",
     "ActivityDetailDto",
     "ActivityDetailResponse",

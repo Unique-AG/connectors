@@ -1,5 +1,8 @@
 from collections.abc import Mapping
 
+from pydantic import validate_email
+from pydantic_core import PydanticCustomError
+
 from backstop_mcp.backstop_client import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
@@ -42,6 +45,19 @@ SEARCH_TYPE_LABEL: Mapping[SearchType, str] = {
     "people": "person",
     "employees": "employee",
 }
+
+
+def normalized_email(value: str) -> str | None:
+    """Return pydantic's normalized address, or `None` when `value` is not an email.
+
+    Accepts display-name forms (`"Bob" <bob@example.com>`) and surrounding whitespace; the
+    returned string is what Backstop's exact `email` / `email2` / `email3` filters expect.
+    """
+    try:
+        _name, email = validate_email(value)
+    except PydanticCustomError:
+        return None
+    return email
 
 
 def candidates_from_document(

@@ -24,11 +24,11 @@ from backstop_mcp.features.activity_history import (
     ActivityGroupResponse,
     ActivityItemDto,
     ActivityType,
+    BackstopActivityType,
     DateRangeResponse,
     EmailItemDto,
     group_activity_page,
 )
-from backstop_mcp.features.activity_history.fetch_activities_page import BackstopActivityType
 
 
 def _activity(

@@ -1,16 +1,13 @@
 from datetime import date
 
-from backstop_mcp.features.accounts.api_responses import (
+from backstop_mcp.features.accounts import (
     AccountApiResponse,
-    AccountAttributes,
-    InvestorQualificationAttributes,
+    AccountOwnerDto,
+    AccountRecordDto,
+    AccountRowResponse,
+    ResolvedProductDto,
 )
-from backstop_mcp.features.accounts.internal_dto import AccountOwnerDto, AccountRecordDto
-from backstop_mcp.features.accounts.responses import AccountRowResponse
-from backstop_mcp.features.accounts.split_open import split_open
 from tests.helpers import resource
-
-_AccountResource = AccountApiResponse
 
 
 def _account(
@@ -52,52 +49,59 @@ def _owner(
     return resource(owner_id, json_api_type, name=name, specificResource=specific)
 
 
+def _from_resource(
+    body: dict[str, object],
+    *,
+    included: list[dict[str, object]] | None = None,
+) -> AccountRecordDto:
+    return AccountRecordDto.from_resource(
+        AccountApiResponse.model_validate(body),
+        included=[] if included is None else included,
+    )
+
+
 class TestAccountAttributesWire:
     def test_accepts_qualification_object_and_eligibility_enum(self) -> None:
-        attributes = AccountAttributes.model_validate(
-            {
-                "name": "Row",
-                "investorQualification": {"status": "REG_UNKNOWN", "option": "UNKNOWN"},
-                "newIssueEligible": "NOT_ELIGIBLE",
-            }
+        record = _from_resource(
+            _account(
+                "1",
+                name="Row",
+                investorQualification={"status": "REG_UNKNOWN", "option": "UNKNOWN"},
+                newIssueEligible="NOT_ELIGIBLE",
+            )
         )
 
-        assert attributes.investor_qualification == InvestorQualificationAttributes(
-            status="REG_UNKNOWN", option="UNKNOWN"
-        )
-        assert attributes.new_issue_eligible == "NOT_ELIGIBLE"
+        assert record.investor_qualification is not None
+        assert record.investor_qualification.status == "REG_UNKNOWN"
+        assert record.investor_qualification.option == "UNKNOWN"
+        assert record.new_issue_eligible == "NOT_ELIGIBLE"
 
     def test_qualification_may_omit_status(self) -> None:
-        attributes = AccountAttributes.model_validate(
-            {"investorQualification": {"option": "UNKNOWN"}, "newIssueEligible": "N/A"}
+        record = _from_resource(
+            _account(
+                "1",
+                investorQualification={"option": "UNKNOWN"},
+                newIssueEligible="N/A",
+            )
         )
 
-        assert attributes.investor_qualification == InvestorQualificationAttributes(
-            option="UNKNOWN"
-        )
-        assert attributes.new_issue_eligible == "N/A"
+        assert record.investor_qualification is not None
+        assert record.investor_qualification.status is None
+        assert record.investor_qualification.option == "UNKNOWN"
+        assert record.new_issue_eligible == "N/A"
 
 
 class TestAccountIsOpen:
     def test_absent_closed_date_is_open(self) -> None:
-        record = AccountRecordDto.from_resource(
-            _AccountResource.model_validate(_account("1", name="Open Account")),
-            included=[],
-        )
+        record = _from_resource(_account("1", name="Open Account"))
         assert record.is_open is True
 
     def test_present_closed_date_is_closed(self) -> None:
-        record = AccountRecordDto.from_resource(
-            _AccountResource.model_validate(_account("1", name="Closed", closedDate="2020-01-15")),
-            included=[],
-        )
+        record = _from_resource(_account("1", name="Closed", closedDate="2020-01-15"))
         assert record.is_open is False
 
     def test_null_closed_date_is_closed(self) -> None:
-        record = AccountRecordDto.from_resource(
-            _AccountResource.model_validate(_account("1", name="Closed", closedDate=None)),
-            included=[],
-        )
+        record = _from_resource(_account("1", name="Closed", closedDate=None))
         assert record.is_open is False
 
 
@@ -167,25 +171,23 @@ class TestProjectAccount:
                 configuration={"productShortName": "CGUP"},
             ),
         ]
-        resource_body = _account(
-            "27871657",
-            owner_id="341688185",
-            investor_type_id="10",
-            product_id="1292283",
-            name="PSP CGUP",
-            currency="USD",
-            accountStartDate="2019-03-01",
-            ownershipType="Direct",
-            investorQualification={"status": "REG_UNKNOWN", "option": "UNKNOWN"},
-            isEmployeeAccount=False,
-            isGpAccount=False,
-            amlCheckComplete=True,
-            newIssueEligible="ELIGIBLE",
-            usDomiciled=False,
-        )
-
-        record = AccountRecordDto.from_resource(
-            _AccountResource.model_validate(resource_body),
+        record = _from_resource(
+            _account(
+                "27871657",
+                owner_id="341688185",
+                investor_type_id="10",
+                product_id="1292283",
+                name="PSP CGUP",
+                currency="USD",
+                accountStartDate="2019-03-01",
+                ownershipType="Direct",
+                investorQualification={"status": "REG_UNKNOWN", "option": "UNKNOWN"},
+                isEmployeeAccount=False,
+                isGpAccount=False,
+                amlCheckComplete=True,
+                newIssueEligible="ELIGIBLE",
+                usDomiciled=False,
+            ),
             included=included,
         )
 
@@ -204,16 +206,13 @@ class TestProjectAccount:
         assert record.account_start_date == date(2019, 3, 1)
         assert record.is_open is True
         assert record.aml_check_complete is True
-        assert record.investor_qualification == InvestorQualificationAttributes(
-            status="REG_UNKNOWN", option="UNKNOWN"
-        )
+        assert record.investor_qualification is not None
+        assert record.investor_qualification.status == "REG_UNKNOWN"
+        assert record.investor_qualification.option == "UNKNOWN"
         assert record.new_issue_eligible == "ELIGIBLE"
 
     def test_missing_includes_leave_fields_unset(self) -> None:
-        record = AccountRecordDto.from_resource(
-            _AccountResource.model_validate(_account("1", name="Solo")),
-            included=[],
-        )
+        record = _from_resource(_account("1", name="Solo"))
 
         assert record.owner is None
         assert record.investor_type is None
@@ -232,8 +231,8 @@ class TestProjectAccount:
                 "relationships": None,
             }
         ]
-        record = AccountRecordDto.from_resource(
-            _AccountResource.model_validate(_account("1", product_id="1292283", name="Row")),
+        record = _from_resource(
+            _account("1", product_id="1292283", name="Row"),
             included=included,
         )
 
@@ -241,41 +240,41 @@ class TestProjectAccount:
         assert record.product.short_name == "CGUP"
 
 
-class TestSplitOpen:
-    def _record(self, account_id: str, *, is_open: bool) -> AccountRecordDto:
-        return AccountRecordDto(id=account_id, is_open=is_open)
-
-    def test_default_drops_closed_and_counts_them(self) -> None:
-        listing = split_open(
-            (self._record("1", is_open=True), self._record("2", is_open=False)),
-            include_closed=False,
+class TestProductFromIncluded:
+    def test_reads_nested_product_short_name(self) -> None:
+        product = ResolvedProductDto.from_included(
+            resource(
+                "1292283",
+                "products",
+                name="Capstone Global Unconstrained Portfolio",
+                configuration={"productShortName": "CGUP"},
+            )
         )
 
-        assert [account.id for account in listing.accounts] == ["1"]
-        assert listing.closed_omitted == 1
-
-    def test_include_closed_keeps_every_row(self) -> None:
-        listing = split_open(
-            (self._record("1", is_open=True), self._record("2", is_open=False)),
-            include_closed=True,
+        assert product == ResolvedProductDto(
+            id="1292283",
+            name="Capstone Global Unconstrained Portfolio",
+            short_name="CGUP",
         )
 
-        assert [account.id for account in listing.accounts] == ["1", "2"]
-        assert listing.closed_omitted == 0
+    def test_missing_configuration_leaves_short_name_unset(self) -> None:
+        product = ResolvedProductDto.from_included(
+            resource("600", "products", name="No Short Name Fund")
+        )
+
+        assert product == ResolvedProductDto(id="600", name="No Short Name Fund", short_name=None)
 
 
 class TestAccountRowResponse:
     def test_passes_through_qualification_object_and_eligibility_enum(self) -> None:
-        row = AccountRowResponse.from_record(
-            AccountRecordDto(
-                id="1",
-                is_open=True,
-                investor_qualification=InvestorQualificationAttributes(
-                    status="REG_UNKNOWN", option="UNKNOWN"
-                ),
-                new_issue_eligible="ELIGIBLE",
+        record = _from_resource(
+            _account(
+                "1",
+                investorQualification={"status": "REG_UNKNOWN", "option": "UNKNOWN"},
+                newIssueEligible="ELIGIBLE",
             )
         )
+        row = AccountRowResponse.from_record(record)
 
         assert row.investor_qualification is not None
         assert row.investor_qualification.status == "REG_UNKNOWN"
@@ -283,10 +282,7 @@ class TestAccountRowResponse:
         assert row.new_issue_eligible == "ELIGIBLE"
 
     def test_empty_qualification_is_omitted(self) -> None:
-        row = AccountRowResponse.from_record(
-            AccountRecordDto(
-                id="1", is_open=True, investor_qualification=InvestorQualificationAttributes()
-            )
-        )
+        record = _from_resource(_account("1", investorQualification={}))
+        row = AccountRowResponse.from_record(record)
 
         assert row.investor_qualification is None

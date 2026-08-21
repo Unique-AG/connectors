@@ -3,30 +3,41 @@ import asyncio
 import httpx
 import pytest
 import respx
+from fastmcp.server.elicitation import AcceptedElicitation
+from mcp.shared.exceptions import McpError
+from mcp.types import METHOD_NOT_FOUND, ClientCapabilities, ErrorData
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.features.party_resolver import (
     PartyResolveItemDto,
     QuickSearchOptionsDto,
+    ResolvedPartyDto,
     resolve_parties,
     resolve_party,
     unresolved_parties_response,
     unresolved_party_response,
 )
-from backstop_mcp.features.party_resolver.quick_search import quick_search
 from backstop_mcp.features.resolution import (
     Ambiguous,
     BatchAmbiguous,
     BatchResolved,
+    Candidate,
     NotFound,
     NotFoundResponse,
     Resolved,
+    elicit_choice,
 )
 from tests.features.party_resolver.helpers import (
     BASE_URL,
+    FakeContext,
+    as_context,
     collection,
+    ctx_accept,
+    ctx_cancel,
     ctx_decline,
     ctx_never_elicit,
+    ctx_no_elicitation_capability,
+    ctx_unsupported,
     resource,
 )
 
@@ -170,6 +181,99 @@ class TestEmailSearch:
         assert orgs.calls.last.request.url.params["filter[email][eq]"] == email
         assert "filter[email2][eq]" not in orgs.calls.last.request.url.params
         assert quick.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_surrounding_whitespace_is_stripped_before_filtering(
+        self, client: BackstopClient
+    ) -> None:
+        email = "bob@example.com"
+        respx.get(f"{BASE_URL}/people", params={"filter[email][eq]": email}).mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p1", "people", name="Bob")),
+            )
+        )
+        respx.get(f"{BASE_URL}/people", params={"filter[email2][eq]": email}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/people", params={"filter[email3][eq]": email}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="people",
+            search="  bob@example.com  ",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "p1"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_plain_name_does_not_hit_email_filters(self, client: BackstopClient) -> None:
+        email_route = respx.get(f"{BASE_URL}/people").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p1", "people", name="Capstone Partners")),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="people",
+            search="Capstone Partners",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "p1"
+        assert email_route.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_string_that_is_not_an_email_goes_to_quick_search(
+        self, client: BackstopClient
+    ) -> None:
+        quick = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="people",
+            search="@example.com",
+        )
+
+        assert quick.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_malformed_email_hit_raises_schema_error(self, client: BackstopClient) -> None:
+        email = "ops@capstone.com"
+        respx.get(f"{BASE_URL}/organizations", params={"filter[email][eq]": email}).mock(
+            return_value=httpx.Response(
+                200,
+                json={"data": [{"type": "organizations", "attributes": {"name": "Capstone"}}]},
+            )
+        )
+
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            await resolve_party(
+                ctx_never_elicit(),
+                client,
+                search_type="organizations",
+                search=email,
+            )
+
+        assert exc_info.value.path == "/organizations"
+        assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"
 
 
 class TestQuickSearch:
@@ -406,14 +510,16 @@ class TestCandidateLabel:
             )
         )
 
-        result = await quick_search(
+        result = await resolve_party(
+            ctx_decline(),
             client,
             search_type="organizations",
             search="Koch",
-            options=QuickSearchOptionsDto(enhance_search_types=True),
+            quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
         )
 
-        assert [candidate.label for candidate in result] == [
+        assert isinstance(result, Ambiguous)
+        assert [candidate.label for candidate in result.candidates] == [
             "Koch (organization)",
             "Voss, Kent (person)",
             "Voss, Kent (contact)",
@@ -424,19 +530,33 @@ class TestCandidateLabel:
     @respx.mock
     async def test_a_hit_without_a_name_still_names_the_kind(self, client: BackstopClient) -> None:
         respx.get(f"{BASE_URL}/quick-search").mock(
-            return_value=httpx.Response(200, json=collection(resource("o42", "organizations")))
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("o42", "organizations"),
+                    resource("o43", "organizations"),
+                ),
+            )
         )
 
-        result = await quick_search(client, search_type="organizations", search="unknown")
+        result = await resolve_party(
+            ctx_decline(),
+            client,
+            search_type="organizations",
+            search="unknown",
+        )
 
-        assert [candidate.label for candidate in result] == ["organization #o42"]
+        assert isinstance(result, Ambiguous)
+        assert [candidate.label for candidate in result.candidates] == [
+            "organization #o42",
+            "organization #o43",
+        ]
 
 
 class TestSearchTypeMapping:
     """`/quick-search` rejects our lowercase `SearchType` outright (400 InvalidParameterException);
-    it wants its own uppercase enum. Exercised via `quick_search` directly (not `resolve_party`)
-    since `_resolve_one` routes email-looking `search` values to `search_by_email` instead,
-    never reaching `quick_search`.
+    it wants its own uppercase enum. Driven through `resolve_party` with a name, which is the
+    production path that reaches quick-search.
     """
 
     @pytest.mark.asyncio
@@ -446,7 +566,12 @@ class TestSearchTypeMapping:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await quick_search(client, search_type="organizations", search="Capstone")
+        await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
 
         assert route.calls.last.request.url.params["filter[searchTypes][eq]"] == "ORGANIZATION"
 
@@ -457,7 +582,12 @@ class TestSearchTypeMapping:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await quick_search(client, search_type="people", search="Ada Lovelace")
+        await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="people",
+            search="Ada Lovelace",
+        )
 
         params = route.calls.last.request.url.params
         assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
@@ -469,7 +599,12 @@ class TestSearchTypeMapping:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await quick_search(client, search_type="contacts", search="Ada Lovelace")
+        await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="contacts",
+            search="Ada Lovelace",
+        )
 
         params = route.calls.last.request.url.params
         assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
@@ -481,39 +616,15 @@ class TestSearchTypeMapping:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await quick_search(client, search_type="employees", search="Ada Lovelace")
+        await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="employees",
+            search="Ada Lovelace",
+        )
 
         params = route.calls.last.request.url.params
         assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_email_shaped_search_adds_email_address_for_people(
-        self, client: BackstopClient
-    ) -> None:
-        route = respx.get(f"{BASE_URL}/quick-search").mock(
-            return_value=httpx.Response(200, json=collection())
-        )
-
-        await quick_search(client, search_type="people", search="ada@example.com")
-
-        params = route.calls.last.request.url.params
-        assert (
-            params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME,EMAIL_ADDRESS"
-        )
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_email_shaped_search_does_not_add_email_address_for_organizations(
-        self, client: BackstopClient
-    ) -> None:
-        route = respx.get(f"{BASE_URL}/quick-search").mock(
-            return_value=httpx.Response(200, json=collection())
-        )
-
-        await quick_search(client, search_type="organizations", search="ops@capstone.com")
-
-        assert route.calls.last.request.url.params["filter[searchTypes][eq]"] == "ORGANIZATION"
 
 
 class TestPartyIdFromResourceId:
@@ -975,3 +1086,201 @@ class TestInvalidArgs:
         assert item.name is None
         item = PartyResolveItemDto(party_id="o1", name=" Capstone ")
         assert item.name == "Capstone"
+
+
+def _two_org_hits() -> dict[str, object]:
+    return collection(
+        resource("o1", "organizations", name="Capstone A"),
+        resource("o2", "organizations", name="Capstone B"),
+    )
+
+
+def _candidate(party_id: str, label: str) -> Candidate[ResolvedPartyDto]:
+    return Candidate(
+        key=party_id,
+        label=label,
+        value=ResolvedPartyDto(id=party_id, search_type="organizations", name=label),
+    )
+
+
+def _ambiguous(*candidates: Candidate[ResolvedPartyDto]) -> Ambiguous[ResolvedPartyDto]:
+    return Ambiguous(query="Capstone", scope="organizations", candidates=candidates)
+
+
+class TestElicitChoice:
+    """Both resolvers share one ambiguity policy, so it is tested once, on `elicit_choice`."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_elicit_accept_resolves_selected_candidate(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=_two_org_hits())
+        )
+
+        result = await resolve_party(
+            ctx_accept("Capstone B (organization)"),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "o2"
+        assert result.value.name == "Capstone B"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_elicit_decline_returns_ambiguous(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=_two_org_hits())
+        )
+
+        result = await resolve_party(
+            ctx_decline(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Ambiguous)
+        assert [c.value.id for c in result.candidates] == ["o1", "o2"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_elicit_cancel_returns_ambiguous(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=_two_org_hits())
+        )
+
+        result = await resolve_party(
+            ctx_cancel(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Ambiguous)
+        assert len(result.candidates) == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_elicit_raising_returns_ambiguous(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=_two_org_hits())
+        )
+
+        result = await resolve_party(
+            ctx_unsupported(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Ambiguous)
+        assert result.query == "Capstone"
+        assert result.scope == "organizations"
+
+    @pytest.mark.asyncio
+    async def test_elicit_method_not_found_returns_ambiguous(self) -> None:
+        elicit_calls = 0
+
+        async def elicit(*, message: str, response_type: object) -> object:
+            nonlocal elicit_calls
+            elicit_calls += 1
+            _ = message, response_type
+            raise McpError(ErrorData(code=METHOD_NOT_FOUND, message="Method not found"))
+
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+        result = await elicit_choice(
+            as_context(FakeContext(elicit)), ambiguous, prompt="Which one?"
+        )
+
+        assert result is ambiguous
+        assert elicit_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_missing_elicitation_capability_skips_elicit(self) -> None:
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        result = await elicit_choice(
+            ctx_no_elicitation_capability(), ambiguous, prompt="Which one?"
+        )
+
+        assert result is ambiguous
+
+    @pytest.mark.asyncio
+    async def test_capability_check_error_degrades_rather_than_guessing(self) -> None:
+        async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
+            _ = message, response_type
+            raise AssertionError("elicit must not be attempted")
+
+        class _BrokenSession:
+            def check_client_capability(self, capability: ClientCapabilities) -> bool:
+                _ = capability
+                raise RuntimeError("client session is in a weird state")
+
+        fake = FakeContext(elicit)
+        object.__setattr__(fake.request_context, "session", _BrokenSession())
+
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+        result = await elicit_choice(as_context(fake), ambiguous, prompt="Which one?")
+
+        assert result is ambiguous
+
+    @pytest.mark.asyncio
+    async def test_no_request_context_degrades(self) -> None:
+        class _ContextlessContext:
+            request_context: None = None
+
+            async def elicit(self, *, message: str, response_type: object) -> object:
+                _ = message, response_type
+                raise AssertionError("elicit must not be attempted")
+
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+        result = await elicit_choice(
+            as_context(_ContextlessContext()),  # pyright: ignore[reportArgumentType]
+            ambiguous,
+            prompt="Which one?",
+        )
+
+        assert result is ambiguous
+
+    @pytest.mark.skip(
+        reason="Manual spike: Unique MCP client elicit interop (UN-23676); not runnable in CI"
+    )
+    def test_unique_client_elicit_interop_spike(self) -> None:
+        """Manual: against Unique chat client, ambiguous get_organization search should either
+        elicit an enum or degrade to `ambiguous` candidates — never crash the tool.
+        """
+
+    @pytest.mark.asyncio
+    async def test_duplicate_labels_are_made_unique_for_elicit(self) -> None:
+        captured: dict[str, object] = {}
+
+        async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
+            captured["message"] = message
+            captured["response_type"] = response_type
+            return AcceptedElicitation(data="Acme [o2]")
+
+        ambiguous = _ambiguous(_candidate("o1", "Acme"), _candidate("o2", "Acme"))
+        result = await elicit_choice(
+            as_context(FakeContext(elicit)), ambiguous, prompt="Which Acme?"
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "o2"
+        assert captured["response_type"] == ["Acme [o1]", "Acme [o2]"]
+        assert captured["message"] == "Which Acme?"
+
+    @pytest.mark.asyncio
+    async def test_unrecognized_choice_degrades(self) -> None:
+        async def elicit(*, message: str, response_type: object) -> AcceptedElicitation[str]:
+            _ = message, response_type
+            return AcceptedElicitation(data="Something Else Entirely")
+
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+        result = await elicit_choice(
+            as_context(FakeContext(elicit)), ambiguous, prompt="Which one?"
+        )
+
+        assert result is ambiguous

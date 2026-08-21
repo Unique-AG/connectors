@@ -1,26 +1,43 @@
 import pytest
 from pydantic import ValidationError
 
-from backstop_mcp.features.activity_history.api_responses import ActivityAttributes
-from backstop_mcp.features.activity_history.internal_dto import ActivityItemDto, ActivityPageDto
+from backstop_mcp.features.activity_history import (
+    ActivityAttributes,
+    ActivityItemDto,
+    ActivityPageDto,
+)
 
 
-class TestActivityAttributes:
+class TestActivityItemFromAttributes:
     def test_unknown_properties_are_ignored(self) -> None:
-        attributes = ActivityAttributes.model_validate(
-            {"title": "Q1", "tenantExtra": "dropped", "another": 1}
+        item = ActivityItemDto.from_attributes(
+            "meeting-or-calls_1",
+            "meeting",
+            ActivityAttributes.model_validate(
+                {"title": "Q1", "tenantExtra": "dropped", "another": 1}
+            ),
         )
 
-        assert attributes.title == "Q1"
-        assert not hasattr(attributes, "tenantExtra")
+        assert item.title == "Q1"
+        assert not hasattr(item, "tenantExtra")
 
     def test_absent_fields_default_to_none(self) -> None:
-        assert ActivityAttributes.model_validate({}).title is None
+        item = ActivityItemDto.from_attributes(
+            "meeting-or-calls_1",
+            "meeting",
+            ActivityAttributes.model_validate({}),
+        )
+
+        assert item.title is None
 
     def test_malformed_timestamp_becomes_none(self) -> None:
-        attributes = ActivityAttributes.model_validate({"createdTimestamp": "not-a-datetime"})
+        item = ActivityItemDto.from_attributes(
+            "meeting-or-calls_1",
+            "meeting",
+            ActivityAttributes.model_validate({"createdTimestamp": "not-a-datetime"}),
+        )
 
-        assert attributes.created_timestamp is None
+        assert item.created_timestamp is None
 
 
 class TestActivityItemDto:

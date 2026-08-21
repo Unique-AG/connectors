@@ -14,12 +14,12 @@ from backstop_mcp.features.activity_history import (
     ActivityHistoryResolvedResponse,
     ActivityItemDto,
     ActivityRecordResponse,
+    BackstopActivityType,
     EmailItemDto,
     EmailRecordResponse,
     ResolvedPartyAsOfResponse,
     to_timeline_record,
 )
-from backstop_mcp.features.activity_history.fetch_activities_page import BackstopActivityType
 from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceAttributes
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
 

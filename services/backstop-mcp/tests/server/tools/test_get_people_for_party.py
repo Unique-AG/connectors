@@ -8,8 +8,8 @@ from fastmcp.tools.function_tool import ToolMeta
 
 from backstop_mcp.features.org_people import OrgPeopleResolvedResponse
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.server.tools.get_people_for_party import get_people_for_party
-from backstop_mcp.server.tools.registry import TOOLS
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
     FORMER_MIRROR_TYPE,

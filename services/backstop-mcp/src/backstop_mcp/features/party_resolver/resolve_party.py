@@ -5,6 +5,7 @@ from fastmcp import Context
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.party_resolver._party_search_types import normalized_email
 from backstop_mcp.features.party_resolver.fetch_party_name import fetch_party_name
 from backstop_mcp.features.party_resolver.internal_dto import (
     BatchPartyResolution,
@@ -14,7 +15,7 @@ from backstop_mcp.features.party_resolver.internal_dto import (
     ResolvedPartyDto,
 )
 from backstop_mcp.features.party_resolver.quick_search import quick_search
-from backstop_mcp.features.party_resolver.search_by_email import normalized_email, search_by_email
+from backstop_mcp.features.party_resolver.search_by_email import search_by_email
 from backstop_mcp.features.resolution import (
     Ambiguous,
     Resolved,

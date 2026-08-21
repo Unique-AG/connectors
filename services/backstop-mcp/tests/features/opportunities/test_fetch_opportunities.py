@@ -1,10 +1,4 @@
-"""`fetch_opportunities` and the pure pieces it is assembled from.
-
-Fixtures reproduce the shapes measured on the live instance rather than tidied-up ones: a
-stage-history entry carries `"relationships": null` and points at its stage through the inline
-`{resourceType, resourceId, resourceLink}` format, and the response side-loads fewer stages than
-its history references — the case the cached vocabulary exists for.
-"""
+"""`fetch_opportunities`: a party's pipeline walk, projected, filtered, and ordered."""
 
 import logging
 from collections.abc import Sequence
@@ -15,19 +9,11 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.opportunities.fetch_opportunities import (
-    OpportunityStatus,
-    date_entered_order_key,
-    fetch_opportunities,
-    matches_status,
-    order_by_date_entered,
-    resolve_stage_name,
-    stage_names_from_included,
-)
-from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
-from backstop_mcp.features.opportunities.responses import (
+from backstop_mcp.features.opportunities import (
     OpportunityFetchResponse,
-    OpportunityResponse,
+    OpportunityStageDto,
+    OpportunityStatus,
+    fetch_opportunities,
 )
 from tests.helpers import BASE_URL, resource
 
@@ -142,17 +128,6 @@ async def _fetch(
     )
 
 
-def _response(
-    opportunity_id: str = "1",
-    *,
-    is_open: bool | None = None,
-    entered: date | None = None,
-) -> OpportunityResponse:
-    return OpportunityResponse(
-        id=opportunity_id, is_open=is_open, date_entered_current_stage=entered
-    )
-
-
 class TestTheRequest:
     @pytest.mark.asyncio
     @respx.mock
@@ -216,6 +191,31 @@ class TestProjection:
         deal = result.opportunities[0]
         assert deal.stage == "IDD"
         assert deal.stage_id == "42482"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_side_loaded_stage_wins_over_the_vocabulary(
+        self, client: BackstopClient
+    ) -> None:
+        """The response describes this instance now; the cache may be up to a TTL behind."""
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity("5072909", stage_id="42482", isOpen=True),
+                included=[
+                    resource(
+                        "42482",
+                        "opportunity-stages",
+                        name="Renamed",
+                        sortOrder=3,
+                        closed=False,
+                    )
+                ],
+            )
+        )
+
+        result = await _fetch(client)
+
+        assert result.opportunities[0].stage == "Renamed"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -588,6 +588,32 @@ class TestStatusFiltering:
 
         assert result.total == 2
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_unknown_open_state_matches_neither_open_nor_closed(
+        self, client: BackstopClient
+    ) -> None:
+        """Filing it under either would be a guess; `all` still returns it."""
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity("unknown"),
+                _opportunity("open-1", isOpen=True),
+                _opportunity("closed-1", isOpen=False),
+            )
+        )
+
+        opened = await _fetch(client, status="open")
+        closed = await _fetch(client, status="closed")
+        all_deals = await _fetch(client, status="all")
+
+        assert [deal.id for deal in opened.opportunities] == ["open-1"]
+        assert [deal.id for deal in closed.opportunities] == ["closed-1"]
+        assert [deal.id for deal in all_deals.opportunities] == [
+            "unknown",
+            "open-1",
+            "closed-1",
+        ]
+
 
 class TestOrdering:
     @pytest.mark.asyncio
@@ -644,6 +670,22 @@ class TestOrdering:
 
         assert [deal.id for deal in result.opportunities] == ["dated", "unreadable"]
         assert result.opportunities[1].date_entered_current_stage is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_deals_sharing_a_date_keep_their_fetch_order(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity("first", dateEnteredCurrentStage="2025-03-03"),
+                _opportunity("second", dateEnteredCurrentStage="2025-03-03"),
+            )
+        )
+
+        result = await _fetch(client)
+
+        assert [deal.id for deal in result.opportunities] == ["first", "second"]
 
 
 class TestMalformedRecords:
@@ -730,97 +772,3 @@ class TestMalformedRecords:
         assert history[0].stage is None
         assert history[0].stage_id is None
         assert history[0].effective_date == date(2024, 4, 10)
-
-
-class TestMatchesStatus:
-    def test_all_matches_every_deal(self) -> None:
-        assert matches_status(_response(is_open=True), "all")
-        assert matches_status(_response(is_open=False), "all")
-        assert matches_status(_response(is_open=None), "all")
-
-    def test_open_matches_only_open_deals(self) -> None:
-        assert matches_status(_response(is_open=True), "open")
-        assert not matches_status(_response(is_open=False), "open")
-
-    def test_closed_matches_only_closed_deals(self) -> None:
-        assert matches_status(_response(is_open=False), "closed")
-        assert not matches_status(_response(is_open=True), "closed")
-
-    def test_an_unknown_state_matches_neither_open_nor_closed(self) -> None:
-        """Filing it under either would be a guess; `all` still returns it."""
-        assert not matches_status(_response(is_open=None), "open")
-        assert not matches_status(_response(is_open=None), "closed")
-
-
-class TestOrderingKey:
-    def test_dated_deals_come_back_newest_first(self) -> None:
-        ordered = order_by_date_entered(
-            [
-                _response("old", entered=date(2020, 1, 1)),
-                _response("new", entered=date(2026, 1, 1)),
-                _response("mid", entered=date(2023, 6, 30)),
-            ]
-        )
-
-        assert [deal.id for deal in ordered] == ["new", "mid", "old"]
-
-    def test_a_missing_date_sorts_after_every_dated_deal(self) -> None:
-        ordered = order_by_date_entered(
-            [_response("undated"), _response("ancient", entered=date.min)]
-        )
-
-        assert [deal.id for deal in ordered] == ["ancient", "undated"]
-
-    def test_deals_sharing_a_date_keep_their_fetch_order(self) -> None:
-        same_day = date(2025, 3, 3)
-        ordered = order_by_date_entered(
-            [_response("first", entered=same_day), _response("second", entered=same_day)]
-        )
-
-        assert [deal.id for deal in ordered] == ["first", "second"]
-
-    def test_the_key_flags_whether_a_date_is_present(self) -> None:
-        assert date_entered_order_key(_response(entered=date(2025, 1, 1))) == (
-            True,
-            date(2025, 1, 1),
-        )
-        assert date_entered_order_key(_response()) == (False, date.min)
-
-
-class TestResolveStageName:
-    def test_a_side_loaded_stage_wins_over_the_vocabulary(self) -> None:
-        """The response describes this instance now; the cache may be up to a TTL behind."""
-        assert (
-            resolve_stage_name("42482", side_loaded={"42482": "Renamed"}, vocabulary=VOCABULARY)
-            == "Renamed"
-        )
-
-    def test_the_vocabulary_names_a_stage_the_response_did_not_side_load(self) -> None:
-        assert resolve_stage_name("42478", side_loaded={}, vocabulary=VOCABULARY) == "Prospect"
-
-    def test_a_stage_in_neither_has_no_name(self) -> None:
-        assert resolve_stage_name("70707", side_loaded={}, vocabulary=VOCABULARY) is None
-
-    def test_no_stage_id_has_no_name(self) -> None:
-        assert resolve_stage_name(None, side_loaded={"42482": "IDD"}, vocabulary=VOCABULARY) is None
-
-
-class TestStageNamesFromIncluded:
-    def test_every_side_loaded_stage_is_indexed_by_id(self) -> None:
-        included = [_side_loaded_stage("42482"), _side_loaded_stage("96016")]
-
-        assert stage_names_from_included(included) == {"42482": "IDD", "96016": "Invested"}
-
-    def test_resources_of_another_type_are_not_indexed(self) -> None:
-        """History entries sit in the same `included` array and carry no name at all."""
-        included = [
-            _history_entry("1", stage_id="42482", effective_date="2024-04-10"),
-            _side_loaded_stage("42482"),
-        ]
-
-        assert stage_names_from_included(included) == {"42482": "IDD"}
-
-    def test_a_stage_without_a_name_is_skipped(self) -> None:
-        unnamed = resource("42482", "opportunity-stages", sortOrder=3)
-
-        assert stage_names_from_included([unnamed]) == {}

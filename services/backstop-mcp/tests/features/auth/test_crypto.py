@@ -2,7 +2,7 @@ import pytest
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
 
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
+from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.config import EncryptionConfig
 from backstop_mcp.features.auth.crypto import (
     InvalidCredentialEnvelopeError,
