@@ -45,6 +45,7 @@ from backstop_mcp.features.collection_scan import (
     AggregateBucketDto,
     AggregateBucketResponse,
     ScanCoverageResponse,
+    project_fields,
     scan_coverage,
 )
 from backstop_mcp.features.data_hygiene import (
@@ -776,49 +777,21 @@ class SearchActivitiesRowResponse(OmitNoneModel):
 
     @classmethod
     def from_dto(cls, row: EntityActivityDto, *, fields: frozenset[str]) -> Self:
+        """Only the requested `fields`, plus `id` — a row the caller cannot identify is no use.
+
+        The two description fields are the only ones whose published shape is not their stored
+        shape: Backstop sends HTML and this publishes plain text, truncated. They are computed
+        here only when selected, since flattening a note body is the expensive part of a row.
+        """
         include = fields | {"id"}
-        author = None
-        if "author" in include and row.author is not None:
-            author = AttendeeResponse.from_chip(row.author)
-        associated = None
-        if "associated_with" in include:
-            associated = tuple(
-                ActivityRegardingResponse.from_dto(party) for party in row.associated_with
+        overrides: dict[str, object] = {}
+        if "short_description" in include:
+            overrides["short_description"] = _plain_text(
+                row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS
             )
-        tags = None
-        if "tags" in include:
-            tags = tuple(ActivityTagChipResponse.from_dto(tag) for tag in row.tags)
-        return cls(
-            id=row.id,
-            type=row.type if "type" in include else None,
-            activity_type=row.activity_type if "activity_type" in include else None,
-            title=row.title if "title" in include else None,
-            effective_date=row.effective_date if "effective_date" in include else None,
-            created_at=row.created_at if "created_at" in include else None,
-            modified_at=row.modified_at if "modified_at" in include else None,
-            start=row.start if "start" in include else None,
-            stop=row.stop if "stop" in include else None,
-            time_zone=row.time_zone if "time_zone" in include else None,
-            location=row.location if "location" in include else None,
-            meeting_type=row.meeting_type if "meeting_type" in include else None,
-            short_description=(
-                _plain_text(row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS)
-                if "short_description" in include
-                else None
-            ),
-            description=(
-                _plain_text(row.description, max_chars=_FULL_BODY_MAX_CHARS)
-                if "description" in include
-                else None
-            ),
-            attachments_count=(row.attachments_count if "attachments_count" in include else None),
-            author=author,
-            attendees=row.attendees if "attendees" in include else None,
-            tags=tags,
-            associated_with=associated,
-            from_address=row.from_address if "from_address" in include else None,
-            to_addresses=row.to_addresses if "to_addresses" in include else None,
-        )
+        if "description" in include:
+            overrides["description"] = _plain_text(row.description, max_chars=_FULL_BODY_MAX_CHARS)
+        return project_fields(row, fields=include, into=cls, overrides=overrides)
 
 
 class SearchActivitiesResolvedResponse(OmitNoneModel):

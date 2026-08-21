@@ -18,6 +18,17 @@ _LIKE_FIELDS: Mapping[SearchType, str] = {
 _LIKE_PAGE_SIZE = 200
 _LIKE_MAX_RECORDS = 200
 
+# The only attributes `PartyAttributes` reads off a collection row. Without a sparse fieldset an
+# `/organizations` row drags its whole `regularCustomFieldValues` blob: 14,164 B/row measured
+# against 398 B sparse, so 200 rows is ~2.8 MB to read four fields. Declared per collection
+# because the people-shaped ones have first/last names and organizations do not.
+_SPARSE_FIELDS: Mapping[SearchType, str] = {
+    "organizations": "name",
+    "contacts": "name,firstName,lastName",
+    "people": "name,firstName,lastName",
+    "employees": "name,firstName,lastName",
+}
+
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _PartyResource = BackstopApiResource[PartyAttributes]
 
@@ -38,7 +49,10 @@ async def search_by_like(
     page = await client.paginate(
         f"/{search_type}",
         schema=_PartyResource,
-        params={f"filter[{field}][like]": search},
+        params={
+            f"filter[{field}][like]": search,
+            f"fields[{search_type}]": _SPARSE_FIELDS[search_type],
+        },
         page_size=_LIKE_PAGE_SIZE,
         max_records=_LIKE_MAX_RECORDS,
     )

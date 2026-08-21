@@ -8,6 +8,7 @@ from backstop_mcp.features.accounts.tools.get_product import (
     ProductResolvedResponse,
     get_product,
 )
+from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import (
@@ -109,6 +110,7 @@ class TestGetProduct:
         assert products.call_count == 1
         params = recorded_requests(products.calls)[0].url.params
         assert "fields" not in params
+        assert result.scan_truncated is False
         payload = tool_payload(result)
         rows = [object_dict(item) for item in object_list(payload["products"])]
         assert rows[0]["id"] == _PRODUCT_ID
@@ -167,3 +169,64 @@ class TestGetProduct:
         assert len(rows) == 1
         fields = [object_dict(item) for item in object_list(rows[0]["custom_field_values"])]
         assert fields[0]["value"] == "Convertible Arbitrage"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_trusted_id_is_one_request(self) -> None:
+        """The full record already carries name and configuration, and 404s when absent."""
+        base_url = tenant("gp-trusted-id")
+        index = respx.get(f"{base_url}/products").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
+        )
+        detail = respx.get(f"{base_url}/products/{_PRODUCT_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": _product(
+                        _PRODUCT_ID,
+                        name="Capstone Dispersion Fund",
+                        short_name="CDSP",
+                        values=_strategy_value(),
+                    )
+                },
+            )
+        )
+        _definitions_route(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_product(
+                    ctx_never_elicit(),
+                    product_id=_PRODUCT_ID,
+                    client=client,
+                    custom_fields=custom_fields_service(),
+                ),
+                ProductResolvedResponse,
+            )
+
+        assert detail.call_count == 1
+        assert index.call_count == 0
+        assert [row.id for row in result.products] == [_PRODUCT_ID]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_missing_trusted_id_is_not_found(self) -> None:
+        base_url = tenant("gp-missing-id")
+        respx.get(f"{base_url}/products/{_PRODUCT_ID}").mock(
+            return_value=httpx.Response(404, json={"errors": [{"title": "Not Found"}]})
+        )
+        _definitions_route(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_product(
+                    ctx_never_elicit(),
+                    product_id=_PRODUCT_ID,
+                    client=client,
+                    custom_fields=custom_fields_service(),
+                ),
+                NotFoundResponse,
+            )
+
+        assert result.query == _PRODUCT_ID
+        assert result.scope == "products"

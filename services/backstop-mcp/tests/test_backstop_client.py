@@ -462,6 +462,8 @@ class TestPaginate:
             included=[],
             total_count=None,
             truncated=False,
+            # Two pages fetched, which is what a tool publishing its cost has to be told.
+            request_count=2,
         )
 
     @pytest.mark.asyncio

@@ -88,12 +88,18 @@ class PageResult[T](BaseModel):
 
     `included` holds the side-loaded resources from every page, deduplicated by
     (`type`, `id`) — JSON:API repeats an included resource on each page that references it.
+
+    `request_count` is how many pages were actually fetched, which is the walk's real cost. A
+    caller cannot infer it from `len(items)`: the page size Backstop serves may be below the one
+    asked for, the last page is short, and a cap keeps the page that crossed it in full. A tool
+    that publishes its request count to the model has to be told, not guess.
     """
 
     items: list[T] = Field(default_factory=list)
     included: list[dict[str, object]] = Field(default_factory=list)
     total_count: int | None = None
     truncated: bool = False
+    request_count: int = 0
 
 
 @dataclass
@@ -103,12 +109,14 @@ class _Accumulator(Generic[T]):
     Owns the `included` dedup set alongside the result it belongs to, so neither strategy can
     accumulate one without the other. `total_count` is kept from the first page that reports
     one: later pages of the same chain repeat it, and some endpoints omit it after page one.
+    One `absorb` is one page fetched, so counting requests here counts them for both strategies.
     """
 
     result: PageResult[T]
     _seen_included: set[tuple[str, str]] = field(default_factory=set)
 
     def absorb(self, page: SinglePage[T]) -> None:
+        self.result.request_count += 1
         self.result.items.extend(page.items)
         for resource in page.included:
             identity = _resource_identity(resource)

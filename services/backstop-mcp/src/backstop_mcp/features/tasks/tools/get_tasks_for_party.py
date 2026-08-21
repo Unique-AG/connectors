@@ -19,7 +19,7 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.features.tasks import TaskDto, fetch_tasks_for_party
+from backstop_mcp.features.tasks import MAX_TASK_SCAN_RECORDS, TaskDto, fetch_tasks_for_party
 from backstop_mcp.models import OmitNoneModel, published_output_schema
 
 type TaskFilter = Literal["open", "completed", "all"]
@@ -62,6 +62,12 @@ class TasksResolvedResponse(OmitNoneModel):
     total: int = Field(description="Every task fetched for this party, before the status filter.")
     open_count: int = Field(description="How many of those are open.")
     completed_count: int = Field(description="How many of those are completed.")
+    scan_truncated: bool = Field(
+        description=(
+            f"True when the walk stopped at the {MAX_TASK_SCAN_RECORDS}-task scan ceiling, so "
+            "these counts are floors rather than totals."
+        )
+    )
 
 
 type GetTasksForPartyResponse = PartyAmbiguousResponse | NotFoundResponse | TasksResolvedResponse
@@ -130,14 +136,15 @@ async def get_tasks_for_party(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    fetched = await fetch_tasks_for_party(client, search_type=party.search_type, entity_id=party.id)
+    listing = await fetch_tasks_for_party(client, search_type=party.search_type, entity_id=party.id)
     selected = tuple(
-        row for row in fetched if status == "all" or (row.is_open is (status == "open"))
+        row for row in listing.rows if status == "all" or (row.is_open is (status == "open"))
     )
     return TasksResolvedResponse(
         resolved=ResolvedPartyResponse.from_party(party),
         tasks=tuple(TaskRowResponse.from_dto(row) for row in selected),
-        total=len(fetched),
-        open_count=sum(1 for row in fetched if row.is_open),
-        completed_count=sum(1 for row in fetched if not row.is_open),
+        total=len(listing.rows),
+        open_count=sum(1 for row in listing.rows if row.is_open),
+        completed_count=sum(1 for row in listing.rows if not row.is_open),
+        scan_truncated=listing.scan_truncated,
     )

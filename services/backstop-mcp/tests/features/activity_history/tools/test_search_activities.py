@@ -144,6 +144,31 @@ class TestSearchActivities:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_a_transport_timeout_also_names_the_fallback(
+        self, client: BackstopClient
+    ) -> None:
+        """A timeout is the likeliest failure of an unbounded-payload UI endpoint.
+
+        `httpx` transport errors are not `BackstopApiError`, so before the broad clause this
+        propagated raw and the model was never told which tool to fall back to.
+        """
+        respx.post(_URL).mock(side_effect=httpx.TimeoutException("read timeout"))
+
+        result = tool_model(
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+                client=client,
+            ),
+            SearchActivitiesUnavailableResponse,
+        )
+
+        assert result.fallback_tool == "get_activity_history"
+        assert "get_activity_history" in result.message
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_auth_failure_does_not_become_unavailable(self, client: BackstopClient) -> None:
         respx.post(_URL).mock(return_value=httpx.Response(401, json={"errors": [{"title": "no"}]}))
 

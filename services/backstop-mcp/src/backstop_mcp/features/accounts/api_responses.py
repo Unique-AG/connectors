@@ -15,6 +15,7 @@ __all__ = [
     "AccountTableDataDocument",
     "AccountTableDataEntry",
     "AccountTableRowAttributes",
+    "CapitalFlowAttributes",
     "InvestorQualificationAttributes",
     "InvestorTypeAttributes",
     "OwnerAttributes",
@@ -24,7 +25,6 @@ __all__ = [
     "TableDataMoneyAttributes",
     "TableDataProductAttributes",
     "TableDataShareAttributes",
-    "CapitalFlowAttributes",
 ]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]

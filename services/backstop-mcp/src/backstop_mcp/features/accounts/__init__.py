@@ -10,7 +10,10 @@ except `get_time_series`, which paginates the dated series.
 from backstop_mcp.features.accounts.api_responses import AccountApiResponse
 from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
 from backstop_mcp.features.accounts.fetch_accounts_for_product import fetch_accounts_for_product
-from backstop_mcp.features.accounts.fetch_capital_flows import fetch_capital_flows
+from backstop_mcp.features.accounts.fetch_capital_flows import (
+    MAX_CAPITAL_FLOW_SCAN_RECORDS,
+    fetch_capital_flows,
+)
 from backstop_mcp.features.accounts.fetch_holdings import (
     FALLBACK_OMITTED_FIELDS,
     fetch_holdings,
@@ -19,7 +22,11 @@ from backstop_mcp.features.accounts.fetch_holdings_table import (
     HoldingsTableShapeError,
     fetch_holdings_table,
 )
-from backstop_mcp.features.accounts.fetch_product import fetch_product, fetch_product_catalog
+from backstop_mcp.features.accounts.fetch_product import (
+    MAX_PRODUCT_SCAN_RECORDS,
+    fetch_product,
+    fetch_product_catalog,
+)
 from backstop_mcp.features.accounts.fetch_time_series import (
     fetch_time_series,
     require_series_for_entity,
@@ -39,6 +46,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     InvestorTypeDto,
     MoneyDto,
     ProductCandidate,
+    ProductCatalogFetchDto,
     ProductFetchDto,
     ProductResolution,
     ResolvedProductDto,
@@ -63,12 +71,12 @@ from backstop_mcp.features.accounts.split_open import split_open
 __all__ = [
     "ACCOUNT_SERIES",
     "AccountApiResponse",
-    "CapitalFlowDto",
-    "CapitalFlowsFetchDto",
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
     "AccountRowResponse",
+    "CapitalFlowDto",
+    "CapitalFlowsFetchDto",
     "FALLBACK_OMITTED_FIELDS",
     "HoldingFigureErrorDto",
     "HoldingFigureErrorResponse",
@@ -78,12 +86,15 @@ __all__ = [
     "HoldingsSource",
     "HoldingsTableShapeError",
     "InvestorTypeDto",
+    "MAX_CAPITAL_FLOW_SCAN_RECORDS",
+    "MAX_PRODUCT_SCAN_RECORDS",
     "MoneyDto",
     "MoneyResponse",
     "PRODUCT_SERIES",
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
+    "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductInvestorsResolvedResponse",
     "ProductResolution",
@@ -94,8 +105,8 @@ __all__ = [
     "TimeSeriesName",
     "TimeSeriesResolvedResponse",
     "fetch_accounts_for_party",
-    "fetch_capital_flows",
     "fetch_accounts_for_product",
+    "fetch_capital_flows",
     "fetch_holdings",
     "fetch_holdings_table",
     "fetch_product",

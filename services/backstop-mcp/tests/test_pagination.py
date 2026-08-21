@@ -100,7 +100,10 @@ class TestPaginateAll:
         )
 
         assert result == PageResult(
-            items=[_Record(id="1"), _Record(id="2")], total_count=None, truncated=False
+            items=[_Record(id="1"), _Record(id="2")],
+            total_count=None,
+            truncated=False,
+            request_count=1,
         )
 
     @pytest.mark.asyncio

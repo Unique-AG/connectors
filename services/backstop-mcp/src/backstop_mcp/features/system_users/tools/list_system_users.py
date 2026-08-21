@@ -48,9 +48,12 @@ def _to_owner(user: SystemUserDto) -> InternalOwnerResponse:
     )
 
 
-def _user_matches(user: SystemUserDto, needle: str) -> bool:
-    haystacks = (user.name, user.user_name)
-    return any(value is not None and needle in value.casefold() for value in haystacks)
+def _user_matches(user: SystemUserDto, search: str) -> bool:
+    search = search.casefold().strip()
+    values_to_check = (user.name, user.user_name, user.email)
+    return any(
+        value is not None and search in value.casefold().strip() for value in values_to_check
+    )
 
 
 @tool(

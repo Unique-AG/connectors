@@ -29,7 +29,7 @@ class ScanCoverageResponse(OmitNoneModel):
     )
     visible_count_is_floor: bool = Field(
         description=(
-            "True when `visible_count` equals the endpoint ceiling. That figure is a floor, "
+            "True when `visible_count` equals the scan ceiling. That figure is a floor, "
             "not a count — the true total is unknown."
         )
     )
@@ -41,9 +41,9 @@ class ScanCoverageResponse(OmitNoneModel):
     )
     ceiling_hit: bool = Field(
         description=(
-            "True when the next page would have exceeded the endpoint ceiling, or "
-            "`visible_count` is already that ceiling. Narrow the window; do not retry the "
-            "same query."
+            "True when the scan stopped at the most this call will read — an endpoint wall or "
+            "the fetch's own scan ceiling — or `visible_count` is already that figure. Narrow "
+            "the window; do not retry the same query."
         )
     )
     partial_due_to_error: bool = Field(

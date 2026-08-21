@@ -14,6 +14,7 @@ costs one request, only on the branch where being wrong is silent.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Annotated
 
 from fastmcp import Context
@@ -174,7 +175,7 @@ async def get_accounts_for_party(
     )
 
 
-def _would_report_owns_nothing(rows: object, closed_omitted: int) -> bool:
+def _would_report_owns_nothing(rows: Sequence[object], closed_omitted: int) -> bool:
     """True when the payload says "nothing", with no closed accounts to explain it away."""
     return not rows and closed_omitted == 0
 

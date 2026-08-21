@@ -94,3 +94,18 @@ class TestAggregateEntityActivities:
             "b": ("people:b", 1),
             "(unattributed)": ("(unattributed)", 1),
         }
+
+    def test_ties_are_broken_by_label_not_by_page_order(self) -> None:
+        """Row order on this endpoint is not stable across hosts, so it must not decide order.
+
+        `Counter.most_common()` breaks a count tie by insertion order — here, page order.
+        """
+        forwards = aggregate_entity_activities(
+            (_row("1", type="Zebra"), _row("2", type="Alpha")), group_by="type"
+        )
+        backwards = aggregate_entity_activities(
+            (_row("1", type="Alpha"), _row("2", type="Zebra")), group_by="type"
+        )
+
+        assert [bucket.key for bucket in forwards] == ["Alpha", "Zebra"]
+        assert [bucket.key for bucket in backwards] == ["Alpha", "Zebra"]

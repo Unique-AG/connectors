@@ -37,6 +37,7 @@ The MCP tools live in `features/activity_history/tools/`.
 """
 
 from backstop_mcp.features.activity_history.aggregate_entity_activities import (
+    ActivityAggregateBy,
     aggregate_entity_activities,
 )
 from backstop_mcp.features.activity_history.api_responses import ActivityAttributes
@@ -109,6 +110,7 @@ from backstop_mcp.features.collection_scan import (
 )
 
 __all__ = [
+    "ActivityAggregateBy",
     "ActivityAttributes",
     "ActivityContinuationResponse",
     "ActivityDetailDto",
