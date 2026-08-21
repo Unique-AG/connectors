@@ -24,6 +24,7 @@ __all__ = [
     "TableDataMoneyAttributes",
     "TableDataProductAttributes",
     "TableDataShareAttributes",
+    "CapitalFlowAttributes",
 ]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
@@ -329,3 +330,19 @@ class AccountTableDataDocument(BaseModel):
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 AccountApiResponse = BackstopApiResource[AccountAttributes]
+
+
+class CapitalFlowAttributes(BaseModel):
+    """Wire attributes shared by subscriptions and redemptions (subset we publish)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    amount: LenientFloat = None
+    transaction_date: LenientDate = Field(default=None, alias="transactionDate")
+    notice_date: LenientDate = Field(default=None, alias="noticeDate")
+    status: _CleanStr = None
+    description: _CleanStr = None
+    share_class: _CleanStr = Field(default=None, alias="shareClass")
+    share_series: _CleanStr = Field(default=None, alias="shareSeries")
+    liquidating: LenientBool = None
+    legacy_transaction_type: _CleanStr = Field(default=None, alias="legacyTransactionType")
