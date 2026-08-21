@@ -37,7 +37,7 @@ blur two different fixes: raise `limit`, or accept that nothing more can be know
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -81,6 +81,15 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 # Maximum transcripts to return. Graph documents `$top` but publishes no ceiling, so this is ours.
 MAX_TRANSCRIPTS = 50
+
+# This connector's own vocabulary, not Microsoft's, so it is closed and publishes as an enum
+# in the output schema rather than as a bare string a model has to mine out of the prose.
+# Graph-owned vocabularies (`meeting_type` here) stay `str`, because Microsoft may add a
+# member at any time. Bare assignment, not `type X = ...`: PEP 695 aliases publish as a
+# `$ref` into `$defs`, which puts the values one hop away from the property a model reads.
+TranscriptStatus = Literal[
+    "available", "not_ready", "not_transcribed", "scan_incomplete", "meeting_not_found"
+]
 
 _DESCRIPTION = f"""\
 List transcripts a Teams meeting has, if any. Takes the `meeting_uri` from list_chats.
@@ -154,7 +163,7 @@ class TranscriptSummary(BaseModel):
 
 
 class MeetingTranscripts(BaseModel):
-    status: str = Field(
+    status: TranscriptStatus = Field(
         description=(
             "What was found and what to do next. One of:\n"
             "- `available` — transcripts are listed, newest first.\n"
@@ -266,7 +275,7 @@ async def list_meeting_transcripts(
     )
 
 
-def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
+def _absence(*, scan_stopped_short: bool, settled: bool) -> TranscriptStatus:
     """Which empty answer: cap hit, window settled, or neither."""
     if scan_stopped_short:
         return "scan_incomplete"

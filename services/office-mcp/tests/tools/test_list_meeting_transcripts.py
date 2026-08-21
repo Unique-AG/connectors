@@ -9,7 +9,9 @@ Every payload is synthesised. A transcript is the most sensitive thing this conn
 nothing here came from a meeting: the ids are obviously fake and the domains are `.invalid`.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta, timezone
+from typing import cast
 
 import httpx
 import pytest
@@ -55,6 +57,16 @@ def _resolved(graph: respx.MockRouter, **meeting: object) -> respx.Route:
     return graph.get(_MEETINGS).mock(
         return_value=httpx.Response(200, json={"value": [meeting_payload(**meeting)]})  # pyright: ignore[reportArgumentType]
     )
+
+
+def _published(*path: str) -> Mapping[str, object]:
+    """A named subschema of this tool's output, narrowed off pydantic's `dict[str, Any]`."""
+    found: Mapping[str, object] = lister.MeetingTranscripts.model_json_schema()
+    for key in path:
+        step = found.get(key)
+        assert isinstance(step, dict), f"expected an object at {key!r}, got {step!r}"
+        found = cast("Mapping[str, object]", step)
+    return found
 
 
 def _pages(
@@ -182,8 +194,8 @@ class TestNoMatchIsNotAnError:
             )
 
 
-class TestTheThreeAbsences:
-    """Nothing came back — and a model must do three different things about it."""
+class TestTheKindsOfAbsence:
+    """Nothing came back — and each reason a model must act on differently has its own status."""
 
     async def test_the_tenant_switch_is_a_refusal_and_not_an_empty_answer(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -254,6 +266,27 @@ class TestTheThreeAbsences:
         )
 
         assert found.status == "not_ready"
+
+    def test_the_five_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
+        """These five words are this connector's invention, not Microsoft's, so a model can only
+        learn them from what this tool publishes. Typed `str` they would arrive as
+        `{"type": "string"}` and exist only inside the description. Asserted inline on the property
+        rather than anywhere in the document: a `$ref` into `$defs` — what a PEP 695 `type` alias
+        would produce — puts them one hop from where the value is read."""
+        status = _published("properties", "status")
+
+        assert status["enum"] == [
+            "available",
+            "not_ready",
+            "not_transcribed",
+            "scan_incomplete",
+            "meeting_not_found",
+        ]
+        assert status["type"] == "string"
+        assert "$ref" not in status
+        assert "There is nothing to try" in str(status["description"]), (
+            "the enum says what the values are; the prose still has to say what to do with them"
+        )
 
 
 class TestScopingToOneOccurrence:

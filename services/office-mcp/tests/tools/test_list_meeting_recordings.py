@@ -10,7 +10,9 @@ Every payload is synthesised — no meeting, no recording and no MP4 anywhere ne
 is easy to hold to because nothing in this tool ever fetches recording content.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
+from typing import cast
 
 import httpx
 import pytest
@@ -59,6 +61,16 @@ def _listed(graph: respx.MockRouter, *payloads: object) -> respx.Route:
     return graph.get(_RECORDINGS).mock(
         return_value=httpx.Response(200, json={"value": list(payloads)})
     )
+
+
+def _published(*path: str) -> Mapping[str, object]:
+    """A named subschema of this tool's output, narrowed off pydantic's `dict[str, Any]`."""
+    found: Mapping[str, object] = lister.MeetingRecordings.model_json_schema()
+    for key in path:
+        step = found.get(key)
+        assert isinstance(step, dict), f"expected an object at {key!r}, got {step!r}"
+        found = cast("Mapping[str, object]", step)
+    return found
 
 
 def _pages(
@@ -267,6 +279,18 @@ class TestTheOrganiserOnlyConstraint:
 
         assert found.recordings[0].content_access == "you_are_the_organizer"
 
+    def test_the_three_sides_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
+        """The constraint is Microsoft's but these three words are not — so the field publishes
+        them, rather than leaving a model to find them in the description of a `string`."""
+        access = _published("$defs", "RecordingSummary", "properties", "content_access")
+
+        assert access["enum"] == ["you_are_the_organizer", "organizer_only", "unknown"]
+        assert access["type"] == "string"
+        assert "$ref" not in access
+        assert "This is NOT a missing recording" in str(access["description"]), (
+            "the enum names the three; only the prose says an unreachable one still exists"
+        )
+
     async def test_the_caller_is_not_looked_up_when_there_is_nothing_to_say_about(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -328,7 +352,7 @@ class TestTheDurationIsDerivedOrAbsent:
         assert found.recordings[0].duration_seconds == pytest.approx(2831.0)
 
 
-class TestTheFourAnswers:
+class TestTheKindsOfAbsence:
     async def test_no_matching_meeting_is_a_status_and_costs_no_listing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -401,6 +425,27 @@ class TestTheFourAnswers:
 
         with pytest.raises(GraphNotFound):
             _ = await _listing(client)
+
+    def test_the_five_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
+        """These five words are this connector's invention, not Microsoft's, so a model can only
+        learn them from what this tool publishes. Typed `str` they would arrive as
+        `{"type": "string"}` and exist only inside the description. Asserted inline on the property
+        rather than anywhere in the document: a `$ref` into `$defs` — what a PEP 695 `type` alias
+        would produce — puts them one hop from where the value is read."""
+        status = _published("properties", "status")
+
+        assert status["enum"] == [
+            "available",
+            "not_ready",
+            "not_recorded",
+            "scan_incomplete",
+            "meeting_not_found",
+        ]
+        assert status["type"] == "string"
+        assert "$ref" not in status
+        assert "Retrying will not help" in str(status["description"]), (
+            "the enum says what the values are; the prose still has to say what to do with them"
+        )
 
 
 class TestScopingToOneOccurrence:

@@ -43,7 +43,7 @@ from SharePoint and OneDrive.
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 import httpx
 from fastmcp import FastMCP
@@ -94,6 +94,16 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 # Max recordings per call. A one-off meeting has 1–2; a series has 1 per recorded occurrence.
 # Graph sets no ceiling on `$top`; this limit is ours.
 MAX_RECORDINGS = 50
+
+# Both vocabularies are this connector's, not Microsoft's, so they are closed and publish as enums
+# in the output schema rather than as bare strings a model has to mine out of the prose. Graph-owned
+# vocabularies (`meeting_type` here) stay `str`, because Microsoft may add a member at any time.
+# Bare assignment, not `type X = ...`: PEP 695 aliases publish as a `$ref` into `$defs`, which puts
+# the values one hop away from the property a model reads.
+RecordingStatus = Literal[
+    "available", "not_ready", "not_recorded", "scan_incomplete", "meeting_not_found"
+]
+ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
 _DESCRIPTION = f"""\
 List a Teams meeting's recordings: whether it was recorded, how long, and whether the signed-in \
@@ -176,7 +186,7 @@ class RecordingSummary(BaseModel):
             "length, not the meeting's."
         )
     )
-    content_access: str = Field(
+    content_access: ContentAccess = Field(
         description=(
             "Whether the SIGNED-IN user may download this recording. Not about this connector "
             "(which has no video). One of:\n"
@@ -221,7 +231,7 @@ class RecordingSummary(BaseModel):
 
 
 class MeetingRecordings(BaseModel):
-    status: str = Field(
+    status: RecordingStatus = Field(
         description=(
             "What was found and what to do next. One of:\n"
             "- `available` — recordings are listed with durations and access info.\n"
@@ -351,7 +361,7 @@ async def list_meeting_recordings(
     )
 
 
-def _absence(*, scan_stopped_short: bool, settled: bool) -> str:
+def _absence(*, scan_stopped_short: bool, settled: bool) -> RecordingStatus:
     """Which empty answer to give: stop, wait, or neither."""
     if scan_stopped_short:
         return "scan_incomplete"
@@ -373,7 +383,7 @@ def _organizer_user_id(recording: CallRecording) -> str | None:
     return organizer.user.id
 
 
-def _content_access(organizer: str | None, caller: str | None) -> str:
+def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
     """Which side of the organiser-only rule the signed-in user is on.
 
     None for either id means it cannot be told. Guessing either way is wrong:
