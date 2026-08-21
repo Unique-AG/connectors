@@ -15,6 +15,9 @@ copy. What it has to get right, once:
   the owner pins a `Future` that later callers await instead of fetching.
 - **A cancelled owner does not cancel its waiters.** Stamping `CancelledError` onto the shared
   future would make every waiter look cancelled itself. They get a `RuntimeError` and may retry.
+- **The owner retrieves a stamped failure.** Waiters `await` the shared future; the owner
+  re-raises. Calling `.exception()` after `set_exception` marks it retrieved so a cold miss
+  with no waiters does not log "Future exception was never retrieved".
 - **Unpinning is shielded.** A `CancelledError` arriving during teardown must not skip it, or
   every later `get()` joins a finished future until the process restarts.
 - **A failed refresh serves stale.** A catalog that was right a minute ago beats no catalog, and
@@ -108,6 +111,7 @@ class CachedCatalog[T]:
                 if isinstance(error, asyncio.CancelledError):
                     waiter_error = RuntimeError(f"{self._subject} catalog fetch was cancelled")
                 in_flight.set_exception(waiter_error)
+            self._mark_in_flight_exception_retrieved(in_flight)
             raise
         finally:
             # Shield so a CancelledError cannot skip unpinning and leave later
@@ -117,6 +121,14 @@ class CachedCatalog[T]:
     def record_load(self, source: CatalogSource) -> None:
         """Called once per completed load. Override in a catalog that meters them."""
         _ = source
+
+    def _mark_in_flight_exception_retrieved(
+        self, in_flight: asyncio.Future[CatalogResult[T]]
+    ) -> None:
+        # Waiters still get the exception when they await. This only clears asyncio's
+        # "never retrieved" flag for the owner, who re-raises instead of awaiting.
+        if in_flight.done() and not in_flight.cancelled():
+            _ = in_flight.exception()
 
     async def _unpin_in_flight(self, in_flight: asyncio.Future[CatalogResult[T]]) -> None:
         async with self._lock:

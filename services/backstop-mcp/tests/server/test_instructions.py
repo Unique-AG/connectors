@@ -15,6 +15,8 @@ class TestInstructions:
         assert "search_activities" in INSTRUCTIONS
         assert "get_activity_history" in INSTRUCTIONS
         assert "filtered search" in INSTRUCTIONS
+        assert "always start with search_activities" in INSTRUCTIONS
+        assert "do not start with it" in INSTRUCTIONS
         assert "get_activity_detail" in INSTRUCTIONS
         history = INSTRUCTIONS.index("get_activity_history")
         assert INSTRUCTIONS.index("search_activities") < history

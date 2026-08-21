@@ -62,6 +62,8 @@ class TestSearchActivities:
         assert isinstance(meta, ToolMeta)
         doc = search_activities.__doc__ or ""
         assert "OR" in doc
+        assert "Always start here" in doc
+        assert "fallback only" in doc
         assert "get_activity_history" in doc
         assert "10000" in doc
         assert "visible to you" in doc

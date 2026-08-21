@@ -105,6 +105,7 @@ class TestGetActivityHistoryDocstring:
     def test_names_itself_the_documented_fallback(self) -> None:
         doc = get_activity_history.__doc__ or ""
         assert "search_activities" in doc
+        assert "Do not start here" in doc
         assert "fallback" in doc
         assert "include_description" in doc
 

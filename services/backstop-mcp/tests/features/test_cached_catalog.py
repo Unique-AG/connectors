@@ -11,6 +11,7 @@ mocked route can leak neither across cases nor across tests.
 """
 
 import asyncio
+import gc
 from collections.abc import AsyncGenerator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Protocol, cast
@@ -421,6 +422,7 @@ class TestInMemoryTtl:
         service = catalog.service()
         done = asyncio.get_running_loop().create_future()
         done.set_exception(RuntimeError("catalog fetch was cancelled"))
+        _ = done.exception()
         service._in_flight = done  # pyright: ignore[reportPrivateUsage]
         route = catalog.route(base_url, ("7", "Recovered Entry"))
 
@@ -442,6 +444,41 @@ class TestInMemoryTtl:
 
         with pytest.raises(httpx.ConnectError):
             await service.get(clients(base_url))
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_cold_fetch_failure_does_not_leave_an_unretrieved_future(
+        self, catalog: _CatalogUnderTest, clients: ClientBuilder
+    ) -> None:
+        """The owner re-raises the fetch error instead of awaiting the shared future.
+
+        `set_exception` is for waiters. With none, asyncio logs "Future exception was never
+        retrieved" unless the owner also retrieves it.
+        """
+        base_url = catalog.base_url("ttl-cold-failure-retrieved")
+        service = catalog.service()
+        respx.get(f"{base_url}{catalog.path}").mock(side_effect=httpx.ConnectError("backstop down"))
+
+        loop = asyncio.get_running_loop()
+        leaked: list[object] = []
+        previous = loop.get_exception_handler()
+
+        def handler(handler_loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
+            if context.get("message") == "Future exception was never retrieved":
+                leaked.append(context.get("exception"))
+                return
+            if previous is not None:
+                previous(handler_loop, context)
+
+        loop.set_exception_handler(handler)
+        try:
+            with pytest.raises(httpx.ConnectError):
+                await service.get(clients(base_url))
+            gc.collect()
+            await asyncio.sleep(0)
+            assert leaked == []
+        finally:
+            loop.set_exception_handler(previous)
 
     @pytest.mark.asyncio
     @respx.mock

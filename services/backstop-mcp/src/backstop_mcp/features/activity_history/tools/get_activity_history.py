@@ -79,14 +79,14 @@ async def get_activity_history(
     client: BackstopClient = Depends(get_backstop_client),
     activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
 ) -> GetActivityHistoryResponse:
-    """Party-scoped stream pages. Not the filtered activity search — use `search_activities`.
+    """Party-scoped stream pages. Do not start here — always use `search_activities` first.
 
     Documented fallback when `search_activities` is unavailable (that primary is an undocumented
     UI search and may 404 on another tenant). Use `search_activities` for a date window, activity
-    types, tags, authors, or a firm-wide question. This tool pages one party's streams when that
-    primary is missing. REST `activity_tag_ids` are AND; `search_activities` tag filters are OR.
-    Not the recommended way to read note text: prefer `search_activities` with
-    `include_description`.
+    types, tags, authors, note text, or a firm-wide question. This tool pages one party's REST
+    streams only when that primary is missing. REST `activity_tag_ids` are AND;
+    `search_activities` tag filters are OR. A 403 on one stream (empty `items` plus `error`) is
+    not "no notes" — retry those types on `search_activities` with `include_description`.
 
     Pass `request.type="first"` with `search_type` plus a trusted `party_id` (from a prior resolve
     echo — never invent or guess one) or `search` to start. When retrying with `party_id`, pass

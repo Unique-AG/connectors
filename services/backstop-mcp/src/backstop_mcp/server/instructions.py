@@ -36,14 +36,15 @@ Share class lives on the original subscription; the window must include that \
 subscription date, not only the period you are asking about. A redemption with no \
 account through originalSubscription is unattributed, not missing.
 
-Meetings, calls, notes, emails, documents: search_activities first — that is the filtered \
-search (mandatory start_date/end_date, optional types, activity_tag_ids, authors, party). \
-That primary is an undocumented UI search and may 404 — that is not "no activity exists". \
-get_activity_history is the party-scoped fallback for paging one stream when the primary \
-is missing; do not use it as the filtered search. Then get_activity_detail for the full \
-untruncated body and the attachment list. Prefer search_activities with include_description \
-for note text while the primary answers. Do not look for those on get_person / \
-get_organization.
+Meetings, calls, notes, emails, documents: always start with search_activities — that is \
+the filtered search (mandatory start_date/end_date, optional types, activity_tag_ids, \
+authors, party). That primary is an undocumented UI search and may 404 — that is not "no \
+activity exists". get_activity_history is only the party-scoped fallback for paging one \
+REST stream when that primary is missing; do not start with it, including for notes. A \
+403 on one history stream is not an empty stream — retry those types on search_activities. \
+Then get_activity_detail for the full untruncated body and the attachment list. Prefer \
+search_activities with include_description for note text while the primary answers. Do \
+not look for those on get_person / get_organization.
 
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \

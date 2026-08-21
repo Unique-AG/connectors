@@ -244,14 +244,15 @@ async def search_activities(
 ) -> GetSearchActivitiesResponse:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
-    Pass a mandatory `start_date` / `end_date` window. Optionally scope to a party
-    (`search_type` plus `party_id` or `search`), restrict `types`, filter `activity_tag_ids`
-    (OR, unlike get_activity_history), and filter `authors` by email.
+    Always start here when the question has a date window. Pass mandatory `start_date` /
+    `end_date`. Optionally scope to a party (`search_type` plus `party_id` or `search`),
+    restrict `types`, filter `activity_tag_ids` (OR, unlike get_activity_history), and filter
+    `authors` by email.
 
-    This is the primary activity tool. It is an undocumented UI search (`POST /entity-activities`)
-    and may 404 on another tenant — that is not "no activity exists". The failure payload names
-    `get_activity_history`, which is party-scoped only. `results: []` with status resolved is
-    genuinely none in that window.
+    This is the primary activity tool; `get_activity_history` is fallback only. It is an
+    undocumented UI search (`POST /entity-activities`) and may 404 on another tenant — that is
+    not "no activity exists". The failure payload names `get_activity_history`, which is
+    party-scoped only. `results: []` with status resolved is genuinely none in that window.
 
     Counts are visible to you, not firm-wide. `totalCount` saturates at 10000; this tool clamps
     `pageNum × pageSize` before requesting so it never provokes that 500, and returns the

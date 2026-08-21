@@ -219,9 +219,9 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
         Field(
             description=(
                 "When this stream could not be read (Backstop 403 on a linked entity the "
-                "caller cannot operate). `items` is empty and `next` is omitted. Other "
-                "groups in this response were still fetched — do not treat this as no "
-                "activity on those streams. Prefer search_activities for a filtered read."
+                "caller cannot operate). `items` is empty and `next` is omitted — that is "
+                "not an empty stream. Other groups in this response were still fetched. "
+                "Retry this activity type on search_activities (the primary)."
             ),
         ),
     ] = None
