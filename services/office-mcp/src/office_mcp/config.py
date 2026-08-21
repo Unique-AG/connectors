@@ -154,22 +154,18 @@ class AppConfig(BaseSettings):
     graph_connect_timeout_seconds: float = Field(default=10.0, gt=0)
     graph_max_retries: int = Field(default=3, ge=0, le=RetryHandlerOption.MAX_MAX_RETRIES)
 
-    @model_validator(mode="before")
+    # Named fields rather than a model validator over the whole dict: pydantic resolves the names
+    # at class-definition time, so renaming a field here becomes an import error instead of a
+    # validator that silently stops firing.
+    @field_validator("log_level", "app_env", mode="before")
     @classmethod
-    def _lowercase_log_level_and_app_env(cls, data: object) -> object:
+    def _lowercase(cls, value: object) -> object:
         """Accept uppercase `LOG_LEVEL=INFO` and `APP_ENV=PRODUCTION` from operators.
 
         Trap: pydantic's `StrEnum` coercion is case-sensitive. Without this step, an
         uppercase value aborts startup instead.
         """
-        if not isinstance(data, dict):
-            return data
-        values = cast(dict[str, object], data)
-        for field in ("log_level", "app_env"):
-            value = values.get(field)
-            if isinstance(value, str):
-                values = {**values, field: value.lower()}
-        return values
+        return value.lower() if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
@@ -341,14 +337,16 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def accept_database_url(cls, data: object) -> object:
-        """Accept DATABASE_URL (Helm alias) if url and discrete fields are not set.
+        """Accept DATABASE_URL (the base Helm chart's alias) as a last resort.
 
-        Explicit args win. Trap: without this guard, an explicit `DatabaseConfig(host=...)`
-        call would silently lose its arguments to the ambient environment instead.
+        Any source that sets `url`, or any one of `host`/`name`/`user`/`password`, suppresses the
+        fallback entirely — the env var is read only when nothing else names a database. Trap:
+        without that guard, an explicit `DatabaseConfig(host=...)` call would silently lose its
+        arguments to the ambient environment instead.
         """
         if not isinstance(data, dict):
             return data
-        values = cast(dict[str, object], data)
+        values = cast("dict[str, object]", data)
         if values.get("url") is not None:
             return values
         if any(values.get(field) is not None for field in ("host", "name", "user", "password")):
