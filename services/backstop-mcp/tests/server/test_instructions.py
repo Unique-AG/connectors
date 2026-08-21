@@ -8,6 +8,7 @@ class TestInstructions:
         assert "get_opportunities" in INSTRUCTIONS
         assert "get_time_series" in INSTRUCTIONS
         assert "get_product_investors" in INSTRUCTIONS
+        assert "not on get_product_investors" in INSTRUCTIONS
         assert "assets under management" in INSTRUCTIONS
         assert "get_people_for_party" in INSTRUCTIONS
         assert "numberOfEmployees" in INSTRUCTIONS
@@ -28,6 +29,7 @@ class TestInstructions:
         assert INSTRUCTIONS.index("list_system_users") < INSTRUCTIONS.index("search_opportunities")
         assert "takes that login, not a display name" in INSTRUCTIONS
         assert "get_capital_flows" in INSTRUCTIONS
+        assert "account.id" in INSTRUCTIONS
         assert "get_tasks_for_party" in INSTRUCTIONS
         assert "not on get_people_for_party" in INSTRUCTIONS
         assert "attachment list" in INSTRUCTIONS

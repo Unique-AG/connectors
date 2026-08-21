@@ -50,12 +50,17 @@ class ProductConfigurationAttributes(BaseModel):
 
 
 class ProductAttributes(BaseModel):
-    """Wire shape of a `products` resource's `attributes` under `fields=name,configuration`."""
+    """Wire shape of a `products` resource's `attributes`.
+
+    The catalog walk for name resolution uses `fields=name,configuration`. `get_product`
+    omits that sparse fieldset so `regularCustomFieldValues` arrives.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: _StrippedStr | None = None
     configuration: ProductConfigurationAttributes | None = None
+    regular_custom_field_values: object = Field(default=None, alias="regularCustomFieldValues")
 
 
 class InvestorQualificationAttributes(BaseModel):

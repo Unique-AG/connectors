@@ -88,6 +88,8 @@ class TestGetCapitalFlows:
         doc = get_capital_flows.__doc__ or ""
         assert "share_class" in doc or "share class" in doc
         assert "unattributed" in doc or "originalSubscription" in doc
+        assert "account_ids" in doc
+        assert "transaction_date" in doc
 
     @pytest.mark.asyncio
     @respx.mock
@@ -192,3 +194,81 @@ class TestGetCapitalFlows:
 
         flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
         assert [item["id"] for item in flows] == ["s-ok"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_account_ids_filter_applies_before_the_row_cap(self) -> None:
+        base_url = tenant("cf-acct")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
+            return_value=_page(
+                _sub("s-other", account_id="a-other", amount=9.0),
+                _sub("s-keep", account_id="a-keep", amount=100.0),
+                included=[
+                    {
+                        **resource("a-other", "accounts", name="Other"),
+                        "relationships": {"owner": {"data": {"id": "o-other", "type": "contacts"}}},
+                    },
+                    {
+                        **resource("a-keep", "accounts", name="Keep"),
+                        "relationships": {"owner": {"data": {"id": "o-keep", "type": "contacts"}}},
+                    },
+                    resource("o-other", "contacts", name="Other Co"),
+                    resource("o-keep", "contacts", name="Keep Co"),
+                ],
+            )
+        )
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(return_value=_page())
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    account_ids=["a-keep"],
+                    max_rows=1,
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        payload = tool_payload(result)
+        flows = [object_dict(item) for item in object_list(payload["flows"])]
+        assert [item["id"] for item in flows] == ["s-keep"]
+        assert result.total == 1
+        assert result.truncated is False
+        assert result.request_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_truncated_is_true_when_matches_exceed_max_rows(self) -> None:
+        base_url = tenant("cf-trunc")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
+            return_value=_page(
+                _sub("s1", account_id="a1"),
+                _sub("s2", account_id="a1"),
+                included=[
+                    {
+                        **resource("a1", "accounts", name="Koch acct"),
+                        "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
+                    },
+                    resource("o1", "contacts", name="Koch"),
+                ],
+            )
+        )
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(return_value=_page())
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    owner_id="o1",
+                    max_rows=1,
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        assert result.total == 2
+        assert result.truncated is True
+        assert len(object_list(tool_payload(result)["flows"])) == 1

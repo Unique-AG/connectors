@@ -40,6 +40,7 @@ __all__ = [
     "ProductResolution",
     "ProductSeries",
     "ResolvedProductDto",
+    "ProductFetchDto",
     "SeriesFigureDto",
     "SeriesPointDto",
     "ShareDto",
@@ -161,6 +162,15 @@ class ResolvedProductDto(BaseModel):
 
 type ProductCandidate = Candidate[ResolvedProductDto]
 type ProductResolution = Resolution[ResolvedProductDto]
+
+
+class ProductFetchDto(BaseModel):
+    """A product identity plus the raw custom-field dump `get_product` joins to the catalog."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    product: ResolvedProductDto
+    stored_custom_field_values: object = None
 
 
 class AccountOwnerDto(BaseModel):
