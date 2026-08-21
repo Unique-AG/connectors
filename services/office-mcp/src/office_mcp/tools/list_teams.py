@@ -38,13 +38,10 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 MAX_TEAMS = 200
 
 _DESCRIPTION = """\
-List the Microsoft Teams teams you are a member of, with each team's id, name, description, \
-and archived flag.
-
-This is the channel side of Teams. To read a channel message, first use this tool to find the \
-team, then list_channels to find the channel. The `team_id` is what list_channels takes, and the \
-same id search_messages reports on channel messages. The `limit` is a window over Microsoft's \
-order; shorter than `limit` means end of list.\
+List the teams the signed-in user belongs to. Start here for any question about a team or a \
+channel: `team_id` is what list_channels needs, and a channel id alone addresses nothing. For \
+chats, group chats and meeting chats — the other surface entirely — use list_chats. Returns each \
+team's id, name, description and archived flag; fewer than `limit` means the end of the list.\
 """
 
 

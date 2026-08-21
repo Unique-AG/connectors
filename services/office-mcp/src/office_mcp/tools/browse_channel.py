@@ -66,38 +66,12 @@ MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = f"""\
-Read a Teams channel's posts with their replies. Take `team_id` and `channel_id` from list_teams \
-and list_channels.
-
-This is the only message tool that walks one channel. `search_messages` finds messages by keyword \
-across channels and chats (not scoped to one). `read_message` reads a single message by handle. \
-Use this when you need to know "what is in this channel".
-
-**Do not sweep channels.** Microsoft rate-limits a given channel to about one request per second \
-for this app across the tenant. This tool makes one request: `$top` is the window. To see more, \
-raise `limit` rather than calling again. `search_messages` covers all channels in one request.
-
-**The order is thread activity, not post date.** Microsoft sorts by the last-modified time of the \
-entire reply chain. A two-year-old post moves to the first page when someone replies to it. Read \
-`created_at` to know when a post was written — not its position here or the top of the list.
-
-**Cannot filter by date.** This collection accepts only `$top` and `$expand=replies`. Use \
-`search_messages` with `sent_after`/`sent_before` for date bounds.
-
-**Cannot tell if a page is the whole channel.** Microsoft drops system messages after counting \
-them, so a short page is not proof the channel is empty. Set `include_window_completeness` to see \
-Microsoft's cursor on the page (`more_posts_in_channel`) — the only accurate answer.
-
-Replies come with posts: up to {MAX_REPLIES_PER_POST} newest per post, oldest first. Each reply \
-carries `reply_to_id` with its parent. Older replies on a post are unreachable — browsing again \
-returns the same newest ones. Every message is complete (same shape and text as `read_message` \
-returns). A reply's `uri` is its only handle, because Microsoft addresses it under its parent — \
-search cannot express this. When a search hit is a reply older than this window, there is no \
-route to its full text anywhere in this connector — report the search snippet and stop looking.
-
-System messages (joins, call ends, renames) are dropped — Microsoft gives them no author or text. \
-That is why pages may be shorter than `limit` and is not evidence the channel is quiet.\
+_DESCRIPTION = """\
+Read one Teams channel's posts in full. Use it for "what is in this channel", with `team_id` \
+from list_teams and `channel_id` from list_channels; for a keyword, a person or any date bound, \
+use search_messages — there is no date filter here. One call is one request: raise `limit` rather \
+than calling again. Microsoft orders by reply-chain activity, not post date: read `created_at` \
+before trusting the order. Returns each post with its newest replies, whole.\
 """
 
 
@@ -108,8 +82,11 @@ class ChannelPosts(BaseModel):
             + "oldest first. Replies carry `reply_to_id` with their parent post. Each message is "
             + "complete — same shape and text as `read_message` returns — no second read needed.\n"
             + "Up to `limit` posts returned (raise it, up to "
-            + f"{MAX_POSTS}). Up to {MAX_REPLIES_PER_POST} newest replies per post (older ones "
-            + "unreachable, browsing returns the same newest). Fewer posts than `limit` is NOT "
+            + f"{MAX_POSTS}). Up to {MAX_REPLIES_PER_POST} newest replies per post; older ones "
+            + "are unreachable and browsing again returns the same newest ones, so when a search "
+            + "hit is a reply older than this window there is no route to its full text anywhere "
+            + "in this connector — report the search snippet and stop looking. Fewer posts than "
+            + "`limit` is NOT "
             + "proof the channel holds no more — Microsoft drops system messages after counting "
             + "them. Set `include_window_completeness` for `more_posts_in_channel` (the only way "
             + "to know if more exists). Microsoft orders by reply-chain last modified, not date; "

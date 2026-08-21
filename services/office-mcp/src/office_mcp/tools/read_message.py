@@ -77,35 +77,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
-Read one Microsoft Teams message in full, from the `uri` handle search_messages produces: the \
-whole text, sender, @-mentions, attachments, and edit/delete status.
-
-This is the other half of search_messages, and the only route to the text of a message a search \
-found. Microsoft's search index answers with a reduced view of a message that contains no body at \
-all, so a search result carries only Microsoft's `summary` snippet. Read the message here whenever \
-the answer depends on what somebody actually said rather than on the fact that a matching message \
-exists — and never present a snippet as the message. A message browse_channel returned needs no \
-read: that tool answers with the whole message already.
-
-`uri` takes a handle this connector produced, in one of exactly three shapes:
-  teams:///chats/{chat_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
-Nothing else is readable here. No handle of this connector's names mail, a calendar event, a file \
-or a SharePoint page, and nothing turns a person's name or a chat topic into one — pass the `uri` \
-from a tool result verbatim. The third shape above is the one only browse_channel emits: Microsoft \
-addresses a reply in a channel thread under the post it answers, and a search result does not say \
-which post that is.
-
-`text` is plain text normalised from Teams HTML: mentions read as `@Name`, list items as `- `, \
-attachments as `[attachment: name]`, inline images as `[image]`, cards as `[card]`. The `mentions` \
-and `attachments` fields name what those placeholders refer to. A message with JSON or code is \
-somebody's words and is returned in full. `[card]` appears only where `attachments` names a card.
-
-Two messages have no text. A deleted message returns `deleted_at` and null `text` — report the \
-deletion. A system event — somebody joining, a call ending, a chat renamed — has no author and no \
-text in Graph (Teams writes the displayed sentence itself). For those, `event` names what \
-happened. Do not invent the wording.\
+Read one Teams message in full: the whole text, sender, @-mentions, attachments, and edit or \
+delete status. Call it on the `uri` of a search_messages hit whenever the answer depends on what \
+somebody actually said — a hit carries a snippet and no message body. A message browse_channel \
+returned is already complete and needs no read. `uri` must be a handle a tool result carried; no \
+name, chat topic or Teams link becomes one.\
 """
 
 _BAD_HANDLE = (
@@ -234,11 +210,16 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The handle search_messages produced, exactly: "
-                    + "`teams:///chats/{chat_id}/messages/{message_id}` or "
-                    + "`teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}`. "
-                    + "No other shape is readable. Chat topics, person names and Teams web links "
-                    + "cannot be turned into handles."
+                    "The handle a tool result carried, verbatim. Exactly three shapes are "
+                    + "readable:\n"
+                    + "  teams:///chats/{chat_id}/messages/{message_id}\n"
+                    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
+                    + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}"
+                    + "/replies/{reply_id}\n"
+                    + "search_messages emits the first two. The third only browse_channel emits: "
+                    + "Microsoft addresses a reply under the post it answers, and a search result "
+                    + "does not say which post that is. No other shape is readable. Chat topics, "
+                    + "person names and Teams web links cannot be turned into handles."
                 ),
             ),
         ],

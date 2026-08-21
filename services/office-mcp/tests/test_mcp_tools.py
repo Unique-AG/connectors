@@ -1004,34 +1004,38 @@ class TestTheToolsThisServerAdvertises:
     async def test_read_message_names_every_handle_shape_and_no_others(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """The description is where a model learns what it may pass. Naming the shapes is what
-        stops it inventing `mail:///`, and the oracle connector's one polymorphic `read_resource`
-        is the promise this connector does not make. The reply shape is named with the tool that
-        mints it, because no search result carries one.
+        """The `uri` parameter's own description is where a model learns what it may pass, read
+        immediately before it writes a value rather than at selection time. Naming the shapes is
+        what stops it inventing `mail:///`, and the oracle connector's one polymorphic
+        `read_resource` is the promise this connector does not make. The reply shape is named with
+        the tool that mints it, because no search result carries one.
         """
         tools = _named(await mcp_client.list_tools())
-        description = tools["read_message"].description
-        assert description is not None
+        uri = _object(_properties(tools["read_message"].inputSchema)["uri"])
+        described = cast("str", uri["description"])
 
-        assert "teams:///chats/{chat_id}/messages/{message_id}" in description
-        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in description
+        assert "teams:///chats/{chat_id}/messages/{message_id}" in described
+        assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in described
         assert (
             "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}"
-            in description
+            in described
         )
-        assert "search_messages" in description
-        assert "browse_channel" in description, "the reply shape has exactly one source"
+        assert "search_messages" in described
+        assert "browse_channel" in described, "the reply shape has exactly one source"
 
     async def test_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """A second reader, deliberately: a transcript is read under a different permission from a
         message, and a token is exchanged per tool, so one polymorphic reader would have to redeem
-        transcript access to read a chat message. Its handle shape is its own, and the description
-        has to name it and say which tool mints it."""
+        transcript access to read a chat message. Its handle shape is its own, and it has to be
+        named where a model reads it before writing a value: the `uri` parameter. The description
+        keeps the half a model needs at selection time, which is that the two readers exist and
+        take different handles."""
         tools = _named(await mcp_client.list_tools())
         schema = tools["read_transcript"].inputSchema
         description = tools["read_transcript"].description
+        handle = str(_object(_properties(schema)["uri"])["description"])
         assert description is not None
 
         assert set(_properties(schema)) == {
@@ -1043,9 +1047,12 @@ class TestTheToolsThisServerAdvertises:
             "speaker",
         }
         assert schema.get("required") == ["uri"]
-        assert "teams:///transcripts/{meeting_id}/{transcript_id}" in description
+        assert "teams:///transcripts/{meeting_id}/{transcript_id}" in handle
+        assert "list_meeting_transcripts" in handle, "the one tool that mints this shape"
+        assert "`meeting_uri` is not readable here" in handle, "the handle a model reaches for"
         assert "list_meeting_transcripts" in description
         assert "read_message" in description, "the two readers must not be confusable"
+        assert "a `meeting_uri` is not one" in description
 
     async def test_read_transcript_narrows_by_seconds_and_by_speaker_in_its_own_schema(
         self, mcp_client: Client[FastMCPTransport]
@@ -1097,9 +1104,9 @@ class TestTheToolsThisServerAdvertises:
         description = tools["browse_channel"].description
         assert description is not None
 
-        assert "reply chain" in description
+        assert "reply-chain" in description
         assert "created_at" in description, "the field that does tell the truth about age"
-        assert "search_messages" in description, "where a date-bounded question goes instead"
+        assert "search_messages" in description, "where a keyword, a person or a date goes instead"
 
     async def test_browse_channel_says_what_one_call_costs_and_where_it_stops(
         self, mcp_client: Client[FastMCPTransport]
@@ -1108,21 +1115,26 @@ class TestTheToolsThisServerAdvertises:
         across the tenant, so the tool makes exactly one. `limit` is therefore the entire window,
         and a model that expects paging to reach further has to be told otherwise in the
         description and in the schema, not only in the code.
+
+        Where it stops is asserted on `messages` rather than on the description: the reply window
+        is a dead end a model meets while reading the list it got back, not while choosing a tool,
+        so the instruction that ends the hunt travels with the list.
         """
         tools = _named(await mcp_client.list_tools())
         description = tools["browse_channel"].description
         limit = _object(_properties(tools["browse_channel"].inputSchema)["limit"])
+        posts = _object(_properties(tools["browse_channel"].outputSchema)["messages"])
         assert description is not None
 
-        assert "makes one request" in description
+        assert "One call is one request" in description
         assert "raise `limit` rather than calling again" in description, (
             "where it stops: the window widens, it never pages deeper"
         )
         assert "one request against the channel" in str(limit["description"])
-        assert "browsing again returns the same newest" in description, (
+        assert "browsing again returns the same newest" in str(posts["description"]), (
             "the reply window is a dead end, not a first page"
         )
-        assert "stop looking" in description
+        assert "stop looking" in str(posts["description"])
 
     async def test_list_meeting_transcripts_names_its_five_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
@@ -1130,12 +1142,23 @@ class TestTheToolsThisServerAdvertises:
         """The four absences that must stay distinct, plus "no such meeting". A model acts
         differently on them only if the tool says what each one means: the one that means wait must
         say wait and must say it is not the one that means stop, and the one that means "this was
-        not knowable" must not be reportable as either."""
+        not knowable" must not be reportable as either.
+
+        The vocabulary is taught on the `status` field, which is where a model reads an answer, and
+        the description carries only the three-way distinction it needs to choose this tool at all.
+        `not_ready` is asserted on both, because it is the one absence a model reports as its
+        opposite: the negative has to sit on the `not_ready` bullet itself, not on the
+        `scan_incomplete` one two lines down, which is a different status.
+        """
         tools = _named(await mcp_client.list_tools())
         description = tools["list_meeting_transcripts"].description
         status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        meeting_type = _object(
+            _properties(tools["list_meeting_transcripts"].outputSchema)["meeting_type"]
+        )
         assert description is not None
-        rendered = description + str(status.get("description"))
+        taught = str(status.get("description"))
+        rendered = description + taught
 
         for value in (
             "available",
@@ -1144,14 +1167,24 @@ class TestTheToolsThisServerAdvertises:
             "scan_incomplete",
             "meeting_not_found",
         ):
-            assert value in description, value
-        assert "Wait and call again later" in description
-        assert 'NOT "there is no transcript"' in description
-        assert "Retrying will not help" in description
+            assert f"`{value}`" in taught, value
+        for value in ("not_ready", "not_transcribed", "scan_incomplete"):
+            assert f"`{value}`" in description, f"{value} decides whether to call this tool at all"
+        assert "`not_ready` means wait" in description
+        not_ready_bullet = (
+            "`not_ready` — nothing is there yet and something may still arrive. Wait and call "
+            + "again later. This is NOT 'there is no transcript'."
+        )
+        assert not_ready_bullet in taught, (
+            "the wait and its negative, on the bullet for the status they are about"
+        )
+        assert "Retrying will not change this" in taught, "and the one that means stop says so"
         assert "no availability SLA" in rendered, "the inference has to be admitted as one"
-        assert "recurring" in description and "started_after" in description
-        assert 'Never report it as "there is no transcript"' in description
-        assert "not known" in description, "the fifth answer claims nothing, and has to say so"
+        assert "recurring" in str(meeting_type["description"])
+        assert "started_after" in str(meeting_type["description"])
+        assert "Never report this as 'there is no transcript'" in taught
+        assert "is NOT known" in taught, "the fifth answer claims nothing, and has to say so"
+        assert "unknowable" in description
 
     @pytest.mark.parametrize(
         ("tool", "artifact", "finality"),
@@ -1175,22 +1208,26 @@ class TestTheToolsThisServerAdvertises:
         """Four of the five statuses tell a caller what to do next. `scan_incomplete` cannot: the
         window is applied after Microsoft has answered, so no argument sends the next call further
         into the collection. Advice that sounds actionable and is not is a loop a model runs until
-        something else stops it, so both the tool and the field say to stop.
+        something else stops it, so the field a model reads this status off says to stop, names the
+        cap that caused it, and offers nothing to change.
 
         Asserted per tool because identical prose drifts by being edited on one side. One says the
         dead end is final, the other names the mechanism that causes it.
+
+        The dead end is stated on the field rather than in the tool description, which is read
+        before the call and cannot act on a status nobody has seen yet.
+        `list_meeting_transcripts` still names it in its own description, because a model choosing
+        between the two listers is told there is a third answer that means neither yes nor no.
         """
         tools = _named(await mcp_client.list_tools())
         description = tools[tool].description
         status = str(_object(_properties(tools[tool].outputSchema)["status"]))
         assert description is not None
 
-        assert "nothing to try" in description and "Stop here" in description
+        assert f"more {artifact} than one call reads" in status, "the cause, where the status is"
         assert "There is nothing to try" in status
+        assert "Stop" in status
         assert finality in status
-        assert f"reads the same {artifact} and returns this same answer" in description, (
-            "a narrower window is named only as the thing that does NOT help"
-        )
         assert (
             "narrow `started_after`/`started_before` to the occurrence you mean and ask again"
             not in (description + status).lower()
@@ -1260,16 +1297,21 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         """The promise the `not_ready` inference has to keep. A recurring series' `endDateTime` can
         be in the future for years, and a caller told to wait for a transcript of an occurrence that
-        ended last month polls forever. So both the tool and the field say the verdict follows the
-        window that was asked for, not the meeting."""
-        tools = _named(await mcp_client.list_tools())
-        description = tools["list_meeting_transcripts"].description
-        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
-        assert description is not None
+        ended last month polls forever. So the field says the verdict follows the window that was
+        asked for, not the meeting, and says it about the series in particular.
 
-        assert "window you asked about" in description
-        assert "already well past never answers this" in description
-        assert "demonstrably passed is never reported this way" in str(status["description"])
+        On the field alone: the promise is about an answer already in hand, and the description is
+        read before there is one. What the description owes is only that `not_ready` means wait,
+        which the test above pins.
+        """
+        tools = _named(await mcp_client.list_tools())
+        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        taught = str(status["description"])
+
+        assert "demonstrably passed is never reported this way" in taught
+        assert "however far in the future a recurring series runs" in taught, (
+            "the series' own end date is what the verdict must not be read off"
+        )
 
     async def test_list_meeting_recordings_takes_the_same_handle_and_window(
         self, mcp_client: Client[FastMCPTransport]
@@ -1318,23 +1360,27 @@ class TestTheToolsThisServerAdvertises:
             _properties(tools["list_meeting_recordings"].inputSchema)
         )
 
-    async def test_list_meeting_recordings_promises_no_video_and_says_why(
+    async def test_list_meeting_recordings_promises_no_video_and_sends_content_elsewhere(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """A recording is an MP4 of a meeting that can run 30 hours, and a model cannot watch
         video, so no tool here returns or fetches one. A description that left that out would have
         a model asking for the file, or reporting that it could not get it as if that were a
-        failure.
+        failure. The promise is paired with the place a question about content does get answered,
+        because "no video" on its own is a dead end rather than a route.
+
+        Only the promise, not the reasons behind it: the 30-hour meeting and the MP4 byte stream
+        explain a decision already taken, and a model that reads "no video is reachable here" acts
+        the same way without them.
         """
         tools = _named(await mcp_client.list_tools())
         description = tools["list_meeting_recordings"].description
         assert description is not None
+        rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
 
-        assert "No video is returned or reachable anywhere in this connector" in description
-        assert "30 hours" in description
-        assert "cannot watch video" in description
+        assert "no video is returned or reachable here" in description
         assert "list_meeting_transcripts" in description, "where a question about content goes"
-        assert "content_correlation_id" in description, "and how to get to the right transcript"
+        assert "content_correlation_id" in rendered, "and how to get to the right transcript"
 
     async def test_list_meeting_recordings_relays_the_organiser_only_rule(
         self, mcp_client: Client[FastMCPTransport]
@@ -1343,6 +1389,11 @@ class TestTheToolsThisServerAdvertises:
         download is the organiser's alone unless an administrator unblocked participants. The
         negative wording matters most. An unreachable recording is not a missing recording, and
         reporting it as one is a wrong answer nobody can detect.
+
+        The rule itself is read off `content_access`, where the value that triggers it lands, so
+        the quote and the three values are asserted over the whole surface. The description keeps
+        only the warning, because the wrong answer it prevents is one a model gives before it ever
+        looks at the field.
         """
         tools = _named(await mcp_client.list_tools())
         description = tools["list_meeting_recordings"].description
@@ -1351,13 +1402,14 @@ class TestTheToolsThisServerAdvertises:
         # inline, and `content_access` carries its three meanings where a model reads the result.
         rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
 
-        assert "ORGANISER-ONLY" in description
         assert "Meeting participants don't have permission to download meeting recordings" in (
-            description
+            rendered
         )
-        assert "unblocked participants" in description
-        assert "Never report an `organizer_only` recording as a missing one" in description
-        assert "organizer_user_id" in description, "who to ask for it"
+        assert "unless admin unblocks them" in rendered
+        assert "An `organizer_only` recording exists but is out of reach" in description
+        assert "never report it as missing" in description
+        assert "This is NOT a missing recording" in rendered
+        assert "organizer_user_id" in rendered, "who to ask for it"
         assert "you_are_the_organizer" in rendered and "organizer_only" in rendered
         assert "Meeting participants don't have permission" in json.dumps(
             tools["list_meeting_recordings"].outputSchema
@@ -1368,12 +1420,18 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         """The same five-outcome vocabulary the transcript lister establishes, adapted by one word:
         `not_recorded` instead of `not_transcribed`. A model that learned when to wait and when to
-        stop for one artifact must not have to learn it again for the other."""
+        stop for one artifact must not have to learn it again for the other.
+
+        Taught on the `status` field, as its neighbour teaches it. The description keeps one of the
+        five, `not_ready`, with the negative attached: it is the answer whose opposite a model
+        reports, and it has to be legible before the call rather than only after it.
+        """
         tools = _named(await mcp_client.list_tools())
         description = tools["list_meeting_recordings"].description
         status = _object(_properties(tools["list_meeting_recordings"].outputSchema)["status"])
         assert description is not None
-        rendered = description + str(status.get("description"))
+        taught = str(status.get("description"))
+        rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
 
         for value in (
             "available",
@@ -1382,15 +1440,17 @@ class TestTheToolsThisServerAdvertises:
             "scan_incomplete",
             "meeting_not_found",
         ):
-            assert value in description, value
-        assert "Wait and call again later" in description
-        assert 'NOT "the call was not recorded"' in description
-        assert "Retrying will not help" in description
-        assert "no availability SLA" in rendered, "the inference has to be admitted as one"
-        assert "recurring" in description and "started_after" in description
-        assert "no duration property" in description, "the duration is derived, and says so"
-        assert 'Never report it as "the call was not recorded"' in description
-        assert "not known" in description, "the fifth answer claims nothing, and has to say so"
+            assert f"`{value}`" in taught, value
+        assert "`not_ready` means wait" in description
+        assert 'not "the call was not recorded"' in description
+        assert "Wait and retry" in taught
+        assert "NOT 'the call was not recorded'" in taught
+        assert "Retrying will not help" in taught
+        assert "no availability SLA" in taught, "the inference has to be admitted as one"
+        assert "recurring" in rendered and "started_after" in rendered
+        assert "publishes no duration field" in rendered, "the duration is derived, and says so"
+        assert "Never report this as 'the call was not recorded'" in taught
+        assert "is NOT known" in taught, "the fifth answer claims nothing, and has to say so"
 
     async def test_both_meeting_listers_teach_the_same_status_vocabulary(
         self, mcp_client: Client[FastMCPTransport]
@@ -1443,21 +1503,29 @@ class TestTheToolsThisServerAdvertises:
             "the overstatement: past the cap those 3 are the newest of what was read"
         )
 
-    async def test_list_meeting_recordings_says_it_is_not_behind_the_transcript_switch(
+    async def test_the_transcript_switch_sends_a_refused_model_to_the_recordings_lister(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """The reason the two artifacts are two tools, said where it changes what a model does: the
         tenant switch that blocks transcripts is off by default and leaves recordings alone, so a
-        model refused a transcript should still ask whether the meeting was recorded."""
+        model refused a transcript should still ask whether the meeting was recorded.
+
+        The arrow runs one way. Only a model that has just been refused a transcript needs it, and
+        one reading the recordings lister has already chosen recordings, so the fallback is stated
+        by `list_meeting_transcripts` alone. The recordings lister points back for content only,
+        which is a different question and not a fallback.
+        """
         tools = _named(await mcp_client.list_tools())
         recordings_description = tools["list_meeting_recordings"].description
         transcripts_description = tools["list_meeting_transcripts"].description
         assert recordings_description is not None and transcripts_description is not None
 
-        assert "NOT behind the tenant-wide Teams switch" in recordings_description
-        assert "OnlineMeetingRecording.Read.All" in recordings_description
-        assert "list_meeting_recordings" in transcripts_description
-        assert "leaves recordings alone" in transcripts_description
+        assert "can block transcripts and never recordings" in transcripts_description
+        assert "try list_meeting_recordings on refusal" in transcripts_description
+        assert "for the words, call list_meeting_transcripts" in recordings_description
+        assert "refus" not in recordings_description, (
+            "a model reading this one has already chosen recordings; a fallback here is noise"
+        )
 
     async def test_no_description_names_a_tool_this_server_does_not_advertise(
         self, mcp_client: Client[FastMCPTransport]

@@ -63,20 +63,12 @@ _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
 
-_DESCRIPTION = f"""\
-List channels of a Microsoft Teams team. Pass the `team_id` from list_teams.
-
-Call this to find the channel to browse, then pass `team_id` and `channel_id` together to \
-browse_channel — a channel id alone addresses nothing. Channel names are unique only inside their \
-own team (every team has a `General`), which is why the pair is always needed. No message content \
-is returned here.
-
-The list shows only channels the signed-in user can access. An absent channel means the user \
-cannot access it, not that the team lacks it.
-
-Microsoft Graph applies no page size to this collection. As many channels as `limit` means more \
-may exist; fewer than `limit` is all of them the user can see. Raise `limit` (up to \
-{MAX_CHANNELS}).\
+_DESCRIPTION = """\
+List one team's channels. Pass the `team_id` from list_teams, then hand `team_id` and `channel_id` \
+together to browse_channel — a channel id alone addresses nothing, and every team has a `General`. \
+No message text comes back here: browse_channel reads the posts. A channel missing from the list \
+is one the signed-in user cannot access, not one the team lacks. Returns each channel's id, name, \
+description, membership type and creation date.\
 """
 
 

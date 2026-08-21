@@ -88,37 +88,12 @@ TranscriptStatus = Literal[
     "available", "not_ready", "not_transcribed", "scan_incomplete", "meeting_not_found"
 ]
 
-_DESCRIPTION = f"""\
-List transcripts a Teams meeting has, if any. Takes the `meeting_uri` from list_chats.
-
-First half of reading: this lists what exists. read_transcript returns the words. Two calls because
-transcripts are large and recurring meetings are one collection to Microsoft.
-
-**Read `status` before anything else. Five values, five actions:**
-- `available` — transcripts are listed, newest first. Use read_transcript.
-- `not_ready` — nothing is there yet for the window you asked about and something might still \
-arrive. Wait and call again later. This is NOT "there is no transcript". Microsoft publishes no \
-availability SLA; this tool infers timing from window or meeting end and errs towards wait. An \
-occurrence window that is already well past never answers this.
-- `not_transcribed` — the window is over; nothing is there; nothing is expected. Retrying will \
-not help. Say the meeting has no transcript, not that the meeting did not happen.
-- `scan_incomplete` — this meeting holds more than {MAX_ARTIFACT_SCAN} transcripts and none read \
-fall in your window, so whether one exists there is not known. Window applies after Microsoft \
-answers, not in the request, so narrower `started_after`/`started_before` reads the same \
-transcripts and returns this same answer. Stop here. There is nothing to try. Never report it as \
-"there is no transcript" — that is not what this status means.
-- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can see.
-
-For recurring meetings, use `started_after`/`started_before` to scope to one occurrence. A one-off \
-meeting has a single transcript and needs neither. Both bounds take a date (that whole UTC day) or \
-a timestamp with or without offset — no offset reads as UTC.
-
-This tool answers transcripts only. Recording exists is a separate question (different \
-permission), so transcript refusal says nothing about whether a recording exists. Use \
-list_meeting_recordings when this call fails — the tenant-wide transcript switch leaves \
-recordings alone. Transcript reading is an org-wide Teams setting OFF by default. When off, the \
-error names the admin who can turn it on. \
-Participants may be refused where the organiser succeeds. The two permissions are independent.
+_DESCRIPTION = """\
+List a Teams meeting's transcripts, from the `meeting_uri` list_chats reports. Call it to learn \
+whether a meeting was transcribed; read_transcript returns the words. Read `status` first: \
+`not_ready` means wait, `not_transcribed` means none, `scan_incomplete` means unknowable — stop, \
+narrowing the window changes nothing. A tenant switch can block transcripts and never recordings, \
+so try list_meeting_recordings on refusal. Returns `status` and each transcript's `uri` and times.\
 """
 
 _NOT_A_MEETING_HANDLE = (
@@ -164,18 +139,21 @@ class MeetingTranscripts(BaseModel):
         description=(
             "What was found and what to do next. One of:\n"
             "- `available` — transcripts are listed, newest first.\n"
-            "- `not_ready` — nothing is there yet and something may still arrive. A window that "
-            "has demonstrably passed is never reported this way, however far in the future a "
-            "recurring series runs. This is inferred; Microsoft publishes no availability SLA.\n"
+            "- `not_ready` — nothing is there yet and something may still arrive. Wait and call "
+            "again later. This is NOT 'there is no transcript'. A window that has demonstrably "
+            "passed is never reported this way, however far in the future a recurring series "
+            "runs. This is inferred; Microsoft publishes no availability SLA.\n"
             "- `scan_incomplete` — this meeting has more transcripts than one call reads "
             f"({MAX_ARTIFACT_SCAN}) and none read fall in your window, so whether one exists there "
-            "is NOT known. There is nothing to try. This status is final and cannot be retried or "
-            "worked around by narrowing the window. Never report this as 'there is no "
+            "is NOT known. There is nothing to try. Stop here. This status is final and cannot be "
+            "retried or worked around by narrowing the window. Never report this as 'there is no "
             "transcript'.\n"
             "- `not_transcribed` — the window is over; nothing is there; nothing expected. "
             "Retrying will not change this.\n"
             "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
-            "see. Do not retry and do not rebuild the handle."
+            "see. Do not retry and do not rebuild the handle.\n"
+            "A refusal is about this user, not about the meeting: a participant may be refused "
+            "where the organiser succeeds."
         )
     )
     meeting_id: str | None = Field(

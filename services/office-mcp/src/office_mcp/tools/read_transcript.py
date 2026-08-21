@@ -56,32 +56,13 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 # Max turns per call. It bounds the context size. The whole transcript is fetched either way.
 MAX_TURNS = 500
 
-_DESCRIPTION = f"""\
-Read the words from a Teams meeting transcript: speaker-attributed, timestamped turns. \
-Takes the `uri` from list_meeting_transcripts.
-
-The `uri` shape is teams:///transcripts/{{meeting_id}}/{{transcript_id}}. Only this tool and \
-list_meeting_transcripts mint this shape. read_message is a different reader with a different \
-handle.
-
-Seconds are offsets from transcription start, not wall-clock times and not offsets from meeting \
-start. They can be negative (Microsoft uses that when transcription began after conversation did). \
-Add them to the transcript's `started_at` if you need absolute time.
-
-`speaker_attribution` is false when your organisation turned speaker names off. Words and timings \
-still arrive; every `speaker` is null. Do not guess who spoke from content. **A `speaker` filter \
-matches NOTHING on such a transcript** — every turn's `speaker` is null by construction. When \
-filtering yields nothing, read the `speaker_attribution` flag before saying the person did not \
-speak.
-
-`from_seconds`, `to_seconds`, `speaker` narrow the answer. The whole transcript fetches either \
-way, so these make the answer smaller, not the call cheaper. Time bounds are inclusive and match \
-by overlap — a turn already under way at `from_seconds` keeps whole. Speaker matches any part of \
-the display name, ignoring case. `next_offset` pages through MATCHING turns, not the meeting.
-
-Paging: each call re-fetches from Microsoft. A wider `limit` (up to {MAX_TURNS}) costs less than \
-paging. `next_offset` is null on the last page and set on all others — the same as \
-search_messages. A page with `next_offset` set is not the whole meeting.\
+_DESCRIPTION = """\
+Return a Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from the \
+`uri` list_meeting_transcripts reports. Call it for what was actually said or decided. \
+read_message is the other reader and takes a different handle; a `meeting_uri` is not one. When \
+`speaker_attribution` is false every `speaker` is null and a `speaker` filter matches nothing — \
+read that flag before reporting that somebody did not speak. Returns turns with speaker, seconds \
+and text.\
 """
 
 _NOT_A_TRANSCRIPT_HANDLE = (
@@ -123,7 +104,11 @@ class TranscriptTurn(BaseModel):
         )
     )
     start_seconds: float = Field(
-        description="Turn start in seconds from transcription start. Can be negative."
+        description=(
+            "Turn start in seconds from transcription start — not wall-clock, and not an offset "
+            "from meeting start. Can be negative. Add it to the transcript's `started_at` for an "
+            "absolute time."
+        )
     )
     end_seconds: float = Field(description="Turn end, same scale.")
     text: str = Field(description="Spoken words without cue markup.")
@@ -161,7 +146,7 @@ class Transcript(BaseModel):
     speaker_attribution: bool = Field(
         description=(
             "True if speakers named. False if tenant turned speaker names off. All `speaker` "
-            "values null when false."
+            "values null when false. Do not guess who spoke from content."
         )
     )
     turns: list[TranscriptTurn] = Field(
@@ -173,7 +158,7 @@ class Transcript(BaseModel):
     next_offset: int | None = Field(
         description=(
             "Offset for next page of matching turns, or null if this is the last page. Pass the "
-            "same filters."
+            "same filters. A page with `next_offset` set is not the whole meeting."
         )
     )
 

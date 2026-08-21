@@ -28,14 +28,10 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
-Return the signed-in user's profile: user_id, display_name, email, user_principal_name, job_title.
-
-Call this tool before any action that depends on who "I", "me", or "my" refers to. The answer is \
-stable for the session.
-
-Trap: email and user_principal_name are not the same value. Use email to match sender or recipient \
-addresses. Use user_principal_name only when email is null (guest or unlicensed accounts). \
-Compare user_id with another user_id only—it is the immutable Entra object id.\
+Return the signed-in user's profile: user_id, display_name, email, user_principal_name, job_title. \
+Call it before anything that turns on who "I", "me" or "my" is, and reuse the answer — it is \
+stable for the session. Match sender and recipient addresses on `email`; `user_principal_name` is \
+a sign-in name on a possibly different domain and is correct only when `email` is null.\
 """
 
 

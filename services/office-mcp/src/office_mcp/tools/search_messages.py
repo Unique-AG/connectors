@@ -88,39 +88,13 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 # 25. It publishes no ceiling for `chatMessage`, so 50 is an undocumented choice between the two.
 MAX_RESULTS = 50
 
-_DESCRIPTION = f"""\
-Search the Microsoft Teams messages the signed-in user can see — every one-to-one chat, group \
-chat, meeting chat and channel they belong to — by keywords, sender, mentions, date, attachments \
-and read state. Messages from ANY participant match, not only the user's own; call get_me if you \
-need to know who the user is. It is the only tool here that searches: it finds messages anywhere, \
-and read_message reads one of them in full, and browse_channel is what walks a single channel when \
-the question is about that channel rather than about a keyword.
-
-A result is metadata plus a snippet, by necessity. Microsoft's search index answers with a reduced \
-view of a message that contains no message body at all, so `summary` — Microsoft's own excerpt, \
-truncated with `...` where it was cut — is the only text here. Every hit carries a `uri` handle \
-identifying that exact message; pass it to read_message for the real text, the attachments and the \
-mentions. Never present `summary` as the whole message, and never conclude from it that the \
-message does not say more.
-
-There is no result total — Graph gives a per-page count, not a match count. Use `next_offset` to \
-page: a value means more matches, null means there is no page to advance to. Pass it back as \
-`offset` to advance. Messages with no sender are dropped: Graph names no author on a system \
-message ("Ada joined") or on a deleted one.
-
-Search covers all user chats and channels; you cannot narrow to one. Use `sender`, dates or more \
-words to filter. Read `chat_id` or `channel_id` on each hit to see where it came from.
-
-Results are not sorted: Graph refuses sort options on message search. The default is newest first \
-with possible relevance mixing. Compare `created_at` when order matters.
-
-At least one criterion is required; all criteria are ANDed. `query` matches as plain words: every \
-word must appear anywhere, in any order. Quote to require adjacency: `"release notes"` matches \
-only side by side. Search operators in `query` are treated as text, not operators. Put operators \
-in their own parameters. Dates are inclusive whole days, applied by the index at no extra cost, \
-and cover both chats and channels. `recipient` works only for one-to-one chats; prefer `sender`. \
-Channel search requires the delegated {CHANNEL_PERMISSION} permission, which this connector \
-requires at sign-in.\
+_DESCRIPTION = """\
+Search every Teams message the signed-in user can see, by keyword, sender, mention, date, \
+attachment or read state. Use it for "find the message where…" and for every date-bounded \
+question, including one about a named channel — browse_channel has no date filter. Search takes \
+no chat or channel scope: read `channel_id` on each hit to see where it came from. At least one \
+criterion is required and all are ANDed. Hits carry metadata and Microsoft's `summary` snippet \
+only — pass a hit's `uri` to read_message for the actual words.\
 """
 
 
@@ -242,7 +216,15 @@ class MessageHit(BaseModel):
 
 
 class MessageSearchResults(BaseModel):
-    messages: list[MessageHit] = Field(description="Matching messages on this page.")
+    messages: list[MessageHit] = Field(
+        description=(
+            "Matching messages on this page, from ANY participant — not only the signed-in "
+            + "user's own. Every chat and channel the user can see was searched, and nothing "
+            + "narrows a search to one of them. Messages with no sender are dropped: Graph names "
+            + 'no author on a system message ("Ada joined") or on a deleted one, so a message '
+            + "absent here is not a message that does not exist."
+        )
+    )
     next_offset: int | None = Field(
         description=(
             "The offset that reaches the next page of results, or null when the page cannot "

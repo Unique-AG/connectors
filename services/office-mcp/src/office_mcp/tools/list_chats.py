@@ -47,32 +47,13 @@ _RECENCY = "lastMessagePreview/createdDateTime desc"
 
 type _ChatsQuery = ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters
 
-_DESCRIPTION = f"""\
-List the signed-in user's Microsoft Teams chats: one-to-one, group, and meeting chats, most \
-recent first. Returns id, type, topic, last-message time, and members (for unnamed chats).
-
-Use this to see which conversations are live, who is in them, and when each was last posted. No \
-message text is returned. Use search_messages to find a message. Use read_message for its full \
-text. Chat_id here is what Microsoft puts on every message in that chat, so this list names \
-messages found elsewhere. Not an argument to any tool. This returns chats only; channels live \
-inside teams and are a different surface.
-
-Meeting chats are conversations attached to a Teams meeting. The `topic` is the meeting subject. \
-`meeting_uri` is the only route from conversation to meeting — pass it verbatim to \
-list_meeting_transcripts to find out whether the meeting was transcribed. No calendar permission \
-needed. `meeting_uri` is null for non-meeting chats and for meeting chats where Microsoft gave no \
-join URL — that meeting's transcripts are then unreachable here.
-
-Order comes from the last message sent in each chat — the only recency Graph applies. \
-`last_message_at` is null if no one has posted yet. `members` returns only for unnamed chats \
-(members are the name). Graph caps members at {MEMBERS_PER_CHAT} per chat with no total. \
-`members_may_be_incomplete` says when the list reached that cap. Set `include_member_emails` \
-when members share a display name.
-
-`limit` is a window on the most recent chats. A full window means more may exist. A short one is \
-all. Raise `limit` up to {MAX_CHATS} to see further back. The notes-to-self chat is usually the \
-oneOnOne chat whose only member is the user—call get_me to confirm. Members match by display name \
-or by email (with `include_member_emails`). This list carries no user ids.\
+_DESCRIPTION = """\
+List the signed-in user's Teams chats — one-to-one, group and meeting — ordered by last message \
+sent. Call it to see who is in a conversation, when it was last active, or for a meeting's \
+`meeting_uri`, the only route to its transcripts and recordings — no filter exists, so match it by \
+subject in `topic`. Channel activity is listed nowhere here: browse_channel walks one, \
+search_messages finds a message. Returns id, type, topic, last-message time and members for \
+unnamed chats.\
 """
 
 
@@ -140,7 +121,9 @@ class ChatSummary(BaseModel):
             "Who is in the chat. Returned only for unnamed chats (where members are the name). "
             + "Null otherwise. A null field does not mean the chat has no members; it means "
             + "members are not returned for named chats. Do not use this incomplete list to make "
-            + "decisions about chat membership."
+            + "decisions about chat membership. Match a member by display name, or by email with "
+            + "`include_member_emails`; this list carries no user ids, so nothing in it can be "
+            + "compared with get_me's `user_id`."
         )
     )
     members_may_be_incomplete: bool = Field(
@@ -179,7 +162,9 @@ class ChatList(BaseModel):
     chats: list[ChatSummary] = Field(
         description=(
             "The user's chats, most recent first. A full window may have more. A short one is "
-            + f"all. Raise `limit` (up to {MAX_CHATS}) to see further back."
+            + f"all. Raise `limit` (up to {MAX_CHATS}) to see further back. The notes-to-self "
+            + "chat is usually the oneOnOne chat whose only member is the user — call get_me to "
+            + "confirm."
         )
     )
 

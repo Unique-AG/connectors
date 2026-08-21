@@ -99,52 +99,13 @@ RecordingStatus = Literal[
 ]
 ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
-_DESCRIPTION = f"""\
-List a Teams meeting's recordings: whether it was recorded, how long, and whether the signed-in \
-user may download it.
-
-**No video is returned or reachable anywhere in this connector.** A Teams meeting runs 30 hours \
-max. Graph serves a recording as one MP4 byte stream. A model cannot watch video, so returning \
-the file would be neither possible nor useful. This tool returns metadata and access rules only.
-
-Call list_meeting_transcripts for the same meeting when you need the words. Use \
-`content_correlation_id` to match a recording with its transcript — that is Microsoft's own \
-identifier for "these two are the same call".
-
-**Read `status` before anything else. Five values, five actions:**
-- `available` — recordings are listed, newest first, with durations and access info.
-- `not_ready` — nothing is there yet for the window you asked; the window or meeting just ended. \
-Wait and call again later. This is NOT "the call was not recorded". Microsoft publishes no \
-availability SLA, so this tool infers timing and errs towards wait.
-- `not_recorded` — the window is past; nothing is there. The call was not recorded. Retrying will \
-not help.
-- `scan_incomplete` — this meeting has more recordings than one call reads \
-({MAX_ARTIFACT_SCAN}). None read fall in your window, so whether one exists there is not known. \
-The window applies after Microsoft answers (not in the request), so narrower \
-`started_after`/`started_before` reads the same recordings and returns this same answer. \
-There is nothing to try. Stop here. Never report it as "the call was not recorded".
-- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can see.
-
-**`content_access` says whether this user may download the video.** It is not about this \
-connector, which has no video. Microsoft's rule is ORGANISER-ONLY under delegated access: \
-"Meeting participants don't have permission to download meeting recordings" unless a tenant \
-admin has unblocked participants. Never report an `organizer_only` recording as a missing one — \
-it exists; the video is out of reach. See `organizer_user_id` to learn who to ask. The three \
-values are you_are_the_organizer / organizer_only / unknown. An admin can still block recording \
-downloads tenant-wide from SharePoint and OneDrive.
-
-For `duration_seconds`: Microsoft publishes no duration property. It is computed as endDateTime \
-minus createdDateTime from the recording itself (not the meeting). It is null if either timestamp \
-is missing. A recording started late and stopped early is shorter than the meeting.
-
-For recurring meetings, use `started_after`/`started_before` to reach one occurrence. A whole \
-series is one meeting to Microsoft, so every occurrence's recording is in this collection. Both \
-bounds take a date (that whole UTC day) or a timestamp with or without offset — no offset reads \
-as UTC.
-
-Recordings are NOT behind the tenant-wide Teams switch for transcript access, so this tool can \
-succeed where list_meeting_transcripts is refused outright. Recordings need their own \
-admin-consented permission ({RECORDING_PERMISSION}); refusal names it.\
+_DESCRIPTION = """\
+List a Teams meeting's recordings from the `meeting_uri` list_chats reports. Call it to learn \
+whether a meeting was recorded, how long, and who may download it — no video is returned or \
+reachable here; for the words, call list_meeting_transcripts. Read `status` first: `not_ready` \
+means wait, not "the call was not recorded". An `organizer_only` recording exists but is out of \
+reach: never report it as missing. Returns `status` and each recording's times, duration and \
+access.\
 """
 
 # `tests/test_layering.py` rule 4 forbids one tool file from importing another, so this text stays

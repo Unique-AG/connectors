@@ -243,8 +243,10 @@ class TeamsMessage(BaseModel):
 
     uri: str = Field(
         description=(
-            "The handle this message was read from, in the form search_messages emits. Echoed so "
-            + "messages can be quoted, cached or re-read without reassembling."
+            "The handle this message was read from, in the form read_message takes. Echoed so "
+            + "messages can be quoted, cached or re-read without reassembling. For a reply in a "
+            + "channel thread this is its only handle, because Microsoft addresses a reply under "
+            + "its parent post and search cannot express that shape."
         )
     )
     message_id: str = Field(
@@ -282,7 +284,8 @@ class TeamsMessage(BaseModel):
             "What happened when this is a system event message: `members joined`, `chat renamed`, "
             + "`call ended`, etc., from Microsoft's `eventDetail` type. Null for ordinary "
             + "messages. Graph does not send the sentence Teams displays—the client writes it—so "
-            + "this naming is all there is. Participant details are not returned."
+            + "this naming is all there is: report it, and do not invent the wording. "
+            + "Participant details are not returned."
         )
     )
     created_at: datetime | None = Field(description="When the message was sent.")
