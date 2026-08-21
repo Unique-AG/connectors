@@ -7,5 +7,5 @@
   "services/hello-mcp": "0.1.0",
   "services/kb-mcp": "0.1.1",
   "services/backstop-mcp": "0.0.2",
-  "services/office-mcp": "0.1.0"
+  "services/office-mcp": "0.0.0"
 }
