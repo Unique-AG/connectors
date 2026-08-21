@@ -14,7 +14,7 @@ from backstop_mcp.features.activity_history import (
     SearchActivitiesUnavailableResponse,
 )
 from backstop_mcp.features.activity_history.tools.search_activities import (
-    _date_window,
+    _date_window,  # pyright: ignore[reportPrivateUsage]
     search_activities,
 )
 from backstop_mcp.server.tools import TOOLS

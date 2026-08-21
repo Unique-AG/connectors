@@ -1,3 +1,5 @@
+from typing import cast
+
 import httpx
 import pytest
 import respx
@@ -15,6 +17,7 @@ from backstop_mcp.features.party_resolver import (
     PartyCandidateResponse,
     ResolvedPartyResponse,
 )
+from backstop_mcp.models import CoercedId
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
     FORMER_TYPE,
@@ -786,7 +789,7 @@ class TestGetPersonCustomFields:
             await get_person(
                 ctx_never_elicit(),
                 party_id="p9",
-                custom_field_definition_ids=[202],
+                custom_field_definition_ids=cast(list[CoercedId], [202]),
                 client=client,
                 custom_fields=_catalog(),
                 employment_index_factory=_INDEX,

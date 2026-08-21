@@ -159,7 +159,12 @@ class TestGetProductInvestors:
         accounts = respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
 
         result = tool_model(
-            await get_product_investors(ctx_never_elicit(), client=client, **kwargs),
+            await get_product_investors(
+                ctx_never_elicit(),
+                client=client,
+                product=kwargs.get("product"),
+                search=kwargs.get("search"),
+            ),
             ProductInvestorsResolvedResponse,
         )
 

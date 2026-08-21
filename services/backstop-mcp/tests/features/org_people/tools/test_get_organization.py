@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 import httpx
 import pytest
@@ -20,6 +21,7 @@ from backstop_mcp.features.party_resolver import (
     ResolvedPartyResponse,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.models import CoercedId
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,
@@ -931,7 +933,7 @@ async def _organization_custom_fields(
             custom_field_tabs=custom_field_tabs,
             custom_field_groups=custom_field_groups,
             custom_field_group_ids=custom_field_group_ids,
-            custom_field_definition_ids=custom_field_definition_ids,
+            custom_field_definition_ids=cast(Sequence[CoercedId], custom_field_definition_ids),
             custom_field_names=custom_field_names,
         )
     )
