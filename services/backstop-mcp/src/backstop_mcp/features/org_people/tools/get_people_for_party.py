@@ -93,13 +93,13 @@ async def get_people_for_party(
     even when people are on file. Name and email come from `/employees` (same ids as people)
     side-loaded with employment relationships on that walk — not a fetch per person.
 
-    Each row is identity (`id` / `search_type` / name / email) plus `employment` from
-    `EmploymentIndex` — `status` is `current` or `former` at this organization. Default is
-    current only. `/employees` does not list former staff; those links are on the
-    organization's `entityRelationships`. When they are omitted, `former_omitted` and
-    `include_former_hint` say so — pass `include_former=true` to include them (contact
-    fields may be absent). Call `get_person` with that row's `id` and `search_type` for
-    the full record.
+    Each row is identity (`id` / `search_type` / name / email / `categories`) plus
+    `employment` from `EmploymentIndex` — `status` is `current` or `former` at this
+    organization. Default is current only. `/employees` does not list former staff; those
+    links are on the organization's `entityRelationships`. When they are omitted,
+    `former_omitted` and `include_former_hint` say so — pass `include_former=true` to
+    include them (contact fields may be absent). Call `get_person` with that row's `id`
+    and `search_type` for the full record.
     """
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")

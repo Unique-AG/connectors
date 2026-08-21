@@ -237,7 +237,7 @@ class TestContactEmail:
 
 
 class TestContactCard:
-    def test_keeps_five_of_the_thirty_one_person_attributes(self) -> None:
+    def test_keeps_five_person_attributes_when_categories_are_absent(self) -> None:
         card = ContactCardResponse.model_validate(_PERSON)
 
         assert card.model_dump() == {
@@ -247,6 +247,20 @@ class TestContactCard:
             "phone": "(480) 419-3625",
             "company_name": "Koch Industries Employees' Pension Plan",
         }
+
+    def test_projects_categories_from_names_or_name_objects(self) -> None:
+        from_strings = ContactCardResponse.model_validate(
+            {"name": "Glenn, Phil", "categories": ["Investor", "Decision Maker"]}
+        )
+        from_objects = ContactCardResponse.model_validate(
+            {
+                "name": "Glenn, Phil",
+                "categories": [{"name": "Investor"}, {"name": "  Decision Maker  "}, {"name": ""}],
+            }
+        )
+
+        assert from_strings.categories == ("Investor", "Decision Maker")
+        assert from_objects.categories == ("Investor", "Decision Maker")
 
 
 class TestCompanyRef:

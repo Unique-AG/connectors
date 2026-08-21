@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 _PAGE_SIZE = 100
 MAX_ORG_PEOPLE = 500
-_EMPLOYEE_FIELDS = "name,jobTitle,email,phone,companyName"
+_EMPLOYEE_FIELDS = "name,jobTitle,email,phone,companyName,categories"
 
 RelationshipResource = BackstopApiResource[EntityRelationshipAttributes]
 RelationshipTypeResource = BackstopApiResource[RelationshipTypeAttributes]
