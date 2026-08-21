@@ -16,9 +16,11 @@ from pydantic import ValidationError
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
     BackstopClient,
+    IncludedIndex,
     IncludedResource,
-    follow_included,
+    follow_indexed,
     included_resource,
+    index_included,
 )
 from backstop_mcp.features.opportunities.api_responses import (
     SearchContactAttributes,
@@ -44,6 +46,12 @@ logger = logging.getLogger(__name__)
 
 _PATH = "/opportunities"
 _PAGE_SIZE = 500
+
+# Scan ceiling. `GET /opportunities` has no wall of its own, and `parallel=True` builds one
+# coroutine per page from `meta.totalResourceCount` and accumulates every row — so an unbounded
+# walk is bounded only by the tenant. 1,206 rows measured here, so this is ~16x headroom on this
+# instance and a stated limit on one 50x larger, reported through `scan_coverage`.
+MAX_OPPORTUNITY_SCAN_RECORDS = 20_000
 _INCLUDE = "investor,product,stage"
 _CONTACT_FIELDS = "name,country,state,city"
 _PRODUCT_FIELDS = "name"
@@ -55,27 +63,25 @@ _OPPORTUNITY_FIELDS = (
     "previousStage"
 )
 
-__all__ = ["fetch_search_opportunities"]
+__all__ = ["MAX_OPPORTUNITY_SCAN_RECORDS", "fetch_search_opportunities"]
 
 
-def _chip_from_included[T](
-    included: Sequence[dict[str, object]],
+def _chip_from_index[T](
+    index: IncludedIndex,
     resource: OpportunityResource,
     relationship: str,
     *,
     schema: type[IncludedResource[T]],
 ) -> IncludedResource[T] | None:
-    matches = follow_included(included, resource, relationship)
+    matches = follow_indexed(index, resource, relationship)
     if not matches:
         return None
     return included_resource(matches[0], schema=schema)
 
 
-def _investor(
-    included: Sequence[dict[str, object]], resource: OpportunityResource
-) -> InvestorChipDto | None:
-    chip = _chip_from_included(
-        included, resource, "investor", schema=IncludedResource[SearchContactAttributes]
+def _investor(index: IncludedIndex, resource: OpportunityResource) -> InvestorChipDto | None:
+    chip = _chip_from_index(
+        index, resource, "investor", schema=IncludedResource[SearchContactAttributes]
     )
     if chip is None:
         return None
@@ -88,11 +94,9 @@ def _investor(
     )
 
 
-def _product(
-    included: Sequence[dict[str, object]], resource: OpportunityResource
-) -> ProductChipDto | None:
-    chip = _chip_from_included(
-        included, resource, "product", schema=IncludedResource[SearchProductAttributes]
+def _product(index: IncludedIndex, resource: OpportunityResource) -> ProductChipDto | None:
+    chip = _chip_from_index(
+        index, resource, "product", schema=IncludedResource[SearchProductAttributes]
     )
     if chip is None:
         return None
@@ -135,6 +139,10 @@ def _project(
     vocabulary: Mapping[str, OpportunityStageDto],
 ) -> tuple[tuple[SearchOpportunityDto, ...], int]:
     side_loaded = stage_names_from_included(included)
+    # Indexed once for the whole walk. `follow_included` indexes on every call, and this loop
+    # follows two relationships per row against one array holding every side-loaded investor,
+    # product and stage from every page — 1,206 rows would rebuild that map 2,412 times.
+    index = index_included(included)
     projected: list[SearchOpportunityDto] = []
     dropped = 0
     for resource in items:
@@ -157,8 +165,8 @@ def _project(
         projected.append(
             _from_deal(
                 deal,
-                investor=_investor(included, resource),
-                product=_product(included, resource),
+                investor=_investor(index, resource),
+                product=_product(index, resource),
             )
         )
     return tuple(projected), dropped
@@ -189,7 +197,7 @@ async def fetch_search_opportunities(
             _PATH,
             schema=BackstopApiResource[dict[str, object]],
             params=_params(representative=representative),
-            max_records=None,
+            max_records=MAX_OPPORTUNITY_SCAN_RECORDS,
             page_size=_PAGE_SIZE,
             parallel=True,
         ),

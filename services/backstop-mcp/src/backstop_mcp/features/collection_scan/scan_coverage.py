@@ -20,8 +20,8 @@ ERROR_DISCLAIMER = (
 
 def _ceiling_disclaimer(ceiling: int) -> str:
     return (
-        f"{ceiling} is the maximum this endpoint will serve. The collection saturates there, "
-        "so the true total is unknown — narrow the window or add a filter. A pagination "
+        f"{ceiling} is the most this call will read from the collection, and the scan reached "
+        "it, so the true total is unknown — narrow the window or add a filter. A pagination "
         "overrun is not an outage. Counts are visible to you, not firm-wide."
     )
 
@@ -37,7 +37,13 @@ def scan_coverage(
     partial_due_to_error: bool,
     extra_disclaimers: tuple[str, ...] = (),
 ) -> ScanCoverageResponse:
-    """Coverage for one walk. `ceiling` is the endpoint wall (10000 on entity-activities)."""
+    """Coverage for one walk.
+
+    `ceiling` is the most this walk will read: an endpoint wall where there is one (10000 on
+    entity-activities) and otherwise the scan ceiling the fetch caps itself at. Both saturate
+    the same way from the caller's side — the answer is a prefix of the collection — so both
+    are reported as `ceiling_hit`.
+    """
     ceiling_hit = ceiling_clamped or visible_count == ceiling
     truncated = truncated_by_row_cap or ceiling_hit or partial_due_to_error
     disclaimers: list[str] = []

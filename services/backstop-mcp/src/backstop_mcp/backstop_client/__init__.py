@@ -31,11 +31,14 @@ from backstop_mcp.backstop_client.json_api import (
     BackstopApiCollectionDocument,
     BackstopApiResource,
     BackstopApiResourceDocument,
+    IncludedIndex,
     IncludedResource,
     ResourceRef,
     follow_included,
+    follow_indexed,
     included_by_type,
     included_resource,
+    index_included,
 )
 from backstop_mcp.backstop_client.pagination import (
     PageResult,
@@ -62,6 +65,7 @@ __all__ = [
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
+    "IncludedIndex",
     "IncludedResource",
     "PageResult",
     "ResourceRef",
@@ -69,8 +73,10 @@ __all__ = [
     "RetrySettings",
     "SinglePage",
     "follow_included",
+    "follow_indexed",
     "included_by_type",
     "included_resource",
+    "index_included",
     "paginate_all",
     "parse_page",
 ]

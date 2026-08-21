@@ -7,9 +7,9 @@ from typing import Literal
 from backstop_mcp.features.activity_history.internal_dto import EntityActivityDto
 from backstop_mcp.features.collection_scan import AggregateBucketDto
 
-__all__ = ["aggregate_entity_activities"]
+__all__ = ["ActivityAggregateBy", "aggregate_entity_activities"]
 
-ActivityAggregateBy = Literal["type", "tag", "party", "period"]
+type ActivityAggregateBy = Literal["type", "tag", "party", "period"]
 
 _UNTAGGED = "(untagged)"
 _UNATTRIBUTED = "(unattributed)"
@@ -47,7 +47,10 @@ def aggregate_entity_activities(
                 continue
             period = row.effective_date.strftime("%Y-%m")
             counts[(period, period)] += 1
+    # Sorted, not `most_common()`: that breaks count ties by insertion order, which here is
+    # page order from an endpoint whose row order is not stable across hosts. Same key as
+    # `aggregate_search_opportunities`, so the two aggregate paths agree.
     return tuple(
         AggregateBucketDto(key=key, label=label, count=count)
-        for (key, label), count in counts.most_common()
+        for (key, label), count in sorted(counts.items(), key=lambda item: (-item[1], item[0][1]))
     )

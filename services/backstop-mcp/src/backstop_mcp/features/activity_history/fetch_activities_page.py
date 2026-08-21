@@ -72,8 +72,7 @@ _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "document": "documents",
 }
 _ACTIVITY_FIELDS = (
-    "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp,"
-    "regarding"
+    "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp,regarding"
 )
 _ACTIVITY_TAG_FIELDS = "name"
 _ATTENDEE_FIELDS = "name,firstName,lastName"

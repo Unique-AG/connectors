@@ -4,7 +4,9 @@ Strategy, Domicile, Fee Structure and the rest live here — not on get_product_
 (owners only) and not on list_custom_fields (definitions only).
 """
 
+import asyncio
 from collections.abc import Sequence
+from http import HTTPStatus
 from typing import Annotated, Literal
 
 from fastmcp import Context
@@ -13,9 +15,10 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.accounts import (
+    MAX_PRODUCT_SCAN_RECORDS,
     ProductAmbiguousResponse,
     ProductFetchDto,
     fetch_product,
@@ -68,6 +71,14 @@ class ProductResolvedResponse(OmitNoneModel):
             "was. The catalog is small (~72 on this instance) — this is one walk, not a "
             "per-product fan-out."
         )
+    )
+    scan_truncated: bool = Field(
+        default=False,
+        description=(
+            f"True when the catalog walk stopped at the {MAX_PRODUCT_SCAN_RECORDS}-product scan "
+            "ceiling, so `products` is a prefix of the catalog. An absent Strategy then means "
+            "'not in what was read', not 'not in the firm'. Always false for a single product."
+        ),
     )
 
 
@@ -145,22 +156,57 @@ async def get_product(
         raise ValueError("Pass at most one of product_id or product")
 
     if product_id is None and product is None:
-        fetched = await fetch_product_catalog(client)
-        products = tuple(
-            [
-                await _record(client, custom_fields, item, names=custom_field_names)
-                for item in fetched
-            ]
+        catalog = await fetch_product_catalog(client)
+        # Concurrently: the catalog is ~72 rows and each row is a catalog join, so a sequential
+        # comprehension is 72 awaits in a row for work that has no ordering between rows.
+        products = await asyncio.gather(
+            *(
+                _record(client, custom_fields, item, names=custom_field_names)
+                for item in catalog.products
+            )
         )
-        return ProductResolvedResponse(products=products)
+        return ProductResolvedResponse(
+            products=tuple(products), scan_truncated=catalog.scan_truncated
+        )
 
-    query = product_id if product_id is not None else product
-    assert query is not None
-    outcome = await resolve_product_query(ctx, client, query=query)
+    if product_id is not None:
+        # A trusted id goes straight to the full record. Resolving it first would GET the same
+        # product twice — once sparse to confirm it exists, once in full — and the full read
+        # already carries `name` and `configuration`, and already 404s when it does not exist.
+        return await _by_trusted_id(
+            client, custom_fields, product_id=product_id, names=custom_field_names
+        )
+
+    assert product is not None
+    outcome = await resolve_product_query(ctx, client, query=product)
     if not isinstance(outcome, Resolved):
         return ProductAmbiguousResponse.from_unresolved(outcome)
 
     item = await fetch_product(client, product_id=outcome.value.id)
     return ProductResolvedResponse(
         products=(await _record(client, custom_fields, item, names=custom_field_names),)
+    )
+
+
+async def _by_trusted_id(
+    client: BackstopClient,
+    custom_fields: CustomFieldsService,
+    *,
+    product_id: str,
+    names: Sequence[str],
+) -> GetProductResponse:
+    """One by-id GET. A 404 is `not_found`; every other error stays an error.
+
+    Backstop answers `GET /products/{non-digit}` with 400 rather than 404, so a value that is
+    not an id is reported as an error rather than silently searched — `product` is the parameter
+    for a name.
+    """
+    try:
+        item = await fetch_product(client, product_id=product_id)
+    except BackstopApiError as exc:
+        if exc.status_code != HTTPStatus.NOT_FOUND:
+            raise
+        return NotFoundResponse(query=product_id, scope="products")
+    return ProductResolvedResponse(
+        products=(await _record(client, custom_fields, item, names=names),)
     )

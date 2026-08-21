@@ -93,9 +93,7 @@ class TestTheQueryParam:
         assert plan.param == "company,contactLocations"
 
     def test_activity_history_always_asks_for_tags_and_attendees(self) -> None:
-        plan = include_plan(
-            ActivityIncludesResponse, requested=["activity_tags", "attendees"]
-        )
+        plan = include_plan(ActivityIncludesResponse, requested=["activity_tags", "attendees"])
 
         assert plan.param == "activityTags,attendees"
 

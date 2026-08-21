@@ -67,6 +67,10 @@ def require_series_for_entity(entity_type: TimeSeriesEntityType, series: TimeSer
 
     The tool parameter type is the union of both enums, so pairing is this check rather than
     pydantic's. An unrecognized path segment is silently a 404 on some Backstop versions.
+
+    This is the *only* statement of the rule. `get_time_series` calls it on its arguments before
+    it spends a product resolve, which is a system boundary and so needs the message; the walk
+    below therefore takes the pair as already checked rather than asserting it again.
     """
     allowed = _allowed_series(entity_type)
     if series in allowed:
@@ -84,10 +88,11 @@ async def fetch_time_series(
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> tuple[SeriesPointDto, ...]:
-    """Every dated point on this series, newest first. Undated rows are dropped, not zeroed."""
-    assert series in _allowed_series(entity_type), (
-        f"series {series!r} is not valid for {entity_type}"
-    )
+    """Every dated point on this series, newest first. Undated rows are dropped, not zeroed.
+
+    `entity_type` / `series` are expected to have been paired by `require_series_for_entity`,
+    which every caller runs on its arguments.
+    """
     path = f"/{entity_type}/{quote(entity_id, safe='')}/{series}"
     page = await client.paginate(
         path,

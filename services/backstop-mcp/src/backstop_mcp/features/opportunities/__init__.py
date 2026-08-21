@@ -23,6 +23,7 @@ from backstop_mcp.features.opportunities.fetch_opportunities import (
     fetch_opportunities,
 )
 from backstop_mcp.features.opportunities.fetch_search_opportunities import (
+    MAX_OPPORTUNITY_SCAN_RECORDS,
     fetch_search_opportunities,
 )
 from backstop_mcp.features.opportunities.internal_dto import (
@@ -38,6 +39,7 @@ from backstop_mcp.features.opportunities.responses import (
 )
 
 __all__ = [
+    "MAX_OPPORTUNITY_SCAN_RECORDS",
     "OpportunityFetchResponse",
     "OpportunityGroupBy",
     "OpportunityResponse",

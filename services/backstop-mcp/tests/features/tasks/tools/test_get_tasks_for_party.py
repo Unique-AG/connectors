@@ -74,6 +74,7 @@ class TestGetTasksForParty:
         assert "filter[status]" not in params
         assert result.total == 2
         assert result.open_count == 1
+        assert result.scan_truncated is False
         assert result.completed_count == 1
         rows = [object_dict(item) for item in object_list(tool_payload(result)["tasks"])]
         assert [item["id"] for item in rows] == ["t1", "t2"]

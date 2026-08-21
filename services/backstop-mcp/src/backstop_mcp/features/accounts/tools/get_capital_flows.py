@@ -11,7 +11,11 @@ from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client
-from backstop_mcp.features.accounts import CapitalFlowDto, fetch_capital_flows
+from backstop_mcp.features.accounts import (
+    MAX_CAPITAL_FLOW_SCAN_RECORDS,
+    CapitalFlowDto,
+    fetch_capital_flows,
+)
 from backstop_mcp.models import OmitNoneModel, published_output_schema
 
 _DEFAULT_MAX_ROWS = 200
@@ -63,8 +67,10 @@ class CapitalFlowRowResponse(OmitNoneModel):
     )
     unattributed: bool = Field(
         description=(
-            "True when a redemption could not be tied to an account through "
-            "originalSubscription.fundAccount. That is an orphan, not a dropped row."
+            "True when this flow could not be tied to an account: a redemption whose "
+            "originalSubscription.fundAccount chain is missing, or a subscription whose "
+            "fundAccount include did not arrive. That is an orphan, not a dropped row, and it "
+            "has no owner — so it drops out of both owner_id and account_ids."
         )
     )
 
@@ -83,7 +89,10 @@ class CapitalFlowsResolvedResponse(OmitNoneModel):
         ),
     )
     request_count: int = Field(
-        description="Always 2: one subscriptions walk and one redemptions walk."
+        description=(
+            "Pages actually fetched across both collections. At least 2 — one page of each — "
+            "and more whenever a window holds more than one page of either."
+        )
     )
     flows: tuple[CapitalFlowRowResponse, ...] = Field(
         description="Actuals newest-first by transaction_date. Capped at max_rows."
@@ -92,12 +101,30 @@ class CapitalFlowsResolvedResponse(OmitNoneModel):
     subscription_count: int = Field(description="How many of `total` are subscriptions.")
     redemption_count: int = Field(description="How many of `total` are redemptions.")
     unattributed_count: int = Field(
-        description="Redemptions that could not be tied to an account. Included in `flows`."
+        description=(
+            "Flows in `total` that could not be tied to an account — see `unattributed`. "
+            "Included in `flows`."
+        )
+    )
+    non_actual_count: int = Field(
+        description=(
+            "Rows in the window that were not actuals (status != COMPLETED) and are therefore "
+            "absent from `flows` and from every count here. A window with pending "
+            "subscriptions is not a window with none."
+        )
     )
     truncated: bool = Field(
         description=(
             "True when matching actuals exceeded `max_rows`. Counts are over the matching "
             "set, not the truncated `flows` list."
+        )
+    )
+    scan_truncated: bool = Field(
+        description=(
+            f"True when a walk stopped at the {MAX_CAPITAL_FLOW_SCAN_RECORDS}-row scan "
+            "ceiling, so the window was read only in part and every count here is a floor. "
+            "Narrow the date window; neither collection takes a server-side account or "
+            "product filter."
         )
     )
 
@@ -116,8 +143,7 @@ async def get_capital_flows(
         date,
         Field(
             description=(
-                "Inclusive start of filter[transactionDate]. Required — an unfiltered read "
-                "is 400."
+                "Inclusive start of filter[transactionDate]. Required — an unfiltered read is 400."
             )
         ),
     ],
@@ -158,8 +184,10 @@ async def get_capital_flows(
 ) -> CapitalFlowsResolvedResponse:
     """Subscriptions and redemptions in a date window — also the only share-class source.
 
-    Always pass `start_date` and `end_date`; Backstop refuses an unfiltered read. Two calls.
-    Actuals only (`COMPLETED`). A redemption has no account of its own and is attributed
+    Always pass `start_date` and `end_date`; Backstop refuses an unfiltered read. Two collection
+    walks, one per direction — `request_count` is what they actually cost, and `scan_truncated`
+    says when a window was too big to read whole. Actuals only (`COMPLETED`); `non_actual_count`
+    is how many rows that excluded. A redemption has no account of its own and is attributed
     through `originalSubscription`; when that chain is missing the row is `unattributed`,
     not omitted. `share_class` / `share_series` live on the subscription, not the account.
 
@@ -188,7 +216,9 @@ async def get_capital_flows(
         subscription_count=subscription_count,
         redemption_count=redemption_count,
         unattributed_count=unattributed_count,
+        non_actual_count=fetched.rows_dropped,
         truncated=len(matched) > max_rows,
+        scan_truncated=fetched.scan_truncated,
     )
 
 

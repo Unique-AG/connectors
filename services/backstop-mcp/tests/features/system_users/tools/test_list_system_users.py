@@ -183,7 +183,11 @@ class TestListSystemUsers:
 
 class TestListSystemUsersInput:
     def test_accepts_search(self) -> None:
-        _INPUT.validate_python({"search": "mlucas"})
+        # Asserted over the adapter's schema, not by validating a payload: `_INPUT` wraps the
+        # tool callable, so `validate_python` would validate the arguments and then *call* it,
+        # leaving an un-awaited coroutine behind.
+        properties = object_dict(object_dict(_INPUT.json_schema())["properties"])
+        assert sorted(properties) == ["refresh", "search"]
 
     def test_refresh_is_only_for_a_user_reported_missing_colleague(self) -> None:
         doc = list_system_users.__doc__ or ""

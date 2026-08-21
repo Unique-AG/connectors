@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 
-__all__ = ["TaskDto"]
+__all__ = ["TaskDto", "TasksListingDto"]
 
 type TaskStatus = Literal["open", "completed"]
 
@@ -46,3 +46,16 @@ def _is_completed(attributes: TaskAttributes) -> bool:
         return True
     status = (attributes.status or "").strip().casefold()
     return status in {"completed", "complete", "done", "closed"}
+
+
+class TasksListingDto(BaseModel):
+    """One party's tasks, and whether the walk read all of them.
+
+    `/tasks` takes no status filter, so the whole sub-collection is read and split here.
+    `scan_truncated` is the walk's scan ceiling firing, which makes `rows` a prefix.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[TaskDto, ...]
+    scan_truncated: bool = False

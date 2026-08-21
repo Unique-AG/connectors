@@ -93,7 +93,12 @@ class SearchOpportunityDto(BaseModel):
 
 
 class SearchOpportunitiesFetchDto(BaseModel):
-    """Projected deals from one firm-wide walk, plus how much of the collection was seen."""
+    """Projected deals from one firm-wide walk, plus how much of the collection was seen.
+
+    `truncated` is the walk's scan ceiling firing. There is deliberately no partial-scan flag:
+    the walk is one `paginate` call and a failed page fails the whole thing, so a short answer
+    is never returned in place of an error.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -102,4 +107,3 @@ class SearchOpportunitiesFetchDto(BaseModel):
     rows_dropped: int
     total_count: int | None
     truncated: bool
-    partial_due_to_error: bool = False

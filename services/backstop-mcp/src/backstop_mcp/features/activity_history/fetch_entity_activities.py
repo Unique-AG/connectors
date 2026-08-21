@@ -166,9 +166,6 @@ async def fetch_entity_activities(
             break
         if max_rows is not None and len(collected) >= max_rows:
             break
-        if total_count is not None and len(collected) + dropped >= total_count:
-            exhausted = True
-            break
         try:
             document = await client.post(
                 _PATH,

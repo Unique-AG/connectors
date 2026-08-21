@@ -17,16 +17,15 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import (
-    BackstopApiError,
     BackstopAuthError,
     BackstopClient,
     BackstopRateLimitError,
-    BackstopResponseSchemaError,
 )
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
+    ActivityAggregateBy,
     EntityActivityType,
     GetSearchActivitiesResponse,
     SearchActivitiesResolvedResponse,
@@ -64,7 +63,6 @@ _DEFAULT_FIELDS: frozenset[str] = frozenset(
         "attachments_count",
     }
 )
-_DESCRIPTION_FIELDS = _DEFAULT_FIELDS | frozenset({"description"})
 _FALLBACK_MESSAGE = (
     "POST /entity-activities is undocumented and did not answer. Call get_activity_history "
     "with a resolved party instead. That fallback is party-scoped only — there is no "
@@ -73,7 +71,6 @@ _FALLBACK_MESSAGE = (
 )
 
 SearchMode = Literal["rows", "aggregate"]
-SearchGroupBy = Literal["type", "tag", "party", "period"]
 SearchRowField = Literal[
     "id",
     "type",
@@ -209,7 +206,7 @@ async def search_activities(
         ),
     ] = "rows",
     group_by: Annotated[
-        SearchGroupBy | None,
+        ActivityAggregateBy | None,
         Field(
             default=None,
             description=(
@@ -305,13 +302,14 @@ async def search_activities(
         )
 
     row_cap = min(max_rows, _DESCRIPTION_MAX_ROWS) if include_description else max_rows
-    selected_fields = (
-        frozenset(fields)
-        if fields
-        else (_DESCRIPTION_FIELDS if include_description else _DEFAULT_FIELDS)
-    )
-    if include_description:
-        selected_fields = selected_fields | frozenset({"description"})
+    # `description` is added to the *default* set when it was opted into, and never forced onto
+    # an explicit `fields` list: a caller who names the fields they want has said what they want.
+    if fields:
+        selected_fields = frozenset(fields)
+    elif include_description:
+        selected_fields = _DEFAULT_FIELDS | frozenset({"description"})
+    else:
+        selected_fields = _DEFAULT_FIELDS
 
     logger.info(
         "activity_history.search.start",
@@ -334,8 +332,17 @@ async def search_activities(
             max_rows=None if mode == "aggregate" else row_cap,
         )
     except (BackstopAuthError, BackstopRateLimitError):
+        # Neither is "this endpoint is unavailable". A dead credential fails the documented
+        # fallback the same way, and a rate limit is a "slow down" that naming a second tool
+        # would answer with more load.
         raise
-    except (BackstopApiError, BackstopResponseSchemaError) as exc:
+    except Exception as exc:
+        # Broad on purpose, matching `fetch_holdings`: HTTP status, transport timeout and
+        # schema-validation failure all mean the same thing here — the undocumented endpoint did
+        # not answer usably. A `httpx.TimeoutException` reaches this frame raw (the client lets
+        # transport errors out), and letting it propagate is the one path where the "name the
+        # fallback" contract silently would not fire, on the failure an unbounded-payload UI
+        # endpoint is likeliest to produce.
         logger.warning(
             "activity_history.search.primary_unavailable",
             extra={"error": f"{type(exc).__name__}: {exc}"},

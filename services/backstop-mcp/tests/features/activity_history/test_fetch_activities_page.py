@@ -714,9 +714,7 @@ class TestActivityTagFilterAndIncludes:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_omits_the_tag_filter_when_no_ids_are_given(
-        self, client: BackstopClient
-    ) -> None:
+    async def test_omits_the_tag_filter_when_no_ids_are_given(self, client: BackstopClient) -> None:
         route = respx.get(f"{BASE_URL}/organizations/42/activities").mock(
             return_value=httpx.Response(200, json=collection())
         )

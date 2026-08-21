@@ -29,6 +29,10 @@ __all__ = [
     "AccountOwnerDto",
     "AccountRecordDto",
     "AccountSeries",
+    "CapitalFlowDto",
+    "CapitalFlowPartyDto",
+    "CapitalFlowWalkDto",
+    "CapitalFlowsFetchDto",
     "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
@@ -37,18 +41,16 @@ __all__ = [
     "MoneyDto",
     "PRODUCT_SERIES",
     "ProductCandidate",
+    "ProductCatalogFetchDto",
+    "ProductFetchDto",
     "ProductResolution",
     "ProductSeries",
     "ResolvedProductDto",
-    "ProductFetchDto",
     "SeriesFigureDto",
     "SeriesPointDto",
     "ShareDto",
     "TimeSeriesEntityType",
     "TimeSeriesName",
-    "CapitalFlowDto",
-    "CapitalFlowPartyDto",
-    "CapitalFlowsFetchDto",
 ]
 
 _OWNER = "owner"
@@ -553,12 +555,44 @@ class CapitalFlowDto(BaseModel):
     unattributed: bool = False
 
 
+class ProductCatalogFetchDto(BaseModel):
+    """The product catalog walk, and whether it read all of it.
+
+    `scan_truncated` is the walk's scan ceiling firing, which turns "the catalog" into "the
+    first N products" — the difference between "no product has this Strategy" and "none of the
+    ones I looked at did".
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    products: tuple[ProductFetchDto, ...]
+    scan_truncated: bool = False
+
+
+class CapitalFlowWalkDto(BaseModel):
+    """One capital-flow collection walk: what it kept, what it cost, and what it missed."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[CapitalFlowDto, ...]
+    non_actuals_dropped: int
+    request_count: int
+    scan_truncated: bool
+
+
 class CapitalFlowsFetchDto(BaseModel):
-    """Both walks, merged, with a request count and drop count."""
+    """Both walks, merged newest-first, with the cost and the coverage of the pair.
+
+    `rows_dropped` is how many rows in the window were not actuals (`status != COMPLETED`) and
+    so are absent from `rows` and from every count derived from it. `request_count` is pages
+    actually fetched across both collections, not a constant. `scan_truncated` is true when
+    either walk stopped at its scan ceiling, which makes `rows` a prefix of the window rather
+    than the window.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     rows: tuple[CapitalFlowDto, ...]
     rows_dropped: int
     request_count: int
-
+    scan_truncated: bool = False

@@ -5,6 +5,7 @@ from `list_system_users`, not a display name. Stage, product, and open/closed ar
 """
 
 import logging
+from datetime import date
 from typing import Annotated, Literal, Self
 
 from fastmcp.dependencies import Depends
@@ -17,9 +18,11 @@ from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.collection_scan import (
     AggregateBucketResponse,
     ScanCoverageResponse,
+    project_fields,
     scan_coverage,
 )
 from backstop_mcp.features.opportunities import (
+    MAX_OPPORTUNITY_SCAN_RECORDS,
     OpportunityGroupBy,
     OpportunityStagesService,
     SearchOpportunitiesFetchDto,
@@ -34,8 +37,6 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_ROWS = 100
 _MAX_ROWS = 1_000
-# No endpoint wall on GET /opportunities; scan_coverage still needs a ceiling that will not fire.
-_NO_CEILING = -1
 
 SearchMode = Literal["rows", "aggregate"]
 SearchRowField = Literal[
@@ -111,15 +112,15 @@ class SearchOpportunityRowResponse(OmitNoneModel):
         default=None, description="Backstop's allocated amount times probability."
     )
     currency: str | None = Field(default=None, description="ISO currency of both amounts.")
-    expected_investment_date: object = Field(
+    expected_investment_date: date | None = Field(
         default=None, description="Day the investment is expected."
     )
-    closed_date: object = Field(default=None, description="Day the deal closed, if it has.")
+    closed_date: date | None = Field(default=None, description="Day the deal closed, if it has.")
     days_open: int | None = Field(default=None, description="Days the deal has been open.")
     days_in_current_stage: int | None = Field(
         default=None, description="Days the deal has sat in `stage`."
     )
-    date_entered_current_stage: object = Field(
+    date_entered_current_stage: date | None = Field(
         default=None, description="Day the deal entered `stage`."
     )
     investor: InvestorChipResponse | None = Field(
@@ -131,46 +132,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
 
     @classmethod
     def from_dto(cls, row: SearchOpportunityDto, *, fields: frozenset[str]) -> Self:
-        payload: dict[str, object] = {}
-        if "id" in fields:
-            payload["id"] = row.id
-        if "name" in fields:
-            payload["name"] = row.name
-        if "stage" in fields:
-            payload["stage"] = row.stage
-        if "stage_id" in fields:
-            payload["stage_id"] = row.stage_id
-        if "previous_stage" in fields:
-            payload["previous_stage"] = row.previous_stage
-        if "is_open" in fields:
-            payload["is_open"] = row.is_open
-        if "probability" in fields:
-            payload["probability"] = row.probability
-        if "requested_amount" in fields:
-            payload["requested_amount"] = row.requested_amount
-        if "allocated_amount" in fields:
-            payload["allocated_amount"] = row.allocated_amount
-        if "weighted_value" in fields:
-            payload["weighted_value"] = row.weighted_value
-        if "weighted_allocated_value" in fields:
-            payload["weighted_allocated_value"] = row.weighted_allocated_value
-        if "currency" in fields:
-            payload["currency"] = row.currency
-        if "expected_investment_date" in fields:
-            payload["expected_investment_date"] = row.expected_investment_date
-        if "closed_date" in fields:
-            payload["closed_date"] = row.closed_date
-        if "days_open" in fields:
-            payload["days_open"] = row.days_open
-        if "days_in_current_stage" in fields:
-            payload["days_in_current_stage"] = row.days_in_current_stage
-        if "date_entered_current_stage" in fields:
-            payload["date_entered_current_stage"] = row.date_entered_current_stage
-        if "investor" in fields and row.investor is not None:
-            payload["investor"] = InvestorChipResponse.model_validate(row.investor.model_dump())
-        if "product" in fields and row.product is not None:
-            payload["product"] = ProductChipResponse.model_validate(row.product.model_dump())
-        return cls.model_validate(payload)
+        return project_fields(row, fields=fields, into=cls)
 
 
 class SearchOpportunitiesResolvedResponse(OmitNoneModel):
@@ -231,10 +193,12 @@ def _resolved(
         rows_scanned=fetch.rows_received,
         visible_count=visible,
         rows_dropped=fetch.rows_dropped,
-        ceiling=_NO_CEILING,
-        ceiling_clamped=False,
+        ceiling=MAX_OPPORTUNITY_SCAN_RECORDS,
+        ceiling_clamped=fetch.truncated,
         truncated_by_row_cap=truncated_by_row_cap,
-        partial_due_to_error=fetch.partial_due_to_error,
+        # One `paginate` call: a failed page raises rather than returning a short list, so this
+        # walk has no partial mode to report.
+        partial_due_to_error=False,
     )
     rows: tuple[SearchOpportunityRowResponse, ...] = ()
     aggregates: tuple[AggregateBucketResponse, ...] = ()
@@ -312,7 +276,11 @@ async def search_opportunities(
         Field(
             ge=1,
             le=_MAX_ROWS,
-            description="Row-body cap in rows mode. Does not limit the walk or aggregate counts.",
+            description=(
+                f"Row-body cap in rows mode. Does not limit the walk, which reads up to "
+                f"{MAX_OPPORTUNITY_SCAN_RECORDS} rows and says so in `coverage`, or the "
+                "aggregate counts."
+            ),
         ),
     ] = _DEFAULT_MAX_ROWS,
     fields: Annotated[

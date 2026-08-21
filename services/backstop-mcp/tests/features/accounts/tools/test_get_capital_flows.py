@@ -5,6 +5,7 @@ import pytest
 import respx
 
 from backstop_mcp.features.accounts.tools.get_capital_flows import (
+    CapitalFlowRowResponse,
     CapitalFlowsResolvedResponse,
     get_capital_flows,
 )
@@ -141,6 +142,8 @@ class TestGetCapitalFlows:
         assert sub_params["include"] == "fundAccount.owner"
         assert red_params["include"] == "originalSubscription.fundAccount"
         assert result.request_count == 2
+        assert result.non_actual_count == 0
+        assert result.scan_truncated is False
         payload = tool_payload(result)
         flows = [object_dict(item) for item in object_list(payload["flows"])]
         kinds = {item["kind"]: item for item in flows}
@@ -194,6 +197,7 @@ class TestGetCapitalFlows:
 
         flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
         assert [item["id"] for item in flows] == ["s-ok"]
+        assert result.non_actual_count == 1
 
     @pytest.mark.asyncio
     @respx.mock
@@ -272,3 +276,63 @@ class TestGetCapitalFlows:
         assert result.total == 2
         assert result.truncated is True
         assert len(object_list(tool_payload(result)["flows"])) == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_undated_flows_sort_last_and_do_not_crowd_the_row_cap(self) -> None:
+        """`flows` is documented newest-first, and `max_rows` slices after the sort.
+
+        Sorting `(date is None, date)` descending puts the undated group first, so an undated
+        row would take the only slot a dated one should have had.
+        """
+        base_url = tenant("cf-undated")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
+            return_value=_page(
+                _sub("s-undated", account_id=None, transactionDate=None),
+                _sub("s-dated", account_id=None),
+            )
+        )
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(return_value=_page())
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    max_rows=1,
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
+        assert [item["id"] for item in flows] == ["s-dated"]
+        assert result.total == 2
+        assert result.truncated is True
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_subscription_with_no_account_include_is_flagged_unattributed(self) -> None:
+        """`unattributed` covers both kinds: a subscription can lose its `fundAccount` too."""
+        base_url = tenant("cf-sub-orphan")
+        respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
+            return_value=_page(_sub("s-orphan", account_id=None))
+        )
+        respx.get(f"{base_url}/hedge-fund-account-redemptions").mock(return_value=_page())
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await get_capital_flows(
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 12, 31),
+                    client=client,
+                ),
+                CapitalFlowsResolvedResponse,
+            )
+
+        flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
+        assert flows[0]["unattributed"] is True
+        assert result.unattributed_count == 1
+        published = CapitalFlowRowResponse.model_fields["unattributed"].description or ""
+        assert "subscription" in published
+        assert "redemption" in published

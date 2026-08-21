@@ -848,6 +848,9 @@ class TestLikeFallback:
         assert params["filter[name][like]"] == "Investment Advisors"
         assert params["page[limit]"] == "200"
         assert "filter[lastName][like]" not in params
+        # Without this an organizations row drags `regularCustomFieldValues`: 36x the bytes,
+        # for four fields the candidate projection reads.
+        assert params["fields[organizations]"] == "name"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -877,6 +880,7 @@ class TestLikeFallback:
         assert params["filter[lastName][like]"] == "Glenn"
         assert "filter[name][like]" not in params
         assert params["page[limit]"] == "200"
+        assert params["fields[people]"] == "name,firstName,lastName"
 
     @pytest.mark.asyncio
     @respx.mock
