@@ -172,7 +172,7 @@ async def collect_pages[T](
     def visit(item: Parsable) -> bool:
         nonlocal scanned, capped
         scanned += 1
-        candidate = cast(T, item)
+        candidate = cast("T", item)
         if matches is None or matches(candidate):
             items.append(candidate)
         capped = len(items) >= limit or scanned >= max_scanned
@@ -186,11 +186,6 @@ async def collect_pages[T](
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         error_mapping={"XXX": ODataError},
     )
-    if headers is not None:
-        # Not `set_headers`: it splats a dict into `add_all`, which takes a `HeadersCollection`.
-        # Copying into the iterator's own collection also keeps the caller's untouched — the request
-        # adapter adds `Authorization` to whichever one it is handed.
-        iterator.headers.add_all(headers)
     empty_pages_in_a_row = 0
     # The count is recorded on the way out however the walk ended: the walk worth seeing on a
     # dashboard is the one that read fifty pages before giving up, and that one leaves by a raise.
@@ -213,6 +208,7 @@ async def collect_pages[T](
             # Counted before the request rather than after it: a walk that gave up on its Nth page
             # spent N requests, and the one that failed is the page a dashboard came here to see.
             pages += 1
+            iterator.headers = _headers_for_one_page(headers)
             page = await iterator.next()
             # Unreachable, and kept for what it narrows: `next()` answers None only for a page with
             # no next link, which the check above already returned on. Every other path builds a
@@ -247,6 +243,31 @@ def _readable_first_page[T](page: GraphCollection[T]) -> GraphCollection[T]:
     writable = cast(_WritableCollection[T], cast(object, stand_in))
     writable.value = []
     return stand_in
+
+
+def _headers_for_one_page(headers: HeadersCollection | None) -> HeadersCollection:
+    """A collection of the caller's headers for exactly one next-page request.
+
+    TRAP: one per page, and re-assigned before every `next()`. `PageIterator.fetch_next_page` does
+    `request_info.headers = self.headers` — an assignment, so every page's request would otherwise
+    share the iterator's one long-lived collection. `BaseBearerTokenAuthenticationProvider` asks
+    `AccessTokenProvider` for a token only when the request carries no `Authorization` yet, so the
+    header the first followed page deposits in a shared collection means no page after it consults
+    the provider again — and that provider (`_CallerTokenProvider` in `client.py`) is where the
+    allowed-hosts check lives, the one thing that refuses to hand the caller's delegated token to an
+    `@odata.nextLink` pointing off Graph.
+
+    A copy rather than the caller's own collection for the same reason in the other direction: the
+    adapter adds `Authorization` to whichever collection it is handed, and the caller's is also on
+    the caller's own first request.
+
+    Not `PageIterator.set_headers`: it splats a dict into `add_all`, which takes a
+    `HeadersCollection`.
+    """
+    for_this_page = HeadersCollection()
+    if headers is not None:
+        for_this_page.add_all(headers)
+    return for_this_page
 
 
 def _more_was_on_offer(iterator: PageIterator) -> bool:

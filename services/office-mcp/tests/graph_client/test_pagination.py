@@ -15,10 +15,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_mcp.graph_client import GraphPagingUnending, collect_pages, pagination
 from office_mcp.graph_client.pagination import MAX_EMPTY_PAGES, MAX_SCANNED_ITEMS
 
-from .conftest import GRAPH_V1
+from .conftest import CALLER_TOKEN, GRAPH_V1
 
 SECOND_PAGE = f"{GRAPH_V1}/me/chats?$skiptoken=synthetic-page-2"
 THIRD_PAGE = f"{GRAPH_V1}/me/chats?$skiptoken=synthetic-page-3"
+# A next link Graph would never send, which is the point: the walk replays what it is given.
+OFF_GRAPH_PAGE = "https://attacker.invalid/v1.0/me/chats"
 
 
 def chat(number: int, topic: str) -> dict[str, object]:
@@ -228,6 +230,67 @@ class TestTheHeadersItCarries:
         _ = await collect_pages(first, client, limit=10)
 
         assert "prefer" not in graph.calls.last.request.headers
+
+
+class TestTheTokenItWillNotCarryOffGraph:
+    """A `@odata.nextLink` is a URL Graph chose, and this walk replays it verbatim. So the walk is
+    the one place a hostile or compromised next link could aim the caller's delegated token at a
+    host that is not Graph, and `_CallerTokenProvider.get_authorization_token` is the only thing
+    that refuses — see the TRAP in `client.py`.
+    """
+
+    async def test_a_next_link_off_graph_is_followed_without_the_callers_token(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Three pages, because two cannot show this: the leak needs a page that *deposits*
+        `Authorization` in a collection a later page then reuses.
+
+        `BaseBearerTokenAuthenticationProvider` asks the token provider for a token only when the
+        request carries no `Authorization` yet, and `PageIterator.fetch_next_page` assigns
+        `request_info.headers = self.headers`. Give every page the iterator's one collection and the
+        header page two got is already on page three's request, so the provider — and with it the
+        allowed-hosts check — is never consulted again for the rest of the walk.
+
+        Asserted with `headers=` passed because that is the case that leaked: a walk given none
+        happens to survive on `authenticate_request`'s `if not request.request_headers` replacing
+        the collection, which is not a property to hold this walk to.
+        """
+        off_graph = graph.route(host="attacker.invalid").mock(
+            return_value=httpx.Response(200, json={"value": [chat(3, "bait")]})
+        )
+        on_graph = graph.get("/me/chats", params={"$skiptoken": "synthetic-page-2"}).mock(
+            return_value=httpx.Response(
+                200,
+                json={"value": [chat(2, "second")], "@odata.nextLink": OFF_GRAPH_PAGE},
+            )
+        )
+        graph.get("/me/chats").mock(
+            return_value=httpx.Response(
+                200,
+                json={"value": [chat(1, "first")], "@odata.nextLink": SECOND_PAGE},
+            )
+        )
+        first = await client.me.chats.get()
+        assert first is not None
+        headers = HeadersCollection()
+        headers.add("Prefer", "include-unknown-enum-members")
+
+        collected = await collect_pages(first, client, limit=10, headers=headers)
+
+        assert topics(collected.items) == ["first", "second", "bait"]
+        assert off_graph.called, (
+            "the next link was followed, so the refusal is about the token only"
+        )
+        off_graph_request = off_graph.calls.last.request
+        assert "authorization" not in off_graph_request.headers, (
+            "the caller's delegated token reached a host that is not Graph"
+        )
+        assert off_graph_request.headers["prefer"] == "include-unknown-enum-members", (
+            "the caller's own headers still travel; it is the bearer token that does not"
+        )
+        assert on_graph.calls.last.request.headers["authorization"] == f"Bearer {CALLER_TOKEN}", (
+            "and the page before it was authenticated, so the header is genuinely per request"
+        )
 
 
 class TestTheCaps:

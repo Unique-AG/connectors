@@ -25,7 +25,6 @@ from office_mcp.graph_client.observability import (
     GRAPH_THROTTLED_TOTAL,
 )
 from office_mcp.graph_client.pagination import (
-    MAX_SCANNED_ITEMS,
     CollectedItems,
     GraphCollection,
     collect_pages,
@@ -40,7 +39,6 @@ __all__ = [
     "GRAPH_STEPS_TOTAL",
     "GRAPH_STEP_DURATION_SECONDS",
     "GRAPH_THROTTLED_TOTAL",
-    "MAX_SCANNED_ITEMS",
     "CollectedItems",
     "GraphCollection",
     "GraphFailure",
