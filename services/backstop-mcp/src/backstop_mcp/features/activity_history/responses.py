@@ -9,7 +9,9 @@ Neither `resource_type` nor `resource_id` is surfaced on its own on history rows
 `activity_id` is already the composite `{resourceType}_{resourceId}` (see
 `ResourceIdentifierDto`), so the two halves are always delivered together. `search_activities`
 rows publish the same `activity_id` field with the search-row id, which
-`get_activity_detail` also accepts. `type` already says which stream a record came from.
+`get_activity_detail` also accepts. History email ids are `/emails` collection ids, not that
+handle — `EmailRecordResponse` must not send them to `get_activity_detail`. `type` already
+says which stream a record came from.
 
 Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurred_at`) use
 `validation_alias` + `from_attributes`. Gist conversion, recipient capping, and the
@@ -415,8 +417,10 @@ class EmailRecordResponse(OmitNoneModel):
     activity_id: str = Field(
         validation_alias=AliasChoices("activity_id", "id"),
         description=(
-            "Handle for this email. Pass it to `get_activity_detail` for the body and "
-            "attachment list. Emails have no body on this tool — subject and addresses only."
+            "Handle for this email on the `/emails` collection. Emails have no body on this "
+            "tool — subject and addresses only. Do not pass this to `get_activity_detail`: "
+            "history email ids are not `/entity-activity-details` ids. Use `search_activities` "
+            "for the body and attachment list."
         ),
     )
     occurred_at: datetime | None = Field(
@@ -692,14 +696,14 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         description=(
             "Same value as `activity_id`. Pass either to get_activity_detail. Distinct from "
             "the composite `meeting-or-calls_{id}` get_activity_history returns, which also "
-            "works there. Never invent one."
+            "works there. History email ids do not. Never invent one."
         )
     )
     activity_id: str = Field(
         description=(
             "Pass this to get_activity_detail. Same value as `id` — the id "
             "`/entity-activity-details` uses. A get_activity_history `activity_id` "
-            "(`meeting-or-calls_76537547`) also works."
+            "(`meeting-or-calls_76537547`) also works. History email ids do not."
         )
     )
     type: str | None = Field(

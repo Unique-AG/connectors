@@ -5,7 +5,8 @@
 id every detail endpoint wants and the resource type that says which endpoints apply (see
 `ResourceIdentifierDto`). A `search_activities` row `activity_id` (same value as `id`) is
 already that bare id (`/entity-activity-details/{id}` answers it live); meeting extras then
-follow the detail record's `type`, because a search id has no resource type.
+follow the detail record's `type`, because a search id has no resource type. A history
+email handle is rejected: `/emails` ids (body via `contentUrl`) are not this id space.
 
 For a meeting/call composite, all three fetches — the detail record, the meeting specifics,
 and the attendees — run CONCURRENTLY via `asyncio.gather`. A note or document composite is
@@ -66,8 +67,9 @@ async def get_activity_detail(
             description=(
                 "The `activity_id` from get_activity_history (`meeting-or-calls_76537547`) or "
                 "the `id` from a search_activities row (`1659094659`). Both resolve on "
-                "`/entity-activity-details`. Never invent or guess one — an unknown id raises "
-                "rather than returning a not-found response."
+                "`/entity-activity-details`. Do not pass a history email handle — those are "
+                "`/emails` ids. Never invent or guess one — an unknown id raises rather than "
+                "returning a not-found response."
             ),
         ),
     ],
@@ -81,11 +83,12 @@ async def get_activity_detail(
     you read the full body.
 
     The attachment list is this tool's one unique capability versus `search_activities`, which
-    only publishes `attachments_count`. Pass `activity_id` from get_activity_history or the
-    `id` from a search_activities row — never invent one. Unlike the timeline's `gist`
-    (truncated to a token budget), `body` here is the FULL converted text. `start`/`stop`/
-    `location`/`time_zone` and `attendees` are only populated for a meeting/call record; a
-    note, document, or email leaves them `None`/empty.
+    only publishes `attachments_count`. Pass `activity_id` from get_activity_history
+    (meeting, call, note, or document — not a history email) or the `id` from a
+    search_activities row — never invent one. Unlike the timeline's `gist` (truncated to a
+    token budget), `body` here is the FULL converted text. `start`/`stop`/`location`/
+    `time_zone` and `attendees` are only populated for a meeting/call record; a note,
+    document, or email leaves them `None`/empty.
     """
     _ = ctx
     handle = ResourceIdentifierDto.from_activity_id(activity_id)

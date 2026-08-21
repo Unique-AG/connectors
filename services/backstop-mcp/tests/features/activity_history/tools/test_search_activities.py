@@ -73,6 +73,7 @@ class TestSearchActivities:
         assert "visible to you" in doc
         assert "get_activity_detail" in doc
         assert "activity_id" in doc
+        assert "history email ids do not" in doc
 
     @pytest.mark.asyncio
     @respx.mock

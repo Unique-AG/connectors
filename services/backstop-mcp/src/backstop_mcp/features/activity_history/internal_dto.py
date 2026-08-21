@@ -35,6 +35,7 @@ __all__ = [
 ]
 
 _MEETING_OR_CALL_RESOURCE_TYPE = "meeting-or-calls"
+_EMAIL_RESOURCE_TYPES = frozenset({"email", "emails"})
 
 BackstopActivityType = Literal["meeting", "call", "note", "document"]
 
@@ -250,6 +251,11 @@ class ResourceIdentifierDto(BaseModel):
     `search_activities` rows use a different `id` (e.g. `1659094659`) that is already the bare
     id `/entity-activity-details/{id}` wants. A handle with no underscore is accepted as that
     form; meeting extras are gated on the detail record's `type`, not on this DTO.
+
+    History email ids are a third space: `/{segment}/{id}/emails` (body via `contentUrl`), not
+    `/entity-activity-details`. A composite `email_*` / `emails_*` handle is rejected rather
+    than stripped and sent to the wrong collection. Bare numeric ids cannot be told apart from
+    search-row ids here; `EmailRecordResponse` must not advertise them as detail handles.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -264,10 +270,19 @@ class ResourceIdentifierDto(BaseModel):
         Composite handles split on the LAST underscore: resource ids are numeric, while a
         resource type can carry hyphens (`meeting-or-calls`), so the final separator is the
         unambiguous one. A value with no underscore is the search-row / detail-record id.
+        A history email composite (`email_*` / `emails_*`) is rejected: those ids are `/emails`.
         """
         handle = activity_id.strip()
         resource_type, separator, resource_id = handle.rpartition("_")
         if separator and resource_type and resource_id:
+            if resource_type in _EMAIL_RESOURCE_TYPES:
+                logger.info("activity_history.handle.email_id", extra={"activity_id": handle})
+                raise ToolError(
+                    f"{activity_id!r} is a get_activity_history email handle, not an "
+                    + "activity_id `get_activity_detail` can fetch. History emails come from "
+                    + "`/emails` (body via contentUrl), not `/entity-activity-details`. Use "
+                    + "`search_activities` for the body and attachment list."
+                )
             return cls(resource_type=resource_type, resource_id=resource_id)
         if handle:
             logger.info("activity_history.handle.bare_id", extra={"activity_id": handle})

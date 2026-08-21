@@ -60,6 +60,7 @@ class TestGetActivityDetailDocstring:
         assert "attachment list" in doc
         assert "attachments_count" in doc
         assert "search_activities row" in doc
+        assert "history email" in doc
 
 
 class TestMeetingOrCall:
@@ -340,6 +341,18 @@ class TestErrorPropagation:
 
         with pytest.raises(ToolError, match="not a valid activity_id"):
             await get_activity_detail(ctx_never_elicit(), activity_id="   ", client=client)
+
+        assert len(respx.calls) == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("activity_id", ["email_42", "emails_99"])
+    async def test_a_history_email_handle_is_rejected_without_reaching_backstop(
+        self, client: BackstopClient, activity_id: str
+    ) -> None:
+
+        with pytest.raises(ToolError, match="email handle"):
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client)
 
         assert len(respx.calls) == 0
 

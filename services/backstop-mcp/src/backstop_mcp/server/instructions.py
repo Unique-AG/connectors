@@ -43,10 +43,12 @@ is an undocumented UI search and may 404 — that is not "no \
 activity exists". get_activity_history is only the party-scoped fallback for paging one \
 REST stream when that primary is missing; do not start with it, including for notes. A \
 403 on one history stream is not an empty stream — retry those types on search_activities. \
-Then get_activity_detail with that row's `id` (or a get_activity_history `activity_id`) \
-for the full untruncated body and the attachment list. Prefer \
-search_activities with include_description for note text while the primary answers. Do \
-not look for those on get_person / get_organization.
+Then get_activity_detail with that row's `id` (or a get_activity_history \
+meeting/call/note/document `activity_id`) for the full untruncated body and the \
+attachment list. History email ids are `/emails` collection ids, not detail ids — \
+use search_activities for email body. Prefer search_activities with \
+include_description for note text while the primary answers. Do not look for those \
+on get_person / get_organization.
 
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \

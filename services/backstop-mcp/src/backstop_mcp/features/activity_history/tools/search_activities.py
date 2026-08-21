@@ -294,8 +294,8 @@ async def search_activities(
     and `include_description` are refused on a wide sweep (no party, no tags, no authors) —
     that walk hits the 10000 ceiling. `include_description` is opt-in, capped, and refused in
     aggregate mode. `attachments_count` is a count only — pass the row `activity_id` (or `id`)
-    to `get_activity_detail` for the file list. That is the same argument
-    `get_activity_history` rows use.
+    to `get_activity_detail` for the file list. Meeting, call, note, and document rows from
+    `get_activity_history` use the same argument; history email ids do not.
     """
     start_date, end_date = _date_window(start_date, end_date, today=date.today())
     if mode == "aggregate" and group_by is None:

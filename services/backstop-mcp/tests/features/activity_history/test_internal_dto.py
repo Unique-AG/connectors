@@ -89,3 +89,8 @@ class TestResourceIdentifierFromActivityId:
     def test_rejects_an_empty_handle(self) -> None:
         with pytest.raises(ToolError, match="not a valid activity_id"):
             ResourceIdentifierDto.from_activity_id("  ")
+
+    @pytest.mark.parametrize("activity_id", ["email_42", "emails_99"])
+    def test_rejects_a_history_email_handle(self, activity_id: str) -> None:
+        with pytest.raises(ToolError, match="email handle"):
+            ResourceIdentifierDto.from_activity_id(activity_id)

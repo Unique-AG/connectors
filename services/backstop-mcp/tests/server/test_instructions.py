@@ -39,4 +39,6 @@ class TestInstructions:
         assert "not on get_people_for_party" in INSTRUCTIONS
         assert "attachment list" in INSTRUCTIONS
         assert "row's `id`" in INSTRUCTIONS
+        assert "History email ids" in INSTRUCTIONS
+        assert "/emails" in INSTRUCTIONS
         assert "falls back internally" in INSTRUCTIONS

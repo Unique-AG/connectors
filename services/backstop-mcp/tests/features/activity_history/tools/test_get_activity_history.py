@@ -110,6 +110,7 @@ class TestGetActivityHistoryDocstring:
         assert "include_description" in doc
         assert "get_activity_detail" in doc
         assert "activity_id" in doc
+        assert "History email ids" in doc
 
 
 class TestFirstCallByTrustedPartyId:
