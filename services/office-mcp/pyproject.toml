@@ -73,6 +73,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
+markers = ["docker: needs a live Postgres via testcontainers"]
 
 [tool.ruff]
 line-length = 100
