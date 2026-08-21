@@ -36,6 +36,8 @@ jobs:
       "services/kb-mcp--version": ${{ steps.release.outputs['services/kb-mcp--version'] }}
       "services/backstop-mcp--release_created": ${{ steps.release.outputs['services/backstop-mcp--release_created'] }}
       "services/backstop-mcp--version": ${{ steps.release.outputs['services/backstop-mcp--version'] }}
+      "services/office-mcp--release_created": ${{ steps.release.outputs['services/office-mcp--release_created'] }}
+      "services/office-mcp--version": ${{ steps.release.outputs['services/office-mcp--version'] }}
 
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -123,3 +125,12 @@ jobs:
       service-name: backstop-mcp
       service-version: ${{ needs.release-please.outputs['services/backstop-mcp--version'] }}
       dockerfile: services/backstop-mcp/deploy/Dockerfile
+  release-office-mcp:
+    needs: release-please
+    if: ${{ needs.release-please.outputs['services/office-mcp--release_created'] == 'true' }}
+    uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
+    with:
+      service-name: office-mcp
+      service-version: ${{ needs.release-please.outputs['services/office-mcp--version'] }}
+      dockerfile: services/office-mcp/deploy/Dockerfile

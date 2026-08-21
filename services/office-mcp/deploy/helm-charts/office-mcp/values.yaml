@@ -1,0 +1,147 @@
+# office-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: office-mcp
+fullnameOverride: office-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json
+# (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  APP_ENV: production
+  LOG_LEVEL: info
+  PORT: "8000"
+  # Tracing. `configure_tracing` installs a tracer provider only when one of these says where to
+  # send spans; with none of them set it returns False and every span in the process is a no-op, so
+  # the switch is `internalServices.dependencies.otelTraces.enabled` below and nothing else. Both
+  # endpoints are emitted, as in outlook-semantic-mcp, so an overlay reads the same two keys in
+  # every chart. The traces-specific one is what actually decides: `TracingSettings` prefers it
+  # (AliasChoices) and so does the OTLP/HTTP span exporter, which would otherwise append
+  # `/v1/traces` to the generic one itself.
+  # Metrics do not travel this way — they are scraped from /metrics — so OTEL_METRICS_EXPORTER and
+  # friends are deliberately absent.
+  OTEL_EXPORTER_OTLP_ENDPOINT:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}'
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}/v1/traces'
+  # `configure_tracing` sets service.name and service.version and nothing else, so which environment
+  # a span came from has to arrive as a resource attribute. Derived from APP_ENV above rather than
+  # written twice: an overlay that moves one and forgets the other would ship spans labelled
+  # production from a QA cluster, and nothing would complain.
+  OTEL_RESOURCE_ATTRIBUTES:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: 'deployment.environment={{ .Values.env.APP_ENV }}'
+  # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
+
+envVars: []
+# Required secrets (provide via envVars in overlay):
+# - DB_URL (or rely on base-chart DATABASE_URL when postgresql.enabled — app accepts both)
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/office-mcp
+  tag: 0.1.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 25m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  # /health is process-up (setup_ops); /ready checks Postgres. Liveness must not restart the pod
+  # when the database is briefly unreachable — readiness alone keeps it out of service.
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # Overlay supplies host/url (CloudNativePG or external). Base chart injects
+    # DATABASE_URL / POSTGRESQL_* — office-mcp also accepts DB_URL.
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who this service calls and who may call it (used by base NetworkPolicy generators).
+internalServices:
+  dependencies:
+    # The OTLP/HTTP trace collector. Off by default: a third-party install has no collector, and a
+    # pod that exports to one that is not there retries in the background for the life of the
+    # process. Turning it on is what enables tracing — it is what emits the OTEL_* keys above and
+    # what generates the Cilium egress rule that lets the spans out.
+    otelTraces:
+      enabled: false
+      name: otel-traces
+      servicePort: 4318
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false

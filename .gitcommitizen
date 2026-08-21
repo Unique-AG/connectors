@@ -34,6 +34,7 @@ temenos-mcp = services/temenos-mcp/**
 hello-mcp = services/hello-mcp/**
 kb-mcp = services/kb-mcp/**
 backstop-mcp = services/backstop-mcp/**
+office-mcp = services/office-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**
