@@ -170,7 +170,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Selection:
     """One deployment's tool surface: what is registered, and what sign-in therefore asks for.
 
