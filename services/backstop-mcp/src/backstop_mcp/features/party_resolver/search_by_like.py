@@ -6,28 +6,20 @@ from backstop_mcp.features.party_resolver._party_search_types import candidates_
 from backstop_mcp.features.party_resolver.api_responses import PartyAttributes
 from backstop_mcp.features.party_resolver.internal_dto import PartyCandidate
 
-# Organizations LIKE `name`. People-shaped collections reject `filter[name][like]` and
-# accept `filter[lastName][like]` only.
-_LIKE_FIELDS: Mapping[SearchType, str] = {
-    "organizations": "name",
-    "contacts": "lastName",
-    "people": "lastName",
-    "employees": "lastName",
+# Organizations LIKE `name`. People and employees reject `filter[name][like]` and accept
+# `filter[lastName][like]` only. `/contacts` is a mixed party table: both `name` and
+# `lastName` filters 400, so contacts have no LIKE fallback — empty quick-search is not-found.
+# Sparse fieldsets: without one an `/organizations` row drags `regularCustomFieldValues`
+# (14,164 B/row measured against 398 B sparse). People/employees accept first/last;
+# `/contacts` rejects `fields[contacts]=name,firstName,lastName` (400).
+_LIKE: Mapping[SearchType, tuple[str, str]] = {
+    "organizations": ("name", "name"),
+    "people": ("lastName", "name,firstName,lastName"),
+    "employees": ("lastName", "name,firstName,lastName"),
 }
 
 _LIKE_PAGE_SIZE = 200
 _LIKE_MAX_RECORDS = 200
-
-# The only attributes `PartyAttributes` reads off a collection row. Without a sparse fieldset an
-# `/organizations` row drags its whole `regularCustomFieldValues` blob: 14,164 B/row measured
-# against 398 B sparse, so 200 rows is ~2.8 MB to read four fields. Declared per collection
-# because the people-shaped ones have first/last names and organizations do not.
-_SPARSE_FIELDS: Mapping[SearchType, str] = {
-    "organizations": "name",
-    "contacts": "name,firstName,lastName",
-    "people": "name,firstName,lastName",
-    "employees": "name,firstName,lastName",
-}
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _PartyResource = BackstopApiResource[PartyAttributes]
@@ -45,13 +37,16 @@ async def search_by_like(
     the fallback for a name that is not a prefix of the stored display name. One page is
     enough: more than `_LIKE_MAX_RECORDS` hits is already ambiguous.
     """
-    field = _LIKE_FIELDS[search_type]
+    spec = _LIKE.get(search_type)
+    if spec is None:
+        return ()
+    field, sparse = spec
     page = await client.paginate(
         f"/{search_type}",
         schema=_PartyResource,
         params={
             f"filter[{field}][like]": search,
-            f"fields[{search_type}]": _SPARSE_FIELDS[search_type],
+            f"fields[{search_type}]": sparse,
         },
         page_size=_LIKE_PAGE_SIZE,
         max_records=_LIKE_MAX_RECORDS,

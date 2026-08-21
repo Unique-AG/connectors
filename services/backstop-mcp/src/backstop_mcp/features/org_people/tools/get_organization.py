@@ -114,6 +114,16 @@ async def get_organization(
             ),
         ),
     ] = None,
+    search_type: Annotated[
+        Literal["organizations"] | None,
+        Field(
+            description=(
+                "Echo `search_type` from a prior resolve. This tool only reads organizations; "
+                "omit it or pass `organizations`. A person/contact/employee echo belongs on "
+                "get_person, not here."
+            ),
+        ),
+    ] = None,
     include: Annotated[
         Sequence[OrganizationInclude],
         Field(
@@ -181,7 +191,8 @@ async def get_organization(
     """Fetch one Backstop organization by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
-    by this server's resolve echo (`id` / `search_type` / `name`). Otherwise pass `search`
+    by this server's resolve echo (`id` / `search_type` / `name`). Echo `search_type` when
+    you have it; this tool accepts only `organizations`. Otherwise pass `search`
     (organization name or email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
 
@@ -209,7 +220,7 @@ async def get_organization(
     result = await resolve_party(
         ctx,
         client,
-        search_type="organizations",
+        search_type=search_type if search_type is not None else "organizations",
         party_id=party_id,
         search=search,
     )

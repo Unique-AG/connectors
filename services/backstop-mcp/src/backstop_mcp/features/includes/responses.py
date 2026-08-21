@@ -415,9 +415,9 @@ type ActivityInclude = Literal["activity_tags", "attendees"]
 class ActivityIncludesResponse(OmitNoneModel):
     """Related records side-loaded with an activity row, one field per include.
 
-    Always requested on get_activity_history's meeting/call/note/document pages. Notes and
-    documents have no attendees relationship; that field is then `[]`. Emails do not support
-    includes and are not projected through this model.
+    Always requested on get_activity_history's meeting/call/note/document pages. `/activities`
+    rejects `include=attendees` (400), so this plan only asks for tags. Attendees stay empty
+    on history rows; emails do not support includes and are not projected through this model.
     """
 
     activity_tags: Annotated[
@@ -436,8 +436,7 @@ class ActivityIncludesResponse(OmitNoneModel):
     ] = Field(
         default=None,
         description=(
-            "People listed on a meeting or call, from include=attendees. Omitted when that "
-            "include was not asked for; [] when it was and there are none, including on notes "
-            "and documents which have no attendees relationship."
+            "People listed on a meeting or call. Omitted when that include was not asked for; "
+            "[] when it was. `/activities` cannot side-load attendees, so history rows are []."
         ),
     )

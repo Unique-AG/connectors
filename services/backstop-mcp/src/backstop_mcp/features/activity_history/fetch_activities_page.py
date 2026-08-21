@@ -72,14 +72,14 @@ _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "document": "documents",
 }
 _ACTIVITY_FIELDS = (
-    "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp,regarding"
+    "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp"
 )
 _ACTIVITY_TAG_FIELDS = "name"
-_ATTENDEE_FIELDS = "name,firstName,lastName"
+# `/activities` rejects `include=attendees` and `fields=regarding` (400 InvalidParameterException).
+# Tags side-load; regarding is not a sparse-selectable attribute on this collection (and is
+# absent even without a fieldset). Attendees stay empty on history rows.
+_ACTIVITY_SIDE_LOADS = include_plan(ActivityIncludesResponse, requested=("activity_tags",))
 _EMAIL_FIELDS = "subject,sentTimestamp,fromEmail,toEmails,ccEmails,hasAttachments,contentUrl"
-_ACTIVITY_SIDE_LOADS = include_plan(
-    ActivityIncludesResponse, requested=("activity_tags", "attendees")
-)
 
 _ActivityResource = BackstopApiResource[ActivityAttributes]
 _EmailResource = BackstopApiResource[EmailAttributes]
@@ -212,7 +212,6 @@ async def fetch_activity_page(
         params={
             "fields": _ACTIVITY_FIELDS,
             "fields[activity-tags]": _ACTIVITY_TAG_FIELDS,
-            "fields[people]": _ATTENDEE_FIELDS,
             "include": _ACTIVITY_SIDE_LOADS.param,
             "sort": "-effectiveDate",
             "filter[activityType][eq]": _ACTIVITY_TYPE_FILTER[stream],

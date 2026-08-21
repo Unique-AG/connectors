@@ -226,7 +226,11 @@ class TestGetOrganization:
 
         result = tool_model(
             await get_organization(
-                ctx_never_elicit(), party_id="trusted-9", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                party_id="trusted-9",
+                search_type="organizations",
+                client=client,
+                custom_fields=_catalog(),
             ),
             OrganizationResolvedResponse,
         )

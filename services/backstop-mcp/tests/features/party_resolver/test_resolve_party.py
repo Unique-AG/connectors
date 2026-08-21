@@ -606,7 +606,9 @@ class TestSearchTypeMapping:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
-        respx.get(f"{BASE_URL}/contacts").mock(return_value=httpx.Response(200, json=collection()))
+        like = respx.get(f"{BASE_URL}/contacts").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
 
         await resolve_party(
             ctx_never_elicit(),
@@ -617,6 +619,8 @@ class TestSearchTypeMapping:
 
         params = route.calls.last.request.url.params
         assert params["filter[searchTypes][eq]"] == "PERSON_FIRST_NAME,PERSON_LAST_NAME"
+        # `/contacts` rejects name/lastName LIKE and firstName,lastName sparse fields.
+        assert like.call_count == 0
 
     @pytest.mark.asyncio
     @respx.mock

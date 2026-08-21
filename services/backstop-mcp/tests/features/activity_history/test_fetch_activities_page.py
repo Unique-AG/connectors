@@ -36,12 +36,12 @@ class TestActivityRequestShape:
 
         params = route.calls.last.request.url.params
         assert params["fields"] == (
-            "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp,"
-            "regarding"
+            "title,description,effectiveDate,specificResource,createdTimestamp,modifiedTimestamp"
         )
-        assert params["include"] == "activityTags,attendees"
+        assert params["include"] == "activityTags"
         assert params["fields[activity-tags]"] == "name"
-        assert params["fields[people]"] == "name,firstName,lastName"
+        assert "fields[people]" not in params
+        assert "regarding" not in params["fields"]
         assert params["sort"] == "-effectiveDate"
         assert params["filter[activityType][eq]"] == "meetings"
         assert params["page[limit]"] == "10"
@@ -727,7 +727,7 @@ class TestActivityTagFilterAndIncludes:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_projects_regarding_tags_and_attendees_from_one_page(
+    async def test_projects_tags_from_one_page_and_does_not_follow_attendee_links(
         self, client: BackstopClient
     ) -> None:
         tag_by_id = respx.get(f"{BASE_URL}/activity-tags/474963").mock(
@@ -781,4 +781,4 @@ class TestActivityTagFilterAndIncludes:
         assert item.regarding.resource_type == "organizations"
         assert item.regarding.search_type == "organizations"
         assert [(tag.id, tag.name) for tag in item.tags] == [("474963", "Quarterly Review")]
-        assert [(attendee.id, attendee.name) for attendee in item.attendees] == [("p1", "Pat Lee")]
+        assert item.attendees == ()

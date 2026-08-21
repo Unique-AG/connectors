@@ -92,10 +92,10 @@ class TestTheQueryParam:
 
         assert plan.param == "company,contactLocations"
 
-    def test_activity_history_always_asks_for_tags_and_attendees(self) -> None:
-        plan = include_plan(ActivityIncludesResponse, requested=["activity_tags", "attendees"])
+    def test_activity_history_asks_for_tags_on_the_activities_collection(self) -> None:
+        plan = include_plan(ActivityIncludesResponse, requested=["activity_tags"])
 
-        assert plan.param == "activityTags,attendees"
+        assert plan.param == "activityTags"
 
     def test_a_name_the_model_does_not_declare_is_an_internal_invariant(self) -> None:
         """Unreachable through the overloads — the cast is what a type error looks like at runtime.

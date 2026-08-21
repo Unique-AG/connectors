@@ -9,7 +9,7 @@ false they are counted on `former_omitted` rather than listed.
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
@@ -73,6 +73,15 @@ async def get_people_for_party(
             ),
         ),
     ] = None,
+    search_type: Annotated[
+        Literal["organizations"] | None,
+        Field(
+            description=(
+                "Echo `search_type` from a prior resolve. This tool only reads an "
+                "organization's roster; omit it or pass `organizations`."
+            ),
+        ),
+    ] = None,
     include_former: Annotated[
         bool,
         Field(
@@ -107,7 +116,7 @@ async def get_people_for_party(
     result = await resolve_party(
         ctx,
         client,
-        search_type="organizations",
+        search_type=search_type if search_type is not None else "organizations",
         party_id=party_id,
         search=search,
     )

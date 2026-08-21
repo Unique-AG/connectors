@@ -102,10 +102,11 @@ async def get_activity_history(
     each requested stream regardless of age, which may be old — activity history in this CRM is
     often sparse.
 
-    Each meeting, call, note, and document row includes `tags`, `attendees` (meetings and calls),
-    and `regarding` when Backstop publishes them. Pass `activity_tag_ids` from list_activity_tags
-    to keep only rows that carry all of those tags. Emails have no tags and no includes; they are
-    omitted when `activity_tag_ids` is set.
+    Each meeting, call, note, and document row includes `tags` when Backstop side-loads them.
+    `/activities` does not publish `regarding` or `attendees` on this collection (those field
+    and include names 400); they stay empty on history rows. Pass `activity_tag_ids` from
+    list_activity_tags to keep only rows that carry all of those tags. Emails have no tags and
+    no includes; they are omitted when `activity_tag_ids` is set.
 
     `resolved.as_of` is plain provenance from the party's own record; relay it, do not treat
     record age as a staleness verdict.
