@@ -1,17 +1,12 @@
 """What a Graph request span is allowed to say about the resource it asked for.
 
 Kiota labels a Graph URL as EUII and sets it as `url.full` by default, in two places: the request
-span the adapter opens, and the span `UrlReplaceHandler` opens for itself. In this service a Graph
-URL carries chat ids, message ids, meeting ids and transcript ids, so with tracing switched on those
-ids would be exported to a trace backend and kept there. `graph_client_for` closes the first and
-`_QuietUrlReplaceHandler` closes the second. These tests are what says so, over real SDK calls
-rather than over the option object.
+span the adapter opens, and the span `UrlReplaceHandler` opens for itself. A Graph URL here carries
+chat, message, meeting and transcript ids. `graph_client_for` closes the first and
+`_QuietUrlReplaceHandler` the second.
 
-Asserted as a property of the whole trace rather than of the two mechanisms, because the mechanisms
-are the part an SDK bump can move. A handler added upstream that exports a URL, a spelling of the
-attribute the quiet handler's span wrapper does not intercept, or this service losing that handler
-in a refactor all land on the same assertion: no span carries `url.full`, and no span attribute
-carries a resource id.
+Asserted over the whole trace rather than over the two mechanisms, which are the part an SDK bump
+can move.
 """
 
 from collections.abc import Iterator, Sequence
@@ -25,30 +20,23 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-# Both survive percent-encoding unchanged, which is the point: the id reaches the URL as
-# `19%3Aleak-detector%40thread.v2`, so a test that looked for the id verbatim would miss it.
+# Both survive percent-encoding unchanged: the id reaches the URL as
+# `19%3Aleak-detector%40thread.v2`, which a test looking for `19:leak-detector@thread.v2` misses.
 _CHAT_ID = "19:leak-detector@thread.v2"
 _MESSAGE_ID = "1770000000042"
 _RESOURCE_IDS = ("leak-detector", _MESSAGE_ID)
 
 _REQUEST_PATH = "/chats/19%3Aleak-detector%40thread.v2/messages/1770000000042"
 
-# The span the URL replacer opens for itself. It is named here because it is the one span this
-# service replaces a handler to clean: `UrlReplaceHandler.send` sets `url.full` on it without
-# consulting `ObservabilityOptions` at all (kiota_http/middleware/url_replace_handler.py:44), so the
-# option the adapter is given cannot reach it. The span itself is wanted and is asserted below:
-# the fix drops one attribute, not the telemetry.
+# `UrlReplaceHandler.send` sets `url.full` on this span without consulting `ObservabilityOptions`
+# at all (kiota_http/middleware/url_replace_handler.py:44), so the adapter's option cannot reach it.
 _URL_REPLACER_SPAN = "UrlReplaceHandler_send"
 
 
 @pytest.fixture
 def recorded_spans() -> Iterator[InMemorySpanExporter]:
-    """Every span this process finishes from here on, collected in memory.
-
-    The tracer provider is process-wide and can be set only once, so the exporter attaches to
-    whichever provider is in play. The collection is emptied on the way in rather than torn down. A
-    span from an earlier test would otherwise read as one of this test's own.
-    """
+    """The tracer provider is process-wide and settable only once, so the exporter attaches to
+    whichever is in play and is emptied on the way in rather than torn down."""
     exporter = InMemorySpanExporter()
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
@@ -60,13 +48,11 @@ def recorded_spans() -> Iterator[InMemorySpanExporter]:
 
 
 async def _read_one_message(client: GraphServiceClient, graph: respx.MockRouter) -> None:
-    """One `GET /chats/{chat}/messages/{message}`, which is a URL made of nothing but ids."""
     _ = graph.get(_REQUEST_PATH).mock(return_value=httpx.Response(200, json={"id": _MESSAGE_ID}))
     _ = await client.chats.by_chat_id(_CHAT_ID).messages.by_chat_message_id(_MESSAGE_ID).get()
 
 
 def _spans_naming_a_resource(spans: Sequence[ReadableSpan]) -> set[str]:
-    """The names of the spans that carry a chat or message id in an attribute."""
     return {
         span.name
         for span in spans
@@ -75,7 +61,6 @@ def _spans_naming_a_resource(spans: Sequence[ReadableSpan]) -> set[str]:
 
 
 def _spans_carrying_the_url(spans: Sequence[ReadableSpan]) -> set[str]:
-    """The names of the spans that carry a `url.full` attribute, whatever its value."""
     return {span.name for span in spans if "url.full" in (span.attributes or {})}
 
 
@@ -86,12 +71,8 @@ class TestAGraphRequestSpanNamesTheTemplateAndNotTheResource:
         graph: respx.MockRouter,
         recorded_spans: InMemorySpanExporter,
     ) -> None:
-        """The span a trace backend shows as "the Graph request" is the one this is about.
-
-        Both halves matter. The template has to still be there, or the way to make this test pass
-        would be to stop tracing Graph calls at all, and grouping a latency breakdown by URL
-        template is the whole reason the span is worth having.
-        """
+        """The template has to still be there, or the way to pass this test is to stop tracing
+        Graph calls at all."""
         await _read_one_message(client, graph)
 
         requests = [
@@ -110,13 +91,8 @@ class TestAGraphRequestSpanNamesTheTemplateAndNotTheResource:
         graph: respx.MockRouter,
         recorded_spans: InMemorySpanExporter,
     ) -> None:
-        """The claim over the whole trace, not over the one span this connector asked for.
-
-        The SDK opens a span per middleware as well as per request, so a dozen spans reach the
-        exporter for one call. Asserting the empty set is what makes a new leak fail: a handler
-        added by a later SDK version that sets `url.full`, or this service losing
-        `_QuietUrlReplaceHandler` in a refactor, both land here.
-        """
+        """The SDK opens a span per middleware as well as per request, so a dozen spans reach the
+        exporter for one call and a leak can appear in any of them."""
         await _read_one_message(client, graph)
 
         spans = recorded_spans.get_finished_spans()
@@ -136,14 +112,9 @@ class TestTheUrlReplacerIsQuietenedAndNotSwitchedOff:
         graph: respx.MockRouter,
         recorded_spans: InMemorySpanExporter,
     ) -> None:
-        """Both of the things a shortcut would have cost.
-
-        Dropping the handler, or disabling it, would also silence the leak and would take the
-        `/users/me-token-to-replace` to `/me` rewrite with it, which every `client.me` call depends
-        on. Dropping its span instead of its one attribute would silence the leak by exporting
-        less telemetry. The route below is asserted called because it is mounted on `/me`: the SDK
-        asks for `/users/me-token-to-replace` and only the handler turns that into `/me`.
-        """
+        """Dropping or disabling the handler would silence the leak and take the
+        `/users/me-token-to-replace` to `/me` rewrite with it, which every `client.me` call needs.
+        The route is mounted on `/me`, so only the handler makes it match."""
         route = graph.get("/me").mock(return_value=httpx.Response(200, json={"id": "u-1"}))
 
         _ = await client.me.get()

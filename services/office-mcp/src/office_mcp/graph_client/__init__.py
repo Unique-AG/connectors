@@ -1,7 +1,6 @@
 """Microsoft Graph transport using the official SDK for one caller's delegated token.
 
-This package knows nothing about Teams, mail, calendars, or the service config. `create_app`
-translates app config into `GraphSettings` and injects it.
+This package knows nothing about Teams, mail, calendars, or the service config.
 """
 
 from office_mcp.graph_client.client import create_graph_transport, graph_client_for

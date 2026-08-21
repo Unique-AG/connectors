@@ -1,15 +1,4 @@
-"""`list_channels`: what the query asks for, what it declines, and the pages it follows.
-
-Two of the assertions here are about parameters. `$select` is a requirement rather than an
-optimisation, because Graph documents populating a channel's `email` as an expensive operation.
-`$top` is one Graph answers with a 400, which `services/teams-mcp` shipped and had to take back
-out.
-
-A third is about a header. `membershipType` is an evolvable enum, so `shared` reaches an answer only
-for a request that asks for unknown members: the first request and every paged one after it.
-
-Every payload is synthesised from Microsoft's documented shapes.
-"""
+"""`list_channels`: what the query asks for, what it declines, and the pages it follows."""
 
 from collections.abc import Callable
 
@@ -49,12 +38,9 @@ def _channel_payload(
 def _graph_page(
     *channels: dict[str, object], next_link: str | None = None
 ) -> Callable[[httpx.Request], httpx.Response]:
-    """One page of channels, answered the way Graph answers an evolvable enum.
-
-    `shared` sits after `unknownFutureValue` in `membershipType`, so Graph substitutes the sentinel
-    for a request that does not ask for unknown members. A mock that answered `shared` either way
-    would pass whether or not the request asked, which is what the tests using this are about.
-    """
+    """`shared` sits after `unknownFutureValue` in `membershipType`, so Graph substitutes the
+    sentinel for a request that did not ask for unknown members. A mock answering `shared` either
+    way would pass whether or not the request asked."""
 
     def answer(request: httpx.Request) -> httpx.Response:
         asked = _PREFER_UNKNOWN_MEMBERS in request.headers.get_list("prefer")
@@ -69,7 +55,6 @@ def _graph_page(
 
 
 def _withheld(channel: dict[str, object]) -> dict[str, object]:
-    """`channel` as Graph answers it when the request did not ask for unknown members."""
     if channel["membershipType"] != "shared":
         return channel
     return channel | {"membershipType": "unknownFutureValue"}
@@ -80,7 +65,7 @@ class TestTheQueryItSends:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph documents populating a channel's `email` as an expensive operation, and `$select`
-        is the only way to decline it. `$top` is unsupported here too."""
+        is the only way to decline it."""
         route = graph.get(_CHANNELS_PATH).mock(
             return_value=httpx.Response(200, json={"value": [_channel_payload(_CHANNEL_ID)]})
         )
@@ -95,8 +80,6 @@ class TestTheQueryItSends:
     async def test_it_asks_for_the_membership_type_graph_withholds_by_default(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`membershipType` is an evolvable enum and `shared` sits after `unknownFutureValue` in it,
-        so a request without this header is answered with the sentinel in place of `shared`."""
         route = graph.get(_CHANNELS_PATH).mock(
             return_value=httpx.Response(200, json={"value": [_channel_payload(_CHANNEL_ID)]})
         )
@@ -109,8 +92,6 @@ class TestTheQueryItSends:
     async def test_a_limit_outside_the_window_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
-        """The tool's schema bounds `limit`, so a value outside it can only arrive from code that
-        bypassed it."""
         with pytest.raises(AssertionError):
             _ = await lister.list_channels(client, team_id=_TEAM_ID, limit=limit)
 
@@ -120,9 +101,7 @@ class TestTheInventoryItReports:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """This collection takes no `$top`, so Graph chooses the page size and a second page is
-        normal. teams-mcp read only the first one until it was fixed ("page teams/channels
-        lists"), which silently hid channels from the listing.
-        """
+        normal. `services/teams-mcp` read only the first one, which silently hid channels."""
         graph.get(_CHANNELS_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(
                 200, json={"value": [_channel_payload("19:second@thread.tacv2")]}
@@ -149,15 +128,8 @@ class TestTheInventoryItReports:
     async def test_an_empty_page_in_the_middle_does_not_end_the_collection(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The load-bearing case for the other half of what this answer promises: fewer channels
-        than `limit` is every channel of this team the user can see.
-
-        Graph answers the odd page with nothing in it and an `@odata.nextLink` still set, and the
-        SDK's own page walker reads an empty page as the end of a collection. Believing it here
-        would not merely drop a channel. It would turn a window with more behind it into "this team
-        has one channel", a claim about the user's own team that nothing checked. The sentence in
-        the description is only true while every page is followed.
-        """
+        """Graph sends the odd empty page with an `@odata.nextLink` still set, and the SDK's own
+        page walker reads one as the end of the collection."""
         graph.get(_CHANNELS_PATH, params={"$skiptoken": "third"}).mock(
             return_value=httpx.Response(
                 200, json={"value": [_channel_payload("19:third@thread.tacv2")]}
@@ -192,8 +164,7 @@ class TestTheInventoryItReports:
     async def test_a_channels_membership_type_comes_through_and_an_unknown_one_does_not_fail(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A `membershipType` the SDK's generated enum has no member for deserializes to None
-        rather than raising, so the channel must still be listed."""
+        """A value the SDK's generated enum has no member for deserializes to None, not raises."""
         graph.get(_CHANNELS_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -215,14 +186,9 @@ class TestTheInventoryItReports:
     async def test_a_shared_channel_is_reported_as_shared(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """What the `Prefer` header buys, and why a missing one is worse than a missing label: the
-        SDK's enum names a member for `unknownFutureValue`, so the sentinel is not dropped and not
-        nulled. It arrives as that word, and a channel labelled with it reads as a channel whose
-        type this connector could not determine.
-
-        The neighbouring test over a wire value of `hypothetical` exercises the other path, a value
-        the enum names no member for, which does become null, and says nothing about this one.
-        """
+        """The SDK's enum does name a member for `unknownFutureValue`, so a withheld type is
+        neither dropped nor nulled: it arrives as that word. The `hypothetical` test above is the
+        other path, a value the enum names no member for, and says nothing about this one."""
         graph.get(_CHANNELS_PATH).mock(
             side_effect=_graph_page(
                 _channel_payload(
@@ -238,12 +204,9 @@ class TestTheInventoryItReports:
     async def test_a_shared_channel_on_a_later_page_is_reported_as_shared_too(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The half of the header that is easy to miss. The SDK's `PageIterator` starts with an
-        empty header collection and stamps it onto every next-page request, so a `Prefer` header set
-        on the first request alone leaves every shared channel past page one labelled
-        `unknownFutureValue`: a listing that is right at the top and wrong further down, for no
-        reason a reader of it can see.
-        """
+        """The SDK's `PageIterator` stamps its own header collection onto every next-page request,
+        so a `Prefer` set on the first request alone leaves page two's shared channels sentinelled:
+        a listing right at the top and wrong further down."""
         graph.get(_CHANNELS_PATH, params={"$skiptoken": "second"}).mock(
             side_effect=_graph_page(
                 _channel_payload(
@@ -267,9 +230,6 @@ class TestGraphFailures:
     async def test_a_refusal_arrives_classified_for_the_tool_to_explain(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This request is made under its own delegated permission, and a tenant commonly grants
-        the two basic ones while withholding the broad message permission, so the failure has to
-        reach the tool layer, which is what names the permission."""
         denied = httpx.Response(
             403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
         )
@@ -279,6 +239,4 @@ class TestGraphFailures:
             _ = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        """A tool owns the permission its own request needs, and listing channels is the cheap
-        "basic" scope. Reading what was posted in one is browse_channel's broader permission."""
         assert lister.GRAPH_PERMISSIONS == ("Channel.ReadBasic.All",)

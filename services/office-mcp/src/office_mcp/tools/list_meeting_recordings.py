@@ -1,39 +1,18 @@
 """`list_meeting_recordings` — did a call record, how long it ran, and who may get the file.
 
-TRAP: No video is returned or reachable anywhere in this connector. A Teams meeting runs 30 hours
+TRAP: no video is returned or reachable anywhere in this connector. A Teams meeting runs 30 hours
 max (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams) and Graph serves
-a recording as one MP4 byte stream: hundreds of megabytes in text form, and a model cannot watch
-video. This tool returns metadata and access rules only. It never returns `recordingContentUrl`
-either: that link opens only with this connector's own token, so passing it on leaks a credential
-or does nothing. `tests/test_layering.py` rule 7 blocks every module from addressing one recording,
-the only way to reach its bytes, and this file stays inside the rule too.
+a recording as one MP4 byte stream. `recordingContentUrl` is never returned either: that link opens
+only with this connector's own token, so passing it on leaks a credential or does nothing.
+`tests/test_layering.py` rule 7 blocks every module from addressing one recording, this file too.
 
-Recordings and transcripts are separate tools because Graph gates them independently, under
+Separate from `list_meeting_transcripts` because Graph gates them independently, under
 `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All`, and a default tenant has
 the transcript gate shut. One tool would have to either fail a reachable recording or hold two
-incompatible statuses. Each tool's refusal names only its own missing permission, so an admin
-grants the right one. `content_correlation_id` links them: Microsoft's identifier for "these two
-are the same call", present on both.
+incompatible statuses. `content_correlation_id` links them.
 
-Newest first: Graph has no `$orderby` on this collection. Read up to MAX_ARTIFACT_SCAN, sort, cut
-to `limit`. Stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
-Past the cap the first entry is the newest of what was READ, and `scan_incomplete` says so.
-
-The five statuses: `available` (newest first, with access rules), `not_ready` (nothing yet,
-window or meeting recent), `not_recorded` (window past, nothing there), `scan_incomplete` (more
-recordings than one call reads, none in window, no remedy), and `meeting_not_found`, which is not
-proof of deletion: a meeting made outside a calendar, or one this user was never invited to,
-answers the same way.
-
-Duration is derived: Graph sends no duration field, so it is `endDateTime - createdDateTime` on
-the recording, not on the meeting.
-
-TRAP: Download is organiser-only. Microsoft: "Meeting participants don't have permission to
-download meeting recordings" unless a tenant admin unblocks them. Metadata access is wider:
-Microsoft gives recording metadata to every invited participant. Existence and reachability are
-separate fields, so never report an unreachable recording as a missing one. `content_access` says
-which side the signed-in user is on. An admin can still block downloads tenant-wide from
-SharePoint and OneDrive.
+Newest first: Graph has no `$orderby` on this collection. Read up to MAX_ARTIFACT_SCAN, sort, then
+cut to `limit`; stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
 """
 
 from collections.abc import Mapping
@@ -63,30 +42,25 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_meeting_recordings"
 
-# This tool's listing request and the walk that continues it. Each Graph call is named by the
-# module that owns it, so the meeting resolve counts under `shared/meetings.py`'s step and the
-# identity check under `shared/identity.py`'s.
+# The meeting resolve counts under `shared/meetings.py`'s step and the identity check under
+# `shared/identity.py`'s, so this names only the listing request and the walk that continues it.
 STEP_RECORDINGS = "recordings"
 
-# Three permissions: meeting resolve, recordings read, and the identity check the organiser-only
-# rule needs. Entra redeems all three under one token or none. The names live in
-# `shared/meetings.py` because they are referenced twice and must never be wrong.
+# Meeting resolve, recordings read, and the identity check the organiser-only rule needs. Entra
+# redeems all three under one token or none. The names live in `shared/meetings.py`.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     MEETING_PERMISSION,
     RECORDING_PERMISSION,
     identity.GRAPH_PERMISSION,
 )
 
-# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
-# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
+# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "meeting_uri": "teams:///meetings/https%3A%2F%2Fteams.microsoft.invalid%2Fl%2Fmeetup-join"
     + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
 }
 
-# Max recordings per call. A one-off meeting has one or two. A series has one per recorded
-# occurrence. Graph sets no ceiling on `$top`, so this limit is ours.
+# Max recordings per call. Graph sets no ceiling on `$top`, so this limit is ours.
 MAX_RECORDINGS = 50
 
 # Both vocabularies are this connector's, not Microsoft's, so they are closed and publish as enums
@@ -108,8 +82,7 @@ reach: never report it as missing. Returns `status` and each recording's times, 
 access.\
 """
 
-# `tests/test_layering.py` rule 4 forbids one tool file from importing another, so this text stays
-# local rather than shared with list_meeting_transcripts's own refusal.
+# Local, not shared with list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids that.
 _NOT_A_MEETING_HANDLE = (
     "list_meeting_recordings takes the `meeting_uri` from list_chats: "
     "teams:///meetings/{join_web_url}. This is not one. Call list_chats, find the meeting chat, "
@@ -171,7 +144,6 @@ class RecordingSummary(BaseModel):
 
     @classmethod
     def from_recording(cls, recording: CallRecording, caller: str | None) -> Self:
-        """Map one Graph recording to a summary, placing `caller` on the organiser-only rule."""
         assert recording.id is not None, "Graph returned a recording with no id"
         organizer = _organizer_user_id(recording)
         return cls(
@@ -265,13 +237,10 @@ async def list_meeting_recordings(
     limit: int,
     include_scan_completeness: bool,
 ) -> MeetingRecordings:
-    """Recordings of the meeting `handle` addresses and what to do about them.
+    """Recordings of the meeting `handle` addresses.
 
-    Two or three Graph requests: resolve the URL, list the collection, and, when something was
-    found, get the caller id the organiser-only rule needs.
-
-    Graph documents no date filter here, so the window applies after fetching and decides both
-    which recordings are kept and what an empty answer means.
+    Two or three Graph requests: resolve, list, and — only when something was found — the caller id
+    the organiser-only rule needs. Graph documents no date filter, so the window applies after.
     """
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -296,9 +265,7 @@ async def list_meeting_recordings(
             assert first_page is not None, "Graph answered a recording listing with no collection"
             collected = await newest_in_window(first_page, client, window=window, limit=limit)
         found = collected.items
-        # Asked for only when it changes an answer: an empty listing has no organiser to compare
-        # anybody with, and the request would be spent on every one. `shared/identity.py` owns it,
-        # so this is not a second GET /me under a different projection.
+        # Only when it changes an answer: an empty listing has no organiser to compare anyone with.
         caller = (await identity.signed_in_user(client)).id if found else None
 
     return MeetingRecordings(
@@ -325,10 +292,9 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> RecordingStatus:
 def _organizer_user_id(recording: CallRecording) -> str | None:
     """Organiser's Entra object id, or None if Graph named nobody.
 
-    Graph sends the organiser as an identitySet whose @odata.type is not always a known SDK type:
-    Microsoft's own sample sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity, not
-    #microsoft.graph.*. An unknown discriminator deserializes to base identity, which still carries
-    the id, so the subtype does not matter.
+    TRAP: the identitySet's @odata.type is not always a known SDK type — Microsoft's own sample
+    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity. An unknown discriminator deserializes to
+    base identity, which still carries the id.
     """
     organizer = recording.meeting_organizer
     if organizer is None or organizer.user is None:
@@ -339,9 +305,7 @@ def _organizer_user_id(recording: CallRecording) -> str | None:
 def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
     """Which side of the organiser-only rule the signed-in user is on.
 
-    Either id missing means it cannot be told, and guessing is wrong both ways:
-    `you_are_the_organizer` promises a download Microsoft refuses, and `organizer_only` sends the
-    caller to ask someone who already has access. Ids are compared case-insensitively, because an
+    Guessing is wrong both ways, so a missing id is `unknown`. Ids compare case-insensitively: an
     Entra object id is a GUID and casing is not part of identity.
     """
     if organizer is None or caller is None:
@@ -353,9 +317,8 @@ def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
 def _duration_seconds(recording: CallRecording) -> float | None:
     """Recording length, or None if Graph did not send enough to compute one.
 
-    Both timestamps resolve on a UTC assumption: a missing offset reads as Z, so no subtraction
-    raises. A negative result is not a duration. Graph's negative offsets apply to content cue
-    times, not to these fields, so a negative is reported as unknown rather than as a number.
+    A missing offset reads as Z, so no subtraction raises. Graph's negative offsets apply to content
+    cue times, not to these fields, so a negative result is unknown rather than a duration.
     """
     began, ended = recording.created_date_time, recording.end_date_time
     if began is None or ended is None:
@@ -365,10 +328,7 @@ def _duration_seconds(recording: CallRecording) -> float | None:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool borrows `transport` per call."""
-    # Built here because this is where `transport` is: the dependency closes over it, and the
-    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
-    # not a call. A call there is ruff's B008.
+    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

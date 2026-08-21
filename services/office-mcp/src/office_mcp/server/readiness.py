@@ -1,12 +1,8 @@
-"""Readiness via the one Postgres connection this service depends on.
+"""Readiness via the one Postgres connection this service depends on: the OAuth state store's.
 
-The OAuth state store owns this connection. Every token is a reference token re-validated against
-the store on each request, so an unreachable database means no one can sign in.
-
-The store builds its own asyncpg pool from `driver_dsn` with no connect args, and TLS settings ride
-the DSN. An earlier version of this probe opened its own connection, which negotiated TLS
-differently and could report ready while every sign-in failed. That is the exact failure a readiness
-probe exists to prevent, so the probe now asks the store itself, through the same wrapper chain.
+The probe asks the store itself, through the same wrapper chain. A probe that opened its own
+connection was tried, and negotiated TLS differently: it could report ready while every sign-in
+failed.
 """
 
 import asyncio
@@ -17,9 +13,8 @@ from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
-# Trap: a key nothing ever writes. A get on a missing key is one SELECT returning None, so it does
-# not disturb OAuth state. On the first call it forces the store's lazy setup, so an unreachable
-# database or a missing CREATE grant surfaces here rather than at the first user's login.
+# Trap: a key nothing ever writes. A get on a missing key is one SELECT returning None, and on the
+# first call it forces the store's lazy setup, so a missing CREATE grant surfaces here not at login.
 _PROBE_COLLECTION = "readiness"
 _PROBE_KEY = "probe"
 

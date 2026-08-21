@@ -1,11 +1,4 @@
-"""`list_teams`: the query Graph accepts here, and what a full window promises.
-
-The load-bearing assertion is about a parameter that is *not* sent. Graph answers an unsupported
-OData parameter on `/me/joinedTeams` with a 400, and `services/teams-mcp` shipped a `$top` on it and
-had to take it back out, so no `$top` is a contract rather than an omission.
-
-Every payload is synthesised from Microsoft's documented shapes.
-"""
+"""`list_teams`: the query Graph accepts here, and what a full window promises."""
 
 import httpx
 import pytest
@@ -21,11 +14,7 @@ from .conftest import GRAPH_V1
 def _team_payload(
     team_id: str, *, display_name: str | None = "Engineering", is_archived: bool | None = False
 ) -> dict[str, object]:
-    """One `team` as `GET /me/joinedTeams` returns it.
-
-    Only these five properties are populated on that endpoint. The nulls are Graph's, not this
-    fixture's shorthand.
-    """
+    """Only these five are populated on `/me/joinedTeams`; the nulls are Graph's."""
     return {
         "id": team_id,
         "displayName": display_name,
@@ -42,8 +31,8 @@ class TestTheQueryItSends:
     async def test_listing_teams_sends_no_odata_parameters_at_all(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`/me/joinedTeams` supports none of them, so a `$top` or a `$select` here is a 400 and
-        not a narrower answer. teams-mcp shipped the `$top` and had to remove it."""
+        """An unsupported OData parameter here is a 400, not a narrower answer.
+        `services/teams-mcp` shipped the `$top` and had to take it back out."""
         route = graph.get("/me/joinedTeams").mock(
             return_value=httpx.Response(200, json={"value": [_team_payload("team-a")]})
         )
@@ -58,8 +47,6 @@ class TestTheQueryItSends:
     async def test_a_limit_outside_the_window_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
     ) -> None:
-        """The tool's schema bounds `limit`, so a value outside it can only arrive from code that
-        bypassed it."""
         with pytest.raises(AssertionError):
             _ = await lister.list_teams(client, limit=limit)
 
@@ -103,16 +90,8 @@ class TestTheInventoryItReports:
     async def test_an_empty_page_in_the_middle_does_not_end_the_collection(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The load-bearing case for the other half of what this answer promises: fewer teams than
-        `limit` is every team the user is in.
-
-        Graph answers the occasional page with nothing in it and a cursor still set, and the SDK's
-        own page walker reads an empty page as the end of a collection. Believing it here would not
-        merely drop a team. It would turn a window with more behind it into "you are in one team",
-        which is a claim about the user's own tenant that nothing checked. This tool cannot even
-        ask for a smaller collection to make the walk shorter, since `/me/joinedTeams` takes no
-        `$top`, so the sentence is only true while every page is followed.
-        """
+        """Graph sends the occasional empty page with a cursor still set, and the SDK's own page
+        walker reads one as the end of the collection."""
         graph.get("/me/joinedTeams", params={"$skiptoken": "third"}).mock(
             return_value=httpx.Response(200, json={"value": [_team_payload("team-c")]})
         )
@@ -169,9 +148,6 @@ class TestGraphFailures:
     async def test_a_refusal_arrives_classified_for_the_tool_to_explain(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This request is made under its own delegated permission, and a tenant commonly grants
-        the two basic ones while withholding the broad message permission, so the failure has to
-        reach the tool layer, which is what names the permission."""
         denied = httpx.Response(
             403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
         )
@@ -181,6 +157,4 @@ class TestGraphFailures:
             _ = await lister.list_teams(client, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        """A tool owns the permission its own request needs, and this collection is behind the
-        cheap "basic" scope over a team's identity."""
         assert lister.GRAPH_PERMISSIONS == ("Team.ReadBasic.All",)

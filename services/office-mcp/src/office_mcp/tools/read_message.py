@@ -1,21 +1,4 @@
-"""`read_message` — one Microsoft Teams message in full, from a handle another tool creates.
-
-Search cannot answer "what did they actually say": Graph's search index has no message body, only
-Microsoft's `summary` snippet. This tool resolves a search result's handle into the full message.
-
-The handle decides which surface to read. Graph puts a Teams message in a chat or a channel, each
-with its own endpoint and permission, and a handle's shape names the surface it addresses.
-
-Three failures are kept apart. A malformed handle is ours to explain. Graph's 403 is about that one
-surface's permission only, because naming the other would send an administrator after a permission
-that was never missing. Graph's 404 means deleted, never existed, or invisible to this user, without
-saying which, so the tool must not claim the message never existed. The generic advice to check the
-id is wrong here: the id came from a tool.
-
-Two messages have no text. A deleted message carries a tombstone, which must not read as content. A
-system event ("Ada joined") has no author and no text in Graph, because Teams writes the sentence
-itself. Report the event, not the emptiness.
-"""
+"""`read_message` — one Microsoft Teams message in full, from a handle another tool creates."""
 
 from collections.abc import Mapping
 from typing import Annotated
@@ -50,11 +33,8 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_
 
 TOOL_NAME = "read_message"
 
-# The surfaces this tool reads, as the step instruments count them. Three rather than one, for the
-# same reason `GRAPH_CALL_NARROWS_TO` names one permission rather than two: a chat message, a
-# channel post and a channel reply are three Graph requests with three failure modes, and a single
-# step would report a tenant that refuses channel messages as a tool that is merely slow. The step
-# name comes from the handle's shape, which is code, never from the handle itself.
+# Three steps, not one: a single step would report a tenant that refuses channel messages as a tool
+# that is merely slow. The name comes from the handle's shape, never from the handle itself.
 STEP_CHAT_MESSAGE = "chat_message"
 STEP_CHANNEL_MESSAGE = "channel_message"
 STEP_CHANNEL_REPLY = "channel_reply"
@@ -63,17 +43,13 @@ STEP_CHANNEL_REPLY = "channel_reply"
 # requests both, because the handle is parsed after the exchange.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
-# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
-# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
+# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 }
 
-# What the call above is refused for, and not the tuple this tool holds. A message is read on one
-# surface, so a chat handle's refusal names the chat permission alone: naming the channel one too
-# would send an administrator after a permission that was never missing. `narrowed_to` below makes
-# the same statement per call, from the argument, at run time.
+# A chat handle's refusal names the chat permission alone: naming the channel one too would send an
+# administrator after a permission that was never missing.
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
@@ -97,9 +73,8 @@ _BAD_HANDLE = (
     + "identically."
 )
 
-# Read by `tools/__init__.py` into the advice table `GraphAdviceMiddleware` words a 404 from. Public
-# for that reason: the default advice ("check the id came from a tool response verbatim") is wrong
-# here, because the handle did come from one.
+# Read by `tools/__init__.py` into the 404 advice table: the default advice, to check the id came
+# from a tool response verbatim, is wrong here because the handle did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
     + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
@@ -119,9 +94,8 @@ GRAPH_NOT_FOUND = (
     + "retrieved, and stop looking."
 )
 
-# Without this header, Graph answers `systemEventMessage` as `unknownFutureValue`. A null `from` or
-# a populated `eventDetail` already marks most system events, but `chatEvent` and `typing` show
-# neither, so `messageType` is the only way to name them and this header keeps it legible.
+# Without this header Graph answers `systemEventMessage` as `unknownFutureValue`. `chatEvent` and
+# `typing` show neither a null `from` nor an `eventDetail`, so `messageType` is the only signal.
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChatMessageQuery = ChatMessageRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
@@ -132,10 +106,8 @@ type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuild
 
 
 async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
-    """The message `handle` addresses. One Graph request, whichever surface it lives on.
-
-    This endpoint does not support `$select` or `$expand`. Mentions and attachments always arrive
-    with the message.
+    """The message `handle` addresses. One request; the endpoint supports no `$select` or
+    `$expand`, so mentions and attachments always arrive with it.
     """
     with graph_errors(TOOL_NAME):
         message = await _get(client, handle)
@@ -163,9 +135,8 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
         client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
     )
     if handle.reply_to_id is not None:
-        # A reply is addressed under the post it replies to, never beside it: the reply id alone
-        # is a 404. `by_chat_message_id1` is the generated name for the second message id in that
-        # path, after the parent post's.
+        # A reply is addressed under its parent post; the reply id alone is a 404.
+        # `by_chat_message_id1` is the generated name for the second message id in that path.
         with graph_step(STEP_CHANNEL_REPLY):
             return await (
                 messages.by_chat_message_id(handle.reply_to_id)
@@ -183,19 +154,14 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
 
 
 def _headers() -> HeadersCollection:
-    """A `HeadersCollection` with the `Prefer` header, built per request rather than shared:
-    adding to the default would affect every Graph request this connector makes.
-    """
+    """Built per request: adding to the shared default collection would affect every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool borrows `transport` per call."""
-    # Built here because this is where `transport` is: the dependency closes over it, and the
-    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
-    # not a call. A call there is ruff's B008.
+    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
@@ -229,8 +195,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         handle = message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        # Use only the permission for this surface. The token was exchanged for both, because the
-        # handle is parsed after the exchange. The table that words a 403 is built at startup and
-        # never sees the handle, so this call tells it which of the two the read was made under.
+        # The 403 table is built at startup and never sees the handle; this names the surface read.
         await narrowed_to(ctx, handle.permission)
         return await read_message(client, handle=handle)

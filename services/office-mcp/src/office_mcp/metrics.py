@@ -71,20 +71,16 @@ _VIEWS = (
     ),
     View(
         instrument_name=GRAPH_PAGES_SCANNED,
-        # Nearly every walk reads one page, so the low end is spelled out one page at a time. A walk
-        # that gives up on a collection Graph will not end lands just past 10 (`MAX_EMPTY_PAGES`),
-        # and only the item scan cap bounds anything above that.
+        # Nearly every walk reads one page. A walk that gives up lands just past 10
+        # (`MAX_EMPTY_PAGES`), and only the item scan cap bounds anything above that.
         aggregation=ExplicitBucketHistogramAggregation((1, 2, 3, 5, 10, 25, 50, 100, 250, 1000)),
     ),
 )
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
-    """Install the OTel-to-Prometheus reader that routes domain instruments to the toolkit registry.
-
-    Trap: `/metrics` reads `unique_toolkit.monitoring.REGISTRY`, not `prometheus_client`'s default
-    registry. Point the reader at it explicitly, or metrics never appear in a scrape.
-    """
+    """Trap: `/metrics` reads `unique_toolkit.monitoring.REGISTRY`, not `prometheus_client`'s
+    default registry. Point the reader at it explicitly, or metrics never appear in a scrape."""
     global _provider
     if _provider is not None:
         return _provider

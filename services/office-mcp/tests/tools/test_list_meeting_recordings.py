@@ -1,14 +1,4 @@
-"""`list_meeting_recordings`: what exists, how long it ran, and who may download it.
-
-The join-URL resolve and the occurrence window are `shared/meetings.py`'s and are tested there.
-This lister and `list_meeting_transcripts` make those promises about the same meeting, and a series
-bracketed one way for transcripts and another for recordings would pair the wrong occurrence with
-the wrong call. This tool's own are here: the organiser-only constraint, the derived duration, its
-four verdicts, and that nothing ever reaches for the video.
-
-Every payload is synthesised: no meeting, no recording and no MP4 anywhere near these tests, which
-is easy because nothing in this tool ever fetches recording content.
-"""
+"""`list_meeting_recordings`: what exists, how long it ran, and who may download it."""
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -41,7 +31,6 @@ _CONTENT = f"{_RECORDINGS}/{_RECORDING_ID}/content"
 
 
 def _handle() -> handles.MeetingHandle:
-    """The same handle the transcript lister takes: one family, one speller, two artifacts."""
     handle = handles.meeting_handle(handles.meeting_uri_for(JOIN_WEB_URL) or "")
     assert handle is not None
     return handle
@@ -76,12 +65,8 @@ def _published(*path: str) -> Mapping[str, object]:
 def _pages(
     graph: respx.MockRouter, first: list[dict[str, object]], second: list[dict[str, object]]
 ) -> respx.Route:
-    """Graph's own paging: a first page carrying `@odata.nextLink`, then the rest.
-
-    Two real pages rather than one that links to itself, because the walk follows the cursor to the
-    end of the collection (bounded by `MAX_ARTIFACT_SCAN`) rather than stopping once it has `limit`
-    items, which is what makes "newest first" true.
-    """
+    """Two real pages rather than one linking to itself, because the walk follows the cursor to
+    the end of the collection (bounded by `MAX_ARTIFACT_SCAN`) rather than stopping at `limit`."""
     return graph.get(_RECORDINGS).mock(
         side_effect=[
             httpx.Response(
@@ -96,21 +81,17 @@ def _pages(
     )
 
 
-# The only meeting shape that outgrows `MAX_ARTIFACT_SCAN`: one occurrence a day, recorded every
-# time, for the better part of a year. Oldest-first, which is an order of Graph's own, since it
-# documents no `$orderby` on this collection either, and the one that puts the genuinely newest
-# occurrence past the cap.
+# One occurrence a day for the better part of a year, which is the only shape that outgrows
+# `MAX_ARTIFACT_SCAN`. Oldest-first is the order that puts the genuinely newest one past the cap.
 _DAILY_SERIES_START = datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
 _PAST_THE_CAP = meetings.MAX_ARTIFACT_SCAN + 60
 
 
 def _day(index: int) -> datetime:
-    """When occurrence `index` of the daily series was recorded."""
     return _DAILY_SERIES_START + timedelta(days=index)
 
 
 def _daily_series(graph: respx.MockRouter, *, total: int = _PAST_THE_CAP) -> respx.Route:
-    """A meeting with more recordings than one call reads, in one page Graph answers with."""
     return _listed(
         graph,
         *(
@@ -124,12 +105,8 @@ def _daily_series(graph: respx.MockRouter, *, total: int = _PAST_THE_CAP) -> res
 
 
 def _weekly_series(graph: respx.MockRouter, *, end: str | None = "2026-02-17T15:00:00Z") -> None:
-    """A recurring series as Graph holds it: one meeting, one recording collection, three weeks.
-
-    The same shape the transcript tests use, because it is the same Graph fact: no occurrence id
-    and no per-occurrence addressing exists, so when a recording ran is all that separates one from
-    the next.
-    """
+    """Three occurrences in one collection, because Graph publishes no occurrence id and no
+    per-occurrence addressing."""
     _resolved(graph, meeting_type="recurring", end=end)
     _listed(
         graph,
@@ -161,12 +138,9 @@ class TestWhatOneRecordingIsReportedAs:
     async def test_it_answers_existence_duration_and_reachability(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole question this tool exists for: was it recorded, how long, can I get at it.
-
-        The duration is derived, because Microsoft publishes no duration, size or media-type
-        property on `callRecording`, and the correlation id is Microsoft's own link to the
-        transcript of the same call, which is the artifact a model can actually read.
-        """
+        """The duration is derived, because Microsoft publishes no duration, size or media-type
+        property on `callRecording`. The correlation id is Microsoft's own link to the transcript
+        of the same call."""
         _resolved(graph)
         listing = _listed(graph, recording_payload())
         _me(graph)
@@ -187,9 +161,7 @@ class TestWhatOneRecordingIsReportedAs:
     async def test_nothing_fetches_the_video(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The decision this whole tool is built around. A recording is an MP4 of a meeting that
-        can run 30 hours, so listing one must never reach for its content: not to size it, not to
-        check it is there, not for anything."""
+        """A recording is an MP4 of a meeting that can run 30 hours."""
         _resolved(graph)
         _listed(graph, recording_payload())
         _me(graph)
@@ -201,17 +173,13 @@ class TestWhatOneRecordingIsReportedAs:
         assert not content.called
 
     def test_a_recording_carries_no_handle_because_nothing_reads_one(self) -> None:
-        """Every readable thing in this connector is addressed by a handle, and a recording is not
-        readable, so minting one would advertise a reader that does not exist and cannot."""
         assert "uri" not in lister.RecordingSummary.model_fields
 
 
 class TestTheOrganiserOnlyConstraint:
-    """Microsoft: "getting callRecording content is supported only for the meeting organizer.
-    Meeting participants don't have permission to download meeting recordings", unless a tenant
-    administrator unblocked them. The metadata is not so restricted, so the two have to be reported
-    separately, and an unreachable recording must never read as a missing one.
-    """
+    """Microsoft: recording content is "supported only for the meeting organizer", unless a tenant
+    administrator unblocked participants. The metadata is not so restricted, so the two are
+    reported separately and an unreachable recording must never read as a missing one."""
 
     @pytest.mark.parametrize(
         ("organizer", "expected"),
@@ -230,9 +198,7 @@ class TestTheOrganiserOnlyConstraint:
         organizer: str | None,
         expected: str,
     ) -> None:
-        """An Entra object id is a GUID and its casing is not part of its identity, so the
-        comparison is case-insensitive: getting that wrong tells the organiser of a meeting that
-        they may not download their own recording."""
+        """An Entra object id is a GUID and its casing is not part of its identity."""
         _resolved(graph)
         _listed(graph, recording_payload(organizer_user_id=organizer))
         _me(graph)
@@ -245,9 +211,6 @@ class TestTheOrganiserOnlyConstraint:
     async def test_a_recording_it_cannot_download_is_still_listed(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The wrong answer this design exists to avoid. For most meetings a participant asks
-        about, the video is out of reach and the recording is real, so the status is `available`,
-        the duration is there, and the organiser is named as the person who has it."""
         _resolved(graph)
         _listed(graph, recording_payload(organizer_user_id=OTHER_USER_ID))
         _me(graph)
@@ -263,9 +226,8 @@ class TestTheOrganiserOnlyConstraint:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph's list-recordings sample types the organiser
-        `#Microsoft.Teams.GraphSvc.teamworkUserIdentity`, which is not one of the discriminators the
-        SDK knows. An unknown one falls back to the base identity, which still carries the id. If
-        it did not, the whole listing would die on a live payload."""
+        `#Microsoft.Teams.GraphSvc.teamworkUserIdentity`, a discriminator the SDK does not know.
+        An unknown one falls back to the base identity, which still carries the id."""
         _resolved(graph)
         _listed(
             graph,
@@ -295,8 +257,6 @@ class TestTheOrganiserOnlyConstraint:
     async def test_the_caller_is_not_looked_up_when_there_is_nothing_to_say_about(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Who the caller is only changes an answer where a recording exists, and "nothing was
-        recorded" is the common answer, so the request that answers it is not spent on that one."""
         _resolved(graph, end="2026-02-10T15:00:00Z")
         _listed(graph)
         me = _me(graph)
@@ -324,8 +284,7 @@ class TestTheDurationIsDerivedOrAbsent:
         created_at: str | None,
         ended_at: str | None,
     ) -> None:
-        """Microsoft publishes no duration property, so a missing timestamp leaves no second
-        source. A negative span is not a duration either, so it is unknown rather than a negative
+        """A negative span is not a duration either, so it is unknown rather than a negative
         number of seconds shown to a caller as a length."""
         _resolved(graph)
         _listed(graph, recording_payload(created_at=created_at, ended_at=ended_at))
@@ -338,9 +297,8 @@ class TestTheDurationIsDerivedOrAbsent:
     async def test_timestamps_without_an_offset_are_still_subtractable(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The crash the transcript window already paid for, one field along: Graph timestamps in
-        UTC and says so with a `Z`, but a payload without one must not take the call down through a
-        naive-versus-aware subtraction."""
+        """Graph timestamps in UTC and says so with a `Z`, but a payload without one must not take
+        the call down through a naive-versus-aware subtraction."""
         _resolved(graph)
         _listed(
             graph,
@@ -357,8 +315,7 @@ class TestTheKindsOfAbsence:
     async def test_no_matching_meeting_is_a_status_and_costs_no_listing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph answers the join-URL filter with `200 OK` and an empty `value` rather than a 404,
-        so "no such meeting" is an answer here exactly as it is for transcripts."""
+        """Graph answers the join-URL filter with `200 OK` and an empty `value`, never a 404."""
         graph.get(_MEETINGS).mock(return_value=httpx.Response(200, json={"value": []}))
         listing = _listed(graph, recording_payload())
         me = _me(graph)
@@ -393,9 +350,8 @@ class TestTheKindsOfAbsence:
     async def test_a_meeting_that_just_ended_is_not_ready_rather_than_never_recorded(
         self, client: GraphServiceClient, graph: respx.MockRouter, ended: datetime | None
     ) -> None:
-        """The same two empty answers as for transcripts, on the same shared inference: Microsoft
-        publishes no processing status and no availability SLA for a recording either, so the bias
-        is towards the wrong answer that costs a caller one more call."""
+        """Microsoft publishes no processing status and no availability SLA for a recording
+        either, so the bias is towards the wrong answer that costs a caller one more call."""
         _resolved(graph, end=ended.isoformat() if ended is not None else None)
         _listed(graph)
 
@@ -406,8 +362,7 @@ class TestTheKindsOfAbsence:
     async def test_a_long_past_occurrence_of_a_running_series_was_not_recorded(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The promise the shared window keeps: a series' own end time says nothing about an
-        occurrence that ended a month ago, and a caller told to wait for it waits forever."""
+        """A series' own end time says nothing about an occurrence that ended a month ago."""
         past = (datetime.now(UTC) - timedelta(days=30)).date()
         _weekly_series(graph, end=(datetime.now(UTC) + timedelta(days=180)).isoformat())
 
@@ -419,7 +374,6 @@ class TestTheKindsOfAbsence:
     async def test_a_404_is_still_a_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The distinction the empty collection exists to be told apart from."""
         graph.get(_MEETINGS).mock(
             return_value=httpx.Response(404, json={"error": {"code": "NotFound", "message": "no"}})
         )
@@ -453,10 +407,9 @@ class TestScopingToOneOccurrence:
     async def test_the_shared_window_picks_one_occurrence_out_of_the_series(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """One meeting, one recording collection, three weeks in it. The window is the transcript
-        lister's own `OccurrenceWindow`, and there is no second implementation: a series bracketed
-        one way for transcripts and another way for recordings would pair the wrong occurrence with
-        the wrong call."""
+        """The window is the transcript lister's own `OccurrenceWindow` from `shared/meetings.py`:
+        a series bracketed one way for transcripts and another for recordings would pair the wrong
+        occurrence with the wrong call."""
         _weekly_series(graph)
         _me(graph)
 
@@ -487,9 +440,6 @@ class TestScopingToOneOccurrence:
         started_before: date | datetime | None,
         expected: list[str],
     ) -> None:
-        """The same shapes the transcript lister accepts and on the same UTC assumption, because
-        they are the same parameters on the same window. A model that learned one has learned both.
-        """
         _weekly_series(graph)
         _me(graph)
 
@@ -501,8 +451,7 @@ class TestScopingToOneOccurrence:
     async def test_recordings_come_back_newest_first(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph documents no `$orderby` on this collection either, so the order it answers in is
-        not a contract and the useful one is applied here."""
+        """Graph documents no `$orderby` here either, so its order is not a contract."""
         _resolved(graph)
         _listed(
             graph,
@@ -518,9 +467,8 @@ class TestScopingToOneOccurrence:
     async def test_a_window_holding_more_than_the_limit_is_a_full_window_and_a_complete_scan(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The two facts one flag would run together: the window holds more recordings than
-        `limit`, which a full window says, and the scan reached the end of the collection, which
-        must not be denied. The first entry here IS the meeting's own latest."""
+        """The two facts one flag would run together: a window filled to `limit` means older ones
+        may exist, and the collection was still read to its end."""
         _resolved(graph)
         _pages(
             graph,
@@ -539,10 +487,8 @@ class TestScopingToOneOccurrence:
     async def test_the_newest_are_returned_and_not_the_first_graph_answered_with(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The collection is ordered before `limit` cuts it, so "the recording of the latest
-        occurrence" is what a small `limit` answers with. Cutting first would have answered
-        `oldest` here.
-        """
+        """The collection is ordered before `limit` cuts it. Cutting first would have answered
+        `oldest` here."""
         _resolved(graph, meeting_type="recurring")
         _listed(
             graph,
@@ -574,11 +520,9 @@ class TestScopingToOneOccurrence:
     async def test_a_scan_that_stopped_short_asserts_no_absence(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The self-contradicting answer: `not_recorded` ("retrying will not help") alongside
-        "there is more". A collection that was not read to the end settles nothing, so the answer is
-        `scan_incomplete`, reported by `status` whether or not the caller asked about the scan,
-        because an empty answer is worth nothing without it, and no absence is claimed.
-        """
+        """`not_recorded` ("retrying will not help") alongside "there is more" cannot both be
+        true, so `scan_incomplete` claims nothing about absence and reaches `status` whether or not
+        the caller asked about the scan."""
         ended = datetime.now(UTC) - timedelta(days=30)
         _resolved(graph, meeting_type="recurring", end=ended.isoformat())
         _listed(
@@ -608,13 +552,9 @@ class TestScopingToOneOccurrence:
     async def test_narrowing_the_window_cannot_reach_past_the_scan_cap(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The remedy `scan_incomplete` used to give. The window is applied to the recordings after
-        Graph has answered, because Graph documents `contentCorrelationId` as this collection's one
-        filterable property and never a date, so the request goes out bare and a narrower window
-        reads the same recordings. Two windows, one of them bracketing a recording that really
-        exists (`day-250`): the same answer both times, which is why the advice is now to stop
-        rather than to ask again.
-        """
+        """Graph documents `contentCorrelationId` as this collection's one filterable property and
+        never a date, so the request goes out bare and a narrower window reads the same recordings.
+        The narrow window here brackets `day-250`, which genuinely exists and is never seen."""
         _resolved(graph, meeting_type="recurring")
         listing = _daily_series(graph)
         _me(graph)
@@ -639,8 +579,6 @@ class TestScopingToOneOccurrence:
             )
 
     async def test_the_unreadable_answer_tells_a_caller_to_stop_rather_than_to_retry(self) -> None:
-        """The same advice as the transcript lister gives, because it is the same dead end: no
-        argument sends the next call further into the collection."""
         described = str(lister.MeetingRecordings.model_fields["status"].description)
 
         assert "There is nothing to try" in described
@@ -651,9 +589,8 @@ class TestScopingToOneOccurrence:
     async def test_past_the_cap_the_newest_returned_is_the_newest_of_what_was_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """ "Newest first" is exact over the recordings read, and the read stops at the cap: a
-        daily series recorded for most of a year has its newest occurrence past
-        `MAX_ARTIFACT_SCAN`, and no `$orderby` exists to ask Graph for it."""
+        """The read stops at `MAX_ARTIFACT_SCAN`, and no `$orderby` exists to ask Graph for the
+        newest ahead of it."""
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
         _me(graph)
@@ -671,16 +608,9 @@ class TestScopingToOneOccurrence:
     async def test_a_short_list_is_not_a_complete_window_when_the_scan_stopped_short(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The sentence a lister is most tempted to write.
-
-        "Fewer than `limit` means these are the whole window" is what every other list-shaped tool
-        here can say, because those walk to the end of their collection. This one does not: it walks
-        to `MAX_ARTIFACT_SCAN` and applies the window to what came back. So a meeting past the cap
-        can answer with two recordings against a `limit` of twenty and still be hiding recordings of
-        that same window among the ones never read: a short list that means the opposite of what the
-        convention says. `scan_incomplete` is the only thing that tells the two cases apart, and
-        both descriptions are worded to it.
-        """
+        """ "Fewer than `limit` means the whole window" holds wherever a walk reaches the end of its
+        collection, and this walk stops at `MAX_ARTIFACT_SCAN` instead, so a short list can mean the
+        opposite of what the convention says."""
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
         _me(graph)
@@ -706,7 +636,6 @@ class TestScopingToOneOccurrence:
         )
 
     async def test_the_order_is_promised_over_what_was_read_and_not_over_the_meeting(self) -> None:
-        """The sentence the case above makes false if it drifts back."""
         described = str(lister.MeetingRecordings.model_fields["recordings"].description)
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in described
@@ -725,7 +654,7 @@ class TestWhatGraphRefusalsLookLikeHere:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Recordings need their own admin-consented permission, and a tenant may grant transcript
-        access without it. Nothing is swallowed: the tool layer is what names the permission."""
+        access without it."""
         _resolved(graph)
         graph.get(_RECORDINGS).mock(
             return_value=httpx.Response(
@@ -740,17 +669,13 @@ class TestWhatGraphRefusalsLookLikeHere:
 
 
 class TestTheRepeatsGraphIsDocumentedToSend:
-    """Microsoft's paging reset on this collection, and the half of the workaround that dedupes.
+    """Microsoft's known-issues page (Teamwork and communications) documents an automatic
+    pagination token reset on `getAllRecordings` and `getAllTranscripts`: an empty collection with
+    an `@odata.nextLink`, after which paging restarts and repeats items already returned. The
+    published remedy is to keep following the link and de-duplicate by `id`.
 
-    The known-issues page (Teamwork and communications) says a paginated request to
-    `getAllRecordings` or `getAllTranscripts` "may experience an automatic pagination token reset. A
-    request can return a `200 OK` response with an empty collection and an `@odata.nextLink`.
-    Pagination then restarts and can return recording or transcript items that were returned
-    previously." The remedy it publishes is two things: keep following the link, and "de-duplicate
-    subsequent items by tracking the **id** property of each recording or transcript."
-
-    `graph_client/pagination.py` does the following and `shared/meetings.py` does the
-    de-duplicating. These are the tests for the second half.
+    `graph_client/pagination.py` does the following; `shared/meetings.py` does the de-duplicating,
+    which is what these test.
     """
 
     async def test_a_recording_graph_sent_twice_is_reported_once(
@@ -780,12 +705,8 @@ class TestTheRepeatsGraphIsDocumentedToSend:
     async def test_a_repeat_does_not_take_the_place_of_an_artifact_the_caller_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Why the de-duplication happens before the cut to `limit` and not after it.
-
-        A repeat that survived into the sort takes one of the `limit` places a distinct recording
-        was owed. A caller asking for the newest two would be handed the same recording twice and
-        never learn a second one existed.
-        """
+        """A repeat surviving into the sort takes one of the `limit` places a distinct recording
+        was owed, so the de-duplication happens before the cut and not after it."""
         _me(graph)
         _resolved(graph)
         _pages(

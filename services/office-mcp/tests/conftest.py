@@ -18,13 +18,8 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 @pytest.fixture(scope="session")
 def postgres_container() -> Generator[PostgresContainer]:
-    """Start a PostgreSQL container, once per test session.
-
-    No schema is applied: this service owns none. The OAuth state store creates its one table
-    (`oauth_kv`) on first use, so the app under test builds it itself, as it does in production.
-
-    Data persists across the session, so use IDs unique to the whole suite: a prefix per test
-    file, or a random uuid.
-    """
+    """No schema is applied: this service owns none, and the OAuth state store creates its one
+    table (`oauth_kv`) on first use. Data persists across the whole session, so use ids unique to
+    the suite — a prefix per test file, or a random uuid."""
     with PostgresContainer("postgres:17-alpine") as postgres:
         yield postgres

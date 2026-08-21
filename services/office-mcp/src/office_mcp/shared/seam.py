@@ -48,48 +48,12 @@ a tool's `meta` would publish this connector's permission names to every client 
 Trap: the middleware never sees a `GraphFailure`. FastMCP re-raises whatever leaves a tool as
 `ToolError` (fastmcp 3.4.5, `fastmcp/server/server.py:1356`), and the dependency engine wraps a
 failed dependency in a `RuntimeError` before that, so what has to be recognised is two links down a
-`__cause__` chain. The chain is walked and matched on type. Matching FastMCP's own message text
-would break on a wording change nobody here would review.
+`__cause__` chain, matched on type. Matching FastMCP's own message text would break on a wording
+change nobody here would review.
 
-A tool that reaches Graph under fewer permissions than it declares says so with `narrowed_to`,
-which carries the narrowing to the middleware on the call's own state. `read_message` is the one
-that does.
-
-No tool opens its own mapping block any more, and one still may. `graph_tool_errors` is that escape.
-
-## Error messages
-
-Every message here is written to one shape. The thing that refused comes first and is always
-"Microsoft 365", not "Microsoft Graph", which is the name of an API the caller is not calling. Then
-the remedy, and whether retrying could help. Then the evidence an operator needs, in a parenthesis
-at the end. Graph is named after that opening only where it is the explanation (one 404 meaning
-three different things, a 500 that recurs) or where an operator needs its own label: `Graph request
-id` is what Microsoft support asks for, by that name.
-
-Two failures are only distinguishable with information Graph does not send. `GraphForbidden` covers
-both 401 and 403 and carries `status` for exactly that reason: a 401 means the token was rejected
-(sign in again) and a 403 means the token was fine and the permission is missing (ask an
-administrator). Those are opposite remedies behind one exception class. `GraphThrottled` reads its
-own `status` for a milder version of the same thing: a 429 is this connector's quota, while a 5xx
-that carried `Retry-After` may be that or a service shedding load, and only the first can be named
-as rate limiting. One remedy, wait exactly as long as Graph asked, is what makes them one class.
-
-A 403 is only actionable if the message says *which* permission, which Graph never does. The tool
-does, so every mapping here is scoped to the permissions the failing call was made under. The same
-missing permission also has an earlier, uglier shape: if it was never consented to, Entra refuses
-the On-Behalf-Of exchange (AADSTS65001) and Graph is never reached at all. `_token_advice` words
-that failure, and it says the same thing as the 403, because from the caller's side it *is* the
-same thing.
-
-One 403 is not about a permission at all, and naming one would send an administrator after something
-that was never missing. Microsoft Graph access to Teams meeting transcripts is a *tenant* switch,
-off by default, that "no app can access meeting transcripts, regardless of app-level permissions"
-until a Teams administrator turns it on, and Microsoft is explicit that there is "no request-side
-workaround". Graph marks it with an inner error code, the only thing that distinguishes it from an
-ordinary refusal, so that is what it is recognised by, never the message text, which Microsoft
-documents as subject to change. This connector already learned the lesson once, in
-`services/teams-mcp` (PR #762) and in `docs/recordings-and-transcripts/`. The remedy names a person
-in the Teams admin centre and rules out re-consent.
+The advice table is built in `tools/__init__.py` from each tool module's own `GRAPH_PERMISSIONS`.
+The permissions travel that way rather than on the tool: `tags` is a set and loses the order the
+message names them in, and `meta` would publish them to every client in `tools/list`.
 """
 
 import re
@@ -123,10 +87,9 @@ _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
-# Every permission this connector may request, listed once, so that the checks over a tool file's
-# own permissions have something to compare them against. Without it a misspelled permission like
-# `Chat.Raed` is only ever compared with itself and passes: Entra rejects an unknown scope at the
-# authorize endpoint, and one typo stops sign-in for every user of this connector.
+# What a tool file's own permissions are checked against. Without it a misspelling like `Chat.Raed`
+# is only ever compared with itself: Entra rejects an unknown scope at the authorize endpoint, and
+# one typo stops sign-in for every user of this connector.
 REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
     {
         "User.Read",
@@ -142,42 +105,30 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
 
 
 def graph_scope(permission: str) -> str:
-    """Permission as scope for sign-in and exchange."""
     return f"{_GRAPH_SCOPE_PREFIX}{permission}"
 
 
 class TokenExchangeFailed(Exception):
-    """The On-Behalf-Of exchange produced no token, carrying what it asked for and what went wrong.
+    """The On-Behalf-Of exchange produced no token.
 
-    Deliberately not a `FastMCPError`, which is what makes it findable. Dependency resolution in
-    `fastmcp.server.dependencies` lets `FastMCPError` subclasses out unwrapped and wraps everything
-    else in a `RuntimeError` naming the parameter, and that wrapping is the signal. So this reaches
-    `GraphAdviceMiddleware` as a link in a `__cause__` chain, recognised by type, and the wording
-    lives with every other remedy rather than at the point of failure.
+    Not a `FastMCPError`: dependency resolution lets those out unwrapped and wraps everything else
+    in a `RuntimeError`, and that wrapping is what `GraphAdviceMiddleware` finds this by.
     """
 
     def __init__(self, *, permissions: tuple[str, ...], cause: BaseException) -> None:
         super().__init__(f"Microsoft 365 issued no token for {_named(permissions)}")
         self.permissions: tuple[str, ...] = permissions
-        # The exception the exchange actually failed with, and an input to the advice: Entra's own
-        # `AADSTS` code is in its message. Kept as a field as well as on `__cause__`, because
-        # reading it off `__cause__` would depend on how this was raised.
         self.cause: BaseException = cause
 
 
 class GraphToken(Dependency[str]):
-    """`EntraOBOToken` for a tool's permissions, reporting a refusal as one that knows them.
-
-    The exchange itself is untouched: `__aenter__` delegates to FastMCP's dependency, which owns
-    the credential cache, and `__aexit__` delegates so any cleanup it grows is not dropped.
-    """
+    """`EntraOBOToken` for a tool's permissions, reporting a refusal as one that knows them."""
 
     def __init__(self, *permissions: str) -> None:
         assert permissions, "a token is exchanged for at least one permission"
         self._permissions: tuple[str, ...] = permissions
-        # `EntraOBOToken` is annotated `-> str` so a tool body can treat the injected value as a
-        # string. The real value is the dependency object, and the two types do not overlap, so the
-        # cast goes through `object`.
+        # `EntraOBOToken` is annotated `-> str`, and the real value is the dependency object; the
+        # two types do not overlap, so the cast goes through `object`.
         self._exchange: Dependency[str] = cast(
             "Dependency[str]",
             cast("object", EntraOBOToken([graph_scope(permission) for permission in permissions])),
@@ -190,10 +141,8 @@ class GraphToken(Dependency[str]):
         except Exception as failure:
             # Every exception, not a type: azure-identity reports a refused exchange as
             # `ClientAuthenticationError`, and `_EntraOBOToken.__aenter__` raises plain
-            # `RuntimeError`s of its own first, for no access token in context or an auth provider
-            # that is not Entra's (fastmcp 3.4.5, `fastmcp/server/auth/providers/azure.py:838,848`).
-            # None of them produced a token and the remedy starts the same way for all of them, so
-            # a type check on the innermost cause would only be a way to miss two of them.
+            # `RuntimeError`s of its own first (fastmcp 3.4.5,
+            # `fastmcp/server/auth/providers/azure.py:838,848`).
             raise TokenExchangeFailed(permissions=self._permissions, cause=failure) from failure
 
     @override
@@ -223,12 +172,6 @@ def _graph_token(*permissions: str) -> str:
 def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> GraphServiceClient:
     """A Graph client that calls as this call's signed-in user. Build inside `register`.
 
-    It owns the two lifetimes a tool would otherwise hold apart itself. `transport` is process-wide
-    and is passed once, at registration, which is the only place that holds it. The token is per
-    call and is a dependency of this dependency, so FastMCP exchanges one per call and the tool body
-    receives a client that is already the caller's. That puts the exchange inside the dependency
-    resolution FastMCP wraps a failure from.
-
     Trap: the result goes in a parameter default by NAME, `client: GraphServiceClient = graph`,
     never as the call itself. A call in a default is ruff's B008, and it would build a second
     exchange on every registration.
@@ -242,66 +185,34 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
 
 
 class Advised(ToolError):
-    """A tool error whose message is already the advice below.
-
-    The type is the whole of what stops the middleware from wording a refusal twice. A type rather
-    than a mark on the message, because the two wordings are not always the same one: a tool that
-    narrows the permissions of its own call reports fewer than it declares, and re-wording that from
-    the table would name a permission that was never missing.
-
-    No leading underscore, although nothing outside this module refers to it. The class name reaches
-    an operator, because `unique_mcp`'s tool metrics label every failed call with
-    `type(error).__name__` and that layer sits inside this one. No tool words its own refusal today,
-    so what an operator reads is `ToolError`. The day one needs to again, the count moves to this
-    name rather than becoming invisible.
-    """
+    """A tool error whose message is already the advice below, so the middleware leaves it alone."""
 
 
 @dataclass(frozen=True, slots=True)
 class ToolAdvice:
-    """What one tool's failures are worded from.
-
-    `permissions` is the tuple the tool's own Graph calls are made under, in the order the message
-    names them. `not_found` is the sentence its 404 needs instead of the default one, which assumes
-    the id was a caller's to check. A tool whose argument is a handle another tool minted needs its
-    own, and it is that tool's to write.
-    """
+    """What one tool's failures are worded from: `permissions` in the order the message names them,
+    and the sentence its 404 needs instead of the default one."""
 
     permissions: tuple[str, ...]
     not_found: str | None = None
 
 
-# The state key one tool writes and the middleware below reads, and its only writer and reader.
-# Namespaced, because the state store is shared with every other writer in the process.
 _NARROWED_PERMISSIONS = "office_mcp.narrowed_permissions"
 
 
 async def narrowed_to(ctx: Context, *permissions: str) -> None:
-    """Say that this call reached Graph under fewer permissions than its tool declares.
+    """Say that this call reached Graph under fewer permissions than its tool declares, so its 403
+    names none that was never missing.
 
-    A tool whose token was exchanged for two permissions and whose call uses one has to say which,
-    or its 403 names a permission that was never missing and an administrator grants it for nothing.
-    The table cannot say it: which surface is being read is learned from the argument, per call, and
-    the table is built once at startup.
-
-    Request state rather than session state, which is what `serializable=False` buys. The narrowing
-    is about this one call, and session state outlives the call by a day, so a second call to the
-    same tool would be worded from the first call's handle.
+    `serializable=False` makes this request state rather than session state, which outlives the call
+    by a day and would word a second call to the same tool from the first call's handle.
     """
     assert permissions, "a Graph call is made under at least one permission"
     await ctx.set_state(_NARROWED_PERMISSIONS, permissions, serializable=False)
 
 
 async def _narrowed_permissions(ctx: Context | None) -> tuple[str, ...] | None:
-    """What `narrowed_to` said about this call, or `None` when it said nothing.
-
-    `None` for nine tools out of ten, and for every call that never reached Graph. `ctx` is `None`
-    only for a call with no request behind it. A test that drives `GraphAdviceMiddleware` directly
-    makes such a call, and nothing in production does.
-
-    `get_state` is typed `Any`, because the store holds whatever any writer put there. The cast
-    asserts what `narrowed_to` guarantees about this one key rather than what the store promises.
-    """
+    """What `narrowed_to` said about this call, or `None` when it said nothing."""
     if ctx is None:
         return None
     return cast("tuple[str, ...] | None", await ctx.get_state(_NARROWED_PERMISSIONS))
@@ -326,21 +237,14 @@ class GraphAdviceMiddleware(Middleware):
             advised = self._advised(error, context.message.name, narrowed)
             if advised is None:
                 raise
-            # `from error` keeps the whole chain: this is the last thing to touch the failure, but a
-            # span or a log sink further out still reads the cause it was raised from.
             raise advised from error
 
     def _advised(
         self, error: BaseException, tool: str, narrowed: tuple[str, ...] | None
     ) -> ToolError | None:
-        """The advice for this failure, or `None` when there is nothing here to say about it.
+        """The advice for this failure, or `None` to leave the failure exactly as it is.
 
-        `None` covers three cases that must all leave the failure exactly as it is: a refusal the
-        tool already worded (`Advised`), a `ToolError` about an argument (a handle of the wrong
-        shape), and anything that is not a Graph or token failure at all.
-
-        `narrowed` wins over the table when the tool said its call used fewer permissions than it
-        declares. A token refusal ignores it: the exchange happens before the argument is parsed and
+        A token refusal ignores `narrowed`: the exchange happens before the argument is parsed and
         asks for every permission, so naming one of them would hide the one that was refused.
         """
         for cause in _causes(error):
@@ -350,9 +254,8 @@ class GraphAdviceMiddleware(Middleware):
                 return ToolError(_token_advice(cause.cause, cause.permissions))
             if isinstance(cause, GraphFailure):
                 known = self._advice.get(tool)
-                # A tool with no entry cannot happen: the table and the registration both come from
-                # one resolved selection. Left as it arrived rather than asserted, because an
-                # assertion would replace a refusal a model could act on with one nobody can.
+                # Left as it arrived rather than asserted: an assertion would replace a refusal a
+                # model could act on with one nobody can.
                 if known is None:
                     return None
                 permissions = known.permissions if narrowed is None else narrowed
@@ -361,11 +264,8 @@ class GraphAdviceMiddleware(Middleware):
 
 
 def _causes(error: BaseException) -> Iterator[BaseException]:
-    """`error` and everything it was raised from, outermost first.
-
-    Cycle-safe rather than trusting the chain: `raise X from Y` accepts a loop, and a loop here
-    would hang the request instead of answering it.
-    """
+    """`error` and everything it was raised from, outermost first. Cycle-safe because `raise X from
+    Y` accepts a loop, which would hang the request instead of answering it."""
     seen: set[int] = set()
     cause: BaseException | None = error
     while cause is not None and id(cause) not in seen:
@@ -378,17 +278,11 @@ def _causes(error: BaseException) -> Iterator[BaseException]:
 def graph_tool_errors(*permissions: str, not_found: str | None = None) -> Generator[None]:
     """Map Graph failures onto actionable tool errors. Name every permission: Graph names none.
 
-    The mapping applied where the failure happens, rather than at `tools/call`. No tool opens one:
-    `GraphAdviceMiddleware` covers every registered tool, including the dependency resolution a
-    block never could, and it words a refusal from this same function. What is left here is the one
-    route a tool would take to say something the table cannot carry. It arrives as `Advised`, which
-    the middleware leaves alone, so the wording reaches the client byte for byte, and it is what the
-    middleware's own wording is compared against, message for message, in
-    `tests/shared/test_seam.py`, a comparison worth having because the two are reached differently.
-
-    `not_found` replaces the default advice for a 404, which assumes the id comes verbatim from a
-    tool response. That assumption is wrong for a handle another tool minted, whose remaining causes
-    are deletion and lost access. Pass the sentence true of this call.
+    No tool opens one — `GraphAdviceMiddleware` covers every registered tool from this same function
+    — so this is the escape for a wording the table cannot carry. It arrives as `Advised`, which the
+    middleware leaves alone, and `tests/shared/test_seam.py` compares the two wordings message for
+    message. `not_found` replaces the default 404 advice, which assumes the id came verbatim from a
+    tool response rather than being a handle another tool minted.
     """
     assert permissions, "a Graph call is made under at least one permission"
     try:
@@ -401,14 +295,10 @@ _ENTRA_CODE = re.compile(r"AADSTS\d+")
 
 
 def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
-    """What to do about an On-Behalf-Of exchange that did not produce a token.
-
-    One message for every cause, because the two the exchange can actually fail for share the first
-    remedy: a permission was never consented to (AADSTS65001, overwhelmingly the common one), or
-    this connector's own Entra credentials are wrong. Splitting them would mean classifying Entra
-    error codes this connector has never observed, and guessing wrong sends the caller after the
-    wrong fix.
-    """
+    """One message for every way the On-Behalf-Of exchange can fail to produce a token: a permission
+    was never consented to (AADSTS65001, overwhelmingly the common one), or this connector's own
+    Entra credentials are wrong. Splitting them would mean classifying Entra error codes this
+    connector has never observed."""
     code = _ENTRA_CODE.search(str(failure))
     diagnostics = code.group() if code is not None else type(failure).__name__
     named = _named(permissions)
@@ -429,13 +319,11 @@ def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
     )
 
 
-# The one throttling status that is only ever rate limiting. `GraphThrottled` also covers a 5xx that
-# carried `Retry-After`: the same remedy reaches a caller, and it cannot claim the same cause. See
-# `_remedy`.
 _TOO_MANY_REQUESTS = 429
 
-# Graph's inner error code for the tenant switch, and the advice for it. Branched on rather than the
-# message, as Microsoft's transcript reference instructs twice.
+# Graph's inner error code for the tenant switch, branched on rather than the message text, as
+# Microsoft's transcript reference instructs twice. `services/teams-mcp` met this switch first
+# (PR #762).
 _TRANSCRIPT_ACCESS_DISABLED = "GraphAccessToTranscriptsDisabled"
 
 _TRANSCRIPTS_SWITCHED_OFF = (
@@ -471,10 +359,9 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
                 "Microsoft 365 is rate-limiting this connector and asked to be left alone for "
                 + f"{advice:g} seconds. Retry after that, not sooner."
             )
-        # A 5xx that named a delay. `errors.py` reads that as throttling rather than as an outage
-        # because the delay is the remedy either way. Which of the two it is, quota spent or a
-        # service shedding load, is not knowable from here, so the sentence claims only what Graph
-        # actually said, and the wait is the same advice a 429 gets.
+        # A 5xx that named a delay, which `errors.py` reads as throttling because the delay is the
+        # remedy either way. Quota spent or a service shedding load is not knowable from here, so
+        # the sentence claims only what Graph actually said.
         return (
             "Microsoft 365 declined to serve this request now and asked to be left alone for "
             + f"{advice:g} seconds — it is either rate-limiting this connector or too busy to "
@@ -512,9 +399,8 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
             + "particular content rather than transient."
         )
     if isinstance(failure, GraphPagingUnending):
-        # The only failure here with no status code, because no request failed: it is what a run of
-        # successful, empty, "there is more" pages means. The count is the whole of the evidence, so
-        # it goes in the sentence rather than in `_diagnostics`, which has nothing to append.
+        # No request failed, so `_diagnostics` has nothing to append and the page count, which is
+        # the whole of the evidence, goes in the sentence.
         return (
             "Microsoft 365 would not finish sending this list: it answered "
             + f"{failure.empty_pages} pages in a row with nothing in them while still saying more "
@@ -530,18 +416,14 @@ def _remedy(failure: GraphFailure, permissions: tuple[str, ...], not_found: str 
 
 
 def _named(permissions: tuple[str, ...]) -> str:
-    """The permissions as a phrase, so the message reads as a sentence rather than a list."""
     if len(permissions) == 1:
         return permissions[0]
     return " and ".join((", ".join(permissions[:-1]), permissions[-1]))
 
 
 def _diagnostics(failure: GraphFailure) -> str:
-    """The evidence an operator needs, appended once rather than woven into every message.
-
-    `request_id` is what Microsoft support asks for first, and it is only ever in this response.
-    Losing it means the failure cannot be traced afterwards.
-    """
+    """The evidence an operator needs. `request_id` is what Microsoft support asks for first, and it
+    is only ever in this one response."""
     parts = [
         f"{label} {value}"
         for label, value in (

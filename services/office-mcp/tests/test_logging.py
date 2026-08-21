@@ -1,17 +1,8 @@
 """What every log line this service writes must and must not carry.
 
-Asserted through the **real** handler: `configure_logging` installs it, `unique_mcp`'s own pino
-formatter renders it, and the only thing these tests change is where its stream points. The defects
-here are all properties of a formatter this service does not own, which copies every `extra=` into
-the payload and serialises whole exception stacks, so a test that formatted the records itself would
-assert against the wrong opponent.
-
-Four subjects, one per defect:
-
-* nothing secret reaches the log, by field name or by value shape;
-* every line carries something that groups it with the rest of its request;
-* one line per MCP message, in the trace of the request that carried it;
-* every line of a really booted server is pino-json on stderr, and nothing is on stdout.
+Asserted through the **real** handler, because the defects are all properties of a formatter this
+service does not own: it copies every `extra=` into the payload and serialises whole exception
+stacks. A test that formatted the records itself would assert against the wrong opponent.
 """
 
 import ast
@@ -57,19 +48,16 @@ _PUBLIC_BASE_URL = "https://office-mcp.example"
 _TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
-# A token-shaped string that is not a token: three base64url segments beginning `eyJ`, which is
-# what every Entra and Graph JWT looks like on the wire.
+# Three base64url segments beginning `eyJ`, which is what every Entra and Graph JWT looks like.
 _JWT = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub2JvZHkifQ.c2lnbmF0dXJl"
 
-# The two traces the session below runs under, one per request. Different on purpose: that is the
-# whole experiment, as in `test_tracing.py`.
+# Two requests, two traces, different on purpose: that is the whole experiment (`test_tracing.py`).
 _INITIALIZE_TRACE = "cc3333333333333333333333333333cc"
 _TOOL_CALL_TRACE = "dd4444444444444444444444444444dd"
 _INITIALIZE_TRACEPARENT = f"00-{_INITIALIZE_TRACE}-3333333333333333-01"
 _TOOL_CALL_TRACEPARENT = f"00-{_TOOL_CALL_TRACE}-4444444444444444-01"
 
-# The SDK line this service quiets, and the module that writes it. Spelled here rather than imported
-# from `office_mcp.logging`, so a rename there is a failing test and not a test that renames itself.
+# Spelled here rather than imported from `office_mcp.logging`, so a rename there is a failing test.
 _SDK_LOGGER = "mcp.server.lowlevel.server"
 _SDK_LINE = "Processing request of type %s"
 
@@ -85,8 +73,6 @@ class _HttpResponse(Protocol):
 
 @dataclass(frozen=True)
 class _Sink:
-    """Everything the real handler wrote, as the JSON objects the log pipeline would receive."""
-
     stream: io.StringIO
     handler: logging.Handler
 
@@ -104,12 +90,8 @@ class _Sink:
 
 
 def _pino_handler() -> logging.Handler:
-    """The handler `configure_logging` installed, found by the formatter upstream puts on it.
-
-    Not found by this service's own filters, which is the obvious way and the wrong one:
-    `configure_logging` installs those on *every* root handler, and under pytest there are five, as
-    `test_no_handler_escapes_the_filters` asserts. The pino formatter is what makes exactly one
-    handler the one the pod's log pipeline reads.
+    """Found by the formatter upstream puts on it, not by this service's own filters:
+    `configure_logging` installs those on *every* root handler, and under pytest there are five.
     """
     handlers = [
         handler
@@ -125,11 +107,8 @@ def _pino_handler() -> logging.Handler:
 
 @pytest.fixture
 def sink() -> Iterator[_Sink]:
-    """The real pino handler, writing where a test can read it.
-
-    `configure_logging` is idempotent and process-wide, and `create_app` calls it too, so this
-    restores the stream and the root level rather than the handler. Removing the handler would
-    leave a later `create_app` in this session with none to reinstall.
+    """Restores the stream rather than the handler: removing the handler would leave a later
+    `create_app` in this session with none to reinstall.
     """
     root = logging.getLogger()
     level = root.level
@@ -147,19 +126,15 @@ def sink() -> Iterator[_Sink]:
 
 
 def _log(message: str, *args: object, **extra: object) -> None:
-    """One line, from a logger this service has never heard of.
-
-    The filters are on the handler, so what redacts a line does not depend on which logger wrote
-    it, whether a vendor module, a framework, or a name invented later.
-    """
+    """From a logger this service has never heard of: the filters are on the handler, so what
+    redacts a line does not depend on which logger wrote it."""
     logging.getLogger("some.vendor.module").info(message, *args, extra=extra or None)
 
 
 class TestNothingSecretReachesTheLog:
-    """The first net is the field name, the second is the value's shape, and both are needed.
-
-    Every vector here is one the TypeScript reference redacts
-    (`packages/logger/src/options.ts:22-34`) or one this service reaches on its own.
+    """The first net is the field name, the second is the value's shape. Every vector here is one
+    the TypeScript reference redacts (`packages/logger/src/options.ts:22-34`) or one this service
+    reaches on its own.
     """
 
     def test_the_authorization_header_is_censored_by_name(self, sink: _Sink) -> None:
@@ -173,9 +148,8 @@ class TestNothingSecretReachesTheLog:
         ids=repr,
     )
     def test_no_spelling_of_a_key_name_gets_through(self, sink: _Sink, spelling: str) -> None:
-        """The reference lists four spellings of two header names as four redact paths. A fifth
-        spelling is what "bypassed by a differently-named key" means, so the name is matched with
-        its separators removed rather than compared to a list."""
+        """The reference lists four spellings of two header names as four redact paths; a fifth is
+        the bypass. So the name is matched with its separators removed, not against a list."""
         _log("inbound", headers={spelling: "opaque-key-value"})
 
         assert sink.one()["headers"] == {spelling: CENSORED}
@@ -216,9 +190,8 @@ class TestNothingSecretReachesTheLog:
     def test_a_bearer_token_in_a_value_is_censored_under_an_innocent_name(
         self, sink: _Sink
     ) -> None:
-        """The second net. A token reaches this service on every request, and the field it ends up
-        in is not always one a name check would suspect. An httpx exception's `repr` of the request
-        it failed to send is a string, and this is that string."""
+        """An httpx exception's `repr` of the request it failed to send is a string, and this is
+        that string."""
         _log("failed", detail=f"<Request headers={{'authorization': 'Bearer {_JWT}'}}>")
 
         assert CENSORED in cast("str", sink.one()["detail"])
@@ -267,8 +240,8 @@ class TestNothingSecretReachesTheLog:
         assert message == f"retrying with Bearer {CENSORED}", message
 
     def test_a_credential_in_a_query_string_is_censored(self, sink: _Sink) -> None:
-        """`req.query["api-key"]` in the reference. uvicorn's access line quotes the path with its
-        query string, so this is about a line this service now emits itself."""
+        """`req.query["api-key"]` in the reference; uvicorn's access line quotes the query
+        string."""
         _log('127.0.0.1:1 - "GET /mcp?api-key=opaque-value&page=2 HTTP/1.1" 200')
 
         message = cast("str", sink.one()["msg"])
@@ -303,8 +276,7 @@ class TestNothingSecretReachesTheLog:
         assert sink.one()["dsn"] == f"postgresql://{CENSORED}@db.internal:5432/office"
 
     def test_an_exception_stack_is_censored(self, sink: _Sink) -> None:
-        """The formatter serialises the whole chain into `err.stack`, so the whole chain is a
-        vector. The three keys it would have written are still the three keys here."""
+        """The formatter serialises the whole chain into `err.stack`, so the chain is a vector."""
         try:
             raise ConnectionRefusedError(
                 "could not connect to postgresql://office:hunter2@db.internal:5432/office"
@@ -380,9 +352,8 @@ class TestNothingSecretReachesTheLog:
         assert err["message"] == f"postgresql://{CENSORED}@db.internal:5432/office"
 
     def test_the_callers_own_dictionary_is_not_touched(self, sink: _Sink) -> None:
-        """Redaction rebuilds rather than edits. The caller is still holding these headers and
-        still going to send them, so censoring in place would corrupt the request the line is
-        about."""
+        """The caller is still going to send these headers, so censoring in place would corrupt
+        the request the line is about."""
         headers = {"Authorization": f"Bearer {_JWT}"}
 
         _log("sending", headers=headers)
@@ -402,9 +373,8 @@ class TestNothingSecretReachesTheLog:
         assert TRUNCATED in json.dumps(scope), "the cycle was passed through rather than cut"
 
     def test_the_filter_runs_before_the_formatter(self, sink: _Sink) -> None:
-        """Stated as its own assertion because everything above depends on it. `Handler.handle`
-        filters and only then emits, so the bytes the formatter produced are the proof: a filter
-        that ran after it would have censored nothing that reached this stream."""
+        """`Handler.handle` filters and only then emits, so the bytes the formatter produced are
+        the proof."""
         _log("outbound", authorization=f"Bearer {_JWT}")
 
         assert _JWT not in sink.stream.getvalue()
@@ -415,19 +385,16 @@ class TestNoLineLeavesByAnotherDoor:
 
     @pytest.mark.usefixtures("sink")
     def test_no_handler_escapes_the_filters(self) -> None:
-        """Every root handler, not only the pino one. A second handler is a second way out, and
-        redaction that covers one of two is redaction that does not hold."""
+        """A second handler is a second way out."""
         for handler in logging.getLogger().handlers:
             installed = {type(existing) for existing in handler.filters}
             assert RedactionFilter in installed, f"{handler} has no redaction filter"
 
     @pytest.mark.usefixtures("sink")
     def test_no_logger_keeps_its_own_way_out(self) -> None:
-        """A logger with handlers of its own and `propagate = False` bypasses both the formatter and
-        the filters. FastMCP configures itself that way at import time, which is why
-        `configure_logging` takes its logger back. This test catches the next dependency that does
-        the same. If it fails, add the logger to `_RECLAIMED_LOGGERS` after reading why it wanted
-        its own handler.
+        """A logger with handlers of its own and `propagate = False` bypasses both the formatter
+        and the filters. FastMCP configures itself that way at import time. If this fails, add the
+        logger to `_RECLAIMED_LOGGERS` after reading why it wanted its own handler.
         """
         registry = cast("Mapping[str, object]", logging.Logger.manager.loggerDict)
         escaping = [
@@ -452,8 +419,7 @@ class TestEveryLineIsJoinable:
     no span for the same reason (`services/teams-mcp/src/app.module.ts:73-79`)."""
 
     def test_a_line_with_no_span_and_no_request_still_carries_an_id(self, sink: _Sink) -> None:
-        """Startup, the tool-surface manifest, a readiness warning: no span, no request. The id is
-        this process's boot, which is what makes one pod's startup a group instead of a pile."""
+        """No span and no request: the id is this process's boot."""
         _log("starting")
 
         correlation = cast("str", sink.one()["correlation_id"])
@@ -483,8 +449,8 @@ class TestEveryLineIsJoinable:
     def test_a_readiness_line_joins_the_request_that_asked(
         self, sink: _Sink, app: Starlette
     ) -> None:
-        """The mechanism has to work outside any MCP call. `/ready` is a plain HTTP route, and with
-        tracing off there is no span on it either, so the id comes from the ASGI middleware."""
+        """`/ready` is a plain HTTP route and with tracing off has no span, so the id comes from
+        the ASGI middleware."""
         with TestClient(app) as client:
             sink.stream.truncate(0)
             _ = sink.stream.seek(0)
@@ -518,15 +484,11 @@ class TestEveryLineIsJoinable:
 
 
 class TestTheSdkLineThisServiceQuiets:
-    """The one line in a tool call that cannot carry the right trace id, and the guard on it."""
-
     def test_the_sdk_still_writes_the_line_this_service_matches(self) -> None:
-        """A drift guard, not a style check. Quieting is matched on the SDK's own message template,
-        so an SDK that renames it would leave this service quieting nothing and emitting a stale
-        trace id again, silently, because both halves keep working.
-
-        When this fails, re-read `mcp/server/lowlevel/server.py` and `src/office_mcp/logging.py`
-        together: either the template moved, or the line no longer runs before the request handler.
+        """Quieting is matched on the SDK's own message template, so an SDK that renamed it would
+        leave this service emitting a stale trace id again, silently. When this fails, re-read
+        `mcp/server/lowlevel/server.py` and `src/office_mcp/logging.py`: either the template moved,
+        or the line no longer runs before the request handler.
         """
         source = pathlib.Path(inspect.getfile(sdk_server)).read_text(encoding="utf-8")
 
@@ -546,7 +508,6 @@ class TestTheSdkLineThisServiceQuiets:
         )
 
     def test_only_that_line_is_dropped(self, sink: _Sink) -> None:
-        """The other lines that logger writes carry operational value and are not touched."""
         sdk = logging.getLogger(_SDK_LOGGER)
 
         sdk.info(_SDK_LINE, "CallToolRequest")
@@ -558,17 +519,14 @@ class TestTheSdkLineThisServiceQuiets:
 
 
 class TestOneLinePerMessageInTheRightTrace:
-    """The before and the after, over the transport the defect lives in.
-
-    A tool call driven over real HTTP, because the wrong trace id is a property of the per-session
-    asyncio task the streamable-HTTP transport starts during `initialize`: an in-process client has
-    no session task and would show nothing. See `src/office_mcp/tracing.py`.
+    """Driven over real HTTP: the wrong trace id is a property of the per-session asyncio task the
+    streamable-HTTP transport starts during `initialize`, and an in-process client has no session
+    task. See `src/office_mcp/tracing.py`.
     """
 
     def test_the_sdk_line_carries_the_initialize_requests_trace(
         self, unquieted_lines: Sequence[Mapping[str, object]]
     ) -> None:
-        """The defect itself, with the filter removed. This is what the pod logged before."""
         stale = [
             line
             for line in unquieted_lines
@@ -599,8 +557,8 @@ class TestOneLinePerMessageInTheRightTrace:
     def test_the_replacement_says_more_than_the_line_it_replaces(
         self, lines: Sequence[Mapping[str, object]]
     ) -> None:
-        """Quieting is only allowed because nothing is lost: the SDK said the request *type*, this
-        says the JSON-RPC method, the MCP request id and the transport's session id."""
+        """Nothing is lost: the SDK said the request *type*, this says the JSON-RPC method, the MCP
+        request id and the transport's session id."""
         replacement = next(line for line in lines if line.get("mcp_method") == "tools/call")
 
         assert replacement["mcp_method"] == "tools/call"
@@ -610,12 +568,8 @@ class TestOneLinePerMessageInTheRightTrace:
     def test_no_line_about_the_tool_call_is_in_the_initialize_trace(
         self, lines: Sequence[Mapping[str, object]]
     ) -> None:
-        """Stated over every line rather than over the one that used to be wrong.
-
-        The first assertion guards the second: `initialize` really did run under its own
-        traceparent, so this is the trace lines used to be swept into and not an id nothing
-        mentioned.
-        """
+        """The first assertion guards the second: `initialize` really did run under its own
+        traceparent, so this is the trace lines used to be swept into."""
         assert any(line.get("trace_id") == _INITIALIZE_TRACE for line in lines), (
             "initialize's traceparent never reached a log line, so this test proves nothing"
         )
@@ -637,12 +591,10 @@ class TestOneLinePerMessageInTheRightTrace:
 
 
 class TestABootedServerHonoursTheLogContract:
-    """A real process, both streams captured. Nothing here is stubbed.
-
-    The chart labels the pod `logging.unique.app/format: pino-json` and the pipeline reads stderr,
-    so a plain-text line, or any line at all on stdout, is a line that is lost. Left to its default,
-    uvicorn applies its own `dictConfig` after this service configured logging and writes its access
-    lines to stdout in plain text. `main.py` passes `log_config=None` to stop that.
+    """The chart labels the pod `logging.unique.app/format: pino-json` and the pipeline reads
+    stderr, so a plain-text line, or any line at all on stdout, is lost. Left to its default,
+    uvicorn applies its own `dictConfig` after this service configured logging and writes access
+    lines to stdout in plain text; `main.py` passes `log_config=None` to stop that.
     """
 
     def test_nothing_is_written_to_stdout(self, booted: "_BootedServer") -> None:
@@ -660,7 +612,6 @@ class TestABootedServerHonoursTheLogContract:
         assert "uvicorn.error" in contexts, sorted(cast("set[str]", contexts))
 
     def test_the_access_line_is_in_it(self, booted: "_BootedServer") -> None:
-        """The line that used to be plain text on stdout."""
         access = [line for line in booted.lines if line["context"] == "uvicorn.access"]
 
         assert access, "no access line was logged as pino-json"
@@ -669,8 +620,7 @@ class TestABootedServerHonoursTheLogContract:
         ]
 
     def test_the_access_line_carries_no_credential(self, booted: "_BootedServer") -> None:
-        """uvicorn quotes the path with its query string, and this service asked for one with a
-        secret in it. End to end: the filter is on the handler uvicorn now propagates to."""
+        """End to end: the filter is on the handler uvicorn now propagates to."""
         assert "opaque-query-secret" not in booted.stderr
         assert any(f"api-key={CENSORED}" in cast("str", line["msg"]) for line in booted.lines), [
             line["msg"] for line in booted.lines
@@ -678,7 +628,7 @@ class TestABootedServerHonoursTheLogContract:
 
     def test_the_probes_own_access_line_is_still_quiet(self, booted: "_BootedServer") -> None:
         """`unique_mcp` drops access lines for the ops routes, and routing uvicorn through the root
-        handler is what keeps that filter in the path."""
+        handler keeps that filter in the path."""
         assert not [
             line
             for line in booted.lines
@@ -690,14 +640,9 @@ class TestABootedServerHonoursTheLogContract:
             assert line.get("correlation_id"), line
 
 
-# ------------------------------------------------------------------------------------------------
-# Fixtures and helpers
-# ------------------------------------------------------------------------------------------------
-
-
 def _install_tracer_provider() -> None:
-    """Make span contexts valid. The tracer provider is process-wide and can be set only once, so
-    this reuses whichever provider is in play, the same shape `test_tracing.py` uses."""
+    """The tracer provider is process-wide and can be set only once, so this reuses whichever
+    provider is in play, the same shape `test_tracing.py` uses."""
     if not isinstance(trace.get_tracer_provider(), TracerProvider):
         trace.set_tracer_provider(TracerProvider())
 
@@ -731,16 +676,8 @@ def _is_the_sdk_line(statement: ast.stmt) -> bool:
 
 @pytest.fixture(autouse=True)
 def entra(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Accept any bearer token and refuse the On-Behalf-Of exchange.
-
-    Autouse because a fixture that only patches is nothing a test would otherwise name, and every
-    request in this file that reaches `/mcp` is authenticated.
-
-    The token check is stubbed so the transport can be driven without an Entra round trip, and
-    reusing one session across two requests is the condition the defect lives in. The exchange is
-    refused rather than stubbed because a tool call must not reach the network, and a refused
-    exchange still produces the whole set of log lines: the message line, the operations layer's
-    failure line, and the cause chain under it.
+    """The exchange is refused rather than stubbed: a tool call must not reach the network, and a
+    refused exchange still produces the whole set of log lines.
     """
 
     async def verify_token(_self: AzureProvider, token: str) -> AccessToken:
@@ -756,7 +693,7 @@ def entra(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def app() -> Starlette:
-    """The real app. Nothing here reaches Postgres, so the URL only has to parse."""
+    """Nothing here reaches Postgres, so the URL only has to parse."""
     return create_app(
         config=AppConfig.model_validate({"public_base_url": _PUBLIC_BASE_URL}),
         database_config=DatabaseConfig.model_validate(
@@ -868,11 +805,8 @@ def _free_port() -> int:
 
 @pytest.fixture(scope="module")
 def booted(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_BootedServer]:
-    """`python -m office_mcp.main`, really booted, with both streams captured.
-
-    Run from an empty directory, because `main.py` calls `load_dotenv()` and a developer's `.env`
-    would otherwise decide this test's configuration. Postgres is never reached: the ops routes and
-    a 404 need no database.
+    """Run from an empty directory, because `main.py` calls `load_dotenv()` and a developer's
+    `.env` would otherwise decide this test's configuration.
     """
     port = _free_port()
     source_root = pathlib.Path(__file__).parent.parent / "src"
@@ -901,7 +835,6 @@ def booted(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_BootedServer]:
     try:
         base = f"http://127.0.0.1:{port}"
         _wait_until_up(server, f"{base}/probe")
-        # One quieted ops route, one route that answers 404, and a credential in a query string.
         _ = httpx.get(f"{base}/probe", timeout=5)
         _ = httpx.get(f"{base}/nope?api-key=opaque-query-secret", timeout=5)
     finally:

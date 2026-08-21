@@ -1,51 +1,14 @@
 """What must not disagree, and nothing else.
 
-Every tool in `tools/` is a file of its own: its name, its description, its Graph permissions, its
-arguments, its answer shape, its Graph request and its own error wording all in one place, so that
-adding the eleventh tool is adding one file and reading the tenth is reading one file. That is the
-whole point, and it has exactly one cost: two files are free to disagree. This package is the list
-of things they must not. Each module below says why its own contents are the shape they are.
+Every tool in `tools/` is a file of its own, and the one cost of that is that two files are free to
+disagree. A thing belongs here when two tools would otherwise each need their own copy of it *and* a
+difference between the copies would be a bug a caller could see. Anything one tool could own — a
+description, an argument, an answer shape only it returns, a Graph request only it makes, a refusal
+only it can explain — stays in that tool, or this package becomes the tool-declaration module the
+tool files exist instead of.
 
-A thing belongs here when two tools would otherwise each need their own copy of it *and* a
-difference between the copies would be a bug a caller could see:
-
-* `handles.py`, the `teams:///` grammar. A handle minted by one tool and read by another is readable
-  only while there is one definition of it. Two spellers would not look like a disagreement. They
-  would look like a handle one tool produced and another answers 404 to. The reply shape is the
-  clearest case: only `browse_channel` can mint one, only `read_message` resolves it, and neither of
-  them spells it.
-* `messages.py`, what a Teams message is. A message browsed in a channel and the same message read
-  by handle are the same type, normalised by the same function, or the two tools answer differently
-  about the same message. The sender is where Graph's projections visibly differ: a search hit
-  carries a mailbox-shaped `emailAddress`, and a Teams read carries a `teamworkUserIdentity` with no
-  email property at all. The Teams HTML a body arrives as is what nothing above here should ever
-  see. It also holds `MAX_REPLIES_PER_POST`, the window on a channel thread: `browse_channel`
-  applies it, and `search_messages` and `read_message` both have to describe it to explain why a
-  reply a search found may have no handle that reads.
-* `meetings.py`, how a meeting is reached, which occurrence was asked about, and how far "newest
-  first" is true. `list_meeting_transcripts` and `list_meeting_recordings` ask about the same
-  meeting with the same handle over the same window, so "newest first" and "this absence is settled"
-  are promises the two would keep differently if each made its own. `read_transcript` takes one name
-  from here without touching the rest. That one name is what the split was for: the permission a
-  transcript resource costs is the resource's rather than one tool's request's, so it is spelled
-  where neither of the two tools that name it owns it.
-* `identity.py`, who the signed-in user is. `get_me` reports it, `list_meeting_recordings` compares
-  a recording's organiser against it, and it is the fact every other answer on this connector is
-  correlated against, so a second `GET /me` under a different projection would be a second answer to
-  one question.
-* `seam.py`, how a tool is attached to the outside: the On-Behalf-Of token it calls under and the
-  advice a Graph refusal becomes. A model reads every refusal on this server as one voice, so the
-  wording cannot be per tool.
-
-What does *not* belong here is anything one tool could own: a description, an argument, an answer
-shape only that tool returns, a Graph request only that tool makes, or a refusal only that tool can
-explain. Moving one of those in is how this package becomes the tool-declaration module the tool
-files exist instead of.
-
-This is vocabulary rather than a layer, so it publishes no `__all__`. Its *modules* are
-the units, and every consumer names the one it depends on at the import line. An `__init__`
-re-exporting the lot would hide the one thing the package exists to show, that two tools depend on
-the same thing.
+No `__all__`: the *modules* are the units, and every consumer names the one it depends on at the
+import line, which is the one thing this package exists to show.
 
 Layering: nothing here imports `tools/`, and `seam.py` alone imports FastMCP. See
 `tests/test_layering.py`, whose first rule is exactly that.

@@ -1,14 +1,4 @@
-"""`get_me`: the five properties it promises, and the two of them a caller must not confuse.
-
-`email` and `user_principal_name` are separate fields because they are separate values. A guest or
-unlicensed account has a null `mail` and is identified by its sign-in name instead, so a caller that
-reads one for the other matches nobody. The projection is asserted here because these five are what
-this tool publishes: `shared/identity.py` makes the Graph call, and its only other caller,
-`list_meeting_recordings`, reads nothing off it but the id.
-
-Every payload is synthesised: the ids are fake, the domains are `.invalid`, and the names are from
-the public domain.
-"""
+"""`get_me`: the five properties it publishes, over `shared/identity.py`'s Graph call."""
 
 import httpx
 import pytest

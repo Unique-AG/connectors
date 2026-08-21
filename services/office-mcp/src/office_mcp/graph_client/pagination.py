@@ -1,46 +1,25 @@
-"""Paging via `@odata.nextLink` with safety guards from teams-mcp experience.
+"""Paging via `@odata.nextLink`, walked by hand rather than by `PageIterator.iterate`.
 
-Graph pages using `@odata.nextLink` as the cursor, replayed verbatim and never decomposed. The
-SDK's `PageIterator` fetches and deserialises. This module walks with three lessons.
+TRAP: the SDK breaks Graph's paging contract in one line. Graph's rule is to keep following
+`@odata.nextLink` until it stops coming, empty pages included
+(https://learn.microsoft.com/en-us/graph/paging), but `page_iterator.py:232-233` makes `enumerate`
+return False for a page with no items and `iterate` reads that as the end of the collection. Grep
+that line on the next SDK bump.
 
-Scan cap: where items are filtered after they are fetched (channel messages are mostly joins),
-"give me 20 items" can walk an entire channel history one page at a time. The cap has to bound what
-was looked at, not only what was kept.
+Not hypothetical: a live known issue has `getAllRecordings` and `getAllTranscripts` — behind
+`list_meeting_recordings` and `list_meeting_transcripts` — reset their pagination token mid-walk
+and answer 200 with an empty collection and an `@odata.nextLink`
+(https://learn.microsoft.com/en-us/graph/known-issues, "Teamwork and communications"). Its expected
+end date of 2026-08-31 dates that incident, not this guard.
 
-Empty pages: Graph's paging contract is that "a page of results might contain zero or more results"
-and that a caller keeps calling with the `@odata.nextLink` of each response "until the
-`@odata.nextLink` property is no longer returned"
-(https://learn.microsoft.com/en-us/graph/paging). The SDK breaks that contract in one line.
-`page_iterator.py:232-233` makes `enumerate` return False for a page with no items, and `iterate`
-reads that as the end of the collection, so a short window comes back as "that's all" instead of
-truthfully saying "window stopped at cap". Grep that line on the next SDK bump. This module's loop
-follows the link instead.
+TRAP: a channel's messages are deliberately not walked here, though they are what the scan cap was
+written against. Graph's throttling limit there is per *app* per tenant on a given channel, so even
+a capped walk spends a budget belonging to every other user of this connector; `browse_channel`
+makes one request, uses `$top` as its window, and never comes here.
 
-Not hypothetical. A live known issue has `getAllRecordings` and `getAllTranscripts`, the
-endpoints behind `list_meeting_recordings` and `list_meeting_transcripts`, reset their pagination
-token mid-walk and answer "a `200 OK` response with an empty collection and an `@odata.nextLink`",
-with Microsoft's own workaround being to "continue following `@odata.nextLink` even when the
-collection is empty" (https://learn.microsoft.com/en-us/graph/known-issues, "Teamwork and
-communications"). Its expected end date of 2026-08-31 dates that incident, not this guard: the
-paging contract carries no end date.
-
-The same body on the *first* page takes a different SDK path: `PageIterator.__init__` runs the
-caller's response through `convert_to_page`, which raises a bare `ValueError` for `value: null`
-(`page_iterator.py:180-181`). See `_readable_first_page`.
-
-Empty run bound: following empty pages needs a bound of its own. `MAX_EMPTY_PAGES` is that bound,
-counted per run and never pooled with the item budget.
-
-A channel's messages are deliberately not walked here, and they are the collection the scan cap
-was written against. Graph's throttling limit there is per *app* per tenant on a given channel, so
-even a capped walk spends a budget that belongs to every other user of this connector.
-`browse_channel` therefore makes one request, uses `$top` as its window, and never comes here. The
-cap is for collections whose cost is the caller's own.
-
-Headers do not travel with the cursor. `PageIterator` starts with an empty header collection and
-stamps it onto every next-page request. A header the caller's own first request needed, say
-`Prefer: include-unknown-enum-members`, reaches page two only if the walk is given it too. Without
-the header, page one answers in one shape and page two in another.
+TRAP: headers do not travel with the cursor. `PageIterator` starts with an empty header collection,
+so a header the caller's first request needed — say `Prefer: include-unknown-enum-members` — reaches
+page two only if the walk is given it too, and without it the two pages answer in different shapes.
 
 Search paging is not handled: `POST /search/query` uses from-and-size offsets, not cursors.
 """
@@ -61,9 +40,6 @@ from office_mcp.graph_client.observability import current_graph_operation, recor
 
 
 class GraphCollection[T](Protocol):
-    """Structural type for Graph collection responses, taking its element type from the caller's
-    own response."""
-
     @property
     def value(self) -> list[T] | None: ...
 
@@ -72,50 +48,28 @@ class GraphCollection[T](Protocol):
 
 
 class _WritableCollection[T](Protocol):
-    """A collection response seen as writable. Used on this module's own shallow copy of one, and
-    never on anything a caller passed in — which is why `GraphCollection` above stays read-only."""
+    """Only ever this module's own shallow copy, never a caller's response."""
 
     value: list[T] | None
 
 
-# How many items may be looked at to satisfy one request, however few of them are kept. A safety
-# valve on request count, not a tuning knob: a caller that needs more than this from a filtered
-# collection is asking the wrong endpoint (use search). A caller with a smaller collection and a
-# tighter budget passes its own `max_scanned`.
+# Items that may be looked at to satisfy one request, however few are kept. A safety valve, not a
+# tuning knob: a caller needing more than this from a filtered collection wants search instead.
 MAX_SCANNED_ITEMS = 1000
 
-# How many pages carrying nothing at all, one after another, one walk will follow before it gives
-# up on the collection. Counted per run, and counted on its own. Both of those are what make the
-# number mean what it says:
+# Consecutive pages carrying nothing that a walk will follow before giving up: an endlessly empty
+# collection costs 11 requests.
 #
-# * **Its own count, not the request budget's.** This used to be half of one pooled number
-#   (`max_scanned + MAX_EMPTY_PAGES + 1` requests for the whole walk), defended as "pages carrying
-#   items can only spend `max_scanned` of it, so this bounds the rest". That defence is wrong in the
-#   case it exists for: a collection answering nothing but empty pages spends *no* scan budget, so
-#   the entire pool went to empty pages. A measured 1010 of them on `list_chats` before the walk
-#   gave up, two orders of magnitude past what this constant said. A thousand sequential Graph
-#   requests take minutes and would trip throttling long before the end, so empty pages are counted
-#   against this and nothing else: an endlessly empty collection now costs 11 requests.
-# * **Per run, not per walk.** Graph does answer the odd empty page in the middle of a collection
-#   that is otherwise fine. `[3 items, nothing, 1 item]` is the shape this walk exists for. A
-#   per-walk total would give up on a large collection that sprinkles a few of them, even though
-#   the walk is making progress. A page that carries an item is progress and starts the count
-#   again. A *run* of nothing means Graph will not end this collection, and an unending collection
-#   is the thing worth refusing.
+# TRAP for anyone tempted to pool this with `max_scanned`: a collection answering nothing but empty
+# pages spends *no* scan budget, so the whole pool goes to empty pages — a measured 1010 of them on
+# `list_chats` when the budgets were shared.
 #
-# The walk is bounded either way: every page it follows either carried an item, and at most
-# `max_scanned` items may be looked at, or extended a run at most this long. The arithmetic worst
-# case is `max_scanned` runs of this length, which Graph does not send but which is not small. No
-# smaller total is available without giving up on a collection that is making progress.
+# Per run, not per walk: `[3 items, nothing, 1 item]` is a shape Graph really sends, so a page
+# carrying an item restarts the count and only an unbroken run means Graph will not end this
+# collection.
 #
-# `collect_pages` refuses a collection that exhausts this rather than returning what it has, because
-# an answer cut short for that reason would be indistinguishable from one cut short by a cap and
-# would mean something entirely different. The honesty the tools above are built on is that a short
-# answer means a cap. The refusal is a `raise` and not an `assert`. Graph misbehaving is the system
-# boundary this package's exceptions are for, and `python -O` strips assertions, so a bound written
-# as one leaves this walk following an endless collection with nothing to stop it.
-# `test_the_bound_still_stops_the_walk_under_python_O` re-runs the empty-page test in a child
-# interpreter started with `-O`.
+# A `raise` and not an `assert`, because `python -O` strips assertions and this bound is all that
+# stops the walk. `test_the_bound_still_stops_the_walk_under_python_O` re-runs it under `-O`.
 MAX_EMPTY_PAGES = 10
 
 
@@ -123,13 +77,9 @@ MAX_EMPTY_PAGES = 10
 class CollectedItems[T]:
     """Up to `limit` items, and whether a cap stopped the walk with more still on offer.
 
-    `capped` means "may be incomplete", not "was incomplete": it is true when a cap stopped the walk
-    while a `@odata.nextLink` or an unread part of a page remained, and Graph's paging gives no way
-    to know whether what was left holds anything the filter would have kept.
-
-    It cannot mean anything other than a cap. An empty page carrying a next link is walked through
-    rather than believed, and a walk that gives up on a collection Graph will not end raises instead
-    of returning.
+    TRAP: `capped` means "may be incomplete", not "was incomplete" — Graph's paging gives no way to
+    know whether what was left holds anything the filter would have kept. It cannot mean anything
+    other than a cap: a walk that gives up on a collection Graph will not end raises instead.
     """
 
     items: list[T]
@@ -147,20 +97,13 @@ async def collect_pages[T](
 ) -> CollectedItems[T]:
     """Walk `first_page` and its successors, keeping matching items up to `limit`.
 
-    The SDK deserialises every page with `type(first_page)`, so the item a page hands back is always
-    what the caller's own collection response declared it holds. The cast to `T` names that
-    guarantee rather than creating it.
-
-    `headers` go on every page this walk fetches. The caller sets them on its own first request and
-    passes the same collection here, because the walk's requests are the caller's request continued
-    and Graph answers a page for the header it was asked under.
+    The SDK deserialises every page with `type(first_page)`, so the cast to `T` names a guarantee
+    rather than creating one. `headers` must be the collection the caller set on its first request.
     """
     items: list[T] = []
     scanned = 0
     capped = False
-    # The caller's own first request counts: it is the first page this walk read, and the histogram
-    # is about what one call cost Graph. The operation it is counted under comes from the
-    # `graph_errors` block this walk runs inside. See `observability.py`.
+    # The caller's own first request counts: it is the first page this walk read.
     pages = 1
 
     def visit(item: Parsable) -> bool:
@@ -173,16 +116,15 @@ async def collect_pages[T](
         return not capped
 
     # The SDK leaves `RequestAdapter`'s own type parameter unbound, so `client.request_adapter`
-    # reads as unknown-typed. Taking `client` here confines that to this one line instead of
-    # every call site.
+    # reads as unknown-typed. Taking `client` confines that here instead of to every call site.
     iterator = PageIterator(
         _readable_first_page(first_page),
         client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
         error_mapping={"XXX": ODataError},
     )
     empty_pages_in_a_row = 0
-    # The count is recorded on the way out however the walk ended: the walk worth seeing on a
-    # dashboard is the one that read fifty pages before giving up, and that one leaves by a raise.
+    # Recorded on the way out however the walk ended: the walk worth seeing on a dashboard is the
+    # one that read fifty pages before giving up, and that one leaves by a raise.
     try:
         while True:
             looked_at_before = scanned
@@ -199,14 +141,12 @@ async def collect_pages[T](
                     + f"({scanned} items looked at, {len(items)} kept)",
                     empty_pages=empty_pages_in_a_row,
                 )
-            # Counted before the request rather than after it: a walk that gave up on its Nth page
-            # spent N requests, and the one that failed is the page a dashboard came here to see.
+            # Counted before the request: a walk that gave up on its Nth page spent N requests.
             pages += 1
             iterator.headers = _headers_for_one_page(headers)
             page = await iterator.next()
             # Unreachable, and kept for what it narrows: `next()` answers None only for a page with
-            # no next link, which the check above already returned on. Every other path builds a
-            # `PageResult`, and this is what says so to the SDK's `Optional` return.
+            # no next link, which the check above already returned on.
             assert page is not None, "Graph advertised a next link and then had no next page"
             # `iterate` also resets `pause_index` here and this walk never needs that: `enumerate`
             # sets it only where `visit` asked to stop, which is `capped`, and `capped` returned.
@@ -218,21 +158,18 @@ async def collect_pages[T](
 def _readable_first_page[T](page: GraphCollection[T]) -> GraphCollection[T]:
     """`page`, or a stand-in for it carrying an empty list where its `value` was null.
 
-    `PageIterator.__init__` runs the response through `convert_to_page`, which raises a bare
-    `ValueError` for `value: null` (`page_iterator.py:180-181`). Nothing classifies that error:
-    `graph_errors` knows `APIError`, `httpx.TransportError` and `GraphFailure`, so it would reach a
-    tool with no remedy, counted under the status meaning "an exception this seam cannot describe".
-    Every *later* page with the same body is read as an empty page and walked through correctly, so
-    page one is made to look like the rest.
+    TRAP: `PageIterator.__init__` runs the response through `convert_to_page`, which raises a bare
+    `ValueError` for `value: null` (`page_iterator.py:180-181`) that nothing here classifies. Every
+    *later* page with the same body is read as an empty page and walked through correctly, so page
+    one is made to look like the rest.
 
-    The copy is shallow and the caller's own response is left as it was. `PageIterator` deserialises
-    every successor with `type()` of what it is handed, which the copy preserves.
+    The copy is shallow, leaving the caller's response as it was, and preserves the `type()`
+    `PageIterator` deserialises every successor with.
     """
     if page.value is not None:
         return page
     stand_in: GraphCollection[T] = copy(page)
-    # Through `object` because the two protocols deliberately do not overlap: one of them is what a
-    # caller hands over, and the other is only ever this module's own copy of it.
+    # Through `object` because the two protocols deliberately do not overlap.
     writable = cast(_WritableCollection[T], cast(object, stand_in))
     writable.value = []
     return stand_in
@@ -264,7 +201,6 @@ def _headers_for_one_page(headers: HeadersCollection | None) -> HeadersCollectio
 
 
 def _more_was_on_offer(iterator: PageIterator) -> bool:
-    """True if the page has unread items or a next link, so more was there when the walk stopped."""
     page = iterator.current_page
     unread_in_page = iterator.pause_index < len(page.value or [])
     return unread_in_page or bool(page.odata_next_link)

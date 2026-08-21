@@ -1,7 +1,6 @@
-"""Query who the signed-in user is.
+"""Who the signed-in user is: the fact every other answer here is correlated against.
 
-This is the fact every other tool answer is correlated against. A meeting organiser can have a null
-display name in Graph, so a caller matches the organiser by Entra object id instead.
+A meeting organiser can have a null display name in Graph, so a caller matches on Entra object id.
 """
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -14,9 +13,8 @@ from office_mcp.graph_client import graph_step
 # User.Read is the least-privileged delegated permission for /me. It needs no admin consent.
 GRAPH_PERMISSION = "User.Read"
 
-# What this module's one Graph call is counted as. Declared here rather than by the tools, because
-# this module owns the call: `get_me` and `list_meeting_recordings` both reach it, and a step named
-# by each of them would be the same request under two names.
+# `get_me` and `list_meeting_recordings` both reach this call, and a step named by each of them
+# would be the same request under two names.
 STEP = "signed_in_user"
 
 # /me returns 11 properties by default. This selects only the five get_me promises.
@@ -26,12 +24,8 @@ type _MeQuery = UserItemRequestBuilder.UserItemRequestBuilderGetQueryParameters
 
 
 async def signed_in_user(client: GraphServiceClient) -> User:
-    """Get the signed-in user from Graph, projected onto the promised properties.
-
-    Returns Graph's own `User` type rather than a shape of our own: `get_me` wants a profile to
-    report and `list_meeting_recordings` wants only an id to compare, and one custom type could not
-    serve both.
-    """
+    """The signed-in user, projected onto `PROFILE`. Graph's own `User` rather than a shape of our
+    own, which could not serve both a profile to report and an id to compare."""
     configuration = RequestConfiguration[_MeQuery](
         query_parameters=UserItemRequestBuilder.UserItemRequestBuilderGetQueryParameters(
             select=PROFILE

@@ -14,11 +14,7 @@ from .conftest import CALLER_TOKEN, GRAPH_V1, RecordedSleeps
 
 
 def _handler_chain(transport: httpx.AsyncClient) -> list[str]:
-    """The class names of the middleware a transport will run, in order.
-
-    Reaches through the SDK's private attributes because there is no public way to see an assembled
-    pipeline, and the assembled pipeline is the thing worth seeing here.
-    """
+    """Reaches through private attributes: the SDK exposes no assembled pipeline."""
     handler: object = transport._transport  # pyright: ignore[reportPrivateUsage]
     handler = getattr(getattr(handler, "pipeline", None), "_first_middleware", None)
     names: list[str] = []
@@ -43,24 +39,16 @@ class TestTheCallersTokenIsWhatCalls:
         assert route.calls.last.request.headers["authorization"] == f"Bearer {CALLER_TOKEN}"
 
     async def test_nothing_else_is_given_the_token(self) -> None:
-        """A `@odata.nextLink` pointing off Graph must not be handed the token.
-
-        The SDK's bearer provider never consults the allowed-hosts validator itself, so this is
-        the only thing standing between a follow-up page URL that arrived inside a response body
-        and a user's delegated credential.
-        """
+        """The SDK's bearer provider never consults the allowed-hosts validator itself, so this is
+        all that stands between an off-Graph `@odata.nextLink` and a user's delegated credential."""
         provider = _CallerTokenProvider(CALLER_TOKEN)
 
         assert await provider.get_authorization_token("https://graph.microsoft.com/v1.0/me")
         assert await provider.get_authorization_token("https://example.invalid/v1.0/me") == ""
 
     async def test_the_right_host_over_the_wrong_scheme_is_given_nothing_either(self) -> None:
-        """`AllowedHostsValidator` compares the hostname and nothing else.
-
-        So the host check on its own hands the delegated token to `http://graph.microsoft.com/...`,
-        in cleartext, and to anything else spelling that same host. Each of these passes the
-        validator, which is why each is asserted.
-        """
+        """`AllowedHostsValidator` compares the hostname and nothing else, so a host check alone
+        hands the delegated token to `http://graph.microsoft.com/...` in cleartext."""
         provider = _CallerTokenProvider(CALLER_TOKEN)
 
         assert await provider.get_authorization_token("http://graph.microsoft.com/v1.0/me") == ""
@@ -72,14 +60,10 @@ class TestTheGraphBaseUrlIsSetInOnePlace:
     async def test_no_empty_path_segment_reaches_the_wire(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`https://graph.microsoft.com/v1.0//me` is what a second base_url produces.
-
-        httpx normalises a base_url it is given to end with a slash, `HttpxRequestAdapter` copies
-        the transport's verbatim, and the SDK's URL templates then join their own leading slash
-        onto it. Graph tolerates the empty segment, so nothing here would fail loudly. respx
-        happens to refuse to match the malformed URL, which is incidental and not something to
-        rest on. Asserted on the built URL directly instead.
-        """
+        """A second base_url produces `https://graph.microsoft.com/v1.0//me`: httpx normalises a
+        base_url to end with a slash, `HttpxRequestAdapter` copies the transport's verbatim, and the
+        SDK's URL templates join their own leading slash onto it. Graph tolerates the empty
+        segment, so nothing fails loudly — hence the assertion on the built URL."""
         route = graph.get("/me").mock(return_value=httpx.Response(200, json={"id": "u-1"}))
 
         _ = await client.me.get()
@@ -89,14 +73,9 @@ class TestTheGraphBaseUrlIsSetInOnePlace:
     async def test_the_adapter_holds_it_and_the_transport_does_not(
         self, transport: httpx.AsyncClient, client: GraphServiceClient
     ) -> None:
-        """The invariant behind the test above, at the two places the value can live.
-
-        Both halves are the assertion: an unset transport base_url is what lets the adapter emit
-        an absolute URL that httpx never joins anything onto, and an adapter base_url without a
-        trailing slash is what keeps the join clean if it ever does.
-        """
-        # The ignore is for the SDK leaving `request_adapter`'s generic parameter unbound on the
-        # client. `base_url` on it is annotated `str`.
+        """An unset transport base_url is what lets the adapter emit an absolute URL httpx never
+        joins onto; the adapter's missing trailing slash keeps the join clean if it ever does."""
+        # The ignore is for the SDK leaving `request_adapter`'s generic parameter unbound.
         base_url: str = client.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
 
         assert str(transport.base_url) == ""
@@ -111,13 +90,8 @@ class TestThrottling:
         graph: respx.MockRouter,
         retry_sleeps: RecordedSleeps,
     ) -> None:
-        """Graph's throttling contract, which the SDK's own retry middleware implements.
-
-        Asserted here because the transport is built with a custom `httpx.AsyncClient`, and the
-        factory does not install any middleware on a client it is handed unless asked. Losing the
-        retry handler is a one-line mistake whose only symptom is intermittent 429s reaching
-        tools.
-        """
+        """The factory installs no middleware on a client it is handed unless asked, and losing
+        the retry handler shows up only as intermittent 429s reaching tools."""
         graph.get("/me").mock(
             side_effect=[
                 httpx.Response(429, headers={"Retry-After": "7"}),
@@ -133,15 +107,9 @@ class TestThrottling:
 
 class TestTheTransportRunsTheSdksOwnPipeline:
     async def test_it_is_the_sdks_default_chain_with_the_url_replacer_quietened(self) -> None:
-        """A tripwire for the one thing `_graph_middleware` cannot get from the SDK.
-
-        That function inlines `GraphClientFactory.create_with_default_middleware`, because the
-        factory builds the handler list and loads it onto the client in one step and leaves no seam
-        to swap a handler into. The cost is that a handler the SDK adds to its own list in a later
-        version would quietly not be installed, and nothing about a missing redirect or user-agent
-        handler announces itself. So the SDK's own client is built beside ours and the two chains
-        are compared.
-        """
+        """`_graph_middleware` inlines `GraphClientFactory.create_with_default_middleware`, which
+        builds and loads the handler list in one step with no seam to swap a handler into. The cost
+        is that a handler the SDK adds in a later version would quietly not be installed."""
         options: dict[str, RequestOption] = {**sdk_middleware_options}
         sdk = GraphClientFactory.create_with_default_middleware(
             client=httpx.AsyncClient(), options=options

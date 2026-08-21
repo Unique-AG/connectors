@@ -1,13 +1,9 @@
 """Every MCP message's span belongs to the trace of the request that carried it.
 
-Driven over real HTTP, because the defect `office_mcp.tracing` exists to fix cannot be reproduced
-any other way: it is a property of the per-session asyncio task the streamable-HTTP transport starts
-during `initialize` and reuses for every later message. An in-process client has no session task and
-no HTTP request, so it would pass with the fix deleted.
-
-Each request here carries a *different* `traceparent`, which is the whole experiment. Without the
-two middlewares, the `tools/list` span lands in the `initialize` request's trace and the
-`tools/list` request's own HTTP span sits alone in a trace with no MCP span in it.
+Driven over real HTTP: the defect is a property of the per-session asyncio task the streamable-HTTP
+transport starts during `initialize` and reuses for every later message, and an in-process client
+has no session task, so it would pass with the fix deleted. Each request carries a *different*
+`traceparent`, which is the whole experiment.
 """
 
 from collections.abc import Iterator, Mapping, Sequence
@@ -31,14 +27,11 @@ from office_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceCon
 
 _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
-# Two traces, one per request, written out so an assertion can name which one a span landed in.
 _INITIALIZE_TRACE = "aa1111111111111111111111111111aa"
 _TOOLS_LIST_TRACE = "bb2222222222222222222222222222bb"
 _INITIALIZE_TRACEPARENT = f"00-{_INITIALIZE_TRACE}-1111111111111111-01"
 _TOOLS_LIST_TRACEPARENT = f"00-{_TOOLS_LIST_TRACE}-2222222222222222-01"
 
-# The span the FastMCP middleware chain opens for a `tools/list` message, and the server span
-# `OpenTelemetryMiddleware` opens for the request that carried it.
 _MESSAGE_SPAN = "tools/list"
 _REQUEST_SPAN = "POST /mcp"
 
@@ -88,15 +81,9 @@ def _trace_ids(spans: Sequence[ReadableSpan], name: str) -> set[str]:
 
 @pytest.fixture(autouse=True)
 def entra(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Accept any bearer token, so the transport can be driven without an Entra round trip.
-
-    Autouse because every request in this file goes to `/mcp`, which is authenticated, and a fixture
-    that only patches is nothing a test would otherwise name.
-
-    Only the token check is stubbed. The session-owner check inside the transport still runs against
-    what this returns, which is what lets a second request reuse the session the first one created.
-    Reusing that session is the condition the defect lives in.
-    """
+    """Only the token check is stubbed. The transport's session-owner check still runs against what
+    this returns, which is what lets a second request reuse the first request's session — and
+    reusing that session is the condition the defect lives in."""
 
     async def verify_token(_self: AzureProvider, token: str) -> AccessToken:
         return AccessToken(token=token, client_id=_CLIENT_ID, scopes=["access_as_user"])
@@ -125,11 +112,8 @@ def app() -> Starlette:
 
 @pytest.fixture
 def exporter() -> Iterator[InMemorySpanExporter]:
-    """An in-memory exporter on the process's tracer provider.
-
-    The tracer provider is process-wide and can be set only once, so the exporter attaches to
-    whichever provider is in play, the same shape `test_mcp_tools.py` uses.
-    """
+    """The tracer provider is process-wide and settable only once, so the exporter attaches to
+    whichever is already in play — the same shape `test_mcp_tools.py` uses."""
     exporter = InMemorySpanExporter()
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
@@ -137,19 +121,16 @@ def exporter() -> Iterator[InMemorySpanExporter]:
         trace.set_tracer_provider(provider)
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     yield exporter
-    # A span processor cannot be removed from a tracer provider, and the provider outlives this
-    # test. Shutting the exporter down is what stops it collecting every span the rest of the
-    # session goes on to emit.
+    # A span processor cannot be removed, and the provider outlives this test: the shutdown is what
+    # stops the exporter collecting every span the rest of the session emits.
     exporter.shutdown()
 
 
 @pytest.fixture
 def session_spans(app: Starlette, exporter: InMemorySpanExporter) -> Sequence[ReadableSpan]:
-    """One MCP session driven over HTTP: initialize, then tools/list under a different trace."""
     with TestClient(app) as client:
-        # Cleared after the lifespan has run, not before. The startup manifest calls the server's
-        # own list_tools with no request to parent it, which is a benign root trace of two
-        # `tools/list` spans, and is exactly what a reader mistakes for the defect.
+        # Cleared after the lifespan, not before: the startup manifest calls list_tools with no
+        # request to parent it, a benign root trace a reader mistakes for the defect.
         exporter.clear()
 
         initialize = _post(
@@ -176,8 +157,7 @@ def session_spans(app: Starlette, exporter: InMemorySpanExporter) -> Sequence[Re
         )
         assert initialized.status_code == 202
 
-        # Trap: post to "/mcp" and not to "/mcp/". The trailing slash redirects, and the redirect
-        # doubles every span for the request.
+        # Post to "/mcp" and not "/mcp/": the trailing slash redirects, doubling every span.
         listed = _post(
             client,
             {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
@@ -202,18 +182,11 @@ class TestEachMessageJoinsTheTraceOfItsOwnRequest:
     def test_the_request_that_carried_it_is_in_that_trace_too(
         self, session_spans: Sequence[ReadableSpan]
     ) -> None:
-        """The other half: sharing a trace is only worth anything if the HTTP span is in it."""
         assert _TOOLS_LIST_TRACE in _trace_ids(session_spans, _REQUEST_SPAN)
 
     def test_no_message_span_lands_in_the_initialize_requests_trace(
         self, session_spans: Sequence[ReadableSpan]
     ) -> None:
-        """The defect itself, stated as its own assertion.
-
-        The first assertion guards the second: `initialize` really was sent under its own
-        traceparent, so this is the trace every later message used to be swept into rather than a
-        trace id nothing ever mentioned.
-        """
         assert _INITIALIZE_TRACE in _trace_ids(session_spans, _REQUEST_SPAN), (
             "initialize's own traceparent never reached a span, so this test proves nothing"
         )
@@ -225,7 +198,6 @@ class TestEachMessageJoinsTheTraceOfItsOwnRequest:
     def test_the_message_span_is_a_child_of_its_own_requests_server_span(
         self, session_spans: Sequence[ReadableSpan]
     ) -> None:
-        """Parented to the request, not merely in the same trace as it."""
         server_spans = {
             _context(span).span_id
             for span in session_spans
@@ -242,12 +214,7 @@ class TestEachMessageJoinsTheTraceOfItsOwnRequest:
 
 class TestAMessageWithNoRequestIsLeftAlone:
     async def test_an_in_process_client_still_lists_tools(self, app: Starlette) -> None:
-        """The stdio path: `get_http_request` raises, and there is nothing stale to correct.
-
-        A message that arrives without an HTTP request already runs under its caller's own context.
-        Asserted through the app rather than the middleware directly, because what has to keep
-        working is the transport that has no scope to read.
-        """
+        """The stdio path: `get_http_request` raises, and there is nothing stale to correct."""
         server = cast("FastMCP[None]", app.state.fastmcp_server)
 
         async with Client(FastMCPTransport(server)) as client:

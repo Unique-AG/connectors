@@ -1,13 +1,4 @@
-"""`search_messages`: the query Graph is sent, and the traps in what comes back.
-
-Every payload is synthesised from Microsoft's own documented shapes: the reduced search projection,
-the Exchange-shaped sender a search hit carries, and the authorless system event message. Nothing
-here came from a tenant.
-
-Which strings are handles at all is `shared/handles.py`'s question:
-`TestTheMessageHandleGrammar` in `tests/shared/test_handles.py` covers the three shapes and
-everything that is not one of them. Which of them a hit carries is covered here.
-"""
+"""`search_messages`: the query Graph is sent, and the traps in what comes back."""
 
 import json
 from datetime import date
@@ -28,13 +19,10 @@ from .conftest import channel_hit, chat_hit, search_response
 
 _MENTIONED = UUID("497b7a2a-9e1a-48d7-80e8-2965d2fc3a81")
 
-# The one field an application identity always carries: Microsoft documents its `id` as present and
-# its `displayName` as optional.
 _APPLICATION_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
 
 def _request(route: respx.Route) -> dict[str, object]:
-    """The `searchRequest` the last call put on the wire."""
     body = cast("dict[str, object]", json.loads(route.calls.last.request.content))
     requests = cast("list[dict[str, object]]", body["requests"])
     assert len(requests) == 1, "Graph honours only one searchRequest per call"
@@ -47,12 +35,8 @@ def _query_string(route: respx.Route) -> str:
 
 
 def _unquoted_words(query: str) -> list[str]:
-    """The words of `query` that a KQL parser would read outside any quoted phrase.
-
-    Splitting on `"` and keeping the even-numbered pieces is exactly that, given a query whose
-    quotes are balanced. Every test using this asserts balance first, because it is the property
-    the quoting exists to hold.
-    """
+    """Splitting on `"` and keeping the even-numbered pieces, which is only the words outside any
+    quoted phrase while the quotes are balanced. Every test using this asserts balance first."""
     return [
         word
         for index, part in enumerate(query.split('"'))
@@ -65,8 +49,8 @@ class TestTheQueryItSends:
     async def test_it_asks_only_for_chat_messages_and_pages_by_offset(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph refuses to mix entity types, and its message search pages by `from` and `size`
-        integers rather than by a cursor, which is what lets a stateless tool resume a search."""
+        """Graph refuses to mix entity types, and message search pages by `from`/`size` integers
+        rather than by a cursor, which is what lets a stateless tool resume one."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([chat_hit()]))
         )
@@ -104,17 +88,9 @@ class TestTheQueryItSends:
         graph: respx.MockRouter,
         criteria: SearchCriteria,
     ) -> None:
-        """The claim the whole design rests on, measured rather than asserted.
-
-        The connector this one replaces answers a date-bounded or channel-covering search by
-        scanning chats one request at a time, and Graph's read budget is "one request per second
-        per app per tenant … on a given channel or chat". It is *per app*, so one user's sweep of
-        fifty chats degrades every other user of the app registration. Putting the dates and the
-        filters into the query string instead lets the index apply them for the price of the
-        request that was being made anyway. A fan-out added later would be a small-looking
-        convenience with a tenant-wide cost, and nothing but a call count says it happened: the
-        answer looks the same.
-        """
+        """Graph's read budget is "one request per second per app per tenant … on a given channel
+        or chat". It is *per app*, so a per-chat scan by one user degrades every other user of the
+        app registration, and nothing but a call count would say a fan-out had been added."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200, json=search_response([chat_hit(), channel_hit()], more_results_available=True)
@@ -129,8 +105,8 @@ class TestTheQueryItSends:
     async def test_every_criterion_becomes_its_documented_scope_term(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The spellings are Microsoft's, including the inconsistent casing and the fact that
-        `sent` is a comparison rather than a `term:value` pair."""
+        """The spellings are Microsoft's, inconsistent casing and all, and `sent` is a comparison
+        rather than a `term:value` pair."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -160,8 +136,7 @@ class TestTheQueryItSends:
     async def test_the_mentioned_user_id_loses_its_hyphens(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft's `mentions` example is a user id "without '-'", the one scope term whose
-        value is not the value the caller supplied."""
+        """Microsoft's `mentions` example is a user id "without '-'"."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -175,8 +150,7 @@ class TestTheQueryItSends:
     async def test_date_bounds_include_the_days_they_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`sent>2026-01-01` silently drops everything sent on the 1st, which is never what a
-        caller asking for "since the 1st" meant."""
+        """`sent>2026-01-01` silently drops everything sent on the 1st."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -193,12 +167,9 @@ class TestTheQueryItSends:
     async def test_a_multi_word_query_reaches_graph_as_words_and_not_as_a_phrase(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The recall this tool would otherwise lose silently. Quoting the whole query, which is
-        the guard a *filter value* needs, makes it an exact-adjacency phrase, so "cut the release"
-        would match only messages with those three words side by side and drop "the release was cut"
-        entirely, while the parameter promises the words are matched as words. Bare terms are what
-        Graph ANDs, so bare terms are what it is sent.
-        """
+        """Quoting the whole query — the guard a *filter value* needs — makes it an exact-adjacency
+        phrase, so "cut the release" would drop "the release was cut". Bare terms are what Graph
+        ANDs."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -212,8 +183,6 @@ class TestTheQueryItSends:
     async def test_a_phrase_the_caller_quoted_themselves_stays_a_phrase(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Adjacency is not unavailable, it is just not the default: a caller who wants it asks
-        for it, and the words outside their quotes stay words."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -242,16 +211,10 @@ class TestTheQueryItSends:
     async def test_a_caller_cannot_smuggle_kql_through_the_free_text(
         self, client: GraphServiceClient, graph: respx.MockRouter, injection: str
     ) -> None:
-        """`query` is words, and the filters a caller may set are exactly the parameters this tool
-        declares. Without this guard, free text reaches Microsoft as Keyword Query Language and can
-        widen the search past every filter the tool applied.
-
-        The guard works a word at a time rather than over the whole query, so the assertion is
-        about the query string's *structure*: outside the quoted spans there is nothing a KQL parser
-        would read as anything but a keyword. Only a word with no operator character, no wildcard,
-        no leading `-` and no operator spelling is left bare, and such a word cannot express a
-        restriction, a negation or a boolean.
-        """
+        """Free text reaches Microsoft as Keyword Query Language and can widen the search past
+        every filter the tool applied. The guard works a word at a time, so the assertion is about
+        the query string's *structure*: nothing outside the quoted spans reads as anything but a
+        keyword, and a bare keyword expresses no restriction, negation or boolean."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -272,8 +235,6 @@ class TestTheQueryItSends:
     async def test_the_words_of_an_injection_attempt_are_still_searched_for(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Neutralising is not dropping: the caller typed those characters, so they are looked for
-        as text. A guard that silently discarded them would answer a different question."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -316,18 +277,11 @@ class TestTheQueryItSends:
         sender: str,
         expected: str,
     ) -> None:
-        """A wildcard is the one injection a scope term's value can still carry, and the widest.
-
-        KQL reads `<property>:*` as a match on every item that has a value for that property, so
-        `from:*` asks for every message that has a sender: the arbitrary sample of everything the
-        no-criteria refusal exists to prevent, reached through a query string that is not empty, so
-        no emptiness check trips. `from:ada*` is the same defect in miniature: prefix matching this
-        tool never offered. A leading `-` is quoted too, because a NOT read into a filter value
-        would invert it and answer the opposite question.
-
-        The last case must not change: an ordinary address quoted into a phrase would alter every
-        search this tool already serves.
-        """
+        """KQL reads `<property>:*` as a match on every item having a value for that property, so
+        `from:*` asks for every message with a sender and no emptiness check trips on it. A leading
+        `-` is quoted because a NOT read into a filter value would answer the opposite question.
+        The last case must not change: quoting an ordinary address into a phrase would alter every
+        search this tool already serves."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -343,8 +297,7 @@ class TestTheQueryItSends:
     async def test_an_ordinary_value_is_left_as_a_keyword(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Quoting everything would turn every search into a phrase search and lose stemming, so
-        only values that could be read as operators are quoted."""
+        """Quoting everything would turn every search into a phrase search and lose stemming."""
         route = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([]))
         )
@@ -361,9 +314,7 @@ class TestCriteriaThatAskForNothing:
         assert SearchCriteria().is_empty is True
 
     def test_free_text_with_no_word_in_it_asks_for_nothing(self) -> None:
-        """`is_empty` is measured on the query string, not on which arguments were passed, so a
-        query that leaves nothing to look for is refused by the boundary that refuses no criteria
-        at all, rather than reaching Graph as a search for everything."""
+        """`is_empty` is measured on the query string, not on which arguments were passed."""
         assert SearchCriteria(query='" "').is_empty is True
 
     @pytest.mark.parametrize(
@@ -381,15 +332,12 @@ class TestCriteriaThatAskForNothing:
         ],
     )
     def test_any_single_criterion_is_enough(self, criteria: SearchCriteria) -> None:
-        """`false` is a criterion: "unread messages" and "messages without attachments" are real
-        questions, so only an unset value counts as absent."""
+        """`false` is a criterion: only an unset value counts as absent."""
         assert criteria.is_empty is False
 
     async def test_searching_for_nothing_is_a_programming_error(
         self, client: GraphServiceClient
     ) -> None:
-        """The tool refuses it at the boundary, so reaching the request with it means the
-        boundary was bypassed."""
         with pytest.raises(AssertionError):
             _ = await search_messages.search_messages(
                 client, criteria=SearchCriteria(), offset=0, size=25
@@ -409,18 +357,8 @@ class TestCriteriaThatAskForNothing:
 
 class TestTheHandleItMints:
     def test_the_handle_names_the_reader_that_now_takes_it(self) -> None:
-        """A description is live protocol surface, and this sentence has had to be both things.
-
-        While nothing on this server opened a handle, it said so outright: "no tool on this server
-        takes it as an argument", "there is no route from here to the message body". A description
-        that promised a reader would have taught a model to call one that was not advertised, and
-        the failure is not a clean "no such tool": the model has already decided the snippet is not
-        the answer and has nowhere to go. `read_message` is the tool that makes that sentence false.
-
-        The flip has to go the whole way. A model told the snippet is all there is stops looking, so
-        leaving the old wording in place would hide the reader as effectively as not shipping it, a
-        defect nothing else here can see: every other assertion about this tool passes either way.
-        """
+        """The absences matter as much as the mention: a model told the snippet is all there is
+        stops looking, and every other assertion about this tool passes either way."""
         described = search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
@@ -430,20 +368,16 @@ class TestTheHandleItMints:
         assert "no route from here to the message body" not in described
 
     def test_the_summary_warns_against_inference_from_truncation(self) -> None:
-        """Summary is an excerpt, not the message. Users must not treat it as complete."""
         described = search_messages.MessageHit.model_fields["summary"].description
         assert described is not None
 
         assert "or infer from its absence" in described
 
     def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
-        """A hit that is really a channel reply carries the root-post shape, which Graph answers 404
-        to, and the advice for that has to end somewhere. `browse_channel` mints a reply's own
-        handle but reaches only the newest replies of each post on a channel's first page and
-        follows no cursor past them, so "browse the channel instead" is a route for a recent reply
-        and a loop for an older one: browse, not find it, read the same advice, browse again. So the
-        window is named and the terminus is stated here, where the handle that can fail is minted.
-        """
+        """A hit on a channel reply carries the root-post shape, which Graph 404s. `browse_channel`
+        mints a reply's own handle but reaches only the newest replies of each post and follows no
+        cursor past them, so "browse instead" is a route for a recent reply and a loop for an older
+        one."""
         described = search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
@@ -461,8 +395,9 @@ class TestWhatTheCallerIsTold:
     async def test_a_chat_hit_carries_a_chat_handle_and_a_channel_hit_a_channel_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The handle is the whole route to the message text, since the search projection has no
-        body, and the ids in it are percent-encoded because a Teams id is full of `:` and `@`."""
+        """The ids are percent-encoded because a Teams id is full of `:` and `@`. Which strings are
+        handles at all is `shared/handles.py`'s question, covered by `TestTheMessageHandleGrammar`
+        in `tests/shared/test_handles.py`."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -499,9 +434,7 @@ class TestWhatTheCallerIsTold:
     async def test_a_hit_with_neither_identity_is_kept_without_a_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph does occasionally return a hit with no chatId and no channelIdentity. Its snippet
-        is still an answer, so it is reported, with a null `uri` saying it cannot be read in full,
-        rather than being dropped or given a handle that would 404."""
+        """Graph does occasionally return a hit with no chatId and no channelIdentity."""
         hit = chat_hit(chat_id=None)
         graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([hit]))
@@ -541,8 +474,7 @@ class TestWhatTheCallerIsTold:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Teams messages are indexed out of the substrate mailbox, so a hit's `from` is an
-        Exchange `emailAddress`: a shape the Graph SDK has no field for, and one the Teams read
-        APIs never return."""
+        Exchange `emailAddress`: a shape the Graph SDK has no field for."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -572,8 +504,6 @@ class TestWhatTheCallerIsTold:
     async def test_a_teams_shaped_sender_is_understood_too(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The other branch: `teamworkUserIdentity` has an id and no email at all, and Microsoft
-        documents its display name as optional, so a null there is not an anonymous sender."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -646,14 +576,8 @@ class TestWhatTheCallerIsTold:
         graph: respx.MockRouter,
         application: dict[str, object],
     ) -> None:
-        """The three ways Graph declines to name a bot: a null display name, a blank one, and no
-        such property.
-
-        Microsoft documents an application identity's `displayName` as optional and its `id` as not,
-        so a bot Graph did not name is still a bot Graph identified. Deciding the hit on the name
-        discards the message and the id with it, and `application_id` is the only thing a caller has
-        to tell one bot from another.
-        """
+        """Microsoft documents an application identity's `displayName` as optional and its `id` as
+        not, so a bot Graph did not name is still a bot Graph identified."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200, json=search_response([chat_hit(sender={"application": application})])
@@ -683,13 +607,8 @@ class TestWhatTheCallerIsTold:
     async def test_an_identity_set_that_names_nobody_is_dropped(
         self, client: GraphServiceClient, graph: respx.MockRouter, sender: dict[str, object]
     ) -> None:
-        """No user, no application and no mailbox address means no sender to report.
-
-        The identity *object* being present says nothing, because Graph sends an empty one, so what
-        is inside it decides. Reading presence as a sender would answer with a hit whose every
-        sender field is null, which a model can see but cannot attribute or cite: worse than the
-        drop, because it looks like an answer.
-        """
+        """Graph sends an empty identity object, so the object's presence says nothing and what is
+        inside it decides."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -708,12 +627,8 @@ class TestWhatTheCallerIsTold:
     async def test_system_event_messages_are_dropped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A message nobody wrote is not a search result: for "Ada joined the chat" Graph sends a
-        null `from` and a body of the literal `<systemEventMessage/>`, rendering the sentence in the
-        Teams client from `eventDetail`, which the search projection does not even return. Left in,
-        these are results with no author and no text, and a model summarising a page of them reports
-        membership churn as the conversation.
-        """
+        """Graph sends a null `from` and a body of the literal `<systemEventMessage/>` for these,
+        and the search projection does not return the `eventDetail` that names them."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -738,8 +653,7 @@ class TestPagingAndItsHonesty:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Microsoft documents `total` as the count of results on the page for Teams messages, not
-        the number of matches, so a tool that reports it tells a model there were 25 matches when
-        there may be thousands. Nothing here reads it."""
+        the number of matches."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -767,8 +681,8 @@ class TestPagingAndItsHonesty:
     async def test_the_next_offset_counts_graphs_hits_not_the_messages_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The filtering happens on our side of the offset. Advancing by the number of messages
-        returned would re-read the hits that were filtered out, forever."""
+        """Advancing by the number of messages returned would re-read the filtered-out hits for
+        ever, because the filtering happens on our side of the offset."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 200,
@@ -823,19 +737,9 @@ class TestPagingAndItsHonesty:
     async def test_a_page_of_no_hits_never_offers_the_offset_it_was_asked_at(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The paging claim taken at its word, in the one shape that could make it false.
-
-        `next_offset` promises "the `offset` that reaches the NEXT page", and it is computed by
-        advancing past the hits Graph returned, so a page with no hits and `moreResultsAvailable`
-        still set would hand back the offset that was just asked at, and a caller following the
-        contract re-requests the same empty page for ever. That is the same defect the chat walk
-        shipped with: a page carrying nothing while saying more is coming is where a cursor stops
-        meaning progress.
-
-        Both directions are asserted, because either one alone would pass while the other rotted:
-        this offset advances no caller, and the offset for a page that DID advance is greater than
-        the one asked at.
-        """
+        """`next_offset` advances past the hits Graph returned, so a page with no hits and
+        `moreResultsAvailable` still set would hand back the offset just asked at. Both directions
+        are asserted, because either alone would pass while the other rotted."""
         empty = graph.post("/search/query").mock(
             return_value=httpx.Response(200, json=search_response([], more_results_available=True))
         )
@@ -866,8 +770,6 @@ class TestGraphFailures:
     async def test_a_refused_search_surfaces_as_a_permission_failure(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The case the per-chat scan this tool deliberately does not have would have hidden: a
-        tenant that has not granted the search permissions must be told, not worked around."""
         graph.post("/search/query").mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}

@@ -28,12 +28,9 @@ def chat(number: int, topic: str) -> dict[str, object]:
 
 
 class RecordedPages:
-    """Stands in for `record_pages_scanned` so the count one walk hands it can be read back.
-
-    The histogram itself is asserted on in `tests/test_graph_metrics.py`, from inside a
-    `graph_errors` block: `observability` drops a count taken outside one, and every walk here is
-    outside one. What this file pins is the number this module arrives at.
-    """
+    """The histogram itself is asserted on in `tests/test_graph_metrics.py`, from inside a
+    `graph_errors` block: `observability` drops a count taken outside one, as every walk here
+    is."""
 
     def __init__(self) -> None:
         self.counts: list[int] = []
@@ -50,11 +47,8 @@ def recorded_pages(monkeypatch: pytest.MonkeyPatch) -> RecordedPages:
 
 
 def mock_two_pages(graph: respx.MockRouter) -> None:
-    """Two pages of three chats, the first advertising the second by absolute nextLink.
-
-    The `$skiptoken` route is registered first because respx matches in registration order and
-    the bare route would otherwise answer both requests.
-    """
+    """The `$skiptoken` route is registered first because respx matches in registration order,
+    and the bare route would otherwise answer both requests."""
     graph.get("/me/chats", params={"$skiptoken": "synthetic-page-2"}).mock(
         return_value=httpx.Response(200, json={"value": [chat(3, "keep")]})
     )
@@ -89,8 +83,7 @@ class TestFollowingNextLink:
     async def test_the_next_link_is_replayed_verbatim(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole URL is the cursor. Graph documents that its `$skiptoken` is not ours to
-        take apart and re-send under our own query parameters."""
+        """The whole URL is the cursor: Graph's `$skiptoken` is not ours to take apart."""
         mock_two_pages(graph)
         first = await client.me.chats.get()
         assert first is not None
@@ -102,15 +95,10 @@ class TestFollowingNextLink:
     async def test_an_empty_page_carrying_a_next_link_is_walked_through(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The SDK quirk this walk exists to close, and what it costs the tools above.
-
-        `PageIterator.enumerate` returns False for a page whose `value` is empty and
-        `PageIterator.iterate` reads that as the end of the collection, so the SDK's own walk over
-        `[items + nextLink]`, `[nothing + nextLink]`, `[the last item]` stops on the middle page.
-        Every tool over this module reports "that is all of it" by coming back short of `limit`, so
-        a walk that stops there does not merely lose chats: it turns a window Graph had more behind
-        into a claim that the user has no more. An empty page carrying a next link means keep going.
-        """
+        """`PageIterator.enumerate` returns False for a page whose `value` is empty and
+        `PageIterator.iterate` reads that as the end, so the SDK's own walk over
+        `[items + nextLink]`, `[nothing + nextLink]`, `[the last item]` stops on the middle page —
+        and a short walk is how every tool here reports "that is all of it"."""
         graph.get("/me/chats", params={"$skiptoken": "synthetic-page-3"}).mock(
             return_value=httpx.Response(200, json={"value": [chat(4, "newest")]})
         )
@@ -136,14 +124,9 @@ class TestFollowingNextLink:
 
 
 class TestAFirstPageCarryingNoValueAtAll:
-    """A `200 OK` whose body has no `value`, which is where the SDK disagrees with itself.
-
-    `PageIterator.enumerate` reads that body as an empty page on every request but the first, and
-    `PageIterator.__init__` raises a bare `ValueError` on it (page_iterator.py:180-181). A
-    `ValueError` is none of the three things `graph_errors` classifies, so it would reach a tool
-    with no remedy attached and be counted under the status that means the seam could not describe
-    it. The fix is that page one behaves as page two already does.
-    """
+    """Where the SDK disagrees with itself: `PageIterator.enumerate` reads a body with no `value`
+    as an empty page on every request but the first, and `PageIterator.__init__` raises a bare
+    `ValueError` on it (page_iterator.py:180-181) — which `graph_errors` cannot classify."""
 
     async def test_a_first_page_with_no_value_and_no_next_link_collects_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -162,9 +145,8 @@ class TestAFirstPageCarryingNoValueAtAll:
     async def test_a_first_page_with_no_value_but_a_next_link_is_walked_through(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The shape the known issue on `getAllRecordings` and `getAllTranscripts` produces: a token
-        reset answers 200 with nothing in it and a `@odata.nextLink` still set. Landing on the
-        first request rather than a later one must not change what the walk does with it."""
+        """The shape the known issue on `getAllRecordings` and `getAllTranscripts` produces: a
+        token reset answers 200 with nothing in it and a `@odata.nextLink` still set."""
         graph.get("/me/chats", params={"$skiptoken": "synthetic-page-2"}).mock(
             return_value=httpx.Response(200, json={"value": [chat(1, "keep")]})
         )
@@ -183,8 +165,6 @@ class TestAFirstPageCarryingNoValueAtAll:
     async def test_the_response_the_caller_passed_in_is_left_as_it_was(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The walk reads page one as empty by standing in a copy for it, not by writing an empty
-        list over what the caller handed it: the caller keeps whatever Graph actually sent."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(200, json={"@odata.context": f"{GRAPH_V1}/$metadata#chats"})
         )
@@ -200,12 +180,9 @@ class TestTheHeadersItCarries:
     async def test_the_headers_it_is_given_go_on_every_page_it_follows(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`PageIterator` starts with an empty header collection and stamps it onto every next-page
-        request, so a header the caller's own first request needed reaches page two only if the walk
-        is given it. `Prefer: include-unknown-enum-members` is the case that made this a parameter:
-        Graph answers an evolvable enum for the header the request carried, so a walk that dropped
-        it would answer page one in one shape and page two in another.
-        """
+        """`PageIterator` starts with an empty header collection, so a header page one needed
+        reaches page two only if the walk is given it. `Prefer: include-unknown-enum-members` made
+        it a parameter: Graph shapes an evolvable enum per the header the request carried."""
         mock_two_pages(graph)
         first = await client.me.chats.get()
         assert first is not None
@@ -310,8 +287,8 @@ class TestTheCaps:
     async def test_a_cap_that_stops_on_the_first_item_of_the_only_page_says_capped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Capping is not read off @odata.nextLink alone. One page, no next link, and a cap
-        that stops on the first item still leaves two items the caller never sees."""
+        """Capping is not read off `@odata.nextLink` alone: one page with no next link and a cap
+        stopping on the first item still leaves two items the caller never sees."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 200,
@@ -329,12 +306,8 @@ class TestTheCaps:
     async def test_filtered_out_items_still_count_against_the_scan_cap(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The teams-mcp lesson: a filtered collection can page a long way for nothing, so the
-        cap has to bound what was *looked at*, not what was kept.
-
-        `max_scanned` is a parameter rather than only a constant because a caller with a small
-        collection and a tighter request budget passes its own. The default is the safety valve
-        for a caller that has no opinion."""
+        """The teams-mcp lesson: a filtered collection can page a long way for nothing, so the cap
+        bounds what was *looked at*, not what was kept."""
         mock_two_pages(graph)
         first = await client.me.chats.get()
         assert first is not None
@@ -370,17 +343,10 @@ class TestTheCaps:
     async def test_a_collection_answering_only_empty_pages_gives_up_in_a_run_of_them(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Following an empty page means a run of them must be bounded, and bounding items does not
-        bound it: a page with nothing in it spends a request and no scan budget at all.
-
-        `MAX_EMPTY_PAGES` is that bound, counted against nothing else. The tempting arithmetic is
-        to pool it: `max_scanned` requests plus this allowance for the whole walk, on the grounds
-        that at most `max_scanned` requests can go on pages that carried anything, so the rest
-        bounds the empty ones. A collection answering nothing but empty pages spends *no* scan
-        budget, so the whole pool would be theirs. So the count is pinned to the requests it costs:
-        the caller's own first page plus `MAX_EMPTY_PAGES` followed after it, whatever `max_scanned`
-        is.
-        """
+        """A page with nothing in it spends a request and no scan budget, so bounding items does
+        not bound a run of them. Pooling the two budgets was the tempting arithmetic and is wrong:
+        a collection answering only empty pages spends no scan budget, so the whole pool is
+        theirs."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
@@ -400,12 +366,7 @@ class TestTheCaps:
     async def test_the_scan_cap_does_not_lend_the_empty_pages_a_longer_run(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The same collection at the module's own `max_scanned`, which is what production passes.
-
-        A pooled budget would get this wrong by two orders of magnitude: the bound has to be the
-        same 11 requests whether the walk was allowed 3 items or 1000, because neither number says
-        anything about pages that carried none.
-        """
+        """The same 11 requests whether the walk was allowed 3 items or `MAX_SCANNED_ITEMS`."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
@@ -422,12 +383,8 @@ class TestTheCaps:
     async def test_a_collection_sprinkling_empty_pages_between_items_is_walked_to_its_end(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Why the bound is per run rather than per walk. Graph does answer the occasional empty
-        page in the middle of a collection that is otherwise fine, so a walk over more of them *in
-        total* than the allowance, with an item between each, is making progress and must not be
-        given up on. A page carrying an item starts the count again. Only a run of nothing is
-        refused.
-        """
+        """Why the bound is per run and not per walk: Graph answers the occasional empty page in
+        the middle of a fine collection, and a page carrying an item starts the count again."""
         pages = MAX_EMPTY_PAGES + 4
         for index in range(pages):
             last = index == pages - 1
@@ -436,8 +393,8 @@ class TestTheCaps:
                     200,
                     json={"value": [chat(index, "keep")]}
                     if last
-                    # One item, then nothing, then on: the empty page carries the cursor to the next
-                    # pair, so `pages` runs of length one add up to more empties than the allowance.
+                    # The empty page carries the cursor to the next pair, so `pages` runs of
+                    # length one add up to more empties than the allowance.
                     else {
                         "value": [chat(index, "keep")],
                         "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=empty-{index}",
@@ -471,9 +428,6 @@ class TestWhatOneWalkCost:
     async def test_the_request_that_failed_is_counted_among_the_pages(
         self, client: GraphServiceClient, graph: respx.MockRouter, recorded_pages: RecordedPages
     ) -> None:
-        """The walk worth seeing on the histogram is the one that read a long way before giving up,
-        and that one leaves by a raise. Counting a page only once its fetch came back drops exactly
-        the request that made the walk worth looking at: the one that failed."""
         graph.get("/me/chats", params={"$skiptoken": "synthetic-page-3"}).mock(
             return_value=httpx.Response(
                 500, json={"error": {"code": "generalException", "message": "unexpected"}}
@@ -501,8 +455,8 @@ class TestWhatOneWalkCost:
         )
 
 
-# The one test the run below re-runs under `-O`. Named once, here, so that renaming the test cannot
-# silently turn that run into a no-op: `pytest` exits non-zero on a node id it cannot collect.
+# Named once so that renaming the test cannot silently turn the `-O` run below into a no-op:
+# `pytest` exits non-zero on a node id it cannot collect.
 _ENDLESS_COLLECTION = (
     "tests/graph_client/test_pagination.py::TestTheCaps"
     "::test_a_collection_answering_only_empty_pages_gives_up_in_a_run_of_them"
@@ -517,9 +471,8 @@ class TestTheBoundIsNotAnAssertion:
     async def test_the_refusal_names_the_run_and_what_graph_was_still_advertising(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """What an operator gets, and what a model gets: `shared/seam.py` maps `GraphFailure` and
-        nothing else onto tool advice, so the type is what makes this reach the caller as something
-        it can act on rather than as a crash, and the count is the whole of the evidence."""
+        """`shared/seam.py` maps `GraphFailure` and nothing else onto tool advice, so the type is
+        what makes this reach the caller as something it can act on rather than as a crash."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(
                 200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}/me/chats?$skiptoken=loop"}
@@ -538,15 +491,9 @@ class TestTheBoundIsNotAnAssertion:
         assert raised.value.status is None, "no request failed; every one of those pages was a 200"
 
     def test_the_bound_still_stops_the_walk_under_python_O(self) -> None:
-        """`python -O` strips `assert` statements, so a bound written as one is not a bound at all.
-
-        So the refusal is a raise, and it cannot be tested in-process: `__debug__` is fixed when
-        the interpreter starts. The empty-page test is re-run in a child interpreter started with
-        `-O`, where a walk with nothing to stop it follows a collection that never ends, so the
-        child is given a deadline and running out of it is reported as the failure it is. Write the
-        bound as an `assert` and this test fails: either the child hangs on the endless collection,
-        or `pytest.raises` reports that nothing was raised.
-        """
+        """`python -O` strips `assert` statements, so a bound written as one is no bound. It
+        cannot be tested in-process because `__debug__` is fixed when the interpreter starts, hence
+        the child run — and the deadline, because a walk with nothing to stop it never returns."""
         stripped = subprocess.run(
             [sys.executable, "-O", "-c", "print(__debug__)"],
             capture_output=True,

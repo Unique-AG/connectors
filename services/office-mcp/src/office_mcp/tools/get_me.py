@@ -1,9 +1,4 @@
-"""`get_me` — return the signed-in user's own profile.
-
-Named `get_me`, not the shell idiom `whoami`, to keep the verb_noun pattern every tool name uses.
-Microsoft's own M365 connector uses the same name. A tool name cannot change later: every caller
-that learned it must learn it again.
-"""
+"""`get_me` — the signed-in user's own profile. A tool name cannot change once callers learn it."""
 
 from collections.abc import Mapping
 from typing import Self
@@ -22,9 +17,6 @@ TOOL_NAME = "get_me"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 
-# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
-# the one call needs none.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
@@ -81,21 +73,15 @@ class SignedInUser(BaseModel):
 async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
     """Return the caller's profile.
 
-    `graph_errors` here names the operation and nothing else: the name is the tool's own, and a
-    tool file is the only thing that knows it. `shared/identity.py` opens its own `graph_step`,
-    which classifies the failures and names the call. Every other tool opens its named block at
-    its own Graph call. This one's Graph call is in `shared/`, so the block comes out one level up
-    rather than the name going one level down.
+    `graph_errors` takes no `step=` here: the Graph call lives in `shared/identity.py`, which opens
+    its own `graph_step`.
     """
     with graph_errors(TOOL_NAME):
         return SignedInUser.from_user(await identity.signed_in_user(client))
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool borrows `transport` per call."""
-    # Built here because this is where `transport` is: the dependency closes over it, and the
-    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
-    # not a call. A call there is ruff's B008.
+    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

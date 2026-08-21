@@ -1,12 +1,8 @@
 """The declarations that keep two directly-imported packages from being dropped as redundant.
 
-`starlette` also reaches this service through `fastmcp`, and `unique_toolkit` through
-`unique-mcp`, so the imports in `app.py` and `metrics.py` work whether or not `pyproject.toml`
-names them. Nothing fails today and the declaration reads like duplication, until an upstream
-package drops its own edge and the import breaks at runtime instead of at resolve time.
-
-Each pair below asserts both halves, so neither can drift alone: the import is really there
-(walked from the AST, not executed), and the package it needs is really declared.
+`starlette` also reaches this service through `fastmcp`, and `unique_toolkit` through `unique-mcp`,
+so the declaration reads like duplication until an upstream package drops its own edge and the
+import breaks at runtime instead of at resolve time.
 """
 
 import ast
@@ -23,7 +19,6 @@ _REQUIREMENT = re.compile(r"^(?P<name>[A-Za-z0-9._-]+)(?:\[(?P<extras>[^]]*)\])?
 
 
 def _declared_dependencies() -> dict[str, set[str]]:
-    """The `[project].dependencies` names, normalized, each mapped to the extras asked of it."""
     pyproject = tomllib.loads((_SERVICE_ROOT / "pyproject.toml").read_text())
     project = cast("dict[str, object]", pyproject["project"])
     requirements = project["dependencies"]
@@ -39,7 +34,6 @@ def _declared_dependencies() -> dict[str, set[str]]:
 
 
 def _imported_modules(source: pathlib.Path) -> set[str]:
-    """Every absolute module name `source` imports."""
     tree = ast.parse(source.read_text(), filename=str(source))
     modules: set[str] = set()
     for node in ast.walk(tree):
@@ -70,7 +64,6 @@ class TestStarlette:
 
 class TestUniqueToolkit:
     def test_metrics_imports_the_toolkit_registry_directly(self) -> None:
-        """Guards the guard, same as above."""
         assert "unique_toolkit.monitoring" in _imported_modules(_SRC / "metrics.py")
 
     def test_unique_toolkit_is_declared_with_the_monitoring_extra(self) -> None:

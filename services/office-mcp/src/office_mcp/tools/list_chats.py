@@ -1,12 +1,8 @@
 """`list_chats` — the signed-in user's Teams chats, most recent first.
 
-Graph's `lastUpdatedDateTime` changes on a rename or a member change. It is not recency. Only the
-last message sent decides `last_message_at` and the sort order.
-
-`limit` is a window, not a cursor. The walk follows Graph's paging to completion rather than
-trusting a short page.
-
-The recency sort needs `Chat.Read`, not `Chat.ReadBasic`.
+TRAP: Graph's `lastUpdatedDateTime` changes on a rename or a member change and is not recency. Only
+the last message sent decides `last_message_at` and the sort order, which needs `Chat.Read` rather
+than `Chat.ReadBasic`.
 """
 
 from collections.abc import Mapping
@@ -29,14 +25,10 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_chats"
 
-# The one Graph call this tool makes, as the step instruments count it.
 STEP = "chats"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)
 
-# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. This tool takes no arguments, so
-# the one call needs none.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 MAX_CHATS = 50
@@ -71,7 +63,6 @@ class ChatMember(BaseModel):
 
     @classmethod
     def from_conversation_member(cls, member: ConversationMember, *, include_email: bool) -> Self:
-        """Only aadUserConversationMember carries email."""
         return cls(
             display_name=member.display_name,
             email=member.email
@@ -138,13 +129,11 @@ class ChatSummary(BaseModel):
     def from_chat(cls, chat: Chat, *, include_member_emails: bool) -> Self:
         assert chat.id is not None, "Graph returned a chat with no id"
         preview = chat.last_message_preview
-        # Graph documents `topic` as absent on an unnamed chat, but a blank one survives the SDK
-        # as `""` and is not a name either. Normalised here, so a caller never tells the two apart.
+        # Graph documents `topic` as absent when unnamed; a blank one survives the SDK as `""`.
         topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
         members = _members(chat, include_member_emails) if topic is None else None
-        # `chat_type` is passed as-is, not as `chat.chat_type.value`: `ChatType` subclasses `str`,
-        # so the member already is its wire value ("group"). `.value` looks right but is typed as
-        # a one-tuple: the generated members carry a trailing comma (`OneOnOne = "oneOnOne",`).
+        # Not `.value`: `ChatType` subclasses `str`, so the member is its wire value already, and
+        # `.value` is typed as a one-tuple (the generated members carry a trailing comma).
         meeting = chat.online_meeting_info
         return cls(
             chat_id=chat.id,
@@ -172,13 +161,11 @@ class ChatList(BaseModel):
 async def list_recent_chats(
     client: GraphServiceClient, *, limit: int, include_member_emails: bool
 ) -> ChatList:
-    """The `limit` most recently active chats."""
     assert 1 <= limit <= MAX_CHATS, f"limit must be within 1..{MAX_CHATS}, got {limit}"
 
     configuration = RequestConfiguration[_ChatsQuery](
         query_parameters=ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters(
-            # Graph rejects `$select` on this collection as an unsupported parameter. These
-            # expansions bring back the fields below instead.
+            # Graph rejects `$select` on this collection; these expansions bring the fields back.
             expand=["members", "lastMessagePreview"],
             orderby=[_RECENCY],
             top=limit,
@@ -205,10 +192,7 @@ def _members(chat: Chat, include_emails: bool) -> list[ChatMember]:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool borrows `transport` per call."""
-    # Built here because this is where `transport` is: the dependency closes over it, and the
-    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
-    # not a call. A call there is ruff's B008.
+    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

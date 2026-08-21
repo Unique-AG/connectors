@@ -1,14 +1,4 @@
-"""`browse_channel`: the one request it spends, the order it must not correct, and the traps.
-
-Two of the assertions here are about parameters that are *not* sent: Graph accepts no `$orderby`
-and no `$filter` on a channel's messages, which is why no date argument is offered. Two more are
-about cursors that are read rather than followed, because a given channel allows this whole
-connector about one request a second across the tenant. The fourth trap is the ordering of the
-collection, which is by reply-chain activity: the one Graph documents and the one nobody expects.
-
-Every payload is synthesised from Microsoft's documented shapes: the ids are obviously fake, the
-domains are `.invalid`, and the names are from the public domain.
-"""
+"""`browse_channel`: the one request it spends, the order it must not correct, and the traps."""
 
 from collections.abc import Mapping, Sequence
 
@@ -28,8 +18,6 @@ _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CHANNEL_ID = "19:general@thread.tacv2"
 _MESSAGES_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages"
 
-# The sender shape every Teams *read* API answers with: a `teamworkUserIdentity`, which has an id,
-# an optional display name and no email property at all.
 _TEAMS_SENDER: dict[str, object] = {
     "user": {
         "@odata.type": "#microsoft.graph.teamworkUserIdentity",
@@ -46,11 +34,6 @@ def _message_payload(
     content: str,
     content_type: str = "html",
 ) -> dict[str, object]:
-    """One full `chatMessage`, as a channel's message collection returns it.
-
-    Unlike a search hit this carries a `body`, which is why browsing needs no follow-up read, and
-    the Teams-shaped sender rather than the mailbox-shaped one.
-    """
     return {
         "@odata.type": "#microsoft.graph.chatMessage",
         "id": message_id,
@@ -82,7 +65,6 @@ def _post_payload(
     replies: Sequence[Mapping[str, object]] = (),
     more_replies: bool = False,
 ) -> dict[str, object]:
-    """One channel root post as `?$expand=replies` returns it."""
     payload = _message_payload(message_id=message_id, content=content)
     payload["createdDateTime"] = created_at
     payload["replies"] = [dict(reply) for reply in replies]
@@ -103,8 +85,8 @@ def _reply_payload(
 _SYSTEM_MESSAGE: dict[str, object] = {
     "@odata.type": "#microsoft.graph.chatMessage",
     "id": "1770000009999",
-    # Without the `Prefer` header Graph reports this type as `unknownFutureValue`, which is what
-    # makes the authorless `from` and the populated `eventDetail` the signals worth filtering on.
+    # Without the `Prefer` header Graph types this `unknownFutureValue`, which is why the
+    # authorless `from` and the populated `eventDetail` are the signals filtered on.
     "messageType": "unknownFutureValue",
     "createdDateTime": "2026-02-11T10:00:00Z",
     "from": None,
@@ -121,9 +103,7 @@ class TestTheQueryItSends:
     async def test_browsing_a_channel_asks_for_replies_and_a_page_size(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`$top` and `$expand` are the only two parameters this collection takes, and the
-        expansion is what makes a thread one request instead of one per post, which matters where
-        Graph allows the whole app one request a second per channel."""
+        """`$top` and `$expand` are the only two parameters this collection takes."""
         route = graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
@@ -159,8 +139,6 @@ class TestBrowsingOneChannel:
     async def test_a_post_arrives_whole_rather_than_as_a_snippet(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The point of the tool: a channel listing carries every field a single read does, so the
-        text is normalised here and no follow-up read is needed."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -192,13 +170,8 @@ class TestBrowsingOneChannel:
     async def test_one_browse_is_one_graph_request_whatever_the_channel_holds(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The budget, pinned. Graph allows this whole connector about one request a second on a
-        given channel *for the tenant*, so a call that follows `@odata.nextLink` spends a budget
-        that is not its own. A page walk is most tempting here, because system messages are filtered
-        out after Graph has counted them into the page, and a walk bounded by items scanned rather
-        than by requests would keep asking for pages until it had `limit` posts. This asks once, and
-        the cursor is read rather than followed.
-        """
+        """Graph allows this whole connector about one request a second on a given channel *for
+        the tenant*, so following `@odata.nextLink` spends a budget that is not this call's."""
         second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
         )
@@ -227,12 +200,8 @@ class TestBrowsingOneChannel:
     async def test_the_order_is_graphs_reply_chain_order_and_the_dates_say_so(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The surprise this tool has to be honest about. Graph sorts a channel's messages by the
-        last modified date of the *entire reply chain*, so a post from two years ago comes back
-        first because somebody replied to it yesterday. Reordering it would be inventing an order
-        Graph did not give, so the order is preserved and `created_at` is what tells the truth about
-        age, which is exactly what the tool's description tells the caller to read.
-        """
+        """Graph sorts a channel's messages by the last modified date of the *entire reply
+        chain*, so `created_at` and not the position is what tells the truth about age."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -276,10 +245,8 @@ class TestBrowsingOneChannel:
     async def test_a_reply_carries_a_handle_read_message_can_actually_resolve(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The gap this piece closes. Graph addresses a reply under the post it answers, so the
-        root-post handle shape cannot name one, and a search hit on a reply gets exactly that shape
-        and 404s. Browsing knows each reply's parent, so it can mint the third shape.
-        """
+        """Graph addresses a reply under the post it answers, so the root-post handle shape cannot
+        name one and a search hit on a reply 404s. Browsing knows each reply's parent."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -325,9 +292,7 @@ class TestBrowsingOneChannel:
     async def test_replies_are_sorted_and_the_newest_of_a_long_thread_are_kept(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph publishes no order for replies, so they are sorted here, and a thread longer than
-        the window comes back full to it. That is the only thing said about a thread's older
-        replies, and all that can be said: they are out of reach either way."""
+        """Graph publishes no order for replies, so they are sorted here."""
         replies = [
             _reply_payload(
                 f"177000000{index:04d}",
@@ -362,16 +327,9 @@ class TestBrowsingOneChannel:
     async def test_a_thread_graph_itself_paged_is_not_chased(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`$expand=replies` has its own cursor per post, and not following it is a deliberate
-        choice: it is a request per post against a channel that allows the whole app one a second,
-        and a thread of hundreds is not a tool response.
-
-        The cursor needs no reporting of its own. Graph expands up to 200 replies before it pages
-        them, so a thread it paged has far more than this window holds and the window comes back
-        full either way. The request count is what is asserted, because every description depends on
-        this half of the reply story: browsing reaches the newest replies of a post and no further,
-        which is why no surface here may tell a model to browse for an older one.
-        """
+        """Following the per-post replies cursor would be a request per post against the same
+        one-a-second channel. The cursor needs no reporting either: Graph expands up to 200 replies
+        before it pages them, so a thread it paged overflows this window regardless."""
         replies = graph.get(f"{_MESSAGES_PATH}/1770000000000/replies").mock(
             return_value=httpx.Response(200, json={"value": []})
         )
@@ -411,10 +369,8 @@ class TestBrowsingOneChannel:
     async def test_system_messages_are_dropped_wherever_they_appear(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph offers no `messageType` filter on this collection, so they are filtered here, and
-        they arrive as `unknownFutureValue` without the `Prefer` header, which is why the author and
-        the event detail are the signals. A page can therefore hold fewer posts than asked for,
-        which is not evidence of a quiet channel."""
+        """Graph offers no `messageType` filter here, so a page can hold fewer posts than asked
+        for, which is not evidence of a quiet channel."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -454,14 +410,8 @@ class TestBrowsingOneChannel:
     async def test_microsofts_own_cursor_is_what_says_the_channel_holds_more(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The completeness signal this tool cannot do without, and the one it can read accurately.
-
-        Every other list here answers whether it was everything by its own length, because the
-        walk underneath it followed Graph's paging to the end of the collection. This tool follows
-        nothing, because one request is the whole budget, and system messages are dropped out of the
-        page after Graph counted them into it, so its length says neither thing. Graph's
-        `@odata.nextLink` on that page does, so it is reported: read, never followed.
-        """
+        """System messages are dropped out of the page after Graph counted them into it, so this
+        answer's own length says nothing about completeness. Graph's cursor does."""
         second_page = graph.get(_MESSAGES_PATH, params={"$skiptoken": "synthetic"}).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000002")]})
         )
@@ -491,10 +441,7 @@ class TestBrowsingOneChannel:
     async def test_the_same_page_without_a_cursor_says_that_was_the_channel(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Why the field is worth its place: without it these two answers are byte-identical, so a
-        caller cannot tell "that was the whole channel" from "Microsoft says there is more". This is
-        the page above with its cursor taken off, and nothing else changed.
-        """
+        """The page above with its cursor taken off, and nothing else changed."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
@@ -513,11 +460,8 @@ class TestBrowsingOneChannel:
     async def test_a_page_holding_more_posts_than_the_window_is_the_other_fact(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Two causes, two fields, because the remedies are opposite. Raising `limit` returns the
-        posts this window closed over. Nothing returns the posts behind Microsoft's cursor. One
-        boolean over both would be ambiguous, so a page Graph over-served without advertising more
-        must report the second and not the first.
-        """
+        """Two fields because the remedies are opposite: raising `limit` returns what this window
+        closed over, and nothing returns what is behind Microsoft's cursor."""
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -549,10 +493,6 @@ class TestBrowsingOneChannel:
     async def test_neither_fact_is_reported_unless_it_was_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Opt-in because a field that is null for almost every answer is one a model need not
-        reason about, so only the caller whose question turns on completeness pays for it. The
-        default answer is the messages and nothing else.
-        """
         graph.get(_MESSAGES_PATH).mock(
             return_value=httpx.Response(
                 200,
@@ -595,9 +535,6 @@ class TestGraphFailures:
     async def test_a_refusal_arrives_classified_for_the_tool_to_explain(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """This request is made under the broad message permission, which a tenant commonly
-        withholds while granting the two basic listing ones, so the failure has to reach the tool
-        layer, which is what names the permission."""
         denied = httpx.Response(
             403, json={"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
         )
@@ -613,7 +550,4 @@ class TestGraphFailures:
             )
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
-        """Reading a channel's posts is read under the same permission `search_messages` needs for
-        channel coverage, taken from the handle grammar rather than respelled, so the two cannot
-        drift."""
         assert browser.GRAPH_PERMISSIONS == ("ChannelMessage.Read.All",)

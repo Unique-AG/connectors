@@ -1,9 +1,4 @@
-"""`read_transcript`: the words that come back, and what narrows them.
-
-Every payload is synthesised. A transcript is the most sensitive thing this connector touches, so
-nothing here came from a meeting: the speakers are historical figures, the words are invented, and
-the ids are obviously fake.
-"""
+"""`read_transcript`: the words that come back, and what narrows them."""
 
 import httpx
 import pytest
@@ -41,11 +36,10 @@ _ATTRIBUTION_OFF = {
     }
 }
 
-# A synthetic WebVTT transcript in the shape Graph's `/content` returns, exercising everything the
-# parser has to survive: the header, a NOTE block, cue identifier lines, a voice tag with a class,
-# a cue wrapped over two lines, escaped entities, inline markup, a cue nobody was attributed for,
-# and the negative offset Microsoft documents for transcription that started mid-conversation.
-# Nothing anybody said: the speakers are long dead and the words are invented.
+# Everything the parser has to survive: the `WEBVTT` header, a NOTE block, cue identifier lines, a
+# voice tag with a class, a cue wrapped over two lines, escaped entities, inline markup, a cue
+# nobody was attributed for, an empty one, and the negative offset Microsoft documents for
+# transcription that started mid-conversation.
 TRANSCRIPT_VTT = """WEBVTT
 
 NOTE this transcript is synthetic
@@ -71,7 +65,6 @@ f1f0c0de-0004
 <v Ada Lovelace></v>
 """
 
-# The same transcript as the unattributed format returns it: cue timings, no voice tags at all.
 TRANSCRIPT_UNATTRIBUTED = """00:00:16.246 --> 00:00:19.900
 We should raise the floor price by three per cent.
 
@@ -81,24 +74,18 @@ Agreed that works.
 
 
 def _transcript() -> TranscriptHandle:
-    """The handle `list_meeting_transcripts` would have minted for the transcript below."""
     return TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID)
 
 
 def _spoken(graph: respx.MockRouter) -> respx.Route:
-    """The words, answered to every read: `/content` is one stream and each call fetches it all."""
     return graph.get(_CONTENT).mock(
         return_value=httpx.Response(200, content=TRANSCRIPT_VTT.encode())
     )
 
 
 def _spoken_by_nobody(graph: respx.MockRouter) -> respx.Route:
-    """The same endpoint in a tenant with speaker attribution off, which is where it is decided.
-
-    The attributed format is refused and the plain one served, exactly as Graph does it. Serving
-    unattributed bytes to the attributed request would say `speaker_attribution` is true, which is
-    the field a caller reads to find out why a speaker filter matched nothing.
-    """
+    """Serving unattributed bytes to the attributed request would report `speaker_attribution`
+    true, which is the field a caller reads to learn why a speaker filter matched nothing."""
 
     def respond(request: httpx.Request) -> httpx.Response:
         if request.headers["accept"] == "text/vtt":
@@ -112,10 +99,6 @@ class TestReadingTheWords:
     async def test_vtt_becomes_speaker_attributed_timestamped_turns(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The whole differentiator, and every parsing trap in one transcript: the `WEBVTT` header,
-        a `NOTE` block, cue identifier lines, a voice tag with a class, a cue wrapped over two
-        lines, HTML entities, inline markup, an unattributed cue, an empty one, and the negative
-        offset Microsoft documents for transcription that started mid-conversation."""
         route = graph.get(_CONTENT).mock(
             return_value=httpx.Response(
                 200, content=TRANSCRIPT_VTT.encode(), headers={"content-type": "text/vtt"}
@@ -161,9 +144,8 @@ class TestReadingTheWords:
     async def test_a_tenant_that_forbids_speaker_names_degrades_instead_of_failing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Graph's own documented remedy: ask again for the unattributed format, which succeeds.
-        `services/teams-mcp` hardcodes `Accept: text/vtt` and so loses the transcript entirely in
-        such a tenant."""
+        """Graph's own documented remedy is to ask again for the unattributed format.
+        `services/teams-mcp` hardcodes `Accept: text/vtt` and loses the transcript entirely."""
         attempts: list[str] = []
 
         def respond(request: httpx.Request) -> httpx.Response:
@@ -191,10 +173,8 @@ class TestReadingTheWords:
     async def test_the_tenant_switch_is_not_retried_in_another_format(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The other 403 on the same endpoint. Microsoft says there is no request-side workaround,
-        so a second request would be a wasted call and the advice for it names an administrator
-        rather than a format, which means the retry must be scoped to the inner code, not to 403.
-        """
+        """Microsoft publishes no request-side workaround for this one, so the retry above must be
+        scoped to the inner code and not to 403."""
         route = graph.get(_CONTENT).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
 
         with pytest.raises(GraphForbidden) as raised:
@@ -211,18 +191,12 @@ class TestReadingTheWords:
     async def test_the_accept_header_is_not_added_to_every_other_graph_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The claim `_accepting` is written on. kiota's
-        `RequestConfiguration.headers` defaults to ONE `HeadersCollection` shared by every
-        configuration in the process, so two configurations built here are the same object and an
-        `Accept` added to the default is added to every Graph call this connector goes on to make.
-        The generated builders' own `try_add("Accept", "application/json")` is then a no-op that
-        cannot take it back. `Accept: text/vtt` on a JSON call is not a header nobody reads: it is
-        every other tool answering with a deserialisation failure, from a request this one made.
+        """kiota's `RequestConfiguration.headers` defaults to ONE `HeadersCollection` shared by
+        every configuration in the process, and the generated builders' own
+        `try_add("Accept", "application/json")` cannot take a polluted default back.
 
-        The unrelated call is `shared/identity.py`'s `GET /me`, and what makes it a witness rather
-        than a passenger is that it passes a `RequestConfiguration` of its own. A call passing none
-        would send Graph's default `Accept` whether or not this one had polluted the shared object,
-        so it would keep passing while the leak came back.
+        `shared/identity.py`'s `GET /me` is the witness because it passes a `RequestConfiguration`
+        of its own; a call passing none would keep passing while the leak came back.
         """
         _spoken(graph)
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
@@ -260,20 +234,9 @@ class TestReadingTheWords:
 
 
 class TestNarrowingWhatComesBack:
-    """The filters, over the one transcript that carries every shape the parser survives.
-
-    An hour of meeting is thousands of turns and a model reads it to answer one question, so the
-    narrowing happens here rather than in the model's context. What a caller cannot check for
-    itself is asserted: which turns a bound admits, and that the page and its `next_offset` are
-    counted over what survived the filter rather than over the whole transcript.
-    """
-
     async def test_a_lower_bound_keeps_everything_still_running_at_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Overlap and not containment: the turn that was mid-sentence when the clock struck is the
-        one a caller asking "from here" most wants, and dropping it would silently cut the sentence
-        their question is about."""
         _spoken(graph)
 
         read = await reader.read_transcript(
@@ -303,8 +266,6 @@ class TestNarrowingWhatComesBack:
     async def test_an_upper_bound_keeps_the_turn_that_starts_exactly_on_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Inclusive at both ends, for the same reason: a bound a caller read off a previous answer
-        names a turn that exists, and excluding it would make the two ends disagree."""
         _spoken(graph)
 
         read = await reader.read_transcript(
@@ -355,11 +316,8 @@ class TestNarrowingWhatComesBack:
     async def test_a_speaker_is_matched_case_insensitively_and_by_part_of_the_name(
         self, client: GraphServiceClient, graph: respx.MockRouter, speaker: str
     ) -> None:
-        """A model writes the name it read in a previous answer, or the half of it the caller said.
-        An exact, case-sensitive match would answer "nobody said that" to a question about somebody
-        who spoke: a wrong answer with the shape of a right one. A copied name carries the
-        whitespace around it, and the turn's own speaker is stripped at parse time, so the filter is
-        stripped as well."""
+        """A copied name carries the whitespace around it, and a turn's own speaker is stripped at
+        parse time, so the filter is stripped too."""
         _spoken(graph)
 
         read = await reader.read_transcript(
@@ -371,10 +329,8 @@ class TestNarrowingWhatComesBack:
     async def test_an_entity_in_a_speaker_name_is_unescaped_like_the_words(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """WebVTT escapes `&` inside a cue payload, so a display name that holds one arrives
-        encoded. The name is what a model reports and what `speaker` matches against, so it is
-        unescaped exactly as the words are. Left encoded, a filter written from the reported name
-        would answer "nobody said that" about somebody who spoke."""
+        """WebVTT escapes `&` inside a cue payload, so a display name holding one arrives
+        encoded, and a filter written from the reported name would then match nothing."""
         graph.get(_CONTENT).mock(
             return_value=httpx.Response(
                 200,
@@ -396,8 +352,6 @@ class TestNarrowingWhatComesBack:
     async def test_a_speaker_and_a_window_narrow_together(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """All three at once, which is the question this exists for: what did she say in that
-        stretch. Each filter has to hold, not the last one written."""
         _spoken(graph)
 
         read = await reader.read_transcript(
@@ -415,9 +369,7 @@ class TestNarrowingWhatComesBack:
     async def test_a_page_is_cut_from_what_survived_the_filter(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """A `next_offset` counted over the whole transcript would offer more where the filter
-        already returned everything it matched, and a model would page for turns that cannot come.
-        """
+        """A `next_offset` over the whole transcript would page for turns that cannot come."""
         _spoken(graph)
 
         read = await reader.read_transcript(
@@ -433,10 +385,8 @@ class TestNarrowingWhatComesBack:
     async def test_the_next_offset_of_a_filtered_page_continues_the_filtered_sequence(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The offset a caller sends back has to index the same sequence it was cut from. Counted
-        over the unfiltered turns it would land in the middle of them: offset 2 of this transcript
-        is Ada's second turn, and offset 2 of what `from_seconds=2.0` matched is the unattributed
-        one."""
+        """Offset 2 of this transcript is Ada's second turn; offset 2 of what `from_seconds=2.0`
+        matched is the unattributed one."""
         _spoken(graph)
         handle = _transcript()
 
@@ -467,10 +417,8 @@ class TestNarrowingWhatComesBack:
     async def test_a_speaker_filter_in_a_tenant_with_no_speakers_matches_nothing_and_says_why(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The one empty answer that must not read as "she never spoke". Where the tenant forbids
-        attribution every `speaker` is null, so the filter legitimately matches nothing, and
-        `speaker_attribution` false is the field that explains it. Refusing the call instead would
-        deny a filter the transcript itself supports for time."""
+        """Where the tenant forbids attribution every `speaker` is null, so the filter matches
+        nothing legitimately and only `speaker_attribution` says why."""
         _spoken_by_nobody(graph)
 
         read = await reader.read_transcript(
@@ -495,8 +443,6 @@ class TestNarrowingWhatComesBack:
     async def test_filters_left_unset_return_the_whole_transcript(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The default is the answer this tool gave before the filters existed, and passing the
-        absent value explicitly is what a model does when it has nothing to narrow by."""
         _spoken(graph)
 
         read = await reader.read_transcript(
@@ -520,8 +466,6 @@ class TestNarrowingWhatComesBack:
     async def test_a_window_that_ends_before_it_starts_is_a_programming_error(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """No transcript can satisfy it, so it is a mistake in the caller rather than an empty
-        answer, and the tool layer refuses it before this is ever reached."""
         content = _spoken(graph)
 
         with pytest.raises(AssertionError):

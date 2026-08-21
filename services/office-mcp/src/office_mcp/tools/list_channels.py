@@ -1,17 +1,8 @@
 """`list_channels` — channels of one team the signed-in user can access.
 
-`list_teams` names a team. This tool names a channel inside it, and a channel id alone identifies
-nothing in Graph.
-
-**`$select` is a requirement: it excludes the expensive `email` property.** Graph documents email \
-as "an expensive operation that results in slow performance", and without `$select` every channel \
-listing pays that cost. The collection accepts no `$top` (Graph returns 400), so the window is \
-this connector's own, applied while walking pages.
-
-Private and shared channels the user is not a member of do not appear: Graph filters them out.
-
-Token exchange and error wording belong to `shared/seam.py`. The tool owns the request, window,
-answer shape, fields, permission, and description.
+TRAP: `$select` is a requirement, not an optimisation — it excludes `email`, which Graph documents
+as "an expensive operation that results in slow performance". The collection accepts no `$top`
+(Graph returns 400), so the window is this connector's own, applied while walking pages.
 """
 
 from collections.abc import Mapping
@@ -32,33 +23,23 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "list_channels"
 
-# The one Graph call this tool makes, as the step instruments count it.
 STEP = "channels"
 
-# The delegated permission for this tool's one request: the basic scope over a channel's identity,
-# which is all this collection returns. Reading what was posted in a channel needs the broad
-# `ChannelMessage.Read.All`, which `browse_channel` declares. A tenant commonly grants one and
-# withholds the other, so the two are named separately.
+# Not `ChannelMessage.Read.All`, which browse_channel declares to read what was posted: a tenant
+# commonly grants one and withholds the other.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 
-# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
-# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
+# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"}
 
-# Caps `limit` and bounds Graph requests per call. Graph accepts no `$top` here.
 MAX_CHANNELS = 200
 
-# Excludes `email` (expensive). Excludes `isArchived`: archived channels are a Teams preview
-# feature. Excludes `layoutType`: Graph documents it as always null on this collection.
+# Excludes `isArchived` (a Teams preview) and `layoutType` (Graph documents it as always null).
 _CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
 
-# `membershipType` is an evolvable enum, and `shared` sits after its `unknownFutureValue` sentinel:
-# Graph answers a shared channel with the sentinel unless the request asks for unknown members. The
-# SDK's enum names a member for that literal, so the sentinel reaches the answer as the word
-# `unknownFutureValue`, which says nothing about the channel and is worse than a null. Graph filters
-# on the real value either way, so `$filter=membershipType eq 'shared'` needs no header. This
-# listing reports the type rather than filtering on it, so it does need one.
+# TRAP: without this header Graph answers a shared channel's `membershipType` with the literal
+# `unknownFutureValue` — `shared` sits after that sentinel in the evolvable enum. A `$filter` on the
+# real value needs no header; this listing reports the type instead, so it does.
 _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
@@ -102,8 +83,7 @@ class ChannelSummary(BaseModel):
     @classmethod
     def from_channel(cls, channel: Channel) -> Self:
         assert channel.id is not None, "Graph returned a channel with no id"
-        # `ChannelMembershipType` subclasses `str`, so each member equals its own wire value. A
-        # type the SDK's enum names no member for deserializes to None rather than raising.
+        # `ChannelMembershipType` subclasses `str`. An unnamed type becomes None, never raises.
         return cls(
             channel_id=channel.id,
             display_name=channel.display_name,
@@ -124,7 +104,6 @@ class ChannelList(BaseModel):
 
 
 async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int) -> ChannelList:
-    """The channels of `team_id` the signed-in user can see, up to `limit`."""
     assert 1 <= limit <= MAX_CHANNELS, f"limit must be within 1..{MAX_CHANNELS}, got {limit}"
 
     headers = _headers()
@@ -147,20 +126,14 @@ async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int)
 
 
 def _headers() -> HeadersCollection:
-    """The `Prefer` header, for the first page and every page after it. Built per request: the
-    default collection is shared by all configurations, so adding to it would affect every Graph
-    request this connector makes.
-    """
+    """Built per request: adding to the shared default collection would affect every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool borrows `transport` per call."""
-    # Built here because this is where `transport` is: the dependency closes over it, and the
-    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
-    # not a call. A call there is ruff's B008.
+    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

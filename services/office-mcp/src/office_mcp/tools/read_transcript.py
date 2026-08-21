@@ -1,17 +1,11 @@
 """`read_transcript` — speaker-attributed, timestamped turns from a Teams meeting transcript.
 
-The handle holds the meeting id and the transcript id, so one call reaches `/content`. A reader
-that took the meeting's `meeting_uri` instead would resolve the join URL that
-`list_meeting_transcripts` already resolved, spend a second permission, and answer a 403 that could
-mean either failure. This tool declares `OnlineMeetingTranscript.Read.All` alone, so a tenant can
-withhold `OnlineMeetings.Read` and this tool still answers.
+The handle holds both ids, so one call reaches `/content`. Taking `meeting_uri` instead would
+re-resolve the join URL, spend a second permission, and answer a 403 meaning either failure.
+Declaring `OnlineMeetingTranscript.Read.All` alone lets a tenant withhold `OnlineMeetings.Read`.
 
-Speaker attribution degrades rather than fails: a tenant can forbid speaker names, and the call
-then asks for the unattributed format Microsoft documents. `services/teams-mcp` still hardcodes
-`Accept: text/vtt` and has this gap. `from_seconds`, `to_seconds`, `speaker` and the paging all
-apply after the whole transcript arrives and is parsed, so no argument makes the call cheaper.
-Inverted time bounds and a blank speaker filter are rejected at the call, because both would answer
-with an empty page.
+Speaker attribution degrades rather than fails: a tenant can forbid names and the call then asks
+for the unattributed format. `services/teams-mcp` hardcodes `Accept: text/vtt` and has this gap.
 """
 
 import html
@@ -34,20 +28,16 @@ from office_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "read_transcript"
 
-# The two attempts this tool can make, counted apart. A tenant that will not give speaker names
-# refuses the first and answers the second, so the rate of `transcript_unattributed` is how often
-# that setting costs a caller the speaker names. No operation-level series can show that rate.
+# Counted apart so the rate of `transcript_unattributed` shows how often a tenant's setting costs a
+# caller the speaker names. No operation-level series can show that rate.
 STEP_ATTRIBUTED = "transcript_attributed"
 STEP_UNATTRIBUTED = "transcript_unattributed"
 
-# The one permission this tool's one request needs, admin-consented and independent from recording
-# permissions. `list_meeting_transcripts` declares it too. The name lives in `shared/meetings.py`,
-# because `tests/test_layering.py` rule 4 forbids one tool file from importing another.
+# Admin-consented and independent from the recording permissions. The name lives in
+# `shared/meetings.py`: `tests/test_layering.py` rule 4 forbids importing list_meeting_transcripts.
 GRAPH_PERMISSIONS: tuple[str, ...] = (TRANSCRIPT_PERMISSION,)
 
-# One call that reaches Graph, read by `tools/__init__.py` into the coverage table
-# `tests/test_error_mapping.py` refuses every registered tool from. The ids are invented, but the
-# shape must be one this tool accepts: an argument it rejects never reaches Graph to be refused.
+# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///transcripts/MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
     + "/MSMjMCMjSYNTHETIC0002"
@@ -82,12 +72,8 @@ _BLANK_SPEAKER = (
     + "pass any part of the display name (case-insensitive, matches anywhere)."
 )
 
-# A transcript ages out with its meeting rather than being deleted, about 60 days after a one-off.
-# Say the meeting "expires", not "expired": the policy makes it unreadable, not a past event.
-#
-# Read by `tools/__init__.py` into the advice table `GraphAdviceMiddleware` words a 404 from. Public
-# for that reason: the default advice ("check the id came from a tool response verbatim") is wrong
-# here, because the handle did come from one.
+# Read by `tools/__init__.py` into the 404 advice table: the default advice, to check the id came
+# from a tool response verbatim, is wrong here because the handle did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this transcript. The handle is well formed. Most likely the "
     + "meeting expires after about 60 days for a one-off; transcripts age out with it. Call "
@@ -115,7 +101,6 @@ class TranscriptTurn(BaseModel):
 
     @classmethod
     def from_block(cls, block: str, *, attributed: bool) -> Self | None:
-        """One cue block as a turn, or None when the block is not a cue or holds no words."""
         lines = [line for line in block.split("\n") if line.strip()]
         timing = next(
             (
@@ -173,19 +158,15 @@ async def read_transcript(
     to_seconds: float | None = None,
     speaker: str | None = None,
 ) -> Transcript:
-    """Matching turns from `offset`, up to `limit`.
-
-    One Graph request, or two when Graph refuses speaker attribution.
-    """
+    """Matching turns from `offset`. One Graph request, or two when attribution is refused."""
     assert 1 <= limit <= MAX_TURNS, f"limit must be within 1..{MAX_TURNS}, got {limit}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
     assert from_seconds is None or to_seconds is None or from_seconds <= to_seconds, (
         f"from_seconds must not be after to_seconds, got {from_seconds} and {to_seconds}"
     )
 
-    # REVIEW: every page refetches and reparses the whole transcript, because `/content` has no
-    # ranged contract. Caching the parsed turns would help, but the key must include the caller:
-    # the token is the caller's own, and Graph checks that caller's access on every read.
+    # REVIEW: every page refetches and reparses the whole transcript — `/content` has no ranged
+    # contract. A cache key would have to include the caller: Graph checks access on every read.
     content, attributed = await _content(client, handle)
 
     turns = _matching(
@@ -213,11 +194,6 @@ def _matching(
     to_seconds: float | None,
     speaker: str | None,
 ) -> list[TranscriptTurn]:
-    """Turns matching all filters.
-
-    The time test is overlap, both bounds inclusive. The speaker test is a case-insensitive
-    substring, and whitespace around the filter is ignored.
-    """
     wanted = speaker.strip().casefold() if speaker is not None else None
     return [
         turn
@@ -231,8 +207,7 @@ def _matching(
 # Graph inner code: the tenant permits transcripts but forbids speaker names.
 _SPEAKER_ATTRIBUTION_REFUSED = "SpeakerAttributionNotAllowed"
 
-# VTT is the default and the only format with `<v Speaker>` tags. The unattributed format is a
-# fallback for a tenant that forbids names. Both are selected by header, never by `$format`.
+# VTT is the only format with `<v Speaker>` tags. Both are selected by header, never by `$format`.
 _ATTRIBUTED_FORMAT = "text/vtt"
 _UNATTRIBUTED_FORMAT = "application/vnd.microsoft.graph.transcript+text"
 
@@ -240,18 +215,11 @@ _UNATTRIBUTED_FORMAT = "application/vnd.microsoft.graph.transcript+text"
 async def _content(client: GraphServiceClient, handle: TranscriptHandle) -> tuple[bytes, bool]:
     """Transcript bytes and whether they carry speaker names.
 
-    Retries once, only for the `SpeakerAttributionNotAllowed` inner code. The tenant-wide switch
-    that blocks transcripts answers with the same `403`, and no retry fixes that one, so retrying it
-    would waste a call and report the wrong remedy.
-
-    Each attempt is its own `graph_step` block, inside one `graph_errors` block for the whole tool
-    call. The step blocks are what translate: the raw SDK error carries no inner code before
-    translation, so the `except` clause below needs an attempt-sized block to have already run.
-
-    The nesting also stops a working tenant looking like a broken one. Two `graph_errors` blocks
-    counted the refused first attempt as a `forbidden` operation on a call that went on to succeed,
-    so any alert on refusals fired on a healthy tenant. The refusal now counts against
-    `transcript_attributed`, and the operation counts as an answer.
+    Retries once, only for the `SpeakerAttributionNotAllowed` inner code: the tenant-wide switch
+    that blocks transcripts answers with the same 403, and no retry fixes that one. Each attempt is
+    its own `graph_step` inside one `graph_errors` for the whole call — the raw SDK error carries no
+    inner code until a step block translates it, and two `graph_errors` would count the refused
+    first attempt as a `forbidden` operation on a call that went on to succeed.
     """
     endpoint = (
         client.me.online_meetings.by_online_meeting_id(handle.meeting_id)
@@ -300,7 +268,6 @@ _BLANK_LINE = re.compile(r"\n[ \t]*\n")
 
 
 def _turns(content: bytes, *, attributed: bool) -> list[TranscriptTurn]:
-    """Content as turns. One cue per turn. Skip non-cue blocks. Drop empty turns."""
     text = content.decode("utf-8-sig", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
     turns: list[TranscriptTurn] = []
     for block in _BLANK_LINE.split(text):
@@ -330,10 +297,7 @@ def _seconds(timestamp: str) -> float:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    """Register this tool. The tool borrows `transport` per call."""
-    # Built here because this is where `transport` is: the dependency closes over it, and the
-    # default below is evaluated when the `def` runs, inside this call. The default holds a name,
-    # not a call. A call there is ruff's B008.
+    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
@@ -409,8 +373,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         handle = transcript_handle(uri)
         if handle is None:
             raise ToolError(_NOT_A_TRANSCRIPT_HANDLE)
-        # Reject an inverted time window and a blank speaker. Both return nothing, and nothing
-        # reads like a silent meeting. The schema cannot carry either rule.
+        # The schema cannot carry either rule, and both would answer like a silent meeting.
         if from_seconds is not None and to_seconds is not None and from_seconds > to_seconds:
             raise ToolError(_INVERTED_TIME_WINDOW)
         if speaker is not None and not speaker.strip():

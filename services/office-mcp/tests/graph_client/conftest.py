@@ -1,7 +1,4 @@
-"""Fixtures for the Graph transport tests: a mocked graph.microsoft.com and a client on it.
-
-Every response body here is synthesised. None came from a real tenant.
-"""
+"""Every response body here is synthesised. None came from a real tenant."""
 
 from collections.abc import AsyncGenerator, Iterator
 
@@ -15,7 +12,6 @@ from office_mcp.graph_client import GraphSettings, create_graph_transport, graph
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
-# What FastMCP's On-Behalf-Of exchange would have returned. Only its identity matters.
 CALLER_TOKEN = "synthetic-graph-access-token"
 
 
@@ -38,12 +34,9 @@ def client(transport: httpx.AsyncClient) -> GraphServiceClient:
 
 
 class RecordedSleeps:
-    """Stands in for the `asyncio` module inside the SDK's retry handler.
-
-    The handler only calls `await asyncio.sleep(delay)`, so this records the delays it chose and
-    a 10-second backoff runs instantly. Those delays are the `Retry-After` assertion worth
-    making. Patching `asyncio.sleep` globally would slow or break everything else on the loop.
-    """
+    """Stands in for the `asyncio` module inside the SDK's retry handler, which only calls
+    `await asyncio.sleep(delay)`. Patching `asyncio.sleep` globally would slow everything else on
+    the loop."""
 
     def __init__(self) -> None:
         self.delays: list[float] = []
