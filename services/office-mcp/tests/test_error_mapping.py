@@ -81,8 +81,9 @@ _NAMES_SEVERAL: tuple[str, ...] = tuple(
 )
 
 # The MCP middleware chain the composed app ends up with, outside-in. Two of the six belong to
-# other packages, so the assertion is on names: what is load-bearing is which side of the operations
-# layer the advice sits on rather than the types themselves.
+# other packages, so the assertion is on names rather than on the types: `_McpMetrics` is
+# `unique_mcp`'s own private class, and importing it here to compare types would be reaching past
+# its front door for the sake of a name it already answers to.
 #
 # `BoundedNameMiddleware` is outermost of all, and that position is its whole point rather than a
 # preference — it has to normalise an unresolvable tool name before `_McpMetrics` reads it. See
@@ -95,6 +96,11 @@ _CHAIN = (
     "DereferenceRefsMiddleware",
     "_McpMetrics",
 )
+
+# The two members of that chain that record what happened to a call — one log line, one set of
+# counters — and so the two the advice has to stay outside of. This, rather than the whole tuple
+# above, is the ordering the class below is named for.
+_RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "_McpMetrics")
 
 # Two synthetic tools that refuse identically, one of them mapping its own refusal first.
 _DOUBLY_MAPPED = "read_twice"
@@ -321,15 +327,48 @@ class TestEveryToolTranslatesItsOwnRefusal:
 
 
 class TestWhereTheMappingSits:
+    def _chain_of(self, app: Starlette) -> tuple[str, ...]:
+        server = cast("FastMCP[None]", app.state.fastmcp_server)
+        return tuple(type(middleware).__name__ for middleware in server.middleware)
+
     def test_the_advice_is_outside_the_operations_layer(self, app: Starlette) -> None:
         """The order is load-bearing in both directions. Outside `_McpMetrics`, a refusal is logged
         and counted as it happened, with the Graph failure still under it, and the client is handed
         the polished text; inside it, every operator-facing record of a 403 would read as the advice
         and the cause chain would be gone.
-        """
-        server = cast("FastMCP[None]", app.state.fastmcp_server)
 
-        assert tuple(type(middleware).__name__ for middleware in server.middleware) == _CHAIN
+        The relation alone is asserted, not the chain: a middleware arriving between the advice and
+        the operations layer changes nothing about that, and pinning it here would make this test
+        fail for a reason it does not name.
+        """
+        chain = self._chain_of(app)
+        recording = [chain.index(name) for name in _RECORDS_THE_OUTCOME]
+
+        assert chain.index("GraphAdviceMiddleware") < min(recording), chain
+
+    def test_the_names_that_ordering_is_asserted_over_are_in_the_chain(
+        self, app: Starlette
+    ) -> None:
+        """Guards the guard: the ordering above is asserted between names, and a name that has been
+        renamed upstream orders nothing. Said here so a rename reads as a rename rather than as a
+        `ValueError` raised from the middle of the assertion it invalidated."""
+        chain = self._chain_of(app)
+        named = ("GraphAdviceMiddleware", *_RECORDS_THE_OUTCOME)
+        missing = [name for name in named if name not in chain]
+
+        assert not missing, f"{missing} is no longer in the chain, which is {chain}"
+
+    def test_a_dependency_bump_that_changes_the_chain_at_all_says_so_here(
+        self, app: Starlette
+    ) -> None:
+        """Not an ordering rule: a tripwire, so a middleware that appears or disappears underneath
+        this service is read here rather than inferred later from a metric that stopped being
+        emitted. Two of the six are not this repository's — `DereferenceRefsMiddleware` is
+        FastMCP's, appended at construction, and `_McpMetrics` is `unique_mcp`'s, appended by
+        `setup_ops`. Update this tuple deliberately when a bump moves it; the ordering above is the
+        part that may not move quietly.
+        """
+        assert self._chain_of(app) == _CHAIN
 
     @pytest.mark.usefixtures("obo", "graph")
     async def test_the_operations_layer_logs_the_failure_untranslated(
