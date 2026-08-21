@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from pydantic import validate_email
 from pydantic_core import PydanticCustomError
@@ -63,8 +63,14 @@ def normalized_email(value: str) -> str | None:
 def candidates_from_document(
     document: PartyCollectionDocument, *, search_type: SearchType
 ) -> tuple[PartyCandidate, ...]:
+    return candidates_from_resources(document.data, search_type=search_type)
+
+
+def candidates_from_resources(
+    resources: Sequence[_PartyResource], *, search_type: SearchType
+) -> tuple[PartyCandidate, ...]:
     return tuple(
-        _candidate_from_resource(resource, search_type=search_type) for resource in document.data
+        _candidate_from_resource(resource, search_type=search_type) for resource in resources
     )
 
 

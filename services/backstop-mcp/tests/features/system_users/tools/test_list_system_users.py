@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.system_users.tools.list_system_users import (
@@ -144,11 +144,46 @@ class TestListSystemUsers:
         assert result.cache == "stale"
         assert result.users[0].id == "u1"
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_search_filters_the_cached_catalog_without_a_like_request(self) -> None:
+        base_url = tenant("su-search")
+        users_route = respx.get(f"{base_url}/system-users").mock(
+            return_value=_collection_page(
+                _user("u1"),
+                _user("u2", name="Departed", user_name="jsmith", disabled=True),
+            )
+        )
+        users = system_users_service()
+
+        async with tool_client(base_url) as client:
+            by_login = tool_model(
+                await list_system_users(
+                    search="MLUCAS",
+                    refresh=True,
+                    client=client,
+                    system_users=users,
+                ),
+                ListSystemUsersResponse,
+            )
+            by_name = tool_model(
+                await list_system_users(
+                    search="departed",
+                    client=client,
+                    system_users=users,
+                ),
+                ListSystemUsersResponse,
+            )
+
+        assert users_route.call_count == 1
+        assert "filter[name][like]" not in recorded_requests(users_route.calls)[0].url.params
+        assert [user.id for user in by_login.users] == ["u1"]
+        assert [user.id for user in by_name.users] == ["u2"]
+
 
 class TestListSystemUsersInput:
-    def test_rejects_search(self) -> None:
-        with pytest.raises(ValidationError):
-            _INPUT.validate_python({"search": "mlucas"})
+    def test_accepts_search(self) -> None:
+        _INPUT.validate_python({"search": "mlucas"})
 
     def test_refresh_is_only_for_a_user_reported_missing_colleague(self) -> None:
         doc = list_system_users.__doc__ or ""
@@ -162,4 +197,4 @@ class TestListSystemUsersInput:
         )
         assert field_info.description is not None
         assert "missing colleague" in field_info.description
-        assert "search" not in without_injected_parameters(list_system_users).__annotations__
+        assert "search" in without_injected_parameters(list_system_users).__annotations__

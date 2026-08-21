@@ -17,9 +17,10 @@ async def quick_search(
 ) -> tuple[PartyCandidate, ...]:
     """Fuzzy/name lookup via `GET /quick-search`, pinned to a single `search_type`.
 
-    The only fuzzy primitive Backstop offers: its filter operators are `eq, neq, gt, ge, lt, le`,
-    so `filter[name][eq]=Capstone` returns nothing when the stored record is
-    "Capstone Investment Advisors LP".
+    Prefix-anchored: `Dispersion` misses `Capstone Dispersion`; `Capstone Disp` hits.
+    Collection filters also accept `like` (`filter[name][like]` on organizations,
+    `filter[lastName][like]` on people) — `resolve_party` falls back to those when this
+    returns nothing. `eq` on a partial display name still misses.
 
     Never sends Backstop's `EMAIL_ADDRESS` search type: `resolve_party` routes email-looking
     input to `search_by_email` before reaching here, so this path only ever sees a name.

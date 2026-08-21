@@ -48,6 +48,11 @@ def _to_owner(user: SystemUserDto) -> InternalOwnerResponse:
     )
 
 
+def _user_matches(user: SystemUserDto, needle: str) -> bool:
+    haystacks = (user.name, user.user_name)
+    return any(value is not None and needle in value.casefold() for value in haystacks)
+
+
 @tool(
     annotations=ToolAnnotations(
         readOnlyHint=True,
@@ -58,6 +63,16 @@ def _to_owner(user: SystemUserDto) -> InternalOwnerResponse:
     output_schema=published_output_schema(ListSystemUsersResponse),
 )
 async def list_system_users(
+    search: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional case-insensitive substring of the display name or login. Filters "
+                "the cached catalog in memory — the catalog walk never sends "
+                "`filter[name][like]`."
+            ),
+        ),
+    ] = None,
     refresh: Annotated[
         bool,
         Field(description="Do not pass true unless the user reports a missing colleague."),
@@ -68,11 +83,16 @@ async def list_system_users(
     """List our colleagues' Backstop logins.
 
     Use when you need the `user_name` login that search_opportunities filters on, or to see
-    whether a colleague is `disabled`. These are our staff, not investors. Pass refresh=true
-    only when the user reports a missing colleague.
+    whether a colleague is `disabled`. These are our staff, not investors. Pass `search` to
+    keep colleagues whose name or login contains that substring. Pass refresh=true only when
+    the user reports a missing colleague.
     """
     catalog, cache = await system_users.get(client, refresh=refresh)
+    selected = tuple(catalog.values())
+    if search is not None:
+        needle = search.casefold()
+        selected = tuple(user for user in selected if _user_matches(user, needle))
     return ListSystemUsersResponse(
         cache=cache,
-        users=[_to_owner(user) for user in catalog.values()],
+        users=[_to_owner(user) for user in selected],
     )
