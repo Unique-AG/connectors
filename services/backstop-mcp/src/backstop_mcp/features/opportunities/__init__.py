@@ -12,13 +12,24 @@ opportunity's stage history names only some of the stages it points at, and the 
 here. See `opportunity_stages_service.py`.
 """
 
+from backstop_mcp.features.opportunities.aggregate_search_opportunities import (
+    OpportunityGroupBy,
+    aggregate_search_opportunities,
+)
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.dependencies import get_opportunity_stages_service
 from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityStatus,
     fetch_opportunities,
 )
-from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
+from backstop_mcp.features.opportunities.fetch_search_opportunities import (
+    fetch_search_opportunities,
+)
+from backstop_mcp.features.opportunities.internal_dto import (
+    OpportunityStageDto,
+    SearchOpportunitiesFetchDto,
+    SearchOpportunityDto,
+)
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import (
     OpportunityFetchResponse,
@@ -28,12 +39,17 @@ from backstop_mcp.features.opportunities.responses import (
 
 __all__ = [
     "OpportunityFetchResponse",
+    "OpportunityGroupBy",
     "OpportunityResponse",
     "OpportunityStageDto",
     "OpportunityStageAttributes",
     "OpportunityStagesService",
     "OpportunityStatus",
+    "SearchOpportunitiesFetchDto",
+    "SearchOpportunityDto",
     "StageChangeResponse",
+    "aggregate_search_opportunities",
     "fetch_opportunities",
+    "fetch_search_opportunities",
     "get_opportunity_stages_service",
 ]

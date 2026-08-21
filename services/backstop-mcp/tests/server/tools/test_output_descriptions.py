@@ -98,6 +98,7 @@ def test_the_walker_reaches_nested_payload_models() -> None:
         "ListSystemUsersResponse",
         "ScanCoverageResponse",
         "SearchActivitiesResolvedResponse",
+        "SearchOpportunitiesResolvedResponse",
         "ResolvedCustomFieldValueResponse",
         "ResolvedPartyResponse",
     } <= names
