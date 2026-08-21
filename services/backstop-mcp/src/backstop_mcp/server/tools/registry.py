@@ -18,6 +18,7 @@ from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
 )
 from backstop_mcp.features.custom_fields.tools.list_custom_fields import list_custom_fields
 from backstop_mcp.features.opportunities.tools.get_opportunities import get_opportunities
+from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
@@ -36,6 +37,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_activity_detail,
     search_activities,
     get_opportunities,
+    search_opportunities,
     get_time_series,
     get_product_investors,
     get_accounts_for_party,

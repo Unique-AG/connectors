@@ -89,7 +89,7 @@ def _stage_ref_id(value: object) -> str | None:
         return None
 
 
-def _stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
+def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str, str]:
     """Stage id to name for every `opportunity-stages` resource side-loaded with the response.
 
     Selected by JSON:API `type` rather than followed from linkage, because the stages a history
@@ -116,7 +116,7 @@ def _stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[st
     return names
 
 
-def _resolve_stage_name(
+def resolve_stage_name(
     stage_id: str | None,
     *,
     side_loaded: Mapping[str, str],
@@ -137,10 +137,10 @@ def _resolve_stage_name(
     return known.name if known is not None else None
 
 
-def _current_stage_id(resource: OpportunityResource) -> str | None:
+def current_stage_id(resource: OpportunityResource) -> str | None:
     """The deal's current stage id, stripped to match how both stage indexes are keyed.
 
-    `BackstopRelationshipRef.id` carries no `StringConstraints`, while `_stage_names_from_included`
+    `BackstopRelationshipRef.id` carries no `StringConstraints`, while `stage_names_from_included`
     keys on a stripped id and the vocabulary's come from `BackstopApiResource`, which strips its
     own. A padded linkage id would otherwise miss both and report a resolvable stage as unnamed.
     """
@@ -216,7 +216,7 @@ def stage_history(
             StageChangeResponse.model_validate(
                 {
                     **attributes,
-                    "stage": _resolve_stage_name(
+                    "stage": resolve_stage_name(
                         stage_id, side_loaded=side_loaded, vocabulary=vocabulary
                     ),
                     "stage_id": stage_id,
@@ -241,15 +241,15 @@ def _project_opportunities(
     other deals are still an answer, and this is the whole reason the fetch does not hand the
     page a typed schema.
     """
-    side_loaded = _stage_names_from_included(included)
+    side_loaded = stage_names_from_included(included)
     projected: list[OpportunityResponse] = []
     for resource in resources:
         try:
-            stage_id = _current_stage_id(resource)
+            stage_id = current_stage_id(resource)
             projected.append(
                 OpportunityResponse.from_resource(
                     resource,
-                    stage=_resolve_stage_name(
+                    stage=resolve_stage_name(
                         stage_id, side_loaded=side_loaded, vocabulary=vocabulary
                     ),
                     stage_id=stage_id,
@@ -270,7 +270,7 @@ def _project_opportunities(
     return tuple(projected)
 
 
-async def _resolved_vocabulary(
+async def await_vocabulary(
     vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
 ) -> dict[str, OpportunityStageDto]:
     """The vocabulary mapping, whether the caller already had it or is still fetching it.
@@ -315,7 +315,7 @@ async def fetch_opportunities(
             max_records=None,
             page_size=_PAGE_SIZE,
         ),
-        _resolved_vocabulary(vocabulary),
+        await_vocabulary(vocabulary),
     )
     fetched = _project_opportunities(
         page.items, included=page.included, vocabulary=resolved_vocabulary

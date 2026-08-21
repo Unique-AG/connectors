@@ -1,3 +1,4 @@
+from datetime import date
 from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict
@@ -5,7 +6,13 @@ from pydantic import BaseModel, ConfigDict
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 
-__all__ = ["OpportunityStageDto"]
+__all__ = [
+    "InvestorChipDto",
+    "OpportunityStageDto",
+    "ProductChipDto",
+    "SearchOpportunitiesFetchDto",
+    "SearchOpportunityDto",
+]
 
 
 class OpportunityStageDto(BaseModel):
@@ -36,3 +43,61 @@ class OpportunityStageDto(BaseModel):
             closed=bool(resource.attributes.closed),
             sort_order=resource.attributes.sort_order,
         )
+
+
+class InvestorChipDto(BaseModel):
+    """The investor side-load on a firm-wide opportunity (`contacts`, not organizations)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    name: str | None = None
+    country: str | None = None
+    state: str | None = None
+    city: str | None = None
+
+
+class ProductChipDto(BaseModel):
+    """The product side-load on a firm-wide opportunity."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    name: str | None = None
+
+
+class SearchOpportunityDto(BaseModel):
+    """One deal from `GET /opportunities`, plus investor and product chips when they arrived."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str
+    name: str | None = None
+    stage: str | None = None
+    stage_id: str | None = None
+    previous_stage: str | None = None
+    is_open: bool | None = None
+    probability: float | None = None
+    requested_amount: float | None = None
+    allocated_amount: float | None = None
+    currency: str | None = None
+    expected_investment_date: date | None = None
+    closed_date: date | None = None
+    days_open: int | None = None
+    days_in_current_stage: int | None = None
+    date_entered_current_stage: date | None = None
+    investor: InvestorChipDto | None = None
+    product: ProductChipDto | None = None
+
+
+class SearchOpportunitiesFetchDto(BaseModel):
+    """Projected deals from one firm-wide walk, plus how much of the collection was seen."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[SearchOpportunityDto, ...]
+    rows_received: int
+    rows_dropped: int
+    total_count: int | None
+    truncated: bool
+    partial_due_to_error: bool = False
