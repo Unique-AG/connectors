@@ -21,6 +21,7 @@ from backstop_mcp.features.opportunities.tools.get_opportunities import get_oppo
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
+from backstop_mcp.features.system_users.tools.list_system_users import list_system_users
 
 type ToolFunction = Callable[..., Awaitable[object]]
 
@@ -30,6 +31,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     list_custom_fields,
     list_custom_field_groups,
     list_activity_tags,
+    list_system_users,
     get_activity_history,
     get_activity_detail,
     search_activities,

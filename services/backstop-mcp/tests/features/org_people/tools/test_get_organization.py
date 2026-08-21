@@ -579,6 +579,7 @@ class TestGetOrganizationIncludes:
             "user_name": "mlucas",
             "email": "margaret.lucas@capstoneco.com",
             "phone": "12122321462",
+            "disabled": False,
         }
         # The tool has to say this reaches our own office, not the organization.
         assert "not a way to contact the organization" in (get_organization.__doc__ or "")

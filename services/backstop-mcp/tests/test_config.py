@@ -82,6 +82,7 @@ class TestBackstopConfigDefaults:
         assert config.custom_field_schema_ttl_minutes == 24 * 60
         assert config.opportunity_stage_ttl_minutes == 60
         assert config.activity_tag_ttl_minutes == 24 * 60
+        assert config.system_user_ttl_minutes == 24 * 60
         assert config.employment_relationship_type_ids == ()
         assert config.employment_relationship_type_markers == ("employ",)
         assert config.former_employment_relationship_type_ids == ()
@@ -116,6 +117,7 @@ class TestBackstopConfigDefaults:
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "120")
         monkeypatch.setenv("BACKSTOP_OPPORTUNITY_STAGE_TTL_MINUTES", "30")
         monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_TTL_MINUTES", "90")
+        monkeypatch.setenv("BACKSTOP_SYSTEM_USER_TTL_MINUTES", "45")
 
         config = BackstopConfig()
 
@@ -129,6 +131,7 @@ class TestBackstopConfigDefaults:
         assert config.custom_field_schema_ttl_minutes == 120
         assert config.opportunity_stage_ttl_minutes == 30
         assert config.activity_tag_ttl_minutes == 90
+        assert config.system_user_ttl_minutes == 45
 
     def test_employment_relationship_types_parse_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "1, 2,3")
@@ -178,6 +181,14 @@ class TestBackstopConfigDefaults:
     def test_activity_tag_ttl_rejects_zero(self) -> None:
         with pytest.raises(ValueError, match="activity_tag_ttl_minutes"):
             BackstopConfig(activity_tag_ttl_minutes=0)
+
+    def test_system_user_ttl_rejects_values_over_24_hours(self) -> None:
+        with pytest.raises(ValueError, match="system_user_ttl_minutes"):
+            BackstopConfig(system_user_ttl_minutes=24 * 60 + 1)
+
+    def test_system_user_ttl_rejects_zero(self) -> None:
+        with pytest.raises(ValueError, match="system_user_ttl_minutes"):
+            BackstopConfig(system_user_ttl_minutes=0)
 
 
 class TestActivityHistoryConfig:

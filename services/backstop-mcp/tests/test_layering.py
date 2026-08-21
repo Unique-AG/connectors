@@ -129,6 +129,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.opportunities",
     "backstop_mcp.features.org_people",
     "backstop_mcp.features.party_resolver",
+    "backstop_mcp.features.system_users",
     "backstop_mcp.server.tools",
 )
 

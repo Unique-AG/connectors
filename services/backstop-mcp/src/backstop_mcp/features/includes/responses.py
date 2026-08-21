@@ -222,6 +222,13 @@ class InternalOwnerResponse(OmitNoneModel):
     phone: _CleanStr = Field(
         default=None, alias="phoneNumber", description="Their office phone number at our firm."
     )
+    disabled: bool | None = Field(
+        default=None,
+        description=(
+            "True when this colleague's login is disabled. Do not treat their empty pipeline "
+            "as 'no coverage' — the filter matched a departed login."
+        ),
+    )
 
 
 type OrganizationInclude = Literal[
@@ -352,9 +359,7 @@ class ActivityTagChipResponse(OmitNoneModel):
             "Backstop id of this activity tag. Echo it into activity_tag_ids; never invent one."
         ),
     )
-    name: _CleanStr = Field(
-        default=None, description="Tag name as Backstop publishes it."
-    )
+    name: _CleanStr = Field(default=None, description="Tag name as Backstop publishes it.")
 
 
 class ActivityAttendeeResponse(OmitNoneModel):
@@ -369,9 +374,7 @@ class ActivityAttendeeResponse(OmitNoneModel):
             "Omitted when the side-load has no id."
         ),
     )
-    name: _CleanStr = Field(
-        default=None, description="Display name as Backstop stores it."
-    )
+    name: _CleanStr = Field(default=None, description="Display name as Backstop stores it.")
 
 
 type ActivityInclude = Literal["activity_tags", "attendees"]

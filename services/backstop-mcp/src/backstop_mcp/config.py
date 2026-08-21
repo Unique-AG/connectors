@@ -252,6 +252,12 @@ class BackstopConfig(BaseSettings):
     # collection.
     activity_tag_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
+    # How long a fetched system-user catalog stays usable before it is re-fetched. The roster
+    # changes rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit
+    # for days after a colleague is added or disabled. `list_system_users(refresh=true)` forces
+    # a refetch when someone is missing.
+    system_user_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
+
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
     # exactly; markers match case-insensitively as substrings of the type's name.
