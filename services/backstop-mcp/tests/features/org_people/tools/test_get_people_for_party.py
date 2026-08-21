@@ -45,6 +45,7 @@ class TestGetPeopleForParty:
                                 "name": "Glenn, Phil",
                                 "jobTitle": "Tax Director",
                                 "email": "phil@example.com",
+                                "categories": ["Investor", "Decision Maker"],
                             },
                         }
                     ],
@@ -81,6 +82,7 @@ class TestGetPeopleForParty:
         assert row.search_type == "people"
         assert row.name == "Glenn, Phil"
         assert row.job_title == "Tax Director"
+        assert row.categories == ("Investor", "Decision Maker")
         assert row.employment.status == "current"
         assert row.employment.organization_id == _ORG
         assert result.former_omitted == 0
@@ -150,6 +152,9 @@ class TestGetPeopleForParty:
     @respx.mock
     async def test_unknown_party_is_not_found(self, client: BackstopClient) -> None:
         respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+        respx.get(f"{BASE_URL}/organizations").mock(
             return_value=httpx.Response(200, json={"data": []})
         )
 

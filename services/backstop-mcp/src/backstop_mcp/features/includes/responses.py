@@ -13,7 +13,7 @@ it. The ids are in the right space for that — `primary_contact` side-loads `pe
 side-loads `organizations`, which is what those two tools resolve against.
 
 `extra="ignore"` does the trimming: a `contact-locations` resource ships 17 attributes and
-`ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 5. Where
+`ContactLocationResponse` keeps 8; a person ships 31 and `ContactCardResponse` keeps 6. Where
 Backstop stores one fact twice — `city`/`cityResolvedName`, `state`/`stateResolvedName`,
 `country`/`countryResolvedName`, `isPrimaryLocation`/`primaryLocation` — only the plain name is
 bound and the twin is dropped, so a reader is never left deciding which of two spellings to
@@ -33,7 +33,8 @@ An include literally named `emails` would invite a model to pull hundreds of mes
 looking for an address, so it is exposed as `email_addresses`.
 """
 
-from typing import Annotated, ClassVar, Literal
+from collections.abc import Mapping, Sequence
+from typing import Annotated, ClassVar, Literal, cast
 
 from pydantic import BeforeValidator, ConfigDict, Field
 
@@ -44,6 +45,30 @@ from backstop_mcp.models import OmitNoneModel
 def _blank_to_none(value: object) -> object:
     """Backstop sends `""` where it means "unset" — `fax` and `secondaryPhoneNumber` both do."""
     return (value.strip() or None) if isinstance(value, str) else value
+
+
+def _mapping_name(item: Mapping[object, object]) -> str | None:
+    raw_name = item.get("name")
+    if isinstance(raw_name, str) and raw_name.strip():
+        return raw_name.strip()
+    return None
+
+
+def _categories(value: object) -> object:
+    """Accept a list of strings or `{name}` objects; empty becomes None."""
+    if value is None:
+        return None
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return None
+    names: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+        elif isinstance(item, Mapping):
+            raw_name = _mapping_name(cast("Mapping[object, object]", item))
+            if raw_name is not None:
+                names.append(raw_name)
+    return tuple(names) or None
 
 
 # Annotated on the *union*, not on the `str` arm: a `BeforeValidator` inside
@@ -165,6 +190,13 @@ class ContactCardResponse(OmitNoneModel):
         default=None,
         alias="companyName",
         description="Name of the organization the person works at.",
+    )
+    categories: Annotated[tuple[str, ...] | None, BeforeValidator(_categories)] = Field(
+        default=None,
+        description=(
+            "CRM categories on this person — investor type, role, or similar labels. "
+            "Omitted when Backstop sends none."
+        ),
     )
 
 

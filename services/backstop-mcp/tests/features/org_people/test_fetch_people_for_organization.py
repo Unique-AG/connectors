@@ -79,6 +79,7 @@ class TestFetchPeopleForOrganization:
                         "name": "Glenn, Phil",
                         "jobTitle": "Tax Director",
                         "email": "phil@example.com",
+                        "categories": ["Investor", "Decision Maker"],
                     },
                 ),
                 included=[
@@ -103,11 +104,12 @@ class TestFetchPeopleForOrganization:
         assert listing.people[0].card is not None
         assert listing.people[0].card.name == "Glenn, Phil"
         assert listing.people[0].card.job_title == "Tax Director"
+        assert listing.people[0].card.categories == ("Investor", "Decision Maker")
         assert listing.former_omitted == 0
         assert listing.people_omitted == 0
         query = dict(route.calls.last.request.url.params)
         assert query["include"] == "entityRelationships,entityRelationships.entityRelationshipType"
-        assert query["fields[employees]"] == "name,jobTitle,email,phone,companyName"
+        assert query["fields[employees]"] == "name,jobTitle,email,phone,companyName,categories"
         assert any(
             request.url.path.endswith("/entityRelationships")
             for request in recorded_requests(respx.calls)
