@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.0...sharepoint-connector@3.1.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **confluence-connector,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** allow azurerm v4 or v5 (&gt;= 4, &lt; 6) in remaining modules ([#768](https://github.com/Unique-AG/connectors/issues/768)) ([dcdd34f](https://github.com/Unique-AG/connectors/commit/dcdd34f521aac36ffa7d388c0478b7e4e8237368))
+
 ## [3.1.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.0.0...sharepoint-connector@3.1.0) (2026-07-20)
 
 
