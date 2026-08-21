@@ -19,6 +19,7 @@ from backstop_mcp.features.accounts.fetch_holdings_table import (
     HoldingsTableShapeError,
     fetch_holdings_table,
 )
+from backstop_mcp.features.accounts.fetch_product import fetch_product, fetch_product_catalog
 from backstop_mcp.features.accounts.fetch_time_series import (
     fetch_time_series,
     require_series_for_entity,
@@ -38,6 +39,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     InvestorTypeDto,
     MoneyDto,
     ProductCandidate,
+    ProductFetchDto,
     ProductResolution,
     ResolvedProductDto,
     ShareDto,
@@ -82,6 +84,7 @@ __all__ = [
     "PartyAccountsResolvedResponse",
     "ProductAmbiguousResponse",
     "ProductCandidate",
+    "ProductFetchDto",
     "ProductInvestorsResolvedResponse",
     "ProductResolution",
     "ResolvedProductDto",
@@ -95,6 +98,8 @@ __all__ = [
     "fetch_accounts_for_product",
     "fetch_holdings",
     "fetch_holdings_table",
+    "fetch_product",
+    "fetch_product_catalog",
     "fetch_time_series",
     "require_series_for_entity",
     "resolve_product",

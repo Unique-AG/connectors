@@ -1,5 +1,6 @@
 """`get_capital_flows`: subscriptions and redemptions in a mandatory date window."""
 
+from collections.abc import Sequence
 from datetime import date
 from typing import Annotated, Literal, Self
 
@@ -93,6 +94,12 @@ class CapitalFlowsResolvedResponse(OmitNoneModel):
     unattributed_count: int = Field(
         description="Redemptions that could not be tied to an account. Included in `flows`."
     )
+    truncated: bool = Field(
+        description=(
+            "True when matching actuals exceeded `max_rows`. Counts are over the matching "
+            "set, not the truncated `flows` list."
+        )
+    )
 
 
 @tool(
@@ -123,9 +130,30 @@ async def get_capital_flows(
         Field(
             ge=1,
             le=_MAX_ROWS,
-            description="Row cap. Counts on the response are over the uncapped actuals.",
+            description="Row cap applied after owner/account filters. Counts are over the match.",
         ),
     ] = _DEFAULT_MAX_ROWS,
+    owner_id: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description=(
+                "Keep flows whose included owner id matches. Echo from get_accounts_for_party "
+                "or a prior resolve. Unattributed rows have no owner and drop out."
+            ),
+        ),
+    ] = None,
+    account_ids: Annotated[
+        Sequence[str] | None,
+        Field(
+            default=None,
+            description=(
+                "Keep flows whose account id is in this list. Echo account ids from "
+                "get_accounts_for_party or get_product_investors. Rows have no product — join "
+                "this way. Unattributed rows drop out."
+            ),
+        ),
+    ] = None,
     client: BackstopClient = Depends(get_backstop_client),
 ) -> CapitalFlowsResolvedResponse:
     """Subscriptions and redemptions in a date window — also the only share-class source.
@@ -134,18 +162,42 @@ async def get_capital_flows(
     Actuals only (`COMPLETED`). A redemption has no account of its own and is attributed
     through `originalSubscription`; when that chain is missing the row is `unattributed`,
     not omitted. `share_class` / `share_series` live on the subscription, not the account.
+
+    Rows carry no product. For "which share class is X in within Fund Y", take that party's
+    account ids from `get_accounts_for_party` (or `get_product_investors`) and pass them as
+    `account_ids` **before** `max_rows` cuts the list. Share class lives on the original
+    subscription, so the window must include that subscription's `transaction_date`, not only
+    the period you are asking about.
     """
     if start_date > end_date:
         raise ValueError("start_date must not be after end_date")
     fetched = await fetch_capital_flows(client, start_date=start_date, end_date=end_date)
-    subscription_count = sum(1 for row in fetched.rows if row.kind == "subscription")
-    redemption_count = sum(1 for row in fetched.rows if row.kind == "redemption")
-    unattributed_count = sum(1 for row in fetched.rows if row.unattributed)
+    wanted_accounts = frozenset(account_ids) if account_ids is not None else None
+    matched = tuple(
+        row
+        for row in fetched.rows
+        if _flow_matches(row, owner_id=owner_id, account_ids=wanted_accounts)
+    )
+    subscription_count = sum(1 for row in matched if row.kind == "subscription")
+    redemption_count = sum(1 for row in matched if row.kind == "redemption")
+    unattributed_count = sum(1 for row in matched if row.unattributed)
     return CapitalFlowsResolvedResponse(
         request_count=fetched.request_count,
-        flows=tuple(CapitalFlowRowResponse.from_dto(row) for row in fetched.rows[:max_rows]),
-        total=len(fetched.rows),
+        flows=tuple(CapitalFlowRowResponse.from_dto(row) for row in matched[:max_rows]),
+        total=len(matched),
         subscription_count=subscription_count,
         redemption_count=redemption_count,
         unattributed_count=unattributed_count,
+        truncated=len(matched) > max_rows,
     )
+
+
+def _flow_matches(
+    row: CapitalFlowDto,
+    *,
+    owner_id: str | None,
+    account_ids: frozenset[str] | None,
+) -> bool:
+    if owner_id is not None and (row.owner is None or row.owner.id != owner_id):
+        return False
+    return account_ids is None or (row.account is not None and row.account.id in account_ids)
