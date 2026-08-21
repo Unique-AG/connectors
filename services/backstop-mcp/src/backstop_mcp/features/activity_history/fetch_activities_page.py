@@ -43,7 +43,7 @@ __all__ = [
     "EmailPageDto",
     "Segment",
     "fetch_activity_page",
-    "fetch_activities_page_by_type",
+    "fetch_activities_page",
     "fetch_email_page",
 ]
 
@@ -227,7 +227,7 @@ async def fetch_email_page(
     return EmailPageDto(items=items, end_of_stream=end_of_stream)
 
 
-async def fetch_activities_page_by_type(
+async def fetch_activities_page(
     client: BackstopClient,
     *,
     activity_type: ActivityType,

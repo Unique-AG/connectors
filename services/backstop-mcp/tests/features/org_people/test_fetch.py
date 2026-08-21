@@ -1,9 +1,14 @@
+from importlib import import_module
+
 import httpx
 import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
-from backstop_mcp.features.org_people.fetch import MAX_ORG_PEOPLE, fetch_people_for_organization
+from backstop_mcp.features.org_people.fetch_people_for_organization import (
+    MAX_ORG_PEOPLE,
+    fetch_people_for_organization,
+)
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
     FORMER_MIRROR_TYPE,
@@ -213,7 +218,12 @@ class TestFetchPeopleForOrganization:
     async def test_caps_the_fan_out(
         self, client: BackstopClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.features.org_people.fetch.MAX_ORG_PEOPLE", 1)
+        # Package re-exports a same-named function; dotted setattr would bind it, not the module.
+        monkeypatch.setattr(
+            import_module("backstop_mcp.features.org_people.fetch_people_for_organization"),
+            "MAX_ORG_PEOPLE",
+            1,
+        )
         respx.get(_EMPLOYEES_URL).mock(
             return_value=_employees_page(
                 ("p1", {"name": "A"}),

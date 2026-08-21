@@ -296,7 +296,7 @@ class ActivityHistoryConfig(BaseSettings):
     combined result. A page can therefore return up to `page_size * number of active streams`
     records — a deliberate simplification (UN-23680) rather than a hard total-output cap.
 
-    `gist_chars` is the character budget `gist_from_html.to_gist` truncates each record's
+    `gist_chars` is the character budget `extract_gist_from_html` truncates each record's
     body to.
     """
 

@@ -6,7 +6,7 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.accounts import resolve_product
-from backstop_mcp.features.accounts.product import LARGE_CATALOG
+from backstop_mcp.features.accounts.resolve_product import LARGE_CATALOG
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, collection, resource

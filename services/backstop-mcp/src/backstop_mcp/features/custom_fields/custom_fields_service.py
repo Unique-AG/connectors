@@ -4,7 +4,9 @@ from datetime import timedelta
 from typing import Literal, Self
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
+from backstop_mcp.features.custom_fields.fetch_custom_field_definitions import (
+    fetch_custom_field_definitions,
+)
 from backstop_mcp.features.custom_fields.internal_dto import CustomFieldDefinitionDto
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
 from backstop_mcp.timed_gate import TimedGate

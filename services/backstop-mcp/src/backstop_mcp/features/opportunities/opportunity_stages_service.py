@@ -3,37 +3,17 @@ import logging
 from datetime import timedelta
 from typing import Self
 
-from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.opportunities.fetch_opportunity_stages import fetch_opportunity_stages
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
 
-_STAGES_PATH = "/opportunity-stages"
-_STAGES_PAGE_SIZE = 100
-
 # How long a failed fetch is remembered before Backstop is tried again. Long enough that a burst
 # of tool calls against a down instance costs one round-trip rather than one each, short enough
 # that a recovered instance is picked up without an operator waiting on the TTL.
 _FAILURE_COOLDOWN = timedelta(seconds=30)
-
-
-async def fetch_opportunity_stages(client: BackstopClient) -> dict[str, OpportunityStageDto]:
-    """Fetch the instance's opportunity-stage vocabulary, keyed by stage id."""
-    page = await client.paginate(
-        _STAGES_PATH,
-        schema=BackstopApiResource[OpportunityStageAttributes],
-        max_records=None,
-        page_size=_STAGES_PAGE_SIZE,
-    )
-
-    stages: dict[str, OpportunityStageDto] = {}
-    for resource in page.items:
-        stage = OpportunityStageDto.from_resource(resource)
-        if stage is not None:
-            stages[stage.id] = stage
-    return stages
 
 
 class OpportunityStagesService:

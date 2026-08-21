@@ -1,6 +1,6 @@
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
 from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto
-from backstop_mcp.features.accounts.product import (
+from backstop_mcp.features.accounts.resolve_product import (
     match_product,
     product_label,
 )

@@ -7,6 +7,7 @@ from backstop_mcp.dates import LenientDate
 from backstop_mcp.lenient import LenientBool, LenientFloat
 
 __all__ = [
+    "ACCOUNT_LISTING_FIELDS",
     "AccountApiResponse",
     "AccountAttributes",
     "InvestorQualificationAttributes",
@@ -75,6 +76,30 @@ class AccountAttributes(BaseModel):
     aml_check_complete: LenientBool = Field(default=None, alias="amlCheckComplete")
     new_issue_eligible: _StrippedStr | None = Field(default=None, alias="newIssueEligible")
     us_domiciled: LenientBool = Field(default=None, alias="usDomiciled")
+
+
+# Exactly the attributes `AccountAttributes` reads, by wire name. Anything added there has to be
+# added here too, or it arrives as `None` on every row instead of failing loudly.
+#
+# `closedDate` has to stay in this fieldset and stay meaningful: open is *the key was absent on
+# the wire*, so a `fields=` set that materialized it as null would report every account closed.
+# It does not — of 200 rows fetched this way the key was absent on 8 and null on 0, matching
+# what the same accounts return unfiltered.
+ACCOUNT_LISTING_FIELDS = ",".join(
+    (
+        "name",
+        "currency",
+        "accountStartDate",
+        "closedDate",
+        "ownershipType",
+        "investorQualification",
+        "isEmployeeAccount",
+        "isGpAccount",
+        "amlCheckComplete",
+        "newIssueEligible",
+        "usDomiciled",
+    )
+)
 
 
 class OwnerAttributes(BaseModel):

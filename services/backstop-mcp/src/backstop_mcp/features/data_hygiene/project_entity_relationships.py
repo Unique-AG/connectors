@@ -47,7 +47,7 @@ def _parse_resources[AttrT](
     return parsed
 
 
-def entity_relationships[AttrT](
+def project_entity_relationships[AttrT](
     document: BackstopApiResourceDocument[AttrT],
 ) -> EntityRelationshipsDto:
     """`relationships` and `relationship_types` for an employment index, from one document."""

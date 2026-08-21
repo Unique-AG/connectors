@@ -8,7 +8,7 @@ from backstop_mcp.features.party_resolver.internal_dto import (
     QuickSearchOptionsDto,
     ResolvedPartyDto,
 )
-from backstop_mcp.features.party_resolver.resolve import resolve_parties, resolve_party
+from backstop_mcp.features.party_resolver.resolve_party import resolve_parties, resolve_party
 from backstop_mcp.features.party_resolver.responses import (
     PartyAmbiguousResponse,
     PartyCandidateResponse,

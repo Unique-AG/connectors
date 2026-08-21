@@ -41,7 +41,7 @@ def latest_figure(resources: Sequence[SeriesPointResource]) -> SeriesFigureDto |
     return SeriesFigureDto(latest=latest, valued=max(valued, key=_by_date) if valued else None)
 
 
-async def fetch_latest_figure(client: BackstopClient, path: str) -> SeriesFigureDto | None:
+async def fetch_series(client: BackstopClient, path: str) -> SeriesFigureDto | None:
     """Latest figure on `path`: first 10 rows of `sort=-date`, then `latest_figure`."""
     page = await client.fetch_page(
         path,

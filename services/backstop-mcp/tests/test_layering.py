@@ -50,7 +50,17 @@
    response class *is* the wire shape. `features/resolution.py` is cross-cutting rather than
    per-feature and keeps its filename.
 
-All five are asserted by walking the AST rather than importing anything, so a violation is
+6. **A logic module is named after the symbol it defines.** The filename stem, or the PascalCase
+   of it, must be a top-level function, class, or assignment in that file — `fetch_series.py`
+   holds `fetch_series`, `custom_fields_service.py` holds `CustomFieldsService`. That is how the
+   tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
+   `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
+   modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
+   `includes/types.py`, `settings.py`) keep their names; `_`-prefixed modules are private shared
+   utilities. `features/auth/` is out of scope; `features/resolution.py` is already exempt by
+   name in rule 5.
+
+All six are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
 """
 
@@ -343,6 +353,58 @@ def _governed_model_layer_sources() -> list[pathlib.Path]:
     return [source for source in _governed_model_sources() if _model_layer_for_path(source)]
 
 
+_LOGIC_NAME_VOCABULARY_FILES = frozenset({"entity_types.py", "settings.py", "resolution.py"})
+_LOGIC_NAME_VOCABULARY_PATHS = frozenset({pathlib.Path("includes") / "types.py"})
+
+
+def _pascal_case_stem(stem: str) -> str:
+    """`custom_fields_service` → `CustomFieldsService`; a leading `_` is dropped."""
+    return "".join(part.capitalize() for part in stem.split("_") if part)
+
+
+def _is_governed_logic_source(source: pathlib.Path) -> bool:
+    relative = _feature_relative(source)
+    if relative is None or not relative.parts:
+        return False
+    if source.name == "__init__.py" or relative.parts[0] == "auth":
+        return False
+    if source.name in _LOGIC_NAME_VOCABULARY_FILES or relative in _LOGIC_NAME_VOCABULARY_PATHS:
+        return False
+    if source.name.startswith("_"):
+        return False
+    if _model_layer_for_path(source) is not None:
+        return False
+    return not any(part.startswith(layer) for part in relative.parts for layer in _MODEL_LAYERS)
+
+
+def _governed_logic_sources() -> list[pathlib.Path]:
+    return sorted(source for source in _FEATURES.rglob("*.py") if _is_governed_logic_source(source))
+
+
+def _top_level_defined_names(tree: ast.Module) -> set[str]:
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+    return names
+
+
+def _logic_module_name_violations(source: str, path: pathlib.Path) -> list[str]:
+    if not _is_governed_logic_source(path):
+        return []
+    stem = path.stem
+    pascal = _pascal_case_stem(stem)
+    defined = _top_level_defined_names(ast.parse(source, filename=str(path)))
+    if stem in defined or pascal in defined:
+        return []
+    matching = repr(stem) if pascal == stem else f"{stem!r} or {pascal!r}"
+    return [f"{path.relative_to(_SRC)} defines no symbol matching {matching}"]
+
+
 class TestTheDetectionItself:
     """The rules are only worth having if they fail on the things they're meant to catch."""
 
@@ -500,6 +562,34 @@ class TestTheDetectionItself:
             _FEATURES / "party_resolver" / "api_responses.py",
         )
 
+    def test_catches_a_logic_module_named_after_a_mechanism(self) -> None:
+        assert _logic_module_name_violations(
+            "def something(): ...\n",
+            _FEATURES / "accounts" / "fetch.py",
+        ) == ["features/accounts/fetch.py defines no symbol matching 'fetch' or 'Fetch'"]
+
+    def test_accepts_a_logic_module_named_after_its_function(self) -> None:
+        assert not _logic_module_name_violations(
+            "async def fetch_series(): ...\n",
+            _FEATURES / "accounts" / "fetch_series.py",
+        )
+
+    def test_accepts_a_logic_module_named_after_its_class(self) -> None:
+        assert not _logic_module_name_violations(
+            "class CustomFieldsService: ...\n",
+            _FEATURES / "custom_fields" / "custom_fields_service.py",
+        )
+
+    def test_does_not_fire_on_a_vocabulary_module(self) -> None:
+        path = _FEATURES / "party_resolver" / "api_responses.py"
+        assert not _is_governed_logic_source(path)
+        assert not _logic_module_name_violations("class PartyAttributes: ...\n", path)
+
+    def test_does_not_fire_on_a_private_shared_utility(self) -> None:
+        path = _FEATURES / "party_resolver" / "_party_search_types.py"
+        assert not _is_governed_logic_source(path)
+        assert not _logic_module_name_violations("EMAIL_FIELDS = {}\n", path)
+
 
 class TestFeaturesDoNotImportServer:
     def test_the_feature_tree_is_actually_there(self) -> None:
@@ -631,5 +721,21 @@ class TestFeatureModelLayers:
         assert not violations, (
             '*Attributes default to extra="ignore"; extra="allow" is only for passthrough '
             + "responses:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestLogicModuleNames:
+    def test_the_logic_modules_are_actually_there(self) -> None:
+        """Guards the guard: a vacated tree must not silently skip the assertion below."""
+        sources = _governed_logic_sources()
+        assert sources, "no logic modules found"
+
+    @pytest.mark.parametrize("source", _governed_logic_sources(), ids=_source_id)
+    def test_logic_module_defines_a_matching_symbol(self, source: pathlib.Path) -> None:
+        violations = _logic_module_name_violations(source.read_text(), source)
+        assert not violations, (
+            "a logic module is named after the function (or class) it exposes, not after a "
+            + "mechanism:\n  "
             + "\n  ".join(violations)
         )

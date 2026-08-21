@@ -221,7 +221,7 @@ class TestGetOrganization:
     async def test_trusted_party_id_is_percent_encoded_in_request_path(
         self, connect_user: ConnectUser
     ) -> None:
-        # Defense in depth alongside the '/' rejection in resolve.py: any character that
+        # Defense in depth alongside the '/' rejection in resolve_party.py: any character that
         # could otherwise change the request's structure (here, a space) must be encoded
         # rather than interpolated raw into the path.
         await connect_user("user-org-5", "org-frank.oz")  # pyright: ignore[reportGeneralTypeIssues]

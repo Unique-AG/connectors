@@ -13,7 +13,7 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentLinkResponse,
     EntityRelationshipInclude,
     ProvenanceAttributes,
-    entity_relationships,
+    project_entity_relationships,
 )
 from backstop_mcp.features.includes import (
     PersonInclude,
@@ -202,7 +202,7 @@ async def get_person(
         schema=BackstopApiResourceDocument[PersonRecordResponse],
     )
     attributes = document.require_data(path=path).attributes
-    loaded = entity_relationships(document)
+    loaded = project_entity_relationships(document)
     index = get_employment_index_factory().index(
         relationships=loaded.relationships,
         relationship_types=loaded.relationship_types,

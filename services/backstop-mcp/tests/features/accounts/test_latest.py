@@ -5,12 +5,12 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
-from backstop_mcp.features.accounts.internal_dto import SeriesFigureDto, SeriesPointDto
-from backstop_mcp.features.accounts.latest import (
+from backstop_mcp.features.accounts.fetch_series import (
     SeriesPointResource,
-    fetch_latest_figure,
+    fetch_series,
     latest_figure,
 )
+from backstop_mcp.features.accounts.internal_dto import SeriesFigureDto, SeriesPointDto
 from tests.helpers import BASE_URL
 
 _PATH = "/accounts/27871657/values"
@@ -117,7 +117,7 @@ class TestFetchLatestFigure:
             return_value=_page(_point("1", date="2026-07-31", value=9.0, valueStatus="ESTIMATE"))
         )
 
-        point = await fetch_latest_figure(client, _PATH)
+        point = await fetch_series(client, _PATH)
 
         params = route.calls.last.request.url.params
         assert route.call_count == 1
@@ -136,7 +136,7 @@ class TestFetchLatestFigure:
             )
         )
 
-        point = await fetch_latest_figure(client, _PATH)
+        point = await fetch_series(client, _PATH)
 
         assert point is not None
         assert point.valued is not None
@@ -155,7 +155,7 @@ class TestFetchLatestFigure:
             )
         )
 
-        point = await fetch_latest_figure(client, _PATH)
+        point = await fetch_series(client, _PATH)
 
         assert point is not None
         assert point.latest.date == date(2026, 7, 31)
@@ -167,7 +167,7 @@ class TestFetchLatestFigure:
     async def test_empty_series_is_none(self, client: BackstopClient) -> None:
         respx.get(_URL).mock(return_value=_page())
 
-        assert await fetch_latest_figure(client, _PATH) is None
+        assert await fetch_series(client, _PATH) is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -179,7 +179,7 @@ class TestFetchLatestFigure:
         )
 
         with pytest.raises(BackstopResponseSchemaError):
-            await fetch_latest_figure(client, _PATH)
+            await fetch_series(client, _PATH)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -190,7 +190,7 @@ class TestFetchLatestFigure:
             return_value=_page(_point("1", date="2026-07-31", value="not-a-number"))
         )
 
-        point = await fetch_latest_figure(client, _PATH)
+        point = await fetch_series(client, _PATH)
 
         assert point is not None
         assert point.latest.date == date(2026, 7, 31)

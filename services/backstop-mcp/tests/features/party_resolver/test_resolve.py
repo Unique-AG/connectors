@@ -13,7 +13,7 @@ from backstop_mcp.features.party_resolver import (
     unresolved_parties_response,
     unresolved_party_response,
 )
-from backstop_mcp.features.party_resolver.search import quick_search
+from backstop_mcp.features.party_resolver.quick_search import quick_search
 from backstop_mcp.features.resolution import (
     Ambiguous,
     BatchAmbiguous,
