@@ -9,14 +9,16 @@ only touch metadata this service serves itself plus one unauthenticated request 
 before any upstream call would happen.
 """
 
+import ast
 import importlib
+import inspect
 import logging
 import os
 import pathlib
 import re
 from collections.abc import Callable, Iterator, Sequence
-from types import ModuleType
-from typing import Protocol, cast, final, override
+from types import ModuleType, UnionType
+from typing import Protocol, cast, final, get_args, get_origin, get_type_hints, override
 from unittest.mock import MagicMock
 
 import httpx
@@ -1030,3 +1032,259 @@ class TestThePathAndMethodLabelsAreBoundedByTheRouter:
                 f"{reader} turns the path into a label or a span attribute, so the bounding has to "
                 + f"happen outside it. Got {installed}"
             )
+
+
+# What a method that releases what an object holds is called. Anchored at the start, so `is_closed`
+# — a flag, and the one that lied about this service's own Graph transport — can never be mistaken
+# for one.
+_CLOSER = re.compile(r"^a?close(_|$)|^(?:shutdown|disconnect|dispose)$")
+
+# Long-lived objects `create_app` builds that the lifespan deliberately does not close, and why.
+# An entry is a decision to hold a resource until the process exits, so it says what closing would
+# have bought. Anything neither closed nor named here fails the rule below.
+_LEFT_OPEN_ON_PURPOSE: dict[str, str] = {
+    "graph_transport": (
+        "aclose() is a no-op — the SDK's AsyncGraphTransport inherits httpx's, whose body is "
+        "`pass` (microsoft/kiota-python#494) — so calling it would only look like cleanup"
+    ),
+}
+
+
+def _create_app_function() -> ast.FunctionDef:
+    """`create_app`'s syntax tree, which is where its long-lived objects are visible as a set."""
+    module = ast.parse(pathlib.Path(app_module.__file__).read_text())
+    found = [
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == "create_app"
+    ]
+
+    assert len(found) == 1, f"expected one create_app in app.py, got {len(found)}"
+    return found[0]
+
+
+def _own_scope(node: ast.AST) -> Iterator[ast.AST]:
+    """Every node of one function's own scope, excluding the functions nested inside it.
+
+    `create_app` defines the lifespan and two routes in its body, and what those bind lives as long
+    as one request — which is the opposite of what this is about.
+    """
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | ast.Lambda):
+            continue
+        yield child
+        yield from _own_scope(child)
+
+
+def _constructors(value: ast.expr) -> list[ast.expr]:
+    """What a bound expression calls to produce its value — the outermost calls only.
+
+    `create_graph_transport(GraphSettings(...))` produces a transport; the settings it was handed
+    are an argument rather than something the composition root is left holding.
+    """
+    if isinstance(value, ast.Call):
+        return [value.func]
+    if isinstance(value, ast.BoolOp):
+        return [called for operand in value.values for called in _constructors(operand)]
+    if isinstance(value, ast.IfExp):
+        branches = (value.body, value.orelse)
+        return [called for branch in branches for called in _constructors(branch)]
+    return []
+
+
+def _built_by(function: ast.FunctionDef) -> dict[str, list[ast.expr]]:
+    """Each name the function binds in its own scope, with the callables that produced it."""
+    built: dict[str, list[ast.expr]] = {}
+    for node in _own_scope(function):
+        if isinstance(node, ast.Assign):
+            targets: list[ast.expr] = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                built.setdefault(target.id, []).extend(_constructors(value))
+    return built
+
+
+def _resolved(called: ast.expr) -> object | None:
+    """The callable `create_app` names, looked up in `app.py`'s own namespace."""
+    attributes: list[str] = []
+    node: ast.expr = called
+    while isinstance(node, ast.Attribute):
+        attributes.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    found: object = app_module
+    for attribute in [node.id, *reversed(attributes)]:
+        found = cast("object", getattr(found, attribute, None))
+        if found is None:
+            return None
+    return found
+
+
+def _classes_named_by(annotation: object) -> list[type]:
+    """The classes an annotation names: itself, a generic's origin, or a union's members.
+
+    The union is why its members are reached through `get_args` rather than through the origin:
+    `X | None` has `types.UnionType` for one, which is itself a class and would otherwise answer
+    for the annotation as though the union were the thing that had been built.
+    """
+    if isinstance(annotation, type):
+        return [annotation]
+    origin = get_origin(annotation)
+    if isinstance(origin, type) and origin is not UnionType:
+        return [origin]
+    arguments = cast("tuple[object, ...]", get_args(annotation))
+    return [named for argument in arguments for named in _classes_named_by(argument)]
+
+
+def _produced_by(called: ast.expr) -> list[type] | None:
+    """The classes one call at the composition root can produce, or None if it cannot be told.
+
+    A class produces itself; anything else produces what its return annotation names. That
+    annotation is the whole of what the composition root is promised, which is the honest reading
+    of it — see the class below on `oauth_storage`.
+    """
+    resolved = _resolved(called)
+    if inspect.isclass(resolved):
+        return [resolved]
+    if not callable(resolved):
+        return None
+    returned = cast("object", get_type_hints(resolved).get("return"))
+    return None if returned is None else _classes_named_by(returned)
+
+
+def _async_closers(produced: type) -> set[str]:
+    """The async methods a type owns whose job is to release what it holds."""
+    return {
+        name
+        for name in dir(produced)
+        if _CLOSER.match(name)
+        and inspect.iscoroutinefunction(cast("object", getattr(produced, name, None)))
+    }
+
+
+def _long_lived_objects() -> dict[str, set[str] | None]:
+    """Each name `create_app` builds from a call, with the async closers its value owns.
+
+    `None` where a call cannot be resolved to a type: an object this rule cannot read is one it
+    cannot vouch for, which is a different answer from "nothing to close".
+    """
+    found: dict[str, set[str] | None] = {}
+    for name, constructors in _built_by(_create_app_function()).items():
+        if not constructors:
+            continue
+        produced = [_produced_by(called) for called in constructors]
+        if any(classes is None for classes in produced):
+            found[name] = None
+            continue
+        found[name] = {
+            closer
+            for classes in produced
+            if classes is not None
+            for produces in classes
+            for closer in _async_closers(produces)
+        }
+    return found
+
+
+def _closed_in_the_lifespan() -> set[str]:
+    """The names the lifespan awaits a closer on, wherever in it that happens.
+
+    Where is left to the author on purpose: `try`/`finally` is how `app.py` does it today, and it
+    is not the only correct shape for it.
+    """
+    found = [
+        node
+        for node in ast.walk(_create_app_function())
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "lifespan"
+    ]
+    assert len(found) == 1, f"expected one lifespan inside create_app, got {len(found)}"
+
+    closed: set[str] = set()
+    for node in ast.walk(found[0]):
+        if not isinstance(node, ast.Await) or not isinstance(node.value, ast.Call):
+            continue
+        called = node.value.func
+        if (
+            isinstance(called, ast.Attribute)
+            and isinstance(called.value, ast.Name)
+            and _CLOSER.match(called.attr)
+        ):
+            closed.add(called.value.id)
+    return closed
+
+
+class TestEveryLongLivedObjectIsClosedOnShutdown:
+    """The composition root builds each long-lived object once, and shutdown is the only release.
+
+    A pool the lifespan forgets leaks for as long as the pod lives, and it is silent while it does:
+    the app starts, every request is served, and nothing counts the sockets. The mistake is one
+    line missing from a `finally` block that the commit adding the object had no reason to touch.
+
+    Structural rather than behavioural, for two reasons. A behavioural test can only assert about
+    the objects it was written to know, and the one this exists for is the object nobody wrote a
+    test for — visible only in what `create_app` binds. And `test_mcp_tools.py`'s
+    `TestTheTransportTheToolsShare` records a behavioural version of exactly this check that passed
+    while the pool it was about survived every shutdown: it asserted `is_closed`, and `is_closed`
+    was the only thing `aclose()` moved.
+
+    What is closeable is read off the type the composition root is handed, which is why
+    `oauth_storage` needs no exemption below: `build_oauth_storage` answers `AsyncKeyValue`, a
+    protocol that declares no closer at all. Reaching through its encryption wrapper for the store's
+    own is exactly what `app.py`'s lifespan explains it is not doing.
+    """
+
+    def test_the_root_builds_something_closeable_and_the_lifespan_closes_it(self) -> None:
+        """Guards the guard from both ends: a rule that found nothing closeable would pass by
+        reading the wrong function, and one that never saw a close would pass by not recognising
+        one. `auth.close_obo_credentials()` is both today."""
+        closeable = {name for name, closers in _long_lived_objects().items() if closers}
+
+        assert closeable, "create_app builds nothing this rule can see a closer on"
+        assert closeable & _closed_in_the_lifespan(), (
+            "the lifespan closes none of them, so this rule cannot tell a close from a leak"
+        )
+
+    def test_every_name_left_open_on_purpose_is_still_left_open(self) -> None:
+        """An exemption outlives what it was written for: the object is renamed or dropped, or
+        somebody finds a close that works and calls it, and the entry stays behind recording a
+        decision nobody is making any more."""
+        built = _built_by(_create_app_function())
+        closed = _closed_in_the_lifespan()
+        stale = sorted(
+            f"{name}: {reason}"
+            for name, reason in _LEFT_OPEN_ON_PURPOSE.items()
+            if name not in built or name in closed
+        )
+
+        assert not stale, (
+            "_LEFT_OPEN_ON_PURPOSE names something create_app no longer builds, or something the "
+            + "lifespan now closes. Delete the entry — the reason it carries has stopped being "
+            + "the reason:\n  "
+            + "\n  ".join(stale)
+        )
+
+    def test_every_long_lived_object_is_closed_or_left_open_on_purpose(self) -> None:
+        closed = _closed_in_the_lifespan()
+        leaked: list[str] = []
+        for name, closers in sorted(_long_lived_objects().items()):
+            if name in closed or name in _LEFT_OPEN_ON_PURPOSE:
+                continue
+            if closers is None:
+                leaked.append(f"{name} is built by a call this rule cannot resolve to a type")
+            elif closers:
+                leaked.append(f"{name} owns {', '.join(sorted(closers))}, and nothing awaits it")
+
+        assert not leaked, (
+            "every long-lived object create_app builds has to be released when the process stops "
+            + "serving, or it is a connection pool that lives as long as the pod and that nothing "
+            + "counts. Await its closer in the lifespan's finally block; if closing it would buy "
+            + "nothing, name it in _LEFT_OPEN_ON_PURPOSE and the reason becomes the record:\n  "
+            + "\n  ".join(leaked)
+        )
