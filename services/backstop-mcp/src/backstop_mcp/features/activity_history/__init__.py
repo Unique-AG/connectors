@@ -28,12 +28,13 @@ the timeline `activity_id` into `{resource_type, resource_id}`;
 and the pure conversion into it. See `responses.py`.
 
 `ActivityHistorySettings`: the per-stream page size and gist truncation budget, translated from
-`config.ActivityHistoryConfig` by `create_app`. See `settings.py`.
+`config.ActivityHistoryConfig` by `get_activity_history_settings`. See `settings.py`.
 
-The MCP tool surface itself lives in a later `activity_history` module.
+The MCP tools live in `features/activity_history/tools/`.
 """
 
 from backstop_mcp.features.activity_history.api_responses import ActivityAttributes
+from backstop_mcp.features.activity_history.dependencies import get_activity_history_settings
 from backstop_mcp.features.activity_history.extract_gist_from_html import (
     Gist,
     extract_gist_from_html,
@@ -111,6 +112,7 @@ __all__ = [
     "fetch_attendees",
     "fetch_email_page",
     "fetch_meeting_specifics",
+    "get_activity_history_settings",
     "group_activity_page",
     "to_timeline_record",
 ]

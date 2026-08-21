@@ -66,6 +66,9 @@ exclude = [".venv"]
 # values (ANN2xx) — enforced everywhere, not just public functions.
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastmcp.dependencies.Depends"]
+
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
@@ -76,3 +79,4 @@ extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
 reportUnusedFunction = false
+reportCallInDefaultInitializer = false

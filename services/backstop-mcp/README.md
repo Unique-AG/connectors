@@ -16,26 +16,50 @@ instance, and an ambiguous match asks the user to pick one.
 
 ```
 src/backstop_mcp/
-  app.py                 composition root — every config and collaborator is built here, once
-  config.py              one BaseSettings class per concern, read only at the root
-  logging.py metrics.py  cross-cutting, used by both sides below
-  features/              what the connector does
-    resolution.py          the shared "which record is that?" algebra + ambiguity policy
-    entity_types.py        canonical Backstop entity-type vocabulary
-    auth/                  Backstop credential bridging: login form, encryption, token rotation
-    custom_fields/         CRM custom-field catalog fetch and in-memory cache
-    party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
-    data_hygiene/          employment edges, departed contacts, as-of provenance
-    activity_history/      merged meeting/call/note/document/email timeline, paged by cursor
+  app.py                 ASGI assembly: logging, metrics, FastMCP, TOOLS, routes, lifespan
+  dependencies.py        cached providers for configs, engine, client factory, auth
+  teardown.py            close_singletons(): release the pools, drop every cached provider
+  config.py              one BaseSettings class per concern; read by the config providers
+  logging.py metrics.py  cross-cutting
+  features/              what the connector does; each may own tools/ and dependencies.py
+    resolution.py
+    entity_types.py
+    auth/
+    custom_fields/
+    party_resolver/
+    accounts/
+    data_hygiene/
+    activity_history/
+    opportunities/
+    org_people/
+    includes/
   server/                how it's exposed over MCP
-    runtime.py             the process-wide service holder tools reach through
-    tools/                 tool functions + the single registry declaring them
-  backstop_client/       HTTP transport: auth headers, concurrency gate, retries, pagination
-  db/                    SQLAlchemy models, engine, alembic migrations
+    instructions.py
+    tools/registry.py    the hand-written TOOLS list create_app registers
+  backstop_client/       HTTP transport
+  db/
 ```
 
 The layering rule is that **nothing under `features/` may import from `server/`** — the server
-wires features together, never the reverse. `tests/test_layering.py` enforces it.
+wires features together, never the reverse. `tests/test_layering.py` enforces it (and rule 7:
+every tool file appears in `TOOLS`).
+
+## Adding a feature or tool
+
+1. Create `features/<name>/` with the model layers `api_responses` → `internal_dto` → `responses`.
+2. Put the fetch in a module named after the function it defines.
+3. Add `dependencies.py` with an `@lru_cache(maxsize=1)` provider only if the feature owns a
+   long-lived service, exported through `__init__` and listed in `teardown.PROVIDERS`.
+4. Add `tools/<tool_name>.py` defining exactly one `FunctionTool` bound to a symbol matching the
+   filename.
+5. Declare collaborators as `Depends(...)` parameters, which stay out of the published schema.
+6. Write the test under `tests/features/<name>/tools/`, passing collaborators as kwargs rather
+   than standing up a database.
+
+Three rules an agent will otherwise break, each enforced by a test: a tool is registered by being
+added to `server/tools/registry.py` as well as written, and nothing under `features/` may import
+`server/` (both `tests/test_layering.py`); a cached provider is torn down by being listed in
+`teardown.PROVIDERS` as well as written (`tests/test_teardown.py`).
 
 ## Run locally
 
@@ -69,8 +93,8 @@ uv run alembic downgrade -1                          # roll back one
 
 ## Tests
 
-Integration tests start a Postgres container and run the migrations against it, so Docker must be
-running.
+Tool tests pass a fake or real client as kwargs and do not need Postgres. The suite still starts
+a container for app, auth, and db tests, so Docker must be running.
 
 ```bash
 uv run pytest

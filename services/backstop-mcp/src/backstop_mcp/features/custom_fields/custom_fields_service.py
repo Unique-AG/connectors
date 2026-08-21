@@ -20,8 +20,8 @@ class CustomFieldsService:
     """Process-wide custom-field schema catalog.
 
     Definitions come from a real Backstop fetch and live in one in-memory list. Until a
-    fetch succeeds this service has nothing to serve. Constructed by `create_app()` and
-    reached via `runtime.get_services().custom_fields`.
+    fetch succeeds this service has nothing to serve. Constructed by
+    `get_custom_fields_service` in this feature's `dependencies.py`.
     """
 
     def __init__(self, *, ttl: timedelta) -> None:

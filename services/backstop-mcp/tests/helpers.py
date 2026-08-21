@@ -1,12 +1,12 @@
 """Shared test construction helpers.
 
-Mirrors what `create_app()` does, minus the web layer: build one `BackstopClientFactory`, and
-install it (plus a `CustomFieldsService`) in the single `runtime.Services` holder. Tests that
-need a client go through the factory exactly as production does, so the concurrency gate and
-config injection under test are the real ones.
+Helpers build a factory the way production does (`transport_settings` / `retry_settings`), not
+a runtime holder. Tests that need a client go through the factory exactly as production does,
+so the concurrency gate and config injection under test are the real ones.
 """
 
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager
 from datetime import date
 from typing import Protocol, cast
 
@@ -14,11 +14,13 @@ import httpx
 import respx
 from pydantic import SecretStr
 
-from backstop_mcp.app import retry_settings, transport_settings
-from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
+from backstop_mcp.backstop_client import (
+    BackstopClient,
+    BackstopClientFactory,
+    BackstopCredentialSecret,
+)
 from backstop_mcp.config import BackstopConfig
-from backstop_mcp.features.activity_history import ActivityHistorySettings
-from backstop_mcp.features.auth import BackstopAuthContext
+from backstop_mcp.dependencies import retry_settings, transport_settings
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
@@ -26,7 +28,6 @@ from backstop_mcp.features.data_hygiene import (
     TypeVocabularyDto,
 )
 from backstop_mcp.features.opportunities import OpportunityStagesService
-from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
 
@@ -49,40 +50,27 @@ def backstop_config(base_url: str = BASE_URL, **overrides: object) -> BackstopCo
     return BackstopConfig(base_url=base_url).model_copy(update=overrides)
 
 
-def client_factory(
-    base_url: str = BASE_URL,
-    *,
-    auth: BackstopAuthContext | None = None,
-    **overrides: object,
-) -> BackstopClientFactory:
+@asynccontextmanager
+async def tool_client(
+    base_url: str = BASE_URL, **overrides: object
+) -> AsyncGenerator[BackstopClient]:
+    """A Backstop client for calling a tool with collaborators passed in as kwargs."""
+    factory = client_factory(base_url, **overrides)
+    try:
+        yield factory.for_credential(credential())
+    finally:
+        await factory.aclose()
+
+
+def client_factory(base_url: str = BASE_URL, **overrides: object) -> BackstopClientFactory:
     """Build a factory the way `create_app` does: config in, transport settings out.
 
-    Goes through the same `app.transport_settings` / `app.retry_settings` translation as
-    production rather than constructing settings directly, so a knob that stops being propagated
-    at the composition root fails these tests too.
+    Goes through the same `dependencies.transport_settings` / `dependencies.retry_settings`
+    translation as production rather than constructing settings directly, so a knob that stops
+    being propagated at the composition root fails these tests too.
     """
     config = backstop_config(base_url, **overrides)
-    return BackstopClientFactory(transport_settings(config), retry_settings(config), auth=auth)
-
-
-def install_services(
-    *,
-    backstop: BackstopClientFactory,
-    custom_fields: CustomFieldsService,
-    employment_index_factory: EmploymentIndexFactory | None = None,
-    activity_history_settings: ActivityHistorySettings | None = None,
-    opportunity_stages: OpportunityStagesService | None = None,
-) -> Services:
-    services = Services(
-        backstop=backstop,
-        custom_fields=custom_fields,
-        employment_index_factory=employment_index_factory or build_employment_index_factory(),
-        activity_history=activity_history_settings
-        or ActivityHistorySettings(page_size=10, gist_max_chars=300),
-        opportunity_stages=opportunity_stages or opportunity_stages_service(),
-    )
-    configure_services(services)
-    return services
+    return BackstopClientFactory(transport_settings(config), retry_settings(config))
 
 
 def build_employment_index_factory(

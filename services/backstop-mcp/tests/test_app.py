@@ -16,21 +16,18 @@ from mcp.server.auth.provider import AccessToken
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
-from backstop_mcp.app import (
-    create_app,
+from backstop_mcp.app import create_app
+from backstop_mcp.config import BackstopConfig
+from backstop_mcp.dependencies import (
+    get_backstop_client_factory,
     retry_settings,
     transport_settings,
 )
-from backstop_mcp.config import (
-    ActivityHistoryConfig,
-    AppConfig,
-    AuthConfig,
-    BackstopConfig,
-    DatabaseConfig,
-    EncryptionConfig,
-)
+from backstop_mcp.features.activity_history import get_activity_history_settings
 from backstop_mcp.features.auth import NotConnectedError
-from backstop_mcp.server.runtime import get_services
+from backstop_mcp.features.custom_fields import get_custom_fields_service
+from backstop_mcp.features.data_hygiene import get_employment_index_factory
+from backstop_mcp.features.opportunities import get_opportunity_stages_service
 from backstop_mcp.server.tools import TOOLS
 
 _BASE_URL = "https://api.backstopsolutions.com"
@@ -74,23 +71,21 @@ def _post_json(
     )
 
 
-def _configs(postgres: PostgresContainer) -> dict[str, object]:
+def _set_app_env(monkeypatch: pytest.MonkeyPatch, postgres: PostgresContainer) -> None:
     url = postgres.get_connection_url().replace("+psycopg2", "")
-    return {
-        "config": AppConfig.model_validate({"public_base_url": "https://backstop-mcp.example"}),
-        "backstop_config": BackstopConfig(base_url=_BASE_URL),
-        "database_config": DatabaseConfig.model_validate({"url": url}),
-        "encryption_config": EncryptionConfig(
-            encryption_key=Fernet.generate_key().decode()  # pyright: ignore[reportArgumentType]
-        ),
-        "auth_config": AuthConfig(),
-    }
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://backstop-mcp.example")
+    monkeypatch.setenv("BACKSTOP_BASE_URL", _BASE_URL)
+    monkeypatch.setenv("DB_URL", url)
+    monkeypatch.setenv("BACKSTOP_MCP_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
 
 @pytest.fixture
-def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
+def app_client(
+    postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[TestClient]:
     """The real app, with its lifespan run."""
-    app = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
+    _set_app_env(monkeypatch, postgres_container)
+    app = create_app()
     with TestClient(app) as client:
         yield client
 
@@ -115,7 +110,8 @@ class TestWiring:
         forever waiting to check out a connection owned by the other one. `create_app` is what
         closes the cycle, so no running server is needed to assert that it did.
         """
-        _ = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
+        _set_app_env(monkeypatch, postgres_container)
+        _ = create_app()
         monkeypatch.setattr(
             "backstop_mcp.features.auth.context.get_access_token",
             lambda: AccessToken(
@@ -127,27 +123,26 @@ class TestWiring:
         )
 
         with pytest.raises(NotConnectedError):
-            await get_services().backstop.for_current_caller()
+            await get_backstop_client_factory().for_current_caller()
 
     def test_the_factory_owns_the_settings_create_app_was_given(
         self, app_client: TestClient
     ) -> None:
         """A second `BackstopConfig()` read from the environment would silently ignore the knobs."""
         _ = app_client
-        assert get_services().backstop.settings.base_url == _BASE_URL
+        assert get_backstop_client_factory().settings.base_url == _BASE_URL
 
     def test_services_carry_the_configured_activity_history_settings(
-        self, postgres_container: PostgresContainer
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Same failure shape as the transport settings above: a re-read would silently win."""
-        configs = {
-            **_configs(postgres_container),
-            "activity_history_config": ActivityHistoryConfig(page_size=25, gist_chars=500),
-        }
-        app = create_app(**configs)  # pyright: ignore[reportArgumentType]
+        _set_app_env(monkeypatch, postgres_container)
+        monkeypatch.setenv("ACTIVITY_HISTORY_PAGE_SIZE", "25")
+        monkeypatch.setenv("ACTIVITY_HISTORY_GIST_CHARS", "500")
+        app = create_app()
 
         with TestClient(app):
-            settings = get_services().activity_history
+            settings = get_activity_history_settings()
 
         assert settings.page_size == 25
         assert settings.gist_max_chars == 500
@@ -155,32 +150,25 @@ class TestWiring:
     def test_the_departed_detector_owns_the_employment_types_create_app_was_given(
         self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """`get_person` used to build `BackstopConfig()` itself, discarding what was injected.
+        """The cached BackstopConfig provider is the one env read; a later change must not win.
 
-        Same failure as `test_the_factory_owns_the_settings_create_app_was_given`, and just as
-        silent: a tenant's configured relationship types would be ignored while the env-parsed
-        defaults quietly took over. The env var is set to something else entirely so a re-read
-        would produce a visibly different answer.
+        `get_person` used to build `BackstopConfig()` itself. The provider is now the env read,
+        so the values set before `create_app` are what the detector owns — a decoy set afterwards
+        must not change them.
         """
-        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "from the environment")
+        _set_app_env(monkeypatch, postgres_container)
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "ert-9")
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "placement at")
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "ert-10")
         monkeypatch.setenv(
-            "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "from the environment"
+            "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "placement ended"
         )
-        configs = {
-            **_configs(postgres_container),
-            "backstop_config": BackstopConfig(
-                base_url=_BASE_URL,
-                employment_relationship_type_ids=("ert-9",),
-                employment_relationship_type_markers=("placement at",),
-                former_employment_relationship_type_ids=("ert-10",),
-                former_employment_relationship_type_markers=("placement ended",),
-            ),
-        }
-        app = create_app(**configs)  # pyright: ignore[reportArgumentType]
+        app = create_app()
 
         with TestClient(app):
-            rules = get_services().employment_index_factory.rules
+            rules = get_employment_index_factory().rules
 
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "from the environment")
         assert rules.employment.type_ids == frozenset({"ert-9"})
         assert rules.employment.name_markers == frozenset({"placement at"})
         assert rules.former.type_ids == frozenset({"ert-10"})
@@ -188,22 +176,22 @@ class TestWiring:
 
     def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
         _ = app_client
-        services = get_services()
-        assert services.custom_fields is not None
-        assert services.backstop is not None
-        assert services.opportunity_stages is not None
+        assert get_custom_fields_service() is not None
+        assert get_backstop_client_factory() is not None
+        assert get_opportunity_stages_service() is not None
 
     def test_lifespan_teardown_releases_the_services(
-        self, postgres_container: PostgresContainer
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """`configure_services` asserts on a second install, so teardown must actually reset.
+        """Teardown must cache_clear: two sequential `create_app()` + `TestClient` must succeed.
 
         Two apps in sequence is what the test suite itself does, and what a reload does.
         """
+        _set_app_env(monkeypatch, postgres_container)
         for _ in range(2):
-            app = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
+            app = create_app()
             with TestClient(app):
-                assert get_services().backstop is not None
+                assert get_backstop_client_factory() is not None
 
 
 class TestRoutes:
@@ -257,16 +245,13 @@ class TestRoutes:
 
 
 class TestReadyReportsDatabaseUnreachable:
-    def test_ready_is_503_when_postgres_is_unreachable(self) -> None:
-        app = create_app(
-            config=AppConfig.model_validate({"public_base_url": "https://backstop-mcp.example"}),
-            database_config=DatabaseConfig.model_validate(
-                {"url": "postgresql://user:pass@127.0.0.1:1/nope"}
-            ),
-            encryption_config=EncryptionConfig(
-                encryption_key=Fernet.generate_key().decode()  # pyright: ignore[reportArgumentType]
-            ),
-        )
+    def test_ready_is_503_when_postgres_is_unreachable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PUBLIC_BASE_URL", "https://backstop-mcp.example")
+        monkeypatch.setenv("DB_URL", "postgresql://user:pass@127.0.0.1:1/nope")
+        monkeypatch.setenv("BACKSTOP_MCP_ENCRYPTION_KEY", Fernet.generate_key().decode())
+        app = create_app()
         with TestClient(app) as client:
             response = _get(client, "/ready")
 
@@ -297,7 +282,7 @@ class TestToolRegistration:
 
 
 class TestConfigTranslation:
-    """`create_app` is the only place a `config` shape becomes a transport one.
+    """`transport_settings` / `retry_settings` map a `config` shape onto a transport one.
 
     A field that stops being propagated here fails silently — the transport would just use the
     dataclass value it was constructed with — so the mapping is asserted rather than eyeballed.

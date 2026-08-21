@@ -1,9 +1,9 @@
 """What the Backstop transport needs to know, as its own types.
 
-`config.BackstopConfig` is the env-parsing shape; these are the domain types `create_app`
-translates it into, so nothing under `backstop_client/` imports `config`. A config shape
-becomes a domain one at the composition root, and the layer downstream depends only on the
-fields it actually reads.
+`config.BackstopConfig` is the env-parsing shape; these are the domain types
+`dependencies.transport_settings` / `retry_settings` translate it into, so nothing under
+`backstop_client/` imports `config`. A config shape becomes a domain one at the composition
+root, and the layer downstream depends only on the fields it actually reads.
 
 Frozen, so "the factory owns the one set of settings" is enforced rather than asserted.
 """
