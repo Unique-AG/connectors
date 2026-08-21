@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/Unique-AG/connectors/compare/hello-mcp@0.1.0...hello-mcp@0.1.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **hello-mcp:** run the image as uid 1000, matching the chart ([#737](https://github.com/Unique-AG/connectors/issues/737)) ([ff7c5ac](https://github.com/Unique-AG/connectors/commit/ff7c5ace963d997b2ef32c9614f2ade7f432ff26))
+
 ## [0.1.0](https://github.com/Unique-AG/connectors/compare/hello-mcp@0.0.1...hello-mcp@0.1.0) (2026-07-30)
 
 
