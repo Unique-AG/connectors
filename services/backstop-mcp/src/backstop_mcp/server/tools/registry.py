@@ -24,6 +24,7 @@ from backstop_mcp.features.org_people.tools.get_organization import get_organiza
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
 from backstop_mcp.features.system_users.tools.list_system_users import list_system_users
+from backstop_mcp.features.tasks.tools.get_tasks_for_party import get_tasks_for_party
 
 type ToolFunction = Callable[..., Awaitable[object]]
 
@@ -44,4 +45,5 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_accounts_for_party,
     get_capital_flows,
     get_people_for_party,
+    get_tasks_for_party,
 )
