@@ -121,7 +121,11 @@ class OpportunityResponse(OmitNoneModel):
     )
     probability: float | None = Field(
         default=None,
-        description="Backstop's likelihood of the deal closing, as a fraction: 0.3 is 30%.",
+        description=(
+            "Backstop's standard likelihood of the deal closing, as a fraction: 0.3 is 30%. "
+            "A rep-entered probability custom field stays in `custom_field_values` under its "
+            "own name — do not treat that as this field."
+        ),
     )
     requested_amount: float | None = Field(
         default=None,
@@ -132,6 +136,19 @@ class OpportunityResponse(OmitNoneModel):
         default=None,
         validation_alias="allocatedAmount",
         description="Amount allocated to the investor so far, in `currency`.",
+    )
+    weighted_value: float | None = Field(
+        default=None,
+        validation_alias="weightedValue",
+        description=(
+            "Backstop's requested amount times `probability`. Use this for book-wide "
+            "prioritization, not a hand-computed product of the two."
+        ),
+    )
+    weighted_allocated_value: float | None = Field(
+        default=None,
+        validation_alias="weightedAllocatedValue",
+        description="Backstop's allocated amount times `probability`.",
     )
     currency: _StrippedStr | None = Field(
         default=None,

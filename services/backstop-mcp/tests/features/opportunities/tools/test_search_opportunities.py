@@ -149,6 +149,8 @@ class TestSearchOpportunities:
         assert params["filter[representative.name][eq]"] == "blazarus"
         assert params["include"] == "investor,product,stage"
         assert params["fields[contacts]"] == "name,country,state,city"
+        assert "weightedValue" in params["fields[opportunities]"]
+        assert "weightedAllocatedValue" in params["fields[opportunities]"]
         assert params["page[limit]"] == "500"
         assert params["page[offset]"] == "0"
         assert "filter[isOpen]" not in params

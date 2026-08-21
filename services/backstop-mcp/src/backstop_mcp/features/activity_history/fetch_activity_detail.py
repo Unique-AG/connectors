@@ -6,8 +6,8 @@ Three endpoints, all keyed by the **bare** `ResourceIdentifierDto.resource_id` �
 `ResourceIdentifierDto`). Every field name below was byte-verified against a live instance:
 
 - `/entity-activity-details/{resource_id}` — `type`, `title` and `description` (the full HTML
-  body), for any activity kind. It carries nothing else worth reading: the whole attribute set is
-  `attachments`, `fbId`, `description`, `type`, `title`, plus `attachedTo` on a document.
+  body), plus `attachments` (the file list this connector's other activity tools do not have).
+  `fbId` is unused; a document also carries `attachedTo`.
 - `/meeting-or-calls/{resource_id}` — `startTimestamp`, `stopTimestamp`, `location` and
   `timeZone`. These live here and NOT on the detail record, which is why they are a separate
   fetch; a sparse `fields=` works, so only those four are requested.
@@ -40,6 +40,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     AttendeeDto,
     MeetingSpecificsDto,
+    attachments_from_stored,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ async def fetch_activity_detail(client: BackstopClient, *, resource_id: str) -> 
         type=attributes.type,
         title=attributes.title,
         description=attributes.description,
+        attachments=attachments_from_stored(attributes.attachments),
     )
     logger.info(
         "activity_history.detail.fetched",

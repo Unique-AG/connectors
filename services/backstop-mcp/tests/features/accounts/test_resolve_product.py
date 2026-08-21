@@ -8,7 +8,7 @@ from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.accounts import resolve_product
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
-from tests.helpers import BASE_URL, collection, resource
+from tests.helpers import BASE_URL, collection, recorded_requests, resource
 
 _PRODUCTS_URL = f"{BASE_URL}/products"
 _PRODUCT_URL = f"{BASE_URL}/products/1292283"
@@ -83,6 +83,7 @@ class TestTheRequest:
         params = route.calls.last.request.url.params
         assert params["fields"] == "name,configuration"
         assert params["page[limit]"] == "200"
+        assert params["filter[name][like]"] == "CGUP"
         assert route.call_count == 1
 
     @pytest.mark.asyncio
@@ -169,6 +170,47 @@ class TestTheRequest:
             await resolve_product(ctx_never_elicit(), client, product="F1")
 
         assert [record.message for record in caplog.records] == ["accounts.products.index_large"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_name_like_miss_walks_the_unfiltered_catalog_for_a_short_name(
+        self, client: BackstopClient
+    ) -> None:
+        def _respond(request: httpx.Request) -> httpx.Response:
+            if request.url.params.get("filter[name][like]") == "CGUP":
+                return _index()
+            return _sample_index()
+
+        route = respx.get(_PRODUCTS_URL).mock(side_effect=_respond)
+
+        result = await resolve_product(ctx_never_elicit(), client, product="CGUP")
+
+        assert isinstance(result, Resolved)
+        assert result.value.short_name == "CGUP"
+        assert route.call_count == 2
+        calls = recorded_requests(route.calls)
+        assert calls[0].url.params["filter[name][like]"] == "CGUP"
+        assert "filter[name][like]" not in calls[1].url.params
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_name_like_hit_does_not_walk_the_unfiltered_catalog(
+        self, client: BackstopClient
+    ) -> None:
+        def _respond(request: httpx.Request) -> httpx.Response:
+            if request.url.params.get("filter[name][like]") == "Dispersion":
+                return _index(
+                    _product("1653647", name="Capstone Dispersion Fund", short_name="CDSP")
+                )
+            raise AssertionError("unfiltered catalog must not be walked after a LIKE hit")
+
+        route = respx.get(_PRODUCTS_URL).mock(side_effect=_respond)
+
+        result = await resolve_product(ctx_never_elicit(), client, product="Dispersion")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "1653647"
+        assert route.call_count == 1
 
 
 class TestResolveSearch:

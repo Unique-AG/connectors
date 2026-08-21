@@ -262,7 +262,7 @@ async def search_activities(
 
     `mode=aggregate` with `group_by` answers a counting question without row bodies.
     `include_description` is opt-in, capped, refused in aggregate mode, and refused on a wide
-    sweep. `attachments_count` is a count only — no tool lists the files.
+    sweep. `attachments_count` is a count only — `get_activity_detail` lists the files.
     """
     if start_date > end_date:
         raise ValueError("start_date must not be after end_date")

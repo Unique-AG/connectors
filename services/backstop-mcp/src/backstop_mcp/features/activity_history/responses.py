@@ -66,6 +66,7 @@ __all__ = [
     "ActivityContinuationResponse",
     "ActivityGroupResponse",
     "ActivityHistoryResolvedResponse",
+    "ActivityAttachmentResponse",
     "ActivityDetailResponse",
     "ActivityRegardingResponse",
     "ActivityTagChipResponse",
@@ -281,6 +282,21 @@ class AttendeeResponse(OmitNoneModel):
     @classmethod
     def from_chip(cls, attendee: AttendeeChipDto) -> Self:
         return cls(id=attendee.id, name=attendee.name)
+
+
+class ActivityAttachmentResponse(OmitNoneModel):
+    """One file attached to an activity. Only `get_activity_detail` lists these."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, from_attributes=True)
+
+    id: str | None = Field(
+        default=None,
+        description="Backstop id of the file when the detail record carries one.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="File name as Backstop publishes it. Omitted when the row has no name.",
+    )
 
 
 class ActivityRecordResponse(OmitNoneModel):
@@ -534,13 +550,14 @@ type GetActivityHistoryResponse = (
 
 
 class ActivityDetailResponse(OmitNoneModel):
-    """`get_activity_detail`'s payload: full body plus meeting specifics and attendees.
+    """`get_activity_detail`'s payload: full body, meeting specifics, attendees, and attachments.
 
-    `type`, `title` and `body` come from `entity-activity-details`; `start`/`stop`/`location`/
-    `time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is only
-    fetched for a meeting-or-calls handle (it 404s for a note or document — see
-    `fetch_activity_detail.py`). They are therefore absent for a note or document because nobody
-    asked, not because Backstop returned nothing.
+    `type`, `title`, `body` and `attachments` come from `entity-activity-details`; `start`/`stop`/
+    `location`/`time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is
+    only fetched for a meeting-or-calls handle (it 404s for a note or document — see
+    `fetch_activity_detail.py`). Meeting fields are therefore absent for a note or document
+    because nobody asked, not because Backstop returned nothing. The attachment list is this
+    tool's one unique capability versus `search_activities`, which only publishes a count.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
@@ -583,6 +600,13 @@ class ActivityDetailResponse(OmitNoneModel):
         default_factory=list,
         description="People listed on a meeting/call. Empty for a note or document.",
     )
+    attachments: tuple[ActivityAttachmentResponse, ...] = Field(
+        default=(),
+        description=(
+            "Files attached to this activity. This is the only tool that lists them — "
+            "search_activities publishes `attachments_count` only. Empty when there are none."
+        ),
+    )
 
     @classmethod
     def from_detail(
@@ -610,6 +634,10 @@ class ActivityDetailResponse(OmitNoneModel):
             location=None if specifics is None else specifics.location,
             time_zone=None if specifics is None else specifics.time_zone,
             attendees=[AttendeeResponse(name=attendee.name) for attendee in attendees],
+            attachments=tuple(
+                ActivityAttachmentResponse(id=item.id, name=item.name)
+                for item in detail.attachments
+            ),
         )
 
 
@@ -708,14 +736,14 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Plain-text body from formattedDescription. Only present when include_description "
-            "was true. `attachments_count` is a count only — no tool lists the files."
+            "was true. `attachments_count` is a count only — the file list is on "
+            "`get_activity_detail`."
         ),
     )
     attachments_count: int | None = Field(
         default=None,
         description=(
-            "How many files are attached. A count only — neither this tool nor "
-            "get_activity_detail lists the files."
+            "How many files are attached. A count only — `get_activity_detail` lists the files."
         ),
     )
     author: AttendeeResponse | None = Field(

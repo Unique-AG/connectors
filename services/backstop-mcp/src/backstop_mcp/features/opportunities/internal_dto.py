@@ -80,6 +80,8 @@ class SearchOpportunityDto(BaseModel):
     probability: float | None = None
     requested_amount: float | None = None
     allocated_amount: float | None = None
+    weighted_value: float | None = None
+    weighted_allocated_value: float | None = None
     currency: str | None = None
     expected_investment_date: date | None = None
     closed_date: date | None = None

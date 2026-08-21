@@ -410,6 +410,8 @@ class TestContract:
         assert "get_product_positions" not in doc
         assert "get_time_series" in doc
         assert "data_caveat" in doc
+        assert "undocumented" in doc
+        assert "may 404" in doc
 
     def test_output_schema_explains_provenance_and_the_zero_trap(self) -> None:
         meta = get_fastmcp_meta(get_accounts_for_party)

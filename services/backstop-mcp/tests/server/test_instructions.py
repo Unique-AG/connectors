@@ -30,3 +30,5 @@ class TestInstructions:
         assert "get_capital_flows" in INSTRUCTIONS
         assert "get_tasks_for_party" in INSTRUCTIONS
         assert "not on get_people_for_party" in INSTRUCTIONS
+        assert "attachment list" in INSTRUCTIONS
+        assert "falls back internally" in INSTRUCTIONS

@@ -56,7 +56,8 @@ class TestGetActivityDetailDocstring:
         assert "search_activities" in doc
         assert "fallback" in doc
         assert "include_description" in doc
-        assert "attachment list" not in doc
+        assert "attachment list" in doc
+        assert "attachments_count" in doc
 
 
 class TestMeetingOrCall:
@@ -73,6 +74,10 @@ class TestMeetingOrCall:
                     type="meeting",
                     title="Quarterly check-in",
                     description="<table><tr><td>Agenda</td><td>Notes</td></tr></table>",
+                    attachments=[
+                        {"id": "att-1", "name": "deck.pdf"},
+                        {"fileName": "notes.docx"},
+                    ],
                 ),
             )
         )
@@ -118,6 +123,10 @@ class TestMeetingOrCall:
             "Jane Doe",
             "John Smith",
             None,
+        ]
+        assert [(item.id, item.name) for item in result.attachments] == [
+            ("att-1", "deck.pdf"),
+            (None, "notes.docx"),
         ]
         # Only the four fields that actually live on this endpoint are requested.
         assert specifics.calls.last.request.url.params["fields"] == (
@@ -309,6 +318,33 @@ class TestDefensiveParsing:
         # name resolves to None, since neither `name` nor `firstName`/`lastName` matched.
         assert len(result.attendees) == 1
         assert result.attendees[0].name is None
+        assert result.attachments == ()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unexpected_attachments_shape_degrades_to_empty_rather_than_crash(
+        self, client: BackstopClient
+    ) -> None:
+        activity_id = "notes_778"
+        _details_route("778").mock(
+            return_value=httpx.Response(
+                200,
+                json=_detail_document(
+                    "778",
+                    type="note",
+                    title="Note",
+                    description="<p>Body</p>",
+                    attachments="not-a-list",
+                ),
+            )
+        )
+
+        result = tool_model(
+            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            ActivityDetailResponse,
+        )
+
+        assert result.attachments == ()
 
     @pytest.mark.asyncio
     @respx.mock

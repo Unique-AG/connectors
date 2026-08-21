@@ -113,6 +113,7 @@ class ActivityDetailAttributes(BaseModel):
     type: str | None = None
     title: str | None = None
     description: str | None = None
+    attachments: object = None
 
 
 class MeetingSpecificAttributes(BaseModel):

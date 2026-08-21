@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
-from typing import ClassVar, Literal, Self
+from typing import ClassVar, Literal, Self, cast
 
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -16,6 +17,7 @@ from backstop_mcp.features.entity_types import SearchType, party_search_type
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ActivityAttachmentDto",
     "ActivityDetailDto",
     "ActivityItemDto",
     "ActivityPageDto",
@@ -166,6 +168,43 @@ class EmailPageDto(BaseModel):
     end_of_stream: bool
 
 
+class ActivityAttachmentDto(BaseModel):
+    """One file on `/entity-activity-details`. Shape is undocumented — degrade, do not raise."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str | None = None
+    name: str | None = None
+
+
+def attachments_from_stored(value: object) -> tuple[ActivityAttachmentDto, ...]:
+    """Project Backstop's `attachments` attribute into chips. Unexpected shapes become empty."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return ()
+    items: list[ActivityAttachmentDto] = []
+    for raw in value:
+        if isinstance(raw, str):
+            name = raw.strip()
+            if name:
+                items.append(ActivityAttachmentDto(name=name))
+            continue
+        if not isinstance(raw, Mapping):
+            continue
+        mapping = cast(Mapping[object, object], raw)
+        raw_id = mapping.get("id") or mapping.get("resourceId")
+        raw_name = (
+            mapping.get("name")
+            or mapping.get("fileName")
+            or mapping.get("filename")
+            or mapping.get("title")
+        )
+        attachment_id = raw_id.strip() if isinstance(raw_id, str) else None
+        name = raw_name.strip() if isinstance(raw_name, str) else None
+        if attachment_id or name:
+            items.append(ActivityAttachmentDto(id=attachment_id or None, name=name or None))
+    return tuple(items)
+
+
 class ActivityDetailDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -174,6 +213,7 @@ class ActivityDetailDto(BaseModel):
     type: str | None = None
     title: str | None = None
     description: str | None = None
+    attachments: tuple[ActivityAttachmentDto, ...] = ()
 
 
 class MeetingSpecificsDto(BaseModel):
