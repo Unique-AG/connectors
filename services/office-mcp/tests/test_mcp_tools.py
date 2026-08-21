@@ -616,6 +616,32 @@ def _described(schema: Mapping[str, object] | None) -> list[str]:
     return found
 
 
+def _fields(node: object, at: str) -> dict[str, object]:
+    """Every field under a published schema, keyed by the path a model reaches it at.
+
+    `_properties` reads one level; this reads all of them. FastMCP publishes these schemas fully
+    inlined — a nested model arrives as an object under `items` or inside an `anyOf` branch rather
+    than as a `$ref` — so both of those are followed, and a chat member's email comes back as
+    `list_chats.chats[].members[].email`.
+    """
+    schema = _object(node)
+    found: dict[str, object] = {}
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        for name, field in cast("Mapping[str, object]", properties).items():
+            where = f"{at}.{name}"
+            found[where] = field
+            found |= _fields(field, where)
+    items = schema.get("items")
+    if items is not None:
+        found |= _fields(items, f"{at}[]")
+    branches = schema.get("anyOf")
+    if isinstance(branches, list):
+        for branch in cast("Sequence[object]", branches):
+            found |= _fields(branch, at)
+    return found
+
+
 def _optional_types(schema: object) -> list[dict[str, object]]:
     """Every non-null branch of an optional parameter's schema, in the order it declares them."""
     branches = cast("Sequence[object]", _object(schema)["anyOf"])
@@ -800,6 +826,35 @@ class TestTheToolsThisServerAdvertises:
             "recordings",
             "scan_incomplete",
         }
+
+    async def test_every_tool_response_field_is_described(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """A tool's description says what the tool is for; a field's says what the value in it
+        means, and that is the only place it gets said — the answer is JSON, with nowhere to put a
+        caveat. A field with no description is one a model reads by guessing from its name, and the
+        names here are exactly the ones worth not guessing at: `chat_id` is not a handle,
+        `next_offset` is not a count, a null `members` does not mean nobody is in the chat.
+
+        Asserted over the published schemas rather than over the model classes, because published
+        is what a model reads: a description that never reaches the wire is not one.
+        """
+        tools = _named(await mcp_client.list_tools())
+        published = {
+            path: field
+            for name, tool in tools.items()
+            for path, field in _fields(tool.outputSchema, name).items()
+        }
+
+        # Guards the guard, the way the tool-mention check further down does: a field two models
+        # deep is the case the walk exists for, so a walk that had stopped reaching one would pass
+        # by finding nothing rather than by finding everything described.
+        assert "list_chats.chats[].members[].email" in published
+
+        undescribed = sorted(
+            path for path, field in published.items() if not _object(field).get("description")
+        )
+        assert undescribed == [], "a model is handed these values with nothing to say what they are"
 
     async def test_the_whole_surface_speaks_one_language(
         self, mcp_client: Client[FastMCPTransport]
