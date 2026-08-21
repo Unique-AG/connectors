@@ -37,6 +37,8 @@ _SCOPE_KEY = "office_mcp.otel_context"
 
 
 class TraceContextCaptureMiddleware:
+    """Records the ambient context on the ASGI scope. Half of a pair; see the module docstring."""
+
     def __init__(self, app: ASGIApp) -> None:
         self._app: ASGIApp = app
 
@@ -49,6 +51,9 @@ class TraceContextCaptureMiddleware:
 
 
 class TraceContextRestoreMiddleware(Middleware):
+    """Reads that context back and makes it current. Deleting either half restores the defect
+    silently: the spans still look healthy, they just land in the wrong trace."""
+
     @override
     async def on_message(
         self,

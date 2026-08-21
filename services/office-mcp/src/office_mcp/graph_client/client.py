@@ -87,7 +87,9 @@ class _CallerTokenProvider(AccessTokenProvider):
         `http://graph.microsoft.com/...` matches and the delegated token goes out in cleartext. The
         SDK raises `HTTPError("Only https is supported")` here
         (kiota_authentication_azure/azure_identity_access_token_provider.py:80-84); `""` is this
-        contract's existing way of saying "no token". Neither check looks at the port.
+        contract's existing way of saying "no token", and
+        `BaseBearerTokenAuthenticationProvider` omits the header entirely for it rather than
+        sending a bare `Authorization: Bearer `. Neither check looks at the port.
         """
         if urlparse(uri).scheme != "https" or not _GRAPH_HOSTS.is_url_host_valid(uri):
             return ""

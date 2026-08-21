@@ -5,7 +5,10 @@ Graph documents exactly three delegated ways to reach an `onlineMeeting`
 or by `joinMeetingIdSettings/joinMeetingId`. Only the join URL works from Teams' conversation side,
 and the only place a delegated caller gets one is `chat.onlineMeetingInfo.joinWebUrl` in the default
 `GET /me/chats`, which has no `$select`. Whether that field is populated for a non-organiser is
-**not verified**, so a null join URL is a first-class outcome. Every artifact API works only while
+**not verified**, so a null join URL is a first-class outcome. `chatInfo.threadId` is filterable
+in code but undocumented, so that route is deliberately not taken. The resolve is documented for
+attendees and the transcript list is not, so the list may refuse a non-organiser. Every artifact
+API works only while
 the meeting has not expired, roughly 60 days after a one-off
 (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams#meeting-expiration).
 
@@ -45,7 +48,8 @@ MEETING_PERMISSION = "OnlineMeetings.Read"
 STEP_RESOLVE_MEETING = "resolve_meeting"
 
 # Reading a transcript or a recording resource: admin-consented, and a resource cost rather than a
-# request cost. Two tools read `TRANSCRIPT_PERMISSION`, and a second spelling of either name is a
+# request cost. Two tools read `TRANSCRIPT_PERMISSION`. `RECORDING_PERMISSION` has one reader and
+# is spelled here anyway because it is the same kind of cost. A second spelling of either name is a
 # scope Entra rejects, which fails sign-in for everybody.
 TRANSCRIPT_PERMISSION = "OnlineMeetingTranscript.Read.All"
 RECORDING_PERMISSION = "OnlineMeetingRecording.Read.All"

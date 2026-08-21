@@ -45,6 +45,11 @@ the registered surface. The permissions travel that way rather than on the tool 
 tool's `tags` are a set and the order the names are read in is prose, which a set loses, and because
 a tool's `meta` would publish this connector's permission names to every client in `tools/list`.
 
+Every refusal here is written to one shape: the thing that refused, then the remedy, then the
+evidence an operator needs in a trailing parenthesis. It is always "Microsoft 365", never
+"Microsoft Graph" — the caller is not calling that API. Graph is named only where it is the
+explanation, or as `Graph request id`, which is what Microsoft support asks for by that name.
+
 Trap: the middleware never sees a `GraphFailure`. FastMCP re-raises whatever leaves a tool as
 `ToolError` (fastmcp 3.4.5, `fastmcp/server/server.py:1356`), and the dependency engine wraps a
 failed dependency in a `RuntimeError` before that, so what has to be recognised is two links down a
@@ -185,7 +190,11 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
 
 
 class Advised(ToolError):
-    """A tool error whose message is already the advice below, so the middleware leaves it alone."""
+    """A tool error whose message is already the advice below, so the middleware leaves it alone.
+
+    Public despite having no importer: `unique_mcp`'s tool metrics label every failed call with
+    `type(error).__name__`, so renaming this renames an operator-facing metric.
+    """
 
 
 @dataclass(frozen=True, slots=True)
