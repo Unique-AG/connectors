@@ -25,11 +25,10 @@ almost nothing else, so the names have to come from the caller, which is why `gr
 that over every module in `src/`, and pins the step vocabulary to an exact set so that adding one is
 a deliberate act with a reviewer attached.
 
-Architectural rationale: the instruments live here rather than beside the rest of this service's
-domain instruments in `office_mcp/metrics.py`, because `graph_client/` imports nothing of this
+Architectural rationale: the instruments live here rather than in `office_mcp/metrics.py`, where
+this service installs its meter provider, because `graph_client/` imports nothing of this
 application and an instrument is not a knob `GraphSettings` could carry. They are created on the
-OpenTelemetry *API* under the meter name `metrics.py` uses, so both halves land in one
-instrumentation scope; the API buffers instrument creation until `configure_metrics` installs a
+OpenTelemetry *API*, which buffers instrument creation until `configure_metrics` installs a
 provider, so nothing depends on import order. What `metrics.py` still owns is the aggregation —
 the histogram buckets are views there, matched by instrument name, which needs no import either
 way.
@@ -65,9 +64,9 @@ GRAPH_PAGES_SCANNED = "graph_pages_scanned"
 GRAPH_STEPS_TOTAL = "graph_steps_total"
 GRAPH_STEP_DURATION_SECONDS = "graph_step_duration_seconds"
 
-# Deliberately the meter name `office_mcp/metrics.py` uses, not one of this package's own. The
-# Prometheus exporter puts the meter name on every sample as `otel_scope_name`, so a second scope
-# would split this service's own metrics into two families of labels for no reader's benefit.
+# Deliberately the whole service's name, not this package's own. The Prometheus exporter puts the
+# meter name on every sample as `otel_scope_name`, so any instrument this service adds later under
+# a scope of its own would split its metrics into two families of labels for no reader's benefit.
 _METER_NAME = "office_mcp"
 
 _meter = metrics.get_meter(_METER_NAME)

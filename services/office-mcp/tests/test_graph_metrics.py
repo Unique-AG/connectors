@@ -122,6 +122,15 @@ def _value(metric: str, **labels: str) -> float:
     return matched[0] if matched else 0.0
 
 
+def _boundaries(metric: str) -> set[str]:
+    """The `le` labels one scrape carries for a histogram, as they are rendered."""
+    return {
+        line.partition('le="')[2].partition('"')[0]
+        for line in generate_latest(REGISTRY).decode().splitlines()
+        if line.startswith(f"{metric}_bucket")
+    }
+
+
 async def _walk_chats(client: GraphServiceClient, *, limit: int) -> None:
     from msgraph.generated.models.chat_collection_response import ChatCollectionResponse
 
@@ -150,6 +159,44 @@ class TestAGraphCallIsCountedAndTimed:
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="ok") == before + 1
         assert _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_count", operation="get_me") == timed + 1
+
+    @pytest.mark.parametrize(
+        "histogram",
+        [GRAPH_OPERATION_DURATION_SECONDS, GRAPH_STEP_DURATION_SECONDS],
+        ids=repr,
+    )
+    async def test_a_graph_latency_histogram_reaches_minutes_and_not_only_ten_seconds(
+        self, client: GraphServiceClient, graph: respx.MockRouter, histogram: str
+    ) -> None:
+        """The buckets are the whole of what these histograms can say about a throttled call.
+
+        Both time the SDK's `Retry-After` waits along with the call: `GraphSettings` documents four
+        attempts at its 30 s request timeout, and each wait between them is capped at kiota's
+        `RetryHandlerOption.MAX_DELAY` of 180 s. At `prometheus_client`'s default ceiling of 10 s
+        every one of those lands in `+Inf` and a throttled call cannot be told apart from a slow one
+        — which is the distinction the panel exists to draw. The same layout `app.py` hands
+        `setup_ops` for the inbound histogram, so the three can be read against each other without
+        correcting for the boundaries.
+
+        Both instruments, because they share one bucket tuple in `metrics.py` on purpose — an
+        operation and the steps inside it are only comparable on one scale, and a view added for one
+        of them without the other is how that stops being true.
+
+        Asserted on the scrape rather than on `_VIEWS`, for the reason the inbound twin in
+        `test_app.py` gives: a histogram's layout is registered once per process, so the argument
+        is only correct if it arrived first, and only the scrape says whether it did.
+        """
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+
+        with graph_errors("get_me"), graph_step("signed_in_user"):
+            _ = await client.me.get()
+
+        boundaries = _boundaries(histogram)
+
+        assert boundaries, f"{histogram} is absent from the scrape entirely"
+        assert {"30.0", "60.0", "120.0", "300.0"} <= boundaries, (
+            f"the minute buckets are missing from {histogram}, which has {sorted(boundaries)}"
+        )
 
     async def test_a_refusal_is_counted_under_its_remedy_and_not_its_status_code(
         self, client: GraphServiceClient, graph: respx.MockRouter

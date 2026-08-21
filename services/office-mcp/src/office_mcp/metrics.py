@@ -14,11 +14,20 @@ from office_mcp.graph_client import (
 
 _provider: MeterProvider | None = None
 
-# `prometheus_client`'s own defaults, which is what unique_toolkit's
-# `python_http_request_duration_seconds` uses, plus two above them. A dashboard that puts inbound
-# MCP latency beside outbound Graph latency can then read one against the other, and the two extra
-# buckets are where a Retry-After wait and a timed-out call land — the slow tail is the whole reason
-# to look.
+# No instrument is declared in this module. It installs the meter provider, and owns one thing about
+# the instruments declared elsewhere: their aggregation. The `graph_*` family —
+# `graph_operations_total`, `graph_operation_duration_seconds`, `graph_throttled_total`,
+# `graph_pages_scanned`, `graph_steps_total` and `graph_step_duration_seconds` — is created in
+# `graph_client/observability.py`, which imports nothing of this application; the provider installed
+# below is what gives those instruments somewhere to record.
+#
+# The layout `app.py` hands `setup_ops` for the inbound histogram: `prometheus_client`'s own
+# defaults, whose top finite boundary is 10 s, plus 30/60/120/300. A dashboard that puts inbound MCP
+# latency beside outbound Graph latency can then read one against the other without correcting for
+# the boundaries. It has to reach minutes because these instruments time the SDK's Retry-After waits
+# too: `GraphSettings` documents four attempts at its 30 s request timeout, and each wait between
+# them is capped at kiota's `RetryHandlerOption.MAX_DELAY` of 180 s. 300 s does not cover that worst
+# case, but it tells a throttled call apart from a slow one, which a 10 s ceiling cannot.
 #
 # One tuple for both Graph latency histograms, so an operation and the steps inside it are read on
 # the same scale. Two literals would drift, and a step quantile that could not be compared with the
@@ -39,15 +48,18 @@ _GRAPH_LATENCY_BUCKETS = (
     7.5,
     10.0,
     30.0,
+    60.0,
+    120.0,
+    300.0,
 )
 
 # Three histograms whose default buckets would answer the wrong question, corrected here rather than
 # where they are declared: a bucket layout is an aggregation, an aggregation is the provider's, and
 # a view matches on the instrument's name — so this needs nothing from the module that records it.
 #
-# The OpenTelemetry default layout runs 0, 5, 10, 25 … 10000, which is minutes-shaped. A Graph call
-# is capped at `GraphSettings.request_timeout_seconds`, so every honest observation would land in
-# the first bucket and every quantile would read the same.
+# The OpenTelemetry default layout runs 0, 5, 10, 25 … 10000, which is minutes-shaped. Nearly every
+# observation of any of the three — one page read, or a call that took well under five seconds —
+# would land in the first bucket, and every quantile would read the same.
 _VIEWS = (
     View(
         instrument_name=GRAPH_OPERATION_DURATION_SECONDS,
@@ -82,15 +94,3 @@ def configure_metrics(config: AppConfig) -> MeterProvider:
     metrics.set_meter_provider(provider)
     _provider = provider
     return provider
-
-
-# Domain instruments declared here at import time. OTel proxy buffers creation
-# until configure_metrics runs, so import order does not matter here.
-#
-# The `graph_*` family is the exception and cannot move here: it is recorded inside
-# `graph_client/`, which imports nothing of this application, so its instruments are declared in
-# `graph_client/observability.py` — on this same meter name, so they share this scope. What stays
-# here is their aggregation, in `_VIEWS` above. Look there for `graph_operations_total`,
-# `graph_operation_duration_seconds`, `graph_throttled_total`, `graph_pages_scanned`,
-# `graph_steps_total` and `graph_step_duration_seconds`.
-_meter = metrics.get_meter("office_mcp")
