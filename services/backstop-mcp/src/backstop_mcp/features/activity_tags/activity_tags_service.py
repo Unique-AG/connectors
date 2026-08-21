@@ -16,14 +16,15 @@ class ActivityTagsService(CachedCatalog[ActivityTagDto]):
     The TTL, single-flight and serve-stale protocol behind `get` is `CachedCatalog`.
     """
 
-    def __init__(self, *, ttl: timedelta) -> None:
+    def __init__(self, *, ttl: timedelta, caching_enabled: bool = True) -> None:
         super().__init__(
             ttl=ttl,
             fetch=fetch_activity_tags,
             log_prefix="activity_tags",
             subject="activity-tag",
+            caching_enabled=caching_enabled,
         )
 
     @classmethod
-    def with_ttl_minutes(cls, *, ttl_minutes: int) -> Self:
-        return cls(ttl=timedelta(minutes=ttl_minutes))
+    def with_ttl_minutes(cls, *, ttl_minutes: int, caching_enabled: bool = True) -> Self:
+        return cls(ttl=timedelta(minutes=ttl_minutes), caching_enabled=caching_enabled)

@@ -1,7 +1,36 @@
 """Firm-wide (or party) activity search via `POST /entity-activities`.
 
-This is the UI Activity Explorer endpoint. The swagger calls it a create; it is a search.
-Pagination is `pageNum` (1-based) × `pageSize` in the JSON body — not `paginate` / `links.next`.
+UNDOCUMENTED ENDPOINT — deliberately. Read this before changing anything here.
+
+**Where it came from.** It is not in the Backstop swagger. It was found by navigating the
+Backstop web app's Activity Explorer with the browser network tab open: the screen a Backstop
+user actually uses to answer "what happened with this client", and this is the single call it
+makes. Nothing about it is inferred from the published API docs, which do not mention it; every
+behaviour recorded below was measured against a live instance. That is also the only way to
+verify a change to this module — the swagger cannot confirm or deny any of it.
+
+**Why we use it anyway.** It is dramatically faster than the documented route, and it answers
+questions the documented route cannot answer at all:
+
+- One POST returns meetings, calls, notes, emails and documents together, already filtered by
+  date window, type, party, tag and author, and already sorted by `effectiveDate`. The
+  documented equivalent (`get_activity_history`) is four separate per-party REST streams, each
+  paged on its own, then merged and sorted here — many requests per answer instead of one.
+- It searches **firm-wide**. The REST streams hang off one party (`/{segment}/{id}/activities`),
+  so without this endpoint "what did the firm do last quarter", "what did this colleague log",
+  and any question spanning more than one client are simply unanswerable.
+- Those are the questions clients want Backstop to answer. This endpoint, and the account table
+  in `accounts/fetch_holdings_table.py`, are the two undocumented calls the product leans on
+  hardest; treat both as load-bearing rather than as shortcuts to clean up later.
+
+**What we owe for that.** An undocumented endpoint can change or be absent without notice, so
+callers must never treat its failure as "no activity exists": `search_activities` catches a 404
+or a schema drift and names `get_activity_history` — the documented, party-scoped fallback — in
+the failure payload. Keep that fallback working. Keep this module's schemas lenient, and keep
+`api_responses.py` degrading unreadable fields to `None` rather than raising.
+
+**Measured behaviour.** The swagger name would call it a create; it is a search. Pagination is
+`pageNum` (1-based) × `pageSize` in the JSON body — not `paginate` / `links.next`.
 `pageNum × pageSize > 10000` is HTTP 500, so this module clamps **before** the request and
 returns whatever was already fetched.
 
@@ -148,7 +177,11 @@ async def fetch_entity_activities(
     page_size: int = _PAGE_SIZE,
     max_retrievable: int = MAX_RETRIEVABLE,
 ) -> EntityActivitiesFetchDto:
-    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall."""
+    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall.
+
+    The endpoint is an undocumented UI search — read the module docstring before changing this,
+    including for what "verified" has to mean here.
+    """
     effective_page_size = page_size if max_rows is None else min(page_size, max_rows)
     collected: list[EntityActivityDto] = []
     dropped = 0

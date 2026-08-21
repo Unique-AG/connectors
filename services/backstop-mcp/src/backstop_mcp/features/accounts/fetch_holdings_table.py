@@ -1,11 +1,31 @@
 """One party's holdings, with balances, from Backstop's undocumented UI table endpoint.
 
-`GET /bsg-account-table-data?entityId={partyId}` is what the Backstop web app's account table
-calls. It is not in the swagger, and it is the only single-request source of a party's accounts
-*with figures* — the documented alternative is a whole-collection `/accounts` walk plus one series
-request per account per figure.
+UNDOCUMENTED ENDPOINT — deliberately. Read this before changing anything here.
 
-Measured against a live instance, and the reasons this does not go through `paginate`:
+**Where it came from.** `GET /bsg-account-table-data?entityId={partyId}` is not in the Backstop
+swagger. It was found by navigating the Backstop web app with the browser network tab open: it is
+the single call behind the account table a Backstop user looks at to see what a client holds. The
+`bsg-` prefix is a giveaway that it exists to serve that screen and nothing else. Everything
+documented below was measured against a live instance, not read from the API docs, which do not
+mention this path — measuring against a live instance is likewise the only way to verify a change
+to this module.
+
+**Why we use it anyway.** It is the only single-request source of a party's accounts *with
+figures*. The documented alternative is a whole-collection `/accounts` walk plus one series
+request per account per figure — so the request count grows with the firm's account count and
+again with every column, where this is one request whatever the answer's size. A party's holdings
+with balances is one of the first things clients want out of Backstop, and answering it at that
+cost is the difference between a usable tool and one that times out. This and the activity search
+in `activity_history/fetch_entity_activities.py` are the two undocumented calls the product leans
+on hardest; treat both as load-bearing rather than as shortcuts to clean up later.
+
+**What we owe for that.** An undocumented endpoint can change or vanish without notice, so this
+one is never the only path: `fetch_holdings.py` falls back to the documented `/accounts` walk, and
+`HoldingListingDto.source` publishes which one answered. Keep that fallback working. The counts
+checked in `_reject_contradictory_counts` are the tripwire for a silent shape change, and the
+lenient scalars in `api_responses.py` are what keep a renamed field from becoming an exception.
+
+**Measured behaviour**, and the reasons this does not go through `paginate`:
 
 - Rows sit at `data[0].attributes.accounts`. The `data` element's `id` is `null`, `links` is
   `null`, `included` is always `[]`, and `meta.totalResourceCount` is `0` no matter how many rows
@@ -88,6 +108,9 @@ async def fetch_holdings_table(
     include_closed: bool = False,
 ) -> HoldingListingDto:
     """A party's accounts with snapshot figures, in one request.
+
+    The one request is the whole point, and it is an undocumented UI endpoint — read the module
+    docstring before changing this, including for what "verified" has to mean here.
 
     `entity_id` should be a resolved party id — an unresolved one yields an empty table rather
     than an error (see the fail-open note above), which this function cannot detect. Raises

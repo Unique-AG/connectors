@@ -240,9 +240,24 @@ class BackstopConfig(BaseSettings):
         le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES,
     )
 
+    # Whether the custom-field catalogs (definitions and groups) are held between calls at all.
+    # Off by default, along with the two flags below: the TTLs above are an assumption about how
+    # much a walk costs, and nothing measured it. With caching off every read walks Backstop and
+    # the pair of histograms in `features/cached_catalog.py` says what that costs and what a TTL
+    # would have saved — `catalog_get_duration_seconds_count` is the demand,
+    # `catalog_fetch_duration_seconds` the walk. Turn one on per feature once its numbers say so;
+    # the TTL above is what it then uses. Set `BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED=true`.
+    #
+    # Covers both custom-field catalogs, mirroring `custom_field_schema_ttl_minutes`, which they
+    # already share. The histograms label the two separately (`catalog="custom-field"` and
+    # `catalog="custom-field group"`), so if the definitions walk turns out to want a TTL and the
+    # much smaller group walk does not, splitting this flag is the next step.
+    custom_field_schema_cache_enabled: bool = False
+
     # How long a fetched opportunity-stage vocabulary stays usable. Seven rows on the instance
     # this was built against, and a stage is added about as often as a custom field, so the same
-    # one-hour default and 24-hour cap apply.
+    # one-hour default and 24-hour cap apply. No cache flag: `OpportunityStagesService` does not
+    # use `CachedCatalog` and always holds its vocabulary.
     opportunity_stage_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
     # How long a fetched activity-tag catalog stays usable before it is re-fetched. Tags change
@@ -252,11 +267,21 @@ class BackstopConfig(BaseSettings):
     # collection.
     activity_tag_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
+    # Whether the activity-tag catalog is held between calls. Off by default — see
+    # `custom_field_schema_cache_enabled` for why and for what evidence flips it. Set
+    # `BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED=true`.
+    activity_tag_cache_enabled: bool = False
+
     # How long a fetched system-user catalog stays usable before it is re-fetched. The roster
     # changes rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit
     # for days after a colleague is added or disabled. `list_system_users(refresh=true)` forces
     # a refetch when someone is missing.
     system_user_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
+
+    # Whether the system-user catalog is held between calls. Off by default — see
+    # `custom_field_schema_cache_enabled` for why and for what evidence flips it. Set
+    # `BACKSTOP_SYSTEM_USER_CACHE_ENABLED=true`.
+    system_user_cache_enabled: bool = False
 
     # Which entity-relationship types mean employment, and which of those mean it has ended,
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id

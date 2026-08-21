@@ -27,17 +27,49 @@ copy. What it has to get right, once:
 Subclasses supply the DTO, the fetch, and the names this logs under. `get` is the whole public
 surface and its shape — `(catalog, "ok" | "stale")` — is what every caller already reads.
 
+**Caching is off by default, per feature, from the environment.** Everything above is an
+argument, not a measurement: nobody has numbers for what a walk costs or how often one happens,
+and a stale catalog served from an unmeasured TTL is a correctness risk taken for an unknown
+saving. So each provider in a feature's `dependencies.py` passes `caching_enabled` from a
+`BACKSTOP_*_CACHE_ENABLED` flag, all of which default to false. Nothing here is deleted for
+that: the TTL, the double-check, the in-flight pin and the serve-stale path all still work, and
+turning one catalog on is one env var — no deploy of new code.
+
+**The two histograms that decide it.** They are one view, and the gap between them is the whole
+answer:
+
+- `catalog_get_duration_seconds{catalog, served}` — one record per `get`, whatever answered it.
+  Its `_count` is demand: the number of walks there would be with no cache and no coalescing,
+  which is the counterfactual the caching decision needs. `served` says what each caller got —
+  `backstop` (its own walk), `coalesced` (another caller's in-flight walk), `cache` (a TTL hit),
+  `stale`, `error`, `cancelled` — and its duration is caller-visible latency, lock and
+  coalescing wait included.
+- `catalog_fetch_duration_seconds{catalog, outcome}` — one record per walk actually made,
+  however many callers were served from it. Its buckets are the walk cost.
+
+Subtract the `_count`s for requests already avoided, and read `served` for which mechanism
+avoided them. With caching off, any gap is coalescing alone; the `served="cache"` rate a TTL
+would add is what the histograms are there to predict, and then to confirm once one is on.
+
+What the disabled mode changes: the two freshness checks never hit, no items are retained, and
+so the serve-stale branch is unreachable — a failure propagates instead of being softened by a
+catalog this mode never kept. Request coalescing is deliberately *not* disabled with it:
+collapsing concurrent callers onto one walk is deduplication, not caching, and turning it off
+would multiply exactly the load this is trying to measure.
+
 `OpportunityStagesService` deliberately does *not* use this; see its own docstring for why a
 seven-row vocabulary wants a failure to propagate rather than be softened.
 """
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from typing import Literal
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.metrics import CATALOG_FETCH_DURATION, CATALOG_GET_DURATION
 from backstop_mcp.timed_gate import TimedGate
 
 __all__ = ["CachedCatalog", "CatalogFreshness", "CatalogSource"]
@@ -50,6 +82,13 @@ type CatalogFreshness = Literal["ok", "stale"]
 # Where a completed load's contents came from, for a catalog that meters its loads.
 type CatalogSource = Literal["backstop", "stale"]
 type CatalogResult[T] = tuple[dict[str, T], CatalogFreshness]
+# Outcome label on `catalog_fetch_duration_seconds`. "cancelled" is its own value rather than
+# folded into "error": a cancelled walk's duration says nothing about how long one takes.
+type CatalogFetchOutcome = Literal["ok", "error", "cancelled"]
+# `served` label on `catalog_get_duration_seconds`: what answered one `get`, one value per call.
+# The three that are not a walk of this caller's own are the ones a caching decision reads —
+# `cache` is what a TTL bought, `coalesced` what the in-flight pin bought without one.
+type CatalogServed = Literal["cache", "coalesced", "backstop", "stale", "error", "cancelled"]
 
 
 class CachedCatalog[T]:
@@ -57,6 +96,9 @@ class CachedCatalog[T]:
 
     Subclassed rather than composed so each feature keeps its own class name, its own docstring
     and its own `with_ttl_minutes`, and so `get`'s return type narrows to that feature's DTO.
+
+    `caching_enabled=False` keeps every mechanism below and consults none of it — see the module
+    docstring for why every production site currently passes it.
     """
 
     def __init__(
@@ -66,10 +108,12 @@ class CachedCatalog[T]:
         fetch: Callable[[BackstopClient], Awaitable[dict[str, T]]],
         log_prefix: str,
         subject: str,
+        caching_enabled: bool = True,
     ) -> None:
         self._fetch_items: Callable[[BackstopClient], Awaitable[dict[str, T]]] = fetch
         self._log_prefix: str = log_prefix
         self._subject: str = subject
+        self._caching_enabled: bool = caching_enabled
         self._items: dict[str, T] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -79,16 +123,41 @@ class CachedCatalog[T]:
         """The catalog, fetching it when cold, past its TTL, or `refresh` was asked for.
 
         Returns a copy, so a caller cannot mutate the shared map. `"stale"` means the refresh
-        failed and this is the previous catalog.
+        failed and this is the previous catalog. With caching disabled every call fetches and
+        `"stale"` is never returned.
+
+        Every call records once into `catalog_get_duration_seconds`, so its `_count` is demand
+        rather than walks — see the module docstring for the pair this forms with the walk
+        histogram.
         """
-        cached = self._items
-        if cached is not None and self._freshness.within() and not refresh:
-            return dict(cached), "ok"
+        started = time.monotonic()
+        # Only a `BaseException` that is not an `Exception` can leave this unassigned, and
+        # cancellation is the one that happens.
+        served: CatalogServed = "cancelled"
+        try:
+            result, served = await self._get_served(client, refresh=refresh)
+            return result
+        except Exception:
+            served = "error"
+            raise
+        finally:
+            CATALOG_GET_DURATION.record(
+                time.monotonic() - started,
+                {"catalog": self._subject, "served": served},
+            )
+
+    async def _get_served(
+        self, client: BackstopClient, *, refresh: bool
+    ) -> tuple[CatalogResult[T], CatalogServed]:
+        """`get`'s actual work, paired with which mechanism answered it."""
+        cached = self._servable(refresh=refresh)
+        if cached is not None:
+            return (dict(cached), "ok"), "cache"
 
         async with self._lock:
-            cached = self._items
-            if cached is not None and self._freshness.within() and not refresh:
-                return dict(cached), "ok"
+            cached = self._servable(refresh=refresh)
+            if cached is not None:
+                return (dict(cached), "ok"), "cache"
             if self._in_flight is not None and not self._in_flight.done():
                 in_flight = self._in_flight
                 owner = False
@@ -99,10 +168,13 @@ class CachedCatalog[T]:
 
         if not owner:
             items, status = await in_flight
-            return dict(items), status
+            # Attributed to the pin, not to the walk it rode on: this caller made no request,
+            # and a stale walk's own failure is already on the fetch histogram.
+            return (dict(items), status), "coalesced"
 
         try:
-            return await self._fetch(client, in_flight)
+            result = await self._fetch(client, in_flight)
+            return result, ("stale" if result[1] == "stale" else "backstop")
         except BaseException as error:
             if not in_flight.done():
                 # Don't stamp CancelledError onto the shared future — waiters would then
@@ -122,6 +194,19 @@ class CachedCatalog[T]:
         """Called once per completed load. Override in a catalog that meters them."""
         _ = source
 
+    def _servable(self, *, refresh: bool) -> dict[str, T] | None:
+        """The held catalog when it may be served, else `None` — cold, past TTL, or caching off.
+
+        Called on both sides of the lock, which is what makes the freshness check double-checked
+        rather than racy.
+        """
+        if not self._caching_enabled or refresh:
+            return None
+        cached = self._items
+        if cached is None or not self._freshness.within():
+            return None
+        return cached
+
     def _mark_in_flight_exception_retrieved(
         self, in_flight: asyncio.Future[CatalogResult[T]]
     ) -> None:
@@ -135,11 +220,33 @@ class CachedCatalog[T]:
             if self._in_flight is in_flight:
                 self._in_flight = None
 
+    async def _metered_fetch(self, client: BackstopClient) -> dict[str, T]:
+        """The walk itself, timed into `catalog_fetch_duration_seconds`.
+
+        Recorded in both modes and on every exit — a cancelled walk is labelled as such rather
+        than left unrecorded, so the histogram's `_count` is the true number of walks started.
+        """
+        started = time.monotonic()
+        outcome: CatalogFetchOutcome = "cancelled"
+        try:
+            items = await self._fetch_items(client)
+        except Exception:
+            outcome = "error"
+            raise
+        else:
+            outcome = "ok"
+            return items
+        finally:
+            CATALOG_FETCH_DURATION.record(
+                time.monotonic() - started,
+                {"catalog": self._subject, "outcome": outcome},
+            )
+
     async def _fetch(
         self, client: BackstopClient, in_flight: asyncio.Future[CatalogResult[T]]
     ) -> CatalogResult[T]:
         try:
-            items = await self._fetch_items(client)
+            items = await self._metered_fetch(client)
         except Exception as error:
             if self._items is not None:
                 logger.warning(
@@ -162,8 +269,11 @@ class CachedCatalog[T]:
             in_flight.set_exception(error)
             raise
 
-        self._items = items
-        self._freshness.mark()
+        if self._caching_enabled:
+            # Nothing is retained with caching off, which is also what makes the serve-stale
+            # branch above unreachable in that mode rather than needing its own guard.
+            self._items = items
+            self._freshness.mark()
         self.record_load("backstop")
         logger.info(
             f"{self._log_prefix}.refreshed",
