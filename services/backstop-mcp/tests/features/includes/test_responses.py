@@ -264,7 +264,7 @@ class TestCompanyRef:
 
 
 class TestInternalOwner:
-    def test_keeps_four_of_the_thirteen_system_user_attributes(self) -> None:
+    def test_keeps_five_of_the_thirteen_system_user_attributes(self) -> None:
         owner = InternalOwnerResponse.model_validate(_SYSTEM_USER)
 
         assert owner.model_dump() == {
@@ -272,6 +272,7 @@ class TestInternalOwner:
             "user_name": "mlucas",
             "email": "margaret.lucas@capstoneco.com",
             "phone": "12122321462",
+            "disabled": False,
         }
 
     def test_is_documented_as_our_own_staff_rather_than_a_way_to_reach_the_investor(self) -> None:

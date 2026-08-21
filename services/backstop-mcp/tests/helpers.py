@@ -30,6 +30,7 @@ from backstop_mcp.features.data_hygiene import (
     TypeVocabularyDto,
 )
 from backstop_mcp.features.opportunities import OpportunityStagesService
+from backstop_mcp.features.system_users import SystemUsersService
 
 BASE_URL = "https://example.backstopsolutions.com"
 
@@ -114,6 +115,10 @@ def build_employment_index_factory(
 
 def activity_tags_service(*, ttl_minutes: int = 60) -> ActivityTagsService:
     return ActivityTagsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+
+
+def system_users_service(*, ttl_minutes: int = 60) -> SystemUsersService:
+    return SystemUsersService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:

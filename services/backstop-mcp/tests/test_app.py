@@ -324,4 +324,5 @@ class TestConfigTranslation:
             "activity_tag_ttl_minutes",
             "custom_field_schema_ttl_minutes",
             "opportunity_stage_ttl_minutes",
+            "system_user_ttl_minutes",
         }
