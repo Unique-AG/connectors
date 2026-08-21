@@ -20,7 +20,7 @@
     "@unique-ag/utils": "workspace:*",
     "https-proxy-agent": "7.0.6",
     "remeda": "2.32.0",
-    "undici": "7.28.0"
+    "undici": "7.29.0"
   },
   "devDependencies": {
     "@nestjs/common": "11.1.18",
