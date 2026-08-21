@@ -20,9 +20,10 @@ shape of one fetched item and the union conversion into it. `ActivityHistoryReso
 
 `fetch_activity_detail`/`fetch_meeting_specifics`/`fetch_attendees`: the `get_activity_detail`
 fetch primitive — one activity's full `entity-activity-details` record plus, for a
-meeting-or-calls handle, timings and attendees. `parse_activity_handle` splits the timeline
-`activity_id` into `{resource_type, resource_id}`; `ActivityHandleDto.is_meeting_or_call` gates
-the two `/meeting-or-calls` fetches. See `fetch_activity_detail.py` and `activity_handle.py`.
+meeting-or-calls handle, timings and attendees. `ResourceIdentifierDto.from_activity_id` splits
+the timeline `activity_id` into `{resource_type, resource_id}`;
+`ResourceIdentifierDto.is_meeting_or_call` gates the two `/meeting-or-calls` fetches. See
+`fetch_activity_detail.py`.
 `ActivityDetailResponse`/`AttendeeResponse`: that tool's wire shape
 and the pure conversion into it. See `responses.py`.
 
@@ -32,10 +33,6 @@ and the pure conversion into it. See `responses.py`.
 The MCP tool surface itself lives in a later `activity_history` module.
 """
 
-from backstop_mcp.features.activity_history.activity_handle import (
-    ActivityHandleDto,
-    parse_activity_handle,
-)
 from backstop_mcp.features.activity_history.fetch_activities import (
     ActivityType,
     BackstopActivityType,
@@ -59,6 +56,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EmailItemDto,
     EmailPageDto,
     MeetingSpecificsDto,
+    ResourceIdentifierDto,
 )
 from backstop_mcp.features.activity_history.responses import (
     ActivityContinuationResponse,
@@ -81,7 +79,6 @@ __all__ = [
     "ActivityDetailDto",
     "ActivityDetailResponse",
     "ActivityGroupResponse",
-    "ActivityHandleDto",
     "ActivityHistoryResolvedResponse",
     "ActivityHistorySettings",
     "ActivityItemDto",
@@ -99,6 +96,7 @@ __all__ = [
     "Gist",
     "MeetingSpecificsDto",
     "ResolvedPartyAsOfResponse",
+    "ResourceIdentifierDto",
     "Segment",
     "TimelineRecord",
     "fetch_activity_detail",
@@ -108,7 +106,6 @@ __all__ = [
     "fetch_email_page",
     "fetch_meeting_specifics",
     "group_page",
-    "parse_activity_handle",
     "to_gist",
     "to_timeline_record",
 ]

@@ -24,13 +24,13 @@
 
 4. **A package is entered through its `__init__`, never through its modules.** From outside,
    `from backstop_mcp.features.data_hygiene import EmploymentIndexFactory` — not
-   `...data_hygiene.service import ...`, and certainly not `...data_hygiene.employment import
-   build_employment_index`. Each package's `__all__` is then the whole of what it promises,
-   and everything else is free to move.
+   `...data_hygiene.employment_index_factory import ...`, and certainly not an internal from
+   `...data_hygiene.employment_index`. Each package's `__all__` is then the whole of what it
+   promises, and everything else is free to move.
 
-   This is what makes a package able to say "call it this way". `data_hygiene/employment.py`
-   decides nothing until it is handed an employment vocabulary, the side-loaded relationship
-   types and a clock; `EmploymentIndexFactory` supplies all three, from configuration, once.
+   This is what makes a package able to say "call it this way". `data_hygiene/employment_index.py`
+   is the fold over already-classified edges; `EmploymentIndexFactory` supplies the employment
+   vocabulary, the side-loaded relationship types and a clock, from configuration, once.
    Reaching past it is how the original bug happened — `get_person` assembled its own vocabulary
    with `BackstopConfig()`, so whatever `create_app` had been given was silently ignored.
    `__all__` alone is only a convention; this rule is what makes it hold.
@@ -461,7 +461,7 @@ class TestTheDetectionItself:
     def test_does_not_police_non_layer_files_importing_responses(self) -> None:
         assert not _layer_import_violations(
             "from backstop_mcp.features.data_hygiene.responses import AsOfResponse\n",
-            _FEATURES / "data_hygiene" / "employment.py",
+            _FEATURES / "data_hygiene" / "employment_index.py",
         )
 
     def test_catches_extra_forbid_on_a_configdict_call(self) -> None:
@@ -569,10 +569,12 @@ class TestPackagesAreEnteredThroughTheirInit:
 
     def test_a_package_still_composes_its_own_modules(self) -> None:
         """The rule is only meaningful if something inside the package assembles the parts."""
-        service = _package_directory("backstop_mcp.features.data_hygiene") / "service.py"
-        imported = {module for module, _line in _imported_modules(ast.parse(service.read_text()))}
+        factory = (
+            _package_directory("backstop_mcp.features.data_hygiene") / "employment_index_factory.py"
+        )
+        imported = {module for module, _line in _imported_modules(ast.parse(factory.read_text()))}
 
-        assert "backstop_mcp.features.data_hygiene.employment" in imported
+        assert "backstop_mcp.features.data_hygiene.employment_index" in imported
 
     @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
     def test_no_module_reaches_past_another_packages_init(self, source: pathlib.Path) -> None:

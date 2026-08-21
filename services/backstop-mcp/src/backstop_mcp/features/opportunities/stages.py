@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import timedelta
+from typing import Self
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
@@ -62,6 +63,10 @@ class OpportunityStagesService:
         self._failure: Exception | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
 
+    @classmethod
+    def with_ttl_minutes(cls, *, ttl_minutes: int) -> Self:
+        return cls(ttl=timedelta(minutes=ttl_minutes))
+
     async def get(self, client: BackstopClient) -> dict[str, OpportunityStageDto]:
         cached = self._stages
         if cached is not None and self._freshness.within():
@@ -91,7 +96,3 @@ class OpportunityStagesService:
             self._freshness.mark()
             logger.info("opportunities.stages.refreshed", extra={"stages": len(stages)})
             return dict(stages)
-
-
-def create_opportunity_stages_service(*, ttl_minutes: int) -> OpportunityStagesService:
-    return OpportunityStagesService(ttl=timedelta(minutes=ttl_minutes))

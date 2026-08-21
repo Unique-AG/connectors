@@ -6,7 +6,7 @@ ordering, the meaning of `activity_types`) belong in the tool description, not i
 see the design doc's "Token budget" section. This module carries no prose `notes` field.
 
 Neither `resource_type` nor `resource_id` is surfaced on its own: `activity_id` is already the
-composite `{resourceType}_{resourceId}` (see `activity_handle.py`), so the two halves are always
+composite `{resourceType}_{resourceId}` (see `ResourceIdentifierDto`), so the two halves are always
 delivered together. A bare `resource_id` would be an id with no collection to look it up in —
 unusable on its own, and easy to mistake for something `get_activity_detail` accepts. `type`
 already says which stream a record came from.

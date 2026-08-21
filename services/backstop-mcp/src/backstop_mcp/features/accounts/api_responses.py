@@ -2,11 +2,12 @@ from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
-from backstop_mcp.backstop_client import ResourceRef
+from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.lenient import LenientBool, LenientFloat
 
 __all__ = [
+    "AccountApiResponse",
     "AccountAttributes",
     "InvestorQualificationAttributes",
     "InvestorTypeAttributes",
@@ -108,3 +109,7 @@ class SeriesPointAttributes(BaseModel):
     date: LenientDate = None
     value: LenientFloat = None
     value_status: _CleanStr = Field(default=None, alias="valueStatus")
+
+
+# Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
+AccountApiResponse = BackstopApiResource[AccountAttributes]

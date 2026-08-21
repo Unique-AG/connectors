@@ -20,19 +20,13 @@ from backstop_mcp.backstop_client.factory import BackstopClientFactory
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.features.activity_history import ActivityHistorySettings
 from backstop_mcp.features.auth.context import BackstopAuthContext
-from backstop_mcp.features.custom_fields import (
-    CustomFieldsService,
-    create_custom_fields_service,
-)
+from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     EmploymentRulesDto,
     TypeVocabularyDto,
 )
-from backstop_mcp.features.opportunities import (
-    OpportunityStagesService,
-    create_opportunity_stages_service,
-)
+from backstop_mcp.features.opportunities import OpportunityStagesService
 from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
@@ -130,11 +124,11 @@ def build_employment_index_factory(
 
 
 def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
-    return create_custom_fields_service(ttl_minutes=ttl_minutes)
+    return CustomFieldsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 def opportunity_stages_service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
-    return create_opportunity_stages_service(ttl_minutes=ttl_minutes)
+    return OpportunityStagesService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 class _RecordedCall(Protocol):

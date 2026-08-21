@@ -13,7 +13,7 @@ from backstop_mcp.features.data_hygiene import (
     DepartureSignal,
     EmploymentStatus,
 )
-from backstop_mcp.features.data_hygiene.employment import EmploymentIndex
+from backstop_mcp.features.data_hygiene.employment_index import EmploymentIndex
 from backstop_mcp.features.data_hygiene.internal_dto import EmploymentEdgeDto
 
 

@@ -22,10 +22,7 @@ from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
     StageChangeResponse,
 )
-from backstop_mcp.features.opportunities.stages import (
-    OpportunityStagesService,
-    create_opportunity_stages_service,
-)
+from backstop_mcp.features.opportunities.stages import OpportunityStagesService
 
 __all__ = [
     "OpportunityFetchResponse",
@@ -35,6 +32,5 @@ __all__ = [
     "OpportunityStagesService",
     "OpportunityStatus",
     "StageChangeResponse",
-    "create_opportunity_stages_service",
     "fetch_opportunities",
 ]

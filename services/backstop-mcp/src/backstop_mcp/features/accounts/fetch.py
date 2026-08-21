@@ -16,23 +16,22 @@ for the relationships named in `include=`, which keep their `data` linkage, so `
 the `owner` pointer. Measured over this instance's 815 accounts: 97.1s/13.1 MiB unchanged,
 17.2s/4.5 MiB with `fields=` alone, 31.7s with parallel paging alone, 9.1s/4.3 MiB with both.
 
-`closedDate` has to stay in `_FIELDS` and stay meaningful: `account_is_open` reads open as *the
-key was absent on the wire*, so a `fields=` set that materialized it as null would report every
-account closed. It does not — of 200 rows fetched this way the key was absent on 8 and null on 0,
-matching what the same accounts return unfiltered.
+`closedDate` has to stay in `_FIELDS` and stay meaningful: open is *the key was absent on the
+wire*, so a `fields=` set that materialized it as null would report every account closed. It does
+not — of 200 rows fetched this way the key was absent on 8 and null on 0, matching what the same
+accounts return unfiltered.
 """
 
 from collections.abc import Sequence
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.accounts.internal_dto import AccountListingDto, AccountRecordDto
-from backstop_mcp.features.accounts.project import (
-    AccountApiResponse,
-    account_owner,
-    project_account,
-    project_accounts,
-    split_open,
+from backstop_mcp.backstop_client import BackstopClient, follow_included
+from backstop_mcp.features.accounts.api_responses import AccountApiResponse
+from backstop_mcp.features.accounts.internal_dto import (
+    AccountListingDto,
+    AccountOwnerDto,
+    AccountRecordDto,
 )
+from backstop_mcp.features.accounts.split_open import split_open
 
 _ACCOUNTS_PATH = "/accounts"
 _PAGE_SIZE = 100
@@ -78,7 +77,7 @@ async def fetch_accounts_for_product(
         parallel=True,
     )
     return split_open(
-        project_accounts(page.items, included=page.included),
+        AccountRecordDto.from_resources(page.items, included=page.included),
         include_closed=include_closed,
     )
 
@@ -110,7 +109,7 @@ def _owned_accounts(
     owner_id: str,
 ) -> tuple[AccountRecordDto, ...]:
     return tuple(
-        project_account(resource, included=included)
+        AccountRecordDto.from_resource(resource, included=included)
         for resource in resources
         if _owns(resource, included=included, owner_id=owner_id)
     )
@@ -125,5 +124,6 @@ def _owns(
     """Linkage id first — it costs nothing and works without the `owner` include."""
     if owner_id in resource.related_ids(_OWNER):
         return True
-    owner = account_owner(resource, included=included)
+    related = follow_included(included, resource, _OWNER)
+    owner = AccountOwnerDto.from_included(related[0] if related else None)
     return owner is not None and owner.id == owner_id

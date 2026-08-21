@@ -34,9 +34,9 @@ from backstop_mcp.features.auth import (
     cleanup_lifespan,
     load_key,
 )
-from backstop_mcp.features.custom_fields import create_custom_fields_service
-from backstop_mcp.features.data_hygiene import create_employment_index_factory
-from backstop_mcp.features.opportunities import create_opportunity_stages_service
+from backstop_mcp.features.custom_fields import CustomFieldsService
+from backstop_mcp.features.data_hygiene import EmploymentIndexFactory
+from backstop_mcp.features.opportunities import OpportunityStagesService
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
@@ -102,13 +102,13 @@ def create_app(
         )
     )
 
-    custom_fields_service = create_custom_fields_service(
+    custom_fields_service = CustomFieldsService.with_ttl_minutes(
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
-    opportunity_stages_service = create_opportunity_stages_service(
+    opportunity_stages_service = OpportunityStagesService.with_ttl_minutes(
         ttl_minutes=backstop_config.opportunity_stage_ttl_minutes,
     )
-    employment_index_factory = create_employment_index_factory(
+    employment_index_factory = EmploymentIndexFactory.from_vocabulary(
         employment_type_ids=backstop_config.employment_relationship_type_ids,
         employment_type_markers=backstop_config.employment_relationship_type_markers,
         former_type_ids=backstop_config.former_employment_relationship_type_ids,

@@ -10,11 +10,7 @@ from datetime import date, timedelta
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.data_hygiene import (
-    DepartureSignal,
-    EmploymentIndexFactory,
-    create_employment_index_factory,
-)
+from backstop_mcp.features.data_hygiene import DepartureSignal, EmploymentIndexFactory
 from backstop_mcp.features.data_hygiene.api_responses import (
     EntityRelationshipAttributes,
     RelationshipTypeAttributes,
@@ -58,7 +54,7 @@ def _factory(
     former_type_ids: Sequence[str] = (),
     former_type_markers: Sequence[str] = ("former",),
 ) -> EmploymentIndexFactory:
-    return create_employment_index_factory(
+    return EmploymentIndexFactory.from_vocabulary(
         employment_type_ids=employment_type_ids,
         employment_type_markers=employment_type_markers,
         former_type_ids=former_type_ids,
