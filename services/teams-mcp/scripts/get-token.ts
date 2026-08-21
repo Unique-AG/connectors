@@ -54,7 +54,6 @@ const MESSAGING_SCOPES = [
 ];
 // Requested only when UNIQUE_INTEGRATION is enabled.
 const KB_SCOPES = [
-  'Calendars.Read',
   'OnlineMeetings.Read',
   'OnlineMeetingRecording.Read.All',
   'OnlineMeetingTranscript.Read.All',

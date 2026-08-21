@@ -28,10 +28,10 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `Channel.ReadBasic.All` | Delegated | No |
 | `ChannelMessage.Read.All` | Delegated | **Yes** |
 
-No calendar, meeting, transcript, or recording scope is requested. For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+No meeting, transcript, or recording scope is requested. For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
-!!! note "Transcript capture adds four scopes"
-    A deployment with `UNIQUE_INTEGRATION=enabled` additionally requests `Calendars.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All`, and `OnlineMeetingRecording.Read.All`, the last two of which require admin consent. Only enable that mode if you intend to store meeting content in the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
+!!! note "Transcript capture adds three scopes"
+    A deployment with `UNIQUE_INTEGRATION=enabled` additionally requests `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All`, and `OnlineMeetingRecording.Read.All`, the last two of which require admin consent. Only enable that mode if you intend to store meeting content in the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
 
 !!! note "Ingestion-only omits the messaging scopes"
     The messaging scopes above are requested only when `CHAT_INTEGRATION=enabled` (the default). Setting `CHAT_INTEGRATION=disabled` together with `UNIQUE_INTEGRATION=enabled` yields an **ingestion-only** deployment whose app registration requests only the identity and transcript scopes — none of the chat/messaging permissions. See [Configuration — Chat Integration](./configuration.md#chat-integration).
@@ -68,7 +68,7 @@ module "teams_mcp_app" {
   display_name     = "Teams MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
   notes              = "MCP server for Teams chats and channels"
-  unique_integration = "disabled" # chat-only: omits calendar/meeting/transcript scopes
+  unique_integration = "disabled" # chat-only: omits meeting/transcript scopes
 
   redirect_uris = [
     "https://teams.mcp.example.com/auth/callback"

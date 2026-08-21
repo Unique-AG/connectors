@@ -32,7 +32,7 @@ Capture runs on a **different Entra ID app registration** than a chat-only Teams
 https://login.microsoftonline.com/organizations/adminconsent?client_id=8ddffb12-1579-4fa8-8844-ca122e4308bc
 ```
 
-The consent prompt lists every scope the capture-enabled server requests — the chat and messaging scopes plus `Calendars.Read`, `OnlineMeetings.Read`, and the two meeting-content scopes above. The URL handles them in one step. For the full list with least-privilege justification, see [Teams MCP - Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802240023/Teams+MCP+-+Permissions).
+The consent prompt lists every scope the capture-enabled server requests — the chat and messaging scopes plus `OnlineMeetings.Read` and the two meeting-content scopes above. The URL handles them in one step. For the full list with least-privilege justification, see [Teams MCP - Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802240023/Teams+MCP+-+Permissions).
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
 
