@@ -5,7 +5,7 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.activity_tags.tools.list_activity_tags import (
@@ -309,11 +309,46 @@ class TestListActivityTagsTool:
             record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
         ] == [f"Conflicting activity tags for duplicate id {_LIVE_TAG_ID!r}; retaining first tag"]
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_search_filters_the_cached_catalog_without_a_like_request(self) -> None:
+        base_url = tenant("at-search")
+        tags_route = respx.get(f"{base_url}/activity-tags").mock(
+            return_value=_collection_page(
+                _quarterly_review(base_url=base_url),
+                _hidden_unused(),
+            )
+        )
+        tags = activity_tags_service()
+
+        async with tool_client(base_url) as client:
+            first = tool_model(
+                await list_activity_tags(
+                    search="quarterly",
+                    refresh=True,
+                    client=client,
+                    activity_tags=tags,
+                ),
+                ListActivityTagsResponse,
+            )
+            cached = tool_model(
+                await list_activity_tags(
+                    search="scratch",
+                    client=client,
+                    activity_tags=tags,
+                ),
+                ListActivityTagsResponse,
+            )
+
+        assert tags_route.call_count == 1
+        assert "filter[name][like]" not in recorded_requests(tags_route.calls)[0].url.params
+        assert [tag.id for tag in first.tags] == [_LIVE_TAG_ID]
+        assert [tag.id for tag in cached.tags] == ["88"]
+
 
 class TestListActivityTagsInput:
-    def test_rejects_search(self) -> None:
-        with pytest.raises(ValidationError):
-            _INPUT.validate_python({"search": "Quarterly"})
+    def test_accepts_search(self) -> None:
+        _INPUT.validate_python({"search": "Quarterly"})
 
     def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
         doc = list_activity_tags.__doc__ or ""
@@ -338,4 +373,4 @@ class TestListActivityTagsInput:
         )
         assert field_info.description is not None
         assert "missing field" in field_info.description
-        assert "search" not in without_injected_parameters(list_activity_tags).__annotations__
+        assert "search" in without_injected_parameters(list_activity_tags).__annotations__

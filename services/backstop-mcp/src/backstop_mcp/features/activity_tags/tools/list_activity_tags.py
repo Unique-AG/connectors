@@ -42,6 +42,15 @@ class ListActivityTagsResponse(BaseModel):
     ),
 )
 async def list_activity_tags(
+    search: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional case-insensitive substring of the tag name. Filters the cached "
+                "catalog in memory — the catalog walk never sends `filter[name][like]`."
+            ),
+        ),
+    ] = None,
     refresh: Annotated[
         bool,
         Field(description="Do not pass true unless the user reports a missing field."),
@@ -52,11 +61,13 @@ async def list_activity_tags(
     """List the standard Backstop activity-tag catalog.
 
     Use when you need tag ids, names, how many activities currently carry each tag, and whether
-    a tag is shown in the Backstop UI. Instance tag names come back as data. Pass refresh=true
-    only when the user reports a missing field.
+    a tag is shown in the Backstop UI. Instance tag names come back as data. Pass `search` to
+    keep tags whose name contains that substring. Pass refresh=true only when the user reports
+    a missing field.
     """
     catalog, cache = await activity_tags.get(client, refresh=refresh)
-    return ListActivityTagsResponse(
-        cache=cache,
-        tags=[ActivityTagResponse.from_tag(tag) for tag in catalog.values()],
-    )
+    tags = [ActivityTagResponse.from_tag(tag) for tag in catalog.values()]
+    if search is not None:
+        needle = search.casefold()
+        tags = [tag for tag in tags if needle in tag.name.casefold()]
+    return ListActivityTagsResponse(cache=cache, tags=tags)

@@ -267,6 +267,7 @@ class TestFirstCallBySearch:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        respx.get(f"{BASE_URL}/people").mock(return_value=httpx.Response(200, json=collection()))
 
         result = tool_model_union(
             await get_activity_history(

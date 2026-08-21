@@ -381,6 +381,9 @@ class TestResolution:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json={"data": []})
         )
+        respx.get(f"{BASE_URL}/organizations").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
 
         result = tool_model(
             await get_accounts_for_party(

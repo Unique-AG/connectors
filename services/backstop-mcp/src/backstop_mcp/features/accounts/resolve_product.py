@@ -13,12 +13,13 @@ a 404 is the `not_found`. That is one 300-byte request that cannot be defeated b
 which is what an echoed id needs — from a prior resolve, or handed back by
 `get_accounts_for_party`.
 
-A name or short name has no by-id equivalent — `/products` filters only on `createdTimestamp,
-entityTypeId, modifiedTimestamp, name, otherId`, so nothing filters on either one. That path reads
-the catalog — `GET /products?fields=name,configuration`, walked to the end 200 rows at a page —
-and matches locally: exact id, then exact `productShortName`, then exact name, then name
-substring. Duplicate short names (`BLUC`) go through one `elicit_choice`. The same response
-hydrates `short_name`.
+A name or short name has no by-id equivalent. `/products` accepts `filter[name][like]`, but
+`shortName` is not a filter field (`filter[shortName][eq]` is 400), so a LIKE on the typed
+string would miss `CGUP`. That path still reads the catalog —
+`GET /products?fields=name,configuration`, walked to the end 200 rows at a page — and matches
+locally: exact id, then exact `productShortName`, then exact name, then name substring.
+Duplicate short names (`BLUC`) go through one `elicit_choice`. The same response hydrates
+`short_name`.
 
 Walking it whole rather than reading page one is what lets `not_found` mean *absent* instead of
 *not on this page*. The catalog is small enough for that: this instance returns 72 in one page,

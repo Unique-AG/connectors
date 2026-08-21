@@ -243,6 +243,9 @@ class TestEmailSearch:
         quick = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        like = respx.get(f"{BASE_URL}/people").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
 
         await resolve_party(
             ctx_never_elicit(),
@@ -252,6 +255,7 @@ class TestEmailSearch:
         )
 
         assert quick.call_count == 1
+        assert like.call_count == 1
 
     @pytest.mark.asyncio
     @respx.mock
@@ -565,6 +569,9 @@ class TestSearchTypeMapping:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        respx.get(f"{BASE_URL}/organizations").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
 
         await resolve_party(
             ctx_never_elicit(),
@@ -581,6 +588,7 @@ class TestSearchTypeMapping:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        respx.get(f"{BASE_URL}/people").mock(return_value=httpx.Response(200, json=collection()))
 
         await resolve_party(
             ctx_never_elicit(),
@@ -598,6 +606,7 @@ class TestSearchTypeMapping:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        respx.get(f"{BASE_URL}/contacts").mock(return_value=httpx.Response(200, json=collection()))
 
         await resolve_party(
             ctx_never_elicit(),
@@ -615,6 +624,7 @@ class TestSearchTypeMapping:
         route = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        respx.get(f"{BASE_URL}/employees").mock(return_value=httpx.Response(200, json=collection()))
 
         await resolve_party(
             ctx_never_elicit(),
@@ -744,6 +754,9 @@ class TestHitCounts:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
         )
+        respx.get(f"{BASE_URL}/organizations").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
 
         result = await resolve_party(
             ctx_never_elicit(),
@@ -802,6 +815,93 @@ class TestHitCounts:
         assert result.query == "Capstone"
 
 
+class TestLikeFallback:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_empty_quick_search_falls_back_to_organization_name_like(
+        self, client: BackstopClient
+    ) -> None:
+        quick = respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        like = respx.get(f"{BASE_URL}/organizations").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("o1", "organizations", name="Capstone Investment Advisors")
+                ),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Investment Advisors",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "o1"
+        assert quick.call_count == 1
+        assert like.call_count == 1
+        params = like.calls.last.request.url.params
+        assert params["filter[name][like]"] == "Investment Advisors"
+        assert params["page[limit]"] == "200"
+        assert "filter[lastName][like]" not in params
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_empty_quick_search_falls_back_to_people_last_name_like(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        like = respx.get(f"{BASE_URL}/people").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p1", "people", name="Glenn, Phil", lastName="Glenn")),
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="people",
+            search="Glenn",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "p1"
+        params = like.calls.last.request.url.params
+        assert params["filter[lastName][like]"] == "Glenn"
+        assert "filter[name][like]" not in params
+        assert params["page[limit]"] == "200"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_quick_search_hit_does_not_send_like(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("o1", "organizations", name="Capstone")),
+            )
+        )
+        like = respx.get(f"{BASE_URL}/organizations").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            search="Capstone",
+        )
+
+        assert isinstance(result, Resolved)
+        assert like.call_count == 0
+
+
 class TestBatchResolve:
     @pytest.mark.asyncio
     @respx.mock
@@ -811,6 +911,9 @@ class TestBatchResolve:
         # Matched on the search text rather than call order: items resolve concurrently, so
         # `side_effect` ordering would be an assumption about scheduling.
         respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Missing Co"}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/organizations", params={"filter[name][like]": "Missing Co"}).mock(
             return_value=httpx.Response(200, json=collection())
         )
         respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Alpha"}).mock(
@@ -889,6 +992,9 @@ class TestBatchResolve:
             return httpx.Response(200, json=collection())
 
         respx.get(f"{BASE_URL}/quick-search").mock(side_effect=handler)
+        respx.get(f"{BASE_URL}/organizations").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
 
         async def run() -> object:
             return await resolve_parties(
@@ -911,6 +1017,9 @@ class TestBatchResolve:
     ) -> None:
         """UN-23676: one combined payload, so the model asks once for the whole batch."""
         respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Nope"}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/organizations", params={"filter[name][like]": "Nope"}).mock(
             return_value=httpx.Response(200, json=collection())
         )
         respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Alpha"}).mock(
