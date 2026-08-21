@@ -12,7 +12,11 @@ _DUPLICATE_WARNING = "Conflicting system users for duplicate id %r; retaining fi
 
 
 async def fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto]:
-    """Fetch Backstop's system-user catalog in one paginated walk, keyed by user id."""
+    """Fetch Backstop's system-user catalog in one paginated walk, keyed by user id.
+    The collection does not accept a search or `filter[name][like]`. This walk is the whole
+    roster so `SystemUsersService` can cache it and tools can filter users in memory instead
+    of returning every colleague on each lookup.
+    """
     page = await client.paginate(
         _USERS_PATH,
         schema=BackstopApiResource[SystemUserAttributes],
