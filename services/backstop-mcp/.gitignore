@@ -6,5 +6,5 @@ __pycache__/
 .basedpyright_cache/
 .env
 .probe-cache/
-explore.py
+/explore.py
 probe_entity_activities.py
