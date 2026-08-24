@@ -7,6 +7,13 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': path.resolve(__dirname, './src'),
+      // CI runs `pnpm build` inside this service only, so workspace packages have
+      // no `dist` when the suite runs. Resolve to source, as outlook-semantic-mcp
+      // does, so a spec can import a module that pulls in the decorator.
+      '@unique-ag/mcp-server-module': path.resolve(
+        __dirname,
+        '../../packages/mcp-server-module/src/index.ts',
+      ),
     },
   },
   test: {
