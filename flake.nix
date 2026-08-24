@@ -76,7 +76,7 @@
           corepack_24 # pnpm version managed via corepack
         ];
 
-        # Python development (services/kb-mcp, services/office-mcp)
+        # Python development (services/kb-mcp, services/office-365-mcp)
         # uv manages the interpreter and the venv itself — see each service's .python-version
         pythonPkgs = with pkgs; [
           uv
