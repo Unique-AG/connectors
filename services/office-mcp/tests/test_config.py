@@ -5,6 +5,7 @@ import asyncpg
 import certifi
 import pytest
 from asyncpg import connect_utils
+from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from pydantic import ValidationError
 from testcontainers.community.postgres import PostgresContainer
 
@@ -12,16 +13,18 @@ from office_mcp.config import (
     AppConfig,
     AppEnv,
     DatabaseConfig,
+    EntraConfig,
     LogLevel,
     asyncpg_dsn,
 )
+from office_mcp.graph_client import GraphSettings, create_graph_transport
+
+_TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
 
-# asyncpg ships no type information, so both seams into it are narrowed once here rather than
-# leaving every call below unchecked. Same idiom `tests/test_app.py` uses for httpx responses.
+# asyncpg ships no type information, so both seams into it are narrowed once here.
 class _ConnectionParameters(Protocol):
-    """The one field of asyncpg's parsed connection parameters these tests read."""
-
     @property
     def server_settings(self) -> dict[str, str] | None: ...
 
@@ -41,13 +44,8 @@ _connect = cast("Callable[[str], Awaitable[_Connection]]", asyncpg.connect)
 
 
 def _parse_connect_args(dsn: str) -> _ParseResult:
-    """Run asyncpg's own connection-string parser over `dsn`.
-
-    This is the parser `asyncpg.connect` runs before it opens a socket, so it answers "what
-    would asyncpg make of this string" without needing a server. Called on the private helper
-    deliberately: it is the single place asyncpg turns a DSN into connection arguments, and
-    going through `asyncpg.connect` would mean an attempted TCP connection per case.
-    """
+    """asyncpg runs this parser before it opens a socket, so it answers what asyncpg makes of a
+    string without a server. `asyncpg.connect` would attempt a TCP connection per case."""
     return _parse_connect_dsn_and_args(
         dsn=dsn,
         host=None,
@@ -68,13 +66,8 @@ def _parse_connect_args(dsn: str) -> _ParseResult:
 
 
 def _asyncpg_parses(dsn: str) -> bool:
-    """Whether asyncpg's parser accepts `dsn` at all.
-
-    `TypeError` is deliberately *not* caught. It means the call above no longer matches
-    asyncpg's signature, and swallowing it would turn every assertion below into "asyncpg
-    rejects everything" — which quietly passes the rejection tests and fails the acceptance ones
-    for a reason that has nothing to do with the DSNs.
-    """
+    """`TypeError` is deliberately not caught: it means `_parse_connect_args` no longer matches
+    asyncpg's signature, and swallowing it would read as "asyncpg rejects everything"."""
     try:
         _ = _parse_connect_args(dsn)
     except TypeError:
@@ -84,28 +77,22 @@ def _asyncpg_parses(dsn: str) -> bool:
     return True
 
 
-# Every row of the DSN contract, as (input, expected output). asyncpg is the authority on what
-# the output has to look like, and `TestAsyncpgItselfAcceptsWhatWeProduce` below holds each of
-# these against asyncpg's own parser rather than against this table alone.
 _DSN_MATRIX: list[tuple[str, str]] = [
-    # Already the asyncpg spelling — untouched.
     ("postgresql://u:p@h:5432/db", "postgresql://u:p@h:5432/db"),
-    # SQLAlchemy's driver-qualified form. asyncpg rejects the `+asyncpg` suffix.
+    # asyncpg rejects SQLAlchemy's `+asyncpg` suffix.
     ("postgresql+asyncpg://u:p@h:5432/db", "postgresql://u:p@h:5432/db"),
-    # libpq's short form, emitted by Heroku/Azure and many operator-generated secrets.
+    # libpq's short form, emitted by Heroku, Azure and operator-generated secrets.
     ("postgres://u:p@h:5432/db", "postgresql://u:p@h:5432/db"),
-    # `verify` is libpq's alias for `verify-full`; asyncpg only knows the long spelling.
+    # `verify` is libpq's alias for `verify-full`; asyncpg knows only the long spelling.
     (
         "postgresql://u:p@h:5432/db?sslmode=verify",
         "postgresql://u:p@h:5432/db?sslmode=verify-full",
     ),
-    # Every other libpq sslmode is a name asyncpg already knows — passed through verbatim.
     ("postgresql://u:p@h:5432/db?sslmode=disable", "postgresql://u:p@h:5432/db?sslmode=disable"),
     ("postgresql://u:p@h:5432/db?sslmode=allow", "postgresql://u:p@h:5432/db?sslmode=allow"),
     ("postgresql://u:p@h:5432/db?sslmode=prefer", "postgresql://u:p@h:5432/db?sslmode=prefer"),
     ("postgresql://u:p@h:5432/db?sslmode=require", "postgresql://u:p@h:5432/db?sslmode=require"),
-    # NOT widened to verify-full: verify-ca checks the CA chain but deliberately not the
-    # hostname, so promoting it would silently strengthen what the operator asked for.
+    # NOT widened to verify-full: verify-ca checks the CA chain and deliberately not the hostname.
     (
         "postgresql://u:p@h:5432/db?sslmode=verify-ca",
         "postgresql://u:p@h:5432/db?sslmode=verify-ca",
@@ -114,24 +101,21 @@ _DSN_MATRIX: list[tuple[str, str]] = [
         "postgresql://u:p@h:5432/db?sslmode=verify-full",
         "postgresql://u:p@h:5432/db?sslmode=verify-full",
     ),
-    # asyncpg has no channel_binding equivalent and does not ignore it either — it forwards the
-    # unrecognised key as a server setting, which Postgres then refuses. So it is dropped.
+    # asyncpg forwards the unrecognised key as a server setting, which Postgres then refuses.
     ("postgresql://u:p@h:5432/db?channel_binding=require", "postgresql://u:p@h:5432/db"),
     (
         "postgresql://u:p@h:5432/db?sslmode=verify&channel_binding=require",
         "postgresql://u:p@h:5432/db?sslmode=verify-full",
     ),
-    # A percent-encoded password stays encoded: decoding `p%40ss` to `p@ss` would put a second
-    # `@` in the netloc and reparse the host as `ss@h`.
+    # Decoding `p%40ss` to `p@ss` would put a second `@` in the netloc and reparse the host `ss@h`.
     ("postgresql://u:p%40ss@h:5432/db", "postgresql://u:p%40ss@h:5432/db"),
     ("postgresql://u:p%3Ass%25x@h:5432/db", "postgresql://u:p%3Ass%25x@h:5432/db"),
-    # An IPv6 literal keeps its brackets — without them the colons read as a port separator.
+    # Without its brackets an IPv6 literal's colons read as a port separator.
     ("postgresql://u:p@[::1]:5432/db", "postgresql://u:p@[::1]:5432/db"),
     (
         "postgresql://u:p@[::1]:5432/db?sslmode=verify",
         "postgresql://u:p@[::1]:5432/db?sslmode=verify-full",
     ),
-    # No port at all: not defaulted to 5432 here, so asyncpg applies its own default.
     ("postgresql://u:p@h/db", "postgresql://u:p@h/db"),
     (
         "postgres://u:p%40ss@h/db?sslmode=verify&channel_binding=require",
@@ -152,31 +136,19 @@ class TestAsyncpgDsn:
             asyncpg_dsn("mysql://user:pass@db:3306/office")
 
     def test_rejects_an_sslmode_that_is_neither_libpqs_nor_asyncpgs(self) -> None:
-        """An unknown sslmode is an operator typo. Passing it through would surface as a
-        connection error at the first request instead of at startup."""
         with pytest.raises(ValueError, match="sslmode"):
             asyncpg_dsn("postgresql://u:p@h:5432/db?sslmode=verify-everything")
 
 
 @pytest.fixture
 def _sslroot(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point asyncpg at a real CA bundle for the duration of one test.
-
-    For `sslmode=verify-ca`/`verify-full` asyncpg loads a root certificate while *parsing*, and
-    defaults to `~/.postgresql/root.crt` — which exists on no CI runner and on few laptops. Left
-    unset, every verifying DSN in the matrix would look rejected for a reason that has nothing
-    to do with the DSN. `PGSSLROOTCERT` is asyncpg's own override for that path.
-    """
+    """For `sslmode=verify-ca` and `verify-full`, asyncpg loads a root certificate while
+    *parsing*, defaulting to `~/.postgresql/root.crt`, which exists on no CI runner.
+    `PGSSLROOTCERT` is asyncpg's own override for that path."""
     monkeypatch.setenv("PGSSLROOTCERT", certifi.where())
 
 
 class TestAsyncpgItselfAcceptsWhatWeProduce:
-    """The matrix above asserts against a table; this asserts against asyncpg.
-
-    Every rewritten DSN must parse, and the rewrites that exist because asyncpg refuses the
-    input must be shown to be refusals rather than cosmetic tidying.
-    """
-
     @pytest.mark.parametrize(("given", "expected"), _DSN_MATRIX, ids=_DSN_IDS)
     @pytest.mark.usefixtures("_sslroot")
     def test_asyncpg_parses_every_rewritten_dsn(self, given: str, expected: str) -> None:
@@ -186,9 +158,7 @@ class TestAsyncpgItselfAcceptsWhatWeProduce:
     @pytest.mark.parametrize(
         "rejected",
         [
-            # libpq's `verify` alias — the one sslmode spelling asyncpg does not know.
             "postgresql://u:p@h:5432/db?sslmode=verify",
-            # SQLAlchemy's driver-qualified scheme.
             "postgresql+asyncpg://u:p@h:5432/db",
         ],
     )
@@ -198,13 +168,8 @@ class TestAsyncpgItselfAcceptsWhatWeProduce:
         assert _asyncpg_parses(asyncpg_dsn(rejected))
 
     def test_channel_binding_survives_parsing_as_a_server_setting(self) -> None:
-        """Why `channel_binding` is dropped rather than left alone.
-
-        asyncpg's parser *accepts* it — it does not recognise the key, so it forwards it as a
-        server setting in the startup packet, and Postgres then refuses the connection with
-        `unrecognized configuration parameter`. A parse check alone would call this DSN fine;
-        `TestTheDsnReachesARealPostgres` below holds the same case against a real server.
-        """
+        """asyncpg's parser *accepts* it, and Postgres then refuses the startup packet with
+        `unrecognized configuration parameter`, so a parse check alone would call this DSN fine."""
         _, params = _parse_connect_args(
             "postgresql://u:p@h:5432/db?channel_binding=require",
         )
@@ -216,9 +181,58 @@ class TestAsyncpgItselfAcceptsWhatWeProduce:
         assert not rewritten.server_settings
 
 
-class TestPublicBaseUrl:
-    """The OAuth issuer clients get redirected to, so a leftover local default is a dead deploy."""
+class TestEntraConfig:
+    def test_reads_the_app_registration_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ENTRA_TENANT_ID", _TENANT_ID)
+        monkeypatch.setenv("ENTRA_CLIENT_ID", _CLIENT_ID)
+        monkeypatch.setenv("ENTRA_CLIENT_SECRET", "s3cr3t")
 
+        # Required fields with no defaults read as missing arguments to pyright.
+        config = EntraConfig()  # pyright: ignore[reportCallIssue]
+
+        assert config.tenant_id == _TENANT_ID
+        assert config.client_id == _CLIENT_ID
+        assert config.client_secret.get_secret_value() == "s3cr3t"
+
+    def test_the_secret_is_not_in_the_repr(self) -> None:
+        config = EntraConfig.model_validate(
+            {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        )
+
+        assert "s3cr3t" not in repr(config)
+
+    @pytest.mark.parametrize("field", ["tenant_id", "client_id", "client_secret"])
+    def test_every_field_is_required(self, field: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        supplied = {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        del supplied[field]
+        for name in ("ENTRA_TENANT_ID", "ENTRA_CLIENT_ID", "ENTRA_CLIENT_SECRET"):
+            monkeypatch.delenv(name, raising=False)
+
+        with pytest.raises(ValidationError, match=field):
+            EntraConfig.model_validate(supplied)
+
+    @pytest.mark.parametrize("field", ["tenant_id", "client_id", "client_secret"])
+    def test_an_empty_value_is_not_a_value(self, field: str) -> None:
+        """An unset variable in a Helm overlay arrives as an empty string, not as absent."""
+        supplied = {"tenant_id": _TENANT_ID, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+        supplied[field] = ""
+
+        with pytest.raises(ValidationError, match=field):
+            EntraConfig.model_validate(supplied)
+
+    @pytest.mark.parametrize("tenant_id", ["common", "organizations", "consumers", "Common"])
+    def test_rejects_a_multi_tenant_authority(self, tenant_id: str) -> None:
+        """The provider derives one expected issuer from this value and cannot be told not to, so
+        these reject every token rather than allow every tenant."""
+        with pytest.raises(ValidationError, match="ENTRA_TENANT_ID"):
+            EntraConfig.model_validate(
+                {"tenant_id": tenant_id, "client_id": _CLIENT_ID, "client_secret": "s3cr3t"}
+            )
+
+
+class TestPublicBaseUrl:
     def test_the_local_default_is_allowed_outside_production(self) -> None:
         config = AppConfig(app_env=AppEnv.DEVELOPMENT)
 
@@ -238,6 +252,21 @@ class TestPublicBaseUrl:
     def test_production_rejects_a_url_no_client_can_reach(self, url: str) -> None:
         with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
             AppConfig.model_validate({"app_env": AppEnv.PRODUCTION, "public_base_url": url})
+
+    def test_production_rejects_a_cleartext_url(self) -> None:
+        """Every OAuth endpoint is published under this URL, and the provider only warns
+        about http."""
+        with pytest.raises(ValueError, match="https"):
+            AppConfig.model_validate(
+                {"app_env": AppEnv.PRODUCTION, "public_base_url": "http://office-mcp.example"}
+            )
+
+    def test_a_cleartext_url_is_allowed_outside_production(self) -> None:
+        config = AppConfig.model_validate(
+            {"app_env": AppEnv.DEVELOPMENT, "public_base_url": "http://office-mcp.example"}
+        )
+
+        assert config.issuer == "http://office-mcp.example"
 
     def test_rejects_malformed_public_base_url(self) -> None:
         with pytest.raises(ValidationError):
@@ -270,7 +299,6 @@ class TestPublicBaseUrl:
     def test_production_is_the_default_env_so_the_bare_default_is_rejected(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """`app_env` defaults to production, so an unconfigured deploy fails at startup."""
         monkeypatch.delenv("APP_ENV", raising=False)
         monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
 
@@ -278,9 +306,83 @@ class TestPublicBaseUrl:
             AppConfig()
 
 
+class TestTheGraphTimeoutBudget:
+    """They live on `AppConfig` because `graph_client/` may not read config. `tests/test_app.py`
+    asserts the translation into `GraphSettings`; this is only what the config accepts."""
+
+    def test_the_defaults_are_the_interactive_budget_the_transport_was_built_with(self) -> None:
+        config = AppConfig(app_env=AppEnv.DEVELOPMENT)
+
+        assert config.graph_request_timeout_seconds == 30.0
+        assert config.graph_connect_timeout_seconds == 10.0
+        assert config.graph_max_retries == 3
+
+    def test_an_operator_sets_all_three_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.setenv("GRAPH_REQUEST_TIMEOUT_SECONDS", "45.5")
+        monkeypatch.setenv("GRAPH_CONNECT_TIMEOUT_SECONDS", "5")
+        monkeypatch.setenv("GRAPH_MAX_RETRIES", "1")
+
+        config = AppConfig()
+
+        assert config.graph_request_timeout_seconds == 45.5
+        assert config.graph_connect_timeout_seconds == 5.0
+        assert config.graph_max_retries == 1
+
+    @pytest.mark.parametrize(
+        "field", ["graph_request_timeout_seconds", "graph_connect_timeout_seconds"]
+    )
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_a_timeout_is_a_deadline_and_so_is_positive(self, field: str, value: float) -> None:
+        """`0` is not "unbounded" to httpx: it is a deadline already passed, and would time every
+        Graph call out before it left the process."""
+        with pytest.raises(ValidationError, match=field):
+            AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, field: value})
+
+    def test_giving_up_on_the_first_throttle_is_allowed(self) -> None:
+        """Zero retries is a real choice, unlike a zero timeout: it answers the caller instead of
+        waiting out a `Retry-After`."""
+        config = AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, "graph_max_retries": 0})
+
+        assert config.graph_max_retries == 0
+
+    def test_a_negative_retry_count_is_not_one(self) -> None:
+        with pytest.raises(ValidationError, match="graph_max_retries"):
+            AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, "graph_max_retries": -1})
+
+    def test_the_sdks_own_retry_ceiling_is_refused_here_rather_than_at_startup(self) -> None:
+        """Above its own ceiling `RetryHandlerOption.__init__` raises `MaxLimitExceeded.
+        MaxRetries should not be more than $10`, from inside `create_graph_transport` inside
+        `create_app`: `GRAPH_MAX_RETRIES=11` crash-loops the pod on a message naming no setting."""
+        with pytest.raises(ValidationError, match="graph_max_retries"):
+            AppConfig.model_validate(
+                {
+                    "app_env": AppEnv.DEVELOPMENT,
+                    "graph_max_retries": RetryHandlerOption.MAX_MAX_RETRIES + 1,
+                }
+            )
+
+    def test_the_ceiling_itself_is_accepted_and_the_transport_takes_it(self) -> None:
+        """Guards the guard: a bound one below the SDK's would pass the test above."""
+        config = AppConfig.model_validate(
+            {
+                "app_env": AppEnv.DEVELOPMENT,
+                "graph_max_retries": RetryHandlerOption.MAX_MAX_RETRIES,
+            }
+        )
+
+        assert config.graph_max_retries == RetryHandlerOption.MAX_MAX_RETRIES
+        transport = create_graph_transport(
+            GraphSettings(max_retries=config.graph_max_retries),
+        )
+        assert transport is not None
+
+
 class TestCaseInsensitiveEnumFields:
-    """Pydantic's `StrEnum` coercion is case-sensitive, but the canonical spellings
-    (`LOG_LEVEL=INFO`, `APP_ENV=Production`) are what operators reach for."""
+    """Pydantic's `StrEnum` coercion is case-sensitive, but `LOG_LEVEL=INFO` and
+    `APP_ENV=Production` are what operators reach for."""
 
     def test_log_level_accepts_the_canonical_uppercase_spelling(self) -> None:
         config = AppConfig.model_validate({"app_env": AppEnv.DEVELOPMENT, "log_level": "INFO"})
@@ -296,8 +398,6 @@ class TestCaseInsensitiveEnumFields:
 
 
 class TestDatabaseConfigDriverDsn:
-    """`driver_dsn` is the whole database surface, so every input path is checked to land on it."""
-
     @pytest.mark.usefixtures("_sslroot")
     def test_db_url_is_rewritten_the_same_way_asyncpg_dsn_rewrites_it(
         self, monkeypatch: pytest.MonkeyPatch
@@ -324,8 +424,7 @@ class TestDatabaseConfigDriverDsn:
         assert config.driver_dsn == "postgresql://user:pass@db:5432/office?sslmode=verify-full"
 
     def test_builds_a_dsn_from_discrete_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # DATABASE_URL no longer needs to be cleared here: supplying any discrete field makes
-        # `accept_database_url` skip the env fallback entirely, regardless of what's ambient.
+        # DATABASE_URL needs no clearing: any discrete field makes `accept_database_url` skip it.
         monkeypatch.delenv("DB_URL", raising=False)
 
         config = DatabaseConfig(
@@ -342,8 +441,8 @@ class TestDatabaseConfigDriverDsn:
     def test_percent_encodes_every_reserved_character_in_an_assembled_password(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """`@`, `:` and `%` are all delimiters or escapes in userinfo. Left raw, the DSN
-        reparses with the wrong host, user or password."""
+        """`@`, `:` and `%` are delimiters or escapes in userinfo; left raw, the DSN reparses
+        with the wrong host, user or password."""
         monkeypatch.delenv("DB_URL", raising=False)
 
         config = DatabaseConfig(
@@ -356,9 +455,6 @@ class TestDatabaseConfigDriverDsn:
     def test_explicit_discrete_fields_beat_a_set_database_url(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A DATABASE_URL left over in the ambient environment must not silently override
-        explicit constructor arguments — the composition-root contract is that nothing
-        downstream re-reads the environment."""
         monkeypatch.delenv("DB_URL", raising=False)
         monkeypatch.setenv("DATABASE_URL", "postgresql://envuser:envpass@envhost:5432/envdb")
 
@@ -397,12 +493,6 @@ class TestDatabaseConfigDriverDsn:
 
 
 class TestTheDsnReachesARealPostgres:
-    """The matrix proves asyncpg *parses* the DSN; this proves one actually connects.
-
-    Covers the round trip the deleted engine tests covered: container URL in, working connection
-    out, no rewriting step in between that only looked right.
-    """
-
     async def test_asyncpg_connects_on_the_dsn_the_config_produced(
         self, postgres_container: PostgresContainer
     ) -> None:
@@ -414,8 +504,6 @@ class TestTheDsnReachesARealPostgres:
     async def test_the_postgres_short_form_reaches_the_same_server(
         self, postgres_container: PostgresContainer
     ) -> None:
-        """`postgres://` and `postgresql+asyncpg://` are rewrites, not cosmetic ones: both are
-        forms an operator or a Helm chart really supplies, and asyncpg takes neither."""
         url = postgres_container.get_connection_url().replace("+psycopg2", "")
 
         for supplied in (url.replace("postgresql://", "postgres://", 1), url):
@@ -425,11 +513,6 @@ class TestTheDsnReachesARealPostgres:
     async def test_a_left_in_channel_binding_would_break_the_connection(
         self, postgres_container: PostgresContainer
     ) -> None:
-        """The whole reason `channel_binding` is dropped, against a real server.
-
-        asyncpg's parser accepts the raw form (it forwards the unknown key as a server setting),
-        so only an actual connection shows the failure — Postgres rejects the startup packet.
-        """
         url = postgres_container.get_connection_url().replace("+psycopg2", "")
         raw = f"{url}?channel_binding=require"
 

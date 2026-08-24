@@ -92,7 +92,7 @@
     },
     "env": {
       "type": "object",
-      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit.",
+      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit. office-mcp additionally requires a tool surface here: exactly one of TOOLS_PRESET and TOOLS_ENABLED. This mirrors the base chart's own env contract because the chart schema is a shallow merge over it; keep it in step when the base chart changes. Naming the two selection keys here also takes them out of additionalProperties, so unlike every other key they must be plain strings — the base chart's {value, if} object form is refused for them, loudly, at validation.",
       "additionalProperties": {
         "oneOf": [
           {
@@ -122,7 +122,39 @@
             }
           }
         ]
-      }
+      },
+      "properties": {
+        "TOOLS_PRESET": {
+          "type": "string",
+          "enum": [
+            "teams",
+            "teams-chat",
+            "teams-messages",
+            "teams-channels",
+            "teams-transcripts",
+            "teams-recordings",
+            "teams-meetings"
+          ],
+          "description": "Which tools this deployment runs, as a named surface. The tools enabled decide which delegated Microsoft Graph permissions every user is asked to consent to at sign-in, so there is deliberately no default: 'every tool' has to be a choice rather than what a deployment gets by not making one. 'teams' is every tool there is; the rest are one use case each, and README's preset table says what each costs a tenant in permissions and admin consents. Set this or TOOLS_ENABLED, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
+        },
+        "TOOLS_ENABLED": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Which tools this deployment runs, as a comma-separated list of tool names, for a surface no preset covers. get_me is always on and need not be listed, so no deployment asks for less than User.Read. Set this or TOOLS_PRESET, never both. Must name at least one tool: an empty value is a selection that says nothing, which the server refuses to start on, and catching it here is the difference between a failed helm install and a crash-looping pod. GET /manifest and the startup log print the resolved tools, the exact delegated permissions and which of them need admin consent — that list is what an Entra administrator has to grant."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "TOOLS_PRESET"
+          ]
+        },
+        {
+          "required": [
+            "TOOLS_ENABLED"
+          ]
+        }
+      ]
     },
     "envSecrets": {
       "type": "object",
@@ -1592,7 +1624,7 @@
     },
     "grafana": {
       "type": "object",
-      "description": "Grafana dashboard ConfigMap provisioning. Place dashboard JSON files under files/grafana/dashboards/ in the consuming chart.",
+      "description": "Grafana dashboard configuration",
       "properties": {
         "dashboards": {
           "type": "object",
@@ -1617,8 +1649,23 @@
               ]
             }
           }
+        },
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "global": {
       "type": "object",

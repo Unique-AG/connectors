@@ -37,11 +37,47 @@ env:
   OTEL_RESOURCE_ATTRIBUTES:
     if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
     value: 'deployment.environment={{ .Values.env.APP_ENV }}'
-  # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
+  # PUBLIC_BASE_URL must be the externally-reachable https OAuth issuer URL (set in overlay).
+  # ENTRA_TENANT_ID and ENTRA_CLIENT_ID identify the app registration users sign in through;
+  # both are required and set in the overlay (not secrets). ENTRA_TENANT_ID must be a single
+  # tenant's ID — a multi-tenant authority is rejected at startup.
+  #
+  # The overlay must also set exactly one of TOOLS_PRESET and TOOLS_ENABLED — the tool surface this
+  # deployment runs, and so which delegated Graph permissions every user consents to at sign-in.
+  # Neither is defaulted here on purpose: a chart-level default would make the widest consent screen
+  # what a deployment gets by not choosing, which is what the knob exists to stop. values.schema.json
+  # requires one of the two, so a missing selection fails `helm install` instead of crash-looping the
+  # pod, and TOOLS_PRESET carries the valid names as an enum so a typo fails there too.
+  #   TOOLS_PRESET: teams              # every tool there is
+  #   TOOLS_ENABLED: get_me,list_chats # or name them; get_me is always on
+  #
+  # How long one Microsoft Graph call may take, and how hard the SDK retries it. Optional and
+  # deliberately not set here: the defaults are sized for an interactive MCP client, and an overlay
+  # that raises them buys a slower failure rather than a better answer — what is really being turned
+  # is the worst case of one tool call, the request timeout times GRAPH_MAX_RETRIES + 1 attempts,
+  # before any Retry-After wait, per Graph call, and a paged walk makes several.
+  #   GRAPH_REQUEST_TIMEOUT_SECONDS: "30"   # must be > 0; httpx reads a timeout as a deadline
+  #   GRAPH_CONNECT_TIMEOUT_SECONDS: "10"   # must be > 0
+  #   GRAPH_MAX_RETRIES: "3"                # 0 is allowed: give up on the first 429
+  #
+  # Those, the tool surface and the two secrets below are the whole of this service's configuration.
+  # What the tools add is tenant-side onboarding, which no value here can carry (see README, "Auth"):
+  #   - the delegated Graph permissions the selected tools ask for, on that app registration. Some
+  #     need admin consent, among them OnlineMeetingTranscript.Read.All and
+  #     OnlineMeetingRecording.Read.All, which are granted independently of each other. GET /manifest
+  #     and the startup log print the exact list this deployment asks for and which of it needs an
+  #     administrator — the only place it is written down, because a scope the registration does not
+  #     carry fails at the authorize hop, for every user, with nothing in this service's logs;
+  #   - Graph access to Teams meeting transcripts, a tenant-wide Teams setting that is OFF by
+  #     default and that only a Teams administrator can turn on. Until they do,
+  #     list_meeting_transcripts answers 403 with that remedy and every other tool — recordings
+  #     included — is unaffected.
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
 # - DB_URL (or rely on base-chart DATABASE_URL when postgresql.enabled — app accepts both)
+# - ENTRA_CLIENT_SECRET, the app registration's client secret. Also the key material for the
+#   OAuth state rows in Postgres, so rotating it costs every signed-in user one re-login.
 
 image:
   registry: ghcr.io
@@ -77,6 +113,10 @@ probes:
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
+    # /ready gives its Postgres check a 2s deadline of its own. The Kubernetes default here is 1s,
+    # which would abandon the request before that deadline is ever reached; 3s lets the handler
+    # answer 503 itself. Keep the two in step — see _PROBE_TIMEOUT_SECONDS in server/readiness.py.
+    timeoutSeconds: 3
   startup:
     failureThreshold: 30
     httpGet:
@@ -133,6 +173,26 @@ routes:
   auth:
     jwt: false
 
+# No migration hook: this service has no schema of its own. Its one table (`oauth_kv`) is created
+# by the OAuth state store on first use, so the app's database user needs CREATE on its schema.
+
+# The dashboard for the graph_* / mcp_* / python_http_* series this service exposes, shipped as a
+# ConfigMap the Grafana sidecar picks up (templates/grafana-dashboard.yaml, files/grafana-dashboard.json).
+# On by default: the ConfigMap is inert wherever no sidecar is watching, and a dashboard nobody
+# switched on is a dashboard nobody has during the first incident.
+#
+# The base chart has its own dashboard mechanism (`grafana.dashboards`, plural, reading
+# files/grafana/dashboards/*.json). It is not used here, and the template is not redundant: base
+# hardcodes `grafana_folder: apps`, and every MCP chart in this repo files its dashboard under
+# `mcp-servers` instead. Folder support in base would make this template deletable — until then,
+# deleting it moves the dashboard.
+grafana:
+  dashboard:
+    # -- Enable Grafana dashboard ConfigMap creation
+    enabled: true
+    # -- Grafana folder where the dashboard will be placed
+    folder: mcp-servers
+
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 networkPolicy:
   enabled: false
@@ -141,7 +201,26 @@ networkPolicy:
     ingress: true
     egress: true
   baseline:
+    # Scrapes reach this pod from Prometheus in `system`, not from the base chart's `monitoring`
+    # default — so the namespace is named, exactly as teams-mcp names it. What is not an option is
+    # switching the rule off: `enabled: false` emits no Prometheus ingress rule at all
+    # (base/templates/_networkPolicy.cilium.tpl, `$hasPrometheus`), so the moment the Unique QA
+    # overlay sets `networkPolicy.enabled: true` every scrape is dropped. /metrics stays up, the
+    # probes stay green and the pod logs nothing — the only symptom is a dashboard that goes blank,
+    # which is the failure this chart is least likely to notice.
     prometheus:
-      enabled: false
+      namespace: system
     ephemeralPorts:
       enabled: false
+    # Entra sign-in and Graph both run server-side over 443. Without this rule DNS still
+    # resolves and /ready still passes, so the only symptom is that every login fails.
+    egress:
+      microsoft:
+        toFQDNs:
+          - matchName: login.microsoftonline.com
+          - matchName: graph.microsoft.com
+          - matchPattern: "*.microsoft.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

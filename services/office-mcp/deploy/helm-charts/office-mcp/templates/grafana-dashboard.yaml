@@ -1,0 +1,13 @@
+{{- if .Values.grafana.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "base.fullname" . }}-grafana-dashboard
+  labels:
+    grafana_dashboard: "1"
+    {{- include "base.labels.common" . | nindent 4 }}
+  annotations:
+    grafana_folder: {{ .Values.grafana.dashboard.folder | quote }}
+data:
+  {{ include "base.fullname" . }}.json: {{ .Files.Get "files/grafana-dashboard.json" | quote }}
+{{- end }}
