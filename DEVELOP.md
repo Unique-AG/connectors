@@ -34,7 +34,7 @@ pnpm quality          # Helm chart linting
 
 ## Python Services
 
-Services that carry a `pyproject.toml` (`services/office-mcp`, ...) sit outside the pnpm/turbo
+Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
 workspace and are driven by [uv](https://docs.astral.sh/uv/). `Python CI` runs exactly this:
 
 ```bash

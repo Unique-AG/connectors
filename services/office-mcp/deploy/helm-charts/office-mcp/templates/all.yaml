@@ -1,2 +1,0 @@
-{{ include "office-mcp.validateValues" . }}
-{{ include "base.all" . }}

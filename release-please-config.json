@@ -164,23 +164,23 @@
         }
       ]
     },
-    "services/office-mcp": {
+    "services/office-365-mcp": {
       "release-type": "python",
-      "component": "office-mcp",
+      "component": "office-365-mcp",
       "extra-files": [
         {
           "type": "yaml",
-          "path": "deploy/helm-charts/office-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/office-365-mcp/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "deploy/helm-charts/office-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/office-365-mcp/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "generic",
-          "path": "deploy/helm-charts/office-mcp/values.yaml"
+          "path": "deploy/helm-charts/office-365-mcp/values.yaml"
         }
       ]
     }
