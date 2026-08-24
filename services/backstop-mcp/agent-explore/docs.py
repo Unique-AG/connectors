@@ -18,17 +18,37 @@ import argparse
 import json
 import os
 import re
+from collections.abc import Generator
+from contextlib import contextmanager
 from html import unescape
 from pathlib import Path
-from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
+from pydantic import TypeAdapter, ValidationError
 
 SSO_START = "https://help-prod.backstopsolutions.com/backstop/sso/elevioStart.jsp"
+SSO_LOGIN = "https://help-prod.backstopsolutions.com/backstop/sso/j_security_check"
+SSO_TOKEN = "https://help-prod.backstopsolutions.com/backstop/sso/elevioToken.jsp"
 KB_ORIGIN = "https://backstopsolutions.elevio.help"
+KB_HOST = "backstopsolutions.elevio.help"
 TIMEOUT = 120.0
+
+_JSON_OBJECT: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
+_JSON_LIST: TypeAdapter[list[object]] = TypeAdapter(list[object])
+
+
+class _Args(argparse.Namespace):
+    cmd: str
+    refresh: bool
+    id: str
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.cmd = ""
+        self.refresh = False
+        self.id = ""
 
 
 def _env_file() -> Path:
@@ -41,6 +61,43 @@ def _cache_dir() -> Path:
     return path
 
 
+def _as_object(value: object) -> dict[str, object]:
+    return _JSON_OBJECT.validate_python(value)
+
+
+def _as_list(value: object) -> list[object]:
+    return _JSON_LIST.validate_python(value)
+
+
+def _object_or_none(value: object) -> dict[str, object] | None:
+    try:
+        return _as_object(value)
+    except ValidationError:
+        return None
+
+
+def _objects(value: object) -> list[dict[str, object]]:
+    try:
+        items = _as_list(value)
+    except ValidationError:
+        return []
+    out: list[dict[str, object]] = []
+    for item in items:
+        parsed = _object_or_none(item)
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
+def _load_json_object(path: Path) -> dict[str, object]:
+    return _JSON_OBJECT.validate_json(path.read_text())
+
+
+def _cookie_field(cookie: dict[str, object], key: str, fallback: str) -> str:
+    value = cookie.get(key)
+    return value if isinstance(value, str) else fallback
+
+
 def _require_docs_credentials() -> tuple[str, str]:
     load_dotenv(_env_file())
     username = os.environ.get("BACKSTOP_DOCS_USERNAME") or os.environ.get(
@@ -50,9 +107,9 @@ def _require_docs_credentials() -> tuple[str, str]:
     if not username or not password:
         raise SystemExit(
             "Elevio docs need a web login, not the API token. Set "
-            "BACKSTOP_DOCS_USERNAME and BACKSTOP_DOCS_PASSWORD in "
-            "services/backstop-mcp/agent-explore/.env (username may fall back to "
-            "BACKSTOP_SERVICE_USERNAME)."
+            + "BACKSTOP_DOCS_USERNAME and BACKSTOP_DOCS_PASSWORD in "
+            + "services/backstop-mcp/agent-explore/.env (username may fall back to "
+            + "BACKSTOP_SERVICE_USERNAME)."
         )
     return username, password
 
@@ -84,15 +141,11 @@ def decode_js_string(src: str) -> str:
     raise ValueError("unterminated JS string")
 
 
-def parse_initial_data(html: str) -> dict[str, Any]:
+def parse_initial_data(html: str) -> dict[str, object]:
     match = re.search(r"window\.initialData\s*=\s*JSON\.parse\(", html)
     if match is None:
         raise ValueError("page has no window.initialData (not logged in, or Elevio changed)")
-    decoded = decode_js_string(html[match.end() :].lstrip())
-    data = json.loads(decoded)
-    if not isinstance(data, dict):
-        raise ValueError("initialData is not an object")
-    return data
+    return _as_object(_JSON_OBJECT.validate_json(decode_js_string(html[match.end() :].lstrip())))
 
 
 def html_to_text(raw: str) -> str:
@@ -101,85 +154,70 @@ def html_to_text(raw: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _article_stub(article: dict[str, Any]) -> dict[str, Any]:
-    category = article.get("category")
-    category_id = None
-    if isinstance(category, dict):
-        category_id = category.get("id")
+def _article_stub(article: dict[str, object]) -> dict[str, object]:
+    category = _object_or_none(article.get("category"))
     return {
         "id": article.get("id"),
         "title": article.get("title"),
         "slug": article.get("slug"),
         "summary": article.get("summary"),
-        "category_id": category_id,
+        "category_id": None if category is None else category.get("id"),
     }
 
 
-def _summarize_category(data: dict[str, Any]) -> dict[str, Any]:
-    page = data.get("page")
-    if not isinstance(page, dict):
+def _summarize_category(data: dict[str, object]) -> dict[str, object]:
+    page = _object_or_none(data.get("page"))
+    if page is None:
         raise ValueError("initialData.page missing")
-    payload = page.get("data") if isinstance(page.get("data"), dict) else None
-    category = payload.get("category") if isinstance(payload, dict) else None
-    if not isinstance(category, dict):
+    payload = _object_or_none(page.get("data"))
+    category = None if payload is None else _object_or_none(payload.get("category"))
+    if category is None:
         raise ValueError("category payload missing")
-    articles_block = category.get("articles") or {}
-    results = articles_block.get("results") if isinstance(articles_block, dict) else []
-    if not isinstance(results, list):
-        results = []
-    subcategories = category.get("subCategories") or []
-    if not isinstance(subcategories, list):
-        subcategories = []
+    articles_block = _object_or_none(category.get("articles")) or {}
     return {
         "id": category.get("id"),
         "title": category.get("title"),
         "slug": category.get("slug"),
-        "page_info": articles_block.get("pageInfo") if isinstance(articles_block, dict) else None,
+        "page_info": articles_block.get("pageInfo"),
         "subcategories": [
             {"id": item.get("id"), "title": item.get("title"), "slug": item.get("slug")}
-            for item in subcategories
-            if isinstance(item, dict)
+            for item in _objects(category.get("subCategories"))
         ],
-        "articles": [_article_stub(item) for item in results if isinstance(item, dict)],
+        "articles": [_article_stub(item) for item in _objects(articles_block.get("results"))],
     }
 
 
-def _summarize_article(data: dict[str, Any]) -> dict[str, Any]:
-    page = data.get("page")
-    if not isinstance(page, dict):
+def _summarize_article(data: dict[str, object]) -> dict[str, object]:
+    page = _object_or_none(data.get("page"))
+    if page is None:
         raise ValueError("initialData.page missing")
-    payload = page.get("data") if isinstance(page.get("data"), dict) else None
-    article = payload.get("article") if isinstance(payload, dict) else None
-    if not isinstance(article, dict):
+    payload = _object_or_none(page.get("data"))
+    article = None if payload is None else _object_or_none(payload.get("article"))
+    if article is None:
         raise ValueError("article payload missing")
     body_text = article.get("bodyText")
     if not isinstance(body_text, str) or not body_text.strip():
         body = article.get("body")
         body_text = html_to_text(body) if isinstance(body, str) else ""
-    related = payload.get("relatedArticles") if isinstance(payload, dict) else []
-    if not isinstance(related, list):
-        related = []
+    related = None if payload is None else payload.get("relatedArticles")
     return {
         **_article_stub(article),
         "body_text": body_text,
-        "related": [_article_stub(item) for item in related if isinstance(item, dict)],
+        "related": [_article_stub(item) for item in _objects(related)],
     }
 
 
-def _summarize_tree(data: dict[str, Any]) -> list[dict[str, Any]]:
-    tree = data.get("categoryTree")
-    categories = tree.get("categories") if isinstance(tree, dict) else None
-    if not isinstance(categories, list):
+def _summarize_tree(data: dict[str, object]) -> list[dict[str, object]]:
+    tree = _object_or_none(data.get("categoryTree"))
+    if tree is None:
         return []
 
-    def walk(nodes: list[Any]) -> list[dict[str, Any]]:
-        out: list[dict[str, Any]] = []
-        for node in nodes:
-            if not isinstance(node, dict):
-                continue
-            kids = node.get("subCategories") or node.get("categories") or []
-            if not isinstance(kids, list):
-                kids = []
+    def walk(nodes: object) -> list[dict[str, object]]:
+        out: list[dict[str, object]] = []
+        for node in _objects(nodes):
+            kids = node.get("subCategories")
+            if kids is None:
+                kids = node.get("categories")
             out.append(
                 {
                     "id": node.get("id"),
@@ -190,7 +228,7 @@ def _summarize_tree(data: dict[str, Any]) -> list[dict[str, Any]]:
             )
         return out
 
-    return walk(categories)
+    return walk(tree.get("categories"))
 
 
 def _session_path() -> Path:
@@ -198,7 +236,7 @@ def _session_path() -> Path:
 
 
 def _save_session(client: httpx.Client) -> None:
-    cookies = [
+    cookies: list[dict[str, object]] = [
         {"name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path}
         for cookie in client.cookies.jar
     ]
@@ -210,13 +248,12 @@ def _load_session(client: httpx.Client) -> None:
     if not path.exists():
         return
     try:
-        cookies = json.loads(path.read_text())
-    except json.JSONDecodeError:
+        cookies = _JSON_LIST.validate_json(path.read_text())
+    except ValueError:
         return
-    if not isinstance(cookies, list):
-        return
-    for cookie in cookies:
-        if not isinstance(cookie, dict):
+    for raw in cookies:
+        cookie = _object_or_none(raw)
+        if cookie is None:
             continue
         name = cookie.get("name")
         value = cookie.get("value")
@@ -224,8 +261,8 @@ def _load_session(client: httpx.Client) -> None:
             client.cookies.set(
                 name,
                 value,
-                domain=cookie.get("domain") or "",
-                path=cookie.get("path") or "/",
+                domain=_cookie_field(cookie, "domain", ""),
+                path=_cookie_field(cookie, "path", "/"),
             )
 
 
@@ -233,59 +270,69 @@ def _still_login_form(html: str) -> bool:
     return "j_security_check" in html and "j_password" in html
 
 
+def _on_elevio(url: httpx.URL | str) -> bool:
+    return urlparse(str(url)).netloc == KB_HOST
+
+
 def _elevio_redirect_url(html: str) -> str | None:
     urls = re.findall(r"https://backstopsolutions\.elevio\.help[^\"'\s<>]+", html)
     return urls[0] if urls else None
+
+
+def _follow_elevio_bounce(client: httpx.Client, current: httpx.Response) -> httpx.Response:
+    bounce = _elevio_redirect_url(current.text)
+    if bounce is None:
+        token_page = client.get(SSO_TOKEN, follow_redirects=True)
+        bounce = _elevio_redirect_url(token_page.text)
+        current = token_page
+    if bounce is not None:
+        return client.get(bounce, follow_redirects=True)
+    return current
 
 
 def _login(client: httpx.Client, username: str, password: str) -> None:
     start = client.get(SSO_START, follow_redirects=True)
     if start.status_code != 200:
         raise SystemExit(f"SSO start failed: HTTP {start.status_code}")
-    post_url = urljoin(str(start.url), "j_security_check")
-    response = client.post(
-        post_url,
-        data={"j_username": username, "j_password": password},
-        follow_redirects=True,
-    )
-    if _still_login_form(response.text):
-        raise SystemExit(
-            "Elevio SSO login failed (check BACKSTOP_DOCS_USERNAME / BACKSTOP_DOCS_PASSWORD)."
+    current = start
+    if not _on_elevio(current.url):
+        response = client.post(
+            SSO_LOGIN,
+            data={"j_username": username, "j_password": password},
+            follow_redirects=True,
         )
-    current = response
-    if urlparse(str(current.url)).netloc != "backstopsolutions.elevio.help":
-        bounce = _elevio_redirect_url(current.text)
-        if bounce is None:
-            token_page = client.get(
-                "https://help-prod.backstopsolutions.com/backstop/sso/elevioToken.jsp",
-                follow_redirects=True,
+        if _still_login_form(response.text):
+            raise SystemExit(
+                "Elevio SSO login failed (check BACKSTOP_DOCS_USERNAME / BACKSTOP_DOCS_PASSWORD)."
             )
-            bounce = _elevio_redirect_url(token_page.text)
-            current = token_page
-        if bounce is not None:
-            current = client.get(bounce, follow_redirects=True)
-    if urlparse(str(current.url)).netloc != "backstopsolutions.elevio.help" and _still_login_form(
-        current.text
-    ):
+        current = response
+        if not _on_elevio(current.url):
+            current = _follow_elevio_bounce(client, current)
+    if not _on_elevio(current.url):
         raise SystemExit("Elevio SSO did not reach the help center.")
     _save_session(client)
 
 
-def _client_with_session() -> httpx.Client:
+@contextmanager
+def _client_with_session() -> Generator[httpx.Client]:
     username, password = _require_docs_credentials()
-    client = httpx.Client(
+    with httpx.Client(
         timeout=TIMEOUT,
         follow_redirects=True,
         headers={"user-agent": "Mozilla/5.0 backstop-mcp-docs-explorer"},
-    )
-    _load_session(client)
-    probe = client.get(f"{KB_ORIGIN}/en/categories/21")
-    if probe.status_code == 401 or _still_login_form(probe.text) or "JSON.parse(" not in probe.text:
-        _login(client, username, password)
-    return client
+    ) as client:
+        _load_session(client)
+        probe = client.get(f"{KB_ORIGIN}/en/categories/21")
+        if (
+            probe.status_code == 401
+            or _still_login_form(probe.text)
+            or "JSON.parse(" not in probe.text
+        ):
+            _login(client, username, password)
+        yield client
 
 
-def _cache_write(name: str, payload: dict[str, Any]) -> None:
+def _cache_write(name: str, payload: dict[str, object]) -> None:
     (_cache_dir() / f"{name}.json").write_text(json.dumps(payload, indent=2))
 
 
@@ -294,29 +341,29 @@ def _fetch_html(client: httpx.Client, path: str) -> str:
     if response.status_code == 401 or _still_login_form(response.text):
         raise SystemExit(
             "Elevio session expired; delete "
-            "services/backstop-mcp/agent-explore/.docs-cache/session.json and retry."
+            + "services/backstop-mcp/agent-explore/.docs-cache/session.json and retry."
         )
     if response.status_code != 200:
         raise SystemExit(f"GET {path} failed: HTTP {response.status_code}")
     return response.text
 
 
-def cmd_tree(*, refresh: bool) -> dict[str, Any]:
+def cmd_tree(*, refresh: bool) -> dict[str, object]:
     cache = _cache_dir() / "tree.json"
     if cache.exists() and not refresh:
-        return json.loads(cache.read_text())
+        return _load_json_object(cache)
     with _client_with_session() as client:
         html = _fetch_html(client, "/en/categories/21")
-        payload = {"categories": _summarize_tree(parse_initial_data(html))}
+        payload: dict[str, object] = {"categories": _summarize_tree(parse_initial_data(html))}
     _cache_write("tree", payload)
     return payload
 
 
-def cmd_category(category_id: str, *, refresh: bool) -> dict[str, Any]:
+def cmd_category(category_id: str, *, refresh: bool) -> dict[str, object]:
     cache_name = f"category-{category_id}"
     cache = _cache_dir() / f"{cache_name}.json"
     if cache.exists() and not refresh:
-        return json.loads(cache.read_text())
+        return _load_json_object(cache)
     with _client_with_session() as client:
         html = _fetch_html(client, f"/en/categories/{category_id}")
         payload = _summarize_category(parse_initial_data(html))
@@ -324,11 +371,11 @@ def cmd_category(category_id: str, *, refresh: bool) -> dict[str, Any]:
     return payload
 
 
-def cmd_article(article_id: str, *, refresh: bool) -> dict[str, Any]:
+def cmd_article(article_id: str, *, refresh: bool) -> dict[str, object]:
     cache_name = f"article-{article_id}"
     cache = _cache_dir() / f"{cache_name}.json"
     if cache.exists() and not refresh:
-        return json.loads(cache.read_text())
+        return _load_json_object(cache)
     with _client_with_session() as client:
         html = _fetch_html(client, f"/en/articles/{article_id}")
         payload = _summarize_article(parse_initial_data(html))
@@ -351,14 +398,13 @@ def main() -> None:
     category.add_argument("id")
     article = with_refresh(sub.add_parser("article", help="fetch one article body"))
     article.add_argument("id")
-    args = parser.parse_args()
-    refresh = bool(getattr(args, "refresh", False))
+    args = parser.parse_args(namespace=_Args())
     if args.cmd == "tree":
-        payload = cmd_tree(refresh=refresh)
+        payload = cmd_tree(refresh=args.refresh)
     elif args.cmd == "category":
-        payload = cmd_category(args.id, refresh=refresh)
+        payload = cmd_category(args.id, refresh=args.refresh)
     else:
-        payload = cmd_article(args.id, refresh=refresh)
+        payload = cmd_article(args.id, refresh=args.refresh)
     print(json.dumps(payload, indent=2))
 
 

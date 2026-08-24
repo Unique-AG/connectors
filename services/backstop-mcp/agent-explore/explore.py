@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """GET-only CLI for the live Backstop REST API. Loads .env from this directory."""
 
+from __future__ import annotations
+
 import argparse
 import base64
 import hashlib
@@ -10,11 +12,17 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+from pydantic import TypeAdapter, ValidationError
 
 
 class _Args(argparse.Namespace):
-    path: str = ""
-    param: list[str] = []
+    path: str
+    param: list[str]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.path = ""
+        self.param = []
 
 
 def main() -> None:
@@ -50,10 +58,15 @@ def main() -> None:
                 "Backstop API did not respond within 2 minutes; treat the API as down."
             ) from None
     try:
-        body = resp.json()
-    except ValueError:
+        body: object = TypeAdapter(object).validate_json(resp.content)
+    except ValidationError:
         body = resp.text
-    record = {"path": args.path, "query": params, "status": resp.status_code, "body": body}
+    record: dict[str, object] = {
+        "path": args.path,
+        "query": params,
+        "status": resp.status_code,
+        "body": body,
+    }
     out = json.dumps(record, indent=2)
     cache_file.write_text(out)
     print(out)
