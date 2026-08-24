@@ -271,7 +271,7 @@ Send a plain-text message to a channel, identified by `teamId` + `channelId`. Ca
 
 ### `search_messages`
 
-Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the [Microsoft Search API](https://learn.microsoft.com/en-us/graph/search-concept-overview) (`POST /search/query` on Graph **v1.0**). Supports identity and scope filters. Results are snippets by default; set `detail=full` to hydrate message bodies. At least one search criterion (`query`, `from`, `to`, `mentions`, `sentAfter`, `sentBefore`, `hasAttachment`, `isRead`, or `isMentioned`) must be provided.
+Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the [Microsoft Search API](https://learn.microsoft.com/en-us/graph/search-concept-overview) (`POST /search/query` on Graph **v1.0**). Supports identity and scope filters. Hits carry hydrated message bodies by default; set `detail=summary` to get Microsoft's relevance snippet only. At least one search criterion (`query`, `from`, `to`, `mentions`, `sentAfter`, `sentBefore`, `hasAttachment`, `isRead`, or `isMentioned`) must be provided.
 
 **Input parameters:**
 
@@ -287,8 +287,8 @@ Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and ch
 | `isRead` | boolean | No | — | Restrict to read (`true`) or unread (`false`) messages. |
 | `isMentioned` | boolean | No | — | Restrict to messages where the signed-in user is (`true`) or is not (`false`) mentioned. |
 | `source` | `chat` \| `channel` \| `all` | No | `all` | Filter results by container. Applied after the search, so a non-`all` value shrinks the returned page. |
-| `detail` | `summary` \| `full` | No | `summary` | `summary` returns the hit snippet only (1 Graph call). `full` hydrates each hit with its message body (one extra Graph call per hit). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | Only applies when `detail=full`. `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
+| `detail` | `summary` \| `full` | No | `full` | `full` hydrates each hit with its message body (one extra Graph call per hit). `summary` returns Microsoft's relevance snippet only (1 Graph call) — clipped mid-sentence, and rarely enough on its own. |
+| `contentFormat` | `normalized` \| `raw` | No | `normalized` | Only applies when `detail=full` (the default). `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `offset` | integer (≥ 0) | No | `0` | Number of results to skip for pagination (maps to Graph `from`). |
 | `size` | integer (1–`GRAPH_PAGE_SIZE`) | No | `25` | Maximum number of results per page. |
 
@@ -311,6 +311,8 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
 
 !!! note "How `detail=full` hydration behaves"
     Hydration issues one extra Graph call per hit (an N+1 fan-out), capped at 5 concurrent requests to stay throttle-friendly. If an individual hit is forbidden or deleted, that row falls back to summary-only (no `content`) rather than failing the whole page.
+
+    Hydration is the default despite that fan-out. Microsoft's search projection carries no message body at all — only a clipped `summary` — so a caller that starts with `detail=summary` and then fetches the messages it actually needed pays for the same Graph calls anyway, plus an extra round trip.
 
 **Example:**
 

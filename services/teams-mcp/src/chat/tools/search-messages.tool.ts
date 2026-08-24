@@ -7,7 +7,7 @@ import { GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { SearchService } from '../search.service';
 
-const SearchMessagesInputSchema = z
+export const SearchMessagesInputSchema = z
   .object({
     query: z
       .string()
@@ -53,15 +53,15 @@ const SearchMessagesInputSchema = z
       ),
     detail: z
       .enum(['summary', 'full'])
-      .default('summary')
+      .default('full')
       .describe(
-        'summary returns the hit snippet only (1 Graph call, fast). full hydrates each hit with its message body (one extra Graph call per hit). Default: summary',
+        'full (default) returns each hit with its message body, and is what you want in almost every case. summary returns only Microsoft\'s relevance snippet, which is cut mid-sentence with "..." and is rarely enough to answer a question — reading it then fetching the messages you needed costs the same Graph calls as full plus an extra round trip. Choose summary only when the snippet genuinely suffices, e.g. counting matches or locating which chat to look in. Default: full',
       ),
     contentFormat: z
       .enum(['normalized', 'raw'])
       .default('normalized')
       .describe(
-        'Only applies when detail=full. normalized converts HTML to readable text; raw returns Teams HTML verbatim. Default: normalized',
+        'Only applies when detail=full (the default). normalized converts HTML to readable text; raw returns Teams HTML verbatim. Default: normalized',
       ),
     offset: z
       .number()
@@ -128,7 +128,7 @@ export class SearchMessagesTool {
     name: 'search_messages',
     title: 'Search Messages',
     description:
-      'Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the Microsoft Search API. Supports identity and scope filters (sender, recipient, mentions, date range, attachments, read/mention state). Results are snippets by default; set detail=full to retrieve message bodies. Paginate with offset + moreResultsAvailable.',
+      "Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the Microsoft Search API. Supports identity and scope filters (sender, recipient, mentions, date range, attachments, read/mention state). Hits carry full message bodies by default, so a follow-up get_chat_messages or get_channel_messages call is normally unnecessary — Microsoft's search index returns no message body of its own, and this tool fetches it per hit. Paginate with offset + moreResultsAvailable.",
     parameters: SearchMessagesInputSchema,
     outputSchema: SearchMessagesOutputSchema,
     annotations: {
