@@ -169,7 +169,7 @@ sequenceDiagram
 
     Note over MCPClient,MSGraph: Step 2 — fetch messages by ID
 
-    MCPClient->>TeamsMCP: get_chat_messages (chatId, limit, orderBy?, excludeSystemMessages?)
+    MCPClient->>TeamsMCP: get_chat_messages (chatId, limit, includeSystemMessages?)
     TeamsMCP->>MSGraph: GET /chats/{chatId}/messages?$top=limit&$orderby=...
     MSGraph->>TeamsMCP: First page of messages
 
@@ -188,7 +188,7 @@ sequenceDiagram
 
 - `list_chats` returns a single bounded page (no auto-pagination); `hasMore` indicates whether more chats exist.
 - Graph does not support server-side `messageType` filtering on message endpoints. When `excludeSystemMessages=true`, the server pages through results client-side until the requested number of user messages is collected.
-- Message bodies are returned as-is from Graph (HTML). The `get_channel_messages` path is identical but targets `/teams/{teamId}/channels/{channelId}/messages`.
+- Message bodies are always normalized to readable plain text, never returned as Teams HTML, and `createdDateTime` is the ISO 8601 value Graph returns. The `get_channel_messages` path is identical but targets `/teams/{teamId}/channels/{channelId}/messages`.
 
 ### Chat Search Flow
 

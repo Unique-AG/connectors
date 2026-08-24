@@ -155,12 +155,9 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
 |-----------|------|----------|---------|-------------|
 | `chatId` | string | Yes | — | Exact chat id from `list_chats` or `search_messages`. |
 | `limit` | integer (1–50) | No | `20` | Maximum number of messages to return (newest first). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `includeSystemMessages` | boolean | No | `false` | Include event notifications (member added, call ended). |
-| `timestampFormat` | `full` \| `short` \| `none` | No | `short` | `full` = ISO 8601 with ms; `short` = `YYYY-MM-DD HH:mm`; `none` = omit timestamps. |
-| `detail` | `standard` \| `full` | No | `standard` | `standard` returns sender, content, and timestamp; `full` also adds `contentType` (the source format from Graph). |
 
-**Returns:** The `chatId` and a `messages` array (newest first). Each message has `id`, `senderDisplayName` (nullable), `content`, `createdDateTime` (omitted when `timestampFormat=none`), and `contentType` (only when `detail=full`).
+**Returns:** The `chatId` and a `messages` array (newest first). Each message has `id`, `senderDisplayName` (nullable), `content` and `createdDateTime`. Bodies are always normalized plain text, never Teams HTML, and `createdDateTime` is the ISO 8601 value Graph returns.
 
 **Example:**
 
@@ -172,7 +169,7 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
       "id": "1718901120000",
       "senderDisplayName": "Alice Smith",
       "content": "@Bob Jones can you review the PR? [attachment: design.pdf]",
-      "createdDateTime": "2024-06-20 14:32"
+      "createdDateTime": "2024-06-20T14:32:07.113Z"
     }
   ]
 }
@@ -191,10 +188,7 @@ Retrieve recent messages from a channel, identified by `teamId` + `channelId`. C
 | `teamId` | string | Yes | — | Exact team id from `list_teams`. |
 | `channelId` | string | Yes | — | Exact channel id from `list_channels` (for that team). |
 | `limit` | integer (1–50) | No | `20` | Maximum number of messages to return (newest first). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `includeSystemMessages` | boolean | No | `false` | Include event notifications (member added, call ended). |
-| `timestampFormat` | `full` \| `short` \| `none` | No | `short` | `full` = ISO 8601 with ms; `short` = `YYYY-MM-DD HH:mm`; `none` = omit timestamps. |
-| `detail` | `standard` \| `full` | No | `standard` | `standard` returns sender, content, and timestamp; `full` also adds `contentType`. |
 
 **Returns:** The `teamId`, `channelId`, and a `messages` array (same shape as `get_chat_messages`).
 

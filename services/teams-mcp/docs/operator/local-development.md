@@ -185,7 +185,7 @@ This URL is used when creating Microsoft Graph subscriptions.
 After connecting a test user via MCP Inspector:
 
 1. **Discover ids** — call `list_teams` to find team ids and `list_chats` to find chat ids. Both return ids alongside display names and metadata so you can identify the right target unambiguously.
-2. **Read messages** — call `get_chat_messages` with a chat id, or `get_channel_messages` with a team id and channel id (use `list_channels` to find channel ids). Both return paginated message history.
+2. **Read messages** — call `get_chat_messages` with a chat id, or `get_channel_messages` with a team id and channel id (use `list_channels` to find channel ids). Both return a bounded window of recent messages, newest first, sized by `limit`.
 3. **Search** — call `search_messages` with a keyword query. Results span both chats and channels, and each hit normally carries its full message content (absent for an `unknown` hit, a channel-thread reply, or a fetch that was denied).
 4. **Send** — call `send_chat_message` with a chat id to post to a 1:1 or group chat, or `send_channel_message` with a team id and channel id to post to a channel. Verify the message appears in the Teams client.
 

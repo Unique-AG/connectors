@@ -8,7 +8,7 @@ import { MsChatMessage } from '../chat.dtos';
 import { ChatService } from '../chat.service';
 import { normalizeContent } from '../utils/normalize-content';
 
-const GetChannelMessagesInputSchema = z.object({
+export const GetChannelMessagesInputSchema = z.object({
   teamId: z.string().describe('Exact team id from list_teams. Use list_teams to find it.'),
   channelId: z
     .string()
@@ -22,29 +22,11 @@ const GetChannelMessagesInputSchema = z.object({
     .max(50)
     .default(20)
     .describe('Maximum number of messages to return (newest first)'),
-  contentFormat: z
-    .enum(['normalized', 'raw'])
-    .default('normalized')
-    .describe(
-      'normalized converts HTML to readable text with @mentions and [attachment: name] placeholders. raw returns Teams HTML verbatim. Default: normalized',
-    ),
   includeSystemMessages: z
     .boolean()
     .default(false)
     .describe(
       'System messages are event notifications (member added, call ended). Default false excludes them',
-    ),
-  timestampFormat: z
-    .enum(['full', 'short', 'none'])
-    .default('short')
-    .describe(
-      'full = ISO 8601 with ms, short = YYYY-MM-DD HH:mm, none = omit timestamps. Default: short',
-    ),
-  detail: z
-    .enum(['standard', 'full'])
-    .default('standard')
-    .describe(
-      'standard returns sender, content, and timestamp. full adds contentType (source format from Graph). Default: standard',
     ),
 });
 
@@ -54,10 +36,9 @@ const GetChannelMessagesOutputSchema = z.object({
   messages: z.array(
     z.object({
       id: z.string(),
-      createdDateTime: z.string().optional(),
+      createdDateTime: z.string(),
       senderDisplayName: z.string().nullable(),
       content: z.string(),
-      contentType: z.string().optional(),
     }),
   ),
 });
@@ -75,7 +56,7 @@ export class GetChannelMessagesTool {
     name: 'get_channel_messages',
     title: 'Get Channel Messages',
     description:
-      'Retrieves recent messages from a Microsoft Teams channel, identified by teamId + channelId. Call list_teams then list_channels (with that teamId) first to find the ids.',
+      'Retrieves recent messages from a Microsoft Teams channel, identified by teamId + channelId. Call list_teams then list_channels (with that teamId) first to find the ids. Message bodies are always normalized plain text, never Teams HTML, and timestamps are the ISO 8601 values Graph returns. System messages (member added, call ended) are excluded unless includeSystemMessages is set.',
     parameters: GetChannelMessagesInputSchema,
     outputSchema: GetChannelMessagesOutputSchema,
     annotations: {
@@ -122,36 +103,18 @@ export class GetChannelMessagesTool {
     return {
       teamId: input.teamId,
       channelId: input.channelId,
-      messages: messages.map((m) => this.mapMessage(m, input)),
+      messages: messages.map((m) => this.mapMessage(m)),
     };
   }
 
   private mapMessage(
     m: MsChatMessage,
-    input: z.infer<typeof GetChannelMessagesInputSchema>,
   ): z.output<typeof GetChannelMessagesOutputSchema>['messages'][number] {
-    const content =
-      input.contentFormat === 'normalized'
-        ? normalizeContent(m.content, m.contentType, m.attachments, m.deletedDateTime)
-        : m.content;
-
-    const msg: z.output<typeof GetChannelMessagesOutputSchema>['messages'][number] = {
+    return {
       id: m.id,
+      createdDateTime: m.createdDateTime,
       senderDisplayName: m.senderDisplayName ?? null,
-      content,
+      content: normalizeContent(m.content, m.contentType, m.attachments, m.deletedDateTime),
     };
-
-    if (input.timestampFormat !== 'none') {
-      msg.createdDateTime =
-        input.timestampFormat === 'full'
-          ? m.createdDateTime
-          : m.createdDateTime.replace('T', ' ').slice(0, 16);
-    }
-
-    if (input.detail === 'full') {
-      msg.contentType = m.contentType;
-    }
-
-    return msg;
   }
 }
