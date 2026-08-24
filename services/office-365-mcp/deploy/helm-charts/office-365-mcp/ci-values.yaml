@@ -1,0 +1,13 @@
+# CI-safe overrides — no external Postgres/secrets required for helm template.
+postgresql:
+  enabled: false
+
+# Placeholders so `helm template` clears office-365-mcp.validateValues at the chart's real
+# APP_ENV: production default, instead of masking it behind a non-production override.
+# TOOLS_PRESET stands in for the overlay's own choice: the chart deliberately defaults no tool
+# surface, so a render without one is meant to fail schema validation.
+env:
+  ENTRA_TENANT_ID: 00000000-0000-0000-0000-000000000000
+  ENTRA_CLIENT_ID: 11111111-1111-1111-1111-111111111111
+  PUBLIC_BASE_URL: https://office-365-mcp.ci.example.com
+  TOOLS_PRESET: teams

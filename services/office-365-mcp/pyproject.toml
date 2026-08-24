@@ -1,0 +1,97 @@
+[project]
+name = "office-365-mcp"
+version = "0.0.0"
+description = "Microsoft 365 (Office) FastMCP server"
+requires-python = ">=3.12"
+dependencies = [
+    # The `azure` extra (azure-identity, pyjwt) is what FastMCP's On-Behalf-Of exchange needs —
+    # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
+    # also arrive transitively via `msgraph-sdk`, which is precisely why this is declared: the day
+    # the Graph SDK stops depending on them, OBO must not break silently.
+    "fastmcp[azure]==3.4.5",
+    # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
+    # the postgresql extra and because auth.py imports it directly (OAuth state store).
+    "py-key-value-aio[postgresql]==0.4.5",
+    # The official Microsoft Graph SDK. `msgraph-core` (the request-adapter/telemetry layer),
+    # `microsoft-kiota-*` (the HTTP middleware pipeline) and `azure-core` (the credential
+    # protocol the SDK authenticates with) all arrive transitively and are pinned in uv.lock.
+    "msgraph-sdk==1.61.0",
+    "uvicorn[standard]==0.52.0",
+    # fastmcp already depends on starlette; declared here because app.py imports Starlette,
+    # Middleware, Request and JSONResponse directly to assemble the ASGI app.
+    "starlette==1.3.1",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "python-dotenv==1.2.2",
+    # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
+    # SDK's own default client; the SDK pulls the same extra, but we ask for it directly because
+    # we are the ones passing `http2=True`.
+    "httpx[http2]==0.28.1",
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-exporter-prometheus==0.65b0",
+    "opentelemetry-instrumentation-asgi==0.65b0",
+    "asyncpg==0.31.0",
+    "cryptography==50.0.0",
+    "tenacity==9.1.4",
+    "typing-extensions==4.16.0",
+    "unique-mcp==2026.34.0.dev3",
+    # unique-mcp already depends on unique-toolkit[monitoring,otel]; declared here for the
+    # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
+    # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
+    "unique-toolkit[monitoring,otel]==2026.34.0.dev7",
+]
+
+[project.scripts]
+office-365-mcp = "office_365_mcp.main:main"
+
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/office_365_mcp"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/office_365_mcp" = "office_365_mcp"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "hatchling==1.31.0",
+    "ruff==0.16.0",
+    "basedpyright==1.39.9",
+    "respx==0.23.1",
+    "testcontainers==4.15.0",
+    "certifi==2026.7.22",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
+markers = ["docker: needs a live Postgres via testcontainers"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+# ANN: requires type annotations on function arguments (ANN001-003) and return
+# values (ANN2xx) — enforced everywhere, not just public functions.
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "all"
+include = ["src", "tests"]
+extraPaths = ["src", "."]
+reportUnusedCallResult = false
+reportMissingTypeStubs = false
+reportUnusedFunction = false

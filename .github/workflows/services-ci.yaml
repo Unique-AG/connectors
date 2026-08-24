@@ -1,9 +1,11 @@
 name: "Services CI"
 
 on:
+  # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
+  # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
+  # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
+  # files it guards change, whatever the PR merges into.
   pull_request:
-    branches:
-      - main
     paths:
       - "services/**"
       - "packages/**"

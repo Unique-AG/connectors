@@ -1,5 +1,11 @@
 # Project Instructions
 
+## Environment
+- Python services (any `services/*/pyproject.toml`) are driven by `uv`, not pnpm/turbo, and their
+  commands live in `DEVELOP.md` under "Python Services". Read the git-worktree trap there before you
+  believe a basedpyright run that reports thousands of errors: a worktree without a synced `.venv`
+  resolves no import and invents every one of them.
+
 ## Code Comments
 - Keep comments minimal - code should be self-explanatory
 - Only add comments for complex algorithms, unexpected behavior, or non-obvious business logic
