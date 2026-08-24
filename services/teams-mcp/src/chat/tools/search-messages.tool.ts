@@ -3,11 +3,16 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import { GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { SearchService } from '../search.service';
 
-const SearchMessagesInputSchema = z
+// Not a Graph limit: Microsoft caps a search page at 25 for the `message` and
+// `event` entities only, never for `chatMessage`. 25 is a product choice — every
+// hit is hydrated with one extra Graph call, so the page size is also the N of
+// that fan-out.
+const MAX_PAGE_SIZE = 25;
+
+export const SearchMessagesInputSchema = z
   .object({
     query: z
       .string()
@@ -45,24 +50,6 @@ const SearchMessagesInputSchema = z
       .describe(
         'Restrict to messages where the signed-in user is (true) or is not (false) mentioned.',
       ),
-    source: z
-      .enum(['chat', 'channel', 'all'])
-      .default('all')
-      .describe(
-        'Filter results by container. Applied after the search (entityType is always chatMessage), so a non-all value shrinks the returned page. Default: all',
-      ),
-    detail: z
-      .enum(['summary', 'full'])
-      .default('summary')
-      .describe(
-        'summary returns the hit snippet only (1 Graph call, fast). full hydrates each hit with its message body (one extra Graph call per hit). Default: summary',
-      ),
-    contentFormat: z
-      .enum(['normalized', 'raw'])
-      .default('normalized')
-      .describe(
-        'Only applies when detail=full. normalized converts HTML to readable text; raw returns Teams HTML verbatim. Default: normalized',
-      ),
     offset: z
       .number()
       .int()
@@ -73,9 +60,11 @@ const SearchMessagesInputSchema = z
       .number()
       .int()
       .min(1)
-      .max(GRAPH_PAGE_SIZE)
-      .default(25)
-      .describe('Maximum number of results to return per page. Default: 25'),
+      .max(MAX_PAGE_SIZE)
+      .default(MAX_PAGE_SIZE)
+      .describe(
+        `Maximum number of results to return per page (1-${MAX_PAGE_SIZE}). Every hit costs one extra Graph call, so ask for fewer when a narrow answer will do. Default: ${MAX_PAGE_SIZE}`,
+      ),
   })
   .refine(
     (data) =>
@@ -98,7 +87,7 @@ const SearchMessagesOutputSchema = z.object({
   messages: z.array(
     z.object({
       id: z.string(),
-      source: z.enum(['chat', 'channel']),
+      source: z.enum(['chat', 'channel', 'unknown']),
       chatId: z.string().nullable(),
       teamId: z.string().nullable(),
       channelId: z.string().nullable(),
@@ -128,7 +117,7 @@ export class SearchMessagesTool {
     name: 'search_messages',
     title: 'Search Messages',
     description:
-      'Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the Microsoft Search API. Supports identity and scope filters (sender, recipient, mentions, date range, attachments, read/mention state). Results are snippets by default; set detail=full to retrieve message bodies. Paginate with offset + moreResultsAvailable.',
+      "Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the Microsoft Search API. Supports filters on sender, recipient, mentions, date range, attachments, and read/mention state. Graph offers no way to scope a search to chats or to channels, so every hit is returned and narrowing to one kind is your job: a hit is 'channel' only when it carries both a team id and a channel id, 'chat' when it carries a chat id, and 'unknown' otherwise. Every addressable hit is then fetched to fill in its message body, so a follow-up get_chat_messages or get_channel_messages call is normally unnecessary. content is always normalized plain text, never HTML: a message carrying no text of its own reads as a placeholder such as [image], [card] or [attachment: name], and a deleted message reads as [deleted] — treat those as descriptions, not as what was written. content is absent when the hit names no container, when the fetch fails (denied, throttled, or gone), and for a reply inside a channel thread — Graph addresses a reply under its parent post and the search index does not name that post, so a reply's body cannot be retrieved by any tool here. webUrl may be an Outlook Web link rather than a Teams deep link, because a search hit is an Exchange projection of the message. Paginate by advancing offset by returnedCount, stopping when moreResultsAvailable is false or returnedCount is 0.",
     parameters: SearchMessagesInputSchema,
     outputSchema: SearchMessagesOutputSchema,
     annotations: {
@@ -156,13 +145,8 @@ export class SearchMessagesTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('source', input.source);
-    span?.setAttribute('detail', input.detail);
 
-    this.logger.log(
-      { userProfileId, source: input.source, detail: input.detail },
-      'Searching messages',
-    );
+    this.logger.log({ userProfileId }, 'Searching messages');
 
     const result = await this.searchService.searchMessages(userProfileId, {
       query: input.query,
@@ -174,9 +158,6 @@ export class SearchMessagesTool {
       hasAttachment: input.hasAttachment,
       isRead: input.isRead,
       isMentioned: input.isMentioned,
-      source: input.source,
-      detail: input.detail,
-      contentFormat: input.contentFormat,
       offset: input.offset,
       size: input.size,
     });

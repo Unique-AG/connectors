@@ -5,29 +5,23 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { type MsSearchHit, MsSearchResponseSchema } from './chat.dtos';
 import { ChatService } from './chat.service';
 import { type BuildSearchQueryParams, buildSearchQuery } from './utils/build-search-query';
+import { cleanSearchSummary } from './utils/clean-search-summary';
 import { normalizeContent } from './utils/normalize-content';
 
-export type SearchSource = 'chat' | 'channel' | 'all';
-export type SearchDetail = 'summary' | 'full';
-export type SearchContentFormat = 'normalized' | 'raw';
-
 export interface SearchMessagesParams extends BuildSearchQueryParams {
-  source: SearchSource;
-  detail: SearchDetail;
-  contentFormat: SearchContentFormat;
   offset: number;
   size: number;
 }
 
 export interface SearchMessageRow {
   id: string;
-  source: 'chat' | 'channel';
+  source: 'chat' | 'channel' | 'unknown';
   chatId: string | null;
   teamId: string | null;
   channelId: string | null;
   senderDisplayName: string | null;
   summary: string | null;
-  /** Hydrated message body; only present when `detail: 'full'` succeeds. */
+  /** Hydrated message body; absent when the hit is unaddressable or the fetch failed. */
   content?: string;
   createdDateTime: string | null;
   webUrl: string | null;
@@ -35,9 +29,42 @@ export interface SearchMessageRow {
 
 export interface SearchMessagesResult {
   messages: SearchMessageRow[];
-  /** Count of rows on THIS page (after the source filter), not total matches. */
+  /** Count of rows on THIS page, not total matches. */
   returnedCount: number;
   moreResultsAvailable: boolean;
+}
+
+interface MappedHit {
+  row: SearchMessageRow;
+  /**
+   * Mailbox address of the sender. Used as the sender of last resort, only once
+   * hydration has had its chance to supply a real display name.
+   */
+  senderAddress: string | null;
+}
+
+// An empty string is not a value. As an identifier it would classify a hit that
+// cannot be addressed and build `/teams//channels//messages/{id}`; as a name or a
+// timestamp it would satisfy `??` and shadow what hydration supplies. Treat it as
+// absent everywhere.
+function nonEmpty(value: string | null | undefined): string | null {
+  return value || null;
+}
+
+function withoutContent(row: SearchMessageRow, senderAddress: string | null): SearchMessageRow {
+  return { ...row, senderDisplayName: row.senderDisplayName ?? senderAddress };
+}
+
+// Rejects when `work` outlives `ms`. The request itself is left to finish on its
+// own: the Graph client offers no cancellation, and the point is to stop the
+// caller waiting, not to stop the request.
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expiry = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`Hydration exceeded ${ms}ms`)), ms);
+  });
+
+  return Promise.race([work, expiry]).finally(() => clearTimeout(timer));
 }
 
 @Injectable()
@@ -49,9 +76,17 @@ export class SearchService {
   // it, flip this to 'beta' — the only change required.
   private static readonly GRAPH_API_VERSION = 'v1.0';
 
-  // Hydration issues one Graph call per hit (N+1); cap concurrency to stay
-  // throttle-friendly.
-  private static readonly HYDRATION_CONCURRENCY = 5;
+  // Hydration issues one Graph call per hit (N+1). Graph throttles chat and
+  // channel message reads at 1 request per second per container, so the cap is
+  // deliberately low: hydration is unconditional now, and several hits from one
+  // busy chat are the common case rather than the exception.
+  private static readonly HYDRATION_CONCURRENCY = 3;
+
+  // Hydration is unconditional, so a throttled page must not hold the whole
+  // response hostage. The Graph client retries a 429 three times honouring
+  // Retry-After, which can run into minutes; past this budget the remaining hits
+  // give up their body rather than the caller giving up the page.
+  private static readonly HYDRATION_BUDGET_MS = 15_000;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -66,8 +101,8 @@ export class SearchService {
   // response. PageIterator only understands `@odata.nextLink`, so it cannot drive
   // this endpoint. The offset/size model is also the correct contract here — the
   // MCP client paginates explicitly via `offset` + `moreResultsAvailable`, which
-  // is always surfaced (never silently capped). The per-page size bound is
-  // sourced from the shared `GRAPH_PAGE_SIZE` constant in the search tool.
+  // is always surfaced (never silently capped). The per-page size bound is a
+  // product choice made in the search tool, not a Graph limit.
   @Span()
   public async searchMessages(
     userProfileId: string,
@@ -75,8 +110,6 @@ export class SearchService {
   ): Promise<SearchMessagesResult> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('source', params.source);
-    span?.setAttribute('detail', params.detail);
 
     const queryString = buildSearchQuery(params);
     // The assembled KQL contains user free-text and identity filters
@@ -84,10 +117,7 @@ export class SearchService {
     // spans or logs. Record only its length for debugging.
     span?.setAttribute('query_length', queryString.length);
 
-    this.logger.debug(
-      { userProfileId, queryLength: queryString.length, source: params.source },
-      'Searching messages',
-    );
+    this.logger.debug({ userProfileId, queryLength: queryString.length }, 'Searching messages');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const body = {
@@ -113,18 +143,10 @@ export class SearchService {
     // moreResultsAvailable lives on the (first) container, not the hit.
     const moreResultsAvailable = containers[0]?.moreResultsAvailable ?? false;
 
-    let rows = hits.map((hit) => this.mapHit(hit));
-
-    // entityType is always chatMessage; the source split is derived from the
-    // resource shape, so it can only be applied after the fetch. This shrinks
-    // the page when filtering to a single source.
-    if (params.source !== 'all') {
-      rows = rows.filter((r) => r.source === params.source);
-    }
-
-    if (params.detail === 'full') {
-      rows = await this.hydrate(userProfileId, rows, params.contentFormat);
-    }
+    const rows = await this.hydrate(
+      userProfileId,
+      hits.map((hit) => this.mapHit(hit)),
+    );
 
     span?.setAttribute('result_count', rows.length);
 
@@ -135,86 +157,130 @@ export class SearchService {
     };
   }
 
-  private mapHit(hit: MsSearchHit): SearchMessageRow {
+  // Container classification uses only what Microsoft documents on a chatMessage:
+  // `channelIdentity.teamId` + `.channelId` for a channel message, `chatId` for a
+  // chat message. A chat hit arrives with `channelIdentity: {}`, so the object's
+  // presence proves nothing — only both ids do. A hit matching neither shape is
+  // reported as 'unknown' rather than guessed at.
+  private mapHit(hit: MsSearchHit): MappedHit {
     const resource = hit.resource;
-    const channelId = resource?.channelIdentity?.channelId ?? null;
-    const teamId = resource?.channelIdentity?.teamId ?? null;
-    const chatId = resource?.chatId ?? null;
+    const teamId = nonEmpty(resource?.channelIdentity?.teamId);
+    const channelId = nonEmpty(resource?.channelIdentity?.channelId);
+    const chatId = nonEmpty(resource?.chatId);
 
-    let source: 'chat' | 'channel';
-    if (channelId) {
-      source = 'channel';
-    } else if (chatId) {
-      source = 'chat';
-    } else {
-      // Neither identifier present — Graph occasionally omits both. Default to
-      // chat and note it; such a hit cannot be hydrated.
-      source = 'chat';
-      this.logger.debug({ hitId: hit.hitId }, 'Search hit missing chatId and channelIdentity');
-    }
+    const isChannel = teamId !== null && channelId !== null;
+    const source = isChannel ? 'channel' : chatId !== null ? 'chat' : 'unknown';
 
+    const from = resource?.from;
+    // A search hit is an Exchange projection, so the mailbox sender is the one
+    // actually populated; the Teams identity set is read as a fallback for
+    // tenants that return it. The bare address is deliberately NOT part of this
+    // chain — it is a last resort applied after hydration, so a fetched display
+    // name always beats an email address.
     const senderDisplayName =
-      resource?.from?.user?.displayName ?? resource?.from?.application?.displayName ?? null;
+      nonEmpty(from?.emailAddress?.name) ??
+      nonEmpty(from?.user?.displayName) ??
+      nonEmpty(from?.application?.displayName);
 
     return {
-      id: resource?.id ?? hit.hitId ?? '',
-      source,
-      chatId,
-      teamId,
-      channelId,
-      senderDisplayName,
-      summary: hit.summary ?? null,
-      createdDateTime: resource?.createdDateTime ?? null,
-      webUrl: resource?.webUrl ?? null,
+      row: {
+        id: nonEmpty(resource?.id) ?? nonEmpty(hit.hitId) ?? '',
+        source,
+        // The ids a row carries describe the container it reports, so a hit that
+        // proves a channel does not also hand back a chat id to follow.
+        chatId: isChannel ? null : chatId,
+        teamId: isChannel ? teamId : null,
+        channelId: isChannel ? channelId : null,
+        senderDisplayName,
+        summary: cleanSearchSummary(hit.summary),
+        createdDateTime: nonEmpty(resource?.createdDateTime),
+        // The retrievable-property list names `webUrl` (a Teams deep link); the
+        // documented example payloads carry `webLink` (an Outlook Web URL)
+        // instead, so this field may hold either kind of link.
+        webUrl: resource?.webUrl ?? resource?.webLink ?? null,
+      },
+      senderAddress: nonEmpty(from?.emailAddress?.address),
     };
   }
 
-  private async hydrate(
-    userProfileId: string,
-    rows: SearchMessageRow[],
-    contentFormat: SearchContentFormat,
-  ): Promise<SearchMessageRow[]> {
+  private async hydrate(userProfileId: string, hits: MappedHit[]): Promise<SearchMessageRow[]> {
     const limit = pLimit(SearchService.HYDRATION_CONCURRENCY);
+    const deadline = Date.now() + SearchService.HYDRATION_BUDGET_MS;
 
     return Promise.all(
-      rows.map((row) =>
+      hits.map(({ row, senderAddress }) =>
         limit(async () => {
-          try {
-            const message =
-              row.source === 'channel' && row.teamId && row.channelId
-                ? await this.chatService.getChannelMessageById(
-                    userProfileId,
-                    row.teamId,
-                    row.channelId,
-                    row.id,
-                  )
-                : row.source === 'chat' && row.chatId
-                  ? await this.chatService.getChatMessageById(userProfileId, row.chatId, row.id)
+          const { teamId, channelId, chatId } = row;
+          // A hit is fetched by the ids it carries: a message id, plus either
+          // both channel ids or a chat id. A hit missing any of those cannot be
+          // addressed in Graph at all, so no call is attempted for it.
+          const fetchMessage =
+            row.id === ''
+              ? null
+              : teamId !== null && channelId !== null
+                ? () =>
+                    this.chatService.getChannelMessageById(userProfileId, teamId, channelId, row.id)
+                : chatId !== null
+                  ? () => this.chatService.getChatMessageById(userProfileId, chatId, row.id)
                   : null;
 
-            if (!message) {
-              return row;
-            }
+          if (!fetchMessage) {
+            // Shape only — never ids, never content.
+            this.logger.debug(
+              {
+                userProfileId,
+                source: row.source,
+                hasMessageId: row.id !== '',
+                hasChatId: chatId !== null,
+                hasTeamId: teamId !== null,
+                hasChannelId: channelId !== null,
+              },
+              'Search hit is not addressable in Graph; returning it without content',
+            );
+            return withoutContent(row, senderAddress);
+          }
 
-            const content =
-              contentFormat === 'normalized'
-                ? normalizeContent(
-                    message.content,
-                    message.contentType,
-                    message.attachments,
-                    message.deletedDateTime,
-                  )
-                : message.content;
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) {
+            this.logger.warn(
+              { userProfileId, source: row.source },
+              'Hydration budget spent before this hit; returning it without content',
+            );
+            return withoutContent(row, senderAddress);
+          }
 
-            return { ...row, content };
+          try {
+            const message = await withDeadline(fetchMessage(), remaining);
+
+            const content = normalizeContent(
+              message.content,
+              message.contentType,
+              message.attachments,
+              message.deletedDateTime,
+            );
+
+            // Hydration only ever fills a gap, so a row reads the same whether
+            // or not its body could be fetched. `webUrl` is not merged at all:
+            // chatmessage-get returns null for chat messages and would blank the
+            // link the hit itself provided.
+            return {
+              ...row,
+              senderDisplayName:
+                row.senderDisplayName ?? message.senderDisplayName ?? senderAddress,
+              createdDateTime: row.createdDateTime ?? message.createdDateTime,
+              content,
+            };
           } catch (error) {
             // A single deleted/forbidden message must not fail the page; fall
-            // back to the summary-only row.
-            this.logger.debug(
+            // back to the summary-only row. Logged at warn: hydration is
+            // unconditional now, so a tenant that never granted admin consent
+            // for channel messages fails every channel hit, and that must be
+            // visible without turning on debug logging.
+            this.logger.warn(
               { userProfileId, messageId: row.id, source: row.source, error },
               'Failed to hydrate search hit; falling back to summary',
             );
-            return row;
+            return withoutContent(row, senderAddress);
           }
         }),
       ),

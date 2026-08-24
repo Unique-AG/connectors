@@ -271,7 +271,9 @@ Send a plain-text message to a channel, identified by `teamId` + `channelId`. Ca
 
 ### `search_messages`
 
-Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the [Microsoft Search API](https://learn.microsoft.com/en-us/graph/search-concept-overview) (`POST /search/query` on Graph **v1.0**). Supports identity and scope filters. Results are snippets by default; set `detail=full` to hydrate message bodies. At least one search criterion (`query`, `from`, `to`, `mentions`, `sentAfter`, `sentBefore`, `hasAttachment`, `isRead`, or `isMentioned`) must be provided.
+Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the [Microsoft Search API](https://learn.microsoft.com/en-us/graph/search-concept-overview) (`POST /search/query` on Graph **v1.0**). Supports filters on sender, recipient, mentions, date range, attachments, and read/mention state. Every addressable hit is fetched to fill in its message body, so a follow-up `get_chat_messages` or `get_channel_messages` call is normally unnecessary. At least one search criterion (`query`, `from`, `to`, `mentions`, `sentAfter`, `sentBefore`, `hasAttachment`, `isRead`, or `isMentioned`) must be provided.
+
+There is no way to scope a Graph search to chats or to channels, and the search projection carries no container type — so every hit is returned and each row reports the container it can prove. A hit is `channel` only when it carries **both** `channelIdentity.teamId` and `channelIdentity.channelId`, `chat` when it carries a `chatId`, and `unknown` otherwise. Filter client-side on that field if you only want one kind.
 
 **Input parameters:**
 
@@ -286,31 +288,28 @@ Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and ch
 | `hasAttachment` | boolean | No | — | Restrict to messages with (`true`) or without (`false`) attachments. |
 | `isRead` | boolean | No | — | Restrict to read (`true`) or unread (`false`) messages. |
 | `isMentioned` | boolean | No | — | Restrict to messages where the signed-in user is (`true`) or is not (`false`) mentioned. |
-| `source` | `chat` \| `channel` \| `all` | No | `all` | Filter results by container. Applied after the search, so a non-`all` value shrinks the returned page. |
-| `detail` | `summary` \| `full` | No | `summary` | `summary` returns the hit snippet only (1 Graph call). `full` hydrates each hit with its message body (one extra Graph call per hit). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | Only applies when `detail=full`. `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `offset` | integer (≥ 0) | No | `0` | Number of results to skip for pagination (maps to Graph `from`). |
-| `size` | integer (1–`GRAPH_PAGE_SIZE`) | No | `25` | Maximum number of results per page. |
+| `size` | integer (1–25) | No | `25` | Maximum number of results per page. Not a Graph limit — Microsoft caps a page at 25 for the `message` and `event` entities only, never for `chatMessage`. Every hit costs one extra Graph call, so the page size is also the size of that fan-out. |
 
-**Returns:** A `messages` array, `returnedCount` (rows on **this page**, after the `source` filter — not total corpus matches), and `moreResultsAvailable` (paginate with `offset` until this is `false`). Each hit has:
+**Returns:** A `messages` array, `returnedCount` (rows on **this page**, not total corpus matches — Graph reports `total` per page for Teams messages), and `moreResultsAvailable`. Paginate by advancing `offset` by `returnedCount`, and stop when `moreResultsAvailable` is `false` or `returnedCount` is `0`. Each hit has:
 
 | Field | Description |
 |-------|-------------|
 | `id` | Message id |
-| `source` | `chat` or `channel` (derived from the hit's resource shape) |
-| `chatId` | Chat id (present for chat hits, else `null`) |
-| `teamId` | Team id (present for channel hits, else `null`) |
-| `channelId` | Channel id (present for channel hits, else `null`) |
-| `senderDisplayName` | Sender name (nullable) |
-| `summary` | Search snippet (nullable) |
-| `content` | Hydrated message body — present only when `detail=full` and hydration succeeded |
+| `source` | `chat`, `channel`, or `unknown`. `channel` requires **both** `teamId` and `channelId` on the hit; `chat` requires a `chatId`; anything else is `unknown` and cannot be fetched |
+| `chatId` | Chat id (populated only for a `chat` hit, else `null`) |
+| `teamId` | Team id (populated only for a `channel` hit, else `null`) |
+| `channelId` | Channel id (populated only for a `channel` hit, else `null`) |
+| `senderDisplayName` | Sender name (nullable). Read from the hit's mailbox identity, which is what the search projection carries, then filled from the hydrated message when the hit named nobody, and as a last resort from the sender's bare email address — so this field can hold an address rather than a name |
+| `summary` | Search snippet, with Graph's hit-highlighting markup stripped (nullable) |
+| `content` | Hydrated message body, always normalized to readable plain text — a message with no text of its own reads as a placeholder (`[image]`, `[card]`, `[attachment: name]`), and a deleted message reads as `[deleted]` rather than being absent. Absent for an `unknown` hit, for a reply inside a channel thread, or when the fetch failed (forbidden, throttled, or otherwise). The row carries no reason code, so an absent `content` does not say which |
 | `createdDateTime` | Message timestamp (nullable) |
-| `webUrl` | Deep link to the message (nullable) |
+| `webUrl` | Link to the message (nullable). Graph's retrievable-property list names a Teams deep link (`webUrl`), but the search projection often carries an Outlook Web link (`webLink`) instead, and either may be returned here — do not label it "open in Teams" |
 
 Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messages` or `send_*_message`.
 
-!!! note "How `detail=full` hydration behaves"
-    Hydration issues one extra Graph call per hit (an N+1 fan-out), capped at 5 concurrent requests to stay throttle-friendly. If an individual hit is forbidden or deleted, that row falls back to summary-only (no `content`) rather than failing the whole page.
+!!! note "How hydration behaves"
+    The search projection of a `chatMessage` carries no body, and Graph offers no way to ask for one, so every hit is fetched individually: one extra Graph call per hit (an N+1 fan-out), capped at 3 concurrent requests. A hit is fetched by the ids it actually carries — a message id plus either both channel ids or a chat id — so an `unknown` hit costs no call at all. If an individual fetch fails, that row falls back to summary-only (no `content`) rather than failing the whole page, and the failure is logged at `warn`. Two consequences: a tenant without admin consent for `ChannelMessage.Read.All` gets bodyless channel rows, and a hit that is a **reply inside a channel thread** always gets a bodyless row — Graph addresses a reply under its parent post (`.../messages/{rootId}/replies/{id}`) and the search index does not name the parent, so the reply's own id cannot be fetched. Graph also throttles reads of a single chat or channel hard, so a page whose hits all come from one busy channel may lose bodies to throttling. Hydration as a whole is bounded at 15 seconds: past that budget the remaining hits come back without `content` rather than holding the response open, because the Graph client retries a `429` while honouring `Retry-After` and that can run into minutes.
 
 **Example:**
 
@@ -321,10 +320,11 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
       "id": "1718900000000",
       "source": "channel",
       "chatId": null,
-      "teamId": "19:abc...@thread.tacv2",
+      "teamId": "fbe2bf47-16c8-47cf-b4a5-4b9b187c508b",
       "channelId": "19:ch1...@thread.tacv2",
       "senderDisplayName": "Carol Lee",
-      "summary": "Deploy is <c0>green</c0>.",
+      "summary": "...Deploy is green",
+      "content": "Deploy is green. Rollout finished at 13:49.",
       "createdDateTime": "2024-06-20T13:50:00Z",
       "webUrl": "https://teams.microsoft.com/l/message/..."
     }

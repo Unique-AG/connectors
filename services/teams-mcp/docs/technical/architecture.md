@@ -117,11 +117,11 @@ The Chat Module (`src/chat/`) exposes a synchronous request/response tool surfac
 | `list_channels` | Lists channels in a given team by ID |
 | `get_channel_messages` | Fetches messages from a team channel by ID |
 | `send_channel_message` | Posts a plain-text message to a team channel by ID |
-| `search_messages` | Searches messages across chats, channels, or both |
+| `search_messages` | Searches messages across chats and channels in one query |
 
 **Targeting by id:** `list_*` tools return identifiers (chat id, team id, channel id) that are passed directly to the `get_*_messages` and `send_*_message` tools. See [Chat Flows](./flows.md#Chat-Flows) for sequence diagrams.
 
-**Search specifics (`SearchService`):** The Microsoft Search API does not use `@odata.nextLink`; pagination is driven by `offset`/`size` on the request body and `moreResultsAvailable` on the response. When `detail=full`, each matching hit is hydrated with its full message body via an additional Graph call (N+1). Hydration runs with a concurrency cap of 5 (via `pLimit`). A hit that returns 403 or 404 during hydration falls back to its summary-only row rather than failing the entire page.
+**Search specifics (`SearchService`):** The Microsoft Search API does not use `@odata.nextLink`; pagination is driven by `offset`/`size` on the request body and `moreResultsAvailable` on the response. Every hit that names a container and a message id is hydrated with its full message body via an additional Graph call (N+1) — the search projection carries no body and Graph offers no way to ask for one. A hit that names neither container (`source: unknown`) costs no call and comes back without `content`. Bodies are always normalized to readable text. Hydration runs with a concurrency cap of 3 (via `pLimit`), kept low because Graph throttles reads of a single chat or channel at roughly one request per second. Any hydration failure — 403, 404, a channel reply that is only addressable under its parent post, a 429, or a schema mismatch — falls back to a row without `content` rather than failing the entire page, and is logged at `warn`. The whole hydration pass is bounded at 15 seconds, so a throttled page degrades to bodyless rows instead of timing the caller out.
 
 ## Infrastructure
 

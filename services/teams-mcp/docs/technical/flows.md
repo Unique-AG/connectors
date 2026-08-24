@@ -192,7 +192,7 @@ sequenceDiagram
 
 ### Chat Search Flow
 
-`search_messages` queries the **Microsoft Search API** (`POST /search/query` on Graph v1.0) and optionally hydrates each hit with its full message body.
+`search_messages` queries the **Microsoft Search API** (`POST /search/query` on Graph v1.0) and hydrates every hit with its full message body.
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -202,26 +202,24 @@ sequenceDiagram
     participant TeamsMCP as Teams MCP Server
     participant MSGraph as Microsoft Graph API
 
-    MCPClient->>TeamsMCP: search_messages (query, source?, detail?, offset, size)
+    MCPClient->>TeamsMCP: search_messages (query, offset, size)
     TeamsMCP->>MSGraph: POST /search/query<br/>{ entityTypes: ['chatMessage'], from: offset, size: size }
     MSGraph->>TeamsMCP: hitsContainers[{ hits[], moreResultsAvailable }]
 
-    Note over TeamsMCP: Map hits to rows (source derived from resource shape:<br/>channelIdentity → channel, chatId → chat)
+    Note over TeamsMCP: Map hits to rows. Container is derived from the ids the hit<br/>carries: teamId AND channelId → channel, chatId → chat,<br/>neither → unknown (logged as a shape, never inferred)
 
-    opt source filter applied (chat | channel)
-        Note over TeamsMCP: Drop rows not matching the requested source<br/>(Graph has no server-side entityType sub-filter)
-    end
-
-    alt detail = full
-        Note over TeamsMCP: Hydrate each hit — one extra Graph call per hit (N+1),<br/>concurrency capped at 5 (pLimit)
-        loop For each hit (up to 5 in parallel)
-            alt hit.source = channel
-                TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
-            else hit.source = chat
-                TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
-            end
+    Note over TeamsMCP: Hydrate every hit — one extra Graph call per hit (N+1),<br/>concurrency capped at 3 (pLimit)
+    loop For each hit (up to 3 in parallel)
+        alt teamId and channelId present
+            TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
             MSGraph->>TeamsMCP: Full message (body, attachments, ...)
-            Note over TeamsMCP: On 403 / 404: fall back to summary-only row (no error)
+            Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
+        else chatId present
+            TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
+            MSGraph->>TeamsMCP: Full message (body, attachments, ...)
+            Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
+        else no addressable id
+            Note over TeamsMCP: Skip the call; return the row without content
         end
     end
 
@@ -230,9 +228,11 @@ sequenceDiagram
 
 **Key points:**
 
-- Pagination uses `offset`/`size` on the request body and `moreResultsAvailable` on the response — **not** `@odata.nextLink`. The caller advances the page by incrementing `offset` by `size`.
-- The source filter (`chat`/`channel`/`all`) is applied client-side after the Graph response, because the Search API's `entityTypes: ['chatMessage']` covers both containers with no sub-filter.
-- `detail=full` issues one additional Graph call per hit. Concurrency is capped at 5 to avoid Graph throttling. A forbidden or deleted hit falls back to its summary row rather than failing the page.
+- Pagination uses `offset`/`size` on the request body and `moreResultsAvailable` on the response — **not** `@odata.nextLink`. The caller advances `offset` by `returnedCount` and stops when `moreResultsAvailable` is `false` or `returnedCount` is `0`.
+- Every hit is returned. The Search API's `entityTypes: ['chatMessage']` covers chats and channels with no sub-filter, and the hit carries no container type, so scoping to one kind is the caller's job — each row reports the container it can prove.
+- Container classification uses only the two identifiers Microsoft documents on a `chatMessage`. A chat hit arrives with `channelIdentity: {}`, so the object's presence proves nothing: `channel` requires both `teamId` and `channelId`. A hit with neither shape is reported as `unknown` and logged as a key-presence shape (never ids) rather than guessed at.
+- Hydration is unconditional and issues one additional Graph call per addressable hit. Concurrency is capped at 3 to avoid Graph throttling, and the pass as a whole is bounded at 15 seconds. Any failed fetch falls back to a row without `content` rather than failing the page (logged at `warn`), so a tenant lacking admin consent for `ChannelMessage.Read.All` gets bodyless channel rows. A hit that is a reply inside a channel thread is also always bodyless: Graph addresses a reply under its parent post and the search index does not name the parent, so no id here can fetch it.
+- A search hit is an Exchange projection of the message: the sender arrives as a mailbox `emailAddress` and the link as an Outlook Web `webLink`, so both those spellings and the Teams-native ones (`from.user`, `webUrl`) are read. Hydration only ever fills a gap — it never overwrites a field the hit provided.
 - See [Tools Reference](./tools.md) for the full `search_messages` parameter list.
 
 ### Chat Send Flow

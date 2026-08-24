@@ -156,7 +156,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Read message content from Teams channels |
-| **Used For** | `get_channel_messages` tool to retrieve channel message history; `search_messages` tool to hydrate channel hits when `detail=full` |
+| **Used For** | `get_channel_messages` tool to retrieve channel message history; `search_messages` tool to hydrate channel hits (hydration is unconditional) |
 | **Why Not Less** | `Channel.ReadBasic.All` only covers listing channels, not reading message content |
 | **Why Not `ChannelMessage.ReadWrite`** | We do not modify or delete channel messages |
 | **Admin Consent** | Required because channel messages may contain sensitive organisational content |

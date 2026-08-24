@@ -195,7 +195,7 @@ These tools operate under the same delegated-OAuth and token-isolation model as 
 
 ## Channel Message Admin Consent
 
-Reading channel message content (`get_channel_messages`, `search_messages` with `detail=full`) requires the `ChannelMessage.Read.All` permission, which **requires admin consent** because channel messages may contain sensitive organisational content. Without admin consent for this permission, the send and list tools remain fully functional.
+Reading channel message content (`get_channel_messages`, and `search_messages` whenever a hit is a channel message) requires the `ChannelMessage.Read.All` permission, which **requires admin consent** because channel messages may contain sensitive organisational content. Without admin consent for this permission, the send and list tools remain fully functional.
 
 See [Permissions](./permissions.md) for the full consent breakdown and the distinction between user-consentable and admin-consent-required scopes.
 
