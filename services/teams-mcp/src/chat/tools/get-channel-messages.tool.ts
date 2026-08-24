@@ -4,11 +4,10 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
-import { MsChatMessage } from '../chat.dtos';
+import { MessageOutputSchema } from '../chat.dtos';
 import { ChatService } from '../chat.service';
-import { normalizeContent } from '../utils/normalize-content';
 
-const GetChannelMessagesInputSchema = z.object({
+export const GetChannelMessagesInputSchema = z.object({
   teamId: z.string().describe('Exact team id from list_teams. Use list_teams to find it.'),
   channelId: z
     .string()
@@ -22,44 +21,18 @@ const GetChannelMessagesInputSchema = z.object({
     .max(50)
     .default(20)
     .describe('Maximum number of messages to return (newest first)'),
-  contentFormat: z
-    .enum(['normalized', 'raw'])
-    .default('normalized')
-    .describe(
-      'normalized converts HTML to readable text with @mentions and [attachment: name] placeholders. raw returns Teams HTML verbatim. Default: normalized',
-    ),
   includeSystemMessages: z
     .boolean()
     .default(false)
     .describe(
       'System messages are event notifications (member added, call ended). Default false excludes them',
     ),
-  timestampFormat: z
-    .enum(['full', 'short', 'none'])
-    .default('short')
-    .describe(
-      'full = ISO 8601 with ms, short = YYYY-MM-DD HH:mm, none = omit timestamps. Default: short',
-    ),
-  detail: z
-    .enum(['standard', 'full'])
-    .default('standard')
-    .describe(
-      'standard returns sender, content, and timestamp. full adds contentType (source format from Graph). Default: standard',
-    ),
 });
 
 const GetChannelMessagesOutputSchema = z.object({
   teamId: z.string(),
   channelId: z.string(),
-  messages: z.array(
-    z.object({
-      id: z.string(),
-      createdDateTime: z.string().optional(),
-      senderDisplayName: z.string().nullable(),
-      content: z.string(),
-      contentType: z.string().optional(),
-    }),
-  ),
+  messages: z.array(MessageOutputSchema),
 });
 
 @Injectable()
@@ -75,7 +48,11 @@ export class GetChannelMessagesTool {
     name: 'get_channel_messages',
     title: 'Get Channel Messages',
     description:
-      'Retrieves recent messages from a Microsoft Teams channel, identified by teamId + channelId. Call list_teams then list_channels (with that teamId) first to find the ids.',
+      'Read the most recent posts in a Microsoft Teams channel. Take the teamId from list_teams and the channelId from list_channels. ' +
+      'Returns root posts only — replies inside a thread are NOT included. ' +
+      'Each post comes with its body, sender, timestamps, mentions, attachments and reactions. ' +
+      'Message bodies are Teams HTML. ' +
+      'Set includeSystemMessages to true to also see event notices, such as a member joining.',
     parameters: GetChannelMessagesInputSchema,
     outputSchema: GetChannelMessagesOutputSchema,
     annotations: {
@@ -122,36 +99,7 @@ export class GetChannelMessagesTool {
     return {
       teamId: input.teamId,
       channelId: input.channelId,
-      messages: messages.map((m) => this.mapMessage(m, input)),
+      messages,
     };
-  }
-
-  private mapMessage(
-    m: MsChatMessage,
-    input: z.infer<typeof GetChannelMessagesInputSchema>,
-  ): z.output<typeof GetChannelMessagesOutputSchema>['messages'][number] {
-    const content =
-      input.contentFormat === 'normalized'
-        ? normalizeContent(m.content, m.contentType, m.attachments, m.deletedDateTime)
-        : m.content;
-
-    const msg: z.output<typeof GetChannelMessagesOutputSchema>['messages'][number] = {
-      id: m.id,
-      senderDisplayName: m.senderDisplayName ?? null,
-      content,
-    };
-
-    if (input.timestampFormat !== 'none') {
-      msg.createdDateTime =
-        input.timestampFormat === 'full'
-          ? m.createdDateTime
-          : m.createdDateTime.replace('T', ' ').slice(0, 16);
-    }
-
-    if (input.detail === 'full') {
-      msg.contentType = m.contentType;
-    }
-
-    return msg;
   }
 }

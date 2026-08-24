@@ -15,7 +15,7 @@ const ListChatsInputSchema = z.object({
     .max(GRAPH_CHATS_PAGE_LIMIT)
     .default(GRAPH_CHATS_PAGE_LIMIT)
     .describe(
-      `Page size: how many chats to return, 1-${GRAPH_CHATS_PAGE_LIMIT}. Default: ${GRAPH_CHATS_PAGE_LIMIT}, which is the most Graph serves in one response.`,
+      `Chats to return in one page, 1-${GRAPH_CHATS_PAGE_LIMIT}. Default: ${GRAPH_CHATS_PAGE_LIMIT}.`,
     ),
   includeMemberEmails: z
     .boolean()
@@ -58,10 +58,11 @@ export class ListChatsTool {
     name: 'list_chats',
     title: 'List My Chats',
     description:
-      "List the signed-in user's Teams chats: 1:1, group and meeting chats, most recent first. " +
-      'Each chat carries its chatId, createdDateTime and lastMessageAt, which tell apart chats that share a topic or a member. ' +
-      'Returns one page of at most 25 chats, which is all Graph serves in one response because this call expands the members of each chat. ' +
-      'Pass a chatId to get_chat_messages or send_chat_message. A chatId targets one chat exactly, so prefer it over a topic or member name.',
+      "List the user's Microsoft Teams chats, most recent first, across 1:1, group and meeting chats. " +
+      'Each chat comes with its chatId, its type, and the time of its last message. ' +
+      'Those tell apart chats that share a topic or a member. ' +
+      'Returns one page of up to 25. ' +
+      'Pass a chatId to get_chat_messages or send_chat_message. A chatId names one chat exactly, so prefer it over a topic or a member name.',
     parameters: ListChatsInputSchema,
     outputSchema: ListChatsOutputSchema,
     annotations: {

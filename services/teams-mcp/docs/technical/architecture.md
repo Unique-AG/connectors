@@ -117,11 +117,15 @@ The Chat Module (`src/chat/`) exposes a synchronous request/response tool surfac
 | `list_channels` | Lists channels in a given team by ID |
 | `get_channel_messages` | Fetches messages from a team channel by ID |
 | `send_channel_message` | Posts a plain-text message to a team channel by ID |
-| `search_messages` | Searches messages across chats, channels, or both |
+| `search_messages` | Searches messages across chats and channels in one query |
 
 **Targeting by id:** `list_*` tools return identifiers (chat id, team id, channel id) that are passed directly to the `get_*_messages` and `send_*_message` tools. See [Chat Flows](./flows.md#Chat-Flows) for sequence diagrams.
 
-**Search specifics (`SearchService`):** The Microsoft Search API does not use `@odata.nextLink`; pagination is driven by `offset`/`size` on the request body and `moreResultsAvailable` on the response. When `detail=full`, each matching hit is hydrated with its full message body via an additional Graph call (N+1). Hydration runs with a concurrency cap of 5 (via `pLimit`). A hit that returns 403 or 404 during hydration falls back to its summary-only row rather than failing the entire page.
+**Search specifics (`SearchService`):** The Microsoft Search API does not use `@odata.nextLink`. It pages by `offset` and `size` on the request, and reports `moreResultsAvailable` on the response.
+
+A search hit carries no message body, so every hit that names a container and a message id is fetched separately. A hit naming neither container (`source: unknown`) costs no call and returns without `message`. Bodies are passed through as Graph sends them, with the structured metadata alongside.
+
+At most 3 fetches run at once (`pLimit`), because Graph throttles reads of one chat or channel at about one request per second. Any failure — 403, 404, 429, a channel reply that is only addressable under its parent post, or a schema mismatch — drops `content` for that row and logs at `warn`. The page still returns. The whole pass stops after 15 seconds, so a throttled page returns bodyless rows instead of timing the caller out.
 
 ## Infrastructure
 
