@@ -85,4 +85,23 @@ describe(classifyCalendar.name, () => {
       accessPath: 'ownMailbox',
     });
   });
+
+  it('forces ownerMailbox when listing from the owner mailbox path', () => {
+    const result = classifyCalendar(
+      calendar({
+        id: 'cal-owner',
+        name: 'Calendar',
+        isDefaultCalendar: true,
+        owner: { address: 'banker@example.com', name: 'Banker' },
+      }),
+      CALLER,
+      'ownerMailbox',
+    );
+
+    expect(result).toMatchObject({
+      isOwn: false,
+      accessPath: 'ownerMailbox',
+      ownerEmail: 'banker@example.com',
+    });
+  });
 });

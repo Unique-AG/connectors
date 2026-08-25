@@ -3,7 +3,7 @@ import { CALENDAR_TOOL_FORMAT_INFORMATION } from './calendar-tool-format';
 
 export const META = createMeta({
   icon: 'calendar',
-  systemPrompt: `Lists Outlook calendars the signed-in user can access: their own calendars plus shared and delegated calendars.
+  systemPrompt: `Lists Outlook calendars the signed-in user can access: their own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to.
 
 Use this when the user asks which calendars they have, who a calendar belongs to, or whether they can edit a calendar. calendarId and accessPath are internal — never display them.
 

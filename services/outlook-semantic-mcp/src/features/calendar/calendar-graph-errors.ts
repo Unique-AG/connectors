@@ -9,19 +9,6 @@ export class CalendarConsentRequiredError extends Error {
   }
 }
 
-export function isInsufficientCalendarScopeError(error: unknown): boolean {
-  if (!(error instanceof GraphError)) {
-    return false;
-  }
-  if (error.statusCode !== 401 && error.statusCode !== 403) {
-    return false;
-  }
-  const code = (error.code ?? '').toLowerCase();
-  const message = (error.message ?? '').toLowerCase();
-  return (
-    code.includes('accessdenied') ||
-    code.includes('authorization_requestdenied') ||
-    message.includes('scope') ||
-    message.includes('consent')
-  );
+export function isCalendarPermissionDeniedError(error: unknown): boolean {
+  return error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403);
 }

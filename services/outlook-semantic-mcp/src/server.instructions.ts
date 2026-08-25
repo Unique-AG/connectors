@@ -18,7 +18,7 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 
 const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar
-- Use \`list_calendars\` to see the user's own calendars and any shared or delegated calendars.
+- Use \`list_calendars\` to see the user's own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to.
 - \`calendarId\` and \`accessPath\` are internal identifiers. Never show them to the user.
 `;
 

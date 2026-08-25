@@ -24,7 +24,9 @@ function createQuery(opts: {
   source?: 'oauth' | 'shared-mailbox';
   email?: string;
   get?: ReturnType<typeof vi.fn>;
+  responsesByPath?: Record<string, unknown | Error>;
   resolverRun?: ReturnType<typeof vi.fn>;
+  fullAccessOwners?: string[];
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
   const request = {
@@ -32,7 +34,21 @@ function createQuery(opts: {
     top: vi.fn().mockReturnThis(),
     get,
   };
-  const api = vi.fn().mockReturnValue(request);
+  const api =
+    opts.responsesByPath === undefined
+      ? vi.fn().mockReturnValue(request)
+      : vi.fn().mockImplementation((path: string) => {
+          const response = opts.responsesByPath?.[path];
+          const pathGet =
+            response instanceof Error
+              ? vi.fn().mockRejectedValue(response)
+              : vi.fn().mockResolvedValue(response ?? { value: [] });
+          return {
+            select: vi.fn().mockReturnThis(),
+            top: vi.fn().mockReturnThis(),
+            get: pathGet,
+          };
+        });
   const resolverRun =
     opts.resolverRun ??
     vi
@@ -40,6 +56,9 @@ function createQuery(opts: {
       .mockImplementation(async ({ fn }) =>
         fn({ client: { api }, clientUserProfileId: 'client-1' }),
       );
+  const getFullDelegatedAccess = vi
+    .fn()
+    .mockResolvedValue((opts.fullAccessOwners ?? []).map((ownerUserEmail) => ({ ownerUserEmail })));
 
   const query = new ListCalendarsQuery(
     { run: resolverRun } as never,
@@ -50,14 +69,15 @@ function createQuery(opts: {
         source: opts.source ?? 'oauth',
       }),
     } as never,
+    { run: getFullDelegatedAccess } as never,
   );
 
-  return { query, api, request, resolverRun };
+  return { query, api, request, resolverRun, getFullDelegatedAccess };
 }
 
 describe(ListCalendarsQuery.name, () => {
   it('GETs /me/calendars and classifies own, delegated-primary, and shared-custom calendars', async () => {
-    const { query, api, request } = createQuery({
+    const { query, api, request, getFullDelegatedAccess } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
           {
@@ -95,6 +115,7 @@ describe(ListCalendarsQuery.name, () => {
 
     expect(api).toHaveBeenCalledWith('/me/calendars');
     expect(request.select).toHaveBeenCalledWith(CALENDAR_SELECT);
+    expect(getFullDelegatedAccess).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
       expect.objectContaining({ calendarId: 'cal-own', isOwn: true, accessPath: 'ownMailbox' }),
@@ -113,8 +134,85 @@ describe(ListCalendarsQuery.name, () => {
     ]);
   });
 
+  it('unions Full Access owner calendars from /users/{owner}/calendars', async () => {
+    const { query, api } = createQuery({
+      fullAccessOwners: [OWNER_EMAIL],
+      responsesByPath: {
+        '/me/calendars': {
+          value: [
+            {
+              id: 'cal-own',
+              name: 'Calendar',
+              owner: { address: OWN_EMAIL, name: 'Me' },
+            },
+            {
+              id: 'cal-local-copy',
+              name: 'Banker',
+              owner: { address: OWNER_EMAIL, name: 'Banker' },
+            },
+          ],
+        },
+        [`/users/${OWNER_EMAIL}/calendars`]: {
+          value: [
+            {
+              id: 'cal-owner-primary',
+              name: 'Calendar',
+              isDefaultCalendar: true,
+              canEdit: true,
+              owner: { address: OWNER_EMAIL, name: 'Banker' },
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(api).toHaveBeenCalledWith('/me/calendars');
+    expect(api).toHaveBeenCalledWith(`/users/${OWNER_EMAIL}/calendars`);
+    expect(result.success).toBe(true);
+    expect(result.calendars).toEqual([
+      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, accessPath: 'ownMailbox' }),
+      expect.objectContaining({
+        calendarId: 'cal-owner-primary',
+        isOwn: false,
+        accessPath: 'ownerMailbox',
+        ownerEmail: OWNER_EMAIL,
+      }),
+    ]);
+    expect(result.calendars?.map((calendar) => calendar.calendarId)).not.toContain(
+      'cal-local-copy',
+    );
+  });
+
+  it('keeps /me calendars when a Full Access mailbox returns 403', async () => {
+    const { query } = createQuery({
+      fullAccessOwners: [OWNER_EMAIL],
+      responsesByPath: {
+        '/me/calendars': {
+          value: [
+            {
+              id: 'cal-local-copy',
+              name: 'Banker',
+              owner: { address: OWNER_EMAIL, name: 'Banker' },
+            },
+          ],
+        },
+        [`/users/${OWNER_EMAIL}/calendars`]: makeGraphError(403, 'ErrorAccessDenied'),
+      },
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(result.success).toBe(true);
+    expect(result.consentRequired).toBeUndefined();
+    expect(result.calendars).toEqual([
+      expect.objectContaining({ calendarId: 'cal-local-copy', ownerEmail: OWNER_EMAIL }),
+    ]);
+  });
+
   it('GETs /users/{email}/calendars for a shared-mailbox profile', async () => {
-    const { query, api, resolverRun } = createQuery({
+    const { query, api, resolverRun, getFullDelegatedAccess } = createQuery({
       source: 'shared-mailbox',
       email: SHARED_EMAIL,
       get: vi.fn().mockResolvedValue({
@@ -137,13 +235,14 @@ describe(ListCalendarsQuery.name, () => {
       }),
     );
     expect(api).toHaveBeenCalledWith(`/users/${SHARED_EMAIL}/calendars`);
+    expect(getFullDelegatedAccess).not.toHaveBeenCalled();
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
       expect.objectContaining({ calendarId: 'cal-shared', isOwn: true, accessPath: 'ownMailbox' }),
     ]);
   });
 
-  it('returns consentRequired when Graph denies calendar scopes', async () => {
+  it('returns consentRequired when Graph denies calendar scopes on /me/calendars', async () => {
     const { query } = createQuery({
       get: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
     });

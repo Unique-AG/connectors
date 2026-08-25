@@ -22,6 +22,15 @@
       "source": "https://learn.microsoft.com/en-us/graph/api/resources/calendar?view=graph-rest-1.0"
     },
     {
+      "question": "Does mailbox FullAccess appear in GET /me/calendars without an accepted calendar share?",
+      "status": "unconfirmed",
+      "conclusion": "Microsoft docs for GET /me/calendars describe local copies from accepted calendar-sharing invitations, not Exchange mailbox FullAccess. Mailbox FullAccess is a different grant (delegated_access_accounts). Until probed live, list_calendars unions /me/calendars with GET /users/{owner}/calendars for each FullAccess owner. Folder-level mail shares are not used.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars",
+        "https://learn.microsoft.com/en-us/graph/outlook-share-or-delegate-calendar"
+      ]
+    },
+    {
       "question": "getSchedule address cap",
       "status": "confirmed-by-docs",
       "conclusion": "Maximum 20 entities per getSchedule call (users, DLs, or resources). Time window must be less than 62 days. Error 5006 when a slot contains more than 1000 entries.",

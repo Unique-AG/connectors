@@ -538,6 +538,8 @@ Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`,
 
 Existing connected users must reconnect Outlook after this is turned on, unless an Entra admin has already granted the extra scope tenant-wide. Without that, token refresh can fail with `invalid_grant` and mail tools stop working.
 
+Calendars of mailboxes the user has Exchange Full Access to are listed when delegated-access scanning has discovered those owners. Calendar-only shares always come from Graph `/me/calendars`.
+
 #### DELEGATED_ACCESS_SCAN
 
 For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Setup](../technical/features.md#Setup).
