@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.4...teams-mcp@0.4.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **teams-mcp:** fix the four reported message tool bugs and align the tools ([#838](https://github.com/Unique-AG/connectors/issues/838)) ([12c5e34](https://github.com/Unique-AG/connectors/commit/12c5e34a97700679f73b1fb62caa2e9db5dfb9f9))
+
 ## [0.4.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.3...teams-mcp@0.4.4) (2026-08-21)
 
 
