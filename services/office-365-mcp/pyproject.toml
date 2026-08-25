@@ -1,7 +1,7 @@
 [project]
 name = "office-365-mcp"
 version = "0.0.0"
-description = "Microsoft 365 (Office) FastMCP server"
+description = "Office 365 FastMCP server"
 requires-python = ">=3.12"
 dependencies = [
     # The `azure` extra (azure-identity, pyjwt) is what FastMCP's On-Behalf-Of exchange needs —
