@@ -14,16 +14,12 @@ export const MAIL_SCOPES = [
   'Mail.ReadWrite',
   'Mail.ReadWrite.Shared',
   'People.Read',
-];
+] as const;
 
-export const CALENDAR_SCOPES = ['Calendars.ReadWrite.Shared'];
-
-export function resolveMicrosoftScopes(calendarEnabled: boolean): string[] {
-  return calendarEnabled ? [...MAIL_SCOPES, ...CALENDAR_SCOPES] : [...MAIL_SCOPES];
-}
+export const CALENDAR_SCOPES = ['Calendars.ReadWrite.Shared'] as const;
 
 export function getScopes(): string[] {
-  return resolveMicrosoftScopes(isCalendarEnabled());
+  return isCalendarEnabled() ? [...MAIL_SCOPES, ...CALENDAR_SCOPES] : [...MAIL_SCOPES];
 }
 
 interface OAuth2WithSetAgent {
@@ -35,6 +31,7 @@ export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderC
     public constructor(...args: ConstructorParameters<typeof MicrosoftStrategy>) {
       super(...args);
       if (agent) {
+        // _oauth2 is assigned in passport-oauth2 constructor; setAgent covers token + profile
         (this as unknown as { _oauth2: OAuth2WithSetAgent })._oauth2.setAgent(agent);
       }
     }
@@ -45,7 +42,7 @@ export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderC
     strategy: MicrosoftStrategyWithProxy,
     strategyOptions: ({ serverUrl, clientId, clientSecret, callbackPath }) => ({
       clientID: clientId,
-      clientSecret: clientSecret,
+      clientSecret,
       callbackURL: serverUrl + callbackPath,
       scope: getScopes(),
     }),
