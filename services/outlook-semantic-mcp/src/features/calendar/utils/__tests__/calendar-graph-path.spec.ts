@@ -4,6 +4,7 @@ import {
   calendarCollectionPath,
   calendarMailbox,
   calendarViewPath,
+  eventResponsePath,
   findMeetingTimesPath,
   getSchedulePath,
 } from '../calendar-graph-path';
@@ -66,5 +67,40 @@ describe(getSchedulePath.name, () => {
 describe(findMeetingTimesPath.name, () => {
   it('posts findMeetingTimes on /users/{email}', () => {
     expect(findMeetingTimesPath('me@example.com')).toBe('/users/me@example.com/findMeetingTimes');
+  });
+});
+
+describe(eventResponsePath.name, () => {
+  it('posts the response on /users/{email}/calendars/{id}/events/{id}/{action}', () => {
+    expect(
+      eventResponsePath({
+        mailboxEmail: 'me@example.com',
+        calendarId: 'cal-1',
+        eventId: 'evt-1',
+        response: 'accept',
+      }),
+    ).toBe('/users/me@example.com/calendars/cal-1/events/evt-1/accept');
+  });
+
+  it('leaves Graph ids unchanged, matching calendarViewPath', () => {
+    expect(
+      eventResponsePath({
+        mailboxEmail: 'me@example.com',
+        calendarId: 'cal/a',
+        eventId: 'evt/b',
+        response: 'decline',
+      }),
+    ).toBe('/users/me@example.com/calendars/cal/a/events/evt/b/decline');
+  });
+
+  it('rejects a mailbox that is not an SMTP address', () => {
+    expect(() =>
+      eventResponsePath({
+        mailboxEmail: 'evil/calendar',
+        calendarId: 'cal-1',
+        eventId: 'evt-1',
+        response: 'accept',
+      }),
+    ).toThrow(/SMTP/i);
   });
 });

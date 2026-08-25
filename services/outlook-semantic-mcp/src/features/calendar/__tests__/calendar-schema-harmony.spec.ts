@@ -7,6 +7,8 @@ import {
 import { META as CHECK_AVAILABILITY_META } from '../check-availability-tool.meta';
 import { ListCalendarsInputSchema, ListCalendarsOutputSchema } from '../list-calendars.tool';
 import { META as LIST_CALENDARS_META } from '../list-calendars-tool.meta';
+import { RespondToInviteInputSchema, RespondToInviteOutputSchema } from '../respond-to-invite.tool';
+import { META as RESPOND_TO_INVITE_META } from '../respond-to-invite-tool.meta';
 import {
   SearchCalendarEventsInputSchema,
   SearchCalendarEventsOutputSchema,
@@ -53,6 +55,12 @@ const CALENDAR_TOOLS = [
     meta: SUGGEST_MEETING_TIMES_META,
     input: SuggestMeetingTimesInputSchema,
     output: SuggestMeetingTimesOutputSchema,
+  },
+  {
+    name: 'respond_to_invite',
+    meta: RESPOND_TO_INVITE_META,
+    input: RespondToInviteInputSchema,
+    output: RespondToInviteOutputSchema,
   },
 ] as const;
 

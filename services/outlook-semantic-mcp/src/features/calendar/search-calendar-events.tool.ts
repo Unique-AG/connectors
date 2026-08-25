@@ -7,6 +7,7 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { DateRangeSchema } from '~/utils/relative-range';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
+import { EventRefSchema } from './utils/event-ref.schema';
 
 const FiltersSchema = z.object({
   mailbox: z
@@ -39,23 +40,6 @@ export const SearchCalendarEventsInputSchema = FiltersSchema.extend({
   dateRange: DateRangeSchema.describe(
     'Time window to search. Prefer rangeType relative with a documented range.',
   ),
-});
-
-const AccessPathSchema = z
-  .enum(['ownMailbox', 'ownerMailbox'])
-  .describe('Internal Graph ID namespace. Never display this to the user.');
-
-const EventRefSchema = z.object({
-  eventId: z.string().describe('Internal Microsoft Graph event ID. Never display to the user.'),
-  calendarId: z
-    .string()
-    .describe('Internal Microsoft Graph calendar ID. Never display to the user.'),
-  accessPath: AccessPathSchema,
-  mailbox: z
-    .string()
-    .describe(
-      'SMTP address of the mailbox whose ID namespace this event belongs to. Never reconstruct eventRef; never display it.',
-    ),
 });
 
 const AttendeeSchema = z.object({

@@ -5,6 +5,7 @@ import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { ListCalendarsQuery } from './list-calendars.query';
+import { RespondToInviteQuery } from './respond-to-invite.query';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { SuggestMeetingTimesQuery } from './suggest-meeting-times.query';
 
@@ -13,6 +14,7 @@ const QUERIES = [
   SearchCalendarEventsQuery,
   CheckAvailabilityQuery,
   SuggestMeetingTimesQuery,
+  RespondToInviteQuery,
 ];
 
 @Module({

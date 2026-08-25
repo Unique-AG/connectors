@@ -3,6 +3,7 @@ import { registerBackendModule } from '../backend.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { CheckAvailabilityTool } from '../calendar/check-availability.tool';
 import { ListCalendarsTool } from '../calendar/list-calendars.tool';
+import { RespondToInviteTool } from '../calendar/respond-to-invite.tool';
 import { SearchCalendarEventsTool } from '../calendar/search-calendar-events.tool';
 import { SuggestMeetingTimesTool } from '../calendar/suggest-meeting-times.tool';
 
@@ -26,6 +27,7 @@ describe(registerBackendModule.name, () => {
     expect(module.providers).not.toContain(SearchCalendarEventsTool);
     expect(module.providers).not.toContain(CheckAvailabilityTool);
     expect(module.providers).not.toContain(SuggestMeetingTimesTool);
+    expect(module.providers).not.toContain(RespondToInviteTool);
   });
 
   it('registers calendar tools when CALENDAR_INTEGRATION is enabled', () => {
@@ -37,5 +39,6 @@ describe(registerBackendModule.name, () => {
     expect(module.providers).toContain(SearchCalendarEventsTool);
     expect(module.providers).toContain(CheckAvailabilityTool);
     expect(module.providers).toContain(SuggestMeetingTimesTool);
+    expect(module.providers).toContain(RespondToInviteTool);
   });
 });
