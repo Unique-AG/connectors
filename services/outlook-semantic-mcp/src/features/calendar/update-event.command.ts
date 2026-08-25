@@ -1,19 +1,24 @@
 import assert from 'node:assert';
-import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
+import {
+  type CalendarMetricErrorType,
+  CalendarMetricsService,
+} from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import type { EventRef } from './calendar.schemas';
-import {
-  CalendarConsentRequiredError,
-  isCalendarPermissionDeniedError,
-} from './utils/calendar-graph-errors';
 import { eventPath } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  classifyCalendarGraphError,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
@@ -64,12 +69,37 @@ export class UpdateEventCommand {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
+    private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
     input: UpdateEventCommandInput,
+  ): Promise<UpdateEventCommandOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.eventRef.mailbox,
+      calendarId: input.eventRef.calendarId,
+      msg: 'update_event started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox: input.eventRef.mailbox,
+      calendarId: input.eventRef.calendarId,
+      operation: 'update_event',
+    });
+    return this.calendarMetrics.measureOperation({ operation: 'update_event' }, (fail) =>
+      this.update(userProfileId, userProfileIdString, input, fail),
+    );
+  }
+
+  private async update(
+    userProfileId: UserProfileTypeID,
+    userProfileIdString: string,
+    input: UpdateEventCommandInput,
+    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<UpdateEventCommandOutput> {
     assert.ok(
       SmtpAddressSchema.safeParse(input.eventRef.mailbox).success,
@@ -121,7 +151,12 @@ export class UpdateEventCommand {
           ...(endTime !== undefined ? { end: endTime } : {}),
         });
       const updated = UpdatedEventSchema.parse(raw);
-      this.logger.log({ msg: 'update_event', mailbox, calendarId: input.eventRef.calendarId });
+      this.logger.log({
+        userProfileId: userProfileIdString,
+        mailbox,
+        calendarId: input.eventRef.calendarId,
+        msg: 'update_event',
+      });
       return {
         success: true,
         message: input.notifyAttendees
@@ -147,12 +182,32 @@ export class UpdateEventCommand {
         webLink: updated.webLink ?? null,
       };
     } catch (error) {
-      return mapWriteError({
+      const recovered = classifyCalendarGraphError({
         error,
         mailbox,
         callerEmail: userProfile.email,
-        deniedDelegated: `Could not update an event on mailbox ${mailbox}.`,
+        notFoundMessage:
+          'That event was not found. Search again and pass eventRef without changing it.',
+        invalidMessage: 'Graph rejected the update. Check the times and fields and try again.',
+        deniedDelegatedMessage: `Could not update an event on mailbox ${mailbox}.`,
       });
+      if (recovered === undefined) {
+        throw error;
+      }
+      fail(recovered.outcome);
+      logCalendarRecovered(this.logger, {
+        userProfileId: userProfileIdString,
+        mailbox,
+        calendarId: input.eventRef.calendarId,
+        outcome: recovered.outcome,
+        msg: `update_event ${recovered.outcome}`,
+        err: error,
+      });
+      return {
+        success: false,
+        message: recovered.message,
+        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+      };
     }
   }
 }
@@ -206,35 +261,4 @@ function uniqueAttendees(attendees: string[]): string[] {
     result.push(trimmed);
   }
   return result;
-}
-
-function mapWriteError(input: {
-  error: unknown;
-  mailbox: string;
-  callerEmail: string;
-  deniedDelegated: string;
-}): UpdateEventCommandOutput {
-  if (input.error instanceof GraphError && input.error.statusCode === 404) {
-    return {
-      success: false,
-      message: 'That event was not found. Search again and pass eventRef without changing it.',
-    };
-  }
-  if (input.error instanceof GraphError && input.error.statusCode === 400) {
-    return {
-      success: false,
-      message: 'Graph rejected the update. Check the times and fields and try again.',
-    };
-  }
-  if (isCalendarPermissionDeniedError(input.error)) {
-    if (input.mailbox.toLowerCase() === input.callerEmail.toLowerCase()) {
-      return {
-        success: false,
-        message: new CalendarConsentRequiredError().message,
-        consentRequired: true,
-      };
-    }
-    return { success: false, message: input.deniedDelegated };
-  }
-  throw input.error;
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
 import { GetMailboxTimezoneQuery } from './get-mailbox-timezone.query';
@@ -13,6 +13,8 @@ export interface ResolvedMailboxTimezone {
 
 @Injectable()
 export class ResolveMailboxTimezoneQuery {
+  private readonly logger = new Logger(ResolveMailboxTimezoneQuery.name);
+
   public constructor(private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery) {}
 
   public async run(userProfileId: UserProfileTypeID): Promise<ResolvedMailboxTimezone> {
@@ -27,6 +29,11 @@ export class ResolveMailboxTimezoneQuery {
       };
     }
     if (mappedIana === undefined) {
+      this.logger.warn({
+        userProfileId: userProfileId.toString(),
+        mailboxTimeZone,
+        msg: 'Mailbox timezone could not be mapped to IANA; falling back to UTC',
+      });
       return {
         ianaTimeZone: UTC,
         outlookTimeZone: UTC,

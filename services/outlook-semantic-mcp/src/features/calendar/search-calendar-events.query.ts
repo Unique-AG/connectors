@@ -18,6 +18,11 @@ import { CalendarRef, GraphEventCollectionSchema } from './calendar.schemas';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { calendarGraphLimit } from './utils/calendar-graph-limit';
 import { calendarMailbox, calendarViewPath } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
 import { dateWindowFromSearchInput } from './utils/date-window-bucket';
 import {
   type CalendarEvent,
@@ -68,6 +73,21 @@ export class SearchCalendarEventsQuery {
     userProfileId: UserProfileTypeID,
     input: SearchCalendarEventsQueryInput,
   ): Promise<SearchCalendarEventsQueryOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      hasAttendeeFilter: input.attendee !== undefined,
+      hasSubjectFilter: input.subject !== undefined,
+      hasCategoryFilter: input.category !== undefined,
+      range: input.range,
+      msg: 'search_calendar_events started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      operation: 'search_calendar_events',
+    });
     return this.calendarMetrics.measureSearch(
       {
         dateWindow: dateWindowFromSearchInput(input),
@@ -75,16 +95,21 @@ export class SearchCalendarEventsQuery {
         hasSubjectFilter: input.subject !== undefined,
         hasCategoryFilter: input.category !== undefined,
       },
-      () => this.search(userProfileId, input),
+      () => this.search(userProfileId, userProfileIdString, input),
     );
   }
 
   private async search(
     userProfileId: UserProfileTypeID,
+    userProfileIdString: string,
     input: SearchCalendarEventsQueryInput,
   ): Promise<SearchCalendarEventsQueryOutput> {
     const listed = await this.listCalendarsQuery.run(userProfileId);
     if (!listed.success) {
+      this.logger.debug({
+        userProfileId: userProfileIdString,
+        msg: 'search_calendar_events list_calendars failed',
+      });
       return {
         success: false,
         message: listed.message,
@@ -110,8 +135,22 @@ export class SearchCalendarEventsQuery {
       endDateTime: input.endDateTime,
       now: clock,
     });
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      ianaTimeZone,
+      outlookTimeZone,
+      interpretation: resolvedWindow.interpretation,
+      calendarCount: calendars.length,
+      msg: 'search_calendar_events window',
+    });
     const prefixNotes = [...timezoneNotes, ...mailboxNotes];
     if (calendars.length === 0) {
+      this.logger.debug({
+        userProfileId: userProfileIdString,
+        mailbox: input.mailbox,
+        msg: 'search_calendar_events no calendars matched',
+      });
       return {
         success: true,
         message: 'No calendars matched the search.',
@@ -125,6 +164,7 @@ export class SearchCalendarEventsQuery {
     const { events, notes: searchNotes } = await this.searchCalendars({
       client,
       userId: userProfile.id,
+      userProfileId: userProfileIdString,
       callerEmail: userProfile.email,
       calendars,
       filters: input,
@@ -168,6 +208,7 @@ export class SearchCalendarEventsQuery {
   private async searchCalendars(input: {
     client: Client;
     userId: string;
+    userProfileId: string;
     callerEmail: string;
     calendars: CalendarRef[];
     filters: SearchCalendarEventsQueryInput;
@@ -187,6 +228,7 @@ export class SearchCalendarEventsQuery {
             try {
               const fetched = await this.fetchEvents({
                 client: input.client,
+                userProfileId: input.userProfileId,
                 callerEmail: input.callerEmail,
                 calendar,
                 filters: input.filters,
@@ -201,6 +243,18 @@ export class SearchCalendarEventsQuery {
               };
             } catch (error) {
               if (isDelegatedAccessNotAvailableError(error)) {
+                logCalendarRecovered(this.logger, {
+                  userProfileId: input.userProfileId,
+                  mailbox: calendarMailbox({
+                    calendar,
+                    callerEmail: input.callerEmail,
+                  }),
+                  calendarId: calendar.calendarId,
+                  ownerEmail: calendar.ownerEmail ?? undefined,
+                  outcome: 'delegated_skipped',
+                  msg: 'search_calendar_events skipped delegated calendar',
+                  err: error,
+                });
                 return {
                   events: [],
                   notes: [
@@ -225,10 +279,12 @@ export class SearchCalendarEventsQuery {
     const totalFetched = perCalendar.reduce((sum, result) => sum + result.fetched, 0);
     const totalReturned = kept.length;
     this.logger.log({
-      msg: 'search_calendar_events Graph fan-out',
+      userProfileId: input.userProfileId,
+      calendarCount: input.calendars.length,
       totalFetched,
       totalReturned,
       truncated,
+      msg: 'search_calendar_events Graph fan-out',
     });
     const notes = [
       ...calendarNotes,
@@ -237,25 +293,42 @@ export class SearchCalendarEventsQuery {
         : []),
       ...(truncated ? [`Results truncated to ${MAX_EVENTS} events.`] : []),
     ];
+    if (totalReturned === 0) {
+      this.logger.debug({
+        userProfileId: input.userProfileId,
+        calendarCount: input.calendars.length,
+        totalFetched,
+        msg: 'search_calendar_events no events matched',
+      });
+    }
     return { events: kept.map(({ event }) => event), notes };
   }
 
+  @Span()
   private async fetchEvents(input: {
     client: Client;
+    userProfileId: string;
     callerEmail: string;
     calendar: CalendarRef;
     filters: SearchCalendarEventsQueryInput;
     timeZone: string;
     resolvedWindow: ResolvedWindow;
   }): Promise<{ events: CalendarEvent[]; notes: string[]; fetched: number }> {
+    const mailbox = calendarMailbox({
+      calendar: input.calendar,
+      callerEmail: input.callerEmail,
+    });
+    calendarTraceAttrs({
+      userProfileId: input.userProfileId,
+      mailbox,
+      calendarId: input.calendar.calendarId,
+      operation: 'search_calendar_events.fetch',
+    });
     const events: CalendarEvent[] = [];
     const prefer = `outlook.timezone="${input.timeZone}", outlook.body-content-type="text", IdType="ImmutableId"`;
     let nextPath: string | undefined = calendarViewPath({
       calendarId: input.calendar.calendarId,
-      mailboxEmail: calendarMailbox({
-        calendar: input.calendar,
-        callerEmail: input.callerEmail,
-      }),
+      mailboxEmail: mailbox,
     });
     let isFirst = true;
     let pages = 0;
@@ -289,6 +362,16 @@ export class SearchCalendarEventsQuery {
       }
       nextPath = parsed['@odata.nextLink'];
     }
+
+    this.logger.debug({
+      userProfileId: input.userProfileId,
+      mailbox,
+      calendarId: input.calendar.calendarId,
+      pages,
+      fetched,
+      matched: events.length,
+      msg: 'search_calendar_events calendar',
+    });
 
     return {
       events,

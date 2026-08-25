@@ -1,6 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
@@ -50,6 +50,8 @@ export const RespondToInviteOutputSchema = z.object({
 
 @Injectable()
 export class RespondToInviteTool {
+  private readonly logger = new Logger(RespondToInviteTool.name);
+
   public constructor(private readonly respondToInviteCommand: RespondToInviteCommand) {}
 
   @Tool({
@@ -75,17 +77,25 @@ export class RespondToInviteTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof RespondToInviteOutputSchema>> {
     const parsed = RespondToInviteInputSchema.parse(input);
+    const userProfileId = extractUserProfileId(request);
     const confirmation = await context.elicit(
       ConfirmSchema,
       elicitMessage(parsed.response, parsed.comment),
     );
     if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+      this.logger.debug({
+        userProfileId: userProfileId.toString(),
+        mailbox: parsed.eventRef.mailbox,
+        calendarId: parsed.eventRef.calendarId,
+        response: parsed.response,
+        msg: 'respond_to_invite elicit cancelled',
+      });
       return {
         success: false,
         message: 'Invite response was cancelled. The organizer was not notified.',
       };
     }
-    return this.respondToInviteCommand.run(extractUserProfileId(request), parsed);
+    return this.respondToInviteCommand.run(userProfileId, parsed);
   }
 }
 

@@ -2,6 +2,7 @@ import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventCommand } from '../create-event.command';
+import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
@@ -55,6 +56,7 @@ function createCommand(
       }),
     } as never,
     { run: vi.fn().mockResolvedValue(DEFAULT_TZ) } as never,
+    passthroughCalendarMetrics() as never,
   );
   return { command, api, request, post, get };
 }

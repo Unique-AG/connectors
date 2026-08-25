@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -18,6 +19,12 @@ import {
   isGetScheduleTooManyEntriesError,
 } from './utils/calendar-graph-errors';
 import { getSchedulePath } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
+import { dateWindowFromSearchInput } from './utils/date-window-bucket';
 import { type AvailabilityBlock, decodeAvailabilityView } from './utils/decode-availability-view';
 import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
 import {
@@ -72,12 +79,41 @@ export class CheckAvailabilityQuery {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
+    private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
     input: CheckAvailabilityQueryInput,
+  ): Promise<CheckAvailabilityQueryOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      attendeeCount: input.attendees.length,
+      range: input.range,
+      msg: 'check_availability started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      operation: 'check_availability',
+    });
+    return this.calendarMetrics.measureOperation(
+      {
+        operation: 'check_availability',
+        dateWindow: dateWindowFromSearchInput(input),
+      },
+      (fail) => this.check(userProfileId, userProfileIdString, input, fail),
+    );
+  }
+
+  private async check(
+    userProfileId: UserProfileTypeID,
+    userProfileIdString: string,
+    input: CheckAvailabilityQueryInput,
+    fail: (errorType: 'consent' | 'permission' | 'too_many_entries') => void,
   ): Promise<CheckAvailabilityQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const {
@@ -94,6 +130,14 @@ export class CheckAvailabilityQuery {
       endDateTime: input.endDateTime,
       now: clock,
     });
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox ?? userProfile.email,
+      ianaTimeZone,
+      outlookTimeZone,
+      interpretation: resolvedWindow.interpretation,
+      msg: 'check_availability window',
+    });
     const schedules = uniqueSchedules(input.attendees);
     assert.ok(
       schedules.length > 0 && schedules.length <= MAX_SCHEDULES,
@@ -108,6 +152,11 @@ export class CheckAvailabilityQuery {
       SmtpAddressSchema.safeParse(mailbox).success,
       'mailbox must already be an SMTP address',
     );
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox,
+      operation: 'check_availability',
+    });
     const intervalMinutes = input.intervalMinutes ?? DEFAULT_INTERVAL_MINUTES;
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
@@ -134,13 +183,29 @@ export class CheckAvailabilityQuery {
         ianaTimeZone,
       );
       const people = parsed.value.map((item) =>
-        this.toPersonAvailability({ item, viewStart, intervalMinutes, notes }),
+        this.toPersonAvailability({
+          item,
+          viewStart,
+          intervalMinutes,
+          notes,
+          userProfileId: userProfileIdString,
+          mailbox,
+        }),
       );
       this.logger.log({
-        msg: 'check_availability getSchedule',
+        userProfileId: userProfileIdString,
+        mailbox,
         scheduleCount: schedules.length,
         returned: people.length,
+        msg: 'check_availability getSchedule',
       });
+      if (people.length === 0) {
+        this.logger.debug({
+          userProfileId: userProfileIdString,
+          mailbox,
+          msg: 'check_availability no availability returned',
+        });
+      }
       return {
         success: true,
         message:
@@ -153,6 +218,14 @@ export class CheckAvailabilityQuery {
       };
     } catch (error) {
       if (isGetScheduleTooManyEntriesError(error)) {
+        fail('too_many_entries');
+        logCalendarRecovered(this.logger, {
+          userProfileId: userProfileIdString,
+          mailbox,
+          outcome: 'too_many_entries',
+          msg: 'check_availability too many calendar entries',
+          err: error,
+        });
         return {
           success: false,
           message: TOO_MANY_ENTRIES_MESSAGE,
@@ -162,6 +235,14 @@ export class CheckAvailabilityQuery {
       }
       if (isCalendarPermissionDeniedError(error)) {
         if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
+          fail('consent');
+          logCalendarRecovered(this.logger, {
+            userProfileId: userProfileIdString,
+            mailbox,
+            outcome: 'consent',
+            msg: 'check_availability consent required',
+            err: error,
+          });
           return {
             success: false,
             message: new CalendarConsentRequiredError().message,
@@ -169,6 +250,14 @@ export class CheckAvailabilityQuery {
             resolvedWindow,
           };
         }
+        fail('permission');
+        logCalendarRecovered(this.logger, {
+          userProfileId: userProfileIdString,
+          mailbox,
+          outcome: 'permission',
+          msg: 'check_availability mailbox denied',
+          err: error,
+        });
         return {
           success: false,
           message: `Could not read availability from mailbox ${mailbox}.`,
@@ -185,11 +274,26 @@ export class CheckAvailabilityQuery {
     viewStart: Temporal.ZonedDateTime;
     intervalMinutes: number;
     notes: string[];
+    userProfileId: string;
+    mailbox: string;
   }): PersonAvailability {
     const email = input.item.scheduleId ?? 'unknown';
     if (isTooManyEntries(input.item.error)) {
+      this.logger.warn({
+        userProfileId: input.userProfileId,
+        mailbox: input.mailbox,
+        scheduleId: email,
+        msg: 'check_availability person too many entries',
+      });
       input.notes.push(`${email}: ${TOO_MANY_ENTRIES_MESSAGE}`);
     } else if (input.item.error?.message !== undefined) {
+      this.logger.warn({
+        userProfileId: input.userProfileId,
+        mailbox: input.mailbox,
+        scheduleId: email,
+        graphResponseCode: input.item.error.responseCode,
+        msg: 'check_availability person error',
+      });
       input.notes.push(`${email}: ${input.item.error.message}`);
     }
     const busyBlocks = decodeAvailabilityView({
@@ -199,11 +303,23 @@ export class CheckAvailabilityQuery {
     });
     const items = (input.item.scheduleItems ?? []).map(mapGraphScheduleItemToScheduleItem);
     if (busyBlocks.length > MAX_BUSY_BLOCKS_PER_PERSON) {
+      this.logger.debug({
+        userProfileId: input.userProfileId,
+        mailbox: input.mailbox,
+        scheduleId: email,
+        msg: 'check_availability busy blocks truncated',
+      });
       input.notes.push(
         `${email}: busy blocks truncated to ${MAX_BUSY_BLOCKS_PER_PERSON}. Narrow the date range.`,
       );
     }
     if (items.length > MAX_ITEMS_PER_PERSON) {
+      this.logger.debug({
+        userProfileId: input.userProfileId,
+        mailbox: input.mailbox,
+        scheduleId: email,
+        msg: 'check_availability schedule items truncated',
+      });
       input.notes.push(
         `${email}: schedule items truncated to ${MAX_ITEMS_PER_PERSON}. Narrow the date range.`,
       );

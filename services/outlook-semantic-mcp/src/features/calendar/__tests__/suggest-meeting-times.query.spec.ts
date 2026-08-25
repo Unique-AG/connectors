@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SuggestMeetingTimesQuery } from '../suggest-meeting-times.query';
+import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
@@ -51,6 +52,7 @@ function createQuery(
     {
       run: vi.fn().mockResolvedValue(opts.timezone ?? DEFAULT_TIMEZONE),
     } as never,
+    passthroughCalendarMetrics() as never,
   );
   return { query, api, request, post };
 }

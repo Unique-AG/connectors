@@ -1,20 +1,25 @@
 import assert from 'node:assert';
-import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import {
+  type CalendarMetricErrorType,
+  CalendarMetricsService,
+} from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import type { EventRef } from './calendar.schemas';
 import {
-  CalendarConsentRequiredError,
-  isCalendarPermissionDeniedError,
-} from './utils/calendar-graph-errors';
-import {
   EVENT_RESPONSES,
   type EventResponse,
   eventResponsePath,
 } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  classifyCalendarGraphError,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
 export interface RespondToInviteCommandInput {
@@ -37,12 +42,38 @@ export class RespondToInviteCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
+    private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
     input: RespondToInviteCommandInput,
+  ): Promise<RespondToInviteCommandOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.eventRef.mailbox,
+      calendarId: input.eventRef.calendarId,
+      response: input.response,
+      msg: 'respond_to_invite started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox: input.eventRef.mailbox,
+      calendarId: input.eventRef.calendarId,
+      operation: 'respond_to_invite',
+    });
+    return this.calendarMetrics.measureOperation({ operation: 'respond_to_invite' }, (fail) =>
+      this.respond(userProfileId, userProfileIdString, input, fail),
+    );
+  }
+
+  private async respond(
+    userProfileId: UserProfileTypeID,
+    userProfileIdString: string,
+    input: RespondToInviteCommandInput,
+    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<RespondToInviteCommandOutput> {
     assert.ok(
       (EVENT_RESPONSES as readonly string[]).includes(input.response),
@@ -75,9 +106,11 @@ export class RespondToInviteCommand {
           ...(comment !== undefined && comment !== '' ? { comment } : {}),
         });
       this.logger.log({
-        msg: 'respond_to_invite',
-        response: input.response,
+        userProfileId: userProfileIdString,
         mailbox,
+        calendarId: input.eventRef.calendarId,
+        response: input.response,
+        msg: 'respond_to_invite',
       });
       return {
         success: true,
@@ -85,26 +118,31 @@ export class RespondToInviteCommand {
         response: input.response,
       };
     } catch (error) {
-      if (error instanceof GraphError && error.statusCode === 404) {
-        return {
-          success: false,
-          message: 'That event was not found. Search again and pass eventRef without changing it.',
-        };
+      const recovered = classifyCalendarGraphError({
+        error,
+        mailbox,
+        callerEmail: userProfile.email,
+        notFoundMessage:
+          'That event was not found. Search again and pass eventRef without changing it.',
+        deniedDelegatedMessage: `Could not respond to an invite on mailbox ${mailbox}.`,
+      });
+      if (recovered === undefined) {
+        throw error;
       }
-      if (isCalendarPermissionDeniedError(error)) {
-        if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
-          return {
-            success: false,
-            message: new CalendarConsentRequiredError().message,
-            consentRequired: true,
-          };
-        }
-        return {
-          success: false,
-          message: `Could not respond to an invite on mailbox ${mailbox}.`,
-        };
-      }
-      throw error;
+      fail(recovered.outcome);
+      logCalendarRecovered(this.logger, {
+        userProfileId: userProfileIdString,
+        mailbox,
+        calendarId: input.eventRef.calendarId,
+        outcome: recovered.outcome,
+        msg: `respond_to_invite ${recovered.outcome}`,
+        err: error,
+      });
+      return {
+        success: false,
+        message: recovered.message,
+        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+      };
     }
   }
 }

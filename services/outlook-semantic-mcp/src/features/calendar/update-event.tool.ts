@@ -1,6 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
@@ -159,6 +159,8 @@ export const UpdateEventOutputSchema = z.object({
 
 @Injectable()
 export class UpdateEventTool {
+  private readonly logger = new Logger(UpdateEventTool.name);
+
   public constructor(
     private readonly getCalendarEventQuery: GetCalendarEventQuery,
     private readonly updateEventCommand: UpdateEventCommand,
@@ -199,9 +201,22 @@ export class UpdateEventTool {
       ? await context.elicit(SeriesConfirmSchema, elicitMessage(parsed, snapshot))
       : await context.elicit(ConfirmSchema, elicitMessage(parsed, snapshot));
     if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+      this.logger.debug({
+        userProfileId: userProfileId.toString(),
+        mailbox: parsed.eventRef.mailbox,
+        calendarId: parsed.eventRef.calendarId,
+        msg: 'update_event elicit cancelled',
+      });
       return { success: false, message: 'Event update was cancelled. No attendees were notified.' };
     }
     const applyTo = parseSeriesScope(confirmation.content);
+    this.logger.debug({
+      userProfileId: userProfileId.toString(),
+      mailbox: parsed.eventRef.mailbox,
+      calendarId: parsed.eventRef.calendarId,
+      applyTo,
+      msg: 'update_event series scope',
+    });
     if (applyTo === 'entireSeries' && snapshot.seriesMasterId === null) {
       return {
         success: false,

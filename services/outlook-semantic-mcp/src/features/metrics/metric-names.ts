@@ -19,4 +19,5 @@ export enum MetricName {
   SyncDelegatedAccessRunDuration = 'osm_sync_delegated_access_run_duration_seconds',
   // Calendar
   SearchCalendarEventsDuration = 'osm_search_calendar_events_duration_seconds',
+  CalendarOperationDuration = 'osm_calendar_operation_duration_seconds',
 }

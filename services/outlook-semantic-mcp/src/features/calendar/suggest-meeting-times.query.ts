@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -13,11 +14,14 @@ import {
   toGraphInstant,
 } from '~/utils/relative-range';
 import { GraphFindMeetingTimesResponseSchema } from './calendar.schemas';
-import {
-  CalendarConsentRequiredError,
-  isCalendarPermissionDeniedError,
-} from './utils/calendar-graph-errors';
 import { findMeetingTimesPath } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  classifyCalendarGraphError,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
+import { dateWindowFromSearchInput } from './utils/date-window-bucket';
 import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
 import {
   type MeetingTimeSuggestion,
@@ -66,12 +70,41 @@ export class SuggestMeetingTimesQuery {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
+    private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
     input: SuggestMeetingTimesQueryInput,
+  ): Promise<SuggestMeetingTimesQueryOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      attendeeCount: input.attendees?.length ?? 0,
+      range: input.range,
+      msg: 'suggest_meeting_times started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      operation: 'suggest_meeting_times',
+    });
+    return this.calendarMetrics.measureOperation(
+      {
+        operation: 'suggest_meeting_times',
+        dateWindow: dateWindowFromSearchInput(input),
+      },
+      (fail) => this.suggest(userProfileId, userProfileIdString, input, fail),
+    );
+  }
+
+  private async suggest(
+    userProfileId: UserProfileTypeID,
+    userProfileIdString: string,
+    input: SuggestMeetingTimesQueryInput,
+    fail: (errorType: 'consent' | 'permission' | 'invalid' | 'not_found') => void,
   ): Promise<SuggestMeetingTimesQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const {
@@ -92,6 +125,13 @@ export class SuggestMeetingTimesQuery {
       now: clock,
     });
     if (resolved.tooLate) {
+      fail('invalid');
+      this.logger.debug({
+        userProfileId: userProfileIdString,
+        mailbox: input.mailbox ?? userProfile.email,
+        interpretation: resolved.window.interpretation,
+        msg: 'suggest_meeting_times window entirely in the past',
+      });
       return {
         success: false,
         message:
@@ -100,8 +140,23 @@ export class SuggestMeetingTimesQuery {
         resolvedWindow: resolved.window,
       };
     }
+    if (resolved.notes.length > 0) {
+      this.logger.debug({
+        userProfileId: userProfileIdString,
+        mailbox: input.mailbox ?? userProfile.email,
+        msg: 'suggest_meeting_times start clamped to now',
+      });
+    }
     notes.push(...resolved.notes);
     const resolvedWindow = resolved.window;
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox ?? userProfile.email,
+      ianaTimeZone,
+      outlookTimeZone,
+      interpretation: resolvedWindow.interpretation,
+      msg: 'suggest_meeting_times window',
+    });
     assert.ok(
       !isScheduleWindowTooLong(resolvedWindow.startDateTime, resolvedWindow.endDateTime),
       'dateRange must already be shorter than 62 days',
@@ -116,6 +171,11 @@ export class SuggestMeetingTimesQuery {
       SmtpAddressSchema.safeParse(mailbox).success,
       'mailbox must already be an SMTP address',
     );
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox,
+      operation: 'suggest_meeting_times',
+    });
 
     const durationMinutes = input.durationMinutes ?? DEFAULT_DURATION_MINUTES;
     const maxCandidates = input.maxCandidates ?? DEFAULT_MAX_CANDIDATES;
@@ -162,10 +222,20 @@ export class SuggestMeetingTimesQuery {
         );
       }
       this.logger.log({
-        msg: 'suggest_meeting_times findMeetingTimes',
+        userProfileId: userProfileIdString,
+        mailbox,
         attendeeCount: attendees.length,
         returned: suggestions.length,
+        msg: 'suggest_meeting_times findMeetingTimes',
       });
+      if (suggestions.length === 0) {
+        this.logger.debug({
+          userProfileId: userProfileIdString,
+          mailbox,
+          emptySuggestionsReason: emptyReason,
+          msg: 'suggest_meeting_times no slots',
+        });
+      }
       return {
         success: true,
         message:
@@ -180,23 +250,30 @@ export class SuggestMeetingTimesQuery {
         resolvedWindow,
       };
     } catch (error) {
-      if (isCalendarPermissionDeniedError(error)) {
-        if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
-          return {
-            success: false,
-            message: new CalendarConsentRequiredError().message,
-            consentRequired: true,
-            resolvedWindow,
-          };
-        }
-        return {
-          success: false,
-          message: `Could not suggest times from mailbox ${mailbox}.`,
-          suggestionNotes: notes.length > 0 ? notes : undefined,
-          resolvedWindow,
-        };
+      const recovered = classifyCalendarGraphError({
+        error,
+        mailbox,
+        callerEmail: userProfile.email,
+        deniedDelegatedMessage: `Could not suggest times from mailbox ${mailbox}.`,
+      });
+      if (recovered === undefined) {
+        throw error;
       }
-      throw error;
+      fail(recovered.outcome);
+      logCalendarRecovered(this.logger, {
+        userProfileId: userProfileIdString,
+        mailbox,
+        outcome: recovered.outcome,
+        msg: `suggest_meeting_times ${recovered.outcome}`,
+        err: error,
+      });
+      return {
+        success: false,
+        message: recovered.message,
+        suggestionNotes: notes.length > 0 ? notes : undefined,
+        resolvedWindow,
+        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+      };
     }
   }
 }

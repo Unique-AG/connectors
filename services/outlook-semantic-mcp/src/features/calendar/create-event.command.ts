@@ -1,20 +1,26 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { Client, GraphError } from '@microsoft/microsoft-graph-client';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
+import {
+  type CalendarMetricErrorType,
+  CalendarMetricsService,
+} from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import type { CalendarAccessPath, EventRef } from './calendar.schemas';
-import {
-  CalendarConsentRequiredError,
-  isCalendarPermissionDeniedError,
-} from './utils/calendar-graph-errors';
 import { createEventPath, defaultCalendarPath } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  classifyCalendarGraphError,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
@@ -71,12 +77,38 @@ export class CreateEventCommand {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
+    private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
     input: CreateEventCommandInput,
+  ): Promise<CreateEventCommandOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      calendarId: input.calendarId,
+      attendeeCount: input.attendees?.length ?? 0,
+      msg: 'create_event started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox: input.mailbox,
+      calendarId: input.calendarId,
+      operation: 'create_event',
+    });
+    return this.calendarMetrics.measureOperation({ operation: 'create_event' }, (fail) =>
+      this.create(userProfileId, userProfileIdString, input, fail),
+    );
+  }
+
+  private async create(
+    userProfileId: UserProfileTypeID,
+    userProfileIdString: string,
+    input: CreateEventCommandInput,
+    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<CreateEventCommandOutput> {
     assert.ok(input.subject.trim() !== '', 'subject must already be set');
     const start = Temporal.Instant.from(input.startDateTime);
@@ -102,12 +134,20 @@ export class CreateEventCommand {
       SmtpAddressSchema.safeParse(mailbox).success,
       'mailbox must already be an SMTP address',
     );
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox,
+      calendarId: input.calendarId,
+      operation: 'create_event',
+    });
     const { ianaTimeZone, outlookTimeZone } =
       await this.resolveMailboxTimezoneQuery.run(userProfileId);
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
     try {
-      const calendarId = input.calendarId ?? (await this.resolveDefaultCalendarId(client, mailbox));
+      const calendarId =
+        input.calendarId ??
+        (await this.resolveDefaultCalendarId(client, mailbox, userProfileIdString));
       const path = createEventPath({ mailboxEmail: mailbox, calendarId });
       const startTime = mapIsoToGraphDateTimeTimeZone({
         iso: input.startDateTime,
@@ -147,10 +187,12 @@ export class CreateEventCommand {
         });
       const created = CreatedEventSchema.parse(raw);
       this.logger.log({
-        msg: 'create_event',
+        userProfileId: userProfileIdString,
         mailbox,
         calendarId,
+        transactionId,
         attendeeCount: attendees.length,
+        msg: 'create_event',
       });
       return {
         success: true,
@@ -179,43 +221,50 @@ export class CreateEventCommand {
         transactionId,
       };
     } catch (error) {
-      if (error instanceof GraphError && error.statusCode === 404) {
-        return {
-          success: false,
-          message:
-            'That calendar was not found. List calendars again and pass calendarId without changing it.',
-          transactionId,
-        };
+      const recovered = classifyCalendarGraphError({
+        error,
+        mailbox,
+        callerEmail: userProfile.email,
+        notFoundMessage:
+          'That calendar was not found. List calendars again and pass calendarId without changing it.',
+        invalidMessage: 'Graph rejected the event. Check the start and end times and try again.',
+        deniedDelegatedMessage: `Could not create an event on mailbox ${mailbox}.`,
+      });
+      if (recovered === undefined) {
+        throw error;
       }
-      if (error instanceof GraphError && error.statusCode === 400) {
-        return {
-          success: false,
-          message: 'Graph rejected the event. Check the start and end times and try again.',
-          transactionId,
-        };
-      }
-      if (isCalendarPermissionDeniedError(error)) {
-        if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
-          return {
-            success: false,
-            message: new CalendarConsentRequiredError().message,
-            consentRequired: true,
-            transactionId,
-          };
-        }
-        return {
-          success: false,
-          message: `Could not create an event on mailbox ${mailbox}.`,
-          transactionId,
-        };
-      }
-      throw error;
+      fail(recovered.outcome);
+      logCalendarRecovered(this.logger, {
+        userProfileId: userProfileIdString,
+        mailbox,
+        calendarId: input.calendarId,
+        outcome: recovered.outcome,
+        msg: `create_event ${recovered.outcome}`,
+        err: error,
+      });
+      return {
+        success: false,
+        message: recovered.message,
+        transactionId,
+        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+      };
     }
   }
 
-  private async resolveDefaultCalendarId(client: Client, mailbox: string): Promise<string> {
+  private async resolveDefaultCalendarId(
+    client: Client,
+    mailbox: string,
+    userProfileId: string,
+  ): Promise<string> {
     const raw = await client.api(defaultCalendarPath(mailbox)).select('id').get();
-    return DefaultCalendarSchema.parse(raw).id;
+    const calendarId = DefaultCalendarSchema.parse(raw).id;
+    this.logger.debug({
+      userProfileId,
+      mailbox,
+      calendarId,
+      msg: 'create_event resolved default calendar',
+    });
+    return calendarId;
   }
 }
 

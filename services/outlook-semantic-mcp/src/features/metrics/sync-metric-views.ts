@@ -91,4 +91,12 @@ export const syncMetricViews: ViewOptions[] = [
       options: { boundaries: [0.1, 0.5, 1, 2, 5, 10, 30, 60] },
     },
   },
+  {
+    instrumentType: InstrumentType.HISTOGRAM,
+    instrumentName: MetricName.CalendarOperationDuration,
+    aggregation: {
+      type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+      options: { boundaries: [0.1, 0.5, 1, 2, 5, 10, 30, 60] },
+    },
+  },
 ];

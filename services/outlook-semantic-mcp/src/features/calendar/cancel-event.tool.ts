@@ -1,6 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
@@ -59,6 +59,8 @@ export const CancelEventOutputSchema = z.object({
 
 @Injectable()
 export class CancelEventTool {
+  private readonly logger = new Logger(CancelEventTool.name);
+
   public constructor(
     private readonly getCalendarEventQuery: GetCalendarEventQuery,
     private readonly cancelEventCommand: CancelEventCommand,
@@ -102,9 +104,22 @@ export class CancelEventTool {
       ? await context.elicit(SeriesConfirmSchema, elicitMessage(parsed, snapshot))
       : await context.elicit(ConfirmSchema, elicitMessage(parsed, snapshot));
     if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+      this.logger.debug({
+        userProfileId: userProfileId.toString(),
+        mailbox: parsed.eventRef.mailbox,
+        calendarId: parsed.eventRef.calendarId,
+        msg: 'cancel_event elicit cancelled',
+      });
       return { success: false, message: 'Cancellation was declined. The event was left in place.' };
     }
     const applyTo = parseSeriesScope(confirmation.content);
+    this.logger.debug({
+      userProfileId: userProfileId.toString(),
+      mailbox: parsed.eventRef.mailbox,
+      calendarId: parsed.eventRef.calendarId,
+      applyTo,
+      msg: 'cancel_event series scope',
+    });
     if (applyTo === 'entireSeries' && snapshot.seriesMasterId === null) {
       return {
         success: false,

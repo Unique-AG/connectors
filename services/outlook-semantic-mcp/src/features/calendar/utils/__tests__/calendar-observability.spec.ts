@@ -1,0 +1,93 @@
+import { GraphError } from '@microsoft/microsoft-graph-client';
+import { Logger } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { classifyCalendarGraphError, logCalendarRecovered } from '../calendar-observability';
+
+vi.mock('~/features/tracing.utils', () => ({
+  traceAttrs: vi.fn(),
+  traceEvent: vi.fn(),
+}));
+
+function makeGraphError(statusCode: number): GraphError {
+  return new GraphError(statusCode, 'Access denied');
+}
+
+describe(classifyCalendarGraphError.name, () => {
+  it('maps 404 to not_found when a message is provided', () => {
+    expect(
+      classifyCalendarGraphError({
+        error: makeGraphError(404),
+        mailbox: 'me@example.com',
+        callerEmail: 'me@example.com',
+        notFoundMessage: 'missing',
+        deniedDelegatedMessage: 'denied',
+      }),
+    ).toEqual({ outcome: 'not_found', message: 'missing' });
+  });
+
+  it('maps 403 on the caller mailbox to consent', () => {
+    expect(
+      classifyCalendarGraphError({
+        error: makeGraphError(403),
+        mailbox: 'me@example.com',
+        callerEmail: 'me@example.com',
+        deniedDelegatedMessage: 'denied',
+      }),
+    ).toEqual({
+      outcome: 'consent',
+      message: expect.stringContaining('re-authorization'),
+      consentRequired: true,
+    });
+  });
+
+  it('maps 403 on a delegated mailbox to permission', () => {
+    expect(
+      classifyCalendarGraphError({
+        error: makeGraphError(403),
+        mailbox: 'banker@example.com',
+        callerEmail: 'me@example.com',
+        deniedDelegatedMessage: 'denied',
+      }),
+    ).toEqual({ outcome: 'permission', message: 'denied' });
+  });
+
+  it('returns undefined for unhandled errors', () => {
+    expect(
+      classifyCalendarGraphError({
+        error: makeGraphError(500),
+        mailbox: 'me@example.com',
+        callerEmail: 'me@example.com',
+        deniedDelegatedMessage: 'denied',
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe(logCalendarRecovered.name, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('warns with userProfileId and records a recovered span event', async () => {
+    const { traceEvent } = await import('~/features/tracing.utils');
+    const warn = vi.fn();
+    const logger = { warn } as unknown as Logger;
+
+    logCalendarRecovered(logger, {
+      userProfileId: 'user_profile_1',
+      mailbox: 'me@example.com',
+      outcome: 'consent',
+      msg: 'list_calendars consent required',
+    });
+
+    expect(warn).toHaveBeenCalledWith({
+      userProfileId: 'user_profile_1',
+      mailbox: 'me@example.com',
+      msg: 'list_calendars consent required',
+    });
+    expect(traceEvent).toHaveBeenCalledWith('calendar.recovered', {
+      outcome: 'consent',
+      mailbox: 'me@example.com',
+    });
+  });
+});

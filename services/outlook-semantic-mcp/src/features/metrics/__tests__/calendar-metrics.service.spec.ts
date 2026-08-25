@@ -63,4 +63,46 @@ describe(CalendarMetricsService.name, () => {
       }),
     );
   });
+
+  it('records operation duration with operation and status labels', async () => {
+    const service = new CalendarMetricsService({ getHistogram } as never);
+
+    await service.measureOperation({ operation: 'create_event' }, async () => ({ success: true }));
+
+    expect(getHistogram).toHaveBeenCalledWith(
+      MetricName.CalendarOperationDuration,
+      expect.objectContaining({ description: expect.any(String) }),
+    );
+    expect(record).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        operation: 'create_event',
+        status: 'success',
+        functionRunResult: 'success',
+      }),
+    );
+  });
+
+  it('labels recovered failures with the errorType passed to fail', async () => {
+    const service = new CalendarMetricsService({ getHistogram } as never);
+
+    await service.measureOperation(
+      { operation: 'check_availability', dateWindow: '<1week' },
+      async (fail) => {
+        fail('consent');
+        return { success: false };
+      },
+    );
+
+    expect(record).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        operation: 'check_availability',
+        dateWindow: '<1week',
+        status: 'failed',
+        errorType: 'consent',
+        functionRunResult: 'success',
+      }),
+    );
+  });
 });

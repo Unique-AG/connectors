@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -8,11 +7,13 @@ import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailb
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import type { EventRef } from './calendar.schemas';
-import {
-  CalendarConsentRequiredError,
-  isCalendarPermissionDeniedError,
-} from './utils/calendar-graph-errors';
 import { eventPath } from './utils/calendar-graph-path';
+import {
+  calendarTraceAttrs,
+  calendarUserProfileId,
+  classifyCalendarGraphError,
+  logCalendarRecovered,
+} from './utils/calendar-observability';
 import { type GraphEventType, parseGraphEventType } from './utils/resolve-write-event-id';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
@@ -70,6 +71,7 @@ export class GetCalendarEventQuery {
     userProfileId: UserProfileTypeID,
     input: GetCalendarEventQueryInput,
   ): Promise<GetCalendarEventQueryOutput> {
+    const userProfileIdString = calendarUserProfileId(userProfileId);
     assert.ok(
       SmtpAddressSchema.safeParse(input.eventRef.mailbox).success,
       'eventRef.mailbox must already be an SMTP address',
@@ -77,8 +79,21 @@ export class GetCalendarEventQuery {
     assert.ok(input.eventRef.eventId.length > 0, 'eventRef.eventId must already be set');
     assert.ok(input.eventRef.calendarId.length > 0, 'eventRef.calendarId must already be set');
 
-    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const mailbox = input.eventRef.mailbox;
+    this.logger.debug({
+      userProfileId: userProfileIdString,
+      mailbox,
+      calendarId: input.eventRef.calendarId,
+      msg: 'get_calendar_event started',
+    });
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      mailbox,
+      calendarId: input.eventRef.calendarId,
+      operation: 'get_calendar_event',
+    });
+
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const { outlookTimeZone } = await this.resolveMailboxTimezoneQuery.run(userProfileId);
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
     const path = eventPath({
@@ -94,7 +109,13 @@ export class GetCalendarEventQuery {
         .select(EVENT_SELECT)
         .get();
       const parsed = SnapshotSchema.parse(raw);
-      this.logger.log({ msg: 'get_calendar_event', mailbox, type: parsed.type });
+      this.logger.debug({
+        userProfileId: userProfileIdString,
+        mailbox,
+        calendarId: input.eventRef.calendarId,
+        type: parsed.type,
+        msg: 'get_calendar_event',
+      });
       return {
         success: true,
         message: 'Loaded the event.',
@@ -118,26 +139,30 @@ export class GetCalendarEventQuery {
         },
       };
     } catch (error) {
-      if (error instanceof GraphError && error.statusCode === 404) {
-        return {
-          success: false,
-          message: 'That event was not found. Search again and pass eventRef without changing it.',
-        };
+      const recovered = classifyCalendarGraphError({
+        error,
+        mailbox,
+        callerEmail: userProfile.email,
+        notFoundMessage:
+          'That event was not found. Search again and pass eventRef without changing it.',
+        deniedDelegatedMessage: `Could not read an event on mailbox ${mailbox}.`,
+      });
+      if (recovered === undefined) {
+        throw error;
       }
-      if (isCalendarPermissionDeniedError(error)) {
-        if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
-          return {
-            success: false,
-            message: new CalendarConsentRequiredError().message,
-            consentRequired: true,
-          };
-        }
-        return {
-          success: false,
-          message: `Could not read an event on mailbox ${mailbox}.`,
-        };
-      }
-      throw error;
+      logCalendarRecovered(this.logger, {
+        userProfileId: userProfileIdString,
+        mailbox,
+        calendarId: input.eventRef.calendarId,
+        outcome: recovered.outcome,
+        msg: `get_calendar_event ${recovered.outcome}`,
+        err: error,
+      });
+      return {
+        success: false,
+        message: recovered.message,
+        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+      };
     }
   }
 }

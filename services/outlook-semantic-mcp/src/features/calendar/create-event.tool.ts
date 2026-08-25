@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
@@ -129,6 +129,8 @@ export const CreateEventOutputSchema = z.object({
 
 @Injectable()
 export class CreateEventTool {
+  private readonly logger = new Logger(CreateEventTool.name);
+
   public constructor(private readonly createEventCommand: CreateEventCommand) {}
 
   @Tool({
@@ -154,16 +156,22 @@ export class CreateEventTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof CreateEventOutputSchema>> {
     const parsed = CreateEventInputSchema.parse(input);
+    const userProfileId = extractUserProfileId(request);
     const transactionId = parsed.transactionId ?? randomUUID().replaceAll('-', '');
     const confirmation = await context.elicit(ConfirmSchema, elicitMessage(parsed));
     if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+      this.logger.debug({
+        userProfileId: userProfileId.toString(),
+        transactionId,
+        msg: 'create_event elicit cancelled',
+      });
       return {
         success: false,
         message: 'Event creation was cancelled. No invitations were sent.',
         transactionId,
       };
     }
-    return this.createEventCommand.run(extractUserProfileId(request), {
+    return this.createEventCommand.run(userProfileId, {
       ...parsed,
       transactionId,
     });

@@ -44,7 +44,8 @@ Rules:
 - Absolute `startDateTime` / `endDateTime` must be valid Instants with `Z` or `±HH:MM`.
 - Fan-out: `using limit = calendarGraphLimit(userId)` — 5 in-flight, refcounted per user.
 - Search filters (attendee includes organizer, subject, category) run inside `fetchEvents`.
-- Metric: `osm_search_calendar_events_duration_seconds` with labels `dateWindow`, `hasAttendeeFilter`, `hasSubjectFilter`, `hasCategoryFilter`.
+- Search metric: `osm_search_calendar_events_duration_seconds` with labels `dateWindow`, `hasAttendeeFilter`, `hasSubjectFilter`, `hasCategoryFilter`.
+- Other calendar tools: `osm_calendar_operation_duration_seconds` (same second buckets), labelled by `operation` (`list_calendars`, `check_availability`, `suggest_meeting_times`, `create_event`, `update_event`, `cancel_event`, `respond_to_invite`) and `status`. Recovered Graph failures add `errorType` (`consent`, `not_found`, `permission`, `invalid`, `too_many_entries`, `other`). Availability and suggest also label `dateWindow`. Duration is measured on the query/command, not including elicit wait.
 - `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses and windows shorter than 62 days. Decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
 - `suggest_meeting_times` POSTs `/users/{email}/findMeetingTimes`. Default duration 30 minutes and `activityDomain` work. Surface `emptySuggestionsReason` instead of inventing slots.
 - `create_event` POSTs after elicit, with `transactionId` (≤ 32 chars). If `calendarId` is omitted it GETs `/users/{email}/calendar`. All-day events are not supported yet.
