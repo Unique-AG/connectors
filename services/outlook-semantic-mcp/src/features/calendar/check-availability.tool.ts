@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { META } from './check-availability-tool.meta';
+import { GraphDateTimeSchema } from './utils/calendar-display';
 import { BUSY_STATUSES } from './utils/decode-availability-view';
 import { GraphScheduleDateRangeSchema } from './utils/graph-schedule-date-range.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
@@ -37,16 +38,6 @@ export const CheckAvailabilityInputSchema = z.object({
     .describe(
       'Length of each availabilityView slot in minutes. Default 30. Minimum 5, maximum 1440.',
     ),
-});
-
-const DateTimeSchema = z.object({
-  dateTime: z
-    .string()
-    .describe('Local date and time of the boundary as returned by Graph, without a trailing Z.'),
-  timeZone: z
-    .string()
-    .nullable()
-    .describe('Windows or IANA timezone Graph attached to this boundary, or null if omitted.'),
 });
 
 const BusyBlockSchema = z.object({
@@ -83,8 +74,8 @@ const ScheduleItemSchema = z.object({
     .describe(
       'True when Graph marked the item private. Subject and location are then redacted even if a value was present.',
     ),
-  start: DateTimeSchema.describe('Item start.'),
-  end: DateTimeSchema.describe('Item end.'),
+  start: GraphDateTimeSchema.describe('Item start.'),
+  end: GraphDateTimeSchema.describe('Item end.'),
 });
 
 const WorkingHoursSchema = z.object({

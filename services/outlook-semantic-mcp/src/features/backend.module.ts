@@ -50,6 +50,21 @@ import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 import { UserUtilsModule } from './user-utils/user-utils.module';
 
+/**
+ * Every calendar tool, exported so the schema-harmony test runs over the real registration list
+ * rather than a copy that can silently fall behind.
+ */
+export const CALENDAR_TOOLS = [
+  ListCalendarsTool,
+  SearchCalendarEventsTool,
+  CheckAvailabilityTool,
+  SuggestMeetingTimesTool,
+  RespondToInviteTool,
+  CreateEventTool,
+  UpdateEventTool,
+  CancelEventTool,
+] as const;
+
 @Module({})
 export class BackendModule {}
 
@@ -113,18 +128,7 @@ export function registerBackendModule(): DynamicModule {
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,
       ...uniqueOnlyTools,
-      ...(isCalendar
-        ? [
-            ListCalendarsTool,
-            SearchCalendarEventsTool,
-            CheckAvailabilityTool,
-            SuggestMeetingTimesTool,
-            RespondToInviteTool,
-            CreateEventTool,
-            UpdateEventTool,
-            CancelEventTool,
-          ]
-        : []),
+      ...(isCalendar ? CALENDAR_TOOLS : []),
       MailSubscriptionController,
     ],
     controllers: [MailSubscriptionController],

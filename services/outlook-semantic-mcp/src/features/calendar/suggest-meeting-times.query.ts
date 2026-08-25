@@ -7,6 +7,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   type RelativeRange,
   type ResolvedWindow,
@@ -28,7 +29,7 @@ import {
   mapGraphMeetingTimeSuggestionToMeetingTimeSuggestion,
 } from './utils/map-graph-meeting-time-suggestion-to-meeting-time-suggestion';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema } from './utils/smtp-address.schema';
+import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
 const MAX_ATTENDEES = 20;
 const MAX_CANDIDATES = 20;
@@ -81,7 +82,7 @@ export class SuggestMeetingTimesQuery {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
+      mailbox: obfuscateEmail(input.mailbox),
       attendeeCount: input.attendees?.length ?? 0,
       range: input.range,
       msg: 'suggest_meeting_times started',
@@ -128,7 +129,7 @@ export class SuggestMeetingTimesQuery {
       fail('invalid');
       this.logger.debug({
         userProfileId: userProfileIdString,
-        mailbox: input.mailbox ?? userProfile.email,
+        mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
         interpretation: resolved.window.interpretation,
         msg: 'suggest_meeting_times window entirely in the past',
       });
@@ -143,7 +144,7 @@ export class SuggestMeetingTimesQuery {
     if (resolved.notes.length > 0) {
       this.logger.debug({
         userProfileId: userProfileIdString,
-        mailbox: input.mailbox ?? userProfile.email,
+        mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
         msg: 'suggest_meeting_times start clamped to now',
       });
     }
@@ -151,7 +152,7 @@ export class SuggestMeetingTimesQuery {
     const resolvedWindow = resolved.window;
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox ?? userProfile.email,
+      mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
@@ -161,7 +162,7 @@ export class SuggestMeetingTimesQuery {
       !isScheduleWindowTooLong(resolvedWindow.startDateTime, resolvedWindow.endDateTime),
       'dateRange must already be shorter than 62 days',
     );
-    const attendees = uniqueAttendees(input.attendees ?? []);
+    const attendees = uniqueSmtpAddresses(input.attendees ?? []);
     assert.ok(
       attendees.length <= MAX_ATTENDEES,
       'attendees must already be at most 20 SMTP addresses',
@@ -223,7 +224,7 @@ export class SuggestMeetingTimesQuery {
       }
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         attendeeCount: attendees.length,
         returned: suggestions.length,
         msg: 'suggest_meeting_times findMeetingTimes',
@@ -231,7 +232,7 @@ export class SuggestMeetingTimesQuery {
       if (suggestions.length === 0) {
         this.logger.debug({
           userProfileId: userProfileIdString,
-          mailbox,
+          mailbox: obfuscateEmail(mailbox),
           emptySuggestionsReason: emptyReason,
           msg: 'suggest_meeting_times no slots',
         });
@@ -302,21 +303,6 @@ function clampSuggestionWindow(input: {
     },
     notes: ['The start of the window was in the past; suggestions start from now.'],
   };
-}
-
-function uniqueAttendees(attendees: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const attendee of attendees) {
-    const trimmed = attendee.trim();
-    const key = trimmed.toLowerCase();
-    if (!SmtpAddressSchema.safeParse(trimmed).success || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(trimmed);
-  }
-  return result;
 }
 
 function toIsoDuration(minutes: number): string {

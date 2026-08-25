@@ -125,20 +125,17 @@ describe(SuggestMeetingTimesTool.name, () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it('rejects more than 20 attendees before calling the query', async () => {
-    const run = vi.fn();
+  it('accepts more than 20 attendees, since findMeetingTimes documents no cap', async () => {
+    const run = vi.fn().mockResolvedValue({ success: true, message: 'ok', suggestions: [] });
     const tool = new SuggestMeetingTimesTool({ run } as never);
+    const attendees = Array.from({ length: 21 }, (_, index) => `user${index}@example.com`);
 
-    await expect(
-      tool.suggestMeetingTimes(
-        {
-          attendees: Array.from({ length: 21 }, (_, index) => `user${index}@example.com`),
-          dateRange: { rangeType: 'relative', range: 'today' },
-        },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
-      ),
-    ).rejects.toThrow(/20/i);
-    expect(run).not.toHaveBeenCalled();
+    await tool.suggestMeetingTimes(
+      { attendees, dateRange: { rangeType: 'relative', range: 'today' } },
+      {} as never,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+    );
+
+    expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, expect.objectContaining({ attendees }));
   });
 });

@@ -9,6 +9,6 @@ There is no draft state. If attendees are included, invitations are sent immedia
 
 Use calendarId from list_calendars when creating on a specific or delegated calendar. Pass the same transactionId if this create is retried.
 
-Do not display eventRef, eventId, calendarId, or accessPath. If consentRequired is true, ask the user to reconnect Outlook.`,
+Do not display eventRef, calendarRef, eventId, or calendarId. If consentRequired is true, ask the user to reconnect Outlook.`,
   toolFormatInformation: CALENDAR_TOOL_FORMAT_INFORMATION,
 });

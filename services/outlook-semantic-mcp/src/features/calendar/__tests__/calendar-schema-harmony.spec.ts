@@ -1,30 +1,7 @@
+import { MCP_TOOL_METADATA_KEY, type ToolOptions } from '@unique-ag/mcp-server-module';
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import { CancelEventInputSchema, CancelEventOutputSchema } from '../cancel-event.tool';
-import { META as CANCEL_EVENT_META } from '../cancel-event-tool.meta';
-import {
-  CheckAvailabilityInputSchema,
-  CheckAvailabilityOutputSchema,
-} from '../check-availability.tool';
-import { META as CHECK_AVAILABILITY_META } from '../check-availability-tool.meta';
-import { CreateEventInputSchema, CreateEventOutputSchema } from '../create-event.tool';
-import { META as CREATE_EVENT_META } from '../create-event-tool.meta';
-import { ListCalendarsInputSchema, ListCalendarsOutputSchema } from '../list-calendars.tool';
-import { META as LIST_CALENDARS_META } from '../list-calendars-tool.meta';
-import { RespondToInviteInputSchema, RespondToInviteOutputSchema } from '../respond-to-invite.tool';
-import { META as RESPOND_TO_INVITE_META } from '../respond-to-invite-tool.meta';
-import {
-  SearchCalendarEventsInputSchema,
-  SearchCalendarEventsOutputSchema,
-} from '../search-calendar-events.tool';
-import { META as SEARCH_CALENDAR_EVENTS_META } from '../search-calendar-events-tool.meta';
-import {
-  SuggestMeetingTimesInputSchema,
-  SuggestMeetingTimesOutputSchema,
-} from '../suggest-meeting-times.tool';
-import { META as SUGGEST_MEETING_TIMES_META } from '../suggest-meeting-times-tool.meta';
-import { UpdateEventInputSchema, UpdateEventOutputSchema } from '../update-event.tool';
-import { META as UPDATE_EVENT_META } from '../update-event-tool.meta';
+import { CALENDAR_TOOLS } from '../../backend.module';
 
 interface JsonSchema {
   description?: string;
@@ -37,56 +14,26 @@ interface JsonSchema {
   $ref?: string;
 }
 
-const CALENDAR_TOOLS = [
-  {
-    name: 'list_calendars',
-    meta: LIST_CALENDARS_META,
-    input: ListCalendarsInputSchema,
-    output: ListCalendarsOutputSchema,
-  },
-  {
-    name: 'search_calendar_events',
-    meta: SEARCH_CALENDAR_EVENTS_META,
-    input: SearchCalendarEventsInputSchema,
-    output: SearchCalendarEventsOutputSchema,
-  },
-  {
-    name: 'check_availability',
-    meta: CHECK_AVAILABILITY_META,
-    input: CheckAvailabilityInputSchema,
-    output: CheckAvailabilityOutputSchema,
-  },
-  {
-    name: 'suggest_meeting_times',
-    meta: SUGGEST_MEETING_TIMES_META,
-    input: SuggestMeetingTimesInputSchema,
-    output: SuggestMeetingTimesOutputSchema,
-  },
-  {
-    name: 'respond_to_invite',
-    meta: RESPOND_TO_INVITE_META,
-    input: RespondToInviteInputSchema,
-    output: RespondToInviteOutputSchema,
-  },
-  {
-    name: 'create_event',
-    meta: CREATE_EVENT_META,
-    input: CreateEventInputSchema,
-    output: CreateEventOutputSchema,
-  },
-  {
-    name: 'update_event',
-    meta: UPDATE_EVENT_META,
-    input: UpdateEventInputSchema,
-    output: UpdateEventOutputSchema,
-  },
-  {
-    name: 'cancel_event',
-    meta: CANCEL_EVENT_META,
-    input: CancelEventInputSchema,
-    output: CancelEventOutputSchema,
-  },
-] as const;
+/**
+ * Reads the @Tool metadata straight off the registered classes, so a tool added to
+ * registerBackendModule is covered here without anyone remembering to update a list.
+ */
+function registeredTools(): { name: string; options: ToolOptions }[] {
+  return CALENDAR_TOOLS.map((toolClass) => {
+    const prototype = toolClass.prototype as unknown as Record<string, unknown>;
+    const handler = Object.getOwnPropertyNames(prototype)
+      .filter((key) => key !== 'constructor')
+      .map((key) => prototype[key])
+      .find(
+        (value) =>
+          typeof value === 'function' &&
+          Reflect.getMetadata(MCP_TOOL_METADATA_KEY, value) !== undefined,
+      );
+    expect(handler, `${toolClass.name} has no @Tool method`).toBeDefined();
+    const options = Reflect.getMetadata(MCP_TOOL_METADATA_KEY, handler as object) as ToolOptions;
+    return { name: options.name ?? toolClass.name, options };
+  });
+}
 
 function resolveRef(schema: JsonSchema, defs: Record<string, JsonSchema>): JsonSchema {
   if (schema.$ref === undefined) {
@@ -134,17 +81,41 @@ function missingFieldDescriptions(
 }
 
 describe('calendar tool schema harmony', () => {
-  it.each(
-    CALENDAR_TOOLS,
-  )('$name has _meta and a description on every input and output field', (tool) => {
-    expect(tool.meta['unique.app/icon']).toBe('calendar');
-    expect(tool.meta['unique.app/system-prompt']?.length).toBeGreaterThan(0);
-    expect(tool.meta['unique.app/tool-format-information']?.length).toBeGreaterThan(0);
+  it.each(registeredTools())('$name has _meta and a description on every input and output field', ({
+    name,
+    options,
+  }) => {
+    const meta = options._meta as Record<string, string> | undefined;
+    expect(meta?.['unique.app/icon'], `${name} icon`).toBe('calendar');
+    expect(meta?.['unique.app/system-prompt']?.length ?? 0).toBeGreaterThan(0);
+    expect(meta?.['unique.app/tool-format-information']?.length ?? 0).toBeGreaterThan(0);
+    expect(options.description?.length ?? 0).toBeGreaterThan(0);
+    expect(options.outputSchema, `${name} outputSchema`).toBeDefined();
 
-    const input = z.toJSONSchema(tool.input, { io: 'input' }) as JsonSchema;
-    const output = z.toJSONSchema(tool.output, { io: 'output' }) as JsonSchema;
+    const input = z.toJSONSchema(options.parameters, { io: 'input' }) as JsonSchema;
+    const output = z.toJSONSchema(
+      options.outputSchema as NonNullable<typeof options.outputSchema>,
+      { io: 'output' },
+    ) as JsonSchema;
 
     expect(missingFieldDescriptions(input, 'input', input.$defs ?? {})).toEqual([]);
     expect(missingFieldDescriptions(output, 'output', output.$defs ?? {})).toEqual([]);
+  });
+
+  it('covers every registered calendar tool', () => {
+    expect(
+      registeredTools()
+        .map((tool) => tool.name)
+        .sort(),
+    ).toEqual([
+      'cancel_event',
+      'check_availability',
+      'create_event',
+      'list_calendars',
+      'respond_to_invite',
+      'search_calendar_events',
+      'suggest_meeting_times',
+      'update_event',
+    ]);
   });
 });

@@ -11,7 +11,7 @@ Absolute timestamps must include a timezone offset. Graph does not apply Prefer:
 
 The result already contains the full plain-text body and the complete attendee list with response status. Do not look for a second tool to open the event.
 
-eventRef, eventId, calendarId and accessPath are internal — never display them. webLink is the only user-facing event URL besides joinUrl; if it is empty, render the subject as plain text.
+eventRef and calendarRef are opaque handles — pass them through unchanged and never display them. webLink is the only user-facing event URL besides joinUrl; if it is empty, render the subject as plain text.
 
 If searchNotes is present, display it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook. Do not invent events.`,
   toolFormatInformation: CALENDAR_TOOL_FORMAT_INFORMATION,

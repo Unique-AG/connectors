@@ -52,5 +52,6 @@ When showing \`suggest_meeting_times\`, use a markdown table with exactly 4 colu
 | {start}–{end} | {confidence}% | {free} | {email (free)} |
 
 ### Identifier rules
-- NEVER show raw IDs (\`calendarId\`, \`eventId\`, \`accessPath\`, \`eventRef\`, \`seriesMasterId\`) to the user.
+- NEVER show raw IDs (\`calendarRef\`, \`eventRef\`, \`calendarId\`, \`eventId\`, \`mailbox\`, \`seriesMasterId\`) to the user.
+- \`calendarRef\` and \`eventRef\` are opaque handles. Pass them back exactly as received; never build one from parts.
 `;

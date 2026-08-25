@@ -681,7 +681,7 @@ Restart the full sync from scratch, discarding all previous progress.
 | `update_event` | Yes | Change an existing meeting. For a series, the user picks this occurrence or the whole series. |
 | `cancel_event` | Yes | Cancel and notify attendees. Not `DELETE`. Only the organizer can cancel. Same series choice as update. |
 
-Do not display `eventRef`, `eventId`, `calendarId`, or `accessPath`. Input and output field descriptions live on the tool schemas (harmony-tested). Enablement, ID namespaces, and example prompts: [Calendar integration](./calendar-integration.md).
+Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`. Input and output field descriptions live on the tool schemas (harmony-tested). Enablement, ID namespaces, and example prompts: [Calendar integration](./calendar-integration.md).
 
 ---
 

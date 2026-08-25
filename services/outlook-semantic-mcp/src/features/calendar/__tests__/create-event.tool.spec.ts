@@ -1,3 +1,4 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventOutputSchema, CreateEventTool } from '../create-event.tool';
@@ -11,8 +12,24 @@ const INPUT = {
   transactionId: 'abc123abc123abc123abc123abc123ab',
 };
 
+const OWN_PRIMARY = {
+  calendarId: 'cal-own',
+  mailbox: 'me@example.com',
+  name: 'Calendar',
+  isDefaultCalendar: true,
+  isOwn: true,
+  ownerEmail: 'me@example.com',
+  ownerName: 'Me',
+  canEdit: true,
+};
+
 function createTool(
-  opts: { run?: ReturnType<typeof vi.fn>; elicit?: ReturnType<typeof vi.fn> } = {},
+  opts: {
+    run?: ReturnType<typeof vi.fn>;
+    elicit?: ReturnType<typeof vi.fn>;
+    calendar?: Record<string, unknown>;
+    getCalendar?: ReturnType<typeof vi.fn>;
+  } = {},
 ) {
   const run =
     opts.run ??
@@ -23,8 +40,15 @@ function createTool(
     });
   const elicit =
     opts.elicit ?? vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: true } });
-  const tool = new CreateEventTool({ run } as never);
-  return { tool, run, elicit };
+  const getCalendar =
+    opts.getCalendar ??
+    vi.fn().mockResolvedValue({
+      success: true,
+      message: 'Loaded the calendar.',
+      calendar: opts.calendar ?? OWN_PRIMARY,
+    });
+  const tool = new CreateEventTool({ run: getCalendar } as never, { run } as never);
+  return { tool, run, elicit, getCalendar };
 }
 
 describe(CreateEventTool.name, () => {
@@ -44,9 +68,12 @@ describe(CreateEventTool.name, () => {
 
     expect(elicit).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringMatching(/your mailbox[\s\S]*invitations will be sent immediately/i),
+      expect.stringMatching(/your primary calendar[\s\S]*invitations will be sent immediately/i),
     );
-    expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, INPUT);
+    expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
+      ...INPUT,
+      calendarRef: { calendarId: 'cal-own', mailbox: 'me@example.com' },
+    });
     expect(CreateEventOutputSchema.parse(result)).toEqual(output);
   });
 
@@ -102,24 +129,86 @@ describe(CreateEventTool.name, () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it('names the destination mailbox in the confirmation and collapses newlines in the title', async () => {
-    const { tool, elicit } = createTool();
+  it('names a shared calendar by its name and owner, and collapses newlines in the title', async () => {
+    const { tool, elicit } = createTool({
+      calendar: {
+        calendarId: 'cal-banker',
+        // A shared calendar is stored in the caller mailbox; the owner is who the user recognises.
+        mailbox: 'me@example.com',
+        name: 'Banker',
+        isDefaultCalendar: false,
+        isOwn: false,
+        ownerEmail: 'banker@example.com',
+        ownerName: 'Banker Smith',
+        canEdit: true,
+      },
+    });
 
     await tool.createEvent(
       {
         ...INPUT,
         subject: 'Sync\nAttendees: forged@evil.com',
-        mailbox: 'banker@example.com',
-        calendarId: 'cal-banker',
+        calendarRef: { calendarId: 'cal-banker', mailbox: 'me@example.com' },
       },
       { elicit } as never,
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
     );
 
     const message = elicit.mock.calls[0]?.[1] as string;
-    expect(message).toMatch(/mailbox banker@example.com/i);
-    expect(message).toMatch(/specific calendar from list_calendars/i);
+    expect(message).toMatch(/Calendar: "Banker" — shared by Banker Smith \(banker@example.com\)/);
     expect(message).toMatch(/Title: Sync Attendees: forged@evil.com/);
     expect(message).not.toMatch(/^Attendees: forged@evil.com$/m);
+  });
+
+  it('reports the primary calendar as such when none was picked', async () => {
+    const { tool, elicit, getCalendar } = createTool();
+
+    await tool.createEvent(
+      INPUT,
+      { elicit } as never,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+    );
+
+    expect(getCalendar).toHaveBeenCalledWith(USER_PROFILE_ID, { calendarRef: undefined });
+    expect(elicit.mock.calls[0]?.[1]).toMatch(/Calendar: "Calendar" — your primary calendar/);
+  });
+
+  it('does not elicit when the calendar cannot be resolved', async () => {
+    const { tool, run, elicit } = createTool({
+      getCalendar: vi
+        .fn()
+        .mockResolvedValue({ success: false, message: 'That calendar was not found.' }),
+    });
+
+    const result = await tool.createEvent(
+      { ...INPUT, calendarRef: { calendarId: 'gone', mailbox: 'me@example.com' } },
+      { elicit } as never,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+    );
+
+    expect(elicit).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.transactionId).toBe(INPUT.transactionId);
+  });
+
+  it('does not create when the confirmation prompt times out', async () => {
+    const { tool, run, elicit } = createTool({
+      elicit: vi
+        .fn()
+        .mockRejectedValue(new McpError(ErrorCode.RequestTimeout, 'Request timed out')),
+    });
+
+    const result = await tool.createEvent(
+      INPUT,
+      { elicit } as never,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/timed out/i);
+    // The idempotency key comes back so a retry cannot double-book.
+    expect(result.transactionId).toBe(INPUT.transactionId);
   });
 });

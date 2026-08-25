@@ -12,7 +12,6 @@ const DEFAULT_TZ = {
   notes: [],
 };
 const CREATE_PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events`;
-const DEFAULT_CALENDAR_PATH = `/users/${OWN_EMAIL}/calendar`;
 const PREFER = 'outlook.timezone="W. Europe Standard Time", IdType="ImmutableId"';
 
 function makeGraphError(statusCode: number, code: string): GraphError {
@@ -72,11 +71,10 @@ describe(CreateEventCommand.name, () => {
       attendees: ['alex@example.com'],
       location: 'Room A',
       isOnlineMeeting: true,
+      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
-    expect(api).toHaveBeenCalledWith(DEFAULT_CALENDAR_PATH);
-    expect(get).toHaveBeenCalled();
     expect(api).toHaveBeenCalledWith(CREATE_PATH);
     expect(request.header).toHaveBeenCalledWith('Prefer', PREFER);
     expect(post).toHaveBeenCalledWith({
@@ -94,7 +92,6 @@ describe(CreateEventCommand.name, () => {
     expect(result.eventRef).toEqual({
       eventId: 'evt-1',
       calendarId: 'cal-own',
-      accessPath: 'ownMailbox',
       mailbox: OWN_EMAIL,
     });
     expect(result.joinUrl).toBe('https://teams.example/join');
@@ -108,8 +105,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      mailbox: 'banker@example.com',
-      calendarId: 'cal-banker',
+      calendarRef: { calendarId: 'cal-banker', mailbox: 'banker@example.com' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -127,6 +123,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
+      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -143,8 +140,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      mailbox: 'banker@example.com',
-      calendarId: 'cal-banker',
+      calendarRef: { calendarId: 'cal-banker', mailbox: 'banker@example.com' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -162,8 +158,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      mailbox: 'banker@example.com',
-      calendarId: 'missing',
+      calendarRef: { calendarId: 'missing', mailbox: 'banker@example.com' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -181,7 +176,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      calendarId: 'cal-own',
+      calendarRef: { calendarId: 'cal-own', mailbox: 'me@example.com' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 

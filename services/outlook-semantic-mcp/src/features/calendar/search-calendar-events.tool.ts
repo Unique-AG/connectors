@@ -7,9 +7,18 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { DateRangeSchema } from '~/utils/relative-range';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
+import { GraphDateTimeSchema } from './utils/calendar-display';
+import { CalendarRefSchema } from './utils/calendar-ref.schema';
 import { EventRefSchema } from './utils/event-ref.schema';
 
 const FiltersSchema = z.object({
+  calendars: z
+    .array(CalendarRefSchema)
+    .max(50)
+    .optional()
+    .describe(
+      'Narrow the search to specific calendars. Take each calendarRef from list_calendars and pass it through unchanged. Omit to search every calendar the user can access, which is the normal case and needs no list_calendars call first.',
+    ),
   mailbox: z
     .string()
     .optional()
@@ -57,16 +66,6 @@ const AttendeeSchema = z.object({
     .describe('Attendee type: required, optional, or resource. Null if Graph omitted it.'),
 });
 
-const DateTimeSchema = z.object({
-  dateTime: z
-    .string()
-    .describe('Local date and time of the boundary as returned by Graph, without a trailing Z.'),
-  timeZone: z
-    .string()
-    .nullable()
-    .describe('Windows or IANA timezone Graph attached to this boundary, or null if omitted.'),
-});
-
 const CalendarEventSchema = z.object({
   subject: z.string().nullable().describe('Event subject. Null when Graph omitted or redacted it.'),
   body: z
@@ -75,8 +74,8 @@ const CalendarEventSchema = z.object({
       'Plain-text event body, already converted by Graph. May be truncated; see bodyTruncated.',
     ),
   bodyTruncated: z.boolean().describe('True when body was cut to the per-event character cap.'),
-  start: DateTimeSchema.describe('Event start.'),
-  end: DateTimeSchema.describe('Event end.'),
+  start: GraphDateTimeSchema.describe('Event start.'),
+  end: GraphDateTimeSchema.describe('Event end.'),
   location: z
     .string()
     .nullable()

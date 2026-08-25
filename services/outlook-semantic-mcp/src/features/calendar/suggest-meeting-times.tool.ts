@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SuggestMeetingTimesQuery } from './suggest-meeting-times.query';
 import { META } from './suggest-meeting-times-tool.meta';
+import { GraphDateTimeSchema } from './utils/calendar-display';
 import { SuggestMeetingDateRangeSchema } from './utils/graph-schedule-date-range.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
 
@@ -16,11 +17,8 @@ export const SuggestMeetingTimesInputSchema = z.object({
         'SMTP address of a required attendee. Omit the whole array to find slots for the organizer only.',
       ),
     )
-    .max(20)
     .optional()
-    .describe(
-      'People who must be free. Maximum 20. Omit to search only the organizer mailbox working hours.',
-    ),
+    .describe('People who must be free. Omit to search only the organizer mailbox working hours.'),
   dateRange: SuggestMeetingDateRangeSchema.describe(
     'Future window in which to search for slots. Prefer rangeType relative (today, tomorrow, thisWeek, nextWeek, next7Days). Must be shorter than 62 days. Past-only ranges (yesterday, lastWeek, past30Days) are rejected; if the start is already past, suggestions begin from now.',
   ),
@@ -61,16 +59,6 @@ export const SuggestMeetingTimesInputSchema = z.object({
     ),
 });
 
-const DateTimeSchema = z.object({
-  dateTime: z
-    .string()
-    .describe('Local date and time of the boundary as returned by Graph, without a trailing Z.'),
-  timeZone: z
-    .string()
-    .nullable()
-    .describe('Windows or IANA timezone Graph attached to this boundary, or null if omitted.'),
-});
-
 const AttendeeAvailabilitySchema = z.object({
   email: z.string().nullable().describe('SMTP address of the attendee, or null if omitted.'),
   availability: z
@@ -80,8 +68,8 @@ const AttendeeAvailabilitySchema = z.object({
 });
 
 const MeetingTimeSuggestionSchema = z.object({
-  start: DateTimeSchema.describe('Suggested slot start.'),
-  end: DateTimeSchema.describe('Suggested slot end.'),
+  start: GraphDateTimeSchema.describe('Suggested slot start.'),
+  end: GraphDateTimeSchema.describe('Suggested slot end.'),
   confidence: z
     .number()
     .nullable()

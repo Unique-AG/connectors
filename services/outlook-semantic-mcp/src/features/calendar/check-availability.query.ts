@@ -7,6 +7,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   type RelativeRange,
   type ResolvedWindow,
@@ -36,7 +37,7 @@ import {
   type WorkingHours,
 } from './utils/map-graph-working-hours-to-working-hours';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema } from './utils/smtp-address.schema';
+import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
 const MAX_SCHEDULES = 20;
 const DEFAULT_INTERVAL_MINUTES = 30;
@@ -90,7 +91,7 @@ export class CheckAvailabilityQuery {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
+      mailbox: obfuscateEmail(input.mailbox),
       attendeeCount: input.attendees.length,
       range: input.range,
       msg: 'check_availability started',
@@ -132,13 +133,13 @@ export class CheckAvailabilityQuery {
     });
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox ?? userProfile.email,
+      mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
       msg: 'check_availability window',
     });
-    const schedules = uniqueSchedules(input.attendees);
+    const schedules = uniqueSmtpAddresses(input.attendees);
     assert.ok(
       schedules.length > 0 && schedules.length <= MAX_SCHEDULES,
       'attendees must already be a non-empty list of at most 20 SMTP addresses',
@@ -182,19 +183,20 @@ export class CheckAvailabilityQuery {
       const viewStart = Temporal.Instant.from(resolvedWindow.startDateTime).toZonedDateTimeISO(
         ianaTimeZone,
       );
-      const people = parsed.value.map((item) =>
+      const perPerson = parsed.value.map((item) =>
         this.toPersonAvailability({
           item,
           viewStart,
           intervalMinutes,
-          notes,
           userProfileId: userProfileIdString,
           mailbox,
         }),
       );
+      const people = perPerson.map((entry) => entry.person);
+      notes.push(...perPerson.flatMap((entry) => entry.notes));
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         scheduleCount: schedules.length,
         returned: people.length,
         msg: 'check_availability getSchedule',
@@ -202,7 +204,7 @@ export class CheckAvailabilityQuery {
       if (people.length === 0) {
         this.logger.debug({
           userProfileId: userProfileIdString,
-          mailbox,
+          mailbox: obfuscateEmail(mailbox),
           msg: 'check_availability no availability returned',
         });
       }
@@ -273,28 +275,28 @@ export class CheckAvailabilityQuery {
     item: GraphScheduleInformation;
     viewStart: Temporal.ZonedDateTime;
     intervalMinutes: number;
-    notes: string[];
     userProfileId: string;
     mailbox: string;
-  }): PersonAvailability {
+  }): { person: PersonAvailability; notes: string[] } {
     const email = input.item.scheduleId ?? 'unknown';
+    const notes: string[] = [];
     if (isTooManyEntries(input.item.error)) {
       this.logger.warn({
         userProfileId: input.userProfileId,
-        mailbox: input.mailbox,
-        scheduleId: email,
+        mailbox: obfuscateEmail(input.mailbox),
+        scheduleId: obfuscateEmail(email),
         msg: 'check_availability person too many entries',
       });
-      input.notes.push(`${email}: ${TOO_MANY_ENTRIES_MESSAGE}`);
+      notes.push(`${email}: ${TOO_MANY_ENTRIES_MESSAGE}`);
     } else if (input.item.error?.message !== undefined) {
       this.logger.warn({
         userProfileId: input.userProfileId,
-        mailbox: input.mailbox,
-        scheduleId: email,
+        mailbox: obfuscateEmail(input.mailbox),
+        scheduleId: obfuscateEmail(email),
         graphResponseCode: input.item.error.responseCode,
         msg: 'check_availability person error',
       });
-      input.notes.push(`${email}: ${input.item.error.message}`);
+      notes.push(`${email}: ${input.item.error.message}`);
     }
     const busyBlocks = decodeAvailabilityView({
       availabilityView: input.item.availabilityView ?? '',
@@ -305,47 +307,35 @@ export class CheckAvailabilityQuery {
     if (busyBlocks.length > MAX_BUSY_BLOCKS_PER_PERSON) {
       this.logger.debug({
         userProfileId: input.userProfileId,
-        mailbox: input.mailbox,
-        scheduleId: email,
+        mailbox: obfuscateEmail(input.mailbox),
+        scheduleId: obfuscateEmail(email),
         msg: 'check_availability busy blocks truncated',
       });
-      input.notes.push(
+      notes.push(
         `${email}: busy blocks truncated to ${MAX_BUSY_BLOCKS_PER_PERSON}. Narrow the date range.`,
       );
     }
     if (items.length > MAX_ITEMS_PER_PERSON) {
       this.logger.debug({
         userProfileId: input.userProfileId,
-        mailbox: input.mailbox,
-        scheduleId: email,
+        mailbox: obfuscateEmail(input.mailbox),
+        scheduleId: obfuscateEmail(email),
         msg: 'check_availability schedule items truncated',
       });
-      input.notes.push(
+      notes.push(
         `${email}: schedule items truncated to ${MAX_ITEMS_PER_PERSON}. Narrow the date range.`,
       );
     }
     return {
-      email,
-      busyBlocks: busyBlocks.slice(0, MAX_BUSY_BLOCKS_PER_PERSON),
-      items: items.slice(0, MAX_ITEMS_PER_PERSON),
-      workingHours: mapGraphWorkingHoursToWorkingHours(input.item.workingHours),
+      person: {
+        email,
+        busyBlocks: busyBlocks.slice(0, MAX_BUSY_BLOCKS_PER_PERSON),
+        items: items.slice(0, MAX_ITEMS_PER_PERSON),
+        workingHours: mapGraphWorkingHoursToWorkingHours(input.item.workingHours),
+      },
+      notes,
     };
   }
-}
-
-function uniqueSchedules(attendees: string[]): string[] {
-  const seen = new Set<string>();
-  const schedules: string[] = [];
-  for (const attendee of attendees) {
-    const trimmed = attendee.trim();
-    const key = trimmed.toLowerCase();
-    if (!SmtpAddressSchema.safeParse(trimmed).success || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    schedules.push(trimmed);
-  }
-  return schedules;
 }
 
 function isTooManyEntries(error: GraphScheduleInformation['error']): boolean {

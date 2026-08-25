@@ -1,22 +1,29 @@
 import * as z from 'zod';
 
-export type CalendarAccessPath = 'ownMailbox' | 'ownerMailbox';
-
 export interface CalendarRef {
   calendarId: string;
   name: string;
+  /**
+   * The mailbox this calendar was listed from, and the only mailbox its calendarId resolves in.
+   * Graph calendar and event ids are scoped to exactly one mailbox: an id read from
+   * /users/{a}/calendars returns 404 under /users/{b}. This is provenance, not a property of the
+   * calendar, so it can only ever be the path the id came from — never infer it from the owner or
+   * from isDefaultCalendar/isTallyingResponses. A calendar somebody shared with you lives in
+   * *your* mailbox even though ownerEmail is theirs.
+   */
+  mailbox: string;
+  /** Display and filtering only. Who the calendar belongs to, which is not where its id resolves. */
   ownerEmail: string | null;
   ownerName: string | null;
   isOwn: boolean;
   canEdit: boolean;
   canViewPrivateItems: boolean;
-  accessPath: CalendarAccessPath;
 }
 
 export interface EventRef {
   eventId: string;
   calendarId: string;
-  accessPath: CalendarAccessPath;
+  /** The mailbox both ids resolve in. See CalendarRef.mailbox. */
   mailbox: string;
 }
 
@@ -25,7 +32,7 @@ const GraphEmailAddressSchema = z.object({
   name: z.string().optional(),
 });
 
-const GraphCalendarSchema = z.object({
+export const GraphCalendarSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   owner: GraphEmailAddressSchema.optional(),
@@ -171,3 +178,15 @@ export const GraphFindMeetingTimesResponseSchema = z.object({
 });
 
 export type GraphMeetingTimeSuggestion = z.infer<typeof GraphMeetingTimeSuggestionSchema>;
+
+/** Shape Graph returns from POST /events and PATCH /events/{id}. */
+export const GraphWrittenEventSchema = z.object({
+  id: z.string(),
+  subject: z.string().optional().nullable(),
+  start: GraphDateTimeTimeZoneSchema.nullish(),
+  end: GraphDateTimeTimeZoneSchema.nullish(),
+  webLink: z.string().nullish(),
+  onlineMeeting: GraphOnlineMeetingSchema.nullish(),
+  onlineMeetingUrl: z.string().nullish(),
+  location: GraphLocationSchema.nullish(),
+});

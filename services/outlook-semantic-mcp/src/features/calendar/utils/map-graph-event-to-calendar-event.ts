@@ -1,5 +1,4 @@
 import type { CalendarRef, EventRef, GraphEvent } from '../calendar.schemas';
-import { calendarMailbox } from './calendar-graph-path';
 import { summariseRecurrence } from './summarise-recurrence';
 
 const BODY_MAX_CHARS = 4000;
@@ -44,7 +43,6 @@ export interface CalendarEvent {
 export function mapGraphEventToCalendarEvent(input: {
   event: GraphEvent;
   calendar: CalendarRef;
-  callerEmail: string;
 }): CalendarEvent {
   const rawBody = input.event.body?.content ?? '';
   const bodyTruncated = rawBody.length > BODY_MAX_CHARS;
@@ -84,11 +82,7 @@ export function mapGraphEventToCalendarEvent(input: {
     eventRef: {
       eventId: input.event.id,
       calendarId: input.calendar.calendarId,
-      accessPath: input.calendar.accessPath,
-      mailbox: calendarMailbox({
-        calendar: input.calendar,
-        callerEmail: input.callerEmail,
-      }),
+      mailbox: input.calendar.mailbox,
     },
   };
 }

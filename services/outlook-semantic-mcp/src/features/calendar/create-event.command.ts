@@ -1,10 +1,8 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
-import * as z from 'zod';
 import {
   type CalendarMetricErrorType,
   CalendarMetricsService,
@@ -13,34 +11,20 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import type { CalendarAccessPath, EventRef } from './calendar.schemas';
-import { createEventPath, defaultCalendarPath } from './utils/calendar-graph-path';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
+import { type EventRef, GraphWrittenEventSchema } from './calendar.schemas';
+import { createEventPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
   classifyCalendarGraphError,
   logCalendarRecovered,
 } from './utils/calendar-observability';
+import type { CalendarRefInput } from './utils/calendar-ref.schema';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema } from './utils/smtp-address.schema';
+import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
-const MAX_ATTENDEES = 20;
 const TRANSACTION_ID_MAX = 32;
-
-const DefaultCalendarSchema = z.object({
-  id: z.string().min(1),
-});
-
-const CreatedEventSchema = z.object({
-  id: z.string(),
-  subject: z.string().optional().nullable(),
-  start: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
-  end: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
-  webLink: z.string().nullish(),
-  onlineMeeting: z.object({ joinUrl: z.string().optional() }).nullish(),
-  onlineMeetingUrl: z.string().nullish(),
-  location: z.object({ displayName: z.string().optional() }).nullish(),
-});
 
 export interface CreateEventCommandInput {
   subject: string;
@@ -50,8 +34,7 @@ export interface CreateEventCommandInput {
   location?: string;
   body?: string;
   isOnlineMeeting?: boolean;
-  mailbox?: string;
-  calendarId?: string;
+  calendarRef: CalendarRefInput;
   transactionId?: string;
 }
 
@@ -88,15 +71,15 @@ export class CreateEventCommand {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
-      calendarId: input.calendarId,
+      mailbox: obfuscateEmail(input.calendarRef.mailbox),
+      calendarId: input.calendarRef.calendarId,
       attendeeCount: input.attendees?.length ?? 0,
       msg: 'create_event started',
     });
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
-      calendarId: input.calendarId,
+      mailbox: input.calendarRef.mailbox,
+      calendarId: input.calendarRef.calendarId,
       operation: 'create_event',
     });
     return this.calendarMetrics.measureOperation({ operation: 'create_event' }, (fail) =>
@@ -117,11 +100,7 @@ export class CreateEventCommand {
       Temporal.Instant.compare(end, start) > 0,
       'endDateTime must already be after startDateTime',
     );
-    const attendees = uniqueAttendees(input.attendees ?? []);
-    assert.ok(
-      attendees.length <= MAX_ATTENDEES,
-      'attendees must already be at most 20 SMTP addresses',
-    );
+    const attendees = uniqueSmtpAddresses(input.attendees ?? []);
     const transactionId = input.transactionId ?? newTransactionId();
     assert.ok(
       transactionId.length > 0 && transactionId.length <= TRANSACTION_ID_MAX,
@@ -129,7 +108,8 @@ export class CreateEventCommand {
     );
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const mailbox = input.mailbox ?? userProfile.email;
+    // calendarRef pairs the id with the mailbox it resolves in, so the two cannot be mismatched.
+    const mailbox = input.calendarRef.mailbox;
     assert.ok(
       SmtpAddressSchema.safeParse(mailbox).success,
       'mailbox must already be an SMTP address',
@@ -137,7 +117,7 @@ export class CreateEventCommand {
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
       mailbox,
-      calendarId: input.calendarId,
+      calendarId: input.calendarRef.calendarId,
       operation: 'create_event',
     });
     const { ianaTimeZone, outlookTimeZone } =
@@ -145,9 +125,7 @@ export class CreateEventCommand {
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
     try {
-      const calendarId =
-        input.calendarId ??
-        (await this.resolveDefaultCalendarId(client, mailbox, userProfileIdString));
+      const calendarId = input.calendarRef.calendarId;
       const path = createEventPath({ mailboxEmail: mailbox, calendarId });
       const startTime = mapIsoToGraphDateTimeTimeZone({
         iso: input.startDateTime,
@@ -185,10 +163,10 @@ export class CreateEventCommand {
             ? { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' }
             : {}),
         });
-      const created = CreatedEventSchema.parse(raw);
+      const created = GraphWrittenEventSchema.parse(raw);
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         calendarId,
         transactionId,
         attendeeCount: attendees.length,
@@ -203,7 +181,6 @@ export class CreateEventCommand {
         eventRef: {
           eventId: created.id,
           calendarId,
-          accessPath: accessPathForMailbox(mailbox, userProfile.email),
           mailbox,
         },
         subject: created.subject ?? input.subject.trim(),
@@ -226,7 +203,7 @@ export class CreateEventCommand {
         mailbox,
         callerEmail: userProfile.email,
         notFoundMessage:
-          'That calendar was not found. List calendars again and pass calendarId without changing it.',
+          'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
         invalidMessage: 'Graph rejected the event. Check the start and end times and try again.',
         deniedDelegatedMessage: `Could not create an event on mailbox ${mailbox}.`,
       });
@@ -237,7 +214,7 @@ export class CreateEventCommand {
       logCalendarRecovered(this.logger, {
         userProfileId: userProfileIdString,
         mailbox,
-        calendarId: input.calendarId,
+        calendarId: input.calendarRef.calendarId,
         outcome: recovered.outcome,
         msg: `create_event ${recovered.outcome}`,
         err: error,
@@ -250,43 +227,8 @@ export class CreateEventCommand {
       };
     }
   }
-
-  private async resolveDefaultCalendarId(
-    client: Client,
-    mailbox: string,
-    userProfileId: string,
-  ): Promise<string> {
-    const raw = await client.api(defaultCalendarPath(mailbox)).select('id').get();
-    const calendarId = DefaultCalendarSchema.parse(raw).id;
-    this.logger.debug({
-      userProfileId,
-      mailbox,
-      calendarId,
-      msg: 'create_event resolved default calendar',
-    });
-    return calendarId;
-  }
-}
-
-function accessPathForMailbox(mailbox: string, callerEmail: string): CalendarAccessPath {
-  return mailbox.toLowerCase() === callerEmail.toLowerCase() ? 'ownMailbox' : 'ownerMailbox';
 }
 
 function newTransactionId(): string {
   return randomUUID().replaceAll('-', '');
-}
-
-function uniqueAttendees(attendees: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const attendee of attendees) {
-    const trimmed = attendee.trim();
-    const key = trimmed.toLowerCase();
-    if (!SmtpAddressSchema.safeParse(trimmed).success || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(trimmed);
-  }
-  return result;
 }

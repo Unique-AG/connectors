@@ -5,7 +5,7 @@ export const META = createMeta({
   icon: 'calendar',
   systemPrompt: `Respond to an Outlook meeting invitation (accept, tentatively accept, or decline).
 
-Pass eventRef from search_calendar_events without modification. A confirmation is shown before the organizer is notified. Do not invent an eventRef. Do not display eventRef, eventId, calendarId, or accessPath.
+Pass eventRef from search_calendar_events without modification. A confirmation is shown before the organizer is notified. Do not invent an eventRef. Do not display eventRef, calendarRef, eventId, or calendarId.
 
 If consentRequired is true, ask the user to reconnect Outlook.`,
   toolFormatInformation: CALENDAR_TOOL_FORMAT_INFORMATION,

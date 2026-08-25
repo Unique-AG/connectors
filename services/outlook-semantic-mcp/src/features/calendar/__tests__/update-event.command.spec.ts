@@ -9,7 +9,6 @@ const OWN_EMAIL = 'me@example.com';
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  accessPath: 'ownMailbox' as const,
   mailbox: OWN_EMAIL,
 };
 const PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events/master-1`;
@@ -68,7 +67,7 @@ describe(UpdateEventCommand.name, () => {
       subject: 'Renamed',
       startDateTime: '2026-08-26T10:00:00+02:00',
       endDateTime: '2026-08-26T10:30:00+02:00',
-      notifyAttendees: true,
+      attendeesWereNotified: true,
     });
 
     expect(api).toHaveBeenCalledWith(PATH);
@@ -92,7 +91,7 @@ describe(UpdateEventCommand.name, () => {
       eventRef: EVENT_REF,
       targetEventId: 'master-1',
       subject: 'Renamed',
-      notifyAttendees: false,
+      attendeesWereNotified: false,
     });
 
     expect(result.success).toBe(false);
@@ -108,7 +107,7 @@ describe(UpdateEventCommand.name, () => {
       eventRef: EVENT_REF,
       targetEventId: 'master-1',
       subject: 'Renamed',
-      notifyAttendees: false,
+      attendeesWereNotified: false,
     });
 
     expect(result.success).toBe(false);

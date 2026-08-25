@@ -1,6 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { classifyCalendarGraphError, logCalendarRecovered } from '../calendar-observability';
 
 vi.mock('~/features/tracing.utils', () => ({
@@ -76,18 +77,23 @@ describe(logCalendarRecovered.name, () => {
     logCalendarRecovered(logger, {
       userProfileId: 'user_profile_1',
       mailbox: 'me@example.com',
+      ownerEmail: 'banker@example.com',
       outcome: 'consent',
       msg: 'list_calendars consent required',
     });
 
+    // The sink de-identifies, so a caller cannot leak an address by forgetting to.
     expect(warn).toHaveBeenCalledWith({
       userProfileId: 'user_profile_1',
-      mailbox: 'me@example.com',
+      mailbox: obfuscateEmail('me@example.com'),
+      ownerEmail: obfuscateEmail('banker@example.com'),
       msg: 'list_calendars consent required',
     });
     expect(traceEvent).toHaveBeenCalledWith('calendar.recovered', {
       outcome: 'consent',
-      mailbox: 'me@example.com',
+      mailbox: obfuscateEmail('me@example.com'),
+      ownerEmail: obfuscateEmail('banker@example.com'),
     });
+    expect(JSON.stringify(warn.mock.calls[0])).not.toContain('me@example.com');
   });
 });

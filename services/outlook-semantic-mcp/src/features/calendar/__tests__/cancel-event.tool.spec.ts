@@ -6,7 +6,6 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  accessPath: 'ownMailbox' as const,
   mailbox: 'me@example.com',
 };
 const SNAPSHOT = {
@@ -71,7 +70,7 @@ describe(CancelEventTool.name, () => {
       expect.objectContaining({
         targetEventId: 'evt-1',
         comment: 'Travel conflict',
-        notifyAttendees: true,
+        attendeesWereNotified: true,
       }),
     );
     expect(CancelEventOutputSchema.parse(result)).toEqual(output);

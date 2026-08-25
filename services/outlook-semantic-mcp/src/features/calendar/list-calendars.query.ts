@@ -8,6 +8,7 @@ import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.serv
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { CalendarRef, GraphCalendarCollectionSchema } from './calendar.schemas';
 import {
   CalendarConsentRequiredError,
@@ -114,7 +115,7 @@ export class ListCalendarsQuery {
     if (ownerEmails.length === 0) {
       this.logger.log({
         userProfileId: input.userProfileId,
-        mailbox: input.callerEmail,
+        mailbox: obfuscateEmail(input.callerEmail),
         calendarCount: own.length,
         delegatedMailboxCount: 0,
         msg: 'list_calendars',
@@ -133,7 +134,6 @@ export class ListCalendarsQuery {
               mailboxEmail: ownerEmail,
               callerEmail: input.callerEmail,
               userProfileId: input.userProfileId,
-              accessPathOverride: 'ownerMailbox',
             });
           } catch (error) {
             if (isDelegatedAccessNotAvailableError(error)) {
@@ -172,7 +172,7 @@ export class ListCalendarsQuery {
     const calendars = [...fromMe, ...delegated];
     this.logger.log({
       userProfileId: input.userProfileId,
-      mailbox: input.callerEmail,
+      mailbox: obfuscateEmail(input.callerEmail),
       calendarCount: calendars.length,
       delegatedMailboxCount: ownerEmails.length,
       msg: 'list_calendars',
@@ -187,7 +187,6 @@ export class ListCalendarsQuery {
     mailboxEmail: string;
     callerEmail: string;
     userProfileId: string;
-    accessPathOverride?: CalendarRef['accessPath'];
     consentOnDenied?: boolean;
   }): Promise<CalendarRef[]> {
     calendarTraceAttrs({
@@ -212,7 +211,7 @@ export class ListCalendarsQuery {
             mapGraphCalendarToCalendarRef({
               calendar: item,
               callerEmail: input.callerEmail,
-              accessPathOverride: input.accessPathOverride,
+              mailboxEmail: input.mailboxEmail,
             }),
           );
         }

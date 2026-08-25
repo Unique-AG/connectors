@@ -20,21 +20,31 @@ Shared-mailbox **profiles** never call calendar tools. A logged-in oauth user qu
 
 See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
 
-## Two ID namespaces
+## ID namespaces
 
-Graph calendar and event IDs belong to **one mailbox**. An ID copied from a sharee's mailbox does not resolve on the owner's mailbox, and the reverse is also true.
+Graph calendar and event IDs belong to **one mailbox**. An ID read from `/users/{a}/calendars` returns `404 ErrorItemNotFound` under `/users/{b}`, in both directions. Verified against live Graph on 2026-08-25: a calendar shared from another mailbox read back as `200` under the caller and `404 ErrorItemNotFound` under its owner.
 
-| What the user can see | `eventRef.accessPath` | `eventRef.mailbox` | IDs are valid on |
+So the mailbox is **provenance**, not a property of the calendar: it is whichever list the ID came out of. `list_calendars` reads two lists and records which one produced each row.
+
+| How the user reaches the calendar | Listed from | `mailbox` | IDs are valid on |
 | --- | --- | --- | --- |
-| Own calendar, or a custom calendar stored in the caller's mailbox | `ownMailbox` | caller SMTP | `/users/{caller}/calendars/{calendarId}/…` |
-| Owner's primary (or other) calendar reached as a delegate / sharee | `ownerMailbox` | owner SMTP | `/users/{owner}/calendars/{calendarId}/…` |
+| Their own calendars | `/users/{caller}/calendars` | caller SMTP | `/users/{caller}/calendars/{calendarId}/…` |
+| A calendar somebody shared with them (they accepted the invitation) | `/users/{caller}/calendars` | **caller SMTP** | `/users/{caller}/calendars/{calendarId}/…` |
+| A mailbox they have Full Access to | `/users/{owner}/calendars` | owner SMTP | `/users/{owner}/calendars/{calendarId}/…` |
 
-`list_calendars` classifies each row. Search and writes always use `/users/{email}/…` (never `/me/calendars`) and send `Prefer: IdType="ImmutableId"` so the IDs stay in one namespace.
+Note row two. A shared calendar is owned by somebody else but **stored in the caller's mailbox**, so `mailbox` is the caller while `ownerEmail` is the owner. Those two fields answer different questions and must not be conflated:
+
+- `mailbox` — routing. Where the ID resolves. Never displayed.
+- `ownerEmail` / `ownerName` — display and filtering. Who it belongs to.
+
+Never infer `mailbox` from the payload. Graph sets `isTallyingResponses: true` on a shared calendar, and treating that as "this is the owner's primary calendar" is what previously routed shared calendars to a 404.
+
+Search and writes always use `/users/{email}/…` (never `/me/calendars`) and send `Prefer: IdType="ImmutableId"` so IDs stay in one namespace.
 
 Rules:
 
-- Pass `eventRef` from `search_calendar_events` through unchanged. Do not reconstruct it.
-- Do not display `eventRef`, `eventId`, `calendarId`, or `accessPath`.
+- `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) are opaque handles that pair an ID with its mailbox. Pass them through unchanged; never assemble one from parts.
+- Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`.
 - Path segments for those IDs are `encodeURIComponent`'d so a slash in a Graph ID cannot leave its segment.
 
 ## Contracts

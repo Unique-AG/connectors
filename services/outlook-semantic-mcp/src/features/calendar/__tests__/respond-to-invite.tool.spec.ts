@@ -1,3 +1,4 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { RespondToInviteOutputSchema, RespondToInviteTool } from '../respond-to-invite.tool';
@@ -6,7 +7,6 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  accessPath: 'ownMailbox' as const,
   mailbox: 'me@example.com',
 };
 
@@ -99,5 +99,23 @@ describe(RespondToInviteTool.name, () => {
     ).rejects.toThrow(/SMTP/i);
     expect(elicit).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('does not respond when the confirmation prompt times out', async () => {
+    const { tool, run, elicit } = createTool({
+      elicit: vi
+        .fn()
+        .mockRejectedValue(new McpError(ErrorCode.RequestTimeout, 'Request timed out')),
+    });
+
+    const result = await tool.respondToInvite(
+      { eventRef: EVENT_REF, response: "accept" },
+      { elicit } as never,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/timed out/i);
   });
 });

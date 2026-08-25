@@ -40,24 +40,36 @@ const MISSING_TIMEZONE: ResolvedMailboxTimezone = {
 const OWN_CALENDAR: CalendarRef = {
   calendarId: 'cal-own',
   name: 'Calendar',
+  mailbox: OWN_EMAIL,
   ownerEmail: OWN_EMAIL,
   ownerName: 'Me',
   isOwn: true,
   canEdit: true,
   canViewPrivateItems: true,
-  accessPath: 'ownMailbox',
 };
 
 const DELEGATED_CALENDAR: CalendarRef = {
   calendarId: 'cal-banker',
   name: 'Banker',
+  mailbox: OWNER_EMAIL,
   ownerEmail: OWNER_EMAIL,
   ownerName: 'Banker',
   isOwn: false,
   canEdit: true,
   canViewPrivateItems: false,
-  accessPath: 'ownerMailbox',
 };
+
+const SHARED_INTO_OWN_MAILBOX: CalendarRef = {
+  calendarId: 'cal-shared',
+  name: 'Banker',
+  mailbox: OWN_EMAIL,
+  ownerEmail: OWNER_EMAIL,
+  ownerName: 'Banker',
+  isOwn: false,
+  canEdit: false,
+  canViewPrivateItems: false,
+};
+const SHARED_VIEW = `/users/${OWN_EMAIL}/calendars/cal-shared/calendarView`;
 
 function makeGraphError(statusCode: number, code: string): GraphError {
   const err = new GraphError(statusCode, 'Access denied');
@@ -186,7 +198,6 @@ describe(SearchCalendarEventsQuery.name, () => {
         eventRef: {
           eventId: 'evt-1',
           calendarId: 'cal-own',
-          accessPath: 'ownMailbox',
           mailbox: OWN_EMAIL,
         },
       }),
@@ -429,7 +440,6 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.events?.[0]?.eventRef).toEqual({
       eventId: 'banker-evt',
       calendarId: 'cal-banker',
-      accessPath: 'ownerMailbox',
       mailbox: OWNER_EMAIL,
     });
   });
@@ -472,5 +482,54 @@ describe(SearchCalendarEventsQuery.name, () => {
       endDateTime: '2026-08-25T23:59:59.999+02:00',
     });
     expect(result.resolvedWindow?.interpretation).toContain('today = Tue 2026-08-25 00:00');
+  });
+
+  it('reads a calendar shared into the caller mailbox from the caller mailbox', async () => {
+    // Regression: classifying this as the owner's calendar sent the caller-namespace id to
+    // /users/{owner}/... , which live Graph answers with 404 ErrorItemNotFound.
+    const { query, api } = createQuery({
+      calendars: [SHARED_INTO_OWN_MAILBOX],
+      getByPath: { [SHARED_VIEW]: { value: [graphEvent({ id: 'shared-evt' })] } },
+    });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(api).toHaveBeenCalledWith(SHARED_VIEW);
+    expect(api).not.toHaveBeenCalledWith(`/users/${OWNER_EMAIL}/calendars/cal-shared/calendarView`);
+    expect(result.events?.[0]?.eventRef).toEqual({
+      eventId: 'shared-evt',
+      calendarId: 'cal-shared',
+      mailbox: OWN_EMAIL,
+    });
+  });
+
+  it('narrows the fan-out to the requested calendars', async () => {
+    const { query, api } = createQuery({
+      calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
+      getByPath: { [OWNER_VIEW]: { value: [graphEvent({ id: 'banker-evt' })] } },
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      calendars: [{ calendarId: 'cal-banker', mailbox: OWNER_EMAIL }],
+    });
+
+    expect(api).toHaveBeenCalledWith(OWNER_VIEW);
+    expect(api).not.toHaveBeenCalledWith(OWN_VIEW);
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['banker-evt']);
+  });
+
+  it('notes a requested calendar that is no longer accessible instead of calling Graph', async () => {
+    const { query, api } = createQuery({ calendars: [OWN_CALENDAR] });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      calendars: [{ calendarId: 'cal-gone', mailbox: OWNER_EMAIL }],
+    });
+
+    expect(api).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(result.events).toEqual([]);
+    expect(result.searchNotes?.join(' ')).toMatch(/no longer accessible/i);
   });
 });

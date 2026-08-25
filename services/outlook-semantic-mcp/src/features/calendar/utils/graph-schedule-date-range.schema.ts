@@ -4,21 +4,46 @@ import { DateRangeSchema, type RelativeRange } from '~/utils/relative-range';
 
 export const MAX_GRAPH_SCHEDULE_WINDOW_DAYS = 62;
 
-const RELATIVE_RANGES_LONGER_THAN_62_DAYS = new Set<RelativeRange>([
-  'thisYear',
-  'nextYear',
-  'lastYear',
-  'next90Days',
-]);
+// Record rather than Set so the compiler forces a decision when a RelativeRange is added.
+const RELATIVE_RANGE_EXCEEDS_62_DAYS: Record<RelativeRange, boolean> = {
+  today: false,
+  tomorrow: false,
+  yesterday: false,
+  thisWeek: false,
+  nextWeek: false,
+  lastWeek: false,
+  thisMonth: false,
+  nextMonth: false,
+  lastMonth: false,
+  thisYear: true,
+  nextYear: true,
+  lastYear: true,
+  next7Days: false,
+  next30Days: false,
+  next90Days: true,
+  past7Days: false,
+  past30Days: false,
+};
 
-const PAST_ONLY_RELATIVE_RANGES = new Set<RelativeRange>([
-  'yesterday',
-  'lastWeek',
-  'lastMonth',
-  'lastYear',
-  'past7Days',
-  'past30Days',
-]);
+const RELATIVE_RANGE_IS_PAST_ONLY: Record<RelativeRange, boolean> = {
+  today: false,
+  tomorrow: false,
+  yesterday: true,
+  thisWeek: false,
+  nextWeek: false,
+  lastWeek: true,
+  thisMonth: false,
+  nextMonth: false,
+  lastMonth: true,
+  thisYear: false,
+  nextYear: false,
+  lastYear: true,
+  next7Days: false,
+  next30Days: false,
+  next90Days: false,
+  past7Days: true,
+  past30Days: true,
+};
 
 export function isScheduleWindowTooLong(startDateTime: string, endDateTime: string): boolean {
   const duration = Temporal.Instant.from(startDateTime).until(Temporal.Instant.from(endDateTime));
@@ -27,7 +52,7 @@ export function isScheduleWindowTooLong(startDateTime: string, endDateTime: stri
 
 function refineScheduleWindow(value: z.infer<typeof DateRangeSchema>, ctx: z.RefinementCtx): void {
   if (value.rangeType === 'relative') {
-    if (RELATIVE_RANGES_LONGER_THAN_62_DAYS.has(value.range)) {
+    if (RELATIVE_RANGE_EXCEEDS_62_DAYS[value.range]) {
       ctx.addIssue({
         code: 'custom',
         message: `Window must be shorter than ${MAX_GRAPH_SCHEDULE_WINDOW_DAYS} days. Use today, thisWeek, nextWeek, or next7Days.`,
@@ -55,7 +80,7 @@ export const GraphScheduleDateRangeSchema = DateRangeSchema.superRefine(refineSc
 
 export const SuggestMeetingDateRangeSchema = DateRangeSchema.superRefine((value, ctx) => {
   refineScheduleWindow(value, ctx);
-  if (value.rangeType === 'relative' && PAST_ONLY_RELATIVE_RANGES.has(value.range)) {
+  if (value.rangeType === 'relative' && RELATIVE_RANGE_IS_PAST_ONLY[value.range]) {
     ctx.addIssue({
       code: 'custom',
       message:

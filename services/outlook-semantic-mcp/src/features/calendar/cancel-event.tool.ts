@@ -4,10 +4,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { CancelEventCommand } from './cancel-event.command';
 import { META } from './cancel-event-tool.meta';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
+import { oneLine } from './utils/calendar-display';
+import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
   isSeriesOccurrence,
@@ -100,13 +103,21 @@ export class CancelEventTool {
     if (snapshot.isCancelled) {
       return { success: false, message: 'That event is already cancelled.' };
     }
-    const confirmation = isSeriesOccurrence(snapshot.type)
-      ? await context.elicit(SeriesConfirmSchema, elicitMessage(parsed, snapshot))
-      : await context.elicit(ConfirmSchema, elicitMessage(parsed, snapshot));
-    if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+    const confirmation = await confirmWrite({
+      context,
+      schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
+      message: elicitMessage(parsed, snapshot),
+      logger: this.logger,
+      operation: 'cancel_event',
+      userProfileId: userProfileId.toString(),
+    });
+    if (confirmation.status === 'unavailable') {
+      return { success: false, message: confirmation.message };
+    }
+    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: parsed.eventRef.mailbox,
+        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
         calendarId: parsed.eventRef.calendarId,
         msg: 'cancel_event elicit cancelled',
       });
@@ -115,7 +126,7 @@ export class CancelEventTool {
     const applyTo = parseSeriesScope(confirmation.content);
     this.logger.debug({
       userProfileId: userProfileId.toString(),
-      mailbox: parsed.eventRef.mailbox,
+      mailbox: obfuscateEmail(parsed.eventRef.mailbox),
       calendarId: parsed.eventRef.calendarId,
       applyTo,
       msg: 'cancel_event series scope',
@@ -134,7 +145,7 @@ export class CancelEventTool {
         applyTo,
       }),
       comment: parsed.comment,
-      notifyAttendees: snapshot.attendeeCount > 0,
+      attendeesWereNotified: snapshot.attendeeCount > 0,
     });
   }
 }
@@ -167,8 +178,4 @@ function elicitMessage(
   ]
     .filter((line) => line !== undefined)
     .join('\n');
-}
-
-function oneLine(value: string): string {
-  return value.replaceAll(/\s+/g, ' ').trim();
 }

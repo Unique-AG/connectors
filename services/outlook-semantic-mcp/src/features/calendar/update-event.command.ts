@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
-import * as z from 'zod';
 import {
   type CalendarMetricErrorType,
   CalendarMetricsService,
@@ -11,7 +10,8 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import type { EventRef } from './calendar.schemas';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
+import { type EventRef, GraphWrittenEventSchema } from './calendar.schemas';
 import { eventPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
@@ -20,20 +20,7 @@ import {
   logCalendarRecovered,
 } from './utils/calendar-observability';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema } from './utils/smtp-address.schema';
-
-const MAX_ATTENDEES = 20;
-
-const UpdatedEventSchema = z.object({
-  id: z.string(),
-  subject: z.string().optional().nullable(),
-  start: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
-  end: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
-  webLink: z.string().nullish(),
-  onlineMeeting: z.object({ joinUrl: z.string().optional() }).nullish(),
-  onlineMeetingUrl: z.string().nullish(),
-  location: z.object({ displayName: z.string().optional() }).nullish(),
-});
+import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
 export interface UpdateEventCommandInput {
   eventRef: EventRef;
@@ -45,7 +32,12 @@ export interface UpdateEventCommandInput {
   location?: string;
   body?: string;
   isOnlineMeeting?: boolean;
-  notifyAttendees: boolean;
+  /**
+   * Whether Graph will have notified attendees. Reporting only — Graph decides this from the event
+   * itself and there is no flag to suppress it, so setting this false does not make the update
+   * silent.
+   */
+  attendeesWereNotified: boolean;
 }
 
 export interface UpdateEventCommandOutput {
@@ -80,7 +72,7 @@ export class UpdateEventCommand {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.eventRef.mailbox,
+      mailbox: obfuscateEmail(input.eventRef.mailbox),
       calendarId: input.eventRef.calendarId,
       msg: 'update_event started',
     });
@@ -150,22 +142,21 @@ export class UpdateEventCommand {
           ...(startTime !== undefined ? { start: startTime } : {}),
           ...(endTime !== undefined ? { end: endTime } : {}),
         });
-      const updated = UpdatedEventSchema.parse(raw);
+      const updated = GraphWrittenEventSchema.parse(raw);
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         calendarId: input.eventRef.calendarId,
         msg: 'update_event',
       });
       return {
         success: true,
-        message: input.notifyAttendees
+        message: input.attendeesWereNotified
           ? 'Updated the event. Attendees were notified immediately.'
           : 'Updated the event.',
         eventRef: {
           eventId: updated.id,
           calendarId: input.eventRef.calendarId,
-          accessPath: input.eventRef.accessPath,
           mailbox,
         },
         subject: updated.subject ?? input.subject?.trim() ?? null,
@@ -221,13 +212,8 @@ function buildPatch(input: UpdateEventCommandInput): Record<string, unknown> {
       'endDateTime must already be after startDateTime',
     );
   }
-  const attendees = input.attendees !== undefined ? uniqueAttendees(input.attendees) : undefined;
-  if (attendees !== undefined) {
-    assert.ok(
-      attendees.length <= MAX_ATTENDEES,
-      'attendees must already be at most 20 SMTP addresses',
-    );
-  }
+  const attendees =
+    input.attendees !== undefined ? uniqueSmtpAddresses(input.attendees) : undefined;
   return {
     ...(input.subject !== undefined && input.subject.trim() !== ''
       ? { subject: input.subject.trim() }
@@ -246,19 +232,4 @@ function buildPatch(input: UpdateEventCommandInput): Record<string, unknown> {
       ? { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' }
       : {}),
   };
-}
-
-function uniqueAttendees(attendees: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const attendee of attendees) {
-    const trimmed = attendee.trim();
-    const key = trimmed.toLowerCase();
-    if (!SmtpAddressSchema.safeParse(trimmed).success || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(trimmed);
-  }
-  return result;
 }

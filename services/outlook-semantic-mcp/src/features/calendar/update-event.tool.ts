@@ -5,12 +5,15 @@ import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
+import { offsetDateTime } from '~/utils/relative-range';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
+import { GraphDateTimeSchema, oneLine } from './utils/calendar-display';
+import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
-import { offsetDateTime } from './utils/offset-date-time.schema';
 import {
   isSeriesOccurrence,
   parseSeriesScope,
@@ -33,16 +36,6 @@ const SeriesConfirmSchema = ConfirmSchema.extend({
     description:
       'thisOccurrence updates only this date. entireSeries updates every date, including this one.',
   }),
-});
-
-const DateTimeSchema = z.object({
-  dateTime: z
-    .string()
-    .describe('Local date and time of the boundary as returned by Graph, without a trailing Z.'),
-  timeZone: z
-    .string()
-    .nullable()
-    .describe('Windows or IANA timezone Graph attached to this boundary, or null if omitted.'),
 });
 
 export const UpdateEventInputSchema = z
@@ -140,8 +133,8 @@ export const UpdateEventOutputSchema = z.object({
     'Internal handle of the updated event. Never display it.',
   ),
   subject: z.string().nullable().optional().describe('Title after the update.'),
-  start: DateTimeSchema.optional().describe('Start after the update.'),
-  end: DateTimeSchema.optional().describe('End after the update.'),
+  start: GraphDateTimeSchema.optional().describe('Start after the update.'),
+  end: GraphDateTimeSchema.optional().describe('End after the update.'),
   location: z.string().nullable().optional().describe('Location after the update, or null.'),
   joinUrl: z.string().nullable().optional().describe('Teams join URL when present, or null.'),
   webLink: z
@@ -197,13 +190,21 @@ export class UpdateEventTool {
       return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
     }
     const snapshot = loaded.event;
-    const confirmation = isSeriesOccurrence(snapshot.type)
-      ? await context.elicit(SeriesConfirmSchema, elicitMessage(parsed, snapshot))
-      : await context.elicit(ConfirmSchema, elicitMessage(parsed, snapshot));
-    if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+    const confirmation = await confirmWrite({
+      context,
+      schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
+      message: elicitMessage(parsed, snapshot),
+      logger: this.logger,
+      operation: 'update_event',
+      userProfileId: userProfileId.toString(),
+    });
+    if (confirmation.status === 'unavailable') {
+      return { success: false, message: confirmation.message };
+    }
+    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: parsed.eventRef.mailbox,
+        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
         calendarId: parsed.eventRef.calendarId,
         msg: 'update_event elicit cancelled',
       });
@@ -212,7 +213,7 @@ export class UpdateEventTool {
     const applyTo = parseSeriesScope(confirmation.content);
     this.logger.debug({
       userProfileId: userProfileId.toString(),
-      mailbox: parsed.eventRef.mailbox,
+      mailbox: obfuscateEmail(parsed.eventRef.mailbox),
       calendarId: parsed.eventRef.calendarId,
       applyTo,
       msg: 'update_event series scope',
@@ -237,7 +238,7 @@ export class UpdateEventTool {
       location: parsed.location,
       body: parsed.body,
       isOnlineMeeting: parsed.isOnlineMeeting,
-      notifyAttendees:
+      attendeesWereNotified:
         snapshot.attendeeCount > 0 ||
         (parsed.attendees !== undefined && parsed.attendees.length > 0),
     });
@@ -275,8 +276,4 @@ function elicitMessage(
       ? 'Attendees will be notified immediately.'
       : 'No attendees will be notified.';
   return [`Update this event on ${mailbox}?`, series, current, ...changes, notify].join('\n');
-}
-
-function oneLine(value: string): string {
-  return value.replaceAll(/\s+/g, ' ').trim();
 }

@@ -108,17 +108,17 @@ describe(ListCalendarsQuery.name, () => {
     expect(getFullDelegatedAccess).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
-      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, accessPath: 'ownMailbox' }),
+      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, mailbox: OWN_EMAIL }),
       expect.objectContaining({
         calendarId: 'cal-primary',
         isOwn: false,
-        accessPath: 'ownerMailbox',
+        mailbox: OWN_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
       expect.objectContaining({
         calendarId: 'cal-custom',
         isOwn: false,
-        accessPath: 'ownMailbox',
+        mailbox: OWN_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
     ]);
@@ -162,11 +162,11 @@ describe(ListCalendarsQuery.name, () => {
     expect(api).toHaveBeenCalledWith(OWNER_PATH);
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
-      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, accessPath: 'ownMailbox' }),
+      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, mailbox: OWN_EMAIL }),
       expect.objectContaining({
         calendarId: 'cal-owner-primary',
         isOwn: false,
-        accessPath: 'ownerMailbox',
+        mailbox: OWNER_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
     ]);

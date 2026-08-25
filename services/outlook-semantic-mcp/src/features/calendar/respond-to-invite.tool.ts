@@ -4,9 +4,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { RespondToInviteCommand } from './respond-to-invite.command';
 import { META } from './respond-to-invite-tool.meta';
 import { EVENT_RESPONSES } from './utils/calendar-graph-path';
+import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 
 const ConfirmSchema = z.object({
@@ -78,14 +80,21 @@ export class RespondToInviteTool {
   ): Promise<z.infer<typeof RespondToInviteOutputSchema>> {
     const parsed = RespondToInviteInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
-    const confirmation = await context.elicit(
-      ConfirmSchema,
-      elicitMessage(parsed.response, parsed.comment),
-    );
-    if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+    const confirmation = await confirmWrite({
+      context,
+      schema: ConfirmSchema,
+      message: elicitMessage(parsed.response, parsed.comment),
+      logger: this.logger,
+      operation: 'respond_to_invite',
+      userProfileId: userProfileId.toString(),
+    });
+    if (confirmation.status === 'unavailable') {
+      return { success: false, message: confirmation.message };
+    }
+    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: parsed.eventRef.mailbox,
+        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
         calendarId: parsed.eventRef.calendarId,
         response: parsed.response,
         msg: 'respond_to_invite elicit cancelled',

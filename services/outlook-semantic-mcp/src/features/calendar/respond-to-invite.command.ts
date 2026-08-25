@@ -8,6 +8,7 @@ import {
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import type { EventRef } from './calendar.schemas';
 import {
   EVENT_RESPONSES,
@@ -53,7 +54,7 @@ export class RespondToInviteCommand {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.eventRef.mailbox,
+      mailbox: obfuscateEmail(input.eventRef.mailbox),
       calendarId: input.eventRef.calendarId,
       response: input.response,
       msg: 'respond_to_invite started',
@@ -107,7 +108,7 @@ export class RespondToInviteCommand {
         });
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         calendarId: input.eventRef.calendarId,
         response: input.response,
         msg: 'respond_to_invite',

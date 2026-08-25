@@ -6,7 +6,6 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  accessPath: 'ownMailbox' as const,
   mailbox: 'me@example.com',
 };
 const INPUT = { eventRef: EVENT_REF, subject: 'Renamed' };
@@ -77,7 +76,7 @@ describe(UpdateEventTool.name, () => {
         eventRef: EVENT_REF,
         targetEventId: 'master-1',
         subject: 'Renamed',
-        notifyAttendees: true,
+        attendeesWereNotified: true,
       }),
     );
     expect(UpdateEventOutputSchema.parse(result)).toEqual(output);

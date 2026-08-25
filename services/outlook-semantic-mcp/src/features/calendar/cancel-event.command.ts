@@ -8,6 +8,7 @@ import {
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import type { EventRef } from './calendar.schemas';
 import { eventCancelPath } from './utils/calendar-graph-path';
 import {
@@ -22,7 +23,8 @@ export interface CancelEventCommandInput {
   eventRef: EventRef;
   targetEventId: string;
   comment?: string;
-  notifyAttendees: boolean;
+  /** Whether the cancellation notifies attendees. Reporting only; cancel always notifies. */
+  attendeesWereNotified: boolean;
 }
 
 export interface CancelEventCommandOutput {
@@ -49,7 +51,7 @@ export class CancelEventCommand {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: input.eventRef.mailbox,
+      mailbox: obfuscateEmail(input.eventRef.mailbox),
       calendarId: input.eventRef.calendarId,
       msg: 'cancel_event started',
     });
@@ -96,13 +98,13 @@ export class CancelEventCommand {
         });
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         calendarId: input.eventRef.calendarId,
         msg: 'cancel_event',
       });
       return {
         success: true,
-        message: input.notifyAttendees
+        message: input.attendeesWereNotified
           ? 'Cancelled the event. Attendees were notified.'
           : 'Cancelled the event.',
       };

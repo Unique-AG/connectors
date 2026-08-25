@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CalendarRef } from '../../calendar.schemas';
 import {
   calendarCollectionPath,
-  calendarMailbox,
   calendarViewPath,
   createEventPath,
   defaultCalendarPath,
@@ -16,23 +15,23 @@ import {
 const own: CalendarRef = {
   calendarId: 'cal-1',
   name: 'Calendar',
+  mailbox: 'me@example.com',
   ownerEmail: 'me@example.com',
   ownerName: 'Me',
   isOwn: true,
   canEdit: true,
   canViewPrivateItems: true,
-  accessPath: 'ownMailbox',
 };
 
 const delegated: CalendarRef = {
   calendarId: 'cal-2',
   name: 'Banker',
+  mailbox: 'banker@example.com',
   ownerEmail: 'banker@example.com',
   ownerName: 'Banker',
   isOwn: false,
   canEdit: true,
   canViewPrivateItems: false,
-  accessPath: 'ownerMailbox',
 };
 
 describe(calendarViewPath.name, () => {
@@ -42,12 +41,9 @@ describe(calendarViewPath.name, () => {
     );
   });
 
-  it('uses the owner mailbox for delegated calendars', () => {
+  it('uses the mailbox the calendar was listed from', () => {
     expect(
-      calendarViewPath({
-        calendarId: delegated.calendarId,
-        mailboxEmail: calendarMailbox({ calendar: delegated, callerEmail: 'me@example.com' }),
-      }),
+      calendarViewPath({ calendarId: delegated.calendarId, mailboxEmail: delegated.mailbox }),
     ).toBe('/users/banker@example.com/calendars/cal-2/calendarView');
   });
 });

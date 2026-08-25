@@ -6,13 +6,14 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { META } from './list-calendars-tool.meta';
+import { CalendarRefSchema } from './utils/calendar-ref.schema';
 
 export const ListCalendarsInputSchema = z.object({});
 
-const CalendarRefSchema = z.object({
-  calendarId: z
-    .string()
-    .describe('Internal Microsoft Graph calendar ID. Never display to the user.'),
+const CalendarSchema = z.object({
+  calendarRef: CalendarRefSchema.describe(
+    'Internal handle for this calendar. Pass it through unchanged to search_calendar_events or create_event. Never display it.',
+  ),
   name: z.string().describe('Display name of the calendar as shown in Outlook.'),
   ownerEmail: z
     .string()
@@ -35,9 +36,6 @@ const CalendarRefSchema = z.object({
     .describe(
       'True when the signed-in user can see details of events marked private. When false, private events are returned redacted.',
     ),
-  accessPath: z
-    .enum(['ownMailbox', 'ownerMailbox'])
-    .describe('Internal Graph ID namespace. Never display this to the user.'),
 });
 
 export const ListCalendarsOutputSchema = z.object({
@@ -46,7 +44,7 @@ export const ListCalendarsOutputSchema = z.object({
     .describe('True when the calendar list was retrieved. False when Graph access failed.'),
   message: z.string().describe('Human-readable summary of the outcome.'),
   calendars: z
-    .array(CalendarRefSchema)
+    .array(CalendarSchema)
     .optional()
     .describe('Calendars the signed-in user can access, including own, shared, and delegated.'),
   consentRequired: z
@@ -65,7 +63,7 @@ export class ListCalendarsTool {
     name: 'list_calendars',
     title: 'List Calendars',
     description:
-      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. To list meetings in a time window, use search_calendar_events. calendarId and accessPath are internal — do not display them. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
+      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. To list meetings in a time window, use search_calendar_events. Each calendar carries a calendarRef — pass it through unchanged to narrow search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
     parameters: ListCalendarsInputSchema,
     outputSchema: ListCalendarsOutputSchema,
     annotations: {
@@ -83,6 +81,18 @@ export class ListCalendarsTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof ListCalendarsOutputSchema>> {
-    return this.listCalendarsQuery.run(extractUserProfileId(request));
+    const result = await this.listCalendarsQuery.run(extractUserProfileId(request));
+    return {
+      ...result,
+      calendars: result.calendars?.map((calendar) => ({
+        calendarRef: { calendarId: calendar.calendarId, mailbox: calendar.mailbox },
+        name: calendar.name,
+        ownerEmail: calendar.ownerEmail,
+        ownerName: calendar.ownerName,
+        isOwn: calendar.isOwn,
+        canEdit: calendar.canEdit,
+        canViewPrivateItems: calendar.canViewPrivateItems,
+      })),
+    };
   }
 }

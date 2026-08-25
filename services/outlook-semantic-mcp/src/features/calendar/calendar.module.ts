@@ -6,6 +6,7 @@ import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { CancelEventCommand } from './cancel-event.command';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { CreateEventCommand } from './create-event.command';
+import { GetCalendarQuery } from './get-calendar.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { RespondToInviteCommand } from './respond-to-invite.command';
@@ -19,6 +20,7 @@ const QUERIES = [
   CheckAvailabilityQuery,
   SuggestMeetingTimesQuery,
   GetCalendarEventQuery,
+  GetCalendarQuery,
 ];
 const COMMANDS = [
   RespondToInviteCommand,

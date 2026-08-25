@@ -6,10 +6,14 @@ import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { offsetDateTime } from '~/utils/relative-range';
 import { CreateEventCommand } from './create-event.command';
 import { META } from './create-event-tool.meta';
+import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
+import { GraphDateTimeSchema, oneLine } from './utils/calendar-display';
+import { CalendarRefSchema } from './utils/calendar-ref.schema';
+import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
-import { offsetDateTime } from './utils/offset-date-time.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
 
 const ConfirmSchema = z.object({
@@ -18,16 +22,6 @@ const ConfirmSchema = z.object({
     description:
       'Confirm to create the event. If there are attendees, invitations are sent immediately. Leave unchecked to cancel.',
   }),
-});
-
-const DateTimeSchema = z.object({
-  dateTime: z
-    .string()
-    .describe('Local date and time of the boundary as returned by Graph, without a trailing Z.'),
-  timeZone: z
-    .string()
-    .nullable()
-    .describe('Windows or IANA timezone Graph attached to this boundary, or null if omitted.'),
 });
 
 export const CreateEventInputSchema = z
@@ -52,16 +46,9 @@ export const CreateEventInputSchema = z
       .boolean()
       .optional()
       .describe('If true, create a Teams meeting and return a join URL.'),
-    mailbox: smtpAddress(
-      'SMTP address of the mailbox to create on. Omit for the signed-in user. For a delegated calendar, use that mailbox together with its calendarId.',
-    ).optional(),
-    calendarId: z
-      .string()
-      .min(1)
-      .optional()
-      .describe(
-        'Internal calendar ID from list_calendars. Omit to use the mailbox default calendar. Never display it.',
-      ),
+    calendarRef: CalendarRefSchema.optional().describe(
+      'Which calendar to create on. Take calendarRef from list_calendars and pass it through unchanged — never assemble one yourself. Omit to use the signed-in user default calendar.',
+    ),
     transactionId: z
       .string()
       .min(1)
@@ -102,8 +89,8 @@ export const CreateEventOutputSchema = z.object({
     'Internal handle of the created event. Never display it.',
   ),
   subject: z.string().nullable().optional().describe('Title of the created event.'),
-  start: DateTimeSchema.optional().describe('Created event start.'),
-  end: DateTimeSchema.optional().describe('Created event end.'),
+  start: GraphDateTimeSchema.optional().describe('Created event start.'),
+  end: GraphDateTimeSchema.optional().describe('Created event end.'),
   location: z.string().nullable().optional().describe('Location of the created event, or null.'),
   joinUrl: z
     .string()
@@ -131,13 +118,16 @@ export const CreateEventOutputSchema = z.object({
 export class CreateEventTool {
   private readonly logger = new Logger(CreateEventTool.name);
 
-  public constructor(private readonly createEventCommand: CreateEventCommand) {}
+  public constructor(
+    private readonly getCalendarQuery: GetCalendarQuery,
+    private readonly createEventCommand: CreateEventCommand,
+  ) {}
 
   @Tool({
     name: 'create_event',
     title: 'Create Event',
     description:
-      'Create an Outlook calendar event. There is no draft state — if attendees are included, invitations are sent immediately after the user confirms. startDateTime and endDateTime must include a timezone offset. Use calendarId from list_calendars for a specific or delegated calendar; omit it for the mailbox default calendar. If you retry this create, pass the same transactionId. If consentRequired is true, ask the user to reconnect Outlook.',
+      'Create an Outlook calendar event. There is no draft state — if attendees are included, invitations are sent immediately after the user confirms. startDateTime and endDateTime must include a timezone offset. To create on a shared or delegated calendar, call list_calendars and pass that calendar calendarRef through unchanged; omit calendarRef for the signed-in user default calendar. If you retry this create, pass the same transactionId. If consentRequired is true, ask the user to reconnect Outlook.',
     parameters: CreateEventInputSchema,
     outputSchema: CreateEventOutputSchema,
     annotations: {
@@ -158,8 +148,32 @@ export class CreateEventTool {
     const parsed = CreateEventInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
     const transactionId = parsed.transactionId ?? randomUUID().replaceAll('-', '');
-    const confirmation = await context.elicit(ConfirmSchema, elicitMessage(parsed));
-    if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+    // Resolve first so the confirmation names the real calendar instead of an opaque id, and so
+    // the command receives a concrete ref rather than resolving the default a second time.
+    const loaded = await this.getCalendarQuery.run(userProfileId, {
+      calendarRef: parsed.calendarRef,
+    });
+    if (loaded.success !== true || loaded.calendar === undefined) {
+      return {
+        success: false,
+        message: loaded.message,
+        transactionId,
+        consentRequired: loaded.consentRequired,
+      };
+    }
+    const calendar = loaded.calendar;
+    const confirmation = await confirmWrite({
+      context,
+      schema: ConfirmSchema,
+      message: elicitMessage(parsed, calendar),
+      logger: this.logger,
+      operation: 'create_event',
+      userProfileId: userProfileId.toString(),
+    });
+    if (confirmation.status === 'unavailable') {
+      return { success: false, message: confirmation.message, transactionId };
+    }
+    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
         transactionId,
@@ -173,18 +187,16 @@ export class CreateEventTool {
     }
     return this.createEventCommand.run(userProfileId, {
       ...parsed,
+      calendarRef: { calendarId: calendar.calendarId, mailbox: calendar.mailbox },
       transactionId,
     });
   }
 }
 
-function elicitMessage(input: z.infer<typeof CreateEventInputSchema>): string {
-  const mailbox =
-    input.mailbox !== undefined ? `mailbox ${input.mailbox}` : 'your mailbox (the signed-in user)';
-  const calendar =
-    input.calendarId !== undefined
-      ? 'a specific calendar from list_calendars'
-      : 'the default calendar';
+function elicitMessage(
+  input: z.infer<typeof CreateEventInputSchema>,
+  calendar: CalendarSummary,
+): string {
   const attendees =
     input.attendees !== undefined && input.attendees.length > 0
       ? `Attendees: ${input.attendees.join(', ')}. Invitations will be sent immediately.`
@@ -195,7 +207,8 @@ function elicitMessage(input: z.infer<typeof CreateEventInputSchema>): string {
       : undefined;
   const teams = input.isOnlineMeeting === true ? 'A Teams meeting will be created.' : undefined;
   return [
-    `Create this event on ${mailbox}, ${calendar}?`,
+    'Create this event?',
+    `Calendar: ${describeCalendar(calendar)}`,
     `Title: ${oneLine(input.subject)}`,
     `When: ${input.startDateTime} to ${input.endDateTime}`,
     attendees,
@@ -206,6 +219,23 @@ function elicitMessage(input: z.infer<typeof CreateEventInputSchema>): string {
     .join('\n');
 }
 
-function oneLine(value: string): string {
-  return value.replaceAll(/\s+/g, ' ').trim();
+/**
+ * Names the calendar the way the user recognises it. Deliberately reports the owner rather than
+ * CalendarRef.mailbox: for a calendar shared with the signed-in user the mailbox is their own, so
+ * showing it would read as if the event were landing on their personal calendar.
+ */
+function describeCalendar(calendar: CalendarSummary): string {
+  const name = oneLine(calendar.name) === '' ? 'Calendar' : oneLine(calendar.name);
+  if (calendar.isOwn) {
+    return calendar.isDefaultCalendar
+      ? `"${name}" — your primary calendar`
+      : `"${name}" — your calendar`;
+  }
+  const owner =
+    calendar.ownerName !== null && calendar.ownerEmail !== null
+      ? `${oneLine(calendar.ownerName)} (${calendar.ownerEmail})`
+      : (calendar.ownerEmail ?? calendar.ownerName ?? 'another mailbox');
+  return calendar.isDefaultCalendar
+    ? `"${name}" — the primary calendar of ${owner}`
+    : `"${name}" — shared by ${owner}`;
 }

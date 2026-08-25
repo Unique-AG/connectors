@@ -9,7 +9,6 @@ const OWN_EMAIL = 'me@example.com';
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  accessPath: 'ownMailbox' as const,
   mailbox: OWN_EMAIL,
 };
 const PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events/evt-1/accept`;
@@ -98,7 +97,6 @@ describe(RespondToInviteCommand.name, () => {
       eventRef: {
         eventId: 'evt-2',
         calendarId: 'cal-banker',
-        accessPath: 'ownerMailbox',
         mailbox: 'banker@example.com',
       },
       response: 'decline',

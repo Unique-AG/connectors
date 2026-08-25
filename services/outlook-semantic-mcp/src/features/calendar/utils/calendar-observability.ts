@@ -2,6 +2,7 @@ import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   CalendarConsentRequiredError,
   isCalendarPermissionDeniedError,
@@ -27,7 +28,7 @@ export function calendarTraceAttrs(attrs: {
 }): void {
   traceAttrs({
     userProfileId: attrs.userProfileId,
-    ...(attrs.mailbox !== undefined ? { mailbox: attrs.mailbox } : {}),
+    ...(attrs.mailbox !== undefined ? { mailbox: obfuscateEmail(attrs.mailbox) } : {}),
     ...(attrs.calendarId !== undefined ? { calendarId: attrs.calendarId } : {}),
     ...(attrs.operation !== undefined ? { operation: attrs.operation } : {}),
   });
@@ -48,16 +49,16 @@ export function logCalendarRecovered(
   logger.warn({
     userProfileId: input.userProfileId,
     msg: input.msg,
-    ...(input.mailbox !== undefined ? { mailbox: input.mailbox } : {}),
+    ...(input.mailbox !== undefined ? { mailbox: obfuscateEmail(input.mailbox) } : {}),
     ...(input.calendarId !== undefined ? { calendarId: input.calendarId } : {}),
-    ...(input.ownerEmail !== undefined ? { ownerEmail: input.ownerEmail } : {}),
+    ...(input.ownerEmail !== undefined ? { ownerEmail: obfuscateEmail(input.ownerEmail) } : {}),
     ...(input.err !== undefined ? { err: input.err } : {}),
   });
   traceEvent('calendar.recovered', {
     outcome: input.outcome,
-    ...(input.mailbox !== undefined ? { mailbox: input.mailbox } : {}),
+    ...(input.mailbox !== undefined ? { mailbox: obfuscateEmail(input.mailbox) } : {}),
     ...(input.calendarId !== undefined ? { calendarId: input.calendarId } : {}),
-    ...(input.ownerEmail !== undefined ? { ownerEmail: input.ownerEmail } : {}),
+    ...(input.ownerEmail !== undefined ? { ownerEmail: obfuscateEmail(input.ownerEmail) } : {}),
   });
 }
 

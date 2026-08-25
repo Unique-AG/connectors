@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import type { CalendarRef } from '../calendar.schemas';
 import { SmtpAddressSchema } from './smtp-address.schema';
 
 export const EVENT_RESPONSES = ['accept', 'tentativelyAccept', 'decline'] as const;
@@ -29,20 +28,20 @@ export function findMeetingTimesPath(mailboxEmail: string): string {
   return `/users/${mailboxEmail}/findMeetingTimes`;
 }
 
-export function calendarMailbox(input: { calendar: CalendarRef; callerEmail: string }): string {
-  if (input.calendar.accessPath === 'ownerMailbox') {
-    assert.ok(input.calendar.ownerEmail, 'ownerMailbox calendars require ownerEmail');
-    return input.calendar.ownerEmail;
-  }
-  return input.callerEmail;
-}
-
 export function defaultCalendarPath(mailboxEmail: string): string {
   assert.ok(
     SmtpAddressSchema.safeParse(mailboxEmail).success,
     'default calendar mailbox must be an SMTP address',
   );
   return `/users/${mailboxEmail}/calendar`;
+}
+
+export function calendarPath(input: { mailboxEmail: string; calendarId: string }): string {
+  assert.ok(
+    SmtpAddressSchema.safeParse(input.mailboxEmail).success,
+    'calendar mailbox must be an SMTP address',
+  );
+  return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}`;
 }
 
 export function createEventPath(input: { mailboxEmail: string; calendarId: string }): string {

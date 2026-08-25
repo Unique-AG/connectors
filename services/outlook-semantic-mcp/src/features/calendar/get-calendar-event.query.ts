@@ -6,6 +6,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import type { EventRef } from './calendar.schemas';
 import { eventPath } from './utils/calendar-graph-path';
 import {
@@ -82,7 +83,7 @@ export class GetCalendarEventQuery {
     const mailbox = input.eventRef.mailbox;
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox,
+      mailbox: obfuscateEmail(mailbox),
       calendarId: input.eventRef.calendarId,
       msg: 'get_calendar_event started',
     });
@@ -111,7 +112,7 @@ export class GetCalendarEventQuery {
       const parsed = SnapshotSchema.parse(raw);
       this.logger.debug({
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: obfuscateEmail(mailbox),
         calendarId: input.eventRef.calendarId,
         type: parsed.type,
         msg: 'get_calendar_event',

@@ -9,7 +9,6 @@ const OWN_EMAIL = 'me@example.com';
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  accessPath: 'ownMailbox' as const,
   mailbox: OWN_EMAIL,
 };
 const PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events/evt-1/cancel`;
@@ -49,7 +48,7 @@ describe(CancelEventCommand.name, () => {
       eventRef: EVENT_REF,
       targetEventId: 'evt-1',
       comment: 'Travel conflict',
-      notifyAttendees: true,
+      attendeesWereNotified: true,
     });
 
     expect(api).toHaveBeenCalledWith(PATH);
@@ -65,7 +64,7 @@ describe(CancelEventCommand.name, () => {
     await command.run(USER_PROFILE_ID, {
       eventRef: EVENT_REF,
       targetEventId: 'evt-1',
-      notifyAttendees: false,
+      attendeesWereNotified: false,
     });
 
     expect(request).not.toHaveProperty('delete');
@@ -79,7 +78,7 @@ describe(CancelEventCommand.name, () => {
     const result = await command.run(USER_PROFILE_ID, {
       eventRef: EVENT_REF,
       targetEventId: 'evt-1',
-      notifyAttendees: false,
+      attendeesWereNotified: false,
     });
 
     expect(result.success).toBe(false);
