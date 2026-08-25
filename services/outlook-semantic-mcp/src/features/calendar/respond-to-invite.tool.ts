@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { RespondToInviteQuery } from './respond-to-invite.query';
+import { RespondToInviteCommand } from './respond-to-invite.command';
 import { META } from './respond-to-invite-tool.meta';
 import { EVENT_RESPONSES } from './utils/calendar-graph-path';
 import { EventRefSchema } from './utils/event-ref.schema';
@@ -50,7 +50,7 @@ export const RespondToInviteOutputSchema = z.object({
 
 @Injectable()
 export class RespondToInviteTool {
-  public constructor(private readonly respondToInviteQuery: RespondToInviteQuery) {}
+  public constructor(private readonly respondToInviteCommand: RespondToInviteCommand) {}
 
   @Tool({
     name: 'respond_to_invite',
@@ -85,7 +85,7 @@ export class RespondToInviteTool {
         message: 'Invite response was cancelled. The organizer was not notified.',
       };
     }
-    return this.respondToInviteQuery.run(extractUserProfileId(request), parsed);
+    return this.respondToInviteCommand.run(extractUserProfileId(request), parsed);
   }
 }
 

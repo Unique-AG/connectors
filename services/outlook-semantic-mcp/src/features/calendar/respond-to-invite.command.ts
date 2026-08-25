@@ -17,13 +17,13 @@ import {
 } from './utils/calendar-graph-path';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
-export interface RespondToInviteQueryInput {
+export interface RespondToInviteCommandInput {
   eventRef: EventRef;
   response: EventResponse;
   comment?: string;
 }
 
-export interface RespondToInviteQueryOutput {
+export interface RespondToInviteCommandOutput {
   success: boolean;
   message: string;
   response?: EventResponse;
@@ -31,8 +31,8 @@ export interface RespondToInviteQueryOutput {
 }
 
 @Injectable()
-export class RespondToInviteQuery {
-  private readonly logger = new Logger(RespondToInviteQuery.name);
+export class RespondToInviteCommand {
+  private readonly logger = new Logger(RespondToInviteCommand.name);
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -42,8 +42,8 @@ export class RespondToInviteQuery {
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
-    input: RespondToInviteQueryInput,
-  ): Promise<RespondToInviteQueryOutput> {
+    input: RespondToInviteCommandInput,
+  ): Promise<RespondToInviteCommandOutput> {
     assert.ok(
       (EVENT_RESPONSES as readonly string[]).includes(input.response),
       'response must already be accept, tentativelyAccept, or decline',

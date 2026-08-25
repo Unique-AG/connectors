@@ -1,7 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { RespondToInviteQuery } from '../respond-to-invite.query';
+import { RespondToInviteCommand } from '../respond-to-invite.command';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
@@ -20,14 +20,14 @@ function makeGraphError(statusCode: number, code: string, message = 'Access deni
   return err;
 }
 
-function createQuery(opts: { post?: ReturnType<typeof vi.fn>; email?: string } = {}) {
+function createCommand(opts: { post?: ReturnType<typeof vi.fn>; email?: string } = {}) {
   const post = opts.post ?? vi.fn().mockResolvedValue(undefined);
   const request = {
     header: vi.fn().mockReturnThis(),
     post,
   };
   const api = vi.fn().mockReturnValue(request);
-  const query = new RespondToInviteQuery(
+  const command = new RespondToInviteCommand(
     { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
     {
       run: vi.fn().mockResolvedValue({
@@ -37,14 +37,14 @@ function createQuery(opts: { post?: ReturnType<typeof vi.fn>; email?: string } =
       }),
     } as never,
   );
-  return { query, api, request, post };
+  return { command, api, request, post };
 }
 
-describe(RespondToInviteQuery.name, () => {
+describe(RespondToInviteCommand.name, () => {
   it('POSTs accept on the event path and reports the organizer was notified', async () => {
-    const { query, api, request, post } = createQuery();
+    const { command, api, request, post } = createCommand();
 
-    const result = await query.run(USER_PROFILE_ID, {
+    const result = await command.run(USER_PROFILE_ID, {
       eventRef: EVENT_REF,
       response: 'accept',
       comment: 'See you there',
@@ -61,9 +61,9 @@ describe(RespondToInviteQuery.name, () => {
   });
 
   it('omits an empty comment from the Graph body', async () => {
-    const { query, post } = createQuery();
+    const { command, post } = createCommand();
 
-    await query.run(USER_PROFILE_ID, {
+    await command.run(USER_PROFILE_ID, {
       eventRef: EVENT_REF,
       response: 'accept',
       comment: '   ',
@@ -73,11 +73,11 @@ describe(RespondToInviteQuery.name, () => {
   });
 
   it('returns consentRequired when the caller mailbox is denied', async () => {
-    const { query } = createQuery({
+    const { command } = createCommand({
       post: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
+    const result = await command.run(USER_PROFILE_ID, {
       eventRef: EVENT_REF,
       response: 'accept',
     });
@@ -88,11 +88,11 @@ describe(RespondToInviteQuery.name, () => {
   });
 
   it('does not ask for consent when a delegated mailbox is denied', async () => {
-    const { query, api } = createQuery({
+    const { command, api } = createCommand({
       post: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
+    const result = await command.run(USER_PROFILE_ID, {
       eventRef: {
         eventId: 'evt-2',
         calendarId: 'cal-banker',
@@ -109,11 +109,11 @@ describe(RespondToInviteQuery.name, () => {
   });
 
   it('returns a not-found message on 404', async () => {
-    const { query } = createQuery({
+    const { command } = createCommand({
       post: vi.fn().mockRejectedValue(makeGraphError(404, 'ErrorItemNotFound', 'Not found')),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
+    const result = await command.run(USER_PROFILE_ID, {
       eventRef: EVENT_REF,
       response: 'tentativelyAccept',
     });

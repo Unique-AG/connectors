@@ -27,7 +27,7 @@ function createTool(
 }
 
 describe(RespondToInviteTool.name, () => {
-  it('elicits confirmation and then calls the query', async () => {
+  it('elicits confirmation and then calls the command', async () => {
     const output = {
       success: true,
       message: 'Accepted the invitation. The organizer was notified.',
@@ -53,7 +53,7 @@ describe(RespondToInviteTool.name, () => {
     expect(RespondToInviteOutputSchema.parse(result)).toEqual(output);
   });
 
-  it('does not call the query when elicitation is cancelled', async () => {
+  it('does not call the command when elicitation is cancelled', async () => {
     const { tool, run, elicit } = createTool({
       elicit: vi.fn().mockResolvedValue({ action: 'cancel' }),
     });
@@ -69,7 +69,7 @@ describe(RespondToInviteTool.name, () => {
     expect(result.message).toMatch(/cancelled/i);
   });
 
-  it('does not call the query when the user unchecks confirm', async () => {
+  it('does not call the command when the user unchecks confirm', async () => {
     const { tool, run, elicit } = createTool({
       elicit: vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: false } }),
     });

@@ -4,7 +4,7 @@ Read path and `respond_to_invite` are landed behind `CALENDAR_INTEGRATION`. Do n
 
 ## Contracts
 
-- Tools call queries. Query I/O is TypeScript interfaces. Zod + `.describe()` only on tool I/O. `@Tool({ parameters })` is a ZodObject.
+- Tools call queries for reads and commands for writes. Query/command I/O is TypeScript interfaces. Zod + `.describe()` only on tool I/O. `@Tool({ parameters })` is a ZodObject.
 - Graph calendar paths are always `/users/{email}/…`, never `/me/calendars`. The caller is the oauth user.
 - Relative ranges: `src/utils/relative-range` + `temporal-polyfill`. Weeks start Monday. `endOfDay` uses `add({ days: 1 }).startOfDay().subtract({ milliseconds: 1 })`.
 - Absolute `startDateTime` / `endDateTime` must include `Z` or `±HH:MM`.

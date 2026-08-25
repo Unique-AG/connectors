@@ -5,7 +5,7 @@ import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { ListCalendarsQuery } from './list-calendars.query';
-import { RespondToInviteQuery } from './respond-to-invite.query';
+import { RespondToInviteCommand } from './respond-to-invite.command';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { SuggestMeetingTimesQuery } from './suggest-meeting-times.query';
 
@@ -14,12 +14,12 @@ const QUERIES = [
   SearchCalendarEventsQuery,
   CheckAvailabilityQuery,
   SuggestMeetingTimesQuery,
-  RespondToInviteQuery,
 ];
+const COMMANDS = [RespondToInviteCommand];
 
 @Module({
   imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule, MetricsModule],
-  providers: [...QUERIES],
-  exports: [...QUERIES],
+  providers: [...QUERIES, ...COMMANDS],
+  exports: [...QUERIES, ...COMMANDS],
 })
 export class CalendarModule {}
