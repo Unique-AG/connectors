@@ -93,7 +93,7 @@ Follow these steps to go from zero to a running deployment:
 4. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#Required-Secrets).
 5. **Configure Helm values** — Create a `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
 
-   > **Key decisions:** Set `MCP_BACKEND` (see [Deployment Modes](./deployment.md#Deployment-Modes)) and optionally `DELEGATED_ACCESS_SCAN` (see [Configuration](./configuration.md#DELEGATED_ACCESS_SCAN)).
+   > **Key decisions:** Set `MCP_BACKEND` (see [Deployment Modes](./deployment.md#Deployment-Modes)), optionally `DELEGATED_ACCESS_SCAN` (see [Configuration](./configuration.md#DELEGATED_ACCESS_SCAN)), and optionally `CALENDAR_INTEGRATION` (Entra consent first — see [Calendar integration](../technical/calendar-integration.md)).
 
 6. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#Install).
 7. **Security checklist** — Before going to production, verify the following:

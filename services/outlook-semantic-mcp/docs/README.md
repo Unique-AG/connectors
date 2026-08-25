@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 MCP tools (plus 4 additional debug-mode tools).
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 mail MCP tools (plus 4 additional debug-mode tools), and query Outlook calendar through 8 more tools when `CALENDAR_INTEGRATION` is enabled.
 
 **Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
@@ -17,7 +17,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Provides AI clients with 10 MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status against a user's Microsoft Outlook mailbox
+**What it does:** Provides AI clients with 10 mail MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status, plus 8 calendar tools when `CALENDAR_INTEGRATION` is enabled
 
 **Deployment:** Kubernetes-based NestJS microservice
 

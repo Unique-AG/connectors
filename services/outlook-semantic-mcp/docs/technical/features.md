@@ -30,7 +30,7 @@ Where a feature works the same in both modes, this page says so once. Where beha
 
 **What's not supported (both modes)**
 
-- Calendar, task, or file data — only mail is in scope.
+- Task or file data — only mail is in scope here. Calendar is a separate, flag-gated live Graph path; see [Calendar](#Calendar).
 
 **See also:** [Tools — search_emails](./tools.md#search_emails)
 
@@ -201,6 +201,26 @@ For a detailed description of how delegated access works at runtime, see the exi
 | **Revocation detection** | Background scan: discovery (every 12 h), verification (every 4 h) | Immediate (live Graph query) |
 
 Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
+
+---
+
+## Calendar
+
+**Both modes**, only when [`CALENDAR_INTEGRATION`](../operator/configuration.md#CALENDAR_INTEGRATION) is `enabled`.
+
+Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar tables. The tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, and `cancel_event`.
+
+- Relative search windows (`today`, `thisWeek`, `nextWeek`, …) resolve in the mailbox timezone. Weeks start Monday.
+- Writes have no draft state. The user confirms in-chat; invitations and cancellations notify attendees immediately. `cancel_event` is not a silent delete.
+- Delegated and shared calendars are supported. Pass `eventRef` from search unchanged. Internal IDs are never shown.
+- Existing users must reconnect Outlook after the flag is turned on (unless tenant admin consent already covers `Calendars.ReadWrite.Shared`).
+
+**What's not supported yet**
+
+- All-day create/update.
+- Mail-invite fusion (finding meetings by searching invite emails).
+
+**See also:** [Calendar integration](./calendar-integration.md) (ID namespaces, re-consent order, example prompts)
 
 ---
 

@@ -9,7 +9,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 |---|---|---|
 | Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
 | Ingestion | Full sync + live catch-up | None |
-| Tools | 10 standard + 4 debug | 6 standard |
+| Tools | 10 standard + 4 debug; +8 when `CALENDAR_INTEGRATION` is enabled | 6 standard; +8 when `CALENDAR_INTEGRATION` is enabled |
 | Requires Unique KB | Yes | Yes |
 | Requires RabbitMQ | Yes | Yes |
 | Folder filtering | Supported | Not supported |
@@ -538,7 +538,7 @@ Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`,
 
 The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers (and admin-consents) `Calendars.ReadWrite.Shared` when `calendar_integration = true`. Enable that apply and tenant admin consent **before** flipping the Helm/env flag. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`; enabling the flag without the Entra permission causes token refresh to fail with `invalid_grant` and mail tools stop working.
 
-Existing connected users must reconnect Outlook after the flag is turned on, unless an Entra admin has already granted the extra scope tenant-wide.
+Existing connected users must reconnect Outlook after the flag is turned on, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` does not re-run OAuth — the user has to start a new Outlook connection. If a calendar tool returns `consentRequired`, ask them to reconnect; do not send them to `/auth/authorize`. Enablement order and the two Graph ID namespaces are in [Calendar integration](../technical/calendar-integration.md).
 
 Calendars of mailboxes the user has Exchange Full Access to are listed when delegated-access scanning has discovered those owners. Calendar-only shares come from Graph `GET /users/{caller}/calendars` (equivalent to `/me/calendars` for the signed-in user). Shared-mailbox **profiles** never call calendar tools — those profiles are ingestion-only; a logged-in oauth user queries a shared mailbox calendar via `/users/{owner}/calendars` after Full Access discovery.
 

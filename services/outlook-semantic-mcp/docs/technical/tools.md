@@ -27,6 +27,17 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
+| [`list_calendars`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`search_calendar_events`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`check_availability`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`suggest_meeting_times`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`respond_to_invite`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`create_event`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`update_event`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`cancel_event`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+
+!!! warning "Calendar tools"
+    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). Writes notify attendees immediately after in-chat confirmation. See [Calendar](#Calendar) and [Calendar integration](./calendar-integration.md).
 
 **Mutating** means the tool writes data to at least one of the following:
 
@@ -44,6 +55,10 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | `pause_full_sync` | Updates the sync state to `paused` in the internal database |
 | `resume_full_sync` | Updates the sync state to resume ingestion in the internal database |
 | `restart_full_sync` | Resets sync state in the internal database and re-triggers full ingestion into the Unique knowledge base |
+| `respond_to_invite` | Notifies the organizer of accept / tentative / decline via Microsoft Graph |
+| `create_event` | Creates an event on the chosen mailbox calendar; invitations are sent immediately |
+| `update_event` | Patches an existing event; attendees are notified immediately |
+| `cancel_event` | Cancels an event and notifies attendees (not a silent delete) |
 
 ---
 
@@ -651,9 +666,29 @@ Restart the full sync from scratch, discarding all previous progress.
 
 ---
 
+## Calendar
+
+**Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through; no calendar ingest.
+
+| Tool | Mutating | What it does |
+|------|----------|----------------|
+| `list_calendars` | No | Own, shared, and Full Access calendars. Returns `calendarId` (internal). |
+| `search_calendar_events` | No | Events in a time window. Prefer relative `dateRange`. Returns `eventRef` (internal) and the full plain-text body. |
+| `check_availability` | No | Free/busy for up to 20 SMTP addresses. Window must be shorter than 62 days. |
+| `suggest_meeting_times` | No | Ranked free slots. If `emptySuggestionsReason` is set, explain it; do not invent times. |
+| `respond_to_invite` | Yes | Accept / tentative / decline. Pass `eventRef` unchanged. User confirms before the organizer is notified. |
+| `create_event` | Yes | Create a meeting. No draft — invitations go out after confirmation. Reuse `transactionId` on retry. |
+| `update_event` | Yes | Change an existing meeting. For a series, the user picks this occurrence or the whole series. |
+| `cancel_event` | Yes | Cancel and notify attendees. Not `DELETE`. Only the organizer can cancel. Same series choice as update. |
+
+Do not display `eventRef`, `eventId`, `calendarId`, or `accessPath`. Input and output field descriptions live on the tool schemas (harmony-tested). Enablement, ID namespaces, and example prompts: [Calendar integration](./calendar-integration.md).
+
+---
+
 ## Related Documentation
 
 - [Full Sync](./flows.md#Full-Sync:-Historical-Email-Ingestion) - Full sync mechanics and states
 - [Live Catch-Up](./flows.md#Live-Catch-Up:-Webhook-Driven-Email-Ingestion) - Webhook-driven real-time ingestion
 - [Flows](./flows.md) - Sequence diagrams for OAuth, sync, and draft creation flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
+- [Calendar integration](./calendar-integration.md) - Calendar flag, ID namespaces, re-consent, example prompts
