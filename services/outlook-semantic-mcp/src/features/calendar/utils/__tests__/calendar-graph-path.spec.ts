@@ -4,6 +4,7 @@ import {
   calendarCollectionPath,
   calendarMailbox,
   calendarViewPath,
+  findMeetingTimesPath,
   getSchedulePath,
   isSmtpAddress,
 } from '../calendar-graph-path';
@@ -60,6 +61,12 @@ describe(getSchedulePath.name, () => {
 
   it('rejects a mailbox that is not an SMTP address', () => {
     expect(() => getSchedulePath('evil/calendar')).toThrow(/SMTP/i);
+  });
+});
+
+describe(findMeetingTimesPath.name, () => {
+  it('posts findMeetingTimes on /users/{email}', () => {
+    expect(findMeetingTimesPath('me@example.com')).toBe('/users/me@example.com/findMeetingTimes');
   });
 });
 

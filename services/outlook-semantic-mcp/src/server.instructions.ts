@@ -21,6 +21,7 @@ const CALENDAR_INSTRUCTIONS = `
 - Use \`list_calendars\` to see the user's own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to.
 - Use \`search_calendar_events\` for meetings in a time window. Prefer \`dateRange\` with \`rangeType: relative\` (\`today\`, \`thisWeek\`, \`nextWeek\`, \`lastMonth\`, \`next7Days\`). Weeks start Monday. State \`resolvedWindow.interpretation\` in the answer.
 - Use \`check_availability\` for free/busy of people, DLs, or rooms. At most 20 addresses; the window must be shorter than 62 days. Subject and location on items appear only with detail-level permission; private items are redacted.
+- Use \`suggest_meeting_times\` to rank free slots for the organizer and optional attendees. Default duration is 30 minutes and activityDomain is work. If \`emptySuggestionsReason\` is present, explain it instead of inventing times.
 - \`calendarId\`, \`eventId\`, \`accessPath\` and \`eventRef\` are internal identifiers. Never show them to the user.
 - The search result already contains the full meeting body. There is no second tool to open an event.
 `;

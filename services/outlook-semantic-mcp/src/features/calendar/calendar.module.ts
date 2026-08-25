@@ -6,8 +6,14 @@ import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
+import { SuggestMeetingTimesQuery } from './suggest-meeting-times.query';
 
-const QUERIES = [ListCalendarsQuery, SearchCalendarEventsQuery, CheckAvailabilityQuery];
+const QUERIES = [
+  ListCalendarsQuery,
+  SearchCalendarEventsQuery,
+  CheckAvailabilityQuery,
+  SuggestMeetingTimesQuery,
+];
 
 @Module({
   imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule, MetricsModule],

@@ -12,6 +12,7 @@ Read path is landed behind `CALENDAR_INTEGRATION`. Writes are not registered yet
 - Search filters (attendee includes organizer, subject, category) run inside `fetchEvents`.
 - Metric: `osm_search_calendar_events_duration_seconds` with labels `dateWindow`, `hasAttendeeFilter`, `hasSubjectFilter`, `hasCategoryFilter`. Duration buckets match other `*_duration_seconds` histograms.
 - `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses; reject windows ≥ 62 days; decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
+- `suggest_meeting_times` POSTs `/users/{email}/findMeetingTimes`. Default duration 30 minutes and `activityDomain` work. Reject past-only windows, clamp a start that is already past to now, and reject windows ≥ 62 days. Surface `emptySuggestionsReason` instead of inventing slots.
 
 ## Probes
 
@@ -19,7 +20,6 @@ Read path is landed behind `CALENDAR_INTEGRATION`. Writes are not registered yet
 
 ## Still to build
 
-1. `suggest_meeting_times` — `findMeetingTimes`
-2. `respond_to_invite` with `context.elicit()` (not `/auth/authorize`)
-3. `create_event` / `update_event` / `cancel_event`
-4. Operator + technical docs wrap-up
+1. `respond_to_invite` with `context.elicit()` (not `/auth/authorize`)
+2. `create_event` / `update_event` / `cancel_event`
+3. Operator + technical docs wrap-up

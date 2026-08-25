@@ -13,6 +13,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { CheckAvailabilityTool } from './calendar/check-availability.tool';
 import { ListCalendarsTool } from './calendar/list-calendars.tool';
 import { SearchCalendarEventsTool } from './calendar/search-calendar-events.tool';
+import { SuggestMeetingTimesTool } from './calendar/suggest-meeting-times.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { SearchEmailsTool, SearchModule } from './content';
@@ -108,7 +109,14 @@ export function registerBackendModule(): DynamicModule {
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,
       ...uniqueOnlyTools,
-      ...(isCalendar ? [ListCalendarsTool, SearchCalendarEventsTool, CheckAvailabilityTool] : []),
+      ...(isCalendar
+        ? [
+            ListCalendarsTool,
+            SearchCalendarEventsTool,
+            CheckAvailabilityTool,
+            SuggestMeetingTimesTool,
+          ]
+        : []),
       MailSubscriptionController,
     ],
     controllers: [MailSubscriptionController],

@@ -20,6 +20,11 @@ export function isSmtpAddress(value: string): boolean {
   return SMTP_ADDRESS.test(value);
 }
 
+export function findMeetingTimesPath(mailboxEmail: string): string {
+  assert.ok(isSmtpAddress(mailboxEmail), 'findMeetingTimes mailbox must be an SMTP address');
+  return `/users/${mailboxEmail}/findMeetingTimes`;
+}
+
 export function calendarMailbox(input: { calendar: CalendarRef; callerEmail: string }): string {
   if (input.calendar.accessPath === 'ownerMailbox') {
     assert.ok(input.calendar.ownerEmail, 'ownerMailbox calendars require ownerEmail');

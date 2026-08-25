@@ -36,6 +36,21 @@ When showing free/busy from \`check_availability\`, write one short section per 
 - After every person, state \`resolvedWindow.interpretation\` when a relative range was used.
 - If \`availabilityNotes\` is present, display those notes after the sections.
 
+### Format for suggested meeting times
+When showing \`suggest_meeting_times\`, use a markdown table with exactly 4 columns: Time, Confidence, Organizer, Attendees.
+- **Time**: Start–end in the timezone shown on the slot.
+- **Confidence**: The \`confidence\` percentage.
+- **Organizer**: \`organizerAvailability\` (free / tentative / busy).
+- **Attendees**: Names or emails with availability in parentheses.
+- After the table, state \`suggestionReason\` for the top slot when present.
+- If \`emptySuggestionsReason\` is present, explain it and suggest widening the window or relaxing constraints. Do not invent slots.
+- After the table, state \`resolvedWindow.interpretation\` when a relative range was used.
+- If \`suggestionNotes\` is present, display those notes after the table.
+
+| Time | Confidence | Organizer | Attendees |
+|------|------------|-----------|-----------|
+| {start}–{end} | {confidence}% | {free} | {email (free)} |
+
 ### Identifier rules
 - NEVER show raw IDs (\`calendarId\`, \`eventId\`, \`accessPath\`, \`eventRef\`, \`seriesMasterId\`) to the user.
 `;

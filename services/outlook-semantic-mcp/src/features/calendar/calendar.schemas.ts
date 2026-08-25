@@ -142,3 +142,32 @@ export const GraphGetScheduleResponseSchema = z.object({
 
 export type GraphScheduleInformation = z.infer<typeof GraphScheduleInformationSchema>;
 export type GraphScheduleItem = z.infer<typeof GraphScheduleItemSchema>;
+
+const GraphAttendeeAvailabilitySchema = z.object({
+  availability: z.string().optional(),
+  attendee: z
+    .object({
+      emailAddress: GraphEmailAddressSchema.optional(),
+    })
+    .optional(),
+});
+
+const GraphMeetingTimeSuggestionSchema = z.object({
+  confidence: z.number().optional(),
+  organizerAvailability: z.string().optional(),
+  suggestionReason: z.string().optional(),
+  attendeeAvailability: z.array(GraphAttendeeAvailabilitySchema).optional(),
+  meetingTimeSlot: z
+    .object({
+      start: GraphDateTimeTimeZoneSchema.optional(),
+      end: GraphDateTimeTimeZoneSchema.optional(),
+    })
+    .optional(),
+});
+
+export const GraphFindMeetingTimesResponseSchema = z.object({
+  emptySuggestionsReason: z.string().optional(),
+  meetingTimeSuggestions: z.array(GraphMeetingTimeSuggestionSchema).optional(),
+});
+
+export type GraphMeetingTimeSuggestion = z.infer<typeof GraphMeetingTimeSuggestionSchema>;

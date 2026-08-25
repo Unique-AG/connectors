@@ -17,6 +17,7 @@ describe(buildServerInstructions.name, () => {
     expect(buildServerInstructions()).not.toContain('list_calendars');
     expect(buildServerInstructions()).not.toContain('search_calendar_events');
     expect(buildServerInstructions()).not.toContain('check_availability');
+    expect(buildServerInstructions()).not.toContain('suggest_meeting_times');
   });
 
   it('includes calendar instructions when CALENDAR_INTEGRATION is enabled', () => {
@@ -24,5 +25,6 @@ describe(buildServerInstructions.name, () => {
     expect(buildServerInstructions()).toContain('list_calendars');
     expect(buildServerInstructions()).toContain('search_calendar_events');
     expect(buildServerInstructions()).toContain('check_availability');
+    expect(buildServerInstructions()).toContain('suggest_meeting_times');
   });
 });

@@ -23,6 +23,7 @@ import {
 } from './utils/calendar-graph-errors';
 import { getSchedulePath, isSmtpAddress } from './utils/calendar-graph-path';
 import { type AvailabilityBlock, decodeAvailabilityView } from './utils/decode-availability-view';
+import { toGraphDateTimeTimeZone } from './utils/to-graph-date-time-time-zone';
 
 const UTC = 'UTC';
 const MAX_SCHEDULES = 20;
@@ -154,12 +155,12 @@ export class CheckAvailabilityQuery {
         .header('Prefer', `outlook.timezone="${outlookTimeZone}"`)
         .post({
           schedules,
-          startTime: toDateTimeTimeZone({
+          startTime: toGraphDateTimeTimeZone({
             iso: resolvedWindow.startDateTime,
             ianaTimeZone,
             windowsTimeZone: outlookTimeZone,
           }),
-          endTime: toDateTimeTimeZone({
+          endTime: toGraphDateTimeTimeZone({
             iso: resolvedWindow.endDateTime,
             ianaTimeZone,
             windowsTimeZone: outlookTimeZone,
@@ -281,18 +282,6 @@ function isTooManyEntries(error: GraphScheduleInformation['error']): boolean {
     return false;
   }
   return error.responseCode === '5006' || /too many calendar entries/i.test(error.message ?? '');
-}
-
-function toDateTimeTimeZone(input: {
-  iso: string;
-  ianaTimeZone: string;
-  windowsTimeZone: string;
-}): { dateTime: string; timeZone: string } {
-  const zoned = Temporal.Instant.from(input.iso).toZonedDateTimeISO(input.ianaTimeZone);
-  return {
-    dateTime: zoned.toPlainDateTime().toString({ smallestUnit: 'second' }),
-    timeZone: input.windowsTimeZone,
-  };
 }
 
 function toScheduleItem(item: GraphScheduleItem): ScheduleItem {

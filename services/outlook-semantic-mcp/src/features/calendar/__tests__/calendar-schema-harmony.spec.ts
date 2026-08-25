@@ -12,6 +12,11 @@ import {
   SearchCalendarEventsOutputSchema,
 } from '../search-calendar-events.tool';
 import { META as SEARCH_CALENDAR_EVENTS_META } from '../search-calendar-events-tool.meta';
+import {
+  SuggestMeetingTimesInputSchema,
+  SuggestMeetingTimesOutputSchema,
+} from '../suggest-meeting-times.tool';
+import { META as SUGGEST_MEETING_TIMES_META } from '../suggest-meeting-times-tool.meta';
 
 interface JsonSchema {
   description?: string;
@@ -42,6 +47,12 @@ const CALENDAR_TOOLS = [
     meta: CHECK_AVAILABILITY_META,
     input: CheckAvailabilityInputSchema,
     output: CheckAvailabilityOutputSchema,
+  },
+  {
+    name: 'suggest_meeting_times',
+    meta: SUGGEST_MEETING_TIMES_META,
+    input: SuggestMeetingTimesInputSchema,
+    output: SuggestMeetingTimesOutputSchema,
   },
 ] as const;
 
