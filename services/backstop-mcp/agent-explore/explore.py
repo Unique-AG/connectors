@@ -43,7 +43,10 @@ def main() -> None:
     cache_dir = here / ".probe-cache"
     cache_dir.mkdir(exist_ok=True)
     key = hashlib.sha256(
-        json.dumps({"path": args.path, "query": params}, sort_keys=True).encode()
+        json.dumps(
+            {"base_url": base_url, "path": args.path, "query": params},
+            sort_keys=True,
+        ).encode()
     ).hexdigest()[:16]
     cache_file = cache_dir / f"{key}.json"
     if cache_file.exists():
