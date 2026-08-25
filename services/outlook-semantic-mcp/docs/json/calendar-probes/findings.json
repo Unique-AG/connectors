@@ -17,8 +17,8 @@
     },
     {
       "question": "isDefaultCalendar on calendar resource",
-      "status": "confirmed-by-docs",
-      "conclusion": "v1.0 calendar resource includes isDefaultCalendar (boolean): true if this is the default calendar where new events are created. Use it to choose accessPath ownerMailbox vs ownMailbox.",
+      "status": "unconfirmed",
+      "conclusion": "v1.0 calendar resource includes isDefaultCalendar (boolean): true if this is the default calendar where new events are created. Whether that flag is relative to the caller's mailbox when listing /me/calendars as a sharee is unconfirmed live — do not treat isDefaultCalendar alone as proof a shared calendar is the owner's primary. Pair it with isTallyingResponses as a second signal; IDs from /me/calendars stay in the caller's namespace.",
       "source": "https://learn.microsoft.com/en-us/graph/api/resources/calendar?view=graph-rest-1.0"
     },
     {

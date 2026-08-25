@@ -9,10 +9,6 @@ export class CalendarConsentRequiredError extends Error {
   }
 }
 
-export function isGraphStatus(error: unknown, ...statusCodes: number[]): boolean {
-  return error instanceof GraphError && statusCodes.includes(error.statusCode);
-}
-
 export function isInsufficientCalendarScopeError(error: unknown): boolean {
   if (!(error instanceof GraphError)) {
     return false;

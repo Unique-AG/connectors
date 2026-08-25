@@ -192,6 +192,7 @@ Set via `mcpConfig.app` in Helm values:
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
 | `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
 | `MCP_BACKEND` | `mcpBackend` | `microsoft_graph_and_unique_api` | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
+| `CALENDAR_INTEGRATION` | `calendarIntegration` | `disabled` | Enables Outlook calendar tools and requests `Calendars.ReadWrite.Shared` on OAuth and token refresh. Existing users must reconnect unless Entra admin consent already covers that scope — see [CALENDAR_INTEGRATION](#CALENDAR_INTEGRATION) |
 | `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
@@ -530,6 +531,12 @@ Required for `cluster_local` auth mode. Provide as a JSON object:
 #### MCP_DEBUG_MODE
 
 When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
+
+#### CALENDAR_INTEGRATION
+
+Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars` today) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string.
+
+Existing connected users must reconnect Outlook after this is turned on, unless an Entra admin has already granted the extra scope tenant-wide. Without that, token refresh can fail with `invalid_grant` and mail tools stop working.
 
 #### DELEGATED_ACCESS_SCAN
 

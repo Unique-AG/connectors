@@ -20,7 +20,6 @@ const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar
 - Use \`list_calendars\` to see the user's own calendars and any shared or delegated calendars.
 - \`calendarId\` and \`accessPath\` are internal identifiers. Never show them to the user.
-- \`webLink\` is the only user-facing link. Never construct or guess Outlook URLs.
 `;
 
 export function buildServerInstructions(): string {

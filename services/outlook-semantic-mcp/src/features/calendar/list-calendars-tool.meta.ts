@@ -3,12 +3,12 @@ import { CALENDAR_TOOL_FORMAT_INFORMATION } from './calendar-tool-format';
 
 export const META = createMeta({
   icon: 'calendar',
-  systemPrompt: `Lists Outlook calendars the signed-in user can access: their own calendars plus shared and delegated calendars from GET /me/calendars.
+  systemPrompt: `Lists Outlook calendars the signed-in user can access: their own calendars plus shared and delegated calendars.
 
-Use this when the user asks which calendars they have, who a calendar belongs to, or whether they can edit a calendar. Pass \`calendarId\` values into \`search_calendar_events\` to narrow a search. \`calendarId\` and \`accessPath\` are internal — never display them.
+Use this when the user asks which calendars they have, who a calendar belongs to, or whether they can edit a calendar. calendarId and accessPath are internal — never display them.
 
-A calendar with \`isOwn: false\` and \`canEdit: true\` is typically a delegated or shared calendar you can create meetings on behalf of the owner. \`canViewPrivateItems: false\` means private events on that calendar will be redacted.
+A calendar with isOwn: false and canEdit: true is typically a delegated or shared calendar the user can create meetings on. canViewPrivateItems: false means private events on that calendar will be redacted.
 
-If \`consentRequired\` is true, the user must reconnect Outlook to grant calendar permission. Do not invent calendar data.`,
+If consentRequired is true, the user must reconnect Outlook to grant calendar permission. Do not invent calendar data.`,
   toolFormatInformation: CALENDAR_TOOL_FORMAT_INFORMATION,
 });

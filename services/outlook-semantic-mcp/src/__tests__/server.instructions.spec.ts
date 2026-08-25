@@ -1,0 +1,24 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildServerInstructions } from '../server.instructions';
+
+describe(buildServerInstructions.name, () => {
+  const original = process.env.CALENDAR_INTEGRATION;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.CALENDAR_INTEGRATION;
+    } else {
+      process.env.CALENDAR_INTEGRATION = original;
+    }
+  });
+
+  it('omits calendar instructions when CALENDAR_INTEGRATION is disabled', () => {
+    process.env.CALENDAR_INTEGRATION = 'disabled';
+    expect(buildServerInstructions()).not.toContain('list_calendars');
+  });
+
+  it('includes calendar instructions when CALENDAR_INTEGRATION is enabled', () => {
+    process.env.CALENDAR_INTEGRATION = 'enabled';
+    expect(buildServerInstructions()).toContain('list_calendars');
+  });
+});

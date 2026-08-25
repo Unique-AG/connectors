@@ -14,13 +14,13 @@ function calendar(overrides: Partial<GraphCalendar> & { id: string }): GraphCale
 }
 
 describe(classifyCalendar.name, () => {
-  it("marks the caller's calendar as ownMailbox", () => {
+  it('marks the caller calendar as ownMailbox', () => {
     const result = classifyCalendar(
       calendar({
         id: 'cal-own',
-        name: 'Calendar',
         isDefaultCalendar: true,
-        owner: { address: 'me@example.com', name: 'Me' },
+        isTallyingResponses: true,
+        owner: { address: 'ME@example.com', name: 'Me' },
       }),
       CALLER,
     );
@@ -29,17 +29,18 @@ describe(classifyCalendar.name, () => {
       calendarId: 'cal-own',
       isOwn: true,
       accessPath: 'ownMailbox',
-      ownerEmail: 'me@example.com',
+      ownerEmail: 'ME@example.com',
     });
   });
 
-  it('routes a shared primary calendar to ownerMailbox', () => {
+  it('routes a shared owner-primary calendar to ownerMailbox', () => {
     const result = classifyCalendar(
       calendar({
         id: 'cal-primary',
         name: 'Banker',
-        isDefaultCalendar: true,
-        canEdit: true,
+        isDefaultCalendar: false,
+        isTallyingResponses: true,
+        canShare: false,
         owner: { address: 'banker@example.com', name: 'Banker' },
       }),
       CALLER,
@@ -58,6 +59,8 @@ describe(classifyCalendar.name, () => {
         id: 'cal-custom',
         name: 'Projects',
         isDefaultCalendar: false,
+        isTallyingResponses: false,
+        canShare: false,
         owner: { address: 'banker@example.com', name: 'Banker' },
       }),
       CALLER,
@@ -70,16 +73,16 @@ describe(classifyCalendar.name, () => {
     });
   });
 
-  it('treats owner email comparison as case-insensitive', () => {
+  it('uses ownMailbox when Graph omits the owner', () => {
     const result = classifyCalendar(
-      calendar({
-        id: 'cal-own',
-        owner: { address: 'ME@example.com' },
-      }),
+      calendar({ id: 'cal-unknown', isDefaultCalendar: true }),
       CALLER,
     );
 
-    expect(result.isOwn).toBe(true);
-    expect(result.accessPath).toBe('ownMailbox');
+    expect(result).toMatchObject({
+      isOwn: false,
+      ownerEmail: null,
+      accessPath: 'ownMailbox',
+    });
   });
 });

@@ -1,5 +1,9 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  AllDelegatesFailedError,
+  NoDelegatesFoundError,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { ListCalendarsQuery } from '../list-calendars.query';
 
@@ -7,18 +11,13 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const OWN_EMAIL = 'me@example.com';
 const SHARED_EMAIL = 'shared@example.com';
 const OWNER_EMAIL = 'banker@example.com';
+const CALENDAR_SELECT =
+  'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses';
 
 function makeGraphError(statusCode: number, code: string): GraphError {
   const err = new GraphError(statusCode, 'Access denied');
   err.code = code;
   return err;
-}
-
-function makeRequest(get: ReturnType<typeof vi.fn>) {
-  return {
-    select: vi.fn().mockReturnThis(),
-    get,
-  };
 }
 
 function createQuery(opts: {
@@ -28,41 +27,44 @@ function createQuery(opts: {
   resolverRun?: ReturnType<typeof vi.fn>;
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
-  const request = makeRequest(get);
-  const graphClientFactory = {
-    createClientForUser: vi.fn().mockReturnValue({
-      api: vi.fn().mockReturnValue(request),
-    }),
+  const request = {
+    select: vi.fn().mockReturnThis(),
+    top: vi.fn().mockReturnThis(),
+    get,
   };
-  const msGraphClientResolver = {
-    run: opts.resolverRun ?? vi.fn(),
-  };
-  const getUserProfileQuery = {
-    run: vi.fn().mockResolvedValue({
-      id: USER_PROFILE_ID.toString(),
-      email: opts.email ?? OWN_EMAIL,
-      source: opts.source ?? 'oauth',
-    }),
-  };
+  const api = vi.fn().mockReturnValue(request);
+  const resolverRun =
+    opts.resolverRun ??
+    vi
+      .fn()
+      .mockImplementation(async ({ fn }) =>
+        fn({ client: { api }, clientUserProfileId: 'client-1' }),
+      );
 
   const query = new ListCalendarsQuery(
-    graphClientFactory as never,
-    msGraphClientResolver as never,
-    getUserProfileQuery as never,
+    { run: resolverRun } as never,
+    {
+      run: vi.fn().mockResolvedValue({
+        id: USER_PROFILE_ID.toString(),
+        email: opts.email ?? OWN_EMAIL,
+        source: opts.source ?? 'oauth',
+      }),
+    } as never,
   );
 
-  return { query, get, request, graphClientFactory, msGraphClientResolver };
+  return { query, api, request, resolverRun };
 }
 
 describe(ListCalendarsQuery.name, () => {
-  it('lists own and shared calendars with accessPath classified from Graph', async () => {
-    const { query } = createQuery({
+  it('GETs /me/calendars and classifies own, delegated-primary, and shared-custom calendars', async () => {
+    const { query, api, request } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
           {
             id: 'cal-own',
             name: 'Calendar',
             isDefaultCalendar: true,
+            isTallyingResponses: true,
             canEdit: true,
             canViewPrivateItems: true,
             owner: { address: OWN_EMAIL, name: 'Me' },
@@ -70,7 +72,8 @@ describe(ListCalendarsQuery.name, () => {
           {
             id: 'cal-primary',
             name: 'Banker',
-            isDefaultCalendar: true,
+            isDefaultCalendar: false,
+            isTallyingResponses: true,
             canEdit: true,
             canViewPrivateItems: false,
             owner: { address: OWNER_EMAIL, name: 'Banker' },
@@ -79,6 +82,7 @@ describe(ListCalendarsQuery.name, () => {
             id: 'cal-custom',
             name: 'Projects',
             isDefaultCalendar: false,
+            isTallyingResponses: false,
             canEdit: false,
             canViewPrivateItems: false,
             owner: { address: OWNER_EMAIL, name: 'Banker' },
@@ -89,13 +93,11 @@ describe(ListCalendarsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID);
 
+    expect(api).toHaveBeenCalledWith('/me/calendars');
+    expect(request.select).toHaveBeenCalledWith(CALENDAR_SELECT);
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
-      expect.objectContaining({
-        calendarId: 'cal-own',
-        isOwn: true,
-        accessPath: 'ownMailbox',
-      }),
+      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, accessPath: 'ownMailbox' }),
       expect.objectContaining({
         calendarId: 'cal-primary',
         isOwn: false,
@@ -108,6 +110,36 @@ describe(ListCalendarsQuery.name, () => {
         accessPath: 'ownMailbox',
         ownerEmail: OWNER_EMAIL,
       }),
+    ]);
+  });
+
+  it('GETs /users/{email}/calendars for a shared-mailbox profile', async () => {
+    const { query, api, resolverRun } = createQuery({
+      source: 'shared-mailbox',
+      email: SHARED_EMAIL,
+      get: vi.fn().mockResolvedValue({
+        value: [
+          {
+            id: 'cal-shared',
+            name: 'Support',
+            isDefaultCalendar: true,
+            owner: { address: SHARED_EMAIL, name: 'Support' },
+          },
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(resolverRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sharedMailboxConfig: { throwIfNoDelegates: true },
+      }),
+    );
+    expect(api).toHaveBeenCalledWith(`/users/${SHARED_EMAIL}/calendars`);
+    expect(result.success).toBe(true);
+    expect(result.calendars).toEqual([
+      expect.objectContaining({ calendarId: 'cal-shared', isOwn: true, accessPath: 'ownMailbox' }),
     ]);
   });
 
@@ -125,45 +157,75 @@ describe(ListCalendarsQuery.name, () => {
     });
   });
 
-  it('lists calendars on a shared-mailbox profile through the delegate resolver', async () => {
-    const get = vi.fn().mockResolvedValue({
-      value: [
-        {
-          id: 'cal-shared',
-          name: 'Support',
-          isDefaultCalendar: true,
-          canEdit: true,
-          canViewPrivateItems: true,
-          owner: { address: SHARED_EMAIL, name: 'Support' },
-        },
-      ],
-    });
-    const request = makeRequest(get);
-    const resolverRun = vi
-      .fn()
-      .mockImplementation(async ({ fn }) =>
-        fn({ client: { api: vi.fn().mockReturnValue(request) }, clientUserProfileId: 'delegate' }),
-      );
-    const { query, graphClientFactory } = createQuery({
+  it('does not leak internal user-profile IDs when no delegates exist', async () => {
+    const { query } = createQuery({
       source: 'shared-mailbox',
       email: SHARED_EMAIL,
-      resolverRun,
+      resolverRun: vi.fn().mockRejectedValue(new NoDelegatesFoundError(USER_PROFILE_ID.toString())),
     });
 
     const result = await query.run(USER_PROFILE_ID);
 
-    expect(graphClientFactory.createClientForUser).not.toHaveBeenCalled();
-    expect(resolverRun).toHaveBeenCalledOnce();
-    expect(request.select).toHaveBeenCalledWith(
-      'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar',
+    expect(result.success).toBe(false);
+    expect(result.message).not.toContain(USER_PROFILE_ID.toString());
+    expect(result.message).toContain('shared mailbox');
+  });
+
+  it('does not leak internal user-profile IDs when all delegates fail', async () => {
+    const { query } = createQuery({
+      source: 'shared-mailbox',
+      email: SHARED_EMAIL,
+      resolverRun: vi
+        .fn()
+        .mockRejectedValue(new AllDelegatesFailedError(USER_PROFILE_ID.toString())),
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(result.success).toBe(false);
+    expect(result.message).not.toContain(USER_PROFILE_ID.toString());
+  });
+
+  it('pages through @odata.nextLink', async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({
+        value: [{ id: 'cal-1', owner: { address: OWN_EMAIL } }],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc',
+      })
+      .mockResolvedValueOnce({
+        value: [{ id: 'cal-2', owner: { address: OWN_EMAIL } }],
+      });
+    const { query, api } = createQuery({ get });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(api).toHaveBeenNthCalledWith(1, '/me/calendars');
+    expect(api).toHaveBeenNthCalledWith(
+      2,
+      'https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc',
     );
     expect(result.success).toBe(true);
-    expect(result.calendars).toEqual([
-      expect.objectContaining({
-        calendarId: 'cal-shared',
-        isOwn: true,
-        accessPath: 'ownMailbox',
-      }),
-    ]);
+    expect(result.calendars?.map((calendar) => calendar.calendarId)).toEqual(['cal-1', 'cal-2']);
+  });
+
+  it('returns an empty-list message when Graph returns no calendars', async () => {
+    const { query } = createQuery({ get: vi.fn().mockResolvedValue({ value: [] }) });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(result).toEqual({
+      success: true,
+      message: 'No calendars were returned.',
+      calendars: [],
+    });
+  });
+
+  it('fails when Graph returns a calendar without an id', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [{ name: 'Broken' }] }),
+    });
+
+    await expect(query.run(USER_PROFILE_ID)).rejects.toThrow();
   });
 });

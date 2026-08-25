@@ -4,7 +4,6 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import {
   AllDelegatesFailedError,
   MsGraphClientResolver,
@@ -19,7 +18,8 @@ import {
 } from './calendar-graph-errors';
 import { classifyCalendar } from './classify-calendar';
 
-const CALENDAR_SELECT = 'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar';
+const CALENDAR_SELECT =
+  'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses';
 
 export const ListCalendarsQueryOutputSchema = z.object({
   success: z
@@ -45,7 +45,6 @@ export class ListCalendarsQuery {
   private readonly logger = new Logger(ListCalendarsQuery.name);
 
   public constructor(
-    private readonly graphClientFactory: GraphClientFactory,
     private readonly msGraphClientResolver: MsGraphClientResolver,
     private readonly getUserProfileQuery: GetUserProfileQuery,
   ) {}
@@ -53,12 +52,17 @@ export class ListCalendarsQuery {
   @Span()
   public async run(userProfileId: UserProfileTypeID): Promise<ListCalendarsQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
+    const path =
+      userProfile.source === 'shared-mailbox'
+        ? `/users/${userProfile.email}/calendars`
+        : '/me/calendars';
 
     try {
-      const calendars =
-        userProfile.source === 'shared-mailbox'
-          ? await this.listForSharedMailbox(userProfile)
-          : await this.listForOauthUser(userProfile);
+      const calendars = await this.msGraphClientResolver.run({
+        userProfile,
+        sharedMailboxConfig: { throwIfNoDelegates: true },
+        fn: ({ client }) => this.fetchCalendars(client, path, userProfile.email),
+      });
 
       return {
         success: true,
@@ -77,30 +81,22 @@ export class ListCalendarsQuery {
         };
       }
       if (error instanceof NoDelegatesFoundError || error instanceof AllDelegatesFailedError) {
+        this.logger.warn({ msg: 'Shared mailbox calendar list failed', err: error });
         return {
           success: false,
-          message: error.message,
+          message:
+            'Could not reach this shared mailbox through a connected Outlook account. Ask a mailbox owner to reconnect.',
         };
       }
       throw error;
     }
   }
 
-  private async listForOauthUser(userProfile: NonNullishProps<UserProfile, 'email'>) {
-    const client = this.graphClientFactory.createClientForUser(userProfile.id);
-    return this.fetchCalendars(client, '/me/calendars', userProfile.email);
-  }
-
-  private async listForSharedMailbox(userProfile: NonNullishProps<UserProfile, 'email'>) {
-    return this.msGraphClientResolver.run({
-      userProfile,
-      sharedMailboxConfig: { throwIfNoDelegates: true },
-      fn: async ({ client }) =>
-        this.fetchCalendars(client, `/users/${userProfile.email}/calendars`, userProfile.email),
-    });
-  }
-
-  private async fetchCalendars(client: Client, path: string, callerEmail: string) {
+  private async fetchCalendars(
+    client: Client,
+    path: string,
+    callerEmail: NonNullishProps<UserProfile, 'email'>['email'],
+  ) {
     const calendars = [];
     let nextPath: string | undefined = path;
     let isFirst = true;
@@ -108,17 +104,15 @@ export class ListCalendarsQuery {
     while (nextPath) {
       try {
         const request = client.api(nextPath);
-        const raw = isFirst ? await request.select(CALENDAR_SELECT).get() : await request.get();
+        const raw = isFirst
+          ? await request.select(CALENDAR_SELECT).top(100).get()
+          : await request.get();
         isFirst = false;
-        const parsed = GraphCalendarCollectionSchema.safeParse(raw);
-        if (!parsed.success) {
-          this.logger.warn({ msg: 'Unexpected /calendars response shape', err: parsed.error });
-          break;
-        }
-        for (const item of parsed.data.value) {
+        const parsed = GraphCalendarCollectionSchema.parse(raw);
+        for (const item of parsed.value) {
           calendars.push(classifyCalendar(item, callerEmail));
         }
-        nextPath = parsed.data['@odata.nextLink'];
+        nextPath = parsed['@odata.nextLink'];
       } catch (error) {
         if (isInsufficientCalendarScopeError(error)) {
           throw new CalendarConsentRequiredError();
