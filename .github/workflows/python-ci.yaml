@@ -181,3 +181,65 @@ jobs:
             VALUES_FLAG="--values ci-values.yaml"
           fi
           helm template . ${VALUES_FLAG}
+
+      # The same step _template-ci.yaml runs for Node services. Python services never reached it,
+      # because that template is only called from services-ci.yaml, which matrixes on package.json —
+      # so a Python service's chart could sit with a values.schema.json that no longer matches its
+      # values.additional.schema.json and nothing said so. The script checks every chart it knows
+      # about, not just this matrix entry; that is how the Node template calls it too.
+      - name: Check values.schema.json drift
+        if: steps.check-helm.outputs.exists == 'true'
+        run: scripts/render-values-schema.sh --check
+
+  # Validates Terraform configurations if they exist for this service. Same job as
+  # _template-ci.yaml's, which Python services never reached either, plus two steps that one lacks:
+  #   - `fmt -check`, so a module is formatted the way `terraform fmt` would format it;
+  #   - `test`, because `validate` is a weak gate. It reports Success on a self-referential
+  #     `identifier_uris` (silently pruning the edge from the graph — only plan fails), and it skips
+  #     variable validations on defaulted variables, so it passes an office-365-mcp registration with
+  #     no tool selection at all. `terraform test` with `mock_provider` runs credential-free.
+  validate-terraform:
+    name: Terraform ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: services/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check if Terraform exists
+        id: check-terraform
+        run: |
+          if [ -d "${{ env.SERVICE_PATH }}/deploy/terraform" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        if: steps.check-terraform.outputs.exists == 'true'
+        with:
+          terraform_version: 1.13.4
+
+      - name: Validate Terraform modules
+        if: steps.check-terraform.outputs.exists == 'true'
+        run: |
+          # -mindepth/-maxdepth 2 is `deploy/terraform/<cloud>/<module>`, so a module's own `tests/`
+          # directory at depth 3 is not mistaken for a root module of its own.
+          for dir in $(find ${{ env.SERVICE_PATH }}/deploy/terraform -mindepth 2 -maxdepth 2 -type d); do
+            echo "Validating: $dir"
+            cd "$dir"
+            terraform fmt -check -recursive
+            terraform init -backend=false
+            terraform validate
+            terraform test
+            cd - > /dev/null
+          done
