@@ -53,7 +53,8 @@ flowchart LR
 |-------------|---------|
 | **Teams MCP Server** | Deployed with `UNIQUE_INTEGRATION=enabled`, a dedicated root scope, and a Zitadel service account — see the [Operator Manual](./operator.md) |
 | **Microsoft Teams** | Meeting transcription enabled by policy; recordings require the meeting to actually be recorded |
-| **Microsoft Entra ID** | Admin consent for `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — see [Grant admin consent](./operator.md#grant-admin-consent) |
+| **Microsoft Entra ID** | Admin consent for Unique's capture app (`OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetingRecording.Read.All`, `User.Read`) — see [Grant admin consent](./operator.md#Grant-admin-consent) |
+| **Graph transcript API access** | Tenant-wide Teams meeting setting `EnableGraphTranscriptAccess` must be **On** — separate from Entra consent; Unique cannot enable it via OAuth — see [Teams Graph transcript API access](./operator.md#Teams-Graph-transcript-API-access) |
 | **Unique platform** | The Recordings area enabled via feature flag, pointed at the same root scope Teams MCP ingests into |
 | **Knowledge-base storage** | Capacity for VTT transcripts and MP4 recordings; recordings are the dominant cost |
 
@@ -133,8 +134,8 @@ Deleting a meeting from the Recordings area removes the transcript, the correlat
 
 - [Teams MCP](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802633229/Teams-MCP) — the MCP server that captures transcripts, and its chat and channel messaging tools
 - [Teams MCP - Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1801683279/Teams+MCP+-+Operator+Manual) — deploying and operating the server
-- [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication) — Entra ID app registration and admin consent
-- [Teams MCP - Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802240023/Teams+MCP+-+Permissions) — Microsoft Graph permissions with least-privilege justification
+- [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication) — Entra ID app registration and admin consent for the chat-only Teams MCP app
+- [Required Microsoft Graph permissions](./technical.md#required-microsoft-graph-permissions) — the four delegated scopes this feature's capture app uses
 
 ## Standard References
 

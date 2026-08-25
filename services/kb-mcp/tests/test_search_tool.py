@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from mcp.types import CallToolResult
+from fastmcp.tools import ToolResult
 from unique_mcp.meta.rjsf import ConfigSchemaMeta
 from unique_toolkit.content.schemas import ContentChunk, ContentMetadata
 from unique_toolkit.experimental.components.internal_search import (
@@ -13,11 +13,15 @@ from unique_toolkit.experimental.components.internal_search import (
 )
 
 from kb_mcp.references import (
-    CITATION_RESULT_INSTRUCTION,
-    REFERENCE_FORMAT_INFORMATION,
+    GENERIC_RESULT_CITATION_INSTRUCTION,
     REFERENCE_META_KEY,
+    SEARCH_SYSTEM_PROMPT,
+    TOOL_DESCRIPTION_CITATION_GUIDANCE,
+    UNIQUE_AI_RESULT_CITATION_INSTRUCTION,
+    UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     chunk_to_text_content,
     frontend_document_url,
+    is_unique_ai_client,
     markdown_citation_link,
     reference_url,
     scope_id_from_folder_id_path,
@@ -55,7 +59,20 @@ def test_tool_description_includes_citation_rules():
     description = search.__fastmcp__.description
     assert description is not None
     assert "Do NOT invent placeholders like [source1]" in description
-    assert REFERENCE_FORMAT_INFORMATION in description
+    assert TOOL_DESCRIPTION_CITATION_GUIDANCE in description
+
+
+def test_tool_meta_uses_unique_ai_format_and_slim_system_prompt():
+    meta = search.__fastmcp__.meta or {}
+    assert (
+        meta["unique.app/tool-format-information"] == UNIQUE_AI_TOOL_FORMAT_INFORMATION
+    )
+    assert "[source" in meta["unique.app/tool-format-information"]
+    assert (
+        "Do NOT invent placeholders" not in meta["unique.app/tool-format-information"]
+    )
+    assert meta["unique.app/system-prompt"] == SEARCH_SYSTEM_PROMPT
+    assert TOOL_DESCRIPTION_CITATION_GUIDANCE not in meta["unique.app/system-prompt"]
 
 
 def _make_chunk(text: str, **kwargs) -> ContentChunk:
@@ -90,6 +107,11 @@ def _patch_identity():
         "kb_mcp.tools.search.tool.get_unique_settings_async",
         new=AsyncMock(return_value=_make_identity()),
     )
+
+
+def _patch_is_unique_ai_client(value: bool):
+    """Stub node-chat-vs-generic-client detection (see is_unique_ai_client)."""
+    return patch("kb_mcp.tools.search.tool.is_unique_ai_client", return_value=value)
 
 
 def _patch_kb_settings(base_url: str | None = None, lookup_concurrency: int = 8):
@@ -133,7 +155,7 @@ async def test_search_string_becomes_the_search_query():
     # backend itself is mocked out here — this is the resulting query state,
     # not an assertion on which collaborator got called.
     assert mock_service.state.search_queries == ["test query"]
-    assert isinstance(result, CallToolResult)
+    assert isinstance(result, ToolResult)
     # result chunks + trailing citation instruction
     assert len(result.content) == 2
 
@@ -190,7 +212,7 @@ async def test_search_uses_defaults_when_no_config_provided():
             config=SearchToolConfig(),
         )
 
-    assert isinstance(result, CallToolResult)
+    assert isinstance(result, ToolResult)
     assert mock_service.state.search_queries == ["fallback query"]
 
 
@@ -208,7 +230,7 @@ async def test_search_returns_error_result_on_service_failure():
             config=SearchToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "KB unavailable" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -238,7 +260,7 @@ async def test_search_returns_error_result_on_post_processor_failure():
             config=SearchToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "post-processor failed" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -253,8 +275,34 @@ async def test_search_returns_error_when_identity_unresolvable():
             config=SearchToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
+
+
+def test_is_unique_ai_client_true_for_node_chats_own_client_name():
+    ctx = MagicMock()
+    ctx.session.client_params.clientInfo.name = "unique-ai-mcp-client-module-kb-mcp"
+    with patch("kb_mcp.references.get_context", return_value=ctx):
+        assert is_unique_ai_client() is True
+
+
+def test_is_unique_ai_client_false_for_generic_client_name():
+    ctx = MagicMock()
+    ctx.session.client_params.clientInfo.name = "claude-code"
+    with patch("kb_mcp.references.get_context", return_value=ctx):
+        assert is_unique_ai_client() is False
+
+
+def test_is_unique_ai_client_false_when_no_context():
+    with patch("kb_mcp.references.get_context", side_effect=RuntimeError):
+        assert is_unique_ai_client() is False
+
+
+def test_is_unique_ai_client_false_when_client_params_missing():
+    ctx = MagicMock()
+    ctx.session.client_params = None
+    with patch("kb_mcp.references.get_context", return_value=ctx):
+        assert is_unique_ai_client() is False
 
 
 def test_scope_id_from_folder_id_path_takes_leaf():
@@ -414,7 +462,42 @@ async def test_search_results_are_numbered_sequentially_and_include_citation_blo
     assert "](unique://content/" in texts[0]
     assert "](unique://content/" in texts[1]
     assert "[source" not in texts[0]
-    assert texts[2] == CITATION_RESULT_INSTRUCTION
+    assert texts[2] == GENERIC_RESULT_CITATION_INSTRUCTION
+
+
+@pytest.mark.asyncio
+async def test_search_uses_sourceN_citation_instruction_when_called_via_unique_ai_chat():
+    """Generic MCP clients (Claude Desktop/Code, Inspector) get the
+    markdown-link instruction above; a call relayed through node-chat (its
+    own MCP `clientInfo`, per is_unique_ai_client) must get the [sourceN]
+    instruction instead — that's the only form the platform's
+    citation-badge rendering resolves.
+    """
+    chunks = [_make_chunk("first"), _make_chunk("second")]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = MagicMock()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+        _patch_is_unique_ai_client(True),
+    ):
+        result = await search(
+            search_string="query",
+            config=SearchToolConfig(),
+        )
+
+    texts = [c.text for c in result.content]  # type: ignore[union-attr]
+    assert texts[2] == UNIQUE_AI_RESULT_CITATION_INSTRUCTION
+    assert texts[2] != GENERIC_RESULT_CITATION_INSTRUCTION
 
 
 @pytest.mark.asyncio

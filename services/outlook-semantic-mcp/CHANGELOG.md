@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.3.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.2.0...outlook-semantic-mcp@3.3.0) (2026-08-13)
+
+
+### Features
+
+* **outlook-semantic-mcp,proxy,unique-api,utils,ci,deps:** add forward proxy support ([#773](https://github.com/Unique-AG/connectors/issues/773)) ([fcc761e](https://github.com/Unique-AG/connectors/commit/fcc761e79b1800c97dd8cb0ba3add459a6ccd668))
+
+
+### Bug Fixes
+
+* **confluence-connector,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** allow azurerm v4 or v5 (&gt;= 4, &lt; 6) in remaining modules ([#768](https://github.com/Unique-AG/connectors/issues/768)) ([dcdd34f](https://github.com/Unique-AG/connectors/commit/dcdd34f521aac36ffa7d388c0478b7e4e8237368))
+
 ## [3.2.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.1.0...outlook-semantic-mcp@3.2.0) (2026-07-29)
 
 

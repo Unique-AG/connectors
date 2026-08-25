@@ -1,9 +1,11 @@
 {
   "services/sharepoint-connector": "3.1.0",
-  "services/teams-mcp": "0.4.3",
-  "services/confluence-connector": "3.0.0",
-  "services/outlook-semantic-mcp": "3.2.0",
+  "services/teams-mcp": "0.4.5",
+  "services/confluence-connector": "3.0.1",
+  "services/outlook-semantic-mcp": "3.3.0",
   "services/kyckr-mcp": "0.1.0",
   "services/hello-mcp": "0.1.0",
-  "services/kb-mcp": "0.1.0"
+  "services/kb-mcp": "0.1.1",
+  "services/backstop-mcp": "0.0.3",
+  "services/office-365-mcp": "0.0.0"
 }

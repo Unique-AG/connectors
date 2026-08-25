@@ -14,16 +14,23 @@ Referencing style
      when the frontend base URL and scope id are known.
    - Otherwise fall back to ``unique://content/{contentId}`` (resolved by the
      Unique platform frontend).
-2. **Text layer** (for the LLM): each result is prefixed with a ready-to-use
-   markdown citation link
+2. **Text layer** (generic MCP clients): each result is prefixed with a
+   ready-to-use markdown citation link
 
        [Quarterly Report 2025.pdf](https://<identifier>.unique.app/knowledge-upload/…?file=…)
        (pages 12-14)
 
    so models can paste the link inline instead of inventing ``[sourceN]`` tags.
+   Surfaced via MCP ``description``, result headers, and trailing citation
+   instruction.
 3. **Structured layer** (``search`` only): each content item carries a
    ``unique.app/reference`` entry in its ``_meta``, always using the
-   ``unique://content/{id}`` scheme for KB docs.
+   ``unique://content/{id}`` scheme for KB docs. Unique AI rehydrates these
+   into ``content_chunks`` / ``[sourceN]`` markers.
+4. **Unique-host format info** (``unique.app/tool-format-information``, i.e.
+   ``UNIQUE_AI_TOOL_FORMAT_INFORMATION``): teaches Unique AI to cite with
+   ``[sourceN]`` from tool results — not markdown deep links. MCP
+   ``description`` stays on the generic path.
 """
 
 from __future__ import annotations
@@ -32,16 +39,43 @@ import logging
 from typing import Any, cast
 from urllib.parse import quote
 
+from fastmcp.server.dependencies import get_context
 from mcp.types import TextContent
 from unique_toolkit.content.schemas import ContentChunk
 
 _LOGGER = logging.getLogger(__name__)
 
+# Set by node-chat's own MCP client (see ExtendedMcpServer.connect). This is
+# the core MCP `initialize` field `clientInfo.name`, not a namespaced `_meta`
+# extra, so it's a reliable way to tell Unique AI apart from a generic client
+# (Claude Desktop/Code, MCP Inspector) without needing per-server admin config.
+_UNIQUE_AI_CLIENT_NAME_PREFIX = "unique-ai-mcp-client-module-"
+
+
+def is_unique_ai_client() -> bool:
+    """True when the connected MCP client is node-chat's own client."""
+    try:
+        ctx = get_context()
+    except (RuntimeError, LookupError):
+        return False
+    client_params = ctx.session.client_params
+    if client_params is None:
+        return False
+    return client_params.clientInfo.name.startswith(_UNIQUE_AI_CLIENT_NAME_PREFIX)
+
+
 REFERENCE_META_KEY = "unique.app/reference"
 
-# Surfaced via tool meta, description, and a trailing result block.
-REFERENCE_FORMAT_INFORMATION = (
-    "Each search result starts with a markdown citation link of the form "
+# Injected into the tool `description`, seen by every client. The opening
+# deferral clause is required: without it, this flatly contradicts
+# UNIQUE_AI_TOOL_FORMAT_INFORMATION for Unique AI's own calls, and its
+# "do NOT use [sourceN]" prohibition would win by being the text closest to
+# where the model decides how to call the tool.
+TOOL_DESCRIPTION_CITATION_GUIDANCE = (
+    "If your system prompt or the tool result instructs you to cite with "
+    "'[source<number>]' markers instead, follow that guidance — it takes "
+    "precedence over everything below. Otherwise: each search result starts "
+    "with a markdown citation link of the form "
     "'[<document name>](<document URL>)' (optional page range on the next line). "
     "When you use information from a result, cite it inline by pasting that "
     "exact markdown link immediately after the claim — for example "
@@ -53,18 +87,75 @@ REFERENCE_FORMAT_INFORMATION = (
     "Never alter unique:// or https:// URLs from the result headers."
 )
 
-CITATION_RESULT_INSTRUCTION = (
+# Unique-host only (`unique.app/tool-format-information`). Kept verbatim-close
+# to Internal Search's own format info
+# (unique_internal_search.prompts.DEFAULT_TOOL_FORMAT_INFORMATION_FOR_SYSTEM_PROMPT)
+# — that wording is proven reliable there, and edits here (e.g. loosening it
+# for other tools) have measurably regressed search's own citation rate, so
+# don't tune this without re-testing search specifically.
+UNIQUE_AI_TOOL_FORMAT_INFORMATION = (
+    "Whenever you use information retrieved with this search tool, you must "
+    "adhere to strict reference guidelines. You must strictly reference each "
+    "fact used with the `source_number` of the corresponding passage, in the "
+    "following format: '[source<source_number>]'.\n\n"
+    "Example:\n"
+    "- Revenue grew 10% [source0] and headcount doubled [source1].\n"
+    "- The policy requires dual approval [source2][source3].\n\n"
+    "A fact is preferably referenced by ONLY ONE source, e.g [sourceX], which "
+    "should be the most relevant source for the fact.\n"
+    "Follow these guidelines closely and be sure to use the proper "
+    "`source_number` when referencing facts.\n"
+    "Make sure that your reference follows the format [sourceX] and that the "
+    "source number is correct. Source is written in singular form and the "
+    "number is written in digits.\n\n"
+    "IT IS VERY IMPORTANT TO FOLLOW THESE GUIDELINES!!\n"
+    "NEVER CITE A source_number THAT YOU DON'T SEE IN THE TOOL CALL "
+    "RESPONSE!!!\n"
+    "The source_number in old assistant messages are no longer valid — this "
+    "has to be the number you find in the message with role 'tool'.\n"
+    "Do not paste knowledge-upload or unique:// URLs into the answer and do "
+    "not add a Sources list — the platform resolves [sourceN] markers to "
+    "clickable references automatically."
+)
+
+SEARCH_SYSTEM_PROMPT = (
+    "Use this tool to search the Unique knowledge base for passages that answer "
+    "the user's question. Prefer it when the answer may live in company "
+    "documents, policies, or uploaded files. Pass a focused search_string; "
+    "split distinct facts into separate calls when needed."
+)
+
+# Trailing content block, generic clients (Claude Desktop/Code, Inspector —
+# anything without Unique's chat-side [sourceN] → reference resolution).
+GENERIC_RESULT_CITATION_INSTRUCTION = (
     "How to cite: paste the exact [<document name>](<url>) markdown links from "
     "the result headers inline after each claim. Do not write [sourceN] or other "
     "bracket placeholders. End with a Sources list using those same markdown links."
 )
 
-SERVER_CITATION_INSTRUCTIONS = (
-    "This server searches the Unique knowledge base. When answering from search "
-    "results, cite sources inline by pasting the exact markdown links "
-    "[document name](url) provided in each result header. Never use [sourceN] "
-    "placeholders. End with a Sources section listing the cited documents as "
-    "those same markdown links."
+# Same trailing block, selected instead when is_unique_ai_client() is true.
+UNIQUE_AI_RESULT_CITATION_INSTRUCTION = (
+    "How to cite: reference each result using its `source_number` as "
+    "'[source<source_number>]' immediately after the claim it supports. Do "
+    "not paste document names, markdown links, or URLs into your answer, and "
+    "do not add a separate Sources list — the platform renders [sourceN] "
+    "markers as clickable references automatically."
+)
+
+# Server-wide `instructions` field — static, sent to every client, so (like
+# TOOL_DESCRIPTION_CITATION_GUIDANCE) it must defer to a stronger,
+# client-specific instruction when one exists. It's also the only citation
+# guidance content_tree/read_file get (their descriptions just have a casual
+# one-liner), so keep this tool-neutral rather than search-flavored.
+SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
+    "If your system prompt or a tool result instructs you to cite with "
+    "'[source<number>]' markers instead, follow that guidance — it takes "
+    "precedence over the rest of this. Otherwise: this server gives access "
+    "to the Unique knowledge base (search, browse, and read files). When "
+    "answering using content from any of its tools, cite sources inline by "
+    "pasting the exact markdown links [document name](url) provided in "
+    "each result header. End with a Sources section listing the cited "
+    "documents as those same markdown links."
 )
 
 
@@ -227,6 +318,17 @@ def chunk_to_text_content(
     )
 
 
-def citation_instruction_content() -> TextContent:
-    """Trailing block that steers the LLM to cite the results above."""
-    return TextContent(type="text", text=CITATION_RESULT_INSTRUCTION)
+def citation_instruction_content(*, is_unique_ai_chat: bool = False) -> TextContent:
+    """Trailing block that steers the LLM to cite the results above.
+
+    ``is_unique_ai_chat`` selects the [sourceN] convention Unique AI's own
+    chat pipeline resolves to clickable references; generic MCP clients
+    (Claude Desktop/Code, Inspector) get the markdown-link instruction
+    instead, since they have no such resolution.
+    """
+    text = (
+        UNIQUE_AI_RESULT_CITATION_INSTRUCTION
+        if is_unique_ai_chat
+        else GENERIC_RESULT_CITATION_INSTRUCTION
+    )
+    return TextContent(type="text", text=text)

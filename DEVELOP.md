@@ -32,9 +32,67 @@ pnpm fix-all          # auto-fix style + syncpack
 pnpm quality          # Helm chart linting
 ```
 
+## Python Services
+
+Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
+workspace and are driven by [uv](https://docs.astral.sh/uv/). `Python CI` runs exactly this:
+
+```bash
+cd services/<service>
+uv sync --frozen
+uv run ruff format --check . && uv run ruff check .
+uv run basedpyright
+uv run pytest
+```
+
+### Trap: basedpyright in a git worktree
+
+`[tool.basedpyright]` pins `venvPath = "."` and `venv = ".venv"`, so basedpyright resolves imports
+against `services/<service>/.venv` — the environment `uv sync` creates. A fresh `git worktree` has
+no `.venv`, and basedpyright then resolves no third-party package. It does not fail; it reports
+thousands of phantom `reportUnknown*` and `reportMissingImports` errors, which reads like the branch
+is broken.
+
+Run `uv sync` inside the worktree — that is what CI does, and it makes every command above work
+unchanged. To reuse another checkout's environment instead, invoke its basedpyright and hand it that
+environment:
+
+```bash
+OTHER=/path/to/other/checkout/services/<service>
+"$OTHER/.venv/bin/basedpyright" --venvpath "$OTHER"
+```
+
+`--venvpath` names the directory that *contains* `.venv`, not `.venv` itself, and the command line
+overrides the `pyproject.toml` value. Do not reach for `uv run` here: it syncs a `.venv` into the
+worktree, which is the first option, not this one.
+
+The config stays as it is on purpose. basedpyright performs no variable expansion on `venvPath`, so
+there is no env-var-driven path to move it to, and deleting the setting would hand import resolution
+to whichever `python` comes first on `PATH` — silently wrong when it picks the wrong one, which is a
+poor trade for a local-only inconvenience.
+
 ## Contributing
 
 1. `pnpm install`
 2. `docker-compose up -d`
 3. Make changes, run `pnpm check-all`
 4. Open a PR — releases are automated via [release-please](https://github.com/googleapis/release-please)
+
+## Releases
+
+Release-please owns every version. Two root settings in `release-please-config.json` exist only to
+make a **new service's first release** come out right:
+
+- `initial-version` — the version a service gets when it has no prior release. Seed a new service at
+  `0.0.0` in `.release-please-manifest.json` (and in `pyproject.toml`/`package.json`, the Helm
+  `version`/`appVersion`, and the image `tag`). Release-please treats `0.0.0` as "never released" and
+  takes the first version straight from `initial-version`. Seeding `0.1.0` instead makes release-please
+  read it as *already shipped* and propose `0.2.0`.
+- `bootstrap-sha` — where the commit scan stops while any service is still unreleased. It points at
+  `2f56700`, an **empty** commit (no files) that carries a repo-wide `BREAKING-CHANGE:` footer for the
+  tag-format change. Release-please attributes file-less commits to *every* package, so without this
+  boundary that footer lands in each new service's first changelog. It only takes effect while some
+  service lacks a release, and is ignored once they all have one.
+
+Do not move `bootstrap-sha` forward: it must stay **older** than every service's last release, or
+services whose last release falls outside the scan window start re-listing already-released commits.

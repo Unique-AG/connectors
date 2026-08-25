@@ -4,11 +4,10 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
-import { MsChatMessage } from '../chat.dtos';
+import { MessageOutputSchema } from '../chat.dtos';
 import { ChatService } from '../chat.service';
-import { normalizeContent } from '../utils/normalize-content';
 
-const GetChatMessagesInputSchema = z.object({
+export const GetChatMessagesInputSchema = z.object({
   chatId: z
     .string()
     .describe(
@@ -21,43 +20,17 @@ const GetChatMessagesInputSchema = z.object({
     .max(50)
     .default(20)
     .describe('Maximum number of messages to return (newest first)'),
-  contentFormat: z
-    .enum(['normalized', 'raw'])
-    .default('normalized')
-    .describe(
-      'normalized converts HTML to readable text with @mentions and [attachment: name] placeholders. raw returns Teams HTML verbatim. Default: normalized',
-    ),
   includeSystemMessages: z
     .boolean()
     .default(false)
     .describe(
       'System messages are event notifications (member added, call ended). Default false excludes them',
     ),
-  timestampFormat: z
-    .enum(['full', 'short', 'none'])
-    .default('short')
-    .describe(
-      'full = ISO 8601 with ms, short = YYYY-MM-DD HH:mm, none = omit timestamps. Default: short',
-    ),
-  detail: z
-    .enum(['standard', 'full'])
-    .default('standard')
-    .describe(
-      'standard returns sender, content, and timestamp. full adds contentType (source format from Graph). Default: standard',
-    ),
 });
 
 const GetChatMessagesOutputSchema = z.object({
   chatId: z.string(),
-  messages: z.array(
-    z.object({
-      id: z.string(),
-      createdDateTime: z.string().optional(),
-      senderDisplayName: z.string().nullable(),
-      content: z.string(),
-      contentType: z.string().optional(),
-    }),
-  ),
+  messages: z.array(MessageOutputSchema),
 });
 
 @Injectable()
@@ -73,7 +46,10 @@ export class GetChatMessagesTool {
     name: 'get_chat_messages',
     title: 'Get Chat Messages',
     description:
-      'Retrieve recent messages from a Microsoft Teams chat, identified by its chatId. Call list_chats first to find the chatId (it also returns topic/members/dates so you can pick the right chat).',
+      'Read the most recent messages in a Microsoft Teams chat. Take the chatId from list_chats or search_messages. ' +
+      'Each message comes with its body, sender, timestamps, mentions, attachments and reactions. ' +
+      'Message bodies are Teams HTML. ' +
+      'Set includeSystemMessages to true to also see event notices, such as a member joining.',
     parameters: GetChatMessagesInputSchema,
     outputSchema: GetChatMessagesOutputSchema,
     annotations: {
@@ -119,36 +95,7 @@ export class GetChatMessagesTool {
 
     return {
       chatId: input.chatId,
-      messages: messages.map((m) => this.mapMessage(m, input)),
+      messages,
     };
-  }
-
-  private mapMessage(
-    m: MsChatMessage,
-    input: z.infer<typeof GetChatMessagesInputSchema>,
-  ): z.output<typeof GetChatMessagesOutputSchema>['messages'][number] {
-    const content =
-      input.contentFormat === 'normalized'
-        ? normalizeContent(m.content, m.contentType, m.attachments, m.deletedDateTime)
-        : m.content;
-
-    const msg: z.output<typeof GetChatMessagesOutputSchema>['messages'][number] = {
-      id: m.id,
-      senderDisplayName: m.senderDisplayName ?? null,
-      content,
-    };
-
-    if (input.timestampFormat !== 'none') {
-      msg.createdDateTime =
-        input.timestampFormat === 'full'
-          ? m.createdDateTime
-          : m.createdDateTime.replace('T', ' ').slice(0, 16);
-    }
-
-    if (input.detail === 'full') {
-      msg.contentType = m.contentType;
-    }
-
-    return msg;
   }
 }

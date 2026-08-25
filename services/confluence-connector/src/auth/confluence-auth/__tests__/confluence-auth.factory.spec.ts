@@ -96,7 +96,7 @@ describe('ConfluenceAuthFactory', () => {
         instanceType: 'data-center',
         auth: {
           mode: AuthMode.Basic,
-          username: 'alice',
+          username: new Redacted('alice'),
           password: new Redacted('s3cret'),
         },
       };

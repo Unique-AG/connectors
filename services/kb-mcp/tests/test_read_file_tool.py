@@ -69,7 +69,7 @@ async def test_unsupported_extension_returns_error_without_downstream_calls():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "unsupported file type for read_file: .xlsx" in result.content[0].text  # type: ignore[union-attr]
     mock_download.assert_not_called()
 
@@ -90,7 +90,7 @@ async def test_no_content_found_returns_error_without_downstream_calls():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "no content found for content_id=cont_missing" in result.content[0].text  # type: ignore[union-attr]
     mock_download.assert_not_called()
 
@@ -128,7 +128,7 @@ async def test_chunked_small_doc_returns_full_text_with_page_markers():
     mock_search.assert_awaited_once()
     _, kwargs = mock_search.call_args
     assert kwargs["where"] == {"id": {"equals": "cont_abc"}}
-    assert result.isError is not True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "--- page 1 ---" in text
     assert "--- page 2 ---" in text
@@ -146,7 +146,7 @@ async def test_chunked_oversized_no_range_returns_informative_error():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "tokens" in text
     assert "100 pages" in text
@@ -169,7 +169,7 @@ async def test_chunked_multi_page_range_over_cap_returns_error():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "narrower range" in text
     assert "per-call limit" in text
@@ -192,7 +192,7 @@ async def test_chunked_single_page_request_exempt_from_cap():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is not True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "word" in text
     assert "short intro" not in text
@@ -210,7 +210,7 @@ async def test_chunked_start_page_zero_is_out_of_bounds():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "out of bounds" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -229,7 +229,7 @@ async def test_chunked_page_gap_range_returns_no_content_error():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "no content found in pages 2-3" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -248,7 +248,7 @@ async def test_chunked_without_page_metadata_falls_back_to_virtual_paging():
             config=ReadFileToolConfig(max_tokens_per_call=8_000),
         )
 
-    assert result.isError is not True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "alpha beta" in text
     assert "gamma delta" in text
@@ -266,7 +266,7 @@ async def test_chunked_out_of_bounds_range_returns_short_error():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "5 pages" in text
     assert "500-510" in text
@@ -282,7 +282,7 @@ async def test_chunked_empty_chunks_returns_not_finished_processing_error():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "hasn't finished processing yet" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -298,7 +298,7 @@ async def test_text_small_doc_returns_full_text_no_markers_no_page_language():
             config=ReadFileToolConfig(max_tokens_per_call=8_000),
         )
 
-    assert result.isError is not True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
     assert text == (
         "[notes.md](unique://content/cont_abc)\n\n"
@@ -320,7 +320,7 @@ async def test_text_oversized_no_range_returns_virtual_page_error():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "tokens" in text
     assert "pages of 10 tokens each" in text
@@ -342,7 +342,7 @@ async def test_text_range_given_returns_token_boundary_slice_with_prefix():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is not True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
     assert text.startswith("[notes.txt](unique://content/cont_abc)\n\n")
     assert "showing tokens 0-10 of" in text
@@ -363,7 +363,7 @@ async def test_text_out_of_bounds_range_returns_short_error():
             config=ReadFileToolConfig(max_tokens_per_call=8_000),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "out of bounds" in text
 
@@ -383,7 +383,7 @@ async def test_text_start_page_zero_is_out_of_bounds():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "out of bounds" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -402,7 +402,7 @@ async def test_text_multi_page_range_returns_one_page_per_call_error():
             config=ReadFileToolConfig(max_tokens_per_call=10),
         )
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "one page per call" in result.content[0].text  # type: ignore[union-attr]
 
 
@@ -418,7 +418,7 @@ async def test_text_non_utf8_bytes_degrade_instead_of_failing():
             config=ReadFileToolConfig(),
         )
 
-    assert result.isError is not True
+    assert result.is_error is not True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "caf" in text and "ol" in text
 
@@ -431,7 +431,7 @@ async def test_identity_refusal_surfaces_as_tool_error(monkeypatch):
     )
     result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
 
-    assert result.isError is True
+    assert result.is_error is True
     assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
 
 

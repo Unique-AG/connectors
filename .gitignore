@@ -52,11 +52,13 @@ lerna-debug.log*
 # Editors
 .vscode/
 .idea/
-.cursor/
+# Local Cursor/Claude config stays ignored; shared project skills are tracked.
+.cursor/*
+!.cursor/skills/
+.claude/*
+!.claude/skills/
 # We do not use .zed/ because we want to ignore symlinks
 .zed
-# We do not use .claude/ because we want to ignore symlinks
-.claude
 *.code-workspace
 
 # OS — macOS
@@ -107,3 +109,11 @@ services/**/src/tenant-configs/*
 **/.pytest_cache/
 **/.ruff_cache/
 *.py[cod]
+
+# Local docs used by llm for apis which give us no other option
+*.docs-local
+services/backstop-mcp/.coverage
+docs/json
+docs/plans
+docs/pr-proposals
+docs/drafts

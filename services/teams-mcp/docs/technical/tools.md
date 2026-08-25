@@ -105,14 +105,16 @@ List all channels in a team, identified by `teamId`. Each channel carries its cr
 
 List the signed-in user's chats (1:1, group, and meeting chats), most recent first. Each chat carries its creation date and last-message timestamp to tell apart chats that share a topic or members. For chats without a topic (typically 1:1 chats), the member list is returned so the chat can be identified by participant.
 
+`limit` is a page size, and the page is 25. Graph serves **at most 25 chats per response**, however large the `$top`, because this call expands the `members` of each chat — a documented limitation of `/me/chats` (see [chat-list](https://learn.microsoft.com/en-us/graph/api/chat-list?view=graph-rest-1.0&tabs=http)), which also behaves differently in some national clouds. One call is one Graph request.
+
 **Input parameters:**
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `limit` | integer (1–50) | No | `50` | Maximum number of chats to return. |
+| `limit` | integer (1–25) | No | `25` | Page size: how many chats to return. 25 is the most Graph serves in one response. |
 | `includeMemberEmails` | boolean | No | `false` | Include member email addresses (only for topic-less chats). Useful when two members share a display name. |
 
-**Returns:** A `chats` array and a `truncated` flag (`true` when more chats exist than were returned). Each chat has `chatId`, `chatType`, `topic` (nullable), `createdDateTime`, `lastMessageAt`, and — for chats without a topic — a `members` array (`displayName`, plus `email` when `includeMemberEmails` is `true`). Pass `chatId` to `get_chat_messages` or `send_chat_message`.
+**Returns:** A `chats` array. Each chat has `chatId`, `chatType`, `topic` (nullable), `createdDateTime`, `lastMessageAt`, and — for chats without a topic — a `members` array (`displayName`, plus `email` when `includeMemberEmails` is `true`). Pass `chatId` to `get_chat_messages` or `send_chat_message`.
 
 **Example:**
 
@@ -134,8 +136,7 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
       "lastMessageAt": "2024-06-19T09:15:00Z",
       "members": [{ "displayName": "Alice Smith" }]
     }
-  ],
-  "truncated": false
+  ]
 }
 ```
 
@@ -143,7 +144,7 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
 
 ## Messages
 
-The two `get_*_messages` tools share the same content-shaping options. Content can be returned **normalized** (the default — Teams HTML converted to readable plain text) or **raw** (Teams HTML verbatim). Normalization rewrites `<at>Name</at>` mentions to `@Name`, attachment references to `[attachment: name]` (or `[attachment]` when the name is unknown), adaptive-card payloads to `[card]`, and blank/tombstone messages to `[deleted]`.
+Both `get_*_messages` tools return a message exactly as Graph gives it: `body.contentType` plus the raw `body.content`, which is usually Teams HTML. Nothing is rewritten and no placeholder text is invented. The structured metadata — `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId`, `channelIdentity` — is returned alongside, so a caller reads those instead of parsing the body.
 
 ### `get_chat_messages`
 
@@ -155,12 +156,9 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
 |-----------|------|----------|---------|-------------|
 | `chatId` | string | Yes | — | Exact chat id from `list_chats` or `search_messages`. |
 | `limit` | integer (1–50) | No | `20` | Maximum number of messages to return (newest first). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `includeSystemMessages` | boolean | No | `false` | Include event notifications (member added, call ended). |
-| `timestampFormat` | `full` \| `short` \| `none` | No | `short` | `full` = ISO 8601 with ms; `short` = `YYYY-MM-DD HH:mm`; `none` = omit timestamps. |
-| `detail` | `standard` \| `full` | No | `standard` | `standard` returns sender, content, and timestamp; `full` also adds `contentType` (the source format from Graph). |
 
-**Returns:** The `chatId` and a `messages` array (newest first). Each message has `id`, `senderDisplayName` (nullable), `content`, `createdDateTime` (omitted when `timestampFormat=none`), and `contentType` (only when `detail=full`).
+**Returns:** The `chatId` and a `messages` array (newest first). Each message carries `id`, `messageType`, `subject`, `body` (`contentType` + raw `content`), `from`, `createdDateTime`, `lastModifiedDateTime`, `lastEditedDateTime`, `deletedDateTime`, `importance`, `locale`, `webUrl`, `etag`, `replyToId`, `channelIdentity`, `mentions`, `reactions` and `attachments`.
 
 **Example:**
 
@@ -171,8 +169,8 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
     {
       "id": "1718901120000",
       "senderDisplayName": "Alice Smith",
-      "content": "@Bob Jones can you review the PR? [attachment: design.pdf]",
-      "createdDateTime": "2024-06-20 14:32"
+      "body": { "contentType": "html", "content": "<p><at id=\"0\">Bob Jones</at> can you review the PR?</p>" },
+      "createdDateTime": "2024-06-20T14:32:07.113Z"
     }
   ]
 }
@@ -191,10 +189,7 @@ Retrieve recent messages from a channel, identified by `teamId` + `channelId`. C
 | `teamId` | string | Yes | — | Exact team id from `list_teams`. |
 | `channelId` | string | Yes | — | Exact channel id from `list_channels` (for that team). |
 | `limit` | integer (1–50) | No | `20` | Maximum number of messages to return (newest first). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `includeSystemMessages` | boolean | No | `false` | Include event notifications (member added, call ended). |
-| `timestampFormat` | `full` \| `short` \| `none` | No | `short` | `full` = ISO 8601 with ms; `short` = `YYYY-MM-DD HH:mm`; `none` = omit timestamps. |
-| `detail` | `standard` \| `full` | No | `standard` | `standard` returns sender, content, and timestamp; `full` also adds `contentType`. |
 
 **Returns:** The `teamId`, `channelId`, and a `messages` array (same shape as `get_chat_messages`).
 
@@ -271,7 +266,9 @@ Send a plain-text message to a channel, identified by `teamId` + `channelId`. Ca
 
 ### `search_messages`
 
-Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the [Microsoft Search API](https://learn.microsoft.com/en-us/graph/search-concept-overview) (`POST /search/query` on Graph **v1.0**). Supports identity and scope filters. Results are snippets by default; set `detail=full` to hydrate message bodies. At least one search criterion (`query`, `from`, `to`, `mentions`, `sentAfter`, `sentBefore`, `hasAttachment`, `isRead`, or `isMentioned`) must be provided.
+Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the [Microsoft Search API](https://learn.microsoft.com/en-us/graph/search-concept-overview) (`POST /search/query` on Graph **v1.0**). Supports filters on sender, recipient, mentions, date range, attachments, and read/mention state. Every addressable hit is fetched to fill in its message body, so a follow-up `get_chat_messages` or `get_channel_messages` call is normally unnecessary. At least one search criterion (`query`, `from`, `to`, `mentions`, `sentAfter`, `sentBefore`, `hasAttachment`, `isRead`, or `isMentioned`) must be provided.
+
+There is no way to scope a Graph search to chats or to channels, and the search projection carries no container type — so every hit is returned and each row reports the container it can prove. A hit is `channel` only when it carries **both** `channelIdentity.teamId` and `channelIdentity.channelId`, `chat` when it carries a `chatId`, and `unknown` otherwise. Filter client-side on that field if you only want one kind.
 
 **Input parameters:**
 
@@ -286,31 +283,37 @@ Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and ch
 | `hasAttachment` | boolean | No | — | Restrict to messages with (`true`) or without (`false`) attachments. |
 | `isRead` | boolean | No | — | Restrict to read (`true`) or unread (`false`) messages. |
 | `isMentioned` | boolean | No | — | Restrict to messages where the signed-in user is (`true`) or is not (`false`) mentioned. |
-| `source` | `chat` \| `channel` \| `all` | No | `all` | Filter results by container. Applied after the search, so a non-`all` value shrinks the returned page. |
-| `detail` | `summary` \| `full` | No | `summary` | `summary` returns the hit snippet only (1 Graph call). `full` hydrates each hit with its message body (one extra Graph call per hit). |
-| `contentFormat` | `normalized` \| `raw` | No | `normalized` | Only applies when `detail=full`. `normalized` converts HTML to readable text; `raw` returns Teams HTML verbatim. |
 | `offset` | integer (≥ 0) | No | `0` | Number of results to skip for pagination (maps to Graph `from`). |
-| `size` | integer (1–`GRAPH_PAGE_SIZE`) | No | `25` | Maximum number of results per page. |
+| `size` | integer (1–25) | No | `25` | Maximum number of results per page. Not a Graph limit — Microsoft caps a page at 25 for the `message` and `event` entities only, never for `chatMessage`. Every hit costs one extra Graph call, so the page size is also the size of that fan-out. |
 
-**Returns:** A `messages` array, `returnedCount` (rows on **this page**, after the `source` filter — not total corpus matches), and `moreResultsAvailable` (paginate with `offset` until this is `false`). Each hit has:
+**Returns:** A `messages` array, `returnedCount` (rows on **this page**, not total corpus matches — Graph reports `total` per page for Teams messages), and `moreResultsAvailable`. Paginate by advancing `offset` by `returnedCount`, and stop when `moreResultsAvailable` is `false` or `returnedCount` is `0`. Each hit has:
 
 | Field | Description |
 |-------|-------------|
 | `id` | Message id |
-| `source` | `chat` or `channel` (derived from the hit's resource shape) |
-| `chatId` | Chat id (present for chat hits, else `null`) |
-| `teamId` | Team id (present for channel hits, else `null`) |
-| `channelId` | Channel id (present for channel hits, else `null`) |
-| `senderDisplayName` | Sender name (nullable) |
-| `summary` | Search snippet (nullable) |
-| `content` | Hydrated message body — present only when `detail=full` and hydration succeeded |
+| `source` | `chat`, `channel`, or `unknown`. `channel` requires **both** `teamId` and `channelId` on the hit; `chat` requires a `chatId`; anything else is `unknown` and cannot be fetched |
+| `chatId` | Chat id (populated only for a `chat` hit, else `null`) |
+| `teamId` | Team id (populated only for a `channel` hit, else `null`) |
+| `channelId` | Channel id (populated only for a `channel` hit, else `null`) |
+| `senderDisplayName` | Sender name (nullable). Read from the hit's mailbox identity, which is what the search projection carries, then filled from the hydrated message when the hit named nobody, and as a last resort from the sender's bare email address — so this field can hold an address rather than a name |
+| `summary` | Search snippet exactly as Graph returns it, including its `<c0>` hit-highlighting markup (nullable) |
+| `message` | The fetched message, exactly as Graph returns it — `body` (`contentType` + raw `content`), plus `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId` and the rest. Absent for an `unknown` hit, a channel reply, or a failed fetch. The row gives no reason code, so an absent `message` does not say which |
 | `createdDateTime` | Message timestamp (nullable) |
-| `webUrl` | Deep link to the message (nullable) |
+| `webUrl` | Link to the message (nullable). Observed as a Teams deep link, but Graph documents an Outlook Web link (`webLink`) for this projection, so either can appear — do not label it "open in Teams" |
 
 Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messages` or `send_*_message`.
 
-!!! note "How `detail=full` hydration behaves"
-    Hydration issues one extra Graph call per hit (an N+1 fan-out), capped at 5 concurrent requests to stay throttle-friendly. If an individual hit is forbidden or deleted, that row falls back to summary-only (no `content`) rather than failing the whole page.
+!!! note "How hydration behaves"
+    A search hit carries no message body, and Graph offers no way to ask for one. So each hit is fetched on its own: one extra Graph call per hit, at most 3 at a time.
+
+    A hit is fetched by the ids it carries: a message id, plus either both channel ids or a chat id. An `unknown` hit costs no call.
+
+    A failed fetch drops `content` for that row only and logs at `warn`. The page still returns. Two cases always lose the body:
+
+    - **No admin consent for `ChannelMessage.Read.All`.** Every channel hit fails.
+    - **A reply inside a channel thread.** Graph addresses a reply under its parent post (`.../messages/{rootId}/replies/{id}`). A search hit does not name that parent, so no id here can fetch it.
+
+    Graph throttles reads of one chat or channel hard, so a page drawn from one busy channel can lose bodies. The whole pass stops after 15 seconds, because the client retries a `429` and honours `Retry-After`, which can take minutes. Remaining hits then return without `content`.
 
 **Example:**
 
@@ -321,10 +324,11 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
       "id": "1718900000000",
       "source": "channel",
       "chatId": null,
-      "teamId": "19:abc...@thread.tacv2",
+      "teamId": "fbe2bf47-16c8-47cf-b4a5-4b9b187c508b",
       "channelId": "19:ch1...@thread.tacv2",
       "senderDisplayName": "Carol Lee",
-      "summary": "Deploy is <c0>green</c0>.",
+      "summary": "...Deploy is green",
+      "content": "Deploy is green. Rollout finished at 13:49.",
       "createdDateTime": "2024-06-20T13:50:00Z",
       "webUrl": "https://teams.microsoft.com/l/message/..."
     }

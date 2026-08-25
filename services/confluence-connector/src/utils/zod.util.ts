@@ -22,12 +22,13 @@ const envResolvableStringSchema = z.string().transform((val) => {
 });
 
 export const envRequiredSecretSchema = envResolvableStringSchema
-  .pipe(z.string().nonempty())
+  .pipe(z.string().trim().nonempty())
   .transform((val) => new Redacted(val));
 
-export const envRequiredPlainSchema = envResolvableStringSchema.pipe(z.string().nonempty());
+export const envRequiredPlainSchema = envResolvableStringSchema.pipe(z.string().trim().nonempty());
 
 export const redactedNonEmptyStringSchema = z
   .string()
+  .trim()
   .nonempty()
   .transform((val) => new Redacted(val));

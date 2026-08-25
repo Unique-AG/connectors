@@ -5,18 +5,18 @@ import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { MsChat } from '../chat.dtos';
-import { ChatService } from '../chat.service';
-
-const LIMIT = 50;
+import { ChatService, GRAPH_CHATS_PAGE_LIMIT } from '../chat.service';
 
 const ListChatsInputSchema = z.object({
   limit: z
     .number()
     .int()
     .min(1)
-    .max(50)
-    .default(LIMIT)
-    .describe('Maximum number of chats to return. Default: 50'),
+    .max(GRAPH_CHATS_PAGE_LIMIT)
+    .default(GRAPH_CHATS_PAGE_LIMIT)
+    .describe(
+      `Chats to return in one page, 1-${GRAPH_CHATS_PAGE_LIMIT}. Default: ${GRAPH_CHATS_PAGE_LIMIT}.`,
+    ),
   includeMemberEmails: z
     .boolean()
     .default(false)
@@ -43,7 +43,6 @@ const ListChatsOutputSchema = z.object({
         .optional(),
     }),
   ),
-  truncated: z.boolean(),
 });
 
 @Injectable()
@@ -59,7 +58,11 @@ export class ListChatsTool {
     name: 'list_chats',
     title: 'List My Chats',
     description:
-      "List the current user's Microsoft Teams chats (1:1, group, and meeting chats). Returns up to 50 most recent chats, each with its chatId plus creation date (createdDateTime) and last-message timestamp (lastMessageAt) to tell apart chats that share a topic or member. Pass the chatId to get_chat_messages or send_chat_message to target a specific chat unambiguously (preferred over the topic/member name when several chats share a name).",
+      "List the user's Microsoft Teams chats, most recent first, across 1:1, group and meeting chats. " +
+      'Each chat comes with its chatId, its type, and the time of its last message. ' +
+      'Those tell apart chats that share a topic or a member. ' +
+      'Returns one page of up to 25. ' +
+      'Pass a chatId to get_chat_messages or send_chat_message. A chatId names one chat exactly, so prefer it over a topic or a member name.',
     parameters: ListChatsInputSchema,
     outputSchema: ListChatsOutputSchema,
     annotations: {
@@ -90,14 +93,13 @@ export class ListChatsTool {
 
     this.logger.log({ userProfileId }, 'Listing chats for user');
 
-    const effectiveLimit = input.limit ?? LIMIT;
-    const { chats, hasMore } = await this.chatService.listChats(userProfileId, effectiveLimit);
+    const effectiveLimit = input.limit ?? GRAPH_CHATS_PAGE_LIMIT;
+    const chats = await this.chatService.listChats(userProfileId, effectiveLimit);
 
     span?.setAttribute('result_count', chats.length);
 
     return {
       chats: chats.map((chat) => this.mapChat(chat, input.includeMemberEmails)),
-      truncated: hasMore,
     };
   }
 

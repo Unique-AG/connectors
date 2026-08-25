@@ -1,9 +1,11 @@
 name: "Services CI"
 
 on:
+  # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
+  # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
+  # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
+  # files it guards change, whatever the PR merges into.
   pull_request:
-    branches:
-      - main
     paths:
       - "services/**"
       - "packages/**"
@@ -34,9 +36,9 @@ jobs:
       services: ${{ steps.build-matrix.outputs.services }}
       packages-changed: ${{ steps.filter.outputs.packages }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:

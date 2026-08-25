@@ -71,3 +71,17 @@ export const redacted = <S extends z.core.$ZodType>(schema: S) =>
     decode: (value) => new Redacted(value),
     encode: (instance) => instance.value,
   });
+
+const ENV_REF_PREFIX = 'os.environ/';
+
+export const envResolvableStringSchema = z.string().transform((val) => {
+  if (!val.startsWith(ENV_REF_PREFIX)) {
+    return val;
+  }
+  const varName = val.slice(ENV_REF_PREFIX.length);
+  return process.env[varName] ?? '';
+});
+
+export const envRequiredSecretSchema = envResolvableStringSchema
+  .pipe(z.string().trim().nonempty())
+  .transform((val) => new Redacted(val));

@@ -5,6 +5,7 @@ import { MetricService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import { isUpstreamNetworkError } from '../utils/classify-error';
 import { normalizeError } from '../utils/normalize-error';
+import { templateEndpoint } from './endpoint-template';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -27,15 +28,7 @@ export class MetricsMiddleware implements Middleware {
   }
 
   private extractEndpoint(request: string | Request): string {
-    try {
-      const url = typeof request === 'string' ? request : request.url;
-      const urlObj = new URL(url);
-      // Remove the base URL and version, keep just the endpoint path
-      const endpoint = urlObj.pathname.replace(/^\/v\d+(\.\d+)?/, '');
-      return endpoint || '/';
-    } catch {
-      return 'unknown';
-    }
+    return templateEndpoint(typeof request === 'string' ? request : request.url);
   }
 
   private extractMethod(options: RequestInit | undefined): string {

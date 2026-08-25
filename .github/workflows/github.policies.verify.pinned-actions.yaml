@@ -8,9 +8,11 @@ permissions:
   contents: read
 
 on:
+  # Design decision: no `branches` filter. Features here land as stacks of PRs that target their
+  # parent branch, not `main`; a `branches: [main]` filter silently skipped this gate for every
+  # PR in a stack except the base one. `paths` alone decides — the gate matters wherever the
+  # files it guards change, whatever the PR merges into.
   pull_request:
-    branches:
-      - main
     paths:
       - .github/workflows/**
       - .github/actions/**
@@ -22,7 +24,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Verify pinned actions
         uses: unique-ag/actions/github/policies/verify-pinned-actions@84a4f60c0a56daae108b22e096b72bb10f476d08 # main

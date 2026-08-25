@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -49,6 +49,7 @@
     "@unique-ag/mcp-oauth": "workspace:*",
     "@unique-ag/mcp-server-module": "workspace:*",
     "@unique-ag/probe": "workspace:*",
+    "@unique-ag/proxy": "workspace:*",
     "@unique-ag/unique-api": "workspace:*",
     "@unique-ag/utils": "workspace:*",
     "amqplib": "0.10.9",

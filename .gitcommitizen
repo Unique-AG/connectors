@@ -33,6 +33,8 @@ teams-mcp = services/teams-mcp/**
 temenos-mcp = services/temenos-mcp/**
 hello-mcp = services/hello-mcp/**
 kb-mcp = services/kb-mcp/**
+backstop-mcp = services/backstop-mcp/**
+office-365-mcp = services/office-365-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**
@@ -41,6 +43,7 @@ logger = packages/logger/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
+proxy = packages/proxy/**
 utils = packages/utils/**
 unique-api = packages/unique-api/**
 

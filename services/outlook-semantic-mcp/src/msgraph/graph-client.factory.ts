@@ -1,4 +1,5 @@
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
+import { ProxyService } from '@unique-ag/proxy';
 import {
   AuthenticationHandler,
   Client,
@@ -37,6 +38,7 @@ export class GraphClientFactory {
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: AesGcmEncryptionService,
     private readonly metricService: MetricService,
+    private readonly proxyService: ProxyService,
   ) {
     this.clientId = this.configService.get('microsoft.clientId', {
       infer: true,
@@ -73,6 +75,7 @@ export class GraphClientFactory {
   }
 
   public createClientForUser(userProfileId: string): Client {
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
     const tokenProvider = new TokenProvider(
       {
         userProfileId,
@@ -83,6 +86,7 @@ export class GraphClientFactory {
       {
         drizzle: this.drizzle,
         encryptionService: this.encryptionService,
+        dispatcher,
       },
     );
 
@@ -126,6 +130,13 @@ export class GraphClientFactory {
       debugLogging: this.configService.get('app.isDebuggingOn', {
         infer: true,
       }),
+      // Node's fetch (undici) accepts `dispatcher` at runtime and the SDK forwards
+      // fetchOptions into that call, but FetchOptions is typed as RequestInit +
+      // legacy node-fetch fields and omits `dispatcher` — cast until the SDK types catch up.
+      // See https://github.com/microsoftgraph/msgraph-sdk-javascript/issues/1646
+      fetchOptions: {
+        dispatcher,
+      } as ClientOptions['fetchOptions'],
     };
 
     return Client.initWithMiddleware(clientOptions);

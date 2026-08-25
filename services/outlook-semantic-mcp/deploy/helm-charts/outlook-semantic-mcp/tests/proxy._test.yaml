@@ -1,0 +1,208 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Proxy config env injection
+templates:
+  - all.yaml
+tests:
+  - it: omits PROXY_* env when proxyConfig is disabled
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: false
+        authMode: none
+      # Ensure container env is an array so notContains can assert absence of PROXY_*
+      envVars:
+        - name: PLACEHOLDER
+          value: unused
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_AUTH_MODE
+
+  - it: sets PROXY_AUTH_MODE=none without HOST when authMode is none
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: none
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_AUTH_MODE
+            value: "none"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_HOST
+
+  - it: sets HOST/PORT/PROTOCOL for no_auth
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: no_auth
+        host: proxy.example.com
+        port: 8080
+        protocol: http
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_AUTH_MODE
+            value: "no_auth"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_HOST
+            value: "proxy.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_PORT
+            value: "8080"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_PROTOCOL
+            value: "http"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_USERNAME
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_PASSWORD
+
+  - it: sets USERNAME for username_password without PROXY_PASSWORD
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: username_password
+        host: proxy.example.com
+        port: 8080
+        protocol: http
+        username: proxy-user
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_AUTH_MODE
+            value: "username_password"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_USERNAME
+            value: "proxy-user"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_PASSWORD
+
+  - it: passes os.environ username through to PROXY_USERNAME
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: username_password
+        host: proxy.example.com
+        port: 8080
+        protocol: http
+        username: os.environ/PROXY_USERNAME_SECRET
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_USERNAME
+            value: "os.environ/PROXY_USERNAME_SECRET"
+
+  - it: sets SSL cert and key paths for ssl_tls
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: ssl_tls
+        host: proxy.example.com
+        port: 8443
+        protocol: https
+        sslCertPath: /app/proxy-certs/client.crt
+        sslKeyPath: /app/proxy-certs/client.key
+        sslCaBundlePath: /app/proxy-certs/ca.crt
+        headers: '{"X-Proxy-Header":"value"}'
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_AUTH_MODE
+            value: "ssl_tls"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_SSL_CERT_PATH
+            value: "/app/proxy-certs/client.crt"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_SSL_KEY_PATH
+            value: "/app/proxy-certs/client.key"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_SSL_CA_BUNDLE_PATH
+            value: "/app/proxy-certs/ca.crt"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_HEADERS
+            value: '{"X-Proxy-Header":"value"}'
+
+  - it: injects proxy env into hook Job as well
+    values:
+      - ../ci-values.yaml
+    set:
+      proxyConfig:
+        enabled: true
+        authMode: no_auth
+        host: proxy.example.com
+        port: 8080
+        protocol: http
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_AUTH_MODE
+            value: "no_auth"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PROXY_HOST
+            value: "proxy.example.com"

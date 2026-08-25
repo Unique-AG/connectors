@@ -8,7 +8,7 @@ export class BasicAuthStrategy extends ConfluenceAuth {
 
   public constructor(authConfig: BasicAuthConfig) {
     super();
-    const credentials = `${authConfig.username}:${authConfig.password.value}`;
+    const credentials = `${authConfig.username.value}:${authConfig.password.value}`;
     this.header = `Basic ${Buffer.from(credentials, 'utf8').toString('base64')}`;
   }
 

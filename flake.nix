@@ -76,6 +76,12 @@
           corepack_24 # pnpm version managed via corepack
         ];
 
+        # Python development (services/kb-mcp, services/office-365-mcp)
+        # uv manages the interpreter and the venv itself — see each service's .python-version
+        pythonPkgs = with pkgs; [
+          uv
+        ];
+
         # Infrastructure (deploy/)
         infraPkgs = [
           devtunnel
@@ -93,12 +99,21 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = shellPkgs ++ nodePkgs ++ infraPkgs ++ utilPkgs;
+          buildInputs = shellPkgs ++ nodePkgs ++ pythonPkgs ++ infraPkgs ++ utilPkgs;
 
           shellHook = ''
+            # azure-cli is a Python application, and mkShell propagates its site-packages onto
+            # PYTHONPATH. Those are python3.13 packages built against a different ABI, and they
+            # shadow whatever a uv venv installed — `uv run` then dies importing cryptography
+            # with `symbol not found in flat namespace '_PyList_GetItemRef'`. The Python services
+            # get their interpreter and packages from uv, so nothing here wants an inherited
+            # PYTHONPATH.
+            unset PYTHONPATH
+
             echo "Connectors dev environment loaded"
             echo "Node.js: $(node --version)"
             echo "pnpm: $(pnpm --version)"
+            echo "uv: $(uv --version)"
           '';
         };
       }

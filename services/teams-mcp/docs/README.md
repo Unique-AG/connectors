@@ -64,7 +64,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Channel.ReadBasic.All` | Delegated | No |
 | `ChannelMessage.Read.All` | Delegated | **Yes** |
 
-Nothing calendar-, meeting-, transcript-, or recording-related is requested, and `ChannelMessage.Read.All` is the sole permission needing admin consent. Transcript capture adds four further scopes, documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Required-Microsoft-Graph-permissions).
+Nothing meeting-, transcript-, or recording-related is requested, and `ChannelMessage.Read.All` is the sole permission needing admin consent. Transcript capture adds three further scopes, documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Required-Microsoft-Graph-permissions).
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 
@@ -81,7 +81,7 @@ Chat and messaging tools target chats and channels by id: call a `list_*` tool t
 - `list_chats`: List the user's recent chats (1:1, group, and meeting chats) by chat id; returns `createdDateTime`, `lastMessageAt`, and members for topic-less or 1:1 chats
 - `get_chat_messages`: Retrieve recent messages from a chat (by chat id)
 - `get_channel_messages`: Retrieve recent messages from a channel (by team id + channel id)
-- `search_messages`: Search messages by keyword across chats and channels via the Microsoft Search API; returns chat/channel ids alongside results, enabling subsequent reads or sends
+- `search_messages`: Search messages by keyword across chats and channels via the Microsoft Search API; returns the chat/channel ids a hit proves, enabling subsequent reads or sends (a hit naming neither is reported as `unknown`)
 - `send_channel_message`: Send a plain text message to a Teams channel (by team id + channel id)
 - `send_chat_message`: Send a plain text message to a Teams chat (by chat id)
 
@@ -197,7 +197,7 @@ See [Chat Flows](./technical/flows.md#chat-flows) for the read, search, and send
 
 1. **Discover the target** (Each use) — call a `list_*` tool (`list_chats`, `list_teams` → `list_channels`) or `search_messages` to obtain the chat/channel id
 2. **Read, search, or send** (Each use)
-   - Pass the id to `get_chat_messages` / `get_channel_messages`, `search_messages`, or `send_*_message`
+   - Pass the id to `get_chat_messages` / `get_channel_messages` or `send_*_message`
    - Messages are fully accessible to the Unique AI through these tools — every call fetches **live from the Microsoft Graph API**, so you always see the current state of Teams
 3. **Accessible, but never stored in Unique**
    - The tools give the AI on-demand access, but Unique keeps **no copy** — messages are never ingested into the knowledge base; they exist only in Microsoft

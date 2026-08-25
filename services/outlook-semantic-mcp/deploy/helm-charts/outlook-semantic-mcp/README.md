@@ -63,8 +63,7 @@ spec:
 | env.OTEL_EXPORTER_PROMETHEUS_HOST | string | `"0.0.0.0"` |  |
 | env.OTEL_EXPORTER_PROMETHEUS_PORT | string | `"51346"` |  |
 | env.OTEL_METRICS_EXPORTER | string | `"prometheus"` |  |
-| envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: UNIQUE_ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: outlook-semantic-mcp-zitadel-secret           key: UNIQUE_ZITADEL_CLIENT_SECRET |
-| extraEnvCM | list | `["outlook-semantic-mcp-config"]` | ConfigMap(s) to load environment variables from. Default assumes release name is "outlook-semantic-mcp" (i.e., base.fullname resolves to "outlook-semantic-mcp"). Override with [<your-fullname>-config] if using a different release name or fullnameOverride. |
+| envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: UNIQUE_ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: outlook-semantic-mcp-zitadel-secret           key: UNIQUE_ZITADEL_CLIENT_SECRET     # For proxy basic auth (required when proxyConfig.authMode is 'username_password').     # Keep credentials out of Helm values with os.environ/ references:     #   proxyConfig.username: os.environ/PROXY_USERNAME_SECRET     - name: PROXY_USERNAME_SECRET       valueFrom:         secretKeyRef:           name: outlook-semantic-mcp-secret           key: PROXY_USERNAME     - name: PROXY_PASSWORD       valueFrom:         secretKeyRef:           name: outlook-semantic-mcp-secret           key: PROXY_PASSWORD |
 | fullnameOverride | string | `"outlook-semantic-mcp"` |  |
 | grafana.dashboard.enabled | bool | `true` | Enable Grafana dashboard ConfigMap creation |
 | grafana.dashboard.folder | string | `"mcp-servers"` | Grafana folder where the dashboard will be placed |
@@ -73,7 +72,7 @@ spec:
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
 | image.repository | string | `"unique-ag/connectors/services/outlook-semantic-mcp"` |  |
-| image.tag | string | `"2.0.2"` |  |
+| image.tag | string | `"3.2.0"` |  |
 | ingress.additionalLabels | object | `{}` | Additional labels for the ingress resource |
 | ingress.annotations | object | `{"konghq.com/plugins":"unique-route-metrics"}` | Annotations for the ingress resource |
 | ingress.enabled | bool | `false` | Enable ingress resource creation |
@@ -91,14 +90,13 @@ spec:
 | internalServices.dependencies.scopeManagement.servicePort | int | `8094` |  |
 | internalServices.dependents.ingressGateway.name | string | `"gateway"` |  |
 | internalServices.dependents.ingressGateway.namespace | string | `"system"` |  |
-| mcpConfig | object | `{"app":{"mcpBackend":"microsoft_graph_and_unique_api","mcpDebugMode":"disabled","selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"},"delegatedAccess":{"scan":"disabled"},"enabled":true,"ingestion":{"defaultMailFilters":{"ignoredContents":[],"ignoredSenders":[],"retentionWindowInDays":95}},"microsoft":{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"},"unique":{"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","scopeManagementServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.scopeManagement) }}","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"zitadel":{"clientId":"{{ fail \"mcpConfig.unique.zitadel.clientId is mandatory when serviceAuthMode is external. Override in your deployment values.\" }}","oauthTokenUrl":"{{ fail \"mcpConfig.unique.zitadel.oauthTokenUrl is mandatory when serviceAuthMode is external. Override in your deployment values.\" }}","projectId":"{{ fail \"mcpConfig.unique.zitadel.projectId is mandatory when serviceAuthMode is external. Override in your deployment values.\" }}"}}}` | Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to [] |
+| mcpConfig | object | `{"app":{"mcpBackend":"microsoft_graph_and_unique_api","mcpDebugMode":"disabled","selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"},"delegatedAccess":{"scan":"disabled"},"enabled":true,"ingestion":{"defaultMailFilters":{"ignoredContents":[],"ignoredSenders":[],"retentionWindowInDays":95}},"microsoft":{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"},"unique":{"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","scopeManagementServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.scopeManagement) }}","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"zitadel":{"clientId":"{{ fail \"mcpConfig.unique.zitadel.clientId is mandatory when serviceAuthMode is external. Override in your deployment values.\" }}","oauthTokenUrl":"{{ fail \"mcpConfig.unique.zitadel.oauthTokenUrl is mandatory when serviceAuthMode is external. Override in your deployment values.\" }}","projectId":"{{ fail \"mcpConfig.unique.zitadel.projectId is mandatory when serviceAuthMode is external. Override in your deployment values.\" }}"}}}` | Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables |
 | mcpConfig.app | object | `{"mcpBackend":"microsoft_graph_and_unique_api","mcpDebugMode":"disabled","selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"}` | Application configuration |
 | mcpConfig.app.mcpBackend | string | `"microsoft_graph_and_unique_api"` | Search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default). microsoft_graph: direct Graph search, no ingestion, sync tools not registered. |
 | mcpConfig.app.mcpDebugMode | string | `"disabled"` | Debug mode for the MCP server. Set to "enabled" to expose:    1. Debugging tools    2. Extra debugging data in tool responses. |
 | mcpConfig.app.selfUrl | string | `"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"` | The URL of the MCP Server. Used for OAuth callbacks. The URL must be reachable from the redirect location, e.g. must be publicly accessible. example: https://outlook.mcp.unique.app |
 | mcpConfig.delegatedAccess | object | `{"scan":"disabled"}` | Delegated access configuration. Controls whether the service discovers shared mailbox access. |
 | mcpConfig.delegatedAccess.scan | string | `"disabled"` | Scanning mode. Values: disabled | full_access_only | granular_access   disabled         - delegated access scanning is off (default)   full_access_only - discovers Full Access (Read & Manage) delegation via /messages endpoint   granular_access  - discovers folder-level delegation via /mailFolders endpoint + runs verification Env var: DELEGATED_ACCESS_SCAN |
-| mcpConfig.enabled | bool | `true` | if disabled, extraEnvCM must be set to [] |
 | mcpConfig.ingestion | object | `{"defaultMailFilters":{"ignoredContents":[],"ignoredSenders":[],"retentionWindowInDays":95}}` | Ingestion backend configuration. Required when mcpBackend is 'microsoft_graph_and_unique_api'. Omit entirely for 'microsoft_graph'. |
 | mcpConfig.ingestion.defaultMailFilters | object | `{"ignoredContents":[],"ignoredSenders":[],"retentionWindowInDays":95}` | Required. Default mail filters applied when creating a new inbox configuration. retentionWindowInDays: limits sync to emails received within the last N days (rolling). Env var: INGESTION_DEFAULT_MAIL_FILTERS (JSON string) |
 | mcpConfig.microsoft | object | `{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"}` | Microsoft Graph API configuration |
@@ -159,6 +157,8 @@ spec:
 | prometheus.additionalAlerts.OutlookSemanticMcpUniqueAPIErrors.for | string | `"30s"` |  |
 | prometheus.additionalAlerts.OutlookSemanticMcpUniqueAPIErrors.labels.alertGroup | string | `"outlook-semantic-mcp"` |  |
 | prometheus.additionalAlerts.OutlookSemanticMcpUniqueAPIErrors.labels.severity | string | `"warning"` |  |
+| proxyConfig | object | `{"authMode":"none","enabled":true}` | HTTP proxy configuration for external API calls Required for environments where internet access is only available through a proxy. When enabled, PROXY_* env vars are rendered into the deployment and hook job via templates/_ext.tpl. |
+| proxyConfig.authMode | string | `"none"` | Proxy authentication mode none: proxy disabled no_auth: proxy enabled, no authentication username_password: username/password authentication ssl_tls: TLS client certificate authentication |
 | rabbitmq.connection | object | `{}` |  |
 | rabbitmq.enabled | bool | `true` |  |
 | resources.limits.memory | string | `"1Gi"` |  |
@@ -175,4 +175,3 @@ spec:
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)
-

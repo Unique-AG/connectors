@@ -25,7 +25,6 @@ locals {
     "ChannelMessage.Read.All",
   ])
   kb_graph_scopes = toset([
-    "Calendars.Read",
     "OnlineMeetings.Read",
     "OnlineMeetingRecording.Read.All",
     "OnlineMeetingTranscript.Read.All",

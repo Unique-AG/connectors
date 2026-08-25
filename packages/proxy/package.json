@@ -1,0 +1,48 @@
+{
+  "name": "@unique-ag/proxy",
+  "description": "Shared NestJS module for outbound HTTP(S) proxy support",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write",
+    "format": "biome format .",
+    "format:fix": "biome format . --write",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@proventuslabs/nestjs-zod": "2.0.0",
+    "@unique-ag/utils": "workspace:*",
+    "https-proxy-agent": "7.0.6",
+    "remeda": "2.32.0",
+    "undici": "7.28.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "11.1.18",
+    "@nestjs/config": "4.0.3",
+    "@swc/core": "1.13.5",
+    "@types/node": "22.16.5",
+    "typescript": "5.9.2",
+    "unplugin-swc": "1.5.7",
+    "vitest": "3.2.6",
+    "zod": "4.1.5"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11",
+    "@nestjs/config": "^4",
+    "zod": "^4.1.5"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  }
+}

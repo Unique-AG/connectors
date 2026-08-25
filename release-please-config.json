@@ -7,6 +7,7 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "initial-version": "0.1.0",
+  "bootstrap-sha": "2f5670000c968d8bf0e0051eeb47766f586c84cc",
   "packages": {
     "services/sharepoint-connector": {
       "extra-files": [
@@ -140,6 +141,46 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/kb-mcp/values.yaml"
+        }
+      ]
+    },
+    "services/backstop-mcp": {
+      "release-type": "python",
+      "component": "backstop-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/backstop-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/backstop-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/backstop-mcp/values.yaml"
+        }
+      ]
+    },
+    "services/office-365-mcp": {
+      "release-type": "python",
+      "component": "office-365-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/office-365-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/office-365-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/office-365-mcp/values.yaml"
         }
       ]
     }

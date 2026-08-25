@@ -8,7 +8,7 @@ from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 
 from kb_mcp.auth import build_auth
-from kb_mcp.references import SERVER_CITATION_INSTRUCTIONS
+from kb_mcp.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
 from kb_mcp.settings import ENV_FILE, get_settings
 
 
@@ -27,7 +27,7 @@ def main() -> None:
 
     mcp = FastMCP(
         "Knowledge Base Search",
-        instructions=SERVER_CITATION_INSTRUCTIONS,
+        instructions=SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
         auth=oidc_proxy,
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
     )

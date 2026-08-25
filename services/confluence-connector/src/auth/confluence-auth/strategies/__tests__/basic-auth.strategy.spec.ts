@@ -16,7 +16,7 @@ describe('BasicAuthStrategy', () => {
   it('returns a Basic authorization header with base64(user:password)', async () => {
     const strategy = new BasicAuthStrategy({
       mode: AuthMode.Basic,
-      username: 'alice',
+      username: new Redacted('alice'),
       password: new Redacted('s3cret'),
     });
 
@@ -28,7 +28,7 @@ describe('BasicAuthStrategy', () => {
   it('returns the same header on multiple calls', async () => {
     const strategy = new BasicAuthStrategy({
       mode: AuthMode.Basic,
-      username: 'bob',
+      username: new Redacted('bob'),
       password: new Redacted('p@ssw0rd'),
     });
 
@@ -41,7 +41,7 @@ describe('BasicAuthStrategy', () => {
   it('correctly encodes credentials containing non-ASCII characters', async () => {
     const strategy = new BasicAuthStrategy({
       mode: AuthMode.Basic,
-      username: 'üser',
+      username: new Redacted('üser'),
       password: new Redacted('päss:wörd'),
     });
 

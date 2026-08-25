@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.4.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.4...teams-mcp@0.4.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **teams-mcp:** fix the four reported message tool bugs and align the tools ([#838](https://github.com/Unique-AG/connectors/issues/838)) ([12c5e34](https://github.com/Unique-AG/connectors/commit/12c5e34a97700679f73b1fb62caa2e9db5dfb9f9))
+
+## [0.4.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.3...teams-mcp@0.4.4) (2026-08-21)
+
+
+### Features
+
+* **teams-mcp,recordings-and-transcripts:** drop the unused Calendars.Read scope ([#827](https://github.com/Unique-AG/connectors/issues/827)) ([6a3515a](https://github.com/Unique-AG/connectors/commit/6a3515a45b27ad7039b23bc08e2d0465bb38aff3))
+* **teams-mcp:** surface clear error when Graph transcript access is disabled ([#762](https://github.com/Unique-AG/connectors/issues/762)) ([20e787c](https://github.com/Unique-AG/connectors/commit/20e787c9664b66f77ecb1d6cb0bd0bdff5107e1f))
+
+
+### Bug Fixes
+
+* **confluence-connector,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** allow azurerm v4 or v5 (&gt;= 4, &lt; 6) in remaining modules ([#768](https://github.com/Unique-AG/connectors/issues/768)) ([dcdd34f](https://github.com/Unique-AG/connectors/commit/dcdd34f521aac36ffa7d388c0478b7e4e8237368))
+* **teams-mcp:** allow azurerm v4 or v5 (&gt;= 4, &lt; 6) in entra module ([#764](https://github.com/Unique-AG/connectors/issues/764)) ([3b78445](https://github.com/Unique-AG/connectors/commit/3b7844549d2a248f9f1cfe0d97c7c8a48cb96a34))
+
 ## [0.4.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.2...teams-mcp@0.4.3) (2026-08-10)
 
 

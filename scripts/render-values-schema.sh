@@ -27,6 +27,8 @@ CHART_DIRS=(
   "services/outlook-semantic-mcp/deploy/helm-charts/outlook-semantic-mcp"
   "services/hello-mcp/deploy/helm-charts/hello-mcp"
   "services/kb-mcp/deploy/helm-charts/kb-mcp"
+  "services/backstop-mcp/deploy/helm-charts/backstop-mcp"
+  "services/office-365-mcp/deploy/helm-charts/office-365-mcp"
 )
 
 had_drift=false

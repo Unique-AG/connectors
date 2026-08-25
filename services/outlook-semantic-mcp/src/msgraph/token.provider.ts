@@ -6,8 +6,15 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { type Dispatcher, fetch } from 'undici';
+import { z } from 'zod';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import { userProfiles } from '../db/schema';
+
+const TokenRefreshResponseSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
+});
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -17,6 +24,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
+  private readonly dispatcher: Dispatcher;
 
   public constructor(
     {
@@ -33,9 +41,11 @@ export class TokenProvider implements AuthenticationProvider {
     {
       drizzle,
       encryptionService,
+      dispatcher,
     }: {
       drizzle: DrizzleDatabase;
       encryptionService: AesGcmEncryptionService;
+      dispatcher: Dispatcher;
     },
   ) {
     this.userProfileId = userProfileId;
@@ -44,6 +54,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.scopes = scopes;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
+    this.dispatcher = dispatcher;
   }
 
   public async getAccessToken(
@@ -87,6 +98,7 @@ export class TokenProvider implements AuthenticationProvider {
           client_secret: this.clientSecret,
           scope: this.scopes.join(' '),
         }),
+        dispatcher: this.dispatcher,
       });
 
       if (!response.ok) {
@@ -102,7 +114,7 @@ export class TokenProvider implements AuthenticationProvider {
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
-      const tokenData = await response.json();
+      const tokenData = TokenRefreshResponseSchema.parse(await response.json());
 
       const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
       // Keep old refresh token if new one not provided

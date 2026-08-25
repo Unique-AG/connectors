@@ -2,6 +2,8 @@ packages:
   - services/*
   - "!services/hello-mcp"
   - "!services/kb-mcp"
+  - "!services/backstop-mcp"
+  - "!services/office-365-mcp"
   - packages/*
 
 injectWorkspacePackages: true

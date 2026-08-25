@@ -1,6 +1,8 @@
 import assert from 'node:assert';
+import { ProxyService } from '@unique-ag/proxy';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { fetch } from 'undici';
 import { UniqueConfigNamespaced } from '~/config';
 
 export interface UploadFileForIngestionInput {
@@ -11,11 +13,16 @@ export interface UploadFileForIngestionInput {
 
 @Injectable()
 export class UploadFileForIngestionCommand {
-  public constructor(private configService: ConfigService<UniqueConfigNamespaced, true>) {}
+  public constructor(
+    private configService: ConfigService<UniqueConfigNamespaced, true>,
+    private readonly proxyService: ProxyService,
+  ) {}
 
   public async run({ uploadUrl, content, mimeType }: UploadFileForIngestionInput): Promise<void> {
-    // We use fetch instead of undici because undici retries on 500s, which caused broken files
-    // on Azure when only the first chunk was re-sent. Plain fetch avoids that.
+    // Use undici fetch with an explicit dispatcher from ProxyService.
+    // Do NOT compose retry — undici retry on 500s previously corrupted Azure blobs by
+    // re-sending only the first chunk. Bare getDispatcher has no retry composed.
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
     await fetch(this.correctWriteUrl(uploadUrl), {
       method: 'PUT',
       headers: {
@@ -23,9 +30,8 @@ export class UploadFileForIngestionCommand {
         'Content-Type': mimeType || 'application/octet-stream',
         'x-ms-blob-type': 'BlockBlob',
       },
-      // For some reason the types for Body are resolved to the browser types instead of node types which
-      // makes the body expect a readable stream instead of a Buffer.
-      body: content as BodyInit,
+      body: content,
+      dispatcher,
     });
   }
 

@@ -11,8 +11,8 @@ from typing import Annotated
 
 import tiktoken
 from fastmcp.dependencies import Depends
-from fastmcp.tools import tool
-from mcp.types import CallToolResult, TextContent, ToolAnnotations
+from fastmcp.tools import ToolResult, tool
+from mcp.types import TextContent, ToolAnnotations
 from pydantic import Field, RootModel, field_validator
 from unique_mcp import (
     ConfigSchemaMeta,
@@ -27,12 +27,12 @@ from unique_toolkit.content.functions import (
     download_content_to_bytes_async,
     search_contents_async,
 )
-from unique_toolkit.content.schemas import Content, ContentChunk
+from unique_toolkit.content.schemas import ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import file_reference_url, markdown_citation_link
-from kb_mcp.settings import Settings, get_settings
+from kb_mcp.settings import get_settings
 from kb_mcp.tools.read_file.config import ReadFileToolConfig
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,41 +72,15 @@ _META = merge_tool_meta(
 )
 
 
-def _error(text: str) -> CallToolResult:
-    return CallToolResult(isError=True, content=[TextContent(type="text", text=text)])
-
-
-def _with_reference_header(
-    result: CallToolResult, content: Content, settings: Settings
-) -> CallToolResult:
-    """Prefix successful reads with a markdown link that opens the file."""
-    if result.isError or not result.content:
-        return result
-    first = result.content[0]
-    if not isinstance(first, TextContent):
-        return result
-    url = file_reference_url(
-        content.id,
-        metadata=content.metadata,
-        frontend_base_url=settings.frontend_base_url_str(),
-    )
-    header = markdown_citation_link(content.title or content.key, url)
-    prefixed = TextContent(type="text", text=f"{header}\n\n{first.text}")
-    return result.model_copy(update={"content": [prefixed, *result.content[1:]]})
-
-
-def _ok(text: str) -> CallToolResult:
-    return CallToolResult(content=[TextContent(type="text", text=text)])
-
-
 def _render_chunked(
     chunks: list[ContentChunk],
     start_page: int | None,
     end_page: int | None,
     max_tokens_per_call: int,
-) -> CallToolResult:
+) -> tuple[bool, str]:
+    """Return ``(is_error, text)``."""
     if not chunks:
-        return _error("this file hasn't finished processing yet")
+        return True, "this file hasn't finished processing yet"
 
     total_pages = max((c.end_page or c.start_page or 0) for c in chunks)
     if total_pages == 0:
@@ -118,8 +92,8 @@ def _render_chunked(
         full_text = "\n".join(c.text for c in chunks)
         total_tokens = count_tokens(full_text)
         if total_tokens <= max_tokens_per_call:
-            return _ok(_render_with_page_markers(chunks))
-        return _error(
+            return False, _render_with_page_markers(chunks)
+        return True, (
             f"file has ~{total_tokens} tokens across {total_pages} pages; "
             "specify start_page/end_page to read a portion."
         )
@@ -127,7 +101,7 @@ def _render_chunked(
     s = start_page if start_page is not None else 1
     e = end_page if end_page is not None else total_pages
     if s < 1 or s > e or s > total_pages:
-        return _error(
+        return True, (
             f"file has {total_pages} pages; requested range {s}-{e} is out of bounds."
         )
 
@@ -137,7 +111,7 @@ def _render_chunked(
         if (c.start_page or 0) <= e and (c.end_page or c.start_page or 0) >= s
     ]
     if not selected:
-        return _error(
+        return True, (
             f"no content found in pages {s}-{e}; the file's page numbering "
             "may have gaps — try a wider range."
         )
@@ -147,12 +121,12 @@ def _render_chunked(
     if s < e:
         selected_tokens = count_tokens(text)
         if selected_tokens > max_tokens_per_call:
-            return _error(
+            return True, (
                 f"pages {s}-{e} span ~{selected_tokens} tokens, over the "
                 f"{max_tokens_per_call}-token per-call limit; request a "
                 "narrower range (a single page is always allowed)."
             )
-    return _ok(text)
+    return False, text
 
 
 def _render_with_page_markers(chunks: list[ContentChunk]) -> str:
@@ -171,14 +145,15 @@ def _render_text(
     start_page: int | None,
     end_page: int | None,
     max_tokens_per_call: int,
-) -> CallToolResult:
+) -> tuple[bool, str]:
+    """Return ``(is_error, text)``."""
     total_tokens = count_tokens(full_text)
     total_pages = max(1, math.ceil(total_tokens / max_tokens_per_call))
 
     if start_page is None and end_page is None:
         if total_tokens <= max_tokens_per_call:
-            return _ok(full_text)
-        return _error(
+            return False, full_text
+        return True, (
             f"file has ~{total_tokens} tokens (~{total_pages} pages of "
             f"{max_tokens_per_call} tokens each); specify start_page/end_page "
             "to read a portion."
@@ -187,12 +162,12 @@ def _render_text(
     s = start_page if start_page is not None else 1
     e = end_page if end_page is not None else total_pages
     if s < 1 or s > e or s > total_pages:
-        return _error(
+        return True, (
             f"file has {total_pages} pages; requested range {s}-{e} is out of bounds."
         )
     # Virtual pages are sized to max_tokens_per_call, so multi-page ranges overflow.
     if s < e:
-        return _error(
+        return True, (
             f"each virtual page is {max_tokens_per_call} tokens (the per-call "
             f"limit); read one page per call. File has {total_pages} pages."
         )
@@ -200,7 +175,7 @@ def _render_text(
     token_start, token_end = _virtual_page_token_bounds(s, e, max_tokens_per_call)
     slice_text = _slice_by_token_count(full_text, token_start, token_end)
     prefix = f"showing tokens {token_start}-{token_end} of {total_tokens} total"
-    return _ok(f"{prefix}\n\n{slice_text}")
+    return False, f"{prefix}\n\n{slice_text}"
 
 
 def _slice_by_token_count(text: str, token_start: int, token_end: int) -> str:
@@ -246,7 +221,7 @@ async def read_file(
         Field(description="Last page to return (1-indexed), inclusive."),
     ] = None,
     config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
-) -> CallToolResult:
+) -> ToolResult:
     """Read a specific knowledge-base file's text content. Requires
     `content_id` (from a prior content_tree 'list'/'search' call).
     For large files, pass `start_page`/`end_page` to read a portion — for
@@ -283,7 +258,15 @@ async def read_file(
                 cid,
                 content_id,
             )
-            return _error(f"no content found for content_id={content_id}")
+            return ToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=f"no content found for content_id={content_id}",
+                    )
+                ],
+                is_error=True,
+            )
         content = contents[0]
 
         try:
@@ -296,11 +279,19 @@ async def read_file(
                 cid,
                 content_id,
             )
-            return _error(f"unsupported file type for read_file: {suffix}")
+            return ToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=f"unsupported file type for read_file: {suffix}",
+                    )
+                ],
+                is_error=True,
+            )
 
         if ext.is_chunked:
             chunks = sort_content_chunks(list(content.chunks))
-            result = _render_chunked(
+            is_error, text = _render_chunked(
                 chunks, start_page, end_page, config.max_tokens_per_call
             )
         else:
@@ -311,17 +302,30 @@ async def read_file(
                 chat_id=None,
             )
             full_text = raw_bytes.decode("utf-8", errors="replace")
-            result = _render_text(
+            is_error, text = _render_text(
                 full_text, start_page, end_page, config.max_tokens_per_call
             )
-        result = _with_reference_header(result, content, kb_settings)
+
         _LOGGER.info(
             "read_file complete correlation_id=%s content_id=%s is_error=%s",
             cid,
             content_id,
-            result.isError,
+            is_error,
         )
-        return result
+        if is_error:
+            return ToolResult(
+                content=[TextContent(type="text", text=text)], is_error=True
+            )
+
+        url = file_reference_url(
+            content.id,
+            metadata=content.metadata,
+            frontend_base_url=kb_settings.frontend_base_url_str(),
+        )
+        header = markdown_citation_link(content.title or content.key, url)
+        return ToolResult(
+            content=[TextContent(type="text", text=f"{header}\n\n{text}")]
+        )
     except Exception as exc:
         _LOGGER.exception(
             "read_file error correlation_id=%s content_id=%s error_type=%s",
@@ -329,6 +333,6 @@ async def read_file(
             content_id,
             type(exc).__name__,
         )
-        return CallToolResult(
-            isError=True, content=[TextContent(type="text", text=str(exc))]
+        return ToolResult(
+            content=[TextContent(type="text", text=str(exc))], is_error=True
         )
