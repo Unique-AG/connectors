@@ -38,7 +38,9 @@ export class SendChannelMessageTool {
     name: 'send_channel_message',
     title: 'Send Channel Message',
     description:
-      'Send a plain text message to a Microsoft Teams channel, identified by teamId + channelId. Call list_teams then list_channels (with that teamId) first to find the ids.',
+      'Send a plain text message to a Microsoft Teams channel. ' +
+      'Take the teamId from list_teams and the channelId from list_channels. ' +
+      'Markdown, HTML and @mentions are NOT supported — they arrive as literal text.',
     parameters: SendChannelMessageInputSchema,
     outputSchema: SendChannelMessageOutputSchema,
     annotations: {

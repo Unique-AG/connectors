@@ -3,11 +3,17 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import { GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
+import { MessageOutputSchema } from '../chat.dtos';
 import { SearchService } from '../search.service';
 
-const SearchMessagesInputSchema = z
+// Not a Graph limit: Microsoft caps a search page at 25 for the `message` and
+// `event` entities only, never for `chatMessage`. 25 is a product choice — every
+// hit is hydrated with one extra Graph call, so the page size is also the N of
+// that fan-out.
+const MAX_PAGE_SIZE = 25;
+
+export const SearchMessagesInputSchema = z
   .object({
     query: z
       .string()
@@ -45,24 +51,6 @@ const SearchMessagesInputSchema = z
       .describe(
         'Restrict to messages where the signed-in user is (true) or is not (false) mentioned.',
       ),
-    source: z
-      .enum(['chat', 'channel', 'all'])
-      .default('all')
-      .describe(
-        'Filter results by container. Applied after the search (entityType is always chatMessage), so a non-all value shrinks the returned page. Default: all',
-      ),
-    detail: z
-      .enum(['summary', 'full'])
-      .default('summary')
-      .describe(
-        'summary returns the hit snippet only (1 Graph call, fast). full hydrates each hit with its message body (one extra Graph call per hit). Default: summary',
-      ),
-    contentFormat: z
-      .enum(['normalized', 'raw'])
-      .default('normalized')
-      .describe(
-        'Only applies when detail=full. normalized converts HTML to readable text; raw returns Teams HTML verbatim. Default: normalized',
-      ),
     offset: z
       .number()
       .int()
@@ -73,9 +61,11 @@ const SearchMessagesInputSchema = z
       .number()
       .int()
       .min(1)
-      .max(GRAPH_PAGE_SIZE)
-      .default(25)
-      .describe('Maximum number of results to return per page. Default: 25'),
+      .max(MAX_PAGE_SIZE)
+      .default(MAX_PAGE_SIZE)
+      .describe(
+        `Results per page, 1-${MAX_PAGE_SIZE}. Default: ${MAX_PAGE_SIZE}. Each result costs an extra fetch, so ask for fewer when you can.`,
+      ),
   })
   .refine(
     (data) =>
@@ -98,13 +88,13 @@ const SearchMessagesOutputSchema = z.object({
   messages: z.array(
     z.object({
       id: z.string(),
-      source: z.enum(['chat', 'channel']),
+      source: z.enum(['chat', 'channel', 'unknown']),
       chatId: z.string().nullable(),
       teamId: z.string().nullable(),
       channelId: z.string().nullable(),
       senderDisplayName: z.string().nullable(),
       summary: z.string().nullable(),
-      content: z.string().optional(),
+      message: MessageOutputSchema.optional(),
       createdDateTime: z.string().nullable(),
       webUrl: z.string().nullable(),
     }),
@@ -128,7 +118,15 @@ export class SearchMessagesTool {
     name: 'search_messages',
     title: 'Search Messages',
     description:
-      'Search Microsoft Teams messages by keyword across 1:1 chats, group chats, and channels in a single query, using the Microsoft Search API. Supports identity and scope filters (sender, recipient, mentions, date range, attachments, read/mention state). Results are snippets by default; set detail=full to retrieve message bodies. Paginate with offset + moreResultsAvailable.',
+      'Search Microsoft Teams messages by keyword across 1:1 chats, group chats and channels. ' +
+      'Narrow the search by sender, recipient, mentions, date range, attachments, read state and mention state. ' +
+      "Each row names its container in source: 'channel' carries a team id and a channel id, 'chat' carries a chat id, 'unknown' otherwise. " +
+      'Keep the rows whose source you want. ' +
+      'Each row also carries the full message under message, with its body, sender, mentions, attachments and reactions. ' +
+      'Message bodies are Teams HTML. ' +
+      "message is absent for rows whose source is 'unknown' and for replies inside a channel thread. " +
+      'senderDisplayName, summary and webUrl come straight from the search index. ' +
+      'Page by adding returnedCount to offset while moreResultsAvailable is true.',
     parameters: SearchMessagesInputSchema,
     outputSchema: SearchMessagesOutputSchema,
     annotations: {
@@ -156,13 +154,8 @@ export class SearchMessagesTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('source', input.source);
-    span?.setAttribute('detail', input.detail);
 
-    this.logger.log(
-      { userProfileId, source: input.source, detail: input.detail },
-      'Searching messages',
-    );
+    this.logger.log({ userProfileId }, 'Searching messages');
 
     const result = await this.searchService.searchMessages(userProfileId, {
       query: input.query,
@@ -174,9 +167,6 @@ export class SearchMessagesTool {
       hasAttachment: input.hasAttachment,
       isRead: input.isRead,
       isMentioned: input.isMentioned,
-      source: input.source,
-      detail: input.detail,
-      contentFormat: input.contentFormat,
       offset: input.offset,
       size: input.size,
     });

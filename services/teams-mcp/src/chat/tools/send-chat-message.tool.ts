@@ -33,7 +33,8 @@ export class SendChatMessageTool {
     name: 'send_chat_message',
     title: 'Send Chat Message',
     description:
-      'Send a plain text message to a Microsoft Teams chat (1:1 or group), identified by its chatId. Call list_chats first to find the chatId (it also returns topic/members/dates so you can pick the right chat).',
+      'Send a plain text message to a Microsoft Teams chat. Take the chatId from list_chats. ' +
+      'Markdown, HTML and @mentions are NOT supported — they arrive as literal text.',
     parameters: SendChatMessageInputSchema,
     outputSchema: SendChatMessageOutputSchema,
     annotations: {

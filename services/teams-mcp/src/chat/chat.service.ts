@@ -6,6 +6,12 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectUntil } from '~/msgraph/graph-pagination';
 import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat.dtos';
 
+// Graph serves at most this many chats in one /me/chats response, whatever the
+// $top, because the call expands members (documented chat-list limitation, and
+// different again in some national clouds). It is the page size, so it is also
+// the tool's maximum `limit`.
+export const GRAPH_CHATS_PAGE_LIMIT = 25;
+
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
@@ -16,19 +22,16 @@ export class ChatService {
   ) {}
 
   @Span()
-  public async listChats(
-    userProfileId: string,
-    limit = 50,
-  ): Promise<{ chats: MsChat[]; hasMore: boolean }> {
+  public async listChats(userProfileId: string, limit = GRAPH_CHATS_PAGE_LIMIT): Promise<MsChat[]> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
     this.logger.debug({ userProfileId }, 'Fetching chats from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    // Single-page by design (not collectAllPages): a bounded "recent chats"
-    // window with an accurate `hasMore`. $orderby is required for "most recent"
-    // — /me/chats is not sorted by activity by default.
+    // One request per call: `limit` is the page size, not a total to accumulate.
+    // $orderby is required for "most recent" — /me/chats is not sorted by
+    // activity by default.
     // /me/chats supports only $expand, $top, $filter and $orderby — $select is
     // rejected as an unsupported OData parameter (see chat-list docs), so we let
     // the members/lastMessagePreview expansions bring back the fields we need.
@@ -40,12 +43,11 @@ export class ChatService {
       .get();
 
     const chats = z.array(MsChatSchema).parse(response.value);
-    const hasMore = Boolean(response['@odata.nextLink']);
 
     span?.setAttribute('result_count', chats.length);
     this.logger.debug({ userProfileId, count: chats.length }, 'Retrieved chats');
 
-    return { chats, hasMore };
+    return chats;
   }
 
   @Span()

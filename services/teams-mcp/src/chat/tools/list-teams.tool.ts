@@ -39,7 +39,9 @@ export class ListTeamsTool {
     name: 'list_teams',
     title: 'List My Teams',
     description:
-      'List all Microsoft Teams the current user is a member of. Each team includes its teamId and an isArchived flag (archived teams are read-only) to distinguish teams that share a display name. Pass the teamId to list_channels, send_channel_message, or get_channel_messages to target a specific team unambiguously.',
+      'List the Microsoft Teams the user belongs to. ' +
+      'Each team comes with its teamId and an isArchived flag, which tells same-named teams apart. ' +
+      'Pass the teamId to list_channels, get_channel_messages or send_channel_message.',
     parameters: ListTeamsInputSchema,
     outputSchema: ListTeamsOutputSchema,
     annotations: {

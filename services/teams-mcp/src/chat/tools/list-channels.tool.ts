@@ -42,7 +42,9 @@ export class ListChannelsTool {
     name: 'list_channels',
     title: 'List Team Channels',
     description:
-      'List all channels in a Microsoft Teams team, identified by teamId (from list_teams). Each channel includes its channelId plus creation date and membership type (standard, private, or shared). Pass the teamId + channelId to send_channel_message or get_channel_messages.',
+      'List the channels in a Microsoft Teams team. Take the teamId from list_teams. ' +
+      'Each channel comes with its channelId and its membership type: standard, private or shared. ' +
+      'Pass the teamId and channelId together to get_channel_messages or send_channel_message.',
     parameters: ListChannelsInputSchema,
     outputSchema: ListChannelsOutputSchema,
     annotations: {
