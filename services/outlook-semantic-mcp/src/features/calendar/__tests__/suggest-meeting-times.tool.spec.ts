@@ -97,6 +97,34 @@ describe(SuggestMeetingTimesTool.name, () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it('rejects a window longer than 62 days', async () => {
+    const run = vi.fn();
+    const tool = new SuggestMeetingTimesTool({ run } as never);
+
+    await expect(
+      tool.suggestMeetingTimes(
+        { dateRange: { rangeType: 'relative', range: 'next90Days' } },
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/62 days/);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('rejects a past-only relative range', async () => {
+    const run = vi.fn();
+    const tool = new SuggestMeetingTimesTool({ run } as never);
+
+    await expect(
+      tool.suggestMeetingTimes(
+        { dateRange: { rangeType: 'relative', range: 'yesterday' } },
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/past/);
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it('rejects more than 20 attendees before calling the query', async () => {
     const run = vi.fn();
     const tool = new SuggestMeetingTimesTool({ run } as never);

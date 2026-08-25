@@ -4,8 +4,8 @@ import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import { isDelegatedAccessNotAvailableError } from '~/features/delegated-access/utils/is-delegated-access-not-available-error';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
-import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { nameSimilarity } from '~/utils/name-similarity-score';
@@ -14,64 +14,22 @@ import {
   type ResolvedWindow,
   resolveQueryWindow,
 } from '~/utils/relative-range';
-import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
-import {
-  CalendarRef,
-  type EventRef,
-  GraphEvent,
-  GraphEventCollectionSchema,
-} from './calendar.schemas';
+import { CalendarRef, GraphEventCollectionSchema } from './calendar.schemas';
 import { ListCalendarsQuery } from './list-calendars.query';
-import { summariseRecurrence } from './summarise-recurrence';
 import { calendarGraphLimit } from './utils/calendar-graph-limit';
 import { calendarMailbox, calendarViewPath } from './utils/calendar-graph-path';
 import { dateWindowFromSearchInput } from './utils/date-window-bucket';
+import {
+  type CalendarEvent,
+  mapGraphEventToCalendarEvent,
+} from './utils/map-graph-event-to-calendar-event';
 
 const EVENT_SELECT =
   'id,subject,body,start,end,location,attendees,organizer,onlineMeeting,onlineMeetingUrl,webLink,isCancelled,isAllDay,sensitivity,categories,type,seriesMasterId,recurrence,showAs';
 const CALENDAR_VIEW_TOP = 100;
 const MAX_CALENDAR_VIEW_PAGES = 5;
 const MAX_EVENTS = 100;
-const BODY_MAX_CHARS = 4000;
 const TEXT_FILTER_SIMILARITY = 0.75;
-const UTC = 'UTC';
-
-interface CalendarEventAttendee {
-  name: string | null;
-  email: string | null;
-  response: string | null;
-  type: string | null;
-}
-
-interface CalendarEventDateTime {
-  dateTime: string;
-  timeZone: string | null;
-}
-
-interface CalendarEvent {
-  subject: string | null;
-  body: string;
-  bodyTruncated: boolean;
-  start: CalendarEventDateTime;
-  end: CalendarEventDateTime;
-  location: string | null;
-  joinUrl: string | null;
-  attendees: CalendarEventAttendee[];
-  organizerName: string | null;
-  organizerEmail: string | null;
-  isCancelled: boolean;
-  isAllDay: boolean;
-  isPrivate: boolean;
-  sensitivity: string | null;
-  categories: string[];
-  recurrence: string | null;
-  seriesMasterId: string | null;
-  type: string | null;
-  showAs: string | null;
-  webLink: string | null;
-  calendarName: string;
-  eventRef: EventRef;
-}
 
 export interface SearchCalendarEventsQueryOutput {
   success: boolean;
@@ -101,7 +59,7 @@ export class SearchCalendarEventsQuery {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly listCalendarsQuery: ListCalendarsQuery,
-    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
+    private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
     private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
@@ -135,19 +93,11 @@ export class SearchCalendarEventsQuery {
     }
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const mailboxTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
-    const outlookTimeZone = mailboxTimeZone ?? UTC;
-    const mappedIana =
-      mailboxTimeZone === undefined ? undefined : resolveIanaTimezone(mailboxTimeZone);
-    const ianaTimeZone = mappedIana ?? UTC;
-    const timezoneNotes: string[] = [];
-    if (mailboxTimeZone === undefined) {
-      timezoneNotes.push('Mailbox timezone was unavailable; times are requested in UTC.');
-    } else if (mappedIana === undefined) {
-      timezoneNotes.push(
-        `Mailbox timezone "${mailboxTimeZone}" could not be mapped to IANA; relative windows are resolved in UTC.`,
-      );
-    }
+    const {
+      ianaTimeZone,
+      outlookTimeZone,
+      notes: timezoneNotes,
+    } = await this.resolveMailboxTimezoneQuery.run(userProfileId);
     const { calendars, notes: mailboxNotes } = this.filterOutNonAccessibleCalendars({
       calendars: listed.calendars ?? [],
       mailbox: input.mailbox,
@@ -328,7 +278,7 @@ export class SearchCalendarEventsQuery {
       const parsed = GraphEventCollectionSchema.parse(raw);
       for (const item of parsed.value) {
         fetched += 1;
-        const event = this.toCalendarEvent({
+        const event = mapGraphEventToCalendarEvent({
           event: item,
           calendar: input.calendar,
           callerEmail: input.callerEmail,
@@ -372,59 +322,6 @@ export class SearchCalendarEventsQuery {
       }
     }
     return true;
-  }
-
-  private toCalendarEvent(input: {
-    event: GraphEvent;
-    calendar: CalendarRef;
-    callerEmail: string;
-  }): CalendarEvent {
-    const rawBody = input.event.body?.content ?? '';
-    const bodyTruncated = rawBody.length > BODY_MAX_CHARS;
-    return {
-      subject: input.event.subject ?? null,
-      body: bodyTruncated ? rawBody.slice(0, BODY_MAX_CHARS) : rawBody,
-      bodyTruncated,
-      start: {
-        dateTime: input.event.start?.dateTime ?? '',
-        timeZone: input.event.start?.timeZone ?? null,
-      },
-      end: {
-        dateTime: input.event.end?.dateTime ?? '',
-        timeZone: input.event.end?.timeZone ?? null,
-      },
-      location: input.event.location?.displayName ?? null,
-      joinUrl: input.event.onlineMeeting?.joinUrl ?? input.event.onlineMeetingUrl ?? null,
-      attendees: (input.event.attendees ?? []).map((attendee) => ({
-        name: attendee.emailAddress?.name ?? null,
-        email: attendee.emailAddress?.address ?? null,
-        response: attendee.status?.response ?? null,
-        type: attendee.type ?? null,
-      })),
-      organizerName: input.event.organizer?.emailAddress?.name ?? null,
-      organizerEmail: input.event.organizer?.emailAddress?.address ?? null,
-      isCancelled: input.event.isCancelled ?? false,
-      isAllDay: input.event.isAllDay ?? false,
-      isPrivate:
-        input.event.sensitivity === 'private' || input.event.sensitivity === 'confidential',
-      sensitivity: input.event.sensitivity ?? null,
-      categories: input.event.categories ?? [],
-      recurrence: summariseRecurrence(input.event.recurrence?.pattern),
-      seriesMasterId: input.event.seriesMasterId ?? null,
-      type: input.event.type ?? null,
-      showAs: input.event.showAs ?? null,
-      webLink: input.event.webLink ?? null,
-      calendarName: input.calendar.name,
-      eventRef: {
-        eventId: input.event.id,
-        calendarId: input.calendar.calendarId,
-        accessPath: input.calendar.accessPath,
-        mailbox: calendarMailbox({
-          calendar: input.calendar,
-          callerEmail: input.callerEmail,
-        }),
-      },
-    };
   }
 }
 

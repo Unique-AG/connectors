@@ -1,6 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, vi } from 'vitest';
+import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SuggestMeetingTimesQuery } from '../suggest-meeting-times.query';
 
@@ -10,6 +11,18 @@ const ATTENDEE = 'alex@example.com';
 const PATH = `/users/${OWN_EMAIL}/findMeetingTimes`;
 const PREFER = 'outlook.timezone="W. Europe Standard Time"';
 const NOW = Temporal.ZonedDateTime.from('2026-08-25T15:30:00+02:00[Europe/Zurich]');
+const DEFAULT_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'Europe/Zurich',
+  outlookTimeZone: 'W. Europe Standard Time',
+  notes: [],
+};
+const UNMAPPED_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'UTC',
+  outlookTimeZone: 'UTC',
+  notes: [
+    'Mailbox timezone "Customized Time Zone" could not be mapped to IANA; relative windows are resolved in UTC.',
+  ],
+};
 
 function makeGraphError(statusCode: number, code: string): GraphError {
   const err = new GraphError(statusCode, 'Access denied');
@@ -17,7 +30,9 @@ function makeGraphError(statusCode: number, code: string): GraphError {
   return err;
 }
 
-function createQuery(opts: { post?: ReturnType<typeof vi.fn>; timeZone?: string | null } = {}) {
+function createQuery(
+  opts: { post?: ReturnType<typeof vi.fn>; timezone?: ResolvedMailboxTimezone } = {},
+) {
   const post = opts.post ?? vi.fn().mockResolvedValue({ meetingTimeSuggestions: [] });
   const request = {
     header: vi.fn().mockReturnThis(),
@@ -34,11 +49,7 @@ function createQuery(opts: { post?: ReturnType<typeof vi.fn>; timeZone?: string 
       }),
     } as never,
     {
-      run: vi
-        .fn()
-        .mockResolvedValue(
-          opts.timeZone === null ? undefined : (opts.timeZone ?? 'W. Europe Standard Time'),
-        ),
+      run: vi.fn().mockResolvedValue(opts.timezone ?? DEFAULT_TIMEZONE),
     } as never,
   );
   return { query, api, request, post };
@@ -152,21 +163,8 @@ describe(SuggestMeetingTimesQuery.name, () => {
     expect(post).not.toHaveBeenCalled();
   });
 
-  it('rejects a window of 62 days or more before calling Graph', async () => {
-    const { query, post } = createQuery();
-
-    const result = await query.run(USER_PROFILE_ID, {
-      range: 'next90Days',
-      now: NOW,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/62 days/);
-    expect(post).not.toHaveBeenCalled();
-  });
-
   it('sends UTC wall-clock times when the mailbox timezone cannot be mapped', async () => {
-    const { query, post } = createQuery({ timeZone: 'Customized Time Zone' });
+    const { query, post } = createQuery({ timezone: UNMAPPED_TIMEZONE });
 
     const result = await query.run(USER_PROFILE_ID, {
       startDateTime: '2026-08-26T09:00:00+02:00',
@@ -213,34 +211,6 @@ describe(SuggestMeetingTimesQuery.name, () => {
         timeConstraint: expect.objectContaining({ activityDomain: 'unrestricted' }),
       }),
     );
-  });
-
-  it('rejects a mailbox that is not an SMTP address', async () => {
-    const { query, post } = createQuery();
-
-    const result = await query.run(USER_PROFILE_ID, {
-      mailbox: 'evil/calendar',
-      range: 'tomorrow',
-      now: NOW,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/SMTP/i);
-    expect(post).not.toHaveBeenCalled();
-  });
-
-  it('rejects more than 20 attendees at the query', async () => {
-    const { query, post } = createQuery();
-
-    const result = await query.run(USER_PROFILE_ID, {
-      attendees: Array.from({ length: 21 }, (_, index) => `user${index}@example.com`),
-      range: 'tomorrow',
-      now: NOW,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/20/);
-    expect(post).not.toHaveBeenCalled();
   });
 
   it('returns emptySuggestionsReason when Graph finds no slots', async () => {

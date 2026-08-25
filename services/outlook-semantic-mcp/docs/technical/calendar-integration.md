@@ -11,8 +11,8 @@ Read path is landed behind `CALENDAR_INTEGRATION`. Writes are not registered yet
 - Fan-out: `using limit = calendarGraphLimit(userId)` — 5 in-flight, refcounted per user. Concurrency, not a cap on calendars queried.
 - Search filters (attendee includes organizer, subject, category) run inside `fetchEvents`.
 - Metric: `osm_search_calendar_events_duration_seconds` with labels `dateWindow`, `hasAttendeeFilter`, `hasSubjectFilter`, `hasCategoryFilter`. Duration buckets match other `*_duration_seconds` histograms.
-- `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses; reject windows ≥ 62 days; decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
-- `suggest_meeting_times` POSTs `/users/{email}/findMeetingTimes`. Default duration 30 minutes and `activityDomain` work. Reject past-only windows, clamp a start that is already past to now, and reject windows ≥ 62 days. Surface `emptySuggestionsReason` instead of inventing slots.
+- `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses and windows ≥ 62 days in the tool Zod schema; the query asserts those invariants. Decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
+- `suggest_meeting_times` POSTs `/users/{email}/findMeetingTimes`. Default duration 30 minutes and `activityDomain` work. Zod rejects past-only and ≥ 62-day ranges; the query clamps a start that is already past to now. Surface `emptySuggestionsReason` instead of inventing slots.
 
 ## Probes
 

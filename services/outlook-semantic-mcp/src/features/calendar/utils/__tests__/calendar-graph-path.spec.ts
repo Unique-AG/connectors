@@ -6,7 +6,6 @@ import {
   calendarViewPath,
   findMeetingTimesPath,
   getSchedulePath,
-  isSmtpAddress,
 } from '../calendar-graph-path';
 
 const own: CalendarRef = {
@@ -67,13 +66,5 @@ describe(getSchedulePath.name, () => {
 describe(findMeetingTimesPath.name, () => {
   it('posts findMeetingTimes on /users/{email}', () => {
     expect(findMeetingTimesPath('me@example.com')).toBe('/users/me@example.com/findMeetingTimes');
-  });
-});
-
-describe(isSmtpAddress.name, () => {
-  it('accepts a normal SMTP address and rejects path characters', () => {
-    expect(isSmtpAddress('me@example.com')).toBe(true);
-    expect(isSmtpAddress('evil/calendar')).toBe(false);
-    expect(isSmtpAddress('me@example.com/calendars')).toBe(false);
   });
 });

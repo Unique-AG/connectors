@@ -89,6 +89,40 @@ describe(CheckAvailabilityTool.name, () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it('rejects a window longer than 62 days', async () => {
+    const run = vi.fn();
+    const tool = new CheckAvailabilityTool({ run } as never);
+
+    await expect(
+      tool.checkAvailability(
+        {
+          attendees: ['alex@example.com'],
+          dateRange: { rangeType: 'relative', range: 'next90Days' },
+        },
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/62 days/);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('rejects a whitespace attendee', async () => {
+    const run = vi.fn();
+    const tool = new CheckAvailabilityTool({ run } as never);
+
+    await expect(
+      tool.checkAvailability(
+        {
+          attendees: ['  '],
+          dateRange: { rangeType: 'relative', range: 'today' },
+        },
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/SMTP/i);
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it('rejects more than 20 attendees before calling the query', async () => {
     const run = vi.fn();
     const tool = new CheckAvailabilityTool({ run } as never);

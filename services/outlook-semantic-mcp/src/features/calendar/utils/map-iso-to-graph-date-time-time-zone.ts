@@ -1,6 +1,6 @@
 import { Temporal } from 'temporal-polyfill';
 
-export function toGraphDateTimeTimeZone(input: {
+export function mapIsoToGraphDateTimeTimeZone(input: {
   iso: string;
   ianaTimeZone: string;
   windowsTimeZone: string;

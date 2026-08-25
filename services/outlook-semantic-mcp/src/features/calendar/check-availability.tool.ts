@@ -4,15 +4,11 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { DateRangeSchema } from '~/utils/relative-range';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { META } from './check-availability-tool.meta';
-import { SMTP_ADDRESS } from './utils/calendar-graph-path';
 import { BUSY_STATUSES } from './utils/decode-availability-view';
-
-function smtpAddress(description: string) {
-  return z.string().regex(SMTP_ADDRESS, 'Must be an SMTP address').describe(description);
-}
+import { GraphScheduleDateRangeSchema } from './utils/graph-schedule-date-range.schema';
+import { smtpAddress } from './utils/smtp-address.schema';
 
 export const CheckAvailabilityInputSchema = z.object({
   attendees: z
@@ -26,8 +22,8 @@ export const CheckAvailabilityInputSchema = z.object({
     .describe(
       'People to check. Maximum 20 addresses per call. Include the signed-in user when asking about their own availability.',
     ),
-  dateRange: DateRangeSchema.describe(
-    'Time window to check. Prefer rangeType relative with a documented range. Must be shorter than 62 days.',
+  dateRange: GraphScheduleDateRangeSchema.describe(
+    'Time window to check. Prefer rangeType relative with a documented range. Must be shorter than 62 days. thisYear, nextYear, lastYear, and next90Days are rejected.',
   ),
   mailbox: smtpAddress(
     'SMTP address of the mailbox whose calendar is used for the free/busy lookup. Omit to use the signed-in user. Use a delegated mailbox only when checking free/busy as that mailbox.',

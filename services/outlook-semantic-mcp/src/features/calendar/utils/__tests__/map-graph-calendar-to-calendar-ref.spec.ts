@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GraphCalendar } from '../calendar.schemas';
-import { classifyCalendar } from '../classify-calendar';
+import type { GraphCalendar } from '../../calendar.schemas';
+import { mapGraphCalendarToCalendarRef } from '../map-graph-calendar-to-calendar-ref';
 
 const CALLER = 'me@example.com';
 
@@ -13,9 +13,9 @@ function calendar(overrides: Partial<GraphCalendar> & { id: string }): GraphCale
   };
 }
 
-describe(classifyCalendar.name, () => {
+describe(mapGraphCalendarToCalendarRef.name, () => {
   it('marks the caller calendar as ownMailbox', () => {
-    const result = classifyCalendar({
+    const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-own',
         isDefaultCalendar: true,
@@ -34,7 +34,7 @@ describe(classifyCalendar.name, () => {
   });
 
   it('routes a shared owner-primary calendar to ownerMailbox', () => {
-    const result = classifyCalendar({
+    const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-primary',
         name: 'Banker',
@@ -54,7 +54,7 @@ describe(classifyCalendar.name, () => {
   });
 
   it('routes a shared custom calendar to ownMailbox', () => {
-    const result = classifyCalendar({
+    const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-custom',
         name: 'Projects',
@@ -74,7 +74,7 @@ describe(classifyCalendar.name, () => {
   });
 
   it('uses ownMailbox when Graph omits the owner', () => {
-    const result = classifyCalendar({
+    const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({ id: 'cal-unknown', isDefaultCalendar: true }),
       callerEmail: CALLER,
     });
@@ -87,7 +87,7 @@ describe(classifyCalendar.name, () => {
   });
 
   it('forces ownerMailbox when listing from the owner mailbox path', () => {
-    const result = classifyCalendar({
+    const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-owner',
         name: 'Calendar',

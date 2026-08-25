@@ -4,14 +4,10 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { DateRangeSchema } from '~/utils/relative-range';
 import { SuggestMeetingTimesQuery } from './suggest-meeting-times.query';
 import { META } from './suggest-meeting-times-tool.meta';
-import { SMTP_ADDRESS } from './utils/calendar-graph-path';
-
-function smtpAddress(description: string) {
-  return z.string().regex(SMTP_ADDRESS, 'Must be an SMTP address').describe(description);
-}
+import { SuggestMeetingDateRangeSchema } from './utils/graph-schedule-date-range.schema';
+import { smtpAddress } from './utils/smtp-address.schema';
 
 export const SuggestMeetingTimesInputSchema = z.object({
   attendees: z
@@ -25,7 +21,7 @@ export const SuggestMeetingTimesInputSchema = z.object({
     .describe(
       'People who must be free. Maximum 20. Omit to search only the organizer mailbox working hours.',
     ),
-  dateRange: DateRangeSchema.describe(
+  dateRange: SuggestMeetingDateRangeSchema.describe(
     'Future window in which to search for slots. Prefer rangeType relative (today, tomorrow, thisWeek, nextWeek, next7Days). Must be shorter than 62 days. Past-only ranges (yesterday, lastWeek, past30Days) are rejected; if the start is already past, suggestions begin from now.',
   ),
   durationMinutes: z

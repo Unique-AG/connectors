@@ -1,6 +1,6 @@
-import { CalendarRef, type GraphCalendar } from './calendar.schemas';
+import { CalendarRef, type GraphCalendar } from '../calendar.schemas';
 
-export function classifyCalendar(input: {
+export function mapGraphCalendarToCalendarRef(input: {
   calendar: GraphCalendar;
   callerEmail: string;
   accessPathOverride?: CalendarRef['accessPath'];

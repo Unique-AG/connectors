@@ -8,13 +8,13 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { CalendarRef, GraphCalendarCollectionSchema } from './calendar.schemas';
-import { classifyCalendar } from './classify-calendar';
 import {
   CalendarConsentRequiredError,
   isCalendarPermissionDeniedError,
 } from './utils/calendar-graph-errors';
 import { calendarGraphLimit } from './utils/calendar-graph-limit';
 import { calendarCollectionPath } from './utils/calendar-graph-path';
+import { mapGraphCalendarToCalendarRef } from './utils/map-graph-calendar-to-calendar-ref';
 
 const CALENDAR_SELECT =
   'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses';
@@ -157,7 +157,7 @@ export class ListCalendarsQuery {
         const parsed = GraphCalendarCollectionSchema.parse(raw);
         for (const item of parsed.value) {
           calendars.push(
-            classifyCalendar({
+            mapGraphCalendarToCalendarRef({
               calendar: item,
               callerEmail: input.callerEmail,
               accessPathOverride: input.accessPathOverride,

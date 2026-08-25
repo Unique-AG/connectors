@@ -1,8 +1,9 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
-import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import {
@@ -10,45 +11,32 @@ import {
   type ResolvedWindow,
   resolveQueryWindow,
 } from '~/utils/relative-range';
-import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
-import {
-  GraphGetScheduleResponseSchema,
-  type GraphScheduleInformation,
-  type GraphScheduleItem,
-} from './calendar.schemas';
+import { GraphGetScheduleResponseSchema, type GraphScheduleInformation } from './calendar.schemas';
 import {
   CalendarConsentRequiredError,
   isCalendarPermissionDeniedError,
   isGetScheduleTooManyEntriesError,
 } from './utils/calendar-graph-errors';
-import { getSchedulePath, isSmtpAddress } from './utils/calendar-graph-path';
+import { getSchedulePath } from './utils/calendar-graph-path';
 import { type AvailabilityBlock, decodeAvailabilityView } from './utils/decode-availability-view';
-import { toGraphDateTimeTimeZone } from './utils/to-graph-date-time-time-zone';
+import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
+import {
+  mapGraphScheduleItemToScheduleItem,
+  type ScheduleItem,
+} from './utils/map-graph-schedule-item-to-schedule-item';
+import {
+  mapGraphWorkingHoursToWorkingHours,
+  type WorkingHours,
+} from './utils/map-graph-working-hours-to-working-hours';
+import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
+import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
-const UTC = 'UTC';
 const MAX_SCHEDULES = 20;
-const MAX_WINDOW_DAYS = 62;
 const DEFAULT_INTERVAL_MINUTES = 30;
 const MAX_BUSY_BLOCKS_PER_PERSON = 100;
 const MAX_ITEMS_PER_PERSON = 100;
 const TOO_MANY_ENTRIES_MESSAGE =
   'This window has more than 1000 calendar entries in a slot. Narrow the date range and try again.';
-
-interface ScheduleItem {
-  status: string | null;
-  subject: string | null;
-  location: string | null;
-  isPrivate: boolean;
-  start: { dateTime: string; timeZone: string | null };
-  end: { dateTime: string; timeZone: string | null };
-}
-
-interface WorkingHours {
-  daysOfWeek: string[];
-  startTime: string | null;
-  endTime: string | null;
-  timeZone: string | null;
-}
 
 export interface PersonAvailability {
   email: string;
@@ -83,7 +71,7 @@ export class CheckAvailabilityQuery {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
+    private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
   ) {}
 
   @Span()
@@ -92,20 +80,12 @@ export class CheckAvailabilityQuery {
     input: CheckAvailabilityQueryInput,
   ): Promise<CheckAvailabilityQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const mailboxTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
-    const mappedIana =
-      mailboxTimeZone === undefined ? undefined : resolveIanaTimezone(mailboxTimeZone);
-    const ianaTimeZone = mappedIana ?? UTC;
-    const outlookTimeZone =
-      mailboxTimeZone !== undefined && mappedIana !== undefined ? mailboxTimeZone : UTC;
-    const notes: string[] = [];
-    if (mailboxTimeZone === undefined) {
-      notes.push('Mailbox timezone was unavailable; times are requested in UTC.');
-    } else if (mappedIana === undefined) {
-      notes.push(
-        `Mailbox timezone "${mailboxTimeZone}" could not be mapped to IANA; relative windows are resolved in UTC.`,
-      );
-    }
+    const {
+      ianaTimeZone,
+      outlookTimeZone,
+      notes: timezoneNotes,
+    } = await this.resolveMailboxTimezoneQuery.run(userProfileId);
+    const notes = [...timezoneNotes];
 
     const clock = input.now ?? Temporal.Now.zonedDateTimeISO(ianaTimeZone);
     const resolvedWindow = resolveQueryWindow({
@@ -115,37 +95,19 @@ export class CheckAvailabilityQuery {
       now: clock,
     });
     const schedules = uniqueSchedules(input.attendees);
-    if (schedules.length === 0) {
-      return {
-        success: false,
-        message: 'At least one attendee SMTP address is required.',
-        resolvedWindow,
-      };
-    }
-    if (schedules.length > MAX_SCHEDULES) {
-      return {
-        success: false,
-        message: `At most ${MAX_SCHEDULES} addresses can be checked at once. Narrow the attendee list.`,
-        resolvedWindow,
-      };
-    }
-    if (isWindowTooLong(resolvedWindow)) {
-      return {
-        success: false,
-        message: `Availability can only be checked for a window shorter than ${MAX_WINDOW_DAYS} days. Use a narrower relative range (today, thisWeek, next7Days) or a shorter absolute window.`,
-        availabilityNotes: notes.length > 0 ? notes : undefined,
-        resolvedWindow,
-      };
-    }
-
+    assert.ok(
+      schedules.length > 0 && schedules.length <= MAX_SCHEDULES,
+      'attendees must already be a non-empty list of at most 20 SMTP addresses',
+    );
+    assert.ok(
+      !isScheduleWindowTooLong(resolvedWindow.startDateTime, resolvedWindow.endDateTime),
+      'dateRange must already be shorter than 62 days',
+    );
     const mailbox = input.mailbox ?? userProfile.email;
-    if (!isSmtpAddress(mailbox)) {
-      return {
-        success: false,
-        message: 'mailbox must be an SMTP address.',
-        resolvedWindow,
-      };
-    }
+    assert.ok(
+      SmtpAddressSchema.safeParse(mailbox).success,
+      'mailbox must already be an SMTP address',
+    );
     const intervalMinutes = input.intervalMinutes ?? DEFAULT_INTERVAL_MINUTES;
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
@@ -155,12 +117,12 @@ export class CheckAvailabilityQuery {
         .header('Prefer', `outlook.timezone="${outlookTimeZone}"`)
         .post({
           schedules,
-          startTime: toGraphDateTimeTimeZone({
+          startTime: mapIsoToGraphDateTimeTimeZone({
             iso: resolvedWindow.startDateTime,
             ianaTimeZone,
             windowsTimeZone: outlookTimeZone,
           }),
-          endTime: toGraphDateTimeTimeZone({
+          endTime: mapIsoToGraphDateTimeTimeZone({
             iso: resolvedWindow.endDateTime,
             ianaTimeZone,
             windowsTimeZone: outlookTimeZone,
@@ -235,7 +197,7 @@ export class CheckAvailabilityQuery {
       start: input.viewStart,
       intervalMinutes: input.intervalMinutes,
     });
-    const items = (input.item.scheduleItems ?? []).map(toScheduleItem);
+    const items = (input.item.scheduleItems ?? []).map(mapGraphScheduleItemToScheduleItem);
     if (busyBlocks.length > MAX_BUSY_BLOCKS_PER_PERSON) {
       input.notes.push(
         `${email}: busy blocks truncated to ${MAX_BUSY_BLOCKS_PER_PERSON}. Narrow the date range.`,
@@ -250,7 +212,7 @@ export class CheckAvailabilityQuery {
       email,
       busyBlocks: busyBlocks.slice(0, MAX_BUSY_BLOCKS_PER_PERSON),
       items: items.slice(0, MAX_ITEMS_PER_PERSON),
-      workingHours: toWorkingHours(input.item),
+      workingHours: mapGraphWorkingHoursToWorkingHours(input.item.workingHours),
     };
   }
 }
@@ -261,7 +223,7 @@ function uniqueSchedules(attendees: string[]): string[] {
   for (const attendee of attendees) {
     const trimmed = attendee.trim();
     const key = trimmed.toLowerCase();
-    if (!isSmtpAddress(trimmed) || seen.has(key)) {
+    if (!SmtpAddressSchema.safeParse(trimmed).success || seen.has(key)) {
       continue;
     }
     seen.add(key);
@@ -270,47 +232,9 @@ function uniqueSchedules(attendees: string[]): string[] {
   return schedules;
 }
 
-function isWindowTooLong(window: ResolvedWindow): boolean {
-  const duration = Temporal.Instant.from(window.startDateTime).until(
-    Temporal.Instant.from(window.endDateTime),
-  );
-  return Temporal.Duration.compare(duration, { days: MAX_WINDOW_DAYS }) >= 0;
-}
-
 function isTooManyEntries(error: GraphScheduleInformation['error']): boolean {
   if (error === undefined || error === null) {
     return false;
   }
   return error.responseCode === '5006' || /too many calendar entries/i.test(error.message ?? '');
-}
-
-function toScheduleItem(item: GraphScheduleItem): ScheduleItem {
-  const isPrivate = item.isPrivate === true;
-  return {
-    status: item.status ?? null,
-    subject: isPrivate ? null : (item.subject ?? null),
-    location: isPrivate ? null : (item.location ?? null),
-    isPrivate,
-    start: {
-      dateTime: item.start?.dateTime ?? '',
-      timeZone: item.start?.timeZone ?? null,
-    },
-    end: {
-      dateTime: item.end?.dateTime ?? '',
-      timeZone: item.end?.timeZone ?? null,
-    },
-  };
-}
-
-function toWorkingHours(item: GraphScheduleInformation): WorkingHours | null {
-  const hours = item.workingHours;
-  if (hours === undefined || hours === null) {
-    return null;
-  }
-  return {
-    daysOfWeek: hours.daysOfWeek ?? [],
-    startTime: hours.startTime ?? null,
-    endTime: hours.endTime ?? null,
-    timeZone: hours.timeZone?.name ?? null,
-  };
 }

@@ -1,6 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, vi } from 'vitest';
+import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import type { CalendarRef } from '../calendar.schemas';
 import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
@@ -18,6 +19,23 @@ const EVENT_SELECT =
   'id,subject,body,start,end,location,attendees,organizer,onlineMeeting,onlineMeetingUrl,webLink,isCancelled,isAllDay,sensitivity,categories,type,seriesMasterId,recurrence,showAs';
 const PREFER =
   'outlook.timezone="W. Europe Standard Time", outlook.body-content-type="text", IdType="ImmutableId"';
+const DEFAULT_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'Europe/Zurich',
+  outlookTimeZone: 'W. Europe Standard Time',
+  notes: [],
+};
+const UNMAPPED_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'UTC',
+  outlookTimeZone: 'UTC',
+  notes: [
+    'Mailbox timezone "Not A Real Zone" could not be mapped to IANA; relative windows are resolved in UTC.',
+  ],
+};
+const MISSING_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'UTC',
+  outlookTimeZone: 'UTC',
+  notes: ['Mailbox timezone was unavailable; times are requested in UTC.'],
+};
 
 const OWN_CALENDAR: CalendarRef = {
   calendarId: 'cal-own',
@@ -84,7 +102,7 @@ function createQuery(opts: {
     consentRequired?: boolean;
     calendars?: CalendarRef[];
   };
-  timeZone?: string | null;
+  timezone?: ResolvedMailboxTimezone;
   get?: ReturnType<typeof vi.fn>;
   getByPath?: Record<string, unknown | Error>;
 }) {
@@ -133,11 +151,7 @@ function createQuery(opts: {
       ),
     } as never,
     {
-      run: vi
-        .fn()
-        .mockResolvedValue(
-          opts.timeZone === null ? undefined : (opts.timeZone ?? 'W. Europe Standard Time'),
-        ),
+      run: vi.fn().mockResolvedValue(opts.timezone ?? DEFAULT_TIMEZONE),
     } as never,
     { measureSearch } as never,
   );
@@ -239,7 +253,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
   it('notes when the mailbox timezone cannot be mapped to IANA', async () => {
     const { query, request } = createQuery({
-      timeZone: 'Not A Real Zone',
+      timezone: UNMAPPED_TIMEZONE,
       get: vi.fn().mockResolvedValue({ value: [] }),
     });
 
@@ -247,7 +261,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     expect(request.header).toHaveBeenCalledWith(
       'Prefer',
-      'outlook.timezone="Not A Real Zone", outlook.body-content-type="text", IdType="ImmutableId"',
+      'outlook.timezone="UTC", outlook.body-content-type="text", IdType="ImmutableId"',
     );
     expect(result.resolvedWindow?.timeZone).toBe('UTC');
     expect(result.searchNotes).toContain(
@@ -382,7 +396,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
   it('notes UTC fallback when mailbox timezone is missing', async () => {
     const { query, request } = createQuery({
-      timeZone: null,
+      timezone: MISSING_TIMEZONE,
       get: vi.fn().mockResolvedValue({ value: [] }),
     });
 

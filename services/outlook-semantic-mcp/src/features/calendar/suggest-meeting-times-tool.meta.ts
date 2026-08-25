@@ -1,5 +1,5 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
-import { CALENDAR_TOOL_FORMAT_INFORMATION } from './calendar-tool-format';
+import { CALENDAR_TOOL_FORMAT_INFORMATION } from './utils/calendar-tool-format';
 
 export const META = createMeta({
   icon: 'calendar',

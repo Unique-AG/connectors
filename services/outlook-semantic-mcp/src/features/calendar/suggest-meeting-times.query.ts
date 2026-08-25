@@ -1,8 +1,9 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
-import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import {
@@ -11,41 +12,27 @@ import {
   resolveQueryWindow,
   toGraphInstant,
 } from '~/utils/relative-range';
-import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
-import {
-  GraphFindMeetingTimesResponseSchema,
-  type GraphMeetingTimeSuggestion,
-} from './calendar.schemas';
+import { GraphFindMeetingTimesResponseSchema } from './calendar.schemas';
 import {
   CalendarConsentRequiredError,
   isCalendarPermissionDeniedError,
 } from './utils/calendar-graph-errors';
-import { findMeetingTimesPath, isSmtpAddress } from './utils/calendar-graph-path';
-import { toGraphDateTimeTimeZone } from './utils/to-graph-date-time-time-zone';
+import { findMeetingTimesPath } from './utils/calendar-graph-path';
+import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
+import {
+  type MeetingTimeSuggestion,
+  mapGraphMeetingTimeSuggestionToMeetingTimeSuggestion,
+} from './utils/map-graph-meeting-time-suggestion-to-meeting-time-suggestion';
+import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
+import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
-const UTC = 'UTC';
 const MAX_ATTENDEES = 20;
 const MAX_CANDIDATES = 20;
-const MAX_WINDOW_DAYS = 62;
 const DEFAULT_DURATION_MINUTES = 30;
 const DEFAULT_MAX_CANDIDATES = 5;
 const DEFAULT_MIN_ATTENDEE_PERCENTAGE = 50;
 
 export type ActivityDomain = 'work' | 'personal' | 'unrestricted';
-
-interface AttendeeAvailability {
-  email: string | null;
-  availability: string | null;
-}
-
-export interface MeetingTimeSuggestion {
-  start: { dateTime: string; timeZone: string | null };
-  end: { dateTime: string; timeZone: string | null };
-  confidence: number | null;
-  organizerAvailability: string | null;
-  suggestionReason: string | null;
-  attendeeAvailability: AttendeeAvailability[];
-}
 
 export interface SuggestMeetingTimesQueryInput {
   attendees?: string[];
@@ -78,7 +65,7 @@ export class SuggestMeetingTimesQuery {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
+    private readonly resolveMailboxTimezoneQuery: ResolveMailboxTimezoneQuery,
   ) {}
 
   @Span()
@@ -87,20 +74,12 @@ export class SuggestMeetingTimesQuery {
     input: SuggestMeetingTimesQueryInput,
   ): Promise<SuggestMeetingTimesQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const mailboxTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
-    const mappedIana =
-      mailboxTimeZone === undefined ? undefined : resolveIanaTimezone(mailboxTimeZone);
-    const ianaTimeZone = mappedIana ?? UTC;
-    const outlookTimeZone =
-      mailboxTimeZone !== undefined && mappedIana !== undefined ? mailboxTimeZone : UTC;
-    const notes: string[] = [];
-    if (mailboxTimeZone === undefined) {
-      notes.push('Mailbox timezone was unavailable; times are requested in UTC.');
-    } else if (mappedIana === undefined) {
-      notes.push(
-        `Mailbox timezone "${mailboxTimeZone}" could not be mapped to IANA; relative windows are resolved in UTC.`,
-      );
-    }
+    const {
+      ianaTimeZone,
+      outlookTimeZone,
+      notes: timezoneNotes,
+    } = await this.resolveMailboxTimezoneQuery.run(userProfileId);
+    const notes = [...timezoneNotes];
 
     const clock = input.now ?? Temporal.Now.zonedDateTimeISO(ianaTimeZone);
     const resolved = clampSuggestionWindow({
@@ -123,49 +102,30 @@ export class SuggestMeetingTimesQuery {
     }
     notes.push(...resolved.notes);
     const resolvedWindow = resolved.window;
-    if (isWindowTooLong(resolvedWindow)) {
-      return {
-        success: false,
-        message: `Meeting times can only be suggested for a window shorter than ${MAX_WINDOW_DAYS} days. Use today, thisWeek, nextWeek, or next7Days.`,
-        suggestionNotes: notes.length > 0 ? notes : undefined,
-        resolvedWindow,
-      };
-    }
+    assert.ok(
+      !isScheduleWindowTooLong(resolvedWindow.startDateTime, resolvedWindow.endDateTime),
+      'dateRange must already be shorter than 62 days',
+    );
     const attendees = uniqueAttendees(input.attendees ?? []);
-    if ((input.attendees?.length ?? 0) > 0 && attendees.length === 0) {
-      return {
-        success: false,
-        message: 'At least one valid attendee SMTP address is required.',
-        suggestionNotes: notes.length > 0 ? notes : undefined,
-        resolvedWindow,
-      };
-    }
-    if (attendees.length > MAX_ATTENDEES) {
-      return {
-        success: false,
-        message: `This tool accepts at most ${MAX_ATTENDEES} attendees. Narrow the list.`,
-        suggestionNotes: notes.length > 0 ? notes : undefined,
-        resolvedWindow,
-      };
-    }
+    assert.ok(
+      attendees.length <= MAX_ATTENDEES,
+      'attendees must already be at most 20 SMTP addresses',
+    );
     const mailbox = input.mailbox ?? userProfile.email;
-    if (!isSmtpAddress(mailbox)) {
-      return {
-        success: false,
-        message: 'mailbox must be an SMTP address.',
-        resolvedWindow,
-      };
-    }
+    assert.ok(
+      SmtpAddressSchema.safeParse(mailbox).success,
+      'mailbox must already be an SMTP address',
+    );
 
     const durationMinutes = input.durationMinutes ?? DEFAULT_DURATION_MINUTES;
     const maxCandidates = input.maxCandidates ?? DEFAULT_MAX_CANDIDATES;
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
-    const startTime = toGraphDateTimeTimeZone({
+    const startTime = mapIsoToGraphDateTimeTimeZone({
       iso: resolvedWindow.startDateTime,
       ianaTimeZone,
       windowsTimeZone: outlookTimeZone,
     });
-    const endTime = toGraphDateTimeTimeZone({
+    const endTime = mapIsoToGraphDateTimeTimeZone({
       iso: resolvedWindow.endDateTime,
       ianaTimeZone,
       windowsTimeZone: outlookTimeZone,
@@ -193,7 +153,7 @@ export class SuggestMeetingTimesQuery {
         });
       const parsed = GraphFindMeetingTimesResponseSchema.parse(raw);
       const suggestions = (parsed.meetingTimeSuggestions ?? [])
-        .map(toSuggestion)
+        .map(mapGraphMeetingTimeSuggestionToMeetingTimeSuggestion)
         .slice(0, MAX_CANDIDATES);
       const emptyReason = emptySuggestionsReason(parsed.emptySuggestionsReason);
       if (suggestions.length === 0 && emptyReason !== null) {
@@ -267,20 +227,13 @@ function clampSuggestionWindow(input: {
   };
 }
 
-function isWindowTooLong(window: ResolvedWindow): boolean {
-  const duration = Temporal.Instant.from(window.startDateTime).until(
-    Temporal.Instant.from(window.endDateTime),
-  );
-  return Temporal.Duration.compare(duration, { days: MAX_WINDOW_DAYS }) >= 0;
-}
-
 function uniqueAttendees(attendees: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const attendee of attendees) {
     const trimmed = attendee.trim();
     const key = trimmed.toLowerCase();
-    if (!isSmtpAddress(trimmed) || seen.has(key)) {
+    if (!SmtpAddressSchema.safeParse(trimmed).success || seen.has(key)) {
       continue;
     }
     seen.add(key);
@@ -306,24 +259,4 @@ function emptySuggestionsReason(value: string | undefined): string | null {
     return null;
   }
   return value;
-}
-
-function toSuggestion(item: GraphMeetingTimeSuggestion): MeetingTimeSuggestion {
-  return {
-    start: {
-      dateTime: item.meetingTimeSlot?.start?.dateTime ?? '',
-      timeZone: item.meetingTimeSlot?.start?.timeZone ?? null,
-    },
-    end: {
-      dateTime: item.meetingTimeSlot?.end?.dateTime ?? '',
-      timeZone: item.meetingTimeSlot?.end?.timeZone ?? null,
-    },
-    confidence: item.confidence ?? null,
-    organizerAvailability: item.organizerAvailability ?? null,
-    suggestionReason: item.suggestionReason ?? null,
-    attendeeAvailability: (item.attendeeAvailability ?? []).map((entry) => ({
-      email: entry.attendee?.emailAddress?.address ?? null,
-      availability: entry.availability ?? null,
-    })),
-  };
 }

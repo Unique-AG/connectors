@@ -1,6 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, vi } from 'vitest';
+import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CheckAvailabilityQuery } from '../check-availability.query';
 
@@ -11,6 +12,18 @@ const SCHEDULE_PATH = `/users/${OWN_EMAIL}/calendar/getSchedule`;
 const OWNER_PATH = '/users/banker@example.com/calendar/getSchedule';
 const PREFER = 'outlook.timezone="W. Europe Standard Time"';
 const NOW = Temporal.ZonedDateTime.from('2026-08-25T15:30:00+02:00[Europe/Zurich]');
+const DEFAULT_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'Europe/Zurich',
+  outlookTimeZone: 'W. Europe Standard Time',
+  notes: [],
+};
+const UNMAPPED_TIMEZONE: ResolvedMailboxTimezone = {
+  ianaTimeZone: 'UTC',
+  outlookTimeZone: 'UTC',
+  notes: [
+    'Mailbox timezone "Customized Time Zone" could not be mapped to IANA; relative windows are resolved in UTC.',
+  ],
+};
 
 function makeGraphError(statusCode: number, code: string, message = 'Access denied'): GraphError {
   const err = new GraphError(statusCode, message);
@@ -19,7 +32,11 @@ function makeGraphError(statusCode: number, code: string, message = 'Access deni
 }
 
 function createQuery(
-  opts: { post?: ReturnType<typeof vi.fn>; email?: string; timeZone?: string | null } = {},
+  opts: {
+    post?: ReturnType<typeof vi.fn>;
+    email?: string;
+    timezone?: ResolvedMailboxTimezone;
+  } = {},
 ) {
   const post = opts.post ?? vi.fn().mockResolvedValue({ value: [] });
   const request = {
@@ -37,11 +54,7 @@ function createQuery(
       }),
     } as never,
     {
-      run: vi
-        .fn()
-        .mockResolvedValue(
-          opts.timeZone === null ? undefined : (opts.timeZone ?? 'W. Europe Standard Time'),
-        ),
+      run: vi.fn().mockResolvedValue(opts.timezone ?? DEFAULT_TIMEZONE),
     } as never,
   );
   return { query, api, request, post };
@@ -180,20 +193,6 @@ describe(CheckAvailabilityQuery.name, () => {
     );
   });
 
-  it('rejects a window of 62 days or more before calling Graph', async () => {
-    const { query, post } = createQuery();
-
-    const result = await query.run(USER_PROFILE_ID, {
-      attendees: [ATTENDEE],
-      range: 'next90Days',
-      now: NOW,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/62 days/);
-    expect(post).not.toHaveBeenCalled();
-  });
-
   it('surfaces error 5006 as a narrow-the-range message', async () => {
     const { query } = createQuery({
       post: vi
@@ -248,7 +247,7 @@ describe(CheckAvailabilityQuery.name, () => {
   });
 
   it('sends UTC wall-clock times when the mailbox timezone cannot be mapped', async () => {
-    const { query, post } = createQuery({ timeZone: 'Customized Time Zone' });
+    const { query, post } = createQuery({ timezone: UNMAPPED_TIMEZONE });
 
     const result = await query.run(USER_PROFILE_ID, {
       attendees: [ATTENDEE],
@@ -299,35 +298,6 @@ describe(CheckAvailabilityQuery.name, () => {
       `${ATTENDEE}: busy blocks truncated to 100. Narrow the date range.`,
       `${ATTENDEE}: schedule items truncated to 100. Narrow the date range.`,
     ]);
-  });
-
-  it('rejects whitespace-only attendees without calling Graph', async () => {
-    const { query, post } = createQuery();
-
-    const result = await query.run(USER_PROFILE_ID, {
-      attendees: ['  '],
-      range: 'today',
-      now: NOW,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/at least one attendee/i);
-    expect(post).not.toHaveBeenCalled();
-  });
-
-  it('rejects a mailbox that is not an SMTP address', async () => {
-    const { query, post } = createQuery();
-
-    const result = await query.run(USER_PROFILE_ID, {
-      attendees: [ATTENDEE],
-      mailbox: 'evil/calendar?other',
-      range: 'today',
-      now: NOW,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/SMTP/i);
-    expect(post).not.toHaveBeenCalled();
   });
 
   it('surfaces a per-person 5006 as a narrow-the-range note', async () => {
