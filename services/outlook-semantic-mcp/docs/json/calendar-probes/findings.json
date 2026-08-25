@@ -1,0 +1,34 @@
+{
+  "probedAt": "2026-08-25",
+  "liveGraph": false,
+  "reason": "No live Microsoft Graph token was available in this environment. Findings below are from Microsoft Graph v1.0 documentation, not raw tenant responses. Re-run with a Calendars.ReadWrite.Shared token before treating $orderby or $search as supported.",
+  "items": [
+    {
+      "question": "$search on /events",
+      "status": "refuted-by-docs",
+      "conclusion": "Do not use. List events documents OData query parameters and explicitly forbids $filter on recurrence; $search is not documented on either /events or calendarView. Search, attendee and category matching stay in-process over calendarView.",
+      "source": "https://learn.microsoft.com/en-us/graph/api/user-list-events?view=graph-rest-1.0"
+    },
+    {
+      "question": "$orderby=start/dateTime on calendarView",
+      "status": "unconfirmed",
+      "conclusion": "Docs only say calendarView supports 'some of the OData query parameters'. Do not rely on $orderby. Sort occurrences in-process by start.dateTime. $top is documented: min 1, max 1000.",
+      "source": "https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview?view=graph-rest-1.0"
+    },
+    {
+      "question": "isDefaultCalendar on calendar resource",
+      "status": "confirmed-by-docs",
+      "conclusion": "v1.0 calendar resource includes isDefaultCalendar (boolean): true if this is the default calendar where new events are created. Use it to choose accessPath ownerMailbox vs ownMailbox.",
+      "source": "https://learn.microsoft.com/en-us/graph/api/resources/calendar?view=graph-rest-1.0"
+    },
+    {
+      "question": "getSchedule address cap",
+      "status": "confirmed-by-docs",
+      "conclusion": "Maximum 20 entities per getSchedule call (users, DLs, or resources). Time window must be less than 62 days. Error 5006 when a slot contains more than 1000 entries.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/graph/outlook-get-free-busy-schedule",
+        "https://learn.microsoft.com/en-us/graph/api/calendar-getschedule?view=graph-rest-1.0"
+      ]
+    }
+  ]
+}
