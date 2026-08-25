@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { RelativeRangeSchema } from '~/utils/relative-range';
+import { DateRangeSchema } from '~/utils/relative-range';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
 
@@ -34,45 +34,6 @@ const FiltersSchema = z.object({
       'Case-insensitive exact match against an Outlook category on the event. Omit rather than guess.',
     ),
 });
-
-const OFFSET_DATE_TIME = /(?:Z|[+-]\d{2}:\d{2})$/;
-
-function offsetDateTime(description: string) {
-  return z
-    .string()
-    .regex(OFFSET_DATE_TIME, 'Must include a timezone offset such as +02:00 or Z')
-    .describe(description);
-}
-
-const DateRangeSchema = z
-  .discriminatedUnion('rangeType', [
-    z.object({
-      rangeType: z
-        .literal('relative')
-        .describe(
-          'Choose relative for a named server-resolved window, or absolute for explicit offset-bearing timestamps. Prefer relative. This branch is the named window.',
-        ),
-      range: RelativeRangeSchema.describe(
-        'Named window such as today, thisWeek, or next7Days. Weeks start Monday.',
-      ),
-    }),
-    z.object({
-      rangeType: z
-        .literal('absolute')
-        .describe(
-          'Choose relative for a named server-resolved window, or absolute for explicit offset-bearing timestamps. Prefer relative. This branch is the explicit window. Graph does not apply Prefer: outlook.timezone to these values.',
-        ),
-      startDateTime: offsetDateTime(
-        'Inclusive start of the window, e.g. 2026-08-25T00:00:00+02:00. Offset is required; a naive timestamp is interpreted as UTC.',
-      ),
-      endDateTime: offsetDateTime(
-        'End of the window, e.g. 2026-08-26T00:00:00+02:00. Offset is required.',
-      ),
-    }),
-  ])
-  .describe(
-    "Choose 'relative' for a named server-resolved window or 'absolute' for explicit offset-bearing timestamps. Prefer relative.",
-  );
 
 export const SearchCalendarEventsInputSchema = FiltersSchema.extend({
   dateRange: DateRangeSchema.describe(

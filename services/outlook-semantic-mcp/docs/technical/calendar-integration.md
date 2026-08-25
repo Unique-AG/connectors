@@ -11,6 +11,7 @@ Read path is landed behind `CALENDAR_INTEGRATION`. Writes are not registered yet
 - Fan-out: `using limit = calendarGraphLimit(userId)` — 5 in-flight, refcounted per user. Concurrency, not a cap on calendars queried.
 - Search filters (attendee includes organizer, subject, category) run inside `fetchEvents`.
 - Metric: `osm_search_calendar_events_duration_seconds` with labels `dateWindow`, `hasAttendeeFilter`, `hasSubjectFilter`, `hasCategoryFilter`. Duration buckets match other `*_duration_seconds` histograms.
+- `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses; reject windows ≥ 62 days; decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
 
 ## Probes
 
@@ -18,8 +19,7 @@ Read path is landed behind `CALENDAR_INTEGRATION`. Writes are not registered yet
 
 ## Still to build
 
-1. `check_availability` — `getSchedule` (max 20 addresses, window &lt; 62 days)
-2. `suggest_meeting_times` — `findMeetingTimes`
-3. `respond_to_invite` with `context.elicit()` (not `/auth/authorize`)
-4. `create_event` / `update_event` / `cancel_event`
-5. Operator + technical docs wrap-up
+1. `suggest_meeting_times` — `findMeetingTimes`
+2. `respond_to_invite` with `context.elicit()` (not `/auth/authorize`)
+3. `create_event` / `update_event` / `cancel_event`
+4. Operator + technical docs wrap-up

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
+import {
+  CheckAvailabilityInputSchema,
+  CheckAvailabilityOutputSchema,
+} from '../check-availability.tool';
+import { META as CHECK_AVAILABILITY_META } from '../check-availability-tool.meta';
 import { ListCalendarsInputSchema, ListCalendarsOutputSchema } from '../list-calendars.tool';
 import { META as LIST_CALENDARS_META } from '../list-calendars-tool.meta';
 import {
@@ -31,6 +36,12 @@ const CALENDAR_TOOLS = [
     meta: SEARCH_CALENDAR_EVENTS_META,
     input: SearchCalendarEventsInputSchema,
     output: SearchCalendarEventsOutputSchema,
+  },
+  {
+    name: 'check_availability',
+    meta: CHECK_AVAILABILITY_META,
+    input: CheckAvailabilityInputSchema,
+    output: CheckAvailabilityOutputSchema,
   },
 ] as const;
 

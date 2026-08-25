@@ -9,6 +9,17 @@ export function calendarViewPath(input: { calendarId: string; mailboxEmail: stri
   return `/users/${input.mailboxEmail}/calendars/${input.calendarId}/calendarView`;
 }
 
+export const SMTP_ADDRESS = /^[^\s/?#@]+@[^\s/?#@]+$/;
+
+export function getSchedulePath(mailboxEmail: string): string {
+  assert.ok(isSmtpAddress(mailboxEmail), 'getSchedule mailbox must be an SMTP address');
+  return `/users/${mailboxEmail}/calendar/getSchedule`;
+}
+
+export function isSmtpAddress(value: string): boolean {
+  return SMTP_ADDRESS.test(value);
+}
+
 export function calendarMailbox(input: { calendar: CalendarRef; callerEmail: string }): string {
   if (input.calendar.accessPath === 'ownerMailbox') {
     assert.ok(input.calendar.ownerEmail, 'ownerMailbox calendars require ownerEmail');

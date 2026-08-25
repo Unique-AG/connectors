@@ -106,3 +106,39 @@ export const GraphEventCollectionSchema = z.object({
 });
 
 export type GraphEvent = z.infer<typeof GraphEventSchema>;
+
+const GraphScheduleItemSchema = z.object({
+  isPrivate: z.boolean().optional(),
+  status: z.string().optional(),
+  subject: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  start: GraphDateTimeTimeZoneSchema.optional(),
+  end: GraphDateTimeTimeZoneSchema.optional(),
+});
+
+const GraphWorkingHoursSchema = z.object({
+  daysOfWeek: z.array(z.string()).optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  timeZone: z.object({ name: z.string().optional() }).optional(),
+});
+
+const GraphScheduleInformationSchema = z.object({
+  scheduleId: z.string().optional(),
+  availabilityView: z.string().optional(),
+  scheduleItems: z.array(GraphScheduleItemSchema).optional(),
+  workingHours: GraphWorkingHoursSchema.nullish(),
+  error: z
+    .object({
+      message: z.string().optional(),
+      responseCode: z.string().optional(),
+    })
+    .nullish(),
+});
+
+export const GraphGetScheduleResponseSchema = z.object({
+  value: z.array(GraphScheduleInformationSchema).default([]),
+});
+
+export type GraphScheduleInformation = z.infer<typeof GraphScheduleInformationSchema>;
+export type GraphScheduleItem = z.infer<typeof GraphScheduleItemSchema>;

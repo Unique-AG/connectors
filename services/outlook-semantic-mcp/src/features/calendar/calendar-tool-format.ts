@@ -28,6 +28,14 @@ When listing meetings, use a markdown table with exactly 4 columns: Time, Subjec
 |------|---------|-----------|----------|
 | {start}–{end} | {subject} | {Name (accepted)} | {location} |
 
+### Format for availability
+When showing free/busy from \`check_availability\`, write one short section per person (\`email\`).
+- Summarise \`busyBlocks\` as Time + Status (Tentative / Busy / Out of office / Working elsewhere). Do not list free slots from the bitmap; free time is the complement inside \`workingHours\`.
+- When \`items\` have a subject or location, mention them next to the matching time. If \`isPrivate\` is true, label the item "Private" and do not invent a subject.
+- After the busy list, state working hours (\`daysOfWeek\`, start–end, timezone) when \`workingHours\` is present.
+- After every person, state \`resolvedWindow.interpretation\` when a relative range was used.
+- If \`availabilityNotes\` is present, display those notes after the sections.
+
 ### Identifier rules
 - NEVER show raw IDs (\`calendarId\`, \`eventId\`, \`accessPath\`, \`eventRef\`, \`seriesMasterId\`) to the user.
 `;

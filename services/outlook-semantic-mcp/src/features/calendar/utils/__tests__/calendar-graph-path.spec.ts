@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { CalendarRef } from '../../calendar.schemas';
-import { calendarCollectionPath, calendarMailbox, calendarViewPath } from '../calendar-graph-path';
+import {
+  calendarCollectionPath,
+  calendarMailbox,
+  calendarViewPath,
+  getSchedulePath,
+  isSmtpAddress,
+} from '../calendar-graph-path';
 
 const own: CalendarRef = {
   calendarId: 'cal-1',
@@ -44,5 +50,23 @@ describe(calendarViewPath.name, () => {
 describe(calendarCollectionPath.name, () => {
   it('lists calendars under /users/{email}/calendars', () => {
     expect(calendarCollectionPath('me@example.com')).toBe('/users/me@example.com/calendars');
+  });
+});
+
+describe(getSchedulePath.name, () => {
+  it('posts getSchedule on /users/{email}/calendar', () => {
+    expect(getSchedulePath('me@example.com')).toBe('/users/me@example.com/calendar/getSchedule');
+  });
+
+  it('rejects a mailbox that is not an SMTP address', () => {
+    expect(() => getSchedulePath('evil/calendar')).toThrow(/SMTP/i);
+  });
+});
+
+describe(isSmtpAddress.name, () => {
+  it('accepts a normal SMTP address and rejects path characters', () => {
+    expect(isSmtpAddress('me@example.com')).toBe(true);
+    expect(isSmtpAddress('evil/calendar')).toBe(false);
+    expect(isSmtpAddress('me@example.com/calendars')).toBe(false);
   });
 });

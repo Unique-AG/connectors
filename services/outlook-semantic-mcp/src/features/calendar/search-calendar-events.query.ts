@@ -1,4 +1,3 @@
-import assert from 'node:assert';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
@@ -13,8 +12,7 @@ import { nameSimilarity } from '~/utils/name-similarity-score';
 import {
   type RelativeRange,
   type ResolvedWindow,
-  resolveRange,
-  toGraphInstant,
+  resolveQueryWindow,
 } from '~/utils/relative-range';
 import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
 import {
@@ -156,7 +154,12 @@ export class SearchCalendarEventsQuery {
       callerEmail: userProfile.email,
     });
     const clock = input.now ?? Temporal.Now.zonedDateTimeISO(ianaTimeZone);
-    const resolvedWindow = this.resolveWindow({ query: input, ianaTimeZone, clock });
+    const resolvedWindow = resolveQueryWindow({
+      range: input.range,
+      startDateTime: input.startDateTime,
+      endDateTime: input.endDateTime,
+      now: clock,
+    });
     const prefixNotes = [...timezoneNotes, ...mailboxNotes];
     if (calendars.length === 0) {
       return {
@@ -209,30 +212,6 @@ export class SearchCalendarEventsQuery {
     return {
       calendars: matched,
       notes: matched.length === 0 ? [`No calendars matched mailbox ${input.mailbox}.`] : [],
-    };
-  }
-
-  private resolveWindow(args: {
-    query: SearchCalendarEventsQueryInput;
-    ianaTimeZone: string;
-    clock: Temporal.ZonedDateTime;
-  }): ResolvedWindow {
-    if (args.query.range !== undefined) {
-      return resolveRange({
-        range: args.query.range,
-        now: args.clock,
-      });
-    }
-    assert.ok(
-      args.query.startDateTime !== undefined && args.query.endDateTime !== undefined,
-      'range or an absolute startDateTime and endDateTime is required',
-    );
-    return {
-      startDateTime: args.query.startDateTime,
-      endDateTime: args.query.endDateTime,
-      timeZone: args.ianaTimeZone,
-      serverCurrentDateTime: toGraphInstant(args.clock),
-      interpretation: `absolute window ${args.query.startDateTime} to ${args.query.endDateTime} (timestamps passed through verbatim)`,
     };
   }
 

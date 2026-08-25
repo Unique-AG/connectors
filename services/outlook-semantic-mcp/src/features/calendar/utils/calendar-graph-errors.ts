@@ -12,3 +12,10 @@ export class CalendarConsentRequiredError extends Error {
 export function isCalendarPermissionDeniedError(error: unknown): boolean {
   return error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403);
 }
+
+export function isGetScheduleTooManyEntriesError(error: unknown): boolean {
+  if (!(error instanceof GraphError)) {
+    return false;
+  }
+  return error.code === '5006' || /too many calendar entries/i.test(error.message);
+}

@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Temporal } from 'temporal-polyfill';
 import type { RelativeRange } from './relative-range';
 
@@ -128,6 +129,31 @@ function boundsFor(
     case 'past30Days':
       return { start: now.subtract({ days: 30 }), end: now };
   }
+}
+
+export function resolveQueryWindow(input: {
+  range?: RelativeRange;
+  startDateTime?: string;
+  endDateTime?: string;
+  now: Temporal.ZonedDateTime;
+}): ResolvedWindow {
+  if (input.range !== undefined) {
+    return resolveRange({
+      range: input.range,
+      now: input.now,
+    });
+  }
+  assert.ok(
+    input.startDateTime !== undefined && input.endDateTime !== undefined,
+    'range or an absolute startDateTime and endDateTime is required',
+  );
+  return {
+    startDateTime: input.startDateTime,
+    endDateTime: input.endDateTime,
+    timeZone: input.now.timeZoneId,
+    serverCurrentDateTime: toGraphInstant(input.now),
+    interpretation: `absolute window ${input.startDateTime} to ${input.endDateTime} (timestamps passed through verbatim)`,
+  };
 }
 
 export function resolveRange(input: {

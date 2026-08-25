@@ -3,10 +3,11 @@ import { DelegatedAccessUtilsModule } from '~/features/delegated-access/delegate
 import { MetricsModule } from '~/features/metrics/metrics.module';
 import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
+import { CheckAvailabilityQuery } from './check-availability.query';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 
-const QUERIES = [ListCalendarsQuery, SearchCalendarEventsQuery];
+const QUERIES = [ListCalendarsQuery, SearchCalendarEventsQuery, CheckAvailabilityQuery];
 
 @Module({
   imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule, MetricsModule],

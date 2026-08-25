@@ -77,7 +77,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Read and write the signed-in user's calendars, including calendars shared with them and mailboxes they have Exchange Full Access to |
-| **Used For** | Calendar tools (`list_calendars`, `search_calendar_events`, and later writes). Live Graph query-through; no calendar ingest |
+| **Used For** | Calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, and later writes). Live Graph query-through; no calendar ingest |
 | **Why Not `Calendars.Read`** | Writes (create/update/respond/cancel) need write. `Calendars.ReadWrite` does not cover shared or delegated calendars |
 | **Note** | Requested at OAuth time only when `CALENDAR_INTEGRATION=enabled`. The Entra app registers the scope only when Terraform `calendar_integration = true`. Unlike `Mail.ReadWrite.Shared`, this is not on the mail-only consent screen |
 

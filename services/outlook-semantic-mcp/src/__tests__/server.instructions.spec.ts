@@ -16,11 +16,13 @@ describe(buildServerInstructions.name, () => {
     process.env.CALENDAR_INTEGRATION = 'disabled';
     expect(buildServerInstructions()).not.toContain('list_calendars');
     expect(buildServerInstructions()).not.toContain('search_calendar_events');
+    expect(buildServerInstructions()).not.toContain('check_availability');
   });
 
   it('includes calendar instructions when CALENDAR_INTEGRATION is enabled', () => {
     process.env.CALENDAR_INTEGRATION = 'enabled';
     expect(buildServerInstructions()).toContain('list_calendars');
     expect(buildServerInstructions()).toContain('search_calendar_events');
+    expect(buildServerInstructions()).toContain('check_availability');
   });
 });
