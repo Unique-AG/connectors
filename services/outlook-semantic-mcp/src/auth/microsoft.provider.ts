@@ -1,19 +1,30 @@
 import type * as http from 'node:http';
 import { type OAuthProviderConfig } from '@unique-ag/mcp-oauth';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
+import { isCalendarEnabled } from '~/utils/backend-config.utils';
 
-export const SCOPES = [
+export const MAIL_SCOPES = [
   'openid',
   'profile',
   'email',
   'offline_access',
-  'User.Read', // (delegated):
-  'User.Read.All', // (delegated):
-  'MailboxSettings.Read', // (delegated):
-  'Mail.ReadWrite', // (delegated):
-  'Mail.ReadWrite.Shared', // (delegated):
-  'People.Read', // (delegated):
+  'User.Read',
+  'User.Read.All',
+  'MailboxSettings.Read',
+  'Mail.ReadWrite',
+  'Mail.ReadWrite.Shared',
+  'People.Read',
 ];
+
+export const CALENDAR_SCOPES = ['Calendars.ReadWrite.Shared'];
+
+export function resolveMicrosoftScopes(calendarEnabled: boolean): string[] {
+  return calendarEnabled ? [...MAIL_SCOPES, ...CALENDAR_SCOPES] : [...MAIL_SCOPES];
+}
+
+export function getScopes(): string[] {
+  return resolveMicrosoftScopes(isCalendarEnabled());
+}
 
 interface OAuth2WithSetAgent {
   setAgent: (agent: http.Agent) => void;
@@ -24,7 +35,6 @@ export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderC
     public constructor(...args: ConstructorParameters<typeof MicrosoftStrategy>) {
       super(...args);
       if (agent) {
-        // _oauth2 is assigned in passport-oauth2 constructor; setAgent covers token + profile
         (this as unknown as { _oauth2: OAuth2WithSetAgent })._oauth2.setAgent(agent);
       }
     }
@@ -35,9 +45,9 @@ export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderC
     strategy: MicrosoftStrategyWithProxy,
     strategyOptions: ({ serverUrl, clientId, clientSecret, callbackPath }) => ({
       clientID: clientId,
-      clientSecret,
+      clientSecret: clientSecret,
       callbackURL: serverUrl + callbackPath,
-      scope: SCOPES,
+      scope: getScopes(),
     }),
     profileMapper: (profile) => ({
       id: profile.id,

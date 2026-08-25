@@ -13,7 +13,12 @@ vi.mock('passport-microsoft', () => {
   return { Strategy: MockMicrosoft };
 });
 
-import { createMicrosoftOAuthProvider } from '../microsoft.provider';
+import {
+  CALENDAR_SCOPES,
+  createMicrosoftOAuthProvider,
+  MAIL_SCOPES,
+  resolveMicrosoftScopes,
+} from '../microsoft.provider';
 
 describe('createMicrosoftOAuthProvider', () => {
   beforeEach(() => {
@@ -38,5 +43,20 @@ describe('createMicrosoftOAuthProvider', () => {
     new Strategy();
 
     expect(setAgentMock).not.toHaveBeenCalled();
+  });
+});
+
+describe(resolveMicrosoftScopes.name, () => {
+  it('produces a byte-identical mail-only scope string when calendar is disabled', () => {
+    const scopes = resolveMicrosoftScopes(false);
+    expect(scopes).toEqual(MAIL_SCOPES);
+    expect(scopes.join(' ')).toBe(MAIL_SCOPES.join(' '));
+    expect(scopes).not.toEqual(expect.arrayContaining(CALENDAR_SCOPES));
+  });
+
+  it('appends Calendars.ReadWrite.Shared when calendar is enabled', () => {
+    const scopes = resolveMicrosoftScopes(true);
+    expect(scopes).toEqual([...MAIL_SCOPES, ...CALENDAR_SCOPES]);
+    expect(scopes).toContain('Calendars.ReadWrite.Shared');
   });
 });

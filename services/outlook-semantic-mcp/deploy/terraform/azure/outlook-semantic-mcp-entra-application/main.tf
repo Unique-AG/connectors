@@ -6,15 +6,17 @@ resource "azuread_service_principal" "msgraph" {
 }
 
 locals {
-  # Microsoft Graph delegated scopes required by Outlook Semantic MCP
-  # Based on SCOPES in services/outlook-semantic-mcp/src/auth/microsoft.provider.ts
+  # Microsoft Graph delegated scopes registered on the Entra app.
+  # Runtime token requests still omit Calendars.ReadWrite.Shared unless
+  # CALENDAR_INTEGRATION=enabled (see getScopes in microsoft.provider.ts).
   graph_scopes = toset([
     "User.Read",
     "User.Read.All",
     "Mail.ReadWrite",
     "Mail.ReadWrite.Shared",
     "MailboxSettings.Read",
-    "People.Read"
+    "People.Read",
+    "Calendars.ReadWrite.Shared"
   ])
 }
 
