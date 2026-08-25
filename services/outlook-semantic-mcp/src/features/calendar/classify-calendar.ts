@@ -1,25 +1,26 @@
-import type { CalendarRef, GraphCalendar } from './calendar.schemas';
+import { CalendarRef, type GraphCalendar } from './calendar.schemas';
 
-export function classifyCalendar(
-  calendar: GraphCalendar,
-  callerEmail: string,
-  accessPathOverride?: CalendarRef['accessPath'],
-): CalendarRef {
-  const ownerEmail = calendar.owner?.address ?? null;
-  const isOwn = ownerEmail !== null && ownerEmail.toLowerCase() === callerEmail.toLowerCase();
-  const ownerPrimary = calendar.isDefaultCalendar === true || calendar.isTallyingResponses === true;
+export function classifyCalendar(input: {
+  calendar: GraphCalendar;
+  callerEmail: string;
+  accessPathOverride?: CalendarRef['accessPath'];
+}): CalendarRef {
+  const ownerEmail = input.calendar.owner?.address ?? null;
+  const isOwn = ownerEmail !== null && ownerEmail.toLowerCase() === input.callerEmail.toLowerCase();
+  const ownerPrimary =
+    input.calendar.isDefaultCalendar === true || input.calendar.isTallyingResponses === true;
   const accessPath: CalendarRef['accessPath'] =
-    accessPathOverride ??
+    input.accessPathOverride ??
     (!isOwn && ownerEmail !== null && ownerPrimary ? 'ownerMailbox' : 'ownMailbox');
 
   return {
-    calendarId: calendar.id,
-    name: calendar.name ?? '',
+    calendarId: input.calendar.id,
+    name: input.calendar.name ?? '',
     ownerEmail,
-    ownerName: calendar.owner?.name ?? null,
-    isOwn: accessPathOverride === 'ownerMailbox' ? false : isOwn,
-    canEdit: calendar.canEdit ?? false,
-    canViewPrivateItems: calendar.canViewPrivateItems ?? false,
+    ownerName: input.calendar.owner?.name ?? null,
+    isOwn: input.accessPathOverride === 'ownerMailbox' ? false : isOwn,
+    canEdit: input.calendar.canEdit ?? false,
+    canViewPrivateItems: input.calendar.canViewPrivateItems ?? false,
     accessPath,
   };
 }

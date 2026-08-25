@@ -21,7 +21,8 @@ When listing meetings, use a markdown table with exactly 4 columns: Time, Subjec
 - **Location**: \`location\` text, and if \`joinUrl\` is present append " · [Join](joinUrl)".
 - After the table, state \`resolvedWindow.interpretation\` when a relative range was used.
 - If \`searchNotes\` is present, display those notes after the table.
-- The \`body\` field is the full plain-text agenda — summarise it when the user asked what a meeting is about; do not call another tool for it.
+- When results come from more than one calendar, mention \`calendarName\` in the subject cell or in a short line after the table. Do not add a fifth column.
+- The \`body\` field is the plain-text agenda Graph already converted. It may be truncated (\`bodyTruncated\`); summarise what is present when the user asked what a meeting is about, and do not call another tool for it.
 
 | Time | Subject | Attendees | Location |
 |------|---------|-----------|----------|

@@ -15,15 +15,15 @@ function calendar(overrides: Partial<GraphCalendar> & { id: string }): GraphCale
 
 describe(classifyCalendar.name, () => {
   it('marks the caller calendar as ownMailbox', () => {
-    const result = classifyCalendar(
-      calendar({
+    const result = classifyCalendar({
+      calendar: calendar({
         id: 'cal-own',
         isDefaultCalendar: true,
         isTallyingResponses: true,
         owner: { address: 'ME@example.com', name: 'Me' },
       }),
-      CALLER,
-    );
+      callerEmail: CALLER,
+    });
 
     expect(result).toMatchObject({
       calendarId: 'cal-own',
@@ -34,8 +34,8 @@ describe(classifyCalendar.name, () => {
   });
 
   it('routes a shared owner-primary calendar to ownerMailbox', () => {
-    const result = classifyCalendar(
-      calendar({
+    const result = classifyCalendar({
+      calendar: calendar({
         id: 'cal-primary',
         name: 'Banker',
         isDefaultCalendar: false,
@@ -43,8 +43,8 @@ describe(classifyCalendar.name, () => {
         canShare: false,
         owner: { address: 'banker@example.com', name: 'Banker' },
       }),
-      CALLER,
-    );
+      callerEmail: CALLER,
+    });
 
     expect(result).toMatchObject({
       isOwn: false,
@@ -54,8 +54,8 @@ describe(classifyCalendar.name, () => {
   });
 
   it('routes a shared custom calendar to ownMailbox', () => {
-    const result = classifyCalendar(
-      calendar({
+    const result = classifyCalendar({
+      calendar: calendar({
         id: 'cal-custom',
         name: 'Projects',
         isDefaultCalendar: false,
@@ -63,8 +63,8 @@ describe(classifyCalendar.name, () => {
         canShare: false,
         owner: { address: 'banker@example.com', name: 'Banker' },
       }),
-      CALLER,
-    );
+      callerEmail: CALLER,
+    });
 
     expect(result).toMatchObject({
       isOwn: false,
@@ -74,10 +74,10 @@ describe(classifyCalendar.name, () => {
   });
 
   it('uses ownMailbox when Graph omits the owner', () => {
-    const result = classifyCalendar(
-      calendar({ id: 'cal-unknown', isDefaultCalendar: true }),
-      CALLER,
-    );
+    const result = classifyCalendar({
+      calendar: calendar({ id: 'cal-unknown', isDefaultCalendar: true }),
+      callerEmail: CALLER,
+    });
 
     expect(result).toMatchObject({
       isOwn: false,
@@ -87,16 +87,16 @@ describe(classifyCalendar.name, () => {
   });
 
   it('forces ownerMailbox when listing from the owner mailbox path', () => {
-    const result = classifyCalendar(
-      calendar({
+    const result = classifyCalendar({
+      calendar: calendar({
         id: 'cal-owner',
         name: 'Calendar',
         isDefaultCalendar: true,
         owner: { address: 'banker@example.com', name: 'Banker' },
       }),
-      CALLER,
-      'ownerMailbox',
-    );
+      callerEmail: CALLER,
+      accessPathOverride: 'ownerMailbox',
+    });
 
     expect(result).toMatchObject({
       isOwn: false,

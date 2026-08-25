@@ -1,52 +1,24 @@
 import * as z from 'zod';
 
-const AccessPathSchema = z
-  .enum(['ownMailbox', 'ownerMailbox'])
-  .describe('Internal Graph ID namespace. Never display this to the user.');
+export type CalendarAccessPath = 'ownMailbox' | 'ownerMailbox';
 
-export const CalendarRefSchema = z.object({
-  calendarId: z
-    .string()
-    .describe('Internal Microsoft Graph calendar ID. Never display to the user.'),
-  name: z.string().describe('Display name of the calendar as shown in Outlook.'),
-  ownerEmail: z
-    .string()
-    .nullable()
-    .describe('SMTP address of the calendar owner, or null if Graph omitted it.'),
-  ownerName: z
-    .string()
-    .nullable()
-    .describe('Display name of the calendar owner, or null if Graph omitted it.'),
-  isOwn: z
-    .boolean()
-    .describe(
-      'True when this calendar belongs to the signed-in user, false when it is shared or delegated.',
-    ),
-  canEdit: z
-    .boolean()
-    .describe('True when the signed-in user can create or modify events on this calendar.'),
-  canViewPrivateItems: z
-    .boolean()
-    .describe(
-      'True when the signed-in user can see details of events marked private. When false, private events are returned redacted.',
-    ),
-  accessPath: AccessPathSchema,
-});
+export interface CalendarRef {
+  calendarId: string;
+  name: string;
+  ownerEmail: string | null;
+  ownerName: string | null;
+  isOwn: boolean;
+  canEdit: boolean;
+  canViewPrivateItems: boolean;
+  accessPath: CalendarAccessPath;
+}
 
-export type CalendarRef = z.infer<typeof CalendarRefSchema>;
-
-export const EventRefSchema = z.object({
-  eventId: z.string().describe('Internal Microsoft Graph event ID. Never display to the user.'),
-  calendarId: z
-    .string()
-    .describe('Internal Microsoft Graph calendar ID. Never display to the user.'),
-  accessPath: AccessPathSchema,
-  mailbox: z
-    .string()
-    .describe(
-      'SMTP address of the mailbox whose ID namespace this event belongs to. Pass eventRef verbatim to other calendar tools; never reconstruct it.',
-    ),
-});
+export interface EventRef {
+  eventId: string;
+  calendarId: string;
+  accessPath: CalendarAccessPath;
+  mailbox: string;
+}
 
 const GraphEmailAddressSchema = z.object({
   address: z.string().optional(),
@@ -108,24 +80,24 @@ const GraphRecurrenceSchema = z.object({
 const GraphEventSchema = z.object({
   id: z.string(),
   subject: z.string().optional().nullable(),
-  body: GraphBodySchema.optional(),
-  start: GraphDateTimeTimeZoneSchema.optional(),
-  end: GraphDateTimeTimeZoneSchema.optional(),
-  location: GraphLocationSchema.optional(),
-  attendees: z.array(GraphAttendeeSchema).optional(),
-  organizer: z.object({ emailAddress: GraphEmailAddressSchema.optional() }).optional(),
-  isOnlineMeeting: z.boolean().optional(),
-  onlineMeeting: GraphOnlineMeetingSchema.optional(),
-  onlineMeetingUrl: z.string().optional().nullable(),
-  webLink: z.string().optional().nullable(),
-  isCancelled: z.boolean().optional(),
-  isAllDay: z.boolean().optional(),
-  sensitivity: z.string().optional(),
-  categories: z.array(z.string()).optional(),
-  type: z.string().optional(),
-  seriesMasterId: z.string().optional().nullable(),
-  recurrence: GraphRecurrenceSchema.optional().nullable(),
-  showAs: z.string().optional(),
+  body: GraphBodySchema.nullish(),
+  start: GraphDateTimeTimeZoneSchema.nullish(),
+  end: GraphDateTimeTimeZoneSchema.nullish(),
+  location: GraphLocationSchema.nullish(),
+  attendees: z.array(GraphAttendeeSchema).nullish(),
+  organizer: z.object({ emailAddress: GraphEmailAddressSchema.optional() }).nullish(),
+  isOnlineMeeting: z.boolean().nullish(),
+  onlineMeeting: GraphOnlineMeetingSchema.nullish(),
+  onlineMeetingUrl: z.string().nullish(),
+  webLink: z.string().nullish(),
+  isCancelled: z.boolean().nullish(),
+  isAllDay: z.boolean().nullish(),
+  sensitivity: z.string().nullish(),
+  categories: z.array(z.string()).nullish(),
+  type: z.string().nullish(),
+  seriesMasterId: z.string().nullish(),
+  recurrence: GraphRecurrenceSchema.nullish(),
+  showAs: z.string().nullish(),
 });
 
 export const GraphEventCollectionSchema = z.object({

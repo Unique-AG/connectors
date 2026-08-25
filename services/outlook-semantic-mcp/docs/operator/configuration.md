@@ -534,11 +534,13 @@ When set to `enabled`, exposes four additional debug tools to all connected MCP 
 
 #### CALENDAR_INTEGRATION
 
-Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars` today) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string.
+Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string.
 
-Existing connected users must reconnect Outlook after this is turned on, unless an Entra admin has already granted the extra scope tenant-wide. Without that, token refresh can fail with `invalid_grant` and mail tools stop working.
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers (and admin-consents) `Calendars.ReadWrite.Shared` when `calendar_integration = true`. Enable that apply and tenant admin consent **before** flipping the Helm/env flag. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`; enabling the flag without the Entra permission causes token refresh to fail with `invalid_grant` and mail tools stop working.
 
-Calendars of mailboxes the user has Exchange Full Access to are listed when delegated-access scanning has discovered those owners. Calendar-only shares always come from Graph `/me/calendars`.
+Existing connected users must reconnect Outlook after the flag is turned on, unless an Entra admin has already granted the extra scope tenant-wide.
+
+Calendars of mailboxes the user has Exchange Full Access to are listed when delegated-access scanning has discovered those owners. Calendar-only shares come from Graph `GET /users/{caller}/calendars` (equivalent to `/me/calendars` for the signed-in user). Shared-mailbox **profiles** never call calendar tools — those profiles are ingestion-only; a logged-in oauth user queries a shared mailbox calendar via `/users/{owner}/calendars` after Full Access discovery.
 
 #### DELEGATED_ACCESS_SCAN
 

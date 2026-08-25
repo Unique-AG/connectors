@@ -1,16 +1,13 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  AllDelegatesFailedError,
-  NoDelegatesFoundError,
-} from '~/msgraph/ms-graph-client-resolver.service';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { ListCalendarsQuery } from '../list-calendars.query';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
-const SHARED_EMAIL = 'shared@example.com';
 const OWNER_EMAIL = 'banker@example.com';
+const OWN_PATH = `/users/${OWN_EMAIL}/calendars`;
+const OWNER_PATH = `/users/${OWNER_EMAIL}/calendars`;
 const CALENDAR_SELECT =
   'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses';
 
@@ -21,11 +18,9 @@ function makeGraphError(statusCode: number, code: string): GraphError {
 }
 
 function createQuery(opts: {
-  source?: 'oauth' | 'shared-mailbox';
   email?: string;
   get?: ReturnType<typeof vi.fn>;
   responsesByPath?: Record<string, unknown | Error>;
-  resolverRun?: ReturnType<typeof vi.fn>;
   fullAccessOwners?: string[];
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
@@ -49,34 +44,27 @@ function createQuery(opts: {
             get: pathGet,
           };
         });
-  const resolverRun =
-    opts.resolverRun ??
-    vi
-      .fn()
-      .mockImplementation(async ({ fn }) =>
-        fn({ client: { api }, clientUserProfileId: 'client-1' }),
-      );
   const getFullDelegatedAccess = vi
     .fn()
     .mockResolvedValue((opts.fullAccessOwners ?? []).map((ownerUserEmail) => ({ ownerUserEmail })));
 
   const query = new ListCalendarsQuery(
-    { run: resolverRun } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: opts.email ?? OWN_EMAIL,
-        source: opts.source ?? 'oauth',
+        source: 'oauth',
       }),
     } as never,
     { run: getFullDelegatedAccess } as never,
   );
 
-  return { query, api, request, resolverRun, getFullDelegatedAccess };
+  return { query, api, request, getFullDelegatedAccess };
 }
 
 describe(ListCalendarsQuery.name, () => {
-  it('GETs /me/calendars and classifies own, delegated-primary, and shared-custom calendars', async () => {
+  it('GETs /users/{email}/calendars and classifies own, delegated-primary, and shared-custom calendars', async () => {
     const { query, api, request, getFullDelegatedAccess } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
@@ -113,7 +101,7 @@ describe(ListCalendarsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID);
 
-    expect(api).toHaveBeenCalledWith('/me/calendars');
+    expect(api).toHaveBeenCalledWith(OWN_PATH);
     expect(request.select).toHaveBeenCalledWith(CALENDAR_SELECT);
     expect(getFullDelegatedAccess).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
     expect(result.success).toBe(true);
@@ -138,7 +126,7 @@ describe(ListCalendarsQuery.name, () => {
     const { query, api } = createQuery({
       fullAccessOwners: [OWNER_EMAIL],
       responsesByPath: {
-        '/me/calendars': {
+        [OWN_PATH]: {
           value: [
             {
               id: 'cal-own',
@@ -152,7 +140,7 @@ describe(ListCalendarsQuery.name, () => {
             },
           ],
         },
-        [`/users/${OWNER_EMAIL}/calendars`]: {
+        [OWNER_PATH]: {
           value: [
             {
               id: 'cal-owner-primary',
@@ -168,8 +156,8 @@ describe(ListCalendarsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID);
 
-    expect(api).toHaveBeenCalledWith('/me/calendars');
-    expect(api).toHaveBeenCalledWith(`/users/${OWNER_EMAIL}/calendars`);
+    expect(api).toHaveBeenCalledWith(OWN_PATH);
+    expect(api).toHaveBeenCalledWith(OWNER_PATH);
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
       expect.objectContaining({ calendarId: 'cal-own', isOwn: true, accessPath: 'ownMailbox' }),
@@ -185,11 +173,11 @@ describe(ListCalendarsQuery.name, () => {
     );
   });
 
-  it('keeps /me calendars when a Full Access mailbox returns 403', async () => {
+  it('keeps caller calendars when a Full Access mailbox returns 403', async () => {
     const { query } = createQuery({
       fullAccessOwners: [OWNER_EMAIL],
       responsesByPath: {
-        '/me/calendars': {
+        [OWN_PATH]: {
           value: [
             {
               id: 'cal-local-copy',
@@ -198,7 +186,7 @@ describe(ListCalendarsQuery.name, () => {
             },
           ],
         },
-        [`/users/${OWNER_EMAIL}/calendars`]: makeGraphError(403, 'ErrorAccessDenied'),
+        [OWNER_PATH]: makeGraphError(403, 'ErrorAccessDenied'),
       },
     });
 
@@ -211,38 +199,7 @@ describe(ListCalendarsQuery.name, () => {
     ]);
   });
 
-  it('GETs /users/{email}/calendars for a shared-mailbox profile', async () => {
-    const { query, api, resolverRun, getFullDelegatedAccess } = createQuery({
-      source: 'shared-mailbox',
-      email: SHARED_EMAIL,
-      get: vi.fn().mockResolvedValue({
-        value: [
-          {
-            id: 'cal-shared',
-            name: 'Support',
-            isDefaultCalendar: true,
-            owner: { address: SHARED_EMAIL, name: 'Support' },
-          },
-        ],
-      }),
-    });
-
-    const result = await query.run(USER_PROFILE_ID);
-
-    expect(resolverRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sharedMailboxConfig: { throwIfNoDelegates: true },
-      }),
-    );
-    expect(api).toHaveBeenCalledWith(`/users/${SHARED_EMAIL}/calendars`);
-    expect(getFullDelegatedAccess).not.toHaveBeenCalled();
-    expect(result.success).toBe(true);
-    expect(result.calendars).toEqual([
-      expect.objectContaining({ calendarId: 'cal-shared', isOwn: true, accessPath: 'ownMailbox' }),
-    ]);
-  });
-
-  it('returns consentRequired when Graph denies calendar scopes on /me/calendars', async () => {
+  it('returns consentRequired when Graph denies calendar scopes on the caller mailbox', async () => {
     const { query } = createQuery({
       get: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
     });
@@ -256,41 +213,12 @@ describe(ListCalendarsQuery.name, () => {
     });
   });
 
-  it('does not leak internal user-profile IDs when no delegates exist', async () => {
-    const { query } = createQuery({
-      source: 'shared-mailbox',
-      email: SHARED_EMAIL,
-      resolverRun: vi.fn().mockRejectedValue(new NoDelegatesFoundError(USER_PROFILE_ID.toString())),
-    });
-
-    const result = await query.run(USER_PROFILE_ID);
-
-    expect(result.success).toBe(false);
-    expect(result.message).not.toContain(USER_PROFILE_ID.toString());
-    expect(result.message).toContain('shared mailbox');
-  });
-
-  it('does not leak internal user-profile IDs when all delegates fail', async () => {
-    const { query } = createQuery({
-      source: 'shared-mailbox',
-      email: SHARED_EMAIL,
-      resolverRun: vi
-        .fn()
-        .mockRejectedValue(new AllDelegatesFailedError(USER_PROFILE_ID.toString())),
-    });
-
-    const result = await query.run(USER_PROFILE_ID);
-
-    expect(result.success).toBe(false);
-    expect(result.message).not.toContain(USER_PROFILE_ID.toString());
-  });
-
   it('pages through @odata.nextLink', async () => {
     const get = vi
       .fn()
       .mockResolvedValueOnce({
         value: [{ id: 'cal-1', owner: { address: OWN_EMAIL } }],
-        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc',
+        '@odata.nextLink': `https://graph.microsoft.com/v1.0/users/${OWN_EMAIL}/calendars?$skiptoken=abc`,
       })
       .mockResolvedValueOnce({
         value: [{ id: 'cal-2', owner: { address: OWN_EMAIL } }],
@@ -299,10 +227,10 @@ describe(ListCalendarsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID);
 
-    expect(api).toHaveBeenNthCalledWith(1, '/me/calendars');
+    expect(api).toHaveBeenNthCalledWith(1, OWN_PATH);
     expect(api).toHaveBeenNthCalledWith(
       2,
-      'https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc',
+      `https://graph.microsoft.com/v1.0/users/${OWN_EMAIL}/calendars?$skiptoken=abc`,
     );
     expect(result.success).toBe(true);
     expect(result.calendars?.map((calendar) => calendar.calendarId)).toEqual(['cal-1', 'cal-2']);

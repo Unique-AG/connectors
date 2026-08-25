@@ -1,4 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
+import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import type { CalendarRef } from '../calendar.schemas';
@@ -7,12 +8,14 @@ import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
 const OWNER_EMAIL = 'banker@example.com';
+const OWN_VIEW = `/users/${OWN_EMAIL}/calendars/cal-own/calendarView`;
+const OWNER_VIEW = `/users/${OWNER_EMAIL}/calendars/cal-banker/calendarView`;
 const WINDOW = {
   startDateTime: '2026-08-25T00:00:00+02:00',
   endDateTime: '2026-08-26T00:00:00+02:00',
 };
 const EVENT_SELECT =
-  'id,subject,body,start,end,location,attendees,organizer,isOnlineMeeting,onlineMeeting,onlineMeetingUrl,webLink,isCancelled,isAllDay,sensitivity,categories,type,seriesMasterId,recurrence,showAs';
+  'id,subject,body,start,end,location,attendees,organizer,onlineMeeting,onlineMeetingUrl,webLink,isCancelled,isAllDay,sensitivity,categories,type,seriesMasterId,recurrence,showAs';
 const PREFER =
   'outlook.timezone="W. Europe Standard Time", outlook.body-content-type="text", IdType="ImmutableId"';
 
@@ -86,6 +89,7 @@ function createQuery(opts: {
   getByPath?: Record<string, unknown | Error>;
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
+  const measureSearch = vi.fn((_filters: unknown, fn: () => Promise<unknown>) => fn());
   const request = {
     header: vi.fn().mockReturnThis(),
     query: vi.fn().mockReturnThis(),
@@ -111,13 +115,7 @@ function createQuery(opts: {
           };
         });
   const query = new SearchCalendarEventsQuery(
-    {
-      run: vi
-        .fn()
-        .mockImplementation(async ({ fn }) =>
-          fn({ client: { api }, clientUserProfileId: 'client-1' }),
-        ),
-    } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
@@ -141,9 +139,10 @@ function createQuery(opts: {
           opts.timeZone === null ? undefined : (opts.timeZone ?? 'W. Europe Standard Time'),
         ),
     } as never,
+    { measureSearch } as never,
   );
 
-  return { query, api, request };
+  return { query, api, request, measureSearch };
 }
 
 describe(SearchCalendarEventsQuery.name, () => {
@@ -154,7 +153,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID, WINDOW);
 
-    expect(api).toHaveBeenCalledWith('/me/calendars/cal-own/calendarView');
+    expect(api).toHaveBeenCalledWith(OWN_VIEW);
     expect(request.header).toHaveBeenCalledWith('Prefer', PREFER);
     expect(request.query).toHaveBeenCalledWith(WINDOW);
     expect(request.select).toHaveBeenCalledWith(EVENT_SELECT);
@@ -183,15 +182,152 @@ describe(SearchCalendarEventsQuery.name, () => {
     ]);
   });
 
+  it('matches attendee against the organizer when Graph omitted them from attendees', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          graphEvent({
+            id: 'keep',
+            attendees: [],
+            organizer: { emailAddress: { name: 'Jordan Lee', address: 'jordan@example.com' } },
+          }),
+          graphEvent({
+            id: 'drop',
+            attendees: [],
+            organizer: { emailAddress: { name: 'Pat', address: 'pat@example.com' } },
+          }),
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, attendee: 'jordan' });
+
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
+  });
+
+  it('filters by category', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          graphEvent({ id: 'keep', categories: ['Client'] }),
+          graphEvent({ id: 'drop', categories: ['Work'] }),
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, category: 'client' });
+
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
+  });
+
+  it('notes private events on calendars that cannot show private details', async () => {
+    const { query } = createQuery({
+      calendars: [DELEGATED_CALENDAR],
+      get: vi.fn().mockResolvedValue({
+        value: [graphEvent({ id: 'secret', sensitivity: 'private', subject: null })],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(result.events?.[0]?.isPrivate).toBe(true);
+    expect(result.events?.[0]?.sensitivity).toBe('private');
+    expect(result.searchNotes).toContain(
+      'Some events are marked private; details may be redacted.',
+    );
+  });
+
+  it('notes when the mailbox timezone cannot be mapped to IANA', async () => {
+    const { query, request } = createQuery({
+      timeZone: 'Not A Real Zone',
+      get: vi.fn().mockResolvedValue({ value: [] }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(request.header).toHaveBeenCalledWith(
+      'Prefer',
+      'outlook.timezone="Not A Real Zone", outlook.body-content-type="text", IdType="ImmutableId"',
+    );
+    expect(result.resolvedWindow?.timeZone).toBe('UTC');
+    expect(result.searchNotes).toContain(
+      'Mailbox timezone "Not A Real Zone" could not be mapped to IANA; relative windows are resolved in UTC.',
+    );
+  });
+
+  it('follows calendarView nextLink and truncates to 100 events', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => graphEvent({ id: `p1-${index}` }));
+    const overflow = graphEvent({
+      id: 'overflow',
+      start: { dateTime: '2026-08-25T10:00:00.0000000' },
+    });
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({
+        value: firstPage,
+        '@odata.nextLink':
+          'https://graph.microsoft.com/v1.0/users/me/calendars/cal-own/calendarView?$skiptoken=1',
+      })
+      .mockResolvedValueOnce({ value: [overflow] });
+    const { query } = createQuery({ get });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(result.events).toHaveLength(100);
+    expect(result.searchNotes).toContain('Results truncated to 100 events.');
+  });
+
+  it('accepts Graph events whose optional objects are null', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          graphEvent({
+            id: 'sparse',
+            body: null,
+            location: null,
+            attendees: null,
+            organizer: null,
+            onlineMeeting: null,
+            categories: null,
+            recurrence: null,
+          }),
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(result.success).toBe(true);
+    expect(result.events?.[0]?.eventRef.eventId).toBe('sparse');
+    expect(result.events?.[0]?.body).toBe('');
+    expect(result.events?.[0]?.location).toBeNull();
+  });
+
+  it('records in-memory filter flags on the search metric', async () => {
+    const { query, measureSearch } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [] }),
+    });
+
+    await query.run(USER_PROFILE_ID, { ...WINDOW, attendee: 'alex', subject: 'Standup' });
+
+    expect(measureSearch).toHaveBeenCalledWith(
+      {
+        dateWindow: '<1week',
+        hasAttendeeFilter: true,
+        hasSubjectFilter: true,
+        hasCategoryFilter: false,
+      },
+      expect.any(Function),
+    );
+  });
+
   it('keeps other calendars and records a note when one calendarView returns 403', async () => {
     const { query } = createQuery({
       calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
       getByPath: {
-        '/me/calendars/cal-own/calendarView': { value: [graphEvent()] },
-        [`/users/${OWNER_EMAIL}/calendars/cal-banker/calendarView`]: makeGraphError(
-          403,
-          'ErrorAccessDenied',
-        ),
+        [OWN_VIEW]: { value: [graphEvent()] },
+        [OWNER_VIEW]: makeGraphError(403, 'ErrorAccessDenied'),
       },
     });
 
@@ -266,7 +402,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     const { query, api } = createQuery({
       calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
       getByPath: {
-        [`/users/${OWNER_EMAIL}/calendars/cal-banker/calendarView`]: {
+        [OWNER_VIEW]: {
           value: [graphEvent({ id: 'banker-evt' })],
         },
       },
@@ -274,8 +410,8 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID, { ...WINDOW, mailbox: OWNER_EMAIL });
 
-    expect(api).toHaveBeenCalledWith(`/users/${OWNER_EMAIL}/calendars/cal-banker/calendarView`);
-    expect(api).not.toHaveBeenCalledWith('/me/calendars/cal-own/calendarView');
+    expect(api).toHaveBeenCalledWith(OWNER_VIEW);
+    expect(api).not.toHaveBeenCalledWith(OWN_VIEW);
     expect(result.events?.[0]?.eventRef).toEqual({
       eventId: 'banker-evt',
       calendarId: 'cal-banker',
@@ -315,7 +451,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     });
     const now = Temporal.ZonedDateTime.from('2026-08-25T15:30:00[Europe/Zurich]');
 
-    const result = await query.run(USER_PROFILE_ID, { range: 'today' }, now);
+    const result = await query.run(USER_PROFILE_ID, { range: 'today', now });
 
     expect(request.query).toHaveBeenCalledWith({
       startDateTime: '2026-08-25T00:00:00.000+02:00',

@@ -310,8 +310,8 @@ mcpConfig:
     mcpBackend: microsoft_graph_and_unique_api
     # -- Outlook calendar tools and Calendars.ReadWrite.Shared scope. Set to "enabled"
     #    to register calendar tools and request the extra Graph scope on OAuth / token refresh.
-    #    Existing users must reconnect unless Entra admin consent already covers that scope;
-    #    otherwise mail token refresh fails with invalid_grant.
+    #    Also set calendar_integration=true on the Entra Terraform module (admin consent)
+    #    before flipping this flag; otherwise mail token refresh fails with invalid_grant.
     #    Env var: CALENDAR_INTEGRATION
     calendarIntegration: disabled
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.

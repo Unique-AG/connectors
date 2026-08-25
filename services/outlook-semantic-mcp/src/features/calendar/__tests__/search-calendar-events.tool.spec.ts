@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { SearchCalendarEventsQueryOutputSchema } from '../search-calendar-events.query';
-import { SearchCalendarEventsTool } from '../search-calendar-events.tool';
+import {
+  SearchCalendarEventsOutputSchema,
+  SearchCalendarEventsTool,
+} from '../search-calendar-events.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 
@@ -23,7 +25,10 @@ describe(SearchCalendarEventsTool.name, () => {
     const tool = new SearchCalendarEventsTool({ run } as never);
 
     const result = await tool.searchCalendarEvents(
-      { rangeType: 'relative', range: 'today', mailbox: 'me@example.com' },
+      {
+        mailbox: 'me@example.com',
+        dateRange: { rangeType: 'relative', range: 'today' },
+      },
       {} as never,
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
     );
@@ -35,7 +40,7 @@ describe(SearchCalendarEventsTool.name, () => {
       category: undefined,
       range: 'today',
     });
-    expect(SearchCalendarEventsQueryOutputSchema.parse(result)).toEqual(output);
+    expect(SearchCalendarEventsOutputSchema.parse(result)).toEqual(output);
   });
 
   it('passes an absolute window through to the query', async () => {
@@ -48,9 +53,11 @@ describe(SearchCalendarEventsTool.name, () => {
 
     await tool.searchCalendarEvents(
       {
-        rangeType: 'absolute',
-        startDateTime: '2026-08-25T00:00:00+02:00',
-        endDateTime: '2026-08-26T00:00:00+02:00',
+        dateRange: {
+          rangeType: 'absolute',
+          startDateTime: '2026-08-25T00:00:00+02:00',
+          endDateTime: '2026-08-26T00:00:00+02:00',
+        },
       },
       {} as never,
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
@@ -64,5 +71,51 @@ describe(SearchCalendarEventsTool.name, () => {
       startDateTime: '2026-08-25T00:00:00+02:00',
       endDateTime: '2026-08-26T00:00:00+02:00',
     });
+  });
+
+  it('rejects a relative search without range', async () => {
+    const tool = new SearchCalendarEventsTool({ run: vi.fn() } as never);
+
+    await expect(
+      tool.searchCalendarEvents(
+        { dateRange: { rangeType: 'relative' } } as never,
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/range/i);
+  });
+
+  it('rejects an absolute search without a window', async () => {
+    const run = vi.fn();
+    const tool = new SearchCalendarEventsTool({ run } as never);
+
+    await expect(
+      tool.searchCalendarEvents(
+        { dateRange: { rangeType: 'absolute' } } as never,
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/startDateTime|endDateTime/i);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('rejects an absolute window without a timezone offset', async () => {
+    const run = vi.fn();
+    const tool = new SearchCalendarEventsTool({ run } as never);
+
+    await expect(
+      tool.searchCalendarEvents(
+        {
+          dateRange: {
+            rangeType: 'absolute',
+            startDateTime: '2026-08-25T00:00:00',
+            endDateTime: '2026-08-26T00:00:00+02:00',
+          },
+        },
+        {} as never,
+        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      ),
+    ).rejects.toThrow(/offset/i);
+    expect(run).not.toHaveBeenCalled();
   });
 });

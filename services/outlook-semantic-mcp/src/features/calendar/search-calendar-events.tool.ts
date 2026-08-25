@@ -4,11 +4,8 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { RelativeRangeSchema } from './relative-range.schema';
-import {
-  SearchCalendarEventsQuery,
-  SearchCalendarEventsQueryOutputSchema,
-} from './search-calendar-events.query';
+import { RelativeRangeSchema } from '~/utils/relative-range';
+import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
 
 const FiltersSchema = z.object({
@@ -22,13 +19,13 @@ const FiltersSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Case-insensitive substring matched against attendee name or email after Graph returns the window. Omit rather than guess.',
+      'Matched against organizer or attendee email (substring) or name (substring or the same name-similarity used for contacts). Applied after Graph returns the window. Omit rather than guess.',
     ),
   subject: z
     .string()
     .optional()
     .describe(
-      'Case-insensitive substring matched against the event subject after Graph returns the window. Omit rather than guess.',
+      'Matched against the event subject with a substring or the same name-similarity used for contacts. Applied after Graph returns the window. Omit rather than guess.',
     ),
   category: z
     .string()
@@ -38,33 +35,200 @@ const FiltersSchema = z.object({
     ),
 });
 
-const InputSchema = FiltersSchema.extend({
-  rangeType: z.union([
-    z
-      .literal('relative')
-      .describe(
-        'Resolve a named window server-side in the mailbox timezone. Prefer this for "tomorrow", "next week", "last month".',
+const OFFSET_DATE_TIME = /(?:Z|[+-]\d{2}:\d{2})$/;
+
+function offsetDateTime(description: string) {
+  return z
+    .string()
+    .regex(OFFSET_DATE_TIME, 'Must include a timezone offset such as +02:00 or Z')
+    .describe(description);
+}
+
+const DateRangeSchema = z
+  .discriminatedUnion('rangeType', [
+    z.object({
+      rangeType: z
+        .literal('relative')
+        .describe(
+          'Choose relative for a named server-resolved window, or absolute for explicit offset-bearing timestamps. Prefer relative. This branch is the named window.',
+        ),
+      range: RelativeRangeSchema.describe(
+        'Named window such as today, thisWeek, or next7Days. Weeks start Monday.',
       ),
-    z
-      .literal('absolute')
-      .describe(
-        'Pass an explicit window. startDateTime and endDateTime must include a timezone offset; Graph does not apply Prefer: outlook.timezone to these values. Use relative ranges unless the user gave exact timestamps.',
+    }),
+    z.object({
+      rangeType: z
+        .literal('absolute')
+        .describe(
+          'Choose relative for a named server-resolved window, or absolute for explicit offset-bearing timestamps. Prefer relative. This branch is the explicit window. Graph does not apply Prefer: outlook.timezone to these values.',
+        ),
+      startDateTime: offsetDateTime(
+        'Inclusive start of the window, e.g. 2026-08-25T00:00:00+02:00. Offset is required; a naive timestamp is interpreted as UTC.',
       ),
-  ]),
-  range: RelativeRangeSchema.optional().describe(
-    'Named window such as today, thisWeek, or next7Days. Required when rangeType is relative. Weeks start Monday.',
+      endDateTime: offsetDateTime(
+        'End of the window, e.g. 2026-08-26T00:00:00+02:00. Offset is required.',
+      ),
+    }),
+  ])
+  .describe(
+    "Choose 'relative' for a named server-resolved window or 'absolute' for explicit offset-bearing timestamps. Prefer relative.",
+  );
+
+export const SearchCalendarEventsInputSchema = FiltersSchema.extend({
+  dateRange: DateRangeSchema.describe(
+    'Time window to search. Prefer rangeType relative with a documented range.',
   ),
-  startDateTime: z
+});
+
+const AccessPathSchema = z
+  .enum(['ownMailbox', 'ownerMailbox'])
+  .describe('Internal Graph ID namespace. Never display this to the user.');
+
+const EventRefSchema = z.object({
+  eventId: z.string().describe('Internal Microsoft Graph event ID. Never display to the user.'),
+  calendarId: z
     .string()
-    .optional()
+    .describe('Internal Microsoft Graph calendar ID. Never display to the user.'),
+  accessPath: AccessPathSchema,
+  mailbox: z
+    .string()
     .describe(
-      'Inclusive start of an absolute window, e.g. 2026-08-25T00:00:00+02:00. Required when rangeType is absolute. Offset is required; a naive timestamp is interpreted as UTC.',
+      'SMTP address of the mailbox whose ID namespace this event belongs to. Never reconstruct eventRef; never display it.',
     ),
-  endDateTime: z
+});
+
+const AttendeeSchema = z.object({
+  name: z.string().nullable().describe('Display name of the attendee, or null if omitted.'),
+  email: z.string().nullable().describe('SMTP address of the attendee, or null if omitted.'),
+  response: z
     .string()
+    .nullable()
+    .describe(
+      'Attendee response: none, organizer, tentativelyAccepted, accepted, declined, or notResponded.',
+    ),
+  type: z
+    .string()
+    .nullable()
+    .describe('Attendee type: required, optional, or resource. Null if Graph omitted it.'),
+});
+
+const DateTimeSchema = z.object({
+  dateTime: z
+    .string()
+    .describe('Local date and time of the boundary as returned by Graph, without a trailing Z.'),
+  timeZone: z
+    .string()
+    .nullable()
+    .describe('Windows or IANA timezone Graph attached to this boundary, or null if omitted.'),
+});
+
+const CalendarEventSchema = z.object({
+  subject: z.string().nullable().describe('Event subject. Null when Graph omitted or redacted it.'),
+  body: z
+    .string()
+    .describe(
+      'Plain-text event body, already converted by Graph. May be truncated; see bodyTruncated.',
+    ),
+  bodyTruncated: z.boolean().describe('True when body was cut to the per-event character cap.'),
+  start: DateTimeSchema.describe('Event start.'),
+  end: DateTimeSchema.describe('Event end.'),
+  location: z
+    .string()
+    .nullable()
+    .describe('Location display name, or null when the event has no location.'),
+  joinUrl: z
+    .string()
+    .nullable()
+    .describe('Online meeting join URL when present. Never construct a Teams URL yourself.'),
+  attendees: z
+    .array(AttendeeSchema)
+    .describe('All attendees with per-person response status. Not capped.'),
+  organizerName: z.string().nullable().describe('Organizer display name, or null if omitted.'),
+  organizerEmail: z.string().nullable().describe('Organizer SMTP address, or null if omitted.'),
+  isCancelled: z.boolean().describe('True when the occurrence or event has been cancelled.'),
+  isAllDay: z.boolean().describe('True when the event lasts the whole day.'),
+  isPrivate: z
+    .boolean()
+    .describe('True when sensitivity is private or confidential. Details may already be redacted.'),
+  sensitivity: z
+    .string()
+    .nullable()
+    .describe(
+      'Graph sensitivity: normal, personal, private, or confidential. Null when Graph omitted it. Private or confidential events may have redacted details.',
+    ),
+  categories: z.array(z.string()).describe('Outlook categories on the event.'),
+  recurrence: z
+    .string()
+    .nullable()
+    .describe('Short human summary of the series pattern, or null for a one-off event.'),
+  seriesMasterId: z
+    .string()
+    .nullable()
+    .describe('Internal series master ID for occurrences. Never display to the user.'),
+  type: z
+    .string()
+    .nullable()
+    .describe('Graph event type: singleInstance, occurrence, exception, or seriesMaster.'),
+  showAs: z
+    .string()
+    .nullable()
+    .describe(
+      'Free/busy shown to others: free, tentative, busy, oof, workingElsewhere, or unknown.',
+    ),
+  webLink: z
+    .string()
+    .nullable()
+    .describe(
+      'Outlook web link for this event. The only user-facing URL besides joinUrl. Empty means render the subject as plain text.',
+    ),
+  calendarName: z.string().describe('Display name of the calendar this event was read from.'),
+  eventRef: EventRefSchema.describe('Internal handle for this event. Never display it.'),
+});
+
+export const SearchCalendarEventsOutputSchema = z.object({
+  success: z
+    .boolean()
+    .describe(
+      'True when the search ran. False when Graph access failed before any calendar was queried.',
+    ),
+  message: z.string().describe('Human-readable summary of the outcome.'),
+  events: z
+    .array(CalendarEventSchema)
+    .optional()
+    .describe('Matching events, sorted by start time, capped at 100.'),
+  searchNotes: z
+    .array(z.string())
     .optional()
     .describe(
-      'End of an absolute window, e.g. 2026-08-26T00:00:00+02:00. Required when rangeType is absolute. Offset is required.',
+      'Notes about dropped calendars, truncated results, or timezone fallback. Display after the results.',
+    ),
+  resolvedWindow: z
+    .object({
+      startDateTime: z
+        .string()
+        .describe('Absolute start sent to Graph, including timezone offset.'),
+      endDateTime: z.string().describe('Absolute end sent to Graph, including timezone offset.'),
+      timeZone: z
+        .string()
+        .describe(
+          'IANA timezone the window was resolved in, or UTC when the mailbox timezone was unavailable.',
+        ),
+      serverCurrentDateTime: z
+        .string()
+        .describe('Server clock in that timezone when the window was resolved, including offset.'),
+      interpretation: z
+        .string()
+        .describe(
+          'Human description of the window, e.g. "next week = Mon 2026-08-31 00:00 to Sun 2026-09-06 23:59 (Europe/Zurich)". State this when a relative range was used.',
+        ),
+    })
+    .optional()
+    .describe('The calendarView window actually queried.'),
+  consentRequired: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
     ),
 });
 
@@ -76,9 +240,9 @@ export class SearchCalendarEventsTool {
     name: 'search_calendar_events',
     title: 'Search Calendar Events',
     description:
-      'Search Outlook calendar events in a time window across the signed-in user\'s calendars, including shared calendars and Full Access mailboxes. Prefer rangeType=relative with a documented range (today, tomorrow, thisWeek, nextWeek, lastMonth, next7Days, …); weeks start Monday. Vague phrasing ("soon", "recently") should use the closest documented range. Absolute startDateTime/endDateTime must include a timezone offset — Graph does not reinterpret them via Prefer: outlook.timezone. Each result includes the full plain-text body (possibly truncated — see bodyTruncated); there is no second tool to open an event. eventRef, eventId, calendarId and accessPath are internal — never display them. If searchNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
-    parameters: InputSchema,
-    outputSchema: SearchCalendarEventsQueryOutputSchema,
+      'Search Outlook calendar events in a time window across the signed-in user\'s calendars, including shared calendars and Full Access mailboxes. Prefer dateRange.rangeType=relative with a documented range (today, tomorrow, thisWeek, nextWeek, lastMonth, next7Days, …); weeks start Monday. Vague phrasing ("soon", "recently") should use the closest documented range. Absolute startDateTime/endDateTime must include a timezone offset — Graph does not reinterpret them via Prefer: outlook.timezone. Each result includes the full plain-text body (possibly truncated — see bodyTruncated); there is no second tool to open an event. eventRef, eventId, calendarId and accessPath are internal — never display them. If searchNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
+    parameters: SearchCalendarEventsInputSchema,
+    outputSchema: SearchCalendarEventsOutputSchema,
     annotations: {
       title: 'Search Calendar Events',
       readOnlyHint: true,
@@ -90,38 +254,16 @@ export class SearchCalendarEventsTool {
   })
   @Span()
   public async searchCalendarEvents(
-    input: z.infer<typeof InputSchema>,
+    input: z.infer<typeof SearchCalendarEventsInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
-  ): Promise<z.infer<typeof SearchCalendarEventsQueryOutputSchema>> {
-    const filters = {
-      mailbox: input.mailbox,
-      attendee: input.attendee,
-      subject: input.subject,
-      category: input.category,
-    };
-    if (input.rangeType === 'relative') {
-      if (input.range === undefined) {
-        return {
-          success: false,
-          message: 'range is required when rangeType is relative.',
-        };
-      }
-      return this.searchCalendarEventsQuery.run(extractUserProfileId(request), {
-        ...filters,
-        range: input.range,
-      });
-    }
-    if (input.startDateTime === undefined || input.endDateTime === undefined) {
-      return {
-        success: false,
-        message: 'startDateTime and endDateTime are required when rangeType is absolute.',
-      };
-    }
+  ): Promise<z.infer<typeof SearchCalendarEventsOutputSchema>> {
+    const { dateRange, ...filters } = SearchCalendarEventsInputSchema.parse(input);
     return this.searchCalendarEventsQuery.run(extractUserProfileId(request), {
       ...filters,
-      startDateTime: input.startDateTime,
-      endDateTime: input.endDateTime,
+      ...(dateRange.rangeType === 'relative'
+        ? { range: dateRange.range }
+        : { startDateTime: dateRange.startDateTime, endDateTime: dateRange.endDateTime }),
     });
   }
 }

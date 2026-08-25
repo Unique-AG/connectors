@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { ListCalendarsQueryOutputSchema } from '../list-calendars.query';
-import { ListCalendarsTool } from '../list-calendars.tool';
+import { ListCalendarsOutputSchema, ListCalendarsTool } from '../list-calendars.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 
@@ -33,6 +32,6 @@ describe(ListCalendarsTool.name, () => {
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
     );
 
-    expect(ListCalendarsQueryOutputSchema.parse(result)).toEqual(output);
+    expect(ListCalendarsOutputSchema.parse(result)).toEqual(output);
   });
 });

@@ -17,4 +17,6 @@ export enum MetricName {
   // Delegated access verification
   SyncDelegatedAccessForAllUsersRunDuration = 'osm_sync_delegated_access_for_all_users_run_duration_seconds',
   SyncDelegatedAccessRunDuration = 'osm_sync_delegated_access_run_duration_seconds',
+  // Calendar
+  SearchCalendarEventsDuration = 'osm_search_calendar_events_duration_seconds',
 }

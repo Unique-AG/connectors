@@ -1,3 +1,4 @@
+import { Temporal } from 'temporal-polyfill';
 import type { RelativeRange } from './relative-range';
 
 export interface ResolvedWindow {
@@ -30,12 +31,8 @@ const RANGE_LABEL: Record<RelativeRange, string> = {
   past30Days: 'past 30 days',
 };
 
-function toGraphInstant(value: Temporal.ZonedDateTime): string {
+export function toGraphInstant(value: Temporal.ZonedDateTime): string {
   return value.toString({ smallestUnit: 'millisecond', timeZoneName: 'never' });
-}
-
-export function formatGraphInstant(value: Temporal.ZonedDateTime): string {
-  return toGraphInstant(value);
 }
 
 function pad(value: number): string {
@@ -51,8 +48,12 @@ function startOfIsoWeek(now: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
   return now.startOfDay().subtract({ days: now.dayOfWeek - 1 });
 }
 
+function lastInstantBefore(nextStart: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
+  return nextStart.startOfDay().subtract({ milliseconds: 1 });
+}
+
 function endOfDay(start: Temporal.ZonedDateTime): Temporal.ZonedDateTime {
-  return start.add({ days: 1 }).subtract({ milliseconds: 1 });
+  return lastInstantBefore(start.add({ days: 1 }));
 }
 
 function calendarDay(
@@ -94,27 +95,27 @@ function boundsFor(
     }
     case 'thisMonth': {
       const start = now.with({ day: 1 }).startOfDay();
-      return { start, end: start.add({ months: 1 }).subtract({ milliseconds: 1 }) };
+      return { start, end: lastInstantBefore(start.add({ months: 1 })) };
     }
     case 'nextMonth': {
       const start = now.with({ day: 1 }).startOfDay().add({ months: 1 });
-      return { start, end: start.add({ months: 1 }).subtract({ milliseconds: 1 }) };
+      return { start, end: lastInstantBefore(start.add({ months: 1 })) };
     }
     case 'lastMonth': {
       const start = now.with({ day: 1 }).startOfDay().subtract({ months: 1 });
-      return { start, end: start.add({ months: 1 }).subtract({ milliseconds: 1 }) };
+      return { start, end: lastInstantBefore(start.add({ months: 1 })) };
     }
     case 'thisYear': {
       const start = now.with({ month: 1, day: 1 }).startOfDay();
-      return { start, end: start.add({ years: 1 }).subtract({ milliseconds: 1 }) };
+      return { start, end: lastInstantBefore(start.add({ years: 1 })) };
     }
     case 'nextYear': {
       const start = now.with({ month: 1, day: 1 }).startOfDay().add({ years: 1 });
-      return { start, end: start.add({ years: 1 }).subtract({ milliseconds: 1 }) };
+      return { start, end: lastInstantBefore(start.add({ years: 1 })) };
     }
     case 'lastYear': {
       const start = now.with({ month: 1, day: 1 }).startOfDay().subtract({ years: 1 });
-      return { start, end: start.add({ years: 1 }).subtract({ milliseconds: 1 }) };
+      return { start, end: lastInstantBefore(start.add({ years: 1 })) };
     }
     case 'next7Days':
       return { start: now, end: now.add({ days: 7 }) };
@@ -129,17 +130,17 @@ function boundsFor(
   }
 }
 
-export function resolveRange(
-  range: RelativeRange,
-  timeZone: string,
-  now: Temporal.ZonedDateTime,
-): ResolvedWindow {
-  const { start, end } = boundsFor(range, now);
+export function resolveRange(input: {
+  range: RelativeRange;
+  now: Temporal.ZonedDateTime;
+}): ResolvedWindow {
+  const timeZone = input.now.timeZoneId;
+  const { start, end } = boundsFor(input.range, input.now);
   return {
     startDateTime: toGraphInstant(start),
     endDateTime: toGraphInstant(end),
     timeZone,
-    serverCurrentDateTime: toGraphInstant(now),
-    interpretation: `${RANGE_LABEL[range]} = ${formatBoundary(start)} to ${formatBoundary(end)} (${timeZone})`,
+    serverCurrentDateTime: toGraphInstant(input.now),
+    interpretation: `${RANGE_LABEL[input.range]} = ${formatBoundary(start)} to ${formatBoundary(end)} (${timeZone})`,
   };
 }

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DelegatedAccessUtilsModule } from '~/features/delegated-access/delegated-access-utils.module';
+import { MetricsModule } from '~/features/metrics/metrics.module';
 import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { ListCalendarsQuery } from './list-calendars.query';
@@ -8,7 +9,7 @@ import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 const QUERIES = [ListCalendarsQuery, SearchCalendarEventsQuery];
 
 @Module({
-  imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule],
+  imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule, MetricsModule],
   providers: [...QUERIES],
   exports: [...QUERIES],
 })

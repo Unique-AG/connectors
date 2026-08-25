@@ -6,22 +6,15 @@ resource "azuread_service_principal" "msgraph" {
 }
 
 locals {
-  # Microsoft Graph delegated scopes registered on the Entra app.
-  # Calendars.ReadWrite.Shared is registered (and admin-consented when the
-  # delegated-permission-grant resource is created) so flipping
-  # CALENDAR_INTEGRATION=enabled does not require a second app-registration change.
-  # Runtime token refresh still omits that scope until the flag is on — see getScopes().
-  # Deployments without the grant resource must re-authorize users when enabling
-  # the flag; otherwise refresh requests the new scope and Microsoft rejects the token.
-  graph_scopes = toset([
+  mail_scopes = toset([
     "User.Read",
     "User.Read.All",
     "Mail.ReadWrite",
     "Mail.ReadWrite.Shared",
     "MailboxSettings.Read",
     "People.Read",
-    "Calendars.ReadWrite.Shared"
   ])
+  graph_scopes = var.calendar_integration ? setunion(local.mail_scopes, toset(["Calendars.ReadWrite.Shared"])) : local.mail_scopes
 }
 
 resource "azuread_application" "outlook_semantic_mcp" {

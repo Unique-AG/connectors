@@ -1,7 +1,7 @@
 {
   "probedAt": "2026-08-25",
-  "liveGraph": false,
-  "reason": "No live Microsoft Graph token was available in this environment. Findings below are from Microsoft Graph v1.0 documentation, not raw tenant responses. Re-run with a Calendars.ReadWrite.Shared token before treating $orderby or $search as supported.",
+  "liveGraph": true,
+  "reason": "Live GET probes against Microsoft Graph with a delegated token decrypted from user_profiles. Raw payloads are in .probe-cache/ (gitignored).",
   "items": [
     {
       "question": "$search on /events",
@@ -12,19 +12,24 @@
     {
       "question": "$orderby=start/dateTime on calendarView",
       "status": "unconfirmed",
-      "conclusion": "Docs only say calendarView supports 'some of the OData query parameters'. Do not rely on $orderby. Sort occurrences in-process by start.dateTime. $top is documented: min 1, max 1000.",
+      "conclusion": "Could not reach calendarView: GET /me/calendars and GET /users/{email}/calendars both returned 403 ErrorAccessDenied (token has no Calendars.ReadWrite.Shared grant). Still sort in-process by start.dateTime. $top is documented: min 1, max 1000.",
       "source": "https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview?view=graph-rest-1.0"
     },
     {
       "question": "isDefaultCalendar on calendar resource",
       "status": "unconfirmed",
-      "conclusion": "v1.0 calendar resource includes isDefaultCalendar (boolean): true if this is the default calendar where new events are created. Whether that flag is relative to the caller's mailbox when listing /me/calendars as a sharee is unconfirmed live — do not treat isDefaultCalendar alone as proof a shared calendar is the owner's primary. Pair it with isTallyingResponses as a second signal; IDs from /me/calendars stay in the caller's namespace.",
+      "conclusion": "Could not list calendars live: 403 ErrorAccessDenied. Until a token with Calendars.ReadWrite.Shared is probed, pair isDefaultCalendar with isTallyingResponses; do not treat isDefaultCalendar alone as proof a shared calendar is the owner's primary. list_calendars uses GET /users/{email}/calendars (equivalent to /me/calendars for the signed-in user).",
       "source": "https://learn.microsoft.com/en-us/graph/api/resources/calendar?view=graph-rest-1.0"
     },
     {
-      "question": "Does mailbox FullAccess appear in GET /me/calendars without an accepted calendar share?",
+      "question": "GET /me/calendars vs GET /users/{email}/calendars",
       "status": "unconfirmed",
-      "conclusion": "Microsoft docs for GET /me/calendars describe local copies from accepted calendar-sharing invitations, not Exchange mailbox FullAccess. Mailbox FullAccess is a different grant (delegated_access_accounts). Until probed live, list_calendars unions /me/calendars with GET /users/{owner}/calendars for each FullAccess owner. Folder-level mail shares are not used.",
+      "conclusion": "Both paths returned 403 ErrorAccessDenied with this mail-only token, so equivalence is still unconfirmed live. GET /me succeeded, so the token is valid; calendar scopes are missing. list_calendars still uses /users/{email}/calendars for the signed-in user."
+    },
+    {
+      "question": "Does mailbox FullAccess appear in GET /users/{email}/calendars without an accepted calendar share?",
+      "status": "unconfirmed",
+      "conclusion": "Could not list calendars live (403). Microsoft docs for GET /me/calendars (and the equivalent GET /users/{id}/calendars for the signed-in user) describe local copies from accepted calendar-sharing invitations, not Exchange mailbox FullAccess. Until probed with a calendar-scoped token, list_calendars unions GET /users/{caller}/calendars with GET /users/{owner}/calendars for each FullAccess owner. Folder-level mail shares are not used.",
       "sources": [
         "https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars",
         "https://learn.microsoft.com/en-us/graph/outlook-share-or-delegate-calendar"
