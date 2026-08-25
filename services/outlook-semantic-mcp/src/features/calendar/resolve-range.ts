@@ -34,6 +34,10 @@ function toGraphInstant(value: Temporal.ZonedDateTime): string {
   return value.toString({ smallestUnit: 'millisecond', timeZoneName: 'never' });
 }
 
+export function formatGraphInstant(value: Temporal.ZonedDateTime): string {
+  return toGraphInstant(value);
+}
+
 function pad(value: number): string {
   return String(value).padStart(2, '0');
 }

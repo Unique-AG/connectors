@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
@@ -14,6 +15,7 @@ import {
 } from '~/msgraph/ms-graph-client-resolver.service';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
 import {
   CalendarRef,
   EventRefSchema,
@@ -22,6 +24,8 @@ import {
 } from './calendar.schemas';
 import { calendarViewPath } from './calendar-view-path';
 import { ListCalendarsQuery } from './list-calendars.query';
+import type { RelativeRange } from './relative-range';
+import { formatGraphInstant, type ResolvedWindow, resolveRange } from './resolve-range';
 import { summariseRecurrence } from './summarise-recurrence';
 
 const EVENT_SELECT =
@@ -133,7 +137,7 @@ export const SearchCalendarEventsQueryOutputSchema = z.object({
     .describe(
       'Notes about dropped calendars, truncated results, or timezone fallback. Display after the results.',
     ),
-  window: z
+  resolvedWindow: z
     .object({
       startDateTime: z
         .string()
@@ -142,7 +146,15 @@ export const SearchCalendarEventsQueryOutputSchema = z.object({
       timeZone: z
         .string()
         .describe(
-          'Windows timezone used in Prefer: outlook.timezone, or UTC when mailbox timezone was unavailable.',
+          'IANA timezone the window was resolved in, or UTC when the mailbox timezone was unavailable.',
+        ),
+      serverCurrentDateTime: z
+        .string()
+        .describe('Server clock in that timezone when the window was resolved, including offset.'),
+      interpretation: z
+        .string()
+        .describe(
+          'Human description of the window, e.g. "next week = Mon 2026-08-31 00:00 to Sun 2026-09-06 23:59 (Europe/Zurich)". State this when a relative range was used.',
         ),
     })
     .optional()
@@ -158,12 +170,13 @@ export const SearchCalendarEventsQueryOutputSchema = z.object({
 export type SearchCalendarEventsQueryOutput = z.infer<typeof SearchCalendarEventsQueryOutputSchema>;
 
 export interface SearchCalendarEventsQueryInput {
-  startDateTime: string;
-  endDateTime: string;
   mailbox?: string;
   attendee?: string;
   subject?: string;
   category?: string;
+  range?: RelativeRange;
+  startDateTime?: string;
+  endDateTime?: string;
 }
 
 @Injectable()
@@ -181,6 +194,7 @@ export class SearchCalendarEventsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     input: SearchCalendarEventsQueryInput,
+    now?: Temporal.ZonedDateTime,
   ): Promise<SearchCalendarEventsQueryOutput> {
     const listed = await this.listCalendarsQuery.run(userProfileId);
     if (!listed.success) {
@@ -193,7 +207,9 @@ export class SearchCalendarEventsQuery {
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const mailboxTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
-    const timeZone = mailboxTimeZone ?? UTC;
+    const outlookTimeZone = mailboxTimeZone ?? UTC;
+    const ianaTimeZone =
+      mailboxTimeZone === undefined ? UTC : (resolveIanaTimezone(mailboxTimeZone) ?? UTC);
     const timezoneNotes =
       mailboxTimeZone === undefined
         ? ['Mailbox timezone was unavailable; times are requested in UTC.']
@@ -203,11 +219,8 @@ export class SearchCalendarEventsQuery {
       input.mailbox,
       userProfile.email,
     );
-    const window = {
-      startDateTime: input.startDateTime,
-      endDateTime: input.endDateTime,
-      timeZone,
-    };
+    const clock = now ?? Temporal.Now.zonedDateTimeISO(ianaTimeZone);
+    const resolvedWindow = this.resolveWindow(input, ianaTimeZone, clock);
     const prefixNotes = [...timezoneNotes, ...mailboxNotes];
     if (calendars.length === 0) {
       return {
@@ -215,7 +228,7 @@ export class SearchCalendarEventsQuery {
         message: 'No calendars matched the search.',
         events: [],
         searchNotes: prefixNotes.length > 0 ? prefixNotes : undefined,
-        window,
+        resolvedWindow,
       };
     }
 
@@ -223,7 +236,15 @@ export class SearchCalendarEventsQuery {
       const { events, notes: searchNotes } = await this.msGraphClientResolver.run({
         userProfile,
         sharedMailboxConfig: { throwIfNoDelegates: true },
-        fn: ({ client }) => this.searchCalendars(client, userProfile, calendars, input, timeZone),
+        fn: ({ client }) =>
+          this.searchCalendars(
+            client,
+            userProfile,
+            calendars,
+            input,
+            outlookTimeZone,
+            resolvedWindow,
+          ),
       });
       const notes = [...prefixNotes, ...searchNotes];
       return {
@@ -234,7 +255,7 @@ export class SearchCalendarEventsQuery {
             : `Found ${events.length} event${events.length === 1 ? '' : 's'}.`,
         events,
         searchNotes: notes.length > 0 ? notes : undefined,
-        window,
+        resolvedWindow,
       };
     } catch (error) {
       if (error instanceof NoDelegatesFoundError || error instanceof AllDelegatesFailedError) {
@@ -270,12 +291,34 @@ export class SearchCalendarEventsQuery {
     };
   }
 
+  private resolveWindow(
+    input: SearchCalendarEventsQueryInput,
+    ianaTimeZone: string,
+    clock: Temporal.ZonedDateTime,
+  ): ResolvedWindow {
+    if (input.range !== undefined) {
+      return resolveRange(input.range, ianaTimeZone, clock);
+    }
+    assert.ok(
+      input.startDateTime !== undefined && input.endDateTime !== undefined,
+      'range or an absolute startDateTime and endDateTime is required',
+    );
+    return {
+      startDateTime: input.startDateTime,
+      endDateTime: input.endDateTime,
+      timeZone: ianaTimeZone,
+      serverCurrentDateTime: formatGraphInstant(clock),
+      interpretation: `absolute window ${input.startDateTime} to ${input.endDateTime} (${ianaTimeZone})`,
+    };
+  }
+
   private async searchCalendars(
     client: Client,
     userProfile: NonNullishProps<UserProfile, 'email'>,
     calendars: CalendarRef[],
     input: SearchCalendarEventsQueryInput,
     timeZone: string,
+    resolvedWindow: ResolvedWindow,
   ): Promise<{ events: z.infer<typeof CalendarEventSchema>[]; notes: string[] }> {
     const limit = pLimit(CALENDAR_VIEW_CONCURRENCY);
     const perCalendar = await Promise.all(
@@ -284,7 +327,13 @@ export class SearchCalendarEventsQuery {
           async (): Promise<{ events: z.infer<typeof CalendarEventSchema>[]; note?: string }> => {
             try {
               return {
-                events: await this.fetchEvents(client, userProfile, calendar, input, timeZone),
+                events: await this.fetchEvents(
+                  client,
+                  userProfile,
+                  calendar,
+                  timeZone,
+                  resolvedWindow,
+                ),
               };
             } catch (error) {
               if (isDelegatedAccessNotAvailableError(error)) {
@@ -317,8 +366,8 @@ export class SearchCalendarEventsQuery {
     client: Client,
     userProfile: NonNullishProps<UserProfile, 'email'>,
     calendar: CalendarRef,
-    input: SearchCalendarEventsQueryInput,
     timeZone: string,
+    resolvedWindow: ResolvedWindow,
   ) {
     const events = [];
     const prefer = `outlook.timezone="${timeZone}", outlook.body-content-type="text", IdType="ImmutableId"`;
@@ -329,7 +378,10 @@ export class SearchCalendarEventsQuery {
       const request = client.api(nextPath).header('Prefer', prefer);
       const raw = isFirst
         ? await request
-            .query({ startDateTime: input.startDateTime, endDateTime: input.endDateTime })
+            .query({
+              startDateTime: resolvedWindow.startDateTime,
+              endDateTime: resolvedWindow.endDateTime,
+            })
             .select(EVENT_SELECT)
             .top(CALENDAR_VIEW_TOP)
             .get()

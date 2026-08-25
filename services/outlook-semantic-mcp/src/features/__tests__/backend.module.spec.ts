@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { registerBackendModule } from '../backend.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { ListCalendarsTool } from '../calendar/list-calendars.tool';
+import { SearchCalendarEventsTool } from '../calendar/search-calendar-events.tool';
 
 describe(registerBackendModule.name, () => {
   const original = process.env.CALENDAR_INTEGRATION;
@@ -20,6 +21,7 @@ describe(registerBackendModule.name, () => {
 
     expect(module.imports).not.toContain(CalendarModule);
     expect(module.providers).not.toContain(ListCalendarsTool);
+    expect(module.providers).not.toContain(SearchCalendarEventsTool);
   });
 
   it('registers calendar tools when CALENDAR_INTEGRATION is enabled', () => {
@@ -28,5 +30,6 @@ describe(registerBackendModule.name, () => {
 
     expect(module.imports).toContain(CalendarModule);
     expect(module.providers).toContain(ListCalendarsTool);
+    expect(module.providers).toContain(SearchCalendarEventsTool);
   });
 });

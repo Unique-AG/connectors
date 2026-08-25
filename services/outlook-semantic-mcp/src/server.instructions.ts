@@ -19,7 +19,9 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar
 - Use \`list_calendars\` to see the user's own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to.
-- \`calendarId\` and \`accessPath\` are internal identifiers. Never show them to the user.
+- Use \`search_calendar_events\` for meetings in a time window. Prefer relative ranges (\`today\`, \`thisWeek\`, \`nextWeek\`, \`lastMonth\`, \`next7Days\`). Weeks start Monday. State \`resolvedWindow.interpretation\` in the answer.
+- \`calendarId\`, \`eventId\`, \`accessPath\` and \`eventRef\` are internal identifiers. Never show them to the user.
+- The search result already contains the full meeting body. There is no second tool to open an event.
 `;
 
 export function buildServerInstructions(): string {

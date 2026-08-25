@@ -17,7 +17,7 @@ export class ListCalendarsTool {
     name: 'list_calendars',
     title: 'List Calendars',
     description:
-      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. calendarId and accessPath are internal — do not display them. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
+      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. To list meetings in a time window, use search_calendar_events. calendarId and accessPath are internal — do not display them. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
     parameters: InputSchema,
     outputSchema: ListCalendarsQueryOutputSchema,
     annotations: {

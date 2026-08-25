@@ -11,6 +11,7 @@ import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CalendarModule } from './calendar/calendar.module';
 import { ListCalendarsTool } from './calendar/list-calendars.tool';
+import { SearchCalendarEventsTool } from './calendar/search-calendar-events.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { SearchEmailsTool, SearchModule } from './content';
@@ -106,7 +107,7 @@ export function registerBackendModule(): DynamicModule {
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,
       ...uniqueOnlyTools,
-      ...(isCalendar ? [ListCalendarsTool] : []),
+      ...(isCalendar ? [ListCalendarsTool, SearchCalendarEventsTool] : []),
       MailSubscriptionController,
     ],
     controllers: [MailSubscriptionController],

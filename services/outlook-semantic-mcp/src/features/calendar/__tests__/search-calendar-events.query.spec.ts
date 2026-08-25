@@ -159,6 +159,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(request.query).toHaveBeenCalledWith(WINDOW);
     expect(request.select).toHaveBeenCalledWith(EVENT_SELECT);
     expect(result.success).toBe(true);
+    expect(result.resolvedWindow?.startDateTime).toBe(WINDOW.startDateTime);
     expect(result.events).toEqual([
       expect.objectContaining({
         subject: 'Standup',
@@ -255,7 +256,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       'Prefer',
       'outlook.timezone="UTC", outlook.body-content-type="text", IdType="ImmutableId"',
     );
-    expect(result.window?.timeZone).toBe('UTC');
+    expect(result.resolvedWindow?.timeZone).toBe('UTC');
     expect(result.searchNotes).toContain(
       'Mailbox timezone was unavailable; times are requested in UTC.',
     );
@@ -306,5 +307,20 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['earlier', 'later']);
     expect(result.events?.[0]?.bodyTruncated).toBe(true);
     expect(result.events?.[0]?.body).toHaveLength(4000);
+  });
+
+  it('resolves a relative range in the mailbox timezone', async () => {
+    const { query, request } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [] }),
+    });
+    const now = Temporal.ZonedDateTime.from('2026-08-25T15:30:00[Europe/Zurich]');
+
+    const result = await query.run(USER_PROFILE_ID, { range: 'today' }, now);
+
+    expect(request.query).toHaveBeenCalledWith({
+      startDateTime: '2026-08-25T00:00:00.000+02:00',
+      endDateTime: '2026-08-25T23:59:59.999+02:00',
+    });
+    expect(result.resolvedWindow?.interpretation).toContain('today = Tue 2026-08-25 00:00');
   });
 });
