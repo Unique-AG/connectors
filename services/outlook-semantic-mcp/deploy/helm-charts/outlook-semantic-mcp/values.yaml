@@ -308,6 +308,11 @@ mcpConfig:
     # -- Search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default).
     # microsoft_graph: direct Graph search, no ingestion, sync tools not registered.
     mcpBackend: microsoft_graph_and_unique_api
+    # -- Outlook calendar tools and Calendars.ReadWrite.Shared scope. Set to "enabled"
+    #    to register calendar tools and request the extra Graph scope on OAuth / token refresh.
+    #    Default disabled keeps the mail-only scope string byte-identical.
+    #    Env var: CALENDAR_INTEGRATION
+    calendarIntegration: disabled
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'
