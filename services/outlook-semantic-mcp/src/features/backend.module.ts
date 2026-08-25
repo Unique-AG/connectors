@@ -10,12 +10,14 @@ import {
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CalendarModule } from './calendar/calendar.module';
+import { CancelEventTool } from './calendar/cancel-event.tool';
 import { CheckAvailabilityTool } from './calendar/check-availability.tool';
 import { CreateEventTool } from './calendar/create-event.tool';
 import { ListCalendarsTool } from './calendar/list-calendars.tool';
 import { RespondToInviteTool } from './calendar/respond-to-invite.tool';
 import { SearchCalendarEventsTool } from './calendar/search-calendar-events.tool';
 import { SuggestMeetingTimesTool } from './calendar/suggest-meeting-times.tool';
+import { UpdateEventTool } from './calendar/update-event.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { SearchEmailsTool, SearchModule } from './content';
@@ -119,6 +121,8 @@ export function registerBackendModule(): DynamicModule {
             SuggestMeetingTimesTool,
             RespondToInviteTool,
             CreateEventTool,
+            UpdateEventTool,
+            CancelEventTool,
           ]
         : []),
       MailSubscriptionController,

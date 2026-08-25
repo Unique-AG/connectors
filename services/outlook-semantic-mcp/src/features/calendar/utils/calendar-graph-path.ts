@@ -53,17 +53,33 @@ export function createEventPath(input: { mailboxEmail: string; calendarId: strin
   return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/events`;
 }
 
+export function eventPath(input: {
+  mailboxEmail: string;
+  calendarId: string;
+  eventId: string;
+}): string {
+  assert.ok(
+    SmtpAddressSchema.safeParse(input.mailboxEmail).success,
+    'event mailbox must be an SMTP address',
+  );
+  return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/events/${graphItemIdSegment(input.eventId, 'eventId')}`;
+}
+
 export function eventResponsePath(input: {
   mailboxEmail: string;
   calendarId: string;
   eventId: string;
   response: EventResponse;
 }): string {
-  assert.ok(
-    SmtpAddressSchema.safeParse(input.mailboxEmail).success,
-    'event response mailbox must be an SMTP address',
-  );
-  return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/events/${graphItemIdSegment(input.eventId, 'eventId')}/${input.response}`;
+  return `${eventPath(input)}/${input.response}`;
+}
+
+export function eventCancelPath(input: {
+  mailboxEmail: string;
+  calendarId: string;
+  eventId: string;
+}): string {
+  return `${eventPath(input)}/cancel`;
 }
 
 function graphItemIdSegment(id: string, label: string): string {

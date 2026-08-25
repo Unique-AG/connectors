@@ -534,7 +534,7 @@ When set to `enabled`, exposes four additional debug tools to all connected MCP 
 
 #### CALENDAR_INTEGRATION
 
-Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. `respond_to_invite` and `create_event` notify other people immediately after the user confirms — there is no draft state.
+Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. Write tools notify other people immediately after the user confirms — there is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
 The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers (and admin-consents) `Calendars.ReadWrite.Shared` when `calendar_integration = true`. Enable that apply and tenant admin consent **before** flipping the Helm/env flag. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`; enabling the flag without the Entra permission causes token refresh to fail with `invalid_grant` and mail tools stop working.
 

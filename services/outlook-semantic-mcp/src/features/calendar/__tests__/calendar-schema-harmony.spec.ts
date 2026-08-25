@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
+import { CancelEventInputSchema, CancelEventOutputSchema } from '../cancel-event.tool';
+import { META as CANCEL_EVENT_META } from '../cancel-event-tool.meta';
 import {
   CheckAvailabilityInputSchema,
   CheckAvailabilityOutputSchema,
@@ -21,6 +23,8 @@ import {
   SuggestMeetingTimesOutputSchema,
 } from '../suggest-meeting-times.tool';
 import { META as SUGGEST_MEETING_TIMES_META } from '../suggest-meeting-times-tool.meta';
+import { UpdateEventInputSchema, UpdateEventOutputSchema } from '../update-event.tool';
+import { META as UPDATE_EVENT_META } from '../update-event-tool.meta';
 
 interface JsonSchema {
   description?: string;
@@ -69,6 +73,18 @@ const CALENDAR_TOOLS = [
     meta: CREATE_EVENT_META,
     input: CreateEventInputSchema,
     output: CreateEventOutputSchema,
+  },
+  {
+    name: 'update_event',
+    meta: UPDATE_EVENT_META,
+    input: UpdateEventInputSchema,
+    output: UpdateEventOutputSchema,
+  },
+  {
+    name: 'cancel_event',
+    meta: CANCEL_EVENT_META,
+    input: CancelEventInputSchema,
+    output: CancelEventOutputSchema,
   },
 ] as const;
 

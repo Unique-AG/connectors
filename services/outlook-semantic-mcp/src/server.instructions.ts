@@ -24,6 +24,8 @@ const CALENDAR_INSTRUCTIONS = `
 - Use \`suggest_meeting_times\` to rank free slots for the organizer and optional attendees. Default duration is 30 minutes and activityDomain is work. If \`emptySuggestionsReason\` is present, explain it instead of inventing times.
 - Use \`respond_to_invite\` to accept, tentatively accept, or decline. Pass \`eventRef\` from \`search_calendar_events\` unchanged. The user must confirm before the organizer is notified.
 - Use \`create_event\` to create a meeting. There is no draft — invitations are sent immediately after the user confirms. Reuse \`transactionId\` if the create is retried.
+- Use \`update_event\` to change an existing meeting. Pass \`eventRef\` unchanged. For a recurring meeting the user chooses this occurrence or the whole series. Attendees are notified immediately.
+- Use \`cancel_event\` to cancel a meeting (notifies attendees). Do not treat it as a silent delete. Pass \`eventRef\` unchanged. Only the organizer can cancel. For a recurring meeting the user chooses this occurrence or the whole series.
 - \`calendarId\`, \`eventId\`, \`accessPath\` and \`eventRef\` are internal identifiers. Never show them to the user.
 - The search result already contains the full meeting body. There is no second tool to open an event.
 `;

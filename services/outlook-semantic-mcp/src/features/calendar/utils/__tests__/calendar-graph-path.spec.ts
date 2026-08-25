@@ -6,6 +6,8 @@ import {
   calendarViewPath,
   createEventPath,
   defaultCalendarPath,
+  eventCancelPath,
+  eventPath,
   eventResponsePath,
   findMeetingTimesPath,
   getSchedulePath,
@@ -95,6 +97,30 @@ describe(createEventPath.name, () => {
     expect(
       createEventPath({ mailboxEmail: 'me@example.com', calendarId: 'x/../../../users/victim' }),
     ).toBe('/users/me@example.com/calendars/x%2F..%2F..%2F..%2Fusers%2Fvictim/events');
+  });
+});
+
+describe(eventPath.name, () => {
+  it('gets or patches the event on /users/{email}/calendars/{id}/events/{id}', () => {
+    expect(
+      eventPath({
+        mailboxEmail: 'me@example.com',
+        calendarId: 'cal-1',
+        eventId: 'evt-1',
+      }),
+    ).toBe('/users/me@example.com/calendars/cal-1/events/evt-1');
+  });
+});
+
+describe(eventCancelPath.name, () => {
+  it('posts cancel on the event path, not DELETE', () => {
+    expect(
+      eventCancelPath({
+        mailboxEmail: 'me@example.com',
+        calendarId: 'cal-1',
+        eventId: 'evt-1',
+      }),
+    ).toBe('/users/me@example.com/calendars/cal-1/events/evt-1/cancel');
   });
 });
 

@@ -1,0 +1,159 @@
+import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type Context, Tool } from '@unique-ag/mcp-server-module';
+import { Injectable } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
+import * as z from 'zod';
+import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { CancelEventCommand } from './cancel-event.command';
+import { META } from './cancel-event-tool.meta';
+import type { CalendarEventSnapshot } from './get-calendar-event.query';
+import { GetCalendarEventQuery } from './get-calendar-event.query';
+import { EventRefSchema } from './utils/event-ref.schema';
+import {
+  isSeriesOccurrence,
+  parseSeriesScope,
+  resolveWriteEventId,
+  SERIES_SCOPES,
+} from './utils/resolve-write-event-id';
+
+const ConfirmSchema = z.object({
+  confirmed: z.boolean().meta({
+    title: 'Cancel this event',
+    description:
+      'Confirm to cancel the event. Attendees are notified. This is not a silent delete. Leave unchecked to keep the event.',
+  }),
+});
+
+const SeriesConfirmSchema = ConfirmSchema.extend({
+  applyTo: z.enum(SERIES_SCOPES).meta({
+    title: 'How much of the series',
+    description:
+      'thisOccurrence cancels only this date. entireSeries cancels every date, including this one.',
+  }),
+});
+
+export const CancelEventInputSchema = z.object({
+  eventRef: EventRefSchema.describe(
+    'Internal handle from search_calendar_events. Pass it through unchanged. Never display it.',
+  ),
+  comment: z
+    .string()
+    .optional()
+    .describe('Optional note included on the cancellation sent to attendees.'),
+});
+
+export const CancelEventOutputSchema = z.object({
+  success: z
+    .boolean()
+    .describe(
+      'True when Graph cancelled the event. False when the user declined, the event was already cancelled or not found, consent is missing, or only the organizer can cancel.',
+    ),
+  message: z.string().describe('Human-readable summary of the outcome.'),
+  consentRequired: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
+    ),
+});
+
+@Injectable()
+export class CancelEventTool {
+  public constructor(
+    private readonly getCalendarEventQuery: GetCalendarEventQuery,
+    private readonly cancelEventCommand: CancelEventCommand,
+  ) {}
+
+  @Tool({
+    name: 'cancel_event',
+    title: 'Cancel Event',
+    description:
+      'Cancel an Outlook calendar event. This notifies attendees and is not a silent delete. Pass eventRef from search_calendar_events unchanged. Only the organizer can cancel. For a recurring meeting the user chooses this occurrence or the whole series in the confirmation. If consentRequired is true, ask the user to reconnect Outlook.',
+    parameters: CancelEventInputSchema,
+    outputSchema: CancelEventOutputSchema,
+    annotations: {
+      title: 'Cancel Event',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    _meta: META,
+  })
+  @Span()
+  public async cancelEvent(
+    input: z.infer<typeof CancelEventInputSchema>,
+    context: Context,
+    request: McpAuthenticatedRequest,
+  ): Promise<z.infer<typeof CancelEventOutputSchema>> {
+    const parsed = CancelEventInputSchema.parse(input);
+    const userProfileId = extractUserProfileId(request);
+    const loaded = await this.getCalendarEventQuery.run(userProfileId, {
+      eventRef: parsed.eventRef,
+    });
+    if (loaded.success !== true || loaded.event === undefined) {
+      return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
+    }
+    const snapshot = loaded.event;
+    if (snapshot.isCancelled) {
+      return { success: false, message: 'That event is already cancelled.' };
+    }
+    const confirmation = isSeriesOccurrence(snapshot.type)
+      ? await context.elicit(SeriesConfirmSchema, elicitMessage(parsed, snapshot))
+      : await context.elicit(ConfirmSchema, elicitMessage(parsed, snapshot));
+    if (confirmation.action !== 'accept' || confirmation.content.confirmed !== true) {
+      return { success: false, message: 'Cancellation was declined. The event was left in place.' };
+    }
+    const applyTo = parseSeriesScope(confirmation.content);
+    if (applyTo === 'entireSeries' && snapshot.seriesMasterId === null) {
+      return {
+        success: false,
+        message: 'This event has no series master. Search again and cancel this occurrence only.',
+      };
+    }
+    return this.cancelEventCommand.run(userProfileId, {
+      eventRef: parsed.eventRef,
+      targetEventId: resolveWriteEventId({
+        eventId: parsed.eventRef.eventId,
+        seriesMasterId: snapshot.seriesMasterId,
+        applyTo,
+      }),
+      comment: parsed.comment,
+      notifyAttendees: snapshot.attendeeCount > 0,
+    });
+  }
+}
+
+function elicitMessage(
+  input: z.infer<typeof CancelEventInputSchema>,
+  snapshot: CalendarEventSnapshot,
+): string {
+  const series =
+    snapshot.type === 'seriesMaster'
+      ? 'This is the series master — cancellation applies to every date.'
+      : isSeriesOccurrence(snapshot.type)
+        ? 'This is one date in a series. Choose this occurrence or the entire series.'
+        : 'This is a single event.';
+  const comment =
+    input.comment !== undefined && oneLine(input.comment) !== ''
+      ? `Comment: ${oneLine(input.comment)}.`
+      : undefined;
+  const notify =
+    snapshot.attendeeCount > 0
+      ? 'Attendees will be notified. This is not a silent delete.'
+      : 'No attendees will be notified.';
+  return [
+    `Cancel this event on mailbox ${snapshot.mailbox}?`,
+    series,
+    `Title: ${oneLine(snapshot.subject ?? '(no title)')}.`,
+    snapshot.start !== null ? `When: ${snapshot.start.dateTime}.` : undefined,
+    comment,
+    notify,
+  ]
+    .filter((line) => line !== undefined)
+    .join('\n');
+}
+
+function oneLine(value: string): string {
+  return value.replaceAll(/\s+/g, ' ').trim();
+}
