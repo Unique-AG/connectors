@@ -3,8 +3,9 @@ import { DelegatedAccessUtilsModule } from '~/features/delegated-access/delegate
 import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { ListCalendarsQuery } from './list-calendars.query';
+import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 
-const QUERIES = [ListCalendarsQuery];
+const QUERIES = [ListCalendarsQuery, SearchCalendarEventsQuery];
 
 @Module({
   imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule],
