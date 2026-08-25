@@ -53,7 +53,8 @@ export class UniqueGraphqlClient {
             ...options,
             dispatcher,
           } as Parameters<typeof undiciFetch>[1],
-        )) as typeof fetch,
+          // undici Response is structurally compatible with globalThis.Response at runtime
+        )) as unknown as typeof fetch,
       requestMiddleware: async (request) => {
         const additionalHeaders = await this.getAdditionalHeaders();
 
