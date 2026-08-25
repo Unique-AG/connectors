@@ -2,9 +2,15 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
-import { isDebugMode, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import {
+  isCalendarEnabled,
+  isDebugMode,
+  isMicrosoftGraphBackend,
+} from '~/utils/backend-config.utils';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
+import { CalendarModule } from './calendar/calendar.module';
+import { ListCalendarsTool } from './calendar/list-calendars.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { SearchEmailsTool, SearchModule } from './content';
@@ -43,6 +49,7 @@ export class BackendModule {}
 export function registerBackendModule(): DynamicModule {
   const isGraph = isMicrosoftGraphBackend();
   const isDebug = isDebugMode();
+  const isCalendar = isCalendarEnabled();
 
   const uniqueAndMicrosoftBackendCommonTools = [
     ListMailboxesAndDirectoriesTool,
@@ -94,10 +101,12 @@ export function registerBackendModule(): DynamicModule {
       DelegatedAccessModule,
       PostAuthorizationUserFlowModule,
       DelegatedAccessUtilsModule,
+      ...(isCalendar ? [CalendarModule] : []),
     ],
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,
       ...uniqueOnlyTools,
+      ...(isCalendar ? [ListCalendarsTool] : []),
       MailSubscriptionController,
     ],
     controllers: [MailSubscriptionController],

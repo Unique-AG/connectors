@@ -1,4 +1,4 @@
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import { isCalendarEnabled, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 
 const MICROSOFT_GRAPH_INSTRUCTIONS = `
 Emails are searched directly via Microsoft Graph KQL —
@@ -16,8 +16,16 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 - When \`search_emails\` returns a \`syncWarning\` field, relay that warning message to the user so they know results may not reflect all emails.
 `;
 
+const CALENDAR_INSTRUCTIONS = `
+## Outlook Calendar
+- Use \`list_calendars\` to see the user's own calendars and any shared or delegated calendars.
+- \`calendarId\` and \`accessPath\` are internal identifiers. Never show them to the user.
+- \`webLink\` is the only user-facing link. Never construct or guess Outlook URLs.
+`;
+
 export function buildServerInstructions(): string {
-  return isMicrosoftGraphBackend()
+  const backend = isMicrosoftGraphBackend()
     ? MICROSOFT_GRAPH_INSTRUCTIONS
     : MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS;
+  return isCalendarEnabled() ? `${backend}\n${CALENDAR_INSTRUCTIONS}` : backend;
 }
