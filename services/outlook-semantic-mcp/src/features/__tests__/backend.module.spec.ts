@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { registerBackendModule } from '../backend.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { CheckAvailabilityTool } from '../calendar/check-availability.tool';
+import { CreateEventTool } from '../calendar/create-event.tool';
 import { ListCalendarsTool } from '../calendar/list-calendars.tool';
 import { RespondToInviteTool } from '../calendar/respond-to-invite.tool';
 import { SearchCalendarEventsTool } from '../calendar/search-calendar-events.tool';
@@ -28,6 +29,7 @@ describe(registerBackendModule.name, () => {
     expect(module.providers).not.toContain(CheckAvailabilityTool);
     expect(module.providers).not.toContain(SuggestMeetingTimesTool);
     expect(module.providers).not.toContain(RespondToInviteTool);
+    expect(module.providers).not.toContain(CreateEventTool);
   });
 
   it('registers calendar tools when CALENDAR_INTEGRATION is enabled', () => {
@@ -40,5 +42,6 @@ describe(registerBackendModule.name, () => {
     expect(module.providers).toContain(CheckAvailabilityTool);
     expect(module.providers).toContain(SuggestMeetingTimesTool);
     expect(module.providers).toContain(RespondToInviteTool);
+    expect(module.providers).toContain(CreateEventTool);
   });
 });

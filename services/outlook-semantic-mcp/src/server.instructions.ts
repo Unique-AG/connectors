@@ -23,6 +23,7 @@ const CALENDAR_INSTRUCTIONS = `
 - Use \`check_availability\` for free/busy of people, DLs, or rooms. At most 20 addresses; the window must be shorter than 62 days. Subject and location on items appear only with detail-level permission; private items are redacted.
 - Use \`suggest_meeting_times\` to rank free slots for the organizer and optional attendees. Default duration is 30 minutes and activityDomain is work. If \`emptySuggestionsReason\` is present, explain it instead of inventing times.
 - Use \`respond_to_invite\` to accept, tentatively accept, or decline. Pass \`eventRef\` from \`search_calendar_events\` unchanged. The user must confirm before the organizer is notified.
+- Use \`create_event\` to create a meeting. There is no draft — invitations are sent immediately after the user confirms. Reuse \`transactionId\` if the create is retried.
 - \`calendarId\`, \`eventId\`, \`accessPath\` and \`eventRef\` are internal identifiers. Never show them to the user.
 - The search result already contains the full meeting body. There is no second tool to open an event.
 `;

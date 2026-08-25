@@ -11,6 +11,7 @@ import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CalendarModule } from './calendar/calendar.module';
 import { CheckAvailabilityTool } from './calendar/check-availability.tool';
+import { CreateEventTool } from './calendar/create-event.tool';
 import { ListCalendarsTool } from './calendar/list-calendars.tool';
 import { RespondToInviteTool } from './calendar/respond-to-invite.tool';
 import { SearchCalendarEventsTool } from './calendar/search-calendar-events.tool';
@@ -117,6 +118,7 @@ export function registerBackendModule(): DynamicModule {
             CheckAvailabilityTool,
             SuggestMeetingTimesTool,
             RespondToInviteTool,
+            CreateEventTool,
           ]
         : []),
       MailSubscriptionController,

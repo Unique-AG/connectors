@@ -10,7 +10,7 @@ export function calendarCollectionPath(mailboxEmail: string): string {
 }
 
 export function calendarViewPath(input: { calendarId: string; mailboxEmail: string }): string {
-  return `/users/${input.mailboxEmail}/calendars/${input.calendarId}/calendarView`;
+  return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/calendarView`;
 }
 
 export function getSchedulePath(mailboxEmail: string): string {
@@ -37,6 +37,22 @@ export function calendarMailbox(input: { calendar: CalendarRef; callerEmail: str
   return input.callerEmail;
 }
 
+export function defaultCalendarPath(mailboxEmail: string): string {
+  assert.ok(
+    SmtpAddressSchema.safeParse(mailboxEmail).success,
+    'default calendar mailbox must be an SMTP address',
+  );
+  return `/users/${mailboxEmail}/calendar`;
+}
+
+export function createEventPath(input: { mailboxEmail: string; calendarId: string }): string {
+  assert.ok(
+    SmtpAddressSchema.safeParse(input.mailboxEmail).success,
+    'create event mailbox must be an SMTP address',
+  );
+  return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/events`;
+}
+
 export function eventResponsePath(input: {
   mailboxEmail: string;
   calendarId: string;
@@ -47,7 +63,10 @@ export function eventResponsePath(input: {
     SmtpAddressSchema.safeParse(input.mailboxEmail).success,
     'event response mailbox must be an SMTP address',
   );
-  assert.ok(input.calendarId.length > 0, 'event response calendarId must already be set');
-  assert.ok(input.eventId.length > 0, 'event response eventId must already be set');
-  return `/users/${input.mailboxEmail}/calendars/${input.calendarId}/events/${input.eventId}/${input.response}`;
+  return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/events/${graphItemIdSegment(input.eventId, 'eventId')}/${input.response}`;
+}
+
+function graphItemIdSegment(id: string, label: string): string {
+  assert.ok(id.length > 0, `${label} must already be set`);
+  return encodeURIComponent(id);
 }

@@ -5,6 +5,8 @@ import {
   CheckAvailabilityOutputSchema,
 } from '../check-availability.tool';
 import { META as CHECK_AVAILABILITY_META } from '../check-availability-tool.meta';
+import { CreateEventInputSchema, CreateEventOutputSchema } from '../create-event.tool';
+import { META as CREATE_EVENT_META } from '../create-event-tool.meta';
 import { ListCalendarsInputSchema, ListCalendarsOutputSchema } from '../list-calendars.tool';
 import { META as LIST_CALENDARS_META } from '../list-calendars-tool.meta';
 import { RespondToInviteInputSchema, RespondToInviteOutputSchema } from '../respond-to-invite.tool';
@@ -61,6 +63,12 @@ const CALENDAR_TOOLS = [
     meta: RESPOND_TO_INVITE_META,
     input: RespondToInviteInputSchema,
     output: RespondToInviteOutputSchema,
+  },
+  {
+    name: 'create_event',
+    meta: CREATE_EVENT_META,
+    input: CreateEventInputSchema,
+    output: CreateEventOutputSchema,
   },
 ] as const;
 

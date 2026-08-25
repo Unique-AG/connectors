@@ -4,6 +4,8 @@ import {
   calendarCollectionPath,
   calendarMailbox,
   calendarViewPath,
+  createEventPath,
+  defaultCalendarPath,
   eventResponsePath,
   findMeetingTimesPath,
   getSchedulePath,
@@ -70,6 +72,32 @@ describe(findMeetingTimesPath.name, () => {
   });
 });
 
+describe(defaultCalendarPath.name, () => {
+  it('gets the default calendar on /users/{email}/calendar', () => {
+    expect(defaultCalendarPath('me@example.com')).toBe('/users/me@example.com/calendar');
+  });
+});
+
+describe(createEventPath.name, () => {
+  it('posts events on /users/{email}/calendars/{id}/events', () => {
+    expect(createEventPath({ mailboxEmail: 'me@example.com', calendarId: 'cal-1' })).toBe(
+      '/users/me@example.com/calendars/cal-1/events',
+    );
+  });
+
+  it('rejects a mailbox that is not an SMTP address', () => {
+    expect(() => createEventPath({ mailboxEmail: 'evil/calendar', calendarId: 'cal-1' })).toThrow(
+      /SMTP/i,
+    );
+  });
+
+  it('percent-encodes calendarId so slashes stay one path segment', () => {
+    expect(
+      createEventPath({ mailboxEmail: 'me@example.com', calendarId: 'x/../../../users/victim' }),
+    ).toBe('/users/me@example.com/calendars/x%2F..%2F..%2F..%2Fusers%2Fvictim/events');
+  });
+});
+
 describe(eventResponsePath.name, () => {
   it('posts the response on /users/{email}/calendars/{id}/events/{id}/{action}', () => {
     expect(
@@ -82,7 +110,7 @@ describe(eventResponsePath.name, () => {
     ).toBe('/users/me@example.com/calendars/cal-1/events/evt-1/accept');
   });
 
-  it('leaves Graph ids unchanged, matching calendarViewPath', () => {
+  it('percent-encodes Graph ids so slashes stay one path segment', () => {
     expect(
       eventResponsePath({
         mailboxEmail: 'me@example.com',
@@ -90,7 +118,7 @@ describe(eventResponsePath.name, () => {
         eventId: 'evt/b',
         response: 'decline',
       }),
-    ).toBe('/users/me@example.com/calendars/cal/a/events/evt/b/decline');
+    ).toBe('/users/me@example.com/calendars/cal%2Fa/events/evt%2Fb/decline');
   });
 
   it('rejects a mailbox that is not an SMTP address', () => {
