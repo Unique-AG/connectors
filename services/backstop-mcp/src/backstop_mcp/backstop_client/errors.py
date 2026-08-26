@@ -18,7 +18,9 @@ HTTP middleware turns into 401 so the MCP client reconnects on this call, not th
 
 import logging
 import re
+from collections.abc import MutableMapping
 from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Literal, cast
@@ -67,28 +69,66 @@ _ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
 
 _BODY_EXCERPT_LIMIT = 500
 
-# Set when MCP tokens for this request have actually been revoked. The HTTP middleware
-# (`server/session_revoked.py`) rewrites the in-flight `/mcp` response to 401 so the client
-# learns on this call, not the next one. Default False; each request resets it.
-_mcp_session_revoked: ContextVar[bool] = ContextVar("backstop_mcp_session_revoked", default=False)
+# Mutable box on the ASGI scope (and a ContextVar of the same object for same-task tests).
+# A bool ContextVar cannot cross FastMCP's session task; this object can. See
+# `server/session_revoked.py`.
+_SESSION_REVOKED_SCOPE_KEY = "backstop_mcp.session_revoked"
+
+
+@dataclass
+class _SessionRevokedFlag:
+    revoked: bool = False
+
+
+_mcp_session_revoked: ContextVar[_SessionRevokedFlag | None] = ContextVar(
+    "backstop_mcp_session_revoked", default=None
+)
 
 
 def mark_mcp_session_revoked() -> None:
     """Record that this request's MCP tokens were revoked, so the HTTP response becomes 401."""
-    _mcp_session_revoked.set(True)
+    flag = _flag_from_http_request()
+    if flag is None:
+        flag = _mcp_session_revoked.get()
+    if flag is not None:
+        flag.revoked = True
 
 
-def mcp_session_was_revoked() -> bool:
-    return _mcp_session_revoked.get()
+def mcp_session_was_revoked(scope: MutableMapping[str, object] | None = None) -> bool:
+    if scope is not None:
+        boxed = scope.get(_SESSION_REVOKED_SCOPE_KEY)
+        return isinstance(boxed, _SessionRevokedFlag) and boxed.revoked
+    boxed = _mcp_session_revoked.get()
+    return boxed is not None and boxed.revoked
 
 
-def reset_mcp_session_revoked() -> Token[bool]:
-    """Start a request as not-revoked. Pair with `restore_mcp_session_revoked`."""
-    return _mcp_session_revoked.set(False)
+def reset_mcp_session_revoked(
+    scope: MutableMapping[str, object],
+) -> Token[_SessionRevokedFlag | None]:
+    """Bind a per-request revoke flag to `scope`. Pair with `restore_mcp_session_revoked`.
+
+    Writes to the caller's `scope`, against the house rule on arguments: ASGI gives middleware
+    no return path, and a plain dict is what survives the session task's ContextVar snapshot.
+    """
+    flag = _SessionRevokedFlag()
+    scope[_SESSION_REVOKED_SCOPE_KEY] = flag
+    return _mcp_session_revoked.set(flag)
 
 
-def restore_mcp_session_revoked(token: Token[bool]) -> None:
+def restore_mcp_session_revoked(token: Token[_SessionRevokedFlag | None]) -> None:
     _mcp_session_revoked.reset(token)
+
+
+def _flag_from_http_request() -> _SessionRevokedFlag | None:
+    """The session task sees this request via `request_ctx`, not the HTTP task's ContextVar."""
+    try:
+        from fastmcp.server.dependencies import get_http_request
+
+        request = get_http_request()
+    except RuntimeError:
+        return None
+    boxed = request.scope.get(_SESSION_REVOKED_SCOPE_KEY)
+    return boxed if isinstance(boxed, _SessionRevokedFlag) else None
 
 
 class BackstopAuthError(Exception):
