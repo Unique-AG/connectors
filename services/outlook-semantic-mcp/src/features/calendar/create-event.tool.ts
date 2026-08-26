@@ -14,17 +14,9 @@ import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
 import { CalendarRefSchema } from './utils/calendar-ref.schema';
-import { confirmWrite } from './utils/confirm-write';
+import { ConfirmSchema, confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
-
-const ConfirmSchema = z.object({
-  confirmed: z.boolean().meta({
-    title: 'Create this event',
-    description:
-      'Confirm to create the event. If there are attendees, invitations are sent immediately. Leave unchecked to cancel.',
-  }),
-});
 
 export const CreateEventInputSchema = z
   .object({
@@ -183,7 +175,7 @@ export class CreateEventTool {
     if (confirmation.status === 'unavailable') {
       return { success: false, message: confirmation.message, transactionId };
     }
-    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
+    if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
         transactionId,

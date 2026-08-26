@@ -6,6 +6,7 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { CreateEventCommand } from '../create-event.command';
 import { CreateEventOutputSchema, CreateEventTool } from '../create-event.tool';
 import { GetCalendarQuery } from '../get-calendar.query';
+import { ConfirmSchema } from '../utils/confirm-write';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const INPUT = {
@@ -42,8 +43,7 @@ function createTool(
       message: 'Created the event and sent invitations immediately.',
       transactionId: INPUT.transactionId,
     });
-  const elicit =
-    opts.elicit ?? vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: true } });
+  const elicit = opts.elicit ?? vi.fn().mockResolvedValue({ action: 'accept', content: {} });
   const getCalendar =
     opts.getCalendar ??
     vi.fn().mockResolvedValue({
@@ -74,7 +74,7 @@ describe(CreateEventTool.name, () => {
     );
 
     expect(elicit).toHaveBeenCalledWith(
-      expect.anything(),
+      ConfirmSchema,
       expect.stringMatching(
         /your primary calendar[\s\S]*Wed 26 Aug 2026, 09:00–09:30 GMT\+2[\s\S]*invitations will be sent immediately/i,
       ),

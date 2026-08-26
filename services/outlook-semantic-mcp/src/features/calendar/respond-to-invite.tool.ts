@@ -11,15 +11,8 @@ import { META } from './respond-to-invite-tool.meta';
 import { formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { EVENT_RESPONSES } from './utils/calendar-graph-path';
 import { ConsentRequiredSchema } from './utils/calendar-output.schema';
-import { confirmWrite } from './utils/confirm-write';
+import { ConfirmSchema, confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
-
-const ConfirmSchema = z.object({
-  confirmed: z.boolean().meta({
-    title: 'Send this response',
-    description: 'Confirm to notify the organizer. Leave unchecked to cancel.',
-  }),
-});
 
 export const RespondToInviteInputSchema = z.object({
   eventRef: EventRefSchema.describe(
@@ -98,7 +91,7 @@ export class RespondToInviteTool {
     if (confirmation.status === 'unavailable') {
       return { success: false, message: confirmation.message };
     }
-    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
+    if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
         mailbox: obfuscateEmail(parsed.eventRef.mailbox),

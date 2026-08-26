@@ -69,7 +69,7 @@ function createTool(
     opts.elicit ??
     vi.fn().mockResolvedValue({
       action: 'accept',
-      content: { confirmed: true, applyTo: 'entireSeries' },
+      content: { applyTo: 'entireSeries' },
     });
   const tool = new UpdateEventTool(
     { run: get } as unknown as GetCalendarEventQuery,

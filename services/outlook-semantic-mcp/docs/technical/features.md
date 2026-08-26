@@ -210,17 +210,25 @@ Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DE
 
 Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar tables. The tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, and `cancel_event`.
 
-- Relative search windows (`today`, `thisWeek`, `nextWeek`, …) resolve in the mailbox timezone. Weeks start Monday.
-- Writes have no draft state. The user confirms in-chat; invitations and cancellations notify attendees immediately. `cancel_event` is not a silent delete.
-- Shared calendars are supported. Pass `eventRef` from search unchanged. Internal IDs are never shown.
-- Existing users must reconnect Outlook after the flag is turned on (unless tenant admin consent already covers `Calendars.ReadWrite.Shared`).
+**What's supported**
+
+- List own calendars and calendars shared with the signed-in user (that they accepted). Holiday and birthday calendars appear in the list — skip those by name.
+- Search events in a time window. Relative ranges (`today`, `thisWeek`, `nextWeek`, `next7Days`, …) resolve in the mailbox timezone. Weeks start Monday. Each result includes the full plain-text body.
+- Free/busy (`check_availability`) and ranked slot suggestions (`suggest_meeting_times`).
+- Create, update, cancel, and respond to invitations. Writes have no draft state: the user confirms in-chat; invitations and cancellations notify attendees immediately. `cancel_event` is not a silent delete.
+- Shared calendars. A shared calendar is owned by somebody else but stored in the caller's mailbox — `ownerEmail` is who it belongs to; internal `mailbox` is routing only and is never shown. Pass `calendarRef` / `eventRef` from list/search unchanged.
 
 **What's not supported yet**
 
 - All-day create/update.
 - Mail-invite fusion (finding meetings by searching invite emails).
+- Calendar tools on shared-mailbox **profiles** (those profiles are ingestion-only).
 
-**See also:** [Calendar integration](./calendar-integration.md) (ID namespaces, re-consent order, example prompts)
+**Setup**
+
+Enablement is operator-side: Entra admin consent for `Calendars.ReadWrite.Shared` first, then `CALENDAR_INTEGRATION=enabled`. Existing users must reconnect Outlook after the flag is turned on (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth.
+
+**See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION)
 
 ---
 

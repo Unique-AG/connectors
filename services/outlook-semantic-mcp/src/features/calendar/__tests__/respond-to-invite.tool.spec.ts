@@ -49,8 +49,7 @@ function createTool(
       message: 'Accepted the invitation. The organizer was notified.',
       response: 'accept',
     });
-  const elicit =
-    opts.elicit ?? vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: true } });
+  const elicit = opts.elicit ?? vi.fn().mockResolvedValue({ action: 'accept', content: {} });
   const tool = new RespondToInviteTool(
     { run: get } as unknown as GetCalendarEventQuery,
     { run } as unknown as RespondToInviteCommand,
@@ -101,21 +100,6 @@ describe(RespondToInviteTool.name, () => {
     expect(run).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/cancelled/i);
-  });
-
-  it('does not call the command when the user unchecks confirm', async () => {
-    const { tool, run, elicit } = createTool({
-      elicit: vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: false } }),
-    });
-
-    const result = await tool.respondToInvite(
-      { eventRef: EVENT_REF, response: 'tentativelyAccept' },
-      { elicit } as unknown as Context,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
-    );
-
-    expect(run).not.toHaveBeenCalled();
-    expect(result.success).toBe(false);
   });
 
   it('rejects an eventRef mailbox that is not an SMTP address', async () => {

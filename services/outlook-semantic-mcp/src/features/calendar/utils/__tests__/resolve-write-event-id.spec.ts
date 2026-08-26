@@ -34,7 +34,7 @@ describe(parseSeriesScope.name, () => {
     expect(parseSeriesScope({ applyTo: 'entireSeries' })).toBe('entireSeries');
     expect(parseSeriesScope({ applyTo: 'thisOccurrence' })).toBe('thisOccurrence');
     expect(parseSeriesScope({ applyTo: 'all' })).toBeUndefined();
-    expect(parseSeriesScope({ confirmed: true })).toBeUndefined();
+    expect(parseSeriesScope({})).toBeUndefined();
   });
 });
 

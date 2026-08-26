@@ -14,7 +14,7 @@ import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
 import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
-import { confirmWrite } from './utils/confirm-write';
+import { ConfirmSchema, confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
   isSeriesOccurrence,
@@ -23,14 +23,6 @@ import {
   SERIES_SCOPES,
 } from './utils/resolve-write-event-id';
 import { smtpAddress } from './utils/smtp-address.schema';
-
-const ConfirmSchema = z.object({
-  confirmed: z.boolean().meta({
-    title: 'Apply this update',
-    description:
-      'Confirm to update the event. If it has attendees, they are notified immediately. Leave unchecked to cancel.',
-  }),
-});
 
 const SeriesConfirmSchema = ConfirmSchema.extend({
   applyTo: z.enum(SERIES_SCOPES).meta({
@@ -225,7 +217,7 @@ export class UpdateEventTool {
     if (confirmation.status === 'unavailable') {
       return { success: false, message: confirmation.message };
     }
-    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
+    if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
         mailbox: obfuscateEmail(parsed.eventRef.mailbox),

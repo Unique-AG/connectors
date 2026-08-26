@@ -2,10 +2,9 @@ import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import * as z from 'zod';
-import { confirmWrite } from '../confirm-write';
+import { ConfirmSchema, confirmWrite } from '../confirm-write';
 
-const SCHEMA = z.object({ confirmed: z.boolean() });
+const SCHEMA = ConfirmSchema;
 
 function run(elicit: ReturnType<typeof vi.fn>) {
   const warn = vi.fn();
@@ -22,11 +21,9 @@ function run(elicit: ReturnType<typeof vi.fn>) {
 
 describe(confirmWrite.name, () => {
   it('returns the content when the user accepts', async () => {
-    const { result } = run(
-      vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: true } }),
-    );
+    const { result } = run(vi.fn().mockResolvedValue({ action: 'accept', content: {} }));
 
-    await expect(result).resolves.toEqual({ status: 'accepted', content: { confirmed: true } });
+    await expect(result).resolves.toEqual({ status: 'accepted', content: {} });
   });
 
   it.each(['decline', 'cancel'])('reports %s as declined', async (action) => {

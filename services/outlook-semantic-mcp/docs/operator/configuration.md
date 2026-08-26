@@ -536,11 +536,19 @@ When set to `enabled`, exposes four additional debug tools to all connected MCP 
 
 Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. Write tools notify other people immediately after the user confirms — there is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
-The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers (and admin-consents) `Calendars.ReadWrite.Shared` when `calendar_integration = true`. Enable that apply and tenant admin consent **before** flipping the Helm/env flag. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`; enabling the flag without the Entra permission causes token refresh to fail with `invalid_grant` and mail tools stop working.
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers (and admin-consents) `Calendars.ReadWrite.Shared` when `calendar_integration = true`. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`.
 
-Existing connected users must reconnect Outlook after the flag is turned on, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` does not re-run OAuth — the user has to start a new Outlook connection. If a calendar tool returns `consentRequired`, ask them to reconnect; do not send them to `/auth/authorize`. Enablement order and the two Graph ID namespaces are in [Calendar integration](../technical/calendar-integration.md).
+Do this in order. Flipping the runtime flag before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
+
+1. Apply Terraform `outlook-semantic-mcp-entra-application` with `calendar_integration = true` and grant tenant admin consent for `Calendars.ReadWrite.Shared`.
+2. Confirm the Entra app lists that delegated permission.
+3. Set `CALENDAR_INTEGRATION=enabled` (`mcpConfig.app.calendarIntegration`).
+4. Existing connected users must **reconnect Outlook**, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` only renews the mail webhook; it does not re-run OAuth. The user has to start a new Outlook connection.
+5. If a calendar tool returns `consentRequired: true`, ask the user to reconnect Outlook. Do not send them to `/auth/authorize`.
 
 Calendar listing is Graph `GET /users/{caller}/calendars` (equivalent to `/me/calendars` for the signed-in user): the user's own calendars plus calendars shared with them that they accepted. Shared-mailbox **profiles** never call calendar tools — those profiles are ingestion-only.
+
+See [Tools — Calendar](../technical/tools.md#Calendar) for ID namespaces and the tool reference, and [Authentication](./authentication.md) for the Entra app registration.
 
 #### DELEGATED_ACCESS_SCAN
 

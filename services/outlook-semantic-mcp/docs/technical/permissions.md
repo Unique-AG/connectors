@@ -121,3 +121,5 @@ In addition to the Graph permissions above, the OAuth flow also requests the sta
 - [Authentication](../operator/authentication.md) - Entra ID app registration and consent flows
 - [Architecture](./architecture.md) - Token isolation and authentication layers
 - [Security](./security.md) - Encryption, PKCE, and threat model
+- [Tools — Calendar](./tools.md#Calendar) - Calendar tools that use `Calendars.ReadWrite.Shared`
+- [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) - Operator enablement order

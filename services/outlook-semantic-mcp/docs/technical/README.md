@@ -17,7 +17,6 @@ This section contains detailed technical documentation for developers and archit
 | [Permissions](./permissions.md)                         | Microsoft Graph permissions with least-privilege justification                 |
 | [Security](./security.md)                               | Encryption, OAuth 2.1 with PKCE, token rotation, and threat model              |
 | [Subscription Management](./subscription-management.md) | Subscription lifecycle, renewal, status, and failure handling                  |
-| [Features](./features.md)                               | User-facing features, what's supported, what's not, and setup steps (including delegated access) |
-| [Tools](./tools.md)                                     | Full reference for mail tools, debug tools, and the calendar tool list         |
-| [Calendar integration](./calendar-integration.md)       | Live Outlook calendar tools, ID namespaces, re-consent, example prompts        |
+| [Features](./features.md)                               | User-facing features, what's supported, what's not, and setup steps (including delegated access and calendar) |
+| [Tools](./tools.md)                                     | Full reference for mail tools, debug tools, and calendar tools                 |
 | [FAQ](../faq.md)                                        | Frequently asked questions                                                     |

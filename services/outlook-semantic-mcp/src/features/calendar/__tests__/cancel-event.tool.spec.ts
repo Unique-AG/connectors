@@ -72,7 +72,7 @@ function createTool(
     opts.elicit ??
     vi.fn().mockResolvedValue({
       action: 'accept',
-      content: { confirmed: true, applyTo: 'thisOccurrence' },
+      content: { applyTo: 'thisOccurrence' },
     });
   const tool = new CancelEventTool(
     { run: get } as unknown as GetCalendarEventQuery,
@@ -130,7 +130,6 @@ describe(CancelEventTool.name, () => {
   });
 
   it.each([
-    ['the confirmation is unchecked', { action: 'accept', content: { confirmed: false } }],
     ['the prompt is dismissed', { action: 'cancel' }],
     ['the prompt is declined', { action: 'decline' }],
   ])('does not call the command when %s', async (_label, elicitResult) => {

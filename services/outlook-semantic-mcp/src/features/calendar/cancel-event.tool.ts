@@ -12,7 +12,7 @@ import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema } from './utils/calendar-output.schema';
-import { confirmWrite } from './utils/confirm-write';
+import { ConfirmSchema, confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
   isSeriesOccurrence,
@@ -20,14 +20,6 @@ import {
   resolveWriteEventId,
   SERIES_SCOPES,
 } from './utils/resolve-write-event-id';
-
-const ConfirmSchema = z.object({
-  confirmed: z.boolean().meta({
-    title: 'Cancel this event',
-    description:
-      'Confirm to cancel the event. Attendees are notified. This is not a silent delete. Leave unchecked to keep the event.',
-  }),
-});
 
 const SeriesConfirmSchema = ConfirmSchema.extend({
   applyTo: z.enum(SERIES_SCOPES).meta({
@@ -125,7 +117,7 @@ export class CancelEventTool {
     if (confirmation.status === 'unavailable') {
       return { success: false, message: confirmation.message };
     }
-    if (confirmation.status !== 'accepted' || confirmation.content.confirmed !== true) {
+    if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
         mailbox: obfuscateEmail(parsed.eventRef.mailbox),

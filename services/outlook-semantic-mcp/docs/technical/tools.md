@@ -27,17 +27,17 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
-| [`list_calendars`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`search_calendar_events`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`check_availability`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`suggest_meeting_times`](#Calendar) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`respond_to_invite`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`create_event`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`update_event`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`cancel_event`](#Calendar) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`list_calendars`](#list_calendars) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`search_calendar_events`](#search_calendar_events) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`check_availability`](#check_availability) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`suggest_meeting_times`](#suggest_meeting_times) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
+| [`respond_to_invite`](#respond_to_invite) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`create_event`](#create_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`update_event`](#update_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`cancel_event`](#cancel_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
 
 !!! warning "Calendar tools"
-    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). Writes notify attendees immediately after in-chat confirmation. See [Calendar](#Calendar) and [Calendar integration](./calendar-integration.md).
+    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). Writes notify attendees immediately after in-chat confirmation. See [Calendar](#Calendar).
 
 **Mutating** means the tool writes data to at least one of the following:
 
@@ -668,20 +668,279 @@ Restart the full sync from scratch, discarding all previous progress.
 
 ## Calendar
 
-**Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through; no calendar ingest.
+**Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
 
-| Tool | Mutating | What it does |
-|------|----------|----------------|
-| `list_calendars` | No | Own and shared calendars. Returns `calendarId` (internal). |
-| `search_calendar_events` | No | Events in a time window. Prefer relative `dateRange`. Returns `eventRef` (internal) and the full plain-text body. |
-| `check_availability` | No | Free/busy for up to 20 SMTP addresses. Window must be shorter than 62 days. |
-| `suggest_meeting_times` | No | Ranked free slots. If `emptySuggestionsReason` is set, explain it; do not invent times. |
-| `respond_to_invite` | Yes | Accept / tentative / decline. Pass `eventRef` unchanged. User confirms before the organizer is notified. |
-| `create_event` | Yes | Create a meeting. No draft — invitations go out after confirmation. Reuse `transactionId` on retry. |
-| `update_event` | Yes | Change an existing meeting. For a series, the user picks this occurrence or the whole series. |
-| `cancel_event` | Yes | Cancel and notify attendees. Not `DELETE`. Only the organizer can cancel. Same series choice as update. |
+Write tools (`respond_to_invite`, `create_event`, `update_event`, `cancel_event`) notify other people immediately after in-chat confirmation. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
-Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`. Input and output field descriptions live on the tool schemas (harmony-tested). Enablement, ID namespaces, and example prompts: [Calendar integration](./calendar-integration.md).
+If a calendar tool returns `consentRequired: true`, ask the user to reconnect Outlook. Do not send them to `/auth/authorize`. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
+
+Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`. Pass `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) through unchanged — never assemble one from parts.
+
+### ID namespaces
+
+Graph calendar and event IDs belong to **one mailbox**. An ID read from `/users/{a}/calendars` returns `404 ErrorItemNotFound` under `/users/{b}`, in both directions.
+
+So the mailbox is **provenance**, not a property of the calendar: it is whichever list the ID came out of. `list_calendars` reads `/users/{caller}/calendars` and records the caller as `mailbox`. Search and writes always use `/users/{email}/…` (never `/me/calendars`).
+
+| How the user reaches the calendar | Listed from | `mailbox` | IDs are valid on |
+| --- | --- | --- | --- |
+| Their own calendars | `/users/{caller}/calendars` | caller SMTP | `/users/{caller}/calendars/{calendarId}/…` |
+| A calendar somebody shared with them (they accepted the invitation) | `/users/{caller}/calendars` | **caller SMTP** | `/users/{caller}/calendars/{calendarId}/…` |
+
+A shared calendar is owned by somebody else but **stored in the caller's mailbox**, so `mailbox` is the caller while `ownerEmail` is the owner. Those two fields answer different questions and must not be conflated:
+
+- `mailbox` — routing. Where the ID resolves. Never displayed.
+- `ownerEmail` / `ownerName` — display and filtering. Who it belongs to.
+
+Never infer `mailbox` from the payload. Graph sets `isTallyingResponses: true` on a shared calendar, and treating that as "this is the owner's primary calendar" routes shared calendars to a 404.
+
+### `list_calendars`
+
+List Outlook calendars the signed-in user can access: their own, and calendars shared with them that they accepted.
+
+**Input parameters:** None
+
+**Return shape:**
+
+```typescript
+{
+  success: boolean;
+  message: string;
+  calendars?: Array<{
+    calendarRef: { calendarId: string; mailbox: string }; // pass through unchanged; never display
+    name: string;
+    ownerEmail: string | null;  // SMTP of the owner; on isOwn true this is the signed-in user
+    ownerName: string | null;
+    isOwn: boolean;             // false when the calendar is shared with the user
+    isDefaultCalendar: boolean; // true for the mailbox's primary calendar
+    canEdit: boolean;
+    canViewPrivateItems: boolean;
+  }>;
+  consentRequired?: true;
+}
+```
+
+**Usage notes:**
+
+- Primary calendars are listed first. Holiday and birthday calendars appear too — skip those by name.
+- Shared calendars have `isOwn: false` and `isDefaultCalendar: false` and still hold meetings. Do not skip every `isDefaultCalendar: false` calendar.
+- For meetings between people, pass every `isDefaultCalendar: true` `calendarRef` and every `isOwn: false` `calendarRef` to `search_calendar_events`.
+- `ownerEmail` on a calendar with `isOwn: true` is the signed-in user SMTP — use it in `check_availability` and `suggest_meeting_times` `attendees` when they want to attend.
+
+---
+
+### `search_calendar_events`
+
+Search events in a time window across calendars returned by `list_calendars`. Each result includes the full plain-text body; there is no second tool to open an event.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `calendars` | array of `calendarRef` (1–50) | Yes | From `list_calendars`. Pass each `calendarRef` through unchanged. Never assemble one from a mailbox address. |
+| `dateRange` | object | Yes | Prefer `rangeType: "relative"` with a documented range. Absolute `startDateTime` / `endDateTime` must include a timezone offset (`Z` or `±HH:MM`). |
+| `attendees` | email[] (max 10) | No | Every listed SMTP must be on the event (organizer or attendee). Exact whole-address match — resolve a name with `lookup_contacts` first. |
+| `subject` | `{ startsWith }` or `{ contains }` | No | Exactly one form. Prefer `contains` unless you know how the title begins. |
+| `categories` | string[] (max 10) | No | Every listed Outlook category must be on the event. Omit rather than guess. |
+
+Relative `dateRange.range` values: `today`, `tomorrow`, `yesterday`, `thisWeek`, `nextWeek`, `lastWeek`, `thisMonth`, `nextMonth`, `lastMonth`, `thisYear`, `nextYear`, `lastYear`, `next7Days`, `next30Days`, `next90Days`, `past7Days`, `past30Days`. Weeks start Monday. `today` is the whole mailbox-local day (including meetings that already happened).
+
+**Which filters Graph evaluates**
+
+Results are capped. Where a filter runs relative to that cap decides what an empty result proves.
+
+| Filter | Where | Why |
+|---|---|---|
+| `subject.startsWith` / `subject.contains` | Graph | Narrows **before** the cap. Everything returned is a real match; `searchNotes` reports when more exist. |
+| `attendees` | in-process | Graph cannot filter into attendee email addresses. Applied **after** the cap, on what Graph already returned. |
+| `categories` | in-process | Graph cannot express the AND of several categories. Applied **after** the cap. |
+| window | Graph | Required `startDateTime` / `endDateTime`. |
+
+`attendees` and `categories` are AND filters: every named person or category has to be on the event. An empty result from those filters does not prove the meeting does not exist — matching events may sit outside the fetched set. When `searchNotes` reports a cap, say the answer may be incomplete and offer a narrower window.
+
+**Return shape:**
+
+```typescript
+{
+  success: boolean;
+  message: string;
+  events?: Array<{
+    subject: string | null;
+    body: string;                 // plain-text agenda; may be truncated — see bodyTruncated
+    bodyTruncated: boolean;
+    start: { dateTime: string; timeZone: string };
+    end: { dateTime: string; timeZone: string };
+    location: string | null;
+    joinUrl: string | null;       // Teams URL when present; never invent one
+    attendees: Array<{ name: string | null; email: string | null; response: string | null; type: string | null }>;
+    organizerName: string | null;
+    organizerEmail: string | null;
+    isCancelled: boolean;
+    isAllDay: boolean;
+    isPrivate: boolean;
+    categories: string[];
+    recurrence: string | null;
+    type: string | null;          // singleInstance, occurrence, exception, seriesMaster
+    webLink: string | null;       // the only user-facing URL besides joinUrl
+    calendarName: string;
+    eventRef: { eventId: string; calendarId: string; mailbox: string }; // never display
+  }>;
+  searchNotes?: string[];         // display after the results
+  resolvedWindow?: { start: string; end: string; interpretation: string };
+  consentRequired?: true;
+}
+```
+
+**Usage notes:**
+
+- Call `list_calendars` first. Skip holiday and birthday calendars by name.
+- If a relative range was used, state `resolvedWindow.interpretation` in the answer.
+- Use `webLink` when present; do not invent Outlook URLs.
+- Do not use `today` for "when is my next meeting" — that window includes the whole day, so it can return a meeting that already happened. Use `next7Days` (starts now).
+
+---
+
+### `check_availability`
+
+Free/busy for people, distribution lists, or rooms via Graph `getSchedule`. Only `attendees` are checked (at most 20). Include the signed-in user when they want to attend; get their SMTP from `list_calendars` `ownerEmail` on a calendar with `isOwn: true` (prefer `isDefaultCalendar: true`).
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `attendees` | email[] (1–20) | Yes | SMTP addresses to check. |
+| `dateRange` | object | Yes | Prefer relative. Must be shorter than 62 days. `thisYear`, `nextYear`, `lastYear`, and `next90Days` are rejected. |
+| `intervalMinutes` | integer (5–1440) | No | Length of each availability slot. Default 30. |
+
+**Usage notes:**
+
+- `busyBlocks` are decoded from `availabilityView` (free slots omitted).
+- Subject and location on `items` appear only with detail-level permission; private items are redacted.
+- Graph error 5006 is returned as a narrow-the-range message (more than 1000 calendar entries in a slot).
+- If a relative range was used, state `resolvedWindow.interpretation`.
+
+---
+
+### `suggest_meeting_times`
+
+Ranked free slots via Graph `findMeetingTimes`. Always runs as the signed-in user (the organizer). Include them in `attendees` when they want to attend; omit `attendees` for organizer-only.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `attendees` | email[] | No | People who must be free. |
+| `dateRange` | object | Yes | Future window. Prefer relative (`today`, `tomorrow`, `thisWeek`, `nextWeek`, `next7Days`). Must be shorter than 62 days. Past-only ranges are rejected. |
+| `durationMinutes` | integer (5–1440) | No | Default 30. |
+| `maxCandidates` | integer (1–20) | No | Default 5. |
+| `activityDomain` | `"work"` \| `"personal"` \| `"unrestricted"` | No | Default `work` (signed-in user working hours). |
+| `isOrganizerOptional` | boolean | No | Default false. |
+| `minimumAttendeePercentage` | number (0–100) | No | Default 50. |
+
+**Usage notes:**
+
+- If `emptySuggestionsReason` is present, explain it and suggest widening the window. Do not invent slots.
+
+---
+
+### `respond_to_invite`
+
+Accept, tentatively accept, or decline an invitation. Pass `eventRef` from `search_calendar_events` unchanged. The user must confirm before the organizer is notified.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `eventRef` | object | Yes | From `search_calendar_events`. Never display it. |
+| `response` | `"accept"` \| `"tentativelyAccept"` \| `"decline"` | Yes | Sent immediately after confirmation. |
+| `comment` | string | No | Optional note included with the response. |
+
+---
+
+### `create_event`
+
+Create an event. There is no draft — if attendees are included, invitations are sent immediately after the user confirms.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `subject` | string | Yes | Event title. |
+| `startDateTime` | string | Yes | Inclusive start with timezone offset, e.g. `2026-08-26T09:00:00+02:00`. |
+| `endDateTime` | string | Yes | Exclusive end with timezone offset. Must be after `startDateTime`. |
+| `attendees` | email[] (max 20) | No | Required attendees. Omit for an appointment with no invitations. |
+| `location` | string | No | Location display name. |
+| `body` | string | No | Plain-text agenda. |
+| `isOnlineMeeting` | boolean | No | If true, create a Teams meeting and return a join URL. |
+| `calendarRef` | object | No | From `list_calendars`. Omit to use the signed-in user default calendar. |
+| `transactionId` | string (max 32) | No | Idempotency key. Reuse the same value if this create is retried. |
+
+**Usage notes:**
+
+- All-day events are not supported yet.
+- The confirmation names the destination calendar by owner, not mailbox.
+- `canEdit` must be true on the chosen calendar.
+
+---
+
+### `update_event`
+
+Change an existing event. Pass `eventRef` from `search_calendar_events` unchanged. Attendees are notified immediately after confirmation. For a recurring meeting the user chooses this occurrence or the whole series.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `eventRef` | object | Yes | From `search_calendar_events`. |
+| `subject` | string | No | Replacement title. |
+| `startDateTime` / `endDateTime` | string | No | Replacement times with timezone offset. |
+| `attendees` | email[] (max 20) | No | Replaces the entire attendee list. An empty list removes every attendee. |
+| `location` | string | No | Replacement location. |
+| `body` | string | No | Replacement plain-text agenda. |
+| `isOnlineMeeting` | `true` | No | Add a Teams meeting. Omit to leave unchanged. |
+
+At least one field besides `eventRef` must be set.
+
+---
+
+### `cancel_event`
+
+Cancel an event and notify attendees. This is not a silent delete. Only the organizer can cancel. Pass `eventRef` unchanged. For a recurring meeting the user chooses this occurrence or the whole series.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `eventRef` | object | Yes | From `search_calendar_events`. |
+| `comment` | string | No | Optional note included on the cancellation. |
+
+---
+
+### Example prompts
+
+These are user prompts. The assistant should use the named tools and never show internal IDs.
+
+#### What meetings do I have next week?
+
+> What meetings do I have next week?
+
+Use `list_calendars`, then `search_calendar_events` with `dateRange.rangeType: relative` and `range: nextWeek`. Weeks start Monday. State `resolvedWindow.interpretation` in the answer. Show subject, start/end (with timezone), attendees and their response, location and/or Teams `joinUrl`, and the agenda from `body`. Use `webLink` when present; do not invent Outlook URLs.
+
+#### When is my next meeting with XY?
+
+> When is my next meeting with Alex Rivera?
+
+Resolve the name with `lookup_contacts` first. Then `search_calendar_events` with `dateRange.rangeType: relative`, `range: next7Days` (starts now), and `attendees: ['alex.rivera@…']`. Answer with the soonest hit: when, where / join URL, and who else is on it. Widen the range only if that window is empty. Do not use `today` for this question.
+
+#### Create a meeting invite for XY
+
+> Create a 30-minute invite for Alex Rivera tomorrow at 10:00, subject Sync, Teams meeting.
+
+1. Optional: `suggest_meeting_times` or `check_availability` if the time is not already agreed.
+2. `create_event` with offset-bearing `startDateTime` / `endDateTime`, `attendees: ["alex@example.com"]`, `isOnlineMeeting: true` if they asked for Teams.
+3. The user must confirm. Invitations are sent immediately; there is no draft. If the create is retried, reuse `transactionId`.
+
+Shared-calendar create: `list_calendars`, then pass that `calendarRef` unchanged. The confirmation names the destination by owner, not mailbox.
 
 ---
 
@@ -691,4 +950,5 @@ Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`.
 - [Live Catch-Up](./flows.md#Live-Catch-Up:-Webhook-Driven-Email-Ingestion) - Webhook-driven real-time ingestion
 - [Flows](./flows.md) - Sequence diagrams for OAuth, sync, and draft creation flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
-- [Calendar integration](./calendar-integration.md) - Calendar flag, ID namespaces, re-consent, example prompts
+- [Features — Calendar](./features.md#Calendar) - What is supported, what is not
+- [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) - Operator enablement and re-consent

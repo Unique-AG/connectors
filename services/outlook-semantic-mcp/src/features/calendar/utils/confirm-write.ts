@@ -1,7 +1,10 @@
 import type { Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from '@nestjs/common';
-import type * as z from 'zod';
+import * as z from 'zod';
+
+/** Accept / decline on the prompt is the confirmation. A boolean field would render as a checkbox on top of Confirm. */
+export const ConfirmSchema = z.object({});
 
 export type WriteConfirmation<T> =
   | { status: 'accepted'; content: T }
@@ -27,6 +30,9 @@ const UNSUPPORTED =
  * email text, which is attacker-controlled, so any bypass reachable by instruction is reachable by
  * injection. If a deployment needs unattended writes, that belongs in server config next to
  * CALENDAR_INTEGRATION, where an operator owns it and it can be audited.
+ *
+ * The schema should not include a confirmation boolean. Unique Chat already puts Accept / Decline
+ * on the prompt; a boolean field is a second checkbox the user has to tick as well.
  */
 export async function confirmWrite<T extends z.ZodRawShape>(input: {
   context: Context;

@@ -107,7 +107,7 @@ An additional 4 tools are available only when the server is running in debug mod
 
 In `microsoft_graph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools are not registered.
 
-**See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools) — [Calendar integration](./technical/calendar-integration.md)
+**See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools) — [Calendar](./technical/tools.md#Calendar)
 
 ### Do I need to do anything after connecting?
 
@@ -542,9 +542,11 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 ### Do any permissions require admin consent?
 
-**Answer:** No. All permissions are delegated and do not require admin consent. Users can connect and grant consent themselves without IT involvement.
+**Answer:** Mail permissions are delegated and do not require admin consent. Users can connect and grant those themselves without IT involvement.
 
-**See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
+Calendar is different. `Calendars.ReadWrite.Shared` typically **does** require admin consent. Register it on the Entra app (`calendar_integration = true` on the Terraform module) and grant tenant consent **before** setting `CALENDAR_INTEGRATION=enabled`. Enabling the runtime flag without that permission breaks mail token refresh (`invalid_grant`).
+
+**See also:** [Permissions](./technical/permissions.md) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
