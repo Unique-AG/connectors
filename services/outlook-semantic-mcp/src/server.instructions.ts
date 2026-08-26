@@ -18,8 +18,8 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 
 export const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar
-- Use \`list_calendars\` to see the user's own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to.
-- Use \`search_calendar_events\` for meetings in a time window. Prefer \`dateRange\` with \`rangeType: relative\` (\`today\`, \`thisWeek\`, \`nextWeek\`, \`lastMonth\`, \`next7Days\`). Weeks start Monday. State \`resolvedWindow.interpretation\` in the answer.
+- Use \`list_calendars\` to see the user's own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to. Pass each \`calendarRef\` to \`search_calendar_events\` as \`calendars\`. The list can include holiday and birthday calendars; for meetings between people, pass only those people's actual calendars, not the holiday ones.
+- Use \`search_calendar_events\` for meetings in a time window. Call \`list_calendars\` first; do not scope the search by mailbox address. Prefer \`dateRange\` with \`rangeType: relative\` (\`today\`, \`thisWeek\`, \`nextWeek\`, \`lastMonth\`, \`next7Days\`). Weeks start Monday. State \`resolvedWindow.interpretation\` in the answer.
 - Its filters are not equal, and results are capped. \`subject.startsWith\` and the first \`categories\` value are sent to Microsoft Graph, so they narrow before the cap. \`subject.contains\`, \`attendees\` and any further category are applied afterwards, on the events Graph returned — so an empty result there means "nothing matched in what came back", not "no such meeting exists". Say so when \`searchNotes\` reports capped results, and offer a narrower window.
 - \`attendees\` is an exact address match, and \`attendees\` and \`categories\` both require every listed value to be present. Resolve a name with \`lookup_contacts\` or ask the user before filtering; never invent an address, a category, or a subject fragment.
 - Use \`check_availability\` for free/busy of people, DLs, or rooms. At most 20 addresses; the window must be shorter than 62 days. Subject and location on items appear only with detail-level permission; private items are redacted.

@@ -9,6 +9,7 @@ import {
 } from '../search-calendar-events.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
+const CALENDARS = [{ calendarId: 'cal-own', mailbox: 'me@example.com' }];
 
 describe(SearchCalendarEventsTool.name, () => {
   it('passes a relative range through to the query', async () => {
@@ -29,7 +30,7 @@ describe(SearchCalendarEventsTool.name, () => {
 
     const result = await tool.searchCalendarEvents(
       {
-        mailbox: 'me@example.com',
+        calendars: CALENDARS,
         dateRange: { rangeType: 'relative', range: 'today' },
       },
       {} as unknown as Context,
@@ -37,7 +38,7 @@ describe(SearchCalendarEventsTool.name, () => {
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
-      mailbox: 'me@example.com',
+      calendars: CALENDARS,
       range: 'today',
     });
     expect(SearchCalendarEventsOutputSchema.parse(result)).toEqual(output);
@@ -49,6 +50,7 @@ describe(SearchCalendarEventsTool.name, () => {
 
     await tool.searchCalendarEvents(
       {
+        calendars: CALENDARS,
         dateRange: { rangeType: 'relative', range: 'thisWeek' },
         subject: { startsWith: 'Weekly' },
         attendees: ['alex@example.com', 'pat@example.com'],
@@ -59,6 +61,7 @@ describe(SearchCalendarEventsTool.name, () => {
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
+      calendars: CALENDARS,
       subject: { startsWith: 'Weekly' },
       attendees: ['alex@example.com', 'pat@example.com'],
       categories: ['Client', 'Urgent'],
@@ -73,6 +76,7 @@ describe(SearchCalendarEventsTool.name, () => {
     await expect(
       tool.searchCalendarEvents(
         {
+          calendars: CALENDARS,
           dateRange: { rangeType: 'relative', range: 'today' },
           subject: { startsWith: 'Weekly', contains: 'Sales' },
         } as unknown as Parameters<SearchCalendarEventsTool['searchCalendarEvents']>[0],
@@ -92,6 +96,7 @@ describe(SearchCalendarEventsTool.name, () => {
     await expect(
       tool.searchCalendarEvents(
         {
+          calendars: CALENDARS,
           dateRange: { rangeType: 'relative', range: 'today' },
           attendees: ['Alex'],
         },
@@ -114,6 +119,7 @@ describe(SearchCalendarEventsTool.name, () => {
 
     await tool.searchCalendarEvents(
       {
+        calendars: CALENDARS,
         dateRange: {
           rangeType: 'absolute',
           startDateTime: '2026-08-25T00:00:00+02:00',
@@ -125,6 +131,7 @@ describe(SearchCalendarEventsTool.name, () => {
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
+      calendars: CALENDARS,
       startDateTime: '2026-08-25T00:00:00+02:00',
       endDateTime: '2026-08-26T00:00:00+02:00',
     });
@@ -137,7 +144,7 @@ describe(SearchCalendarEventsTool.name, () => {
 
     await expect(
       tool.searchCalendarEvents(
-        { dateRange: { rangeType: 'relative' } } as unknown as Parameters<
+        { calendars: CALENDARS, dateRange: { rangeType: 'relative' } } as unknown as Parameters<
           SearchCalendarEventsTool['searchCalendarEvents']
         >[0],
         {} as unknown as Context,
@@ -154,7 +161,7 @@ describe(SearchCalendarEventsTool.name, () => {
 
     await expect(
       tool.searchCalendarEvents(
-        { dateRange: { rangeType: 'absolute' } } as unknown as Parameters<
+        { calendars: CALENDARS, dateRange: { rangeType: 'absolute' } } as unknown as Parameters<
           SearchCalendarEventsTool['searchCalendarEvents']
         >[0],
         {} as unknown as Context,
@@ -173,6 +180,7 @@ describe(SearchCalendarEventsTool.name, () => {
     await expect(
       tool.searchCalendarEvents(
         {
+          calendars: CALENDARS,
           dateRange: {
             rangeType: 'absolute',
             startDateTime: '2026-08-25T00:00:00',
@@ -185,6 +193,24 @@ describe(SearchCalendarEventsTool.name, () => {
         } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/offset/i);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('rejects a search without calendars', async () => {
+    const run = vi.fn();
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
+
+    await expect(
+      tool.searchCalendarEvents(
+        {
+          dateRange: { rangeType: 'relative', range: 'today' },
+        } as unknown as Parameters<SearchCalendarEventsTool['searchCalendarEvents']>[0],
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
+      ),
+    ).rejects.toThrow(/calendars/i);
     expect(run).not.toHaveBeenCalled();
   });
 });

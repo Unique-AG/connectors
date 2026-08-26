@@ -42,19 +42,6 @@ const SubjectFilterSchema = z
   );
 
 const FiltersSchema = z.object({
-  calendars: z
-    .array(CalendarRefSchema)
-    .max(50)
-    .optional()
-    .describe(
-      'Narrow the search to specific calendars. Take each calendarRef from list_calendars and pass it through unchanged. Omit to search every calendar the user can access, which is the normal case and needs no list_calendars call first.',
-    ),
-  mailbox: z
-    .string()
-    .optional()
-    .describe(
-      'SMTP address of a mailbox to search. Omit to search every calendar the user can access (own, shared, and Full Access). Do not put the mailbox in subject or attendees.',
-    ),
   attendees: z
     .array(smtpAddress('SMTP address that must be on the event, as organizer or as an attendee.'))
     .max(10)
@@ -81,6 +68,13 @@ const FiltersSchema = z.object({
 });
 
 export const SearchCalendarEventsInputSchema = FiltersSchema.extend({
+  calendars: z
+    .array(CalendarRefSchema)
+    .min(1)
+    .max(50)
+    .describe(
+      'Which calendars to search. Call list_calendars first and pass each calendarRef through unchanged. The list can include noise such as holiday or birthday calendars: for meetings between people, pass only those people\'s actual calendars (typically isOwn, or a named person\'s Calendar), not holiday calendars. Pass every meeting calendarRef from the list only when the user wants all meeting calendars. Never assemble a calendarRef yourself and never use a mailbox address to choose calendars.',
+    ),
   dateRange: DateRangeSchema.describe(
     'Time window to search. Prefer rangeType relative with a documented range.',
   ),
@@ -195,7 +189,7 @@ export class SearchCalendarEventsTool {
     name: 'search_calendar_events',
     title: 'Search Calendar Events',
     description:
-      'Search Outlook calendar events in a time window across the signed-in user\'s calendars, including shared calendars and Full Access mailboxes.\n\nTime window: prefer dateRange.rangeType=relative with a documented range (today, tomorrow, thisWeek, nextWeek, lastMonth, next7Days, …); weeks start Monday. Vague phrasing ("soon", "recently") should use the closest documented range. Absolute startDateTime/endDateTime must include a timezone offset — Graph does not reinterpret them via Prefer: outlook.timezone.\n\nWhere each filter runs, because it changes what an empty result means. Results are capped, and the cap is what makes an answer incomplete. subject.startsWith and the first value of categories are sent to Microsoft Graph, so they narrow BEFORE the cap: every event you get back is a real match, and searchNotes tells you when more of the same exist. subject.contains, attendees, and any category after the first are evaluated in this service AFTER the cap, on the events Graph already returned — so they are a convenience, not a guarantee. They can return nothing while matching events sit outside what was fetched.\n\nSo: an empty result from subject.contains or attendees does not prove the meeting does not exist. When searchNotes reports that results were capped, say the answer may be incomplete and offer a narrower window instead of answering "there are no such meetings".\n\nGather what you need before calling, rather than guessing a filter. attendees is an exact whole-address match, not a name search: a partial or wrong address silently returns nothing that reads exactly like an empty calendar. Resolve a name with lookup_contacts, or ask the user, first. categories must match an existing Outlook category exactly. Choosing subject.startsWith over subject.contains has to be a fact about the title, not a guess made to reach the server-side path — a wrong prefix excludes the event entirely. attendees and categories are AND filters: every value listed must be on the event, so search once per value when the user means either. If you cannot build a filter confidently, either ask the user or search on the time window alone and read the results.\n\nEach result includes the full plain-text body (possibly truncated — see bodyTruncated); there is no second tool to open an event. eventRef, eventId, calendarId and mailbox are internal — never display them. If searchNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
+      'Search Outlook calendar events in a time window. Call list_calendars first and pass those calendarRef values as calendars — that is how you choose among the signed-in user\'s own, shared, and Full Access calendars. Do not scope by mailbox address. list_calendars can return noise such as holiday calendars: for meetings between people, pass only those people\'s actual calendars, not holiday or birthday calendars. Pass every meeting calendarRef from the list only when the user wants all of them.\n\nTime window: prefer dateRange.rangeType=relative with a documented range (today, tomorrow, thisWeek, nextWeek, lastMonth, next7Days, …); weeks start Monday. Vague phrasing ("soon", "recently") should use the closest documented range. Absolute startDateTime/endDateTime must include a timezone offset — Graph does not reinterpret them via Prefer: outlook.timezone.\n\nWhere each filter runs, because it changes what an empty result means. Results are capped, and the cap is what makes an answer incomplete. subject.startsWith and the first value of categories are sent to Microsoft Graph, so they narrow BEFORE the cap: every event you get back is a real match, and searchNotes tells you when more of the same exist. subject.contains, attendees, and any category after the first are evaluated in this service AFTER the cap, on the events Graph already returned — so they are a convenience, not a guarantee. They can return nothing while matching events sit outside what was fetched.\n\nSo: an empty result from subject.contains or attendees does not prove the meeting does not exist. When searchNotes reports that results were capped, say the answer may be incomplete and offer a narrower window instead of answering "there are no such meetings".\n\nGather what you need before calling, rather than guessing a filter. attendees is an exact whole-address match, not a name search: a partial or wrong address silently returns nothing that reads exactly like an empty calendar. Resolve a name with lookup_contacts, or ask the user, first. categories must match an existing Outlook category exactly. Choosing subject.startsWith over subject.contains has to be a fact about the title, not a guess made to reach the server-side path — a wrong prefix excludes the event entirely. attendees and categories are AND filters: every value listed must be on the event, so search once per value when the user means either. If you cannot build a filter confidently, either ask the user or search on the time window alone and read the results.\n\nEach result includes the full plain-text body (possibly truncated — see bodyTruncated); there is no second tool to open an event. eventRef, eventId, calendarId and mailbox are internal — never display them. If searchNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
     parameters: SearchCalendarEventsInputSchema,
     outputSchema: SearchCalendarEventsOutputSchema,
     annotations: {

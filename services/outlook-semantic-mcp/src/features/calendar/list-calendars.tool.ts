@@ -15,7 +15,11 @@ const CalendarSchema = z.object({
   calendarRef: CalendarRefSchema.describe(
     'Internal handle for this calendar. Pass it through unchanged to search_calendar_events or create_event. Never display it.',
   ),
-  name: z.string().describe('Display name of the calendar as shown in Outlook.'),
+  name: z
+    .string()
+    .describe(
+      'Display name of the calendar as shown in Outlook. Holiday and birthday calendars appear here too; they are not meeting calendars.',
+    ),
   ownerEmail: z
     .string()
     .nullable()
@@ -65,7 +69,7 @@ export class ListCalendarsTool {
     name: 'list_calendars',
     title: 'List Calendars',
     description:
-      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. To list meetings in a time window, use search_calendar_events. Each calendar carries a calendarRef — pass it through unchanged to narrow search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. If listNotes is present, show it after the list — a Full Access mailbox that could not be read is omitted from calendars and explained there. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
+      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. The list can include noise such as holiday and birthday calendars. To list meetings in a time window, call this first, then search_calendar_events with calendarRef values from the people's actual calendars — not holiday calendars. Each calendar carries a calendarRef — pass it through unchanged to search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. If listNotes is present, show it after the list — a Full Access mailbox that could not be read is omitted from calendars and explained there. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
     parameters: ListCalendarsInputSchema,
     outputSchema: ListCalendarsOutputSchema,
     annotations: {

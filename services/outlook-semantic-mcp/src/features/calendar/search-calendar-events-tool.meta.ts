@@ -17,7 +17,9 @@ Evaluated here, after the cap, on the events Graph already returned: subject.con
 
 So when searchNotes reports capped results, say the answer may be incomplete and offer a narrower window rather than asserting the calendar is empty. Prefer the Graph-side filters, and prefer a narrower dateRange over a wide window trimmed in memory.
 
-Before calling, make sure you actually have the values you are filtering on:
+Before calling, call list_calendars and pass its calendarRef values as calendars. That is the only way to choose which calendars to search; do not pass a mailbox address. The list can include noise such as holiday and birthday calendars. For meetings between people, pass only those people's actual calendars (isOwn or a named person's Calendar), not holiday calendars. Pass every meeting calendarRef only when the user wants all meeting calendars.
+
+Then make sure you actually have the values you are filtering on:
 - attendees is an exact whole-address match, not a name search. A partial or misremembered address returns an empty result that looks identical to a free calendar. Resolve the name with lookup_contacts or ask the user.
 - categories must name an existing Outlook category exactly.
 - subject.startsWith only helps if you know how the title begins. A wrong prefix excludes the event outright, so use subject.contains instead and accept that it runs after the cap.

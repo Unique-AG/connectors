@@ -49,8 +49,7 @@ export interface SearchCalendarEventsQueryOutput {
 }
 
 export interface SearchCalendarEventsQueryInput {
-  mailbox?: string;
-  calendars?: CalendarRefInput[];
+  calendars: CalendarRefInput[];
   /** Every address must be on the event, as organizer or attendee. */
   attendees?: string[];
   subject?: SubjectFilter;
@@ -82,7 +81,7 @@ export class SearchCalendarEventsQuery {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.mailbox),
+      requestedCalendarCount: input.calendars.length,
       hasAttendeeFilter: hasAttendeeFilter(input),
       hasSubjectFilter: input.subject !== undefined,
       hasCategoryFilter: hasCategoryFilter(input),
@@ -91,7 +90,6 @@ export class SearchCalendarEventsQuery {
     });
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
       operation: 'search_calendar_events',
     });
     return this.calendarMetrics.measureSearch(
@@ -129,11 +127,9 @@ export class SearchCalendarEventsQuery {
       outlookTimeZone,
       notes: timezoneNotes,
     } = await this.resolveMailboxTimezoneQuery.run(userProfileId);
-    const { calendars, notes: mailboxNotes } = this.selectCalendars({
+    const { calendars, notes: calendarNotes } = this.selectCalendars({
       calendars: listed.calendars ?? [],
       requested: input.calendars,
-      mailbox: input.mailbox,
-      callerEmail: userProfile.email,
     });
     const clock = input.now ?? Temporal.Now.zonedDateTimeISO(ianaTimeZone);
     const resolvedWindow = resolveQueryWindow({
@@ -144,18 +140,17 @@ export class SearchCalendarEventsQuery {
     });
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.mailbox),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
       calendarCount: calendars.length,
       msg: 'search_calendar_events window',
     });
-    const prefixNotes = [...timezoneNotes, ...mailboxNotes];
+    const prefixNotes = [...timezoneNotes, ...calendarNotes];
     if (calendars.length === 0) {
       this.logger.debug({
         userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(input.mailbox),
+        requestedCalendarCount: input.calendars.length,
         msg: 'search_calendar_events no calendars matched',
       });
       return {
@@ -172,7 +167,6 @@ export class SearchCalendarEventsQuery {
       client,
       userId: userProfile.id,
       userProfileId: userProfileIdString,
-      callerEmail: userProfile.email,
       calendars,
       filters: input,
       timeZone: outlookTimeZone,
@@ -192,53 +186,34 @@ export class SearchCalendarEventsQuery {
   }
 
   /**
-   * Narrows the fan-out. An explicit calendars list wins over the mailbox filter, and is matched
-   * against what list_calendars actually returned rather than trusted, so a stale or hand-built
-   * calendarRef is reported instead of being sent to Graph.
+   * Matches requested calendarRefs against what list_calendars actually returned rather than
+   * trusting them, so a stale or hand-built calendarRef is reported instead of being sent to Graph.
    */
-  private selectCalendars(input: {
+  private selectCalendars(input: { calendars: CalendarRef[]; requested: CalendarRefInput[] }): {
     calendars: CalendarRef[];
-    requested: CalendarRefInput[] | undefined;
-    mailbox: string | undefined;
-    callerEmail: string;
-  }): { calendars: CalendarRef[]; notes: string[] } {
-    if (input.requested !== undefined && input.requested.length > 0) {
-      const accessible = new Map(
-        input.calendars.map((calendar) => [calendarKey(calendar), calendar] as const),
-      );
-      const matched: CalendarRef[] = [];
-      const unknown: string[] = [];
-      for (const requested of input.requested) {
-        const calendar = accessible.get(calendarKey(requested));
-        if (calendar === undefined) {
-          unknown.push(requested.mailbox);
-          continue;
-        }
-        matched.push(calendar);
+    notes: string[];
+  } {
+    const accessible = new Map(
+      input.calendars.map((calendar) => [calendarKey(calendar), calendar] as const),
+    );
+    const matched: CalendarRef[] = [];
+    const unknown: string[] = [];
+    for (const requested of input.requested) {
+      const calendar = accessible.get(calendarKey(requested));
+      if (calendar === undefined) {
+        unknown.push(requested.mailbox);
+        continue;
       }
-      return {
-        calendars: matched,
-        notes:
-          unknown.length === 0
-            ? []
-            : [
-                `${unknown.length} requested calendar${unknown.length === 1 ? ' is' : 's are'} no longer accessible; call list_calendars again.`,
-              ],
-      };
+      matched.push(calendar);
     }
-    if (input.mailbox === undefined) {
-      return { calendars: input.calendars, notes: [] };
-    }
-    const target = input.mailbox.toLowerCase();
-    const matched = input.calendars.filter((calendar) => {
-      if (calendar.ownerEmail?.toLowerCase() === target) {
-        return true;
-      }
-      return calendar.isOwn && input.callerEmail.toLowerCase() === target;
-    });
     return {
       calendars: matched,
-      notes: matched.length === 0 ? [`No calendars matched mailbox ${input.mailbox}.`] : [],
+      notes:
+        unknown.length === 0
+          ? []
+          : [
+              `${unknown.length} requested calendar${unknown.length === 1 ? ' is' : 's are'} no longer accessible; call list_calendars again.`,
+            ],
     };
   }
 
@@ -246,7 +221,6 @@ export class SearchCalendarEventsQuery {
     client: Client;
     userId: string;
     userProfileId: string;
-    callerEmail: string;
     calendars: CalendarRef[];
     filters: SearchCalendarEventsQueryInput;
     timeZone: string;

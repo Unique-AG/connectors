@@ -11,7 +11,10 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import type { CalendarRef } from '../calendar.schemas';
 import { ListCalendarsQuery } from '../list-calendars.query';
-import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
+import {
+  SearchCalendarEventsQuery,
+  type SearchCalendarEventsQueryInput,
+} from '../search-calendar-events.query';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
@@ -77,6 +80,26 @@ const SHARED_INTO_OWN_MAILBOX: CalendarRef = {
   canViewPrivateItems: false,
 };
 const SHARED_VIEW = `/users/${OWN_EMAIL}/calendars/cal-shared/calendarView`;
+
+const OWN_CALENDAR_REF = { calendarId: OWN_CALENDAR.calendarId, mailbox: OWN_CALENDAR.mailbox };
+const DELEGATED_CALENDAR_REF = {
+  calendarId: DELEGATED_CALENDAR.calendarId,
+  mailbox: DELEGATED_CALENDAR.mailbox,
+};
+const SHARED_CALENDAR_REF = {
+  calendarId: SHARED_INTO_OWN_MAILBOX.calendarId,
+  mailbox: SHARED_INTO_OWN_MAILBOX.mailbox,
+};
+
+function search(
+  overrides: Partial<SearchCalendarEventsQueryInput> = {},
+): SearchCalendarEventsQueryInput {
+  return {
+    calendars: [OWN_CALENDAR_REF],
+    ...WINDOW,
+    ...overrides,
+  };
+}
 
 function makeGraphError(statusCode: number, code: string): GraphError {
   const err = new GraphError(statusCode, 'Access denied');
@@ -203,7 +226,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [graphEvent()] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(api).toHaveBeenCalledWith(OWN_VIEW);
     expect(request.header).toHaveBeenCalledWith('Prefer', PREFER);
@@ -251,10 +274,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      attendees: ['JORDAN@example.com'],
-    });
+    const result = await query.run(USER_PROFILE_ID, search({ attendees: ['JORDAN@example.com'] }));
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });
@@ -275,10 +295,10 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [both, onlyOne] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      attendees: ['alex@example.com', 'pat@example.com'],
-    });
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({ attendees: ['alex@example.com', 'pat@example.com'] }),
+    );
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['both']);
   });
@@ -288,7 +308,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [graphEvent()] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, attendees: ['alex@example.co'] });
+    const result = await query.run(USER_PROFILE_ID, search({ attendees: ['alex@example.co'] }));
 
     expect(result.events).toEqual([]);
   });
@@ -303,7 +323,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, categories: ['client'] });
+    const result = await query.run(USER_PROFILE_ID, search({ categories: ['client'] }));
 
     expect(filterCalls).toEqual(["categories/any(c:c eq 'client')"]);
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
@@ -319,10 +339,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      categories: ['client', 'URGENT'],
-    });
+    const result = await query.run(USER_PROFILE_ID, search({ categories: ['client', 'URGENT'] }));
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['both']);
   });
@@ -332,11 +349,10 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [graphEvent({ categories: ['Client'] })] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      categories: ["O'Brien"],
-      subject: { startsWith: 'Stand' },
-    });
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({ categories: ["O'Brien"], subject: { startsWith: 'Stand' } }),
+    );
 
     expect(filterCalls).toEqual([
       "categories/any(c:c eq 'O''Brien') and startswith(subject,'Stand')",
@@ -355,10 +371,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      subject: { contains: 'standup' },
-    });
+    const result = await query.run(USER_PROFILE_ID, search({ subject: { contains: 'standup' } }));
 
     expect(filterCalls).toEqual([]);
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
@@ -374,10 +387,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      subject: { startsWith: 'standup' },
-    });
+    const result = await query.run(USER_PROFILE_ID, search({ subject: { startsWith: 'standup' } }));
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });
@@ -394,7 +404,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       });
     const { query, filterCalls } = createQuery({ get });
 
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, categories: ['Client'] });
+    const result = await query.run(USER_PROFILE_ID, search({ categories: ['Client'] }));
 
     expect(filterCalls).toEqual(["categories/any(c:c eq 'Client')"]);
     expect(result.success).toBe(true);
@@ -408,7 +418,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(result.events).toHaveLength(1);
     expect(result.events?.[0]?.isCancelled).toBe(true);
@@ -422,7 +432,10 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({ calendars: [DELEGATED_CALENDAR_REF] }),
+    );
 
     expect(result.events?.[0]?.isPrivate).toBe(true);
     expect(result.events?.[0]?.sensitivity).toBe('private');
@@ -437,7 +450,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(request.header).toHaveBeenCalledWith(
       'Prefer',
@@ -458,7 +471,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     });
     const { query } = createQuery({ get });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(get).toHaveBeenCalledTimes(1);
     expect(result.events).toHaveLength(100);
@@ -476,7 +489,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     });
     const { query } = createQuery({ get });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(get).toHaveBeenCalledTimes(5);
     expect(result.events).toHaveLength(50);
@@ -490,7 +503,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [graphEvent()] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(result.searchNotes).toBeUndefined();
   });
@@ -513,7 +526,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(result.success).toBe(true);
     expect(result.events?.[0]?.eventRef.eventId).toBe('sparse');
@@ -526,11 +539,10 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [] }),
     });
 
-    await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      attendees: ['alex@example.com'],
-      subject: { contains: 'Standup' },
-    });
+    await query.run(
+      USER_PROFILE_ID,
+      search({ attendees: ['alex@example.com'], subject: { contains: 'Standup' } }),
+    );
 
     expect(measureSearch).toHaveBeenCalledWith(
       {
@@ -555,7 +567,10 @@ describe(SearchCalendarEventsQuery.name, () => {
       },
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({ calendars: [OWN_CALENDAR_REF, DELEGATED_CALENDAR_REF] }),
+    );
 
     expect(result.success).toBe(true);
     expect(result.events).toHaveLength(1);
@@ -571,7 +586,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       },
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(result).toEqual({
       success: false,
@@ -586,7 +601,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [] }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(request.header).toHaveBeenCalledWith(
       'Prefer',
@@ -596,27 +611,6 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.searchNotes).toContain(
       'Mailbox timezone was unavailable; times are requested in UTC.',
     );
-  });
-
-  it('scopes to calendars whose owner matches mailbox', async () => {
-    const { query, api } = createQuery({
-      calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
-      getByPath: {
-        [OWNER_VIEW]: {
-          value: [graphEvent({ id: 'banker-evt' })],
-        },
-      },
-    });
-
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, mailbox: OWNER_EMAIL });
-
-    expect(api).toHaveBeenCalledWith(OWNER_VIEW);
-    expect(api).not.toHaveBeenCalledWith(OWN_VIEW);
-    expect(result.events?.[0]?.eventRef).toEqual({
-      eventId: 'banker-evt',
-      calendarId: 'cal-banker',
-      mailbox: OWNER_EMAIL,
-    });
   });
 
   it('sorts events by start and flags a truncated body', async () => {
@@ -637,7 +631,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search());
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['earlier', 'later']);
     expect(result.events?.[0]?.bodyTruncated).toBe(true);
@@ -650,7 +644,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     });
     const now = Temporal.ZonedDateTime.from('2026-08-25T15:30:00[Europe/Zurich]');
 
-    const result = await query.run(USER_PROFILE_ID, { range: 'today', now });
+    const result = await query.run(USER_PROFILE_ID, search({ range: 'today', now }));
 
     expect(request.query).toHaveBeenCalledWith({
       startDateTime: '2026-08-25T00:00:00.000+02:00',
@@ -667,7 +661,7 @@ describe(SearchCalendarEventsQuery.name, () => {
       getByPath: { [SHARED_VIEW]: { value: [graphEvent({ id: 'shared-evt' })] } },
     });
 
-    const result = await query.run(USER_PROFILE_ID, WINDOW);
+    const result = await query.run(USER_PROFILE_ID, search({ calendars: [SHARED_CALENDAR_REF] }));
 
     expect(api).toHaveBeenCalledWith(SHARED_VIEW);
     expect(api).not.toHaveBeenCalledWith(`/users/${OWNER_EMAIL}/calendars/cal-shared/calendarView`);
@@ -684,10 +678,10 @@ describe(SearchCalendarEventsQuery.name, () => {
       getByPath: { [OWNER_VIEW]: { value: [graphEvent({ id: 'banker-evt' })] } },
     });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      calendars: [{ calendarId: 'cal-banker', mailbox: OWNER_EMAIL }],
-    });
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({ calendars: [DELEGATED_CALENDAR_REF] }),
+    );
 
     expect(api).toHaveBeenCalledWith(OWNER_VIEW);
     expect(api).not.toHaveBeenCalledWith(OWN_VIEW);
@@ -697,10 +691,10 @@ describe(SearchCalendarEventsQuery.name, () => {
   it('notes a requested calendar that is no longer accessible instead of calling Graph', async () => {
     const { query, api } = createQuery({ calendars: [OWN_CALENDAR] });
 
-    const result = await query.run(USER_PROFILE_ID, {
-      ...WINDOW,
-      calendars: [{ calendarId: 'cal-gone', mailbox: OWNER_EMAIL }],
-    });
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({ calendars: [{ calendarId: 'cal-gone', mailbox: OWNER_EMAIL }] }),
+    );
 
     expect(api).not.toHaveBeenCalled();
     expect(result.success).toBe(true);
@@ -720,7 +714,14 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     // A relative range resolved per calendar could straddle midnight and produce different days.
     const now = Temporal.ZonedDateTime.from('2026-08-25T23:59:59.999[Europe/Zurich]');
-    const result = await query.run(USER_PROFILE_ID, { range: 'today', now });
+    const result = await query.run(
+      USER_PROFILE_ID,
+      search({
+        calendars: [OWN_CALENDAR_REF, DELEGATED_CALENDAR_REF, SHARED_CALENDAR_REF],
+        range: 'today',
+        now,
+      }),
+    );
 
     const expected = {
       startDateTime: result.resolvedWindow?.startDateTime,
