@@ -10,7 +10,7 @@ import type { ResolvedWindow } from '~/utils/relative-range';
 export const ConsentRequiredSchema = z
   .boolean()
   .describe(
-    'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
+    'True when calendar scopes have not been granted yet. Ask the user to reconnect Outlook. Do not call reconnect_inbox.',
   );
 
 /** Output counterpart of CalendarDateTime — one end of an event, slot, or schedule item. */

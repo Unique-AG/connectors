@@ -35,7 +35,12 @@ export const CreateEventInputSchema = z
         'Required attendees. Maximum 20. Omit for an appointment with no invitations. Invitations are sent as soon as the event is created.',
       ),
     location: z.string().optional().describe('Optional location display name.'),
-    body: z.string().optional().describe('Optional plain-text agenda or notes.'),
+    body: z
+      .string()
+      .optional()
+      .describe(
+        'Optional agenda as HTML, sent to Outlook unchanged. Do not write Markdown. Use <p> for paragraphs, <br> for line breaks, <strong> bold, <em> italic, <ul>/<ol>/<li> lists, <a href="https://example.com"> links, and <blockquote>. Fragment only — no html, head, or body wrappers. Do not include the Teams join section (underscore rules or me-email-text); Graph adds that when isOnlineMeeting is true.',
+      ),
     isOnlineMeeting: z
       .boolean()
       .optional()

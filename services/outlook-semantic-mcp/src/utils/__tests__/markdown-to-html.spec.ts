@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { markdownToHtml } from './markdown-to-html';
+import { markdownToHtml } from '../markdown-to-html';
 
 describe('markdownToHtml', () => {
   it('renders paragraphs and inline formatting', () => {

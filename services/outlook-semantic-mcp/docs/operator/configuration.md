@@ -544,7 +544,7 @@ Do this in order. Flipping the runtime flag before Entra has the scope breaks **
 2. Confirm the Entra app lists that delegated permission.
 3. Set `CALENDAR_INTEGRATION=enabled` (`mcpConfig.app.calendarIntegration`).
 4. Existing connected users must **reconnect Outlook**, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` only renews the mail webhook; it does not re-run OAuth. The user has to start a new Outlook connection.
-5. If a calendar tool returns `consentRequired: true`, ask the user to reconnect Outlook. Do not send them to `/auth/authorize`.
+5. If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox. Ask the user to reconnect Outlook (new Microsoft OAuth). Do not call `reconnect_inbox`. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect.
 
 Calendar listing is Graph `GET /users/{caller}/calendars` (equivalent to `/me/calendars` for the signed-in user): the user's own calendars plus calendars shared with them that they accepted. Shared-mailbox **profiles** never call calendar tools — those profiles are ingestion-only.
 

@@ -670,9 +670,9 @@ Restart the full sync from scratch, discarding all previous progress.
 
 **Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
 
-Write tools (`respond_to_invite`, `create_event`, `update_event`, `cancel_event`) notify other people immediately after in-chat confirmation. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
+Write tools (`respond_to_invite`, `create_event`, `update_event`, `cancel_event`) notify other people immediately after in-chat confirmation. There is no draft state. Confirmation is Accept / Decline on the prompt — there is no extra checkbox. For a recurring `update_event` or `cancel_event`, the prompt also asks this occurrence or the entire series. `cancel_event` notifies attendees; it is not a silent delete.
 
-If a calendar tool returns `consentRequired: true`, ask the user to reconnect Outlook. Do not send them to `/auth/authorize`. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
+If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
 
 Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`. Pass `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) through unchanged — never assemble one from parts.
 
@@ -778,15 +778,24 @@ Results are capped. Where a filter runs relative to that cap decides what an emp
     isCancelled: boolean;
     isAllDay: boolean;
     isPrivate: boolean;
+    sensitivity: string | null;   // normal, personal, private, confidential
     categories: string[];
     recurrence: string | null;
+    seriesMasterId: string | null; // never display
     type: string | null;          // singleInstance, occurrence, exception, seriesMaster
+    showAs: string | null;        // free, tentative, busy, oof, workingElsewhere, unknown
     webLink: string | null;       // the only user-facing URL besides joinUrl
     calendarName: string;
     eventRef: { eventId: string; calendarId: string; mailbox: string }; // never display
   }>;
   searchNotes?: string[];         // display after the results
-  resolvedWindow?: { start: string; end: string; interpretation: string };
+  resolvedWindow?: {
+    startDateTime: string;
+    endDateTime: string;
+    timeZone: string;
+    serverCurrentDateTime: string;
+    interpretation: string;
+  };
   consentRequired?: true;
 }
 ```
@@ -870,7 +879,7 @@ Create an event. There is no draft — if attendees are included, invitations ar
 | `endDateTime` | string | Yes | Exclusive end with timezone offset. Must be after `startDateTime`. |
 | `attendees` | email[] (max 20) | No | Required attendees. Omit for an appointment with no invitations. |
 | `location` | string | No | Location display name. |
-| `body` | string | No | Plain-text agenda. |
+| `body` | string | No | Agenda as HTML, sent to Outlook unchanged. Use `<p>`, `<br>`, `<strong>`, `<em>`, lists, and links. Fragment only — no document wrappers and no Teams join section. |
 | `isOnlineMeeting` | boolean | No | If true, create a Teams meeting and return a join URL. |
 | `calendarRef` | object | No | From `list_calendars`. Omit to use the signed-in user default calendar. |
 | `transactionId` | string (max 32) | No | Idempotency key. Reuse the same value if this create is retried. |
@@ -878,8 +887,9 @@ Create an event. There is no draft — if attendees are included, invitations ar
 **Usage notes:**
 
 - All-day events are not supported yet.
-- The confirmation names the destination calendar by owner, not mailbox.
+- The confirmation names the destination calendar by owner, not mailbox. The user confirms with Accept / Decline on the prompt.
 - `canEdit` must be true on the chosen calendar.
+- `body` is HTML sent to Graph unchanged (`contentType: HTML`). Do not write Markdown. Graph appends the Teams join HTML when `isOnlineMeeting` is true.
 
 ---
 
@@ -896,10 +906,12 @@ Change an existing event. Pass `eventRef` from `search_calendar_events` unchange
 | `startDateTime` / `endDateTime` | string | No | Replacement times with timezone offset. |
 | `attendees` | email[] (max 20) | No | Replaces the entire attendee list. An empty list removes every attendee. |
 | `location` | string | No | Replacement location. |
-| `body` | string | No | Replacement plain-text agenda. |
+| `body` | string | No | Replacement agenda as HTML, sent to Outlook unchanged. Fragment only. Do not include the Teams join section. Omit to leave the body unchanged. |
 | `isOnlineMeeting` | `true` | No | Add a Teams meeting. Omit to leave unchanged. |
 
 At least one field besides `eventRef` must be set.
+
+A Teams meeting body is an HTML document Graph already owns. Inside `<body>` the user agenda comes first, then Microsoft's insert: a gray underscore rule, a `div.me-email-text` block (Join Microsoft Teams Meeting link, dial-in, conference ID, Local numbers / Reset PIN / Learn more / Meeting options), and a closing underscore rule. Updating `body` writes the agent's HTML into the user-agenda region only; the Microsoft block is not rewritten, and the agent's HTML is not converted or escaped.
 
 ---
 

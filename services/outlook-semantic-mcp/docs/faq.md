@@ -548,6 +548,16 @@ Calendar is different. `Calendars.ReadWrite.Shared` typically **does** require a
 
 **See also:** [Permissions](./technical/permissions.md) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
 
+### What does `consentRequired: true` on a calendar tool mean?
+
+**Answer:** Graph denied calendar permission on the signed-in user's own mailbox — usually because `Calendars.ReadWrite.Shared` is not on their token yet. Ask the user to **reconnect Outlook** so Microsoft OAuth runs again with the calendar scope.
+
+Do **not** call `reconnect_inbox` — that only renews the mail webhook. Do **not** send the user to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a reconnect.
+
+A permission error on a *delegated* mailbox is different: that is not `consentRequired`; the tool returns a mailbox-specific denial instead.
+
+**See also:** [Tools — Calendar](./technical/tools.md#Calendar) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
+
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
 **Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `create_draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.

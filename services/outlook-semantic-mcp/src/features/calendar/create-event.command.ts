@@ -20,6 +20,7 @@ import {
   recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import type { CalendarRefInput } from './utils/calendar-ref.schema';
+import { graphEventBody } from './utils/graph-event-body';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
 import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
@@ -145,7 +146,7 @@ export class CreateEventCommand {
           end: endTime,
           transactionId,
           ...(input.body !== undefined && input.body.trim() !== ''
-            ? { body: { contentType: 'text', content: input.body } }
+            ? { body: graphEventBody(input.body) }
             : {}),
           ...(input.location !== undefined && input.location.trim() !== ''
             ? { location: { displayName: input.location.trim() } }

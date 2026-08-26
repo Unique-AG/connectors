@@ -6,6 +6,7 @@ import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailb
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventCommand } from '../create-event.command';
+import { graphEventBody } from '../utils/graph-event-body';
 import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
@@ -100,6 +101,42 @@ describe(CreateEventCommand.name, () => {
     });
     expect(result.joinUrl).toBe('https://teams.example/join');
     expect(result.transactionId).toBe('abc123abc123abc123abc123abc123ab');
+  });
+
+  it('POSTs the agent HTML body unchanged', async () => {
+    const { command, post } = createCommand();
+    const body = '<p>Hello <strong>world</strong></p>';
+
+    await command.run(USER_PROFILE_ID, {
+      subject: 'Sync',
+      startDateTime: '2026-08-26T09:00:00+02:00',
+      endDateTime: '2026-08-26T09:30:00+02:00',
+      body,
+      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
+      transactionId: 'abc123abc123abc123abc123abc123ab',
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: graphEventBody(body),
+      }),
+    );
+  });
+
+  it('omits body when it is only whitespace', async () => {
+    const { command, post } = createCommand();
+
+    await command.run(USER_PROFILE_ID, {
+      subject: 'Sync',
+      startDateTime: '2026-08-26T09:00:00+02:00',
+      endDateTime: '2026-08-26T09:30:00+02:00',
+      body: '   ',
+      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
+      transactionId: 'abc123abc123abc123abc123abc123ab',
+    });
+
+    const payload = post.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('body');
   });
 
   it('uses the given calendarId and skips the default-calendar GET', async () => {

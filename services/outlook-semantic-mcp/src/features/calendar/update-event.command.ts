@@ -1,7 +1,9 @@
 import assert from 'node:assert';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
+import * as z from 'zod';
 import {
   type CalendarMetricErrorType,
   CalendarMetricsService,
@@ -18,8 +20,17 @@ import {
   calendarUserProfileId,
   recoverCalendarGraphError,
 } from './utils/calendar-observability';
+import { graphEventBody } from './utils/graph-event-body';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
 import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
+
+const GraphExistingEventBodySchema = z.object({
+  body: z
+    .object({
+      content: z.string().optional(),
+    })
+    .nullish(),
+});
 
 export interface UpdateEventCommandInput {
   eventRef: EventRef;
@@ -101,7 +112,7 @@ export class UpdateEventCommand {
     const patch = buildPatch(input);
     const hasTimeChange = input.startDateTime !== undefined || input.endDateTime !== undefined;
     assert.ok(
-      Object.keys(patch).length > 0 || hasTimeChange,
+      Object.keys(patch).length > 0 || hasTimeChange || input.body !== undefined,
       'update must already include at least one field',
     );
 
@@ -133,11 +144,16 @@ export class UpdateEventCommand {
         : undefined;
 
     try {
+      const body =
+        input.body !== undefined
+          ? graphEventBody(input.body, await loadExistingEventHtml(client, path, outlookTimeZone))
+          : undefined;
       const raw = await client
         .api(path)
         .header('Prefer', `outlook.timezone="${outlookTimeZone}", IdType="ImmutableId"`)
         .patch({
           ...patch,
+          ...(body !== undefined ? { body } : {}),
           ...(startTime !== undefined ? { start: startTime } : {}),
           ...(endTime !== undefined ? { end: endTime } : {}),
         });
@@ -208,7 +224,6 @@ function buildPatch(input: UpdateEventCommandInput): Record<string, unknown> {
     ...(input.subject !== undefined && input.subject.trim() !== ''
       ? { subject: input.subject.trim() }
       : {}),
-    ...(input.body !== undefined ? { body: { contentType: 'text', content: input.body } } : {}),
     ...(input.location !== undefined ? { location: { displayName: input.location.trim() } } : {}),
     ...(attendees !== undefined
       ? {
@@ -222,4 +237,22 @@ function buildPatch(input: UpdateEventCommandInput): Record<string, unknown> {
       ? { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' }
       : {}),
   };
+}
+
+async function loadExistingEventHtml(
+  client: Client,
+  path: string,
+  outlookTimeZone: string,
+): Promise<string | undefined> {
+  const existing = GraphExistingEventBodySchema.parse(
+    await client
+      .api(path)
+      .header(
+        'Prefer',
+        `outlook.timezone="${outlookTimeZone}", IdType="ImmutableId", outlook.body-content-type="html"`,
+      )
+      .select('body')
+      .get(),
+  );
+  return existing.body?.content;
 }

@@ -63,7 +63,9 @@ export const UpdateEventInputSchema = z
     body: z
       .string()
       .optional()
-      .describe('Replacement plain-text agenda or notes. Omit to leave the body unchanged.'),
+      .describe(
+        'Replacement agenda as HTML, sent to Outlook unchanged. Do not write Markdown. Use <p> for paragraphs, <br> for line breaks, <strong> bold, <em> italic, <ul>/<ol>/<li> lists, <a href="https://example.com"> links, and <blockquote>. Fragment only — no html, head, or body wrappers. Do not include the Teams join section; this tool keeps Microsoft\'s existing join HTML. Omit to leave the body unchanged.',
+      ),
     isOnlineMeeting: z
       .literal(true)
       .optional()
