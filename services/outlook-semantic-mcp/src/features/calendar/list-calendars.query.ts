@@ -129,7 +129,7 @@ export class ListCalendarsQuery {
         msg: 'list_calendars',
       });
       return {
-        calendars: own,
+        calendars: rankCalendars(own),
         notes: scanDisabled
           ? [
               'Calendars of mailboxes you have Full Access to are not listed because delegated-access discovery is turned off on this deployment. Calendars shared with you directly are listed.',
@@ -191,7 +191,7 @@ export class ListCalendarsQuery {
       const owner = calendar.ownerEmail?.toLowerCase();
       return owner === undefined || owner === null || !reachedOwners.has(owner);
     });
-    const calendars = [...fromMe, ...delegated];
+    const calendars = rankCalendars([...fromMe, ...delegated]);
     this.logger.log({
       userProfileId: input.userProfileId,
       mailbox: obfuscateEmail(input.callerEmail),
@@ -248,4 +248,16 @@ export class ListCalendarsQuery {
 
     return calendars;
   }
+}
+
+/** Primary calendars first so holiday and extra calendars do not hide the meeting calendars. */
+function rankCalendars(calendars: CalendarRef[]): CalendarRef[] {
+  return [...calendars].sort((left, right) => calendarRank(left) - calendarRank(right));
+}
+
+function calendarRank(calendar: CalendarRef): number {
+  if (calendar.isDefaultCalendar) {
+    return calendar.isOwn ? 0 : 1;
+  }
+  return calendar.isOwn ? 2 : 3;
 }

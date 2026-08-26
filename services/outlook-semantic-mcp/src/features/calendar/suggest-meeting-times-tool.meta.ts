@@ -5,7 +5,7 @@ export const META = createMeta({
   icon: 'calendar',
   systemPrompt: `Suggest ranked meeting times via Outlook findMeetingTimes.
 
-Prefer dateRange.rangeType "relative" with a future range (today, tomorrow, thisWeek, nextWeek, next7Days). Weeks start Monday. The window must be shorter than 62 days; past-only ranges are rejected and a start that is already past is clamped to now. Default duration is 30 minutes; default activityDomain is work (mailbox working hours). Omit attendees to find slots for the organizer only.
+Prefer dateRange.rangeType "relative" with a future range (today, tomorrow, thisWeek, nextWeek, next7Days). Weeks start Monday. The window must be shorter than 62 days; past-only ranges are rejected and a start that is already past is clamped to now. Default duration is 30 minutes; default activityDomain is work (signed-in user working hours). Always runs as the signed-in user (the organizer). Include them in attendees when they want to attend; get their SMTP from list_calendars ownerEmail on a calendar with isOwn true (prefer isDefaultCalendar true). Omit attendees to find slots for the organizer only.
 
 If emptySuggestionsReason is present, tell the user why Graph found no slots and suggest widening the window or relaxing constraints. If suggestionNotes is present, display it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook. Do not invent slots.`,
   toolFormatInformation: CALENDAR_TOOL_FORMAT_INFORMATION,

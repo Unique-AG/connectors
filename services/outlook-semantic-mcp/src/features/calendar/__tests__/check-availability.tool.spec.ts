@@ -27,7 +27,6 @@ describe(CheckAvailabilityTool.name, () => {
     const result = await tool.checkAvailability(
       {
         attendees: ['alex@example.com'],
-        mailbox: 'me@example.com',
         intervalMinutes: 60,
         dateRange: { rangeType: 'relative', range: 'today' },
       },
@@ -37,7 +36,6 @@ describe(CheckAvailabilityTool.name, () => {
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       attendees: ['alex@example.com'],
-      mailbox: 'me@example.com',
       intervalMinutes: 60,
       range: 'today',
     });
@@ -67,31 +65,10 @@ describe(CheckAvailabilityTool.name, () => {
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       attendees: ['alex@example.com'],
-      mailbox: undefined,
       intervalMinutes: undefined,
       startDateTime: '2026-08-25T09:00:00+02:00',
       endDateTime: '2026-08-25T18:00:00+02:00',
     });
-  });
-
-  it('rejects a mailbox that is not an SMTP address', async () => {
-    const run = vi.fn();
-    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
-
-    await expect(
-      tool.checkAvailability(
-        {
-          attendees: ['alex@example.com'],
-          mailbox: 'not/an/email',
-          dateRange: { rangeType: 'relative', range: 'today' },
-        },
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/SMTP/i);
-    expect(run).not.toHaveBeenCalled();
   });
 
   it('rejects a window longer than 62 days', async () => {

@@ -54,6 +54,7 @@ const OWN_CALENDAR: CalendarRef = {
   ownerEmail: OWN_EMAIL,
   ownerName: 'Me',
   isOwn: true,
+  isDefaultCalendar: true,
   canEdit: true,
   canViewPrivateItems: true,
 };
@@ -65,6 +66,7 @@ const DELEGATED_CALENDAR: CalendarRef = {
   ownerEmail: OWNER_EMAIL,
   ownerName: 'Banker',
   isOwn: false,
+  isDefaultCalendar: true,
   canEdit: true,
   canViewPrivateItems: false,
 };
@@ -76,6 +78,7 @@ const SHARED_INTO_OWN_MAILBOX: CalendarRef = {
   ownerEmail: OWNER_EMAIL,
   ownerName: 'Banker',
   isOwn: false,
+  isDefaultCalendar: false,
   canEdit: false,
   canViewPrivateItems: false,
 };

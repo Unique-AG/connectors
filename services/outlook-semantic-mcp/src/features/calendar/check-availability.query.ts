@@ -30,7 +30,10 @@ import {
   logCalendarRecovered,
 } from './utils/calendar-observability';
 import { type AvailabilityBlock, decodeAvailabilityView } from './utils/decode-availability-view';
-import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
+import {
+  isScheduleWindowTooLong,
+  MAX_GRAPH_SCHEDULE_ADDRESSES,
+} from './utils/graph-schedule-date-range.schema';
 import {
   mapGraphScheduleItemToScheduleItem,
   type ScheduleItem,
@@ -42,7 +45,6 @@ import {
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
 import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
-const MAX_SCHEDULES = 20;
 const DEFAULT_INTERVAL_MINUTES = 30;
 const MAX_BUSY_BLOCKS_PER_PERSON = 100;
 const MAX_ITEMS_PER_PERSON = 100;
@@ -58,7 +60,6 @@ export interface PersonAvailability {
 
 export interface CheckAvailabilityQueryInput {
   attendees: string[];
-  mailbox?: string;
   intervalMinutes?: number;
   range?: RelativeRange;
   startDateTime?: string;
@@ -95,14 +96,12 @@ export class CheckAvailabilityQuery {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.mailbox),
       attendeeCount: input.attendees.length,
       range: input.range,
       msg: 'check_availability started',
     });
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
       operation: 'check_availability',
     });
     return this.calendarMetrics.measureOperation(
@@ -136,7 +135,7 @@ export class CheckAvailabilityQuery {
     });
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
+      mailbox: obfuscateEmail(userProfile.email),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
@@ -144,21 +143,20 @@ export class CheckAvailabilityQuery {
     });
     const schedules = uniqueSmtpAddresses(input.attendees);
     assert.ok(
-      schedules.length > 0 && schedules.length <= MAX_SCHEDULES,
-      'attendees must already be a non-empty list of at most 20 SMTP addresses',
+      schedules.length > 0 && schedules.length <= MAX_GRAPH_SCHEDULE_ADDRESSES,
+      `attendees must already be a non-empty list of at most ${MAX_GRAPH_SCHEDULE_ADDRESSES} SMTP addresses`,
     );
     assert.ok(
       !isScheduleWindowTooLong(resolvedWindow.startDateTime, resolvedWindow.endDateTime),
       'dateRange must already be shorter than 62 days',
     );
-    const mailbox = input.mailbox ?? userProfile.email;
     assert.ok(
-      SmtpAddressSchema.safeParse(mailbox).success,
-      'mailbox must already be an SMTP address',
+      SmtpAddressSchema.safeParse(userProfile.email).success,
+      'signed-in user email must already be an SMTP address',
     );
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox,
+      mailbox: userProfile.email,
       operation: 'check_availability',
     });
     const intervalMinutes = input.intervalMinutes ?? DEFAULT_INTERVAL_MINUTES;
@@ -166,7 +164,7 @@ export class CheckAvailabilityQuery {
 
     try {
       const raw = await client
-        .api(getSchedulePath(mailbox))
+        .api(getSchedulePath(userProfile.email))
         .header('Prefer', `outlook.timezone="${outlookTimeZone}"`)
         .post({
           schedules,
@@ -192,14 +190,14 @@ export class CheckAvailabilityQuery {
           viewStart,
           intervalMinutes,
           userProfileId: userProfileIdString,
-          mailbox,
+          mailbox: userProfile.email,
         }),
       );
       const people = perPerson.map((entry) => entry.person);
       notes.push(...perPerson.flatMap((entry) => entry.notes));
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(mailbox),
+        mailbox: obfuscateEmail(userProfile.email),
         scheduleCount: schedules.length,
         returned: people.length,
         msg: 'check_availability getSchedule',
@@ -207,7 +205,7 @@ export class CheckAvailabilityQuery {
       if (people.length === 0) {
         this.logger.debug({
           userProfileId: userProfileIdString,
-          mailbox: obfuscateEmail(mailbox),
+          mailbox: obfuscateEmail(userProfile.email),
           msg: 'check_availability no availability returned',
         });
       }
@@ -225,7 +223,7 @@ export class CheckAvailabilityQuery {
       if (isGetScheduleTooManyEntriesError(error)) {
         logCalendarRecovered(this.logger, {
           userProfileId: userProfileIdString,
-          mailbox,
+          mailbox: userProfile.email,
           outcome: 'too_many_entries',
           msg: 'check_availability too many calendar entries',
           err: error,
@@ -239,35 +237,19 @@ export class CheckAvailabilityQuery {
         };
       }
       if (isCalendarPermissionDeniedError(error)) {
-        if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
-          logCalendarRecovered(this.logger, {
-            userProfileId: userProfileIdString,
-            mailbox,
-            outcome: 'consent',
-            msg: 'check_availability consent required',
-            err: error,
-          });
-          return {
-            success: false,
-            message: new CalendarConsentRequiredError().message,
-            consentRequired: true,
-            resolvedWindow,
-            errorType: 'consent',
-          };
-        }
         logCalendarRecovered(this.logger, {
           userProfileId: userProfileIdString,
-          mailbox,
-          outcome: 'permission',
-          msg: 'check_availability mailbox denied',
+          mailbox: userProfile.email,
+          outcome: 'consent',
+          msg: 'check_availability consent required',
           err: error,
         });
         return {
           success: false,
-          message: `Could not read availability from mailbox ${mailbox}.`,
-          availabilityNotes: notes.length > 0 ? notes : undefined,
+          message: new CalendarConsentRequiredError().message,
+          consentRequired: true,
           resolvedWindow,
-          errorType: 'permission',
+          errorType: 'consent',
         };
       }
       throw error;

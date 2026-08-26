@@ -12,27 +12,27 @@ import {
   ResolvedWindowSchema,
 } from './utils/calendar-output.schema';
 import { BUSY_STATUSES } from './utils/decode-availability-view';
-import { GraphScheduleDateRangeSchema } from './utils/graph-schedule-date-range.schema';
+import {
+  GraphScheduleDateRangeSchema,
+  MAX_GRAPH_SCHEDULE_ADDRESSES,
+} from './utils/graph-schedule-date-range.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
 
 export const CheckAvailabilityInputSchema = z.object({
   attendees: z
     .array(
       smtpAddress(
-        'SMTP address of a person, distribution list, or room to check. Include the signed-in user to see their own free/busy.',
+        'SMTP address of a person, distribution list, or room to check. Only addresses in attendees are looked up. Include the signed-in user when they want to attend; take that SMTP from list_calendars ownerEmail on a calendar with isOwn true.',
       ),
     )
     .min(1)
-    .max(20)
+    .max(MAX_GRAPH_SCHEDULE_ADDRESSES)
     .describe(
-      'People to check. Maximum 20 addresses per call. Include the signed-in user when asking about their own availability.',
+      `Only these addresses are checked. Include the signed-in user when they want to attend; get their SMTP from list_calendars ownerEmail on a calendar with isOwn true (prefer isDefaultCalendar true). Graph getSchedule allows at most ${MAX_GRAPH_SCHEDULE_ADDRESSES}.`,
     ),
   dateRange: GraphScheduleDateRangeSchema.describe(
     'Time window to check. Prefer rangeType relative with a documented range. Must be shorter than 62 days. thisYear, nextYear, lastYear, and next90Days are rejected.',
   ),
-  mailbox: smtpAddress(
-    'SMTP address of the mailbox whose calendar is used for the free/busy lookup. Omit to use the signed-in user. Use a delegated mailbox only when checking free/busy as that mailbox.',
-  ).optional(),
   intervalMinutes: z
     .number()
     .int()
@@ -148,7 +148,7 @@ export class CheckAvailabilityTool {
     name: 'check_availability',
     title: 'Check Availability',
     description:
-      'Check free/busy for people, distribution lists, or rooms in a time window via Outlook getSchedule. Prefer dateRange.rangeType=relative with a documented range (today, thisWeek, nextWeek, next7Days); weeks start Monday. The window must be shorter than 62 days — do not use thisYear or next90Days. Pass at most 20 SMTP addresses in attendees; include the signed-in user to see their own free/busy. busyBlocks are decoded from availabilityView (free slots omitted). items may include subject and location only when the caller has detail-level permission; when isPrivate is true those fields are redacted. If availabilityNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
+      'Check free/busy for the addresses in attendees (people, DLs, or rooms) via Outlook getSchedule. Only attendees are checked. Include the signed-in user in attendees when they want to attend; get their SMTP from list_calendars ownerEmail on a calendar with isOwn true (prefer isDefaultCalendar true). Prefer dateRange.rangeType=relative with a documented range (today, thisWeek, nextWeek, next7Days); weeks start Monday. The window must be shorter than 62 days — do not use thisYear or next90Days. Pass at most 20 SMTP addresses. busyBlocks are decoded from availabilityView (free slots omitted). items may include subject and location only when the caller has detail-level permission; when isPrivate is true those fields are redacted. If availabilityNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
     parameters: CheckAvailabilityInputSchema,
     outputSchema: CheckAvailabilityOutputSchema,
     annotations: {

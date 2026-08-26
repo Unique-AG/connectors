@@ -19,6 +19,7 @@ export function mapGraphCalendarToCalendarRef(input: {
     ownerEmail,
     ownerName: input.calendar.owner?.name ?? null,
     isOwn: ownerEmail !== null && ownerEmail.toLowerCase() === input.callerEmail.toLowerCase(),
+    isDefaultCalendar: input.calendar.isDefaultCalendar ?? false,
     canEdit: input.calendar.canEdit ?? false,
     canViewPrivateItems: input.calendar.canViewPrivateItems ?? false,
   };

@@ -19,6 +19,7 @@ const own: CalendarRef = {
   ownerEmail: 'me@example.com',
   ownerName: 'Me',
   isOwn: true,
+  isDefaultCalendar: true,
   canEdit: true,
   canViewPrivateItems: true,
 };
@@ -30,6 +31,7 @@ const delegated: CalendarRef = {
   ownerEmail: 'banker@example.com',
   ownerName: 'Banker',
   isOwn: false,
+  isDefaultCalendar: true,
   canEdit: true,
   canViewPrivateItems: false,
 };

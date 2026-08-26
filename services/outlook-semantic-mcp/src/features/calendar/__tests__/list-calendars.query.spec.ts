@@ -118,16 +118,23 @@ describe(ListCalendarsQuery.name, () => {
     expect(getFullAccessMailboxes).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
-      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, mailbox: OWN_EMAIL }),
+      expect.objectContaining({
+        calendarId: 'cal-own',
+        isOwn: true,
+        isDefaultCalendar: true,
+        mailbox: OWN_EMAIL,
+      }),
       expect.objectContaining({
         calendarId: 'cal-primary',
         isOwn: false,
+        isDefaultCalendar: false,
         mailbox: OWN_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
       expect.objectContaining({
         calendarId: 'cal-custom',
         isOwn: false,
+        isDefaultCalendar: false,
         mailbox: OWN_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
@@ -143,6 +150,7 @@ describe(ListCalendarsQuery.name, () => {
             {
               id: 'cal-own',
               name: 'Calendar',
+              isDefaultCalendar: true,
               owner: { address: OWN_EMAIL, name: 'Me' },
             },
             {
@@ -172,16 +180,60 @@ describe(ListCalendarsQuery.name, () => {
     expect(api).toHaveBeenCalledWith(OWNER_PATH);
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
-      expect.objectContaining({ calendarId: 'cal-own', isOwn: true, mailbox: OWN_EMAIL }),
+      expect.objectContaining({
+        calendarId: 'cal-own',
+        isOwn: true,
+        isDefaultCalendar: true,
+        mailbox: OWN_EMAIL,
+      }),
       expect.objectContaining({
         calendarId: 'cal-owner-primary',
         isOwn: false,
+        isDefaultCalendar: true,
         mailbox: OWNER_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
     ]);
     expect(result.calendars?.map((calendar) => calendar.calendarId)).not.toContain(
       'cal-local-copy',
+    );
+  });
+
+  it('lists primary calendars ahead of holiday and extra calendars', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          {
+            id: 'cal-holidays',
+            name: 'United States holidays',
+            isDefaultCalendar: false,
+            owner: { address: OWN_EMAIL, name: 'Me' },
+          },
+          {
+            id: 'cal-own',
+            name: 'Calendar',
+            isDefaultCalendar: true,
+            owner: { address: OWN_EMAIL, name: 'Me' },
+          },
+          {
+            id: 'cal-birthdays',
+            name: 'Birthdays',
+            isDefaultCalendar: false,
+            owner: { address: OWN_EMAIL, name: 'Me' },
+          },
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(result.calendars?.map((calendar) => calendar.calendarId)).toEqual([
+      'cal-own',
+      'cal-holidays',
+      'cal-birthdays',
+    ]);
+    expect(result.calendars?.[0]).toEqual(
+      expect.objectContaining({ calendarId: 'cal-own', isDefaultCalendar: true }),
     );
   });
 

@@ -18,11 +18,13 @@ export const SuggestMeetingTimesInputSchema = z.object({
   attendees: z
     .array(
       smtpAddress(
-        'SMTP address of a required attendee. Omit the whole array to find slots for the organizer only.',
+        'SMTP address of a required attendee. Include the signed-in user when they want to attend; take that SMTP from list_calendars ownerEmail on a calendar with isOwn true.',
       ),
     )
     .optional()
-    .describe('People who must be free. Omit to search only the organizer mailbox working hours.'),
+    .describe(
+      'People who must be free. Include the signed-in user when they want to attend; get their SMTP from list_calendars ownerEmail on a calendar with isOwn true (prefer isDefaultCalendar true). Graph findMeetingTimes also treats the signed-in user as organizer. Omit attendees to find slots for the organizer only.',
+    ),
   dateRange: SuggestMeetingDateRangeSchema.describe(
     'Future window in which to search for slots. Prefer rangeType relative (today, tomorrow, thisWeek, nextWeek, next7Days). Must be shorter than 62 days. Past-only ranges (yesterday, lastWeek, past30Days) are rejected; if the start is already past, suggestions begin from now.',
   ),
@@ -33,9 +35,6 @@ export const SuggestMeetingTimesInputSchema = z.object({
     .max(1440)
     .optional()
     .describe('Meeting length in minutes. Default 30. Minimum 5, maximum 1440.'),
-  mailbox: smtpAddress(
-    'SMTP address of the organizer mailbox findMeetingTimes is called on. Omit to use the signed-in user. Use a delegated mailbox only when suggesting times as that mailbox.',
-  ).optional(),
   maxCandidates: z
     .number()
     .int()
@@ -47,7 +46,7 @@ export const SuggestMeetingTimesInputSchema = z.object({
     .enum(['work', 'personal', 'unrestricted'])
     .optional()
     .describe(
-      'work (default) stays inside mailbox working hours. personal adds Saturday and Sunday. unrestricted uses all hours.',
+      'work (default) stays inside the signed-in user working hours. personal adds Saturday and Sunday. unrestricted uses all hours.',
     ),
   isOrganizerOptional: z
     .boolean()
@@ -129,7 +128,7 @@ export class SuggestMeetingTimesTool {
     name: 'suggest_meeting_times',
     title: 'Suggest Meeting Times',
     description:
-      'Suggest ranked meeting times from Outlook findMeetingTimes for the organizer and optional required attendees. Prefer dateRange.rangeType=relative with a future range (today, tomorrow, thisWeek, nextWeek, next7Days); weeks start Monday. The window must be shorter than 62 days; past-only ranges are rejected and a start that is already past is clamped to now. Default duration is 30 minutes and activityDomain is work (mailbox working hours). Omit attendees to find slots for the organizer only. If emptySuggestionsReason is present, explain it and suggest widening the window. If suggestionNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
+      'Suggest ranked meeting times from Outlook findMeetingTimes. Always runs as the signed-in user (the organizer). Include them in attendees when they want to attend; get their SMTP from list_calendars ownerEmail on a calendar with isOwn true (prefer isDefaultCalendar true). Omit attendees to find slots for the organizer only. Prefer dateRange.rangeType=relative with a future range (today, tomorrow, thisWeek, nextWeek, next7Days); weeks start Monday. The window must be shorter than 62 days; past-only ranges are rejected and a start that is already past is clamped to now. Default duration is 30 minutes and activityDomain is work (signed-in user working hours). If emptySuggestionsReason is present, explain it and suggest widening the window. If suggestionNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
     parameters: SuggestMeetingTimesInputSchema,
     outputSchema: SuggestMeetingTimesOutputSchema,
     annotations: {

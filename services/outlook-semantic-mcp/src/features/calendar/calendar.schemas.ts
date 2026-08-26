@@ -16,6 +16,8 @@ export interface CalendarRef {
   ownerEmail: string | null;
   ownerName: string | null;
   isOwn: boolean;
+  /** Graph isDefaultCalendar: the mailbox's primary calendar, not a holiday or extra calendar. */
+  isDefaultCalendar: boolean;
   canEdit: boolean;
   canViewPrivateItems: boolean;
 }

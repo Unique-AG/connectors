@@ -3,6 +3,8 @@ import * as z from 'zod';
 import { DateRangeSchema, type RelativeRange } from '~/utils/relative-range';
 
 export const MAX_GRAPH_SCHEDULE_WINDOW_DAYS = 62;
+/** Microsoft Graph `getSchedule` `schedules` array size. */
+export const MAX_GRAPH_SCHEDULE_ADDRESSES = 20;
 
 // Record rather than Set so the compiler forces a decision when a RelativeRange is added.
 const RELATIVE_RANGE_EXCEEDS_62_DAYS: Record<RelativeRange, boolean> = {

@@ -253,20 +253,4 @@ describe(SuggestMeetingTimesQuery.name, () => {
     expect(result.success).toBe(false);
     expect(result.consentRequired).toBe(true);
   });
-
-  it('does not treat a delegated mailbox 403 as missing consent', async () => {
-    const { query, api } = createQuery({
-      post: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
-    });
-
-    const result = await query.run(USER_PROFILE_ID, {
-      mailbox: 'banker@example.com',
-      range: 'today',
-      now: NOW,
-    });
-
-    expect(api).toHaveBeenCalledWith('/users/banker@example.com/findMeetingTimes');
-    expect(result.success).toBe(false);
-    expect(result.consentRequired).toBeUndefined();
-  });
 });

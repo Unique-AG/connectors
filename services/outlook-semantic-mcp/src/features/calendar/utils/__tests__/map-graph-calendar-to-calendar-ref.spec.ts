@@ -31,6 +31,7 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
       calendarId: 'cal-own',
       mailbox: CALLER,
       isOwn: true,
+      isDefaultCalendar: true,
       ownerEmail: 'ME@example.com',
     });
   });
@@ -54,6 +55,7 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
     expect(result).toMatchObject({
       mailbox: CALLER,
       isOwn: false,
+      isDefaultCalendar: false,
       ownerEmail: OWNER,
     });
   });
@@ -86,7 +88,12 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
       mailboxEmail: OWNER,
     });
 
-    expect(result).toMatchObject({ mailbox: OWNER, isOwn: false, ownerEmail: OWNER });
+    expect(result).toMatchObject({
+      mailbox: OWNER,
+      isOwn: false,
+      isDefaultCalendar: true,
+      ownerEmail: OWNER,
+    });
   });
 
   it('is not own when Graph omits the owner', () => {
@@ -96,6 +103,11 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
       mailboxEmail: CALLER,
     });
 
-    expect(result).toMatchObject({ mailbox: CALLER, isOwn: false, ownerEmail: null });
+    expect(result).toMatchObject({
+      mailbox: CALLER,
+      isOwn: false,
+      isDefaultCalendar: true,
+      ownerEmail: null,
+    });
   });
 });

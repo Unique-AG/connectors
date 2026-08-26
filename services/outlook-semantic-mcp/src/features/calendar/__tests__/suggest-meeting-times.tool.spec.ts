@@ -41,7 +41,6 @@ describe(SuggestMeetingTimesTool.name, () => {
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       attendees: ['alex@example.com'],
       durationMinutes: 45,
-      mailbox: undefined,
       maxCandidates: undefined,
       activityDomain: undefined,
       isOrganizerOptional: undefined,

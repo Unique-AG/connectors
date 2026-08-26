@@ -14,7 +14,6 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const OWN_EMAIL = 'me@example.com';
 const ATTENDEE = 'alex@example.com';
 const SCHEDULE_PATH = `/users/${OWN_EMAIL}/calendar/getSchedule`;
-const OWNER_PATH = '/users/banker@example.com/calendar/getSchedule';
 const PREFER = 'outlook.timezone="W. Europe Standard Time"';
 const NOW = Temporal.ZonedDateTime.from('2026-08-25T15:30:00+02:00[Europe/Zurich]');
 const DEFAULT_TIMEZONE: ResolvedMailboxTimezone = {
@@ -232,24 +231,6 @@ describe(CheckAvailabilityQuery.name, () => {
 
     expect(result.success).toBe(false);
     expect(result.consentRequired).toBe(true);
-  });
-
-  it('does not treat a delegated mailbox 403 as missing consent', async () => {
-    const { query, api } = createQuery({
-      post: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
-    });
-
-    const result = await query.run(USER_PROFILE_ID, {
-      attendees: [ATTENDEE],
-      mailbox: 'banker@example.com',
-      range: 'today',
-      now: NOW,
-    });
-
-    expect(api).toHaveBeenCalledWith(OWNER_PATH);
-    expect(result.success).toBe(false);
-    expect(result.consentRequired).toBeUndefined();
-    expect(result.message).toMatch(/banker@example.com/);
   });
 
   it('sends UTC wall-clock times when the mailbox timezone cannot be mapped', async () => {

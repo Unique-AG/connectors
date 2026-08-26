@@ -43,7 +43,6 @@ export type ActivityDomain = 'work' | 'personal' | 'unrestricted';
 
 export interface SuggestMeetingTimesQueryInput {
   attendees?: string[];
-  mailbox?: string;
   durationMinutes?: number;
   maxCandidates?: number;
   activityDomain?: ActivityDomain;
@@ -85,14 +84,12 @@ export class SuggestMeetingTimesQuery {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.mailbox),
       attendeeCount: input.attendees?.length ?? 0,
       range: input.range,
       msg: 'suggest_meeting_times started',
     });
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox: input.mailbox,
       operation: 'suggest_meeting_times',
     });
     return this.calendarMetrics.measureOperation(
@@ -130,7 +127,7 @@ export class SuggestMeetingTimesQuery {
     if (resolved.tooLate) {
       this.logger.debug({
         userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
+        mailbox: obfuscateEmail(userProfile.email),
         interpretation: resolved.window.interpretation,
         msg: 'suggest_meeting_times window entirely in the past',
       });
@@ -146,7 +143,7 @@ export class SuggestMeetingTimesQuery {
     if (resolved.notes.length > 0) {
       this.logger.debug({
         userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
+        mailbox: obfuscateEmail(userProfile.email),
         msg: 'suggest_meeting_times start clamped to now',
       });
     }
@@ -154,7 +151,7 @@ export class SuggestMeetingTimesQuery {
     const resolvedWindow = resolved.window;
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
+      mailbox: obfuscateEmail(userProfile.email),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
@@ -169,14 +166,13 @@ export class SuggestMeetingTimesQuery {
       attendees.length <= MAX_ATTENDEES,
       'attendees must already be at most 20 SMTP addresses',
     );
-    const mailbox = input.mailbox ?? userProfile.email;
     assert.ok(
-      SmtpAddressSchema.safeParse(mailbox).success,
-      'mailbox must already be an SMTP address',
+      SmtpAddressSchema.safeParse(userProfile.email).success,
+      'signed-in user email must already be an SMTP address',
     );
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox,
+      mailbox: userProfile.email,
       operation: 'suggest_meeting_times',
     });
 
@@ -196,7 +192,7 @@ export class SuggestMeetingTimesQuery {
 
     try {
       const raw = await client
-        .api(findMeetingTimesPath(mailbox))
+        .api(findMeetingTimesPath(userProfile.email))
         .header('Prefer', `outlook.timezone="${outlookTimeZone}"`)
         .post({
           attendees: attendees.map((address) => ({
@@ -226,7 +222,7 @@ export class SuggestMeetingTimesQuery {
       }
       this.logger.log({
         userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(mailbox),
+        mailbox: obfuscateEmail(userProfile.email),
         attendeeCount: attendees.length,
         returned: suggestions.length,
         msg: 'suggest_meeting_times findMeetingTimes',
@@ -234,7 +230,7 @@ export class SuggestMeetingTimesQuery {
       if (suggestions.length === 0) {
         this.logger.debug({
           userProfileId: userProfileIdString,
-          mailbox: obfuscateEmail(mailbox),
+          mailbox: obfuscateEmail(userProfile.email),
           emptySuggestionsReason: emptyReason,
           msg: 'suggest_meeting_times no slots',
         });
@@ -257,10 +253,10 @@ export class SuggestMeetingTimesQuery {
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
-        mailbox,
+        mailbox: userProfile.email,
         callerEmail: userProfile.email,
         operation: 'suggest_meeting_times',
-        deniedDelegatedMessage: `Could not suggest times from mailbox ${mailbox}.`,
+        deniedDelegatedMessage: `Could not suggest times from mailbox ${userProfile.email}.`,
       });
       if (recovered === undefined) {
         throw error;
