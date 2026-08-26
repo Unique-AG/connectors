@@ -12,7 +12,7 @@ import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
-import { describeCalendar, oneLine } from './utils/calendar-display';
+import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
@@ -201,10 +201,23 @@ export class UpdateEventTool {
         consentRequired: loadedCalendar.consentRequired,
       };
     }
+    const calendar = loadedCalendar.calendar;
+    if (!calendar.canEdit) {
+      this.logger.debug({
+        userProfileId: userProfileId.toString(),
+        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
+        calendarId: parsed.eventRef.calendarId,
+        msg: 'update_event rejected read-only calendar',
+      });
+      return {
+        success: false,
+        message: `Cannot update events on ${describeCalendar(calendar)} — it is read-only.`,
+      };
+    }
     const confirmation = await confirmWrite({
       context,
       schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
-      message: elicitMessage(parsed, snapshot, loadedCalendar.calendar),
+      message: elicitMessage(parsed, snapshot, calendar),
       logger: this.logger,
       operation: 'update_event',
       userProfileId: userProfileId.toString(),
@@ -271,7 +284,7 @@ function elicitMessage(
   const changes = [
     input.subject !== undefined ? `New title: ${oneLine(input.subject)}.` : undefined,
     input.startDateTime !== undefined || input.endDateTime !== undefined
-      ? `New when: ${oneLine(input.startDateTime ?? 'unchanged')} to ${oneLine(input.endDateTime ?? 'unchanged')}.`
+      ? `New when: ${formatDisplayWhen(input.startDateTime ?? snapshot.start, input.endDateTime ?? snapshot.end) ?? 'unchanged'}.`
       : undefined,
     input.attendees !== undefined
       ? input.attendees.length > 0

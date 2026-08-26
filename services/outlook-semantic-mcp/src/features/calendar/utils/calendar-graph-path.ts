@@ -12,6 +12,15 @@ export function calendarViewPath(input: { calendarId: string; mailboxEmail: stri
   return `/users/${input.mailboxEmail}/calendars/${graphItemIdSegment(input.calendarId, 'calendarId')}/calendarView`;
 }
 
+/**
+ * The Graph JS SDK concatenates query values without percent-encoding. In
+ * application/x-www-form-urlencoded a `+` is a space, so `…T00:00:00.000+02:00`
+ * arrives as `…T00:00:00.000 02:00` and calendarView rejects StartDateTime.
+ */
+export function encodeGraphQueryInstant(iso: string): string {
+  return iso.replaceAll('+', '%2B');
+}
+
 export function getSchedulePath(mailboxEmail: string): string {
   assert.ok(
     SmtpAddressSchema.safeParse(mailboxEmail).success,

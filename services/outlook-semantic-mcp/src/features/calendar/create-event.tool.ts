@@ -6,11 +6,12 @@ import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { offsetDateTime } from '~/utils/relative-range';
 import { CreateEventCommand } from './create-event.command';
 import { META } from './create-event-tool.meta';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
-import { describeCalendar, oneLine } from './utils/calendar-display';
+import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
 import { CalendarRefSchema } from './utils/calendar-ref.schema';
 import { confirmWrite } from './utils/confirm-write';
@@ -158,6 +159,19 @@ export class CreateEventTool {
       };
     }
     const calendar = loaded.calendar;
+    if (!calendar.canEdit) {
+      this.logger.debug({
+        userProfileId: userProfileId.toString(),
+        mailbox: obfuscateEmail(calendar.mailbox),
+        calendarId: calendar.calendarId,
+        msg: 'create_event rejected read-only calendar',
+      });
+      return {
+        success: false,
+        message: `Cannot create on ${describeCalendar(calendar)} — it is read-only. Choose a calendar with canEdit true from list_calendars.`,
+        transactionId,
+      };
+    }
     const confirmation = await confirmWrite({
       context,
       schema: ConfirmSchema,
@@ -206,7 +220,7 @@ function elicitMessage(
     'Create this event?',
     `Calendar: ${describeCalendar(calendar)}`,
     `Title: ${oneLine(input.subject)}`,
-    `When: ${input.startDateTime} to ${input.endDateTime}`,
+    `When: ${formatDisplayWhen(input.startDateTime, input.endDateTime) ?? `${input.startDateTime} to ${input.endDateTime}`}`,
     attendees,
     location,
     teams,

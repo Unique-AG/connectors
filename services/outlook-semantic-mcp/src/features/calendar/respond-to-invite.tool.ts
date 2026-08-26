@@ -8,7 +8,7 @@ import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { type CalendarEventSnapshot, GetCalendarEventQuery } from './get-calendar-event.query';
 import { RespondToInviteCommand } from './respond-to-invite.command';
 import { META } from './respond-to-invite-tool.meta';
-import { oneLine } from './utils/calendar-display';
+import { formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { EVENT_RESPONSES } from './utils/calendar-graph-path';
 import { ConsentRequiredSchema } from './utils/calendar-output.schema';
 import { confirmWrite } from './utils/confirm-write';
@@ -134,10 +134,11 @@ function elicitMessage(
     comment !== undefined && comment.trim() !== ''
       ? ` The comment sent with it will be: "${oneLine(comment)}".`
       : '';
+  const when = formatDisplayWhen(snapshot.start, snapshot.end);
   return [
     `Confirm to ${action} this invitation.`,
     `Title: ${oneLine(snapshot.subject ?? '(no title)')}.`,
-    snapshot.start !== null ? `When: ${snapshot.start.dateTime}.` : undefined,
+    when !== undefined ? `When: ${when}.` : undefined,
     `Organizer: ${organizer}.`,
     `The organizer will be notified immediately.${note}`,
   ]

@@ -15,6 +15,7 @@ import {
   SearchCalendarEventsQuery,
   type SearchCalendarEventsQueryInput,
 } from '../search-calendar-events.query';
+import { encodeGraphQueryInstant } from '../utils/calendar-graph-path';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
@@ -233,7 +234,10 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     expect(api).toHaveBeenCalledWith(OWN_VIEW);
     expect(request.header).toHaveBeenCalledWith('Prefer', PREFER);
-    expect(request.query).toHaveBeenCalledWith(WINDOW);
+    expect(request.query).toHaveBeenCalledWith({
+      startDateTime: '2026-08-25T00:00:00%2B02:00',
+      endDateTime: '2026-08-26T00:00:00%2B02:00',
+    });
     expect(request.select).toHaveBeenCalledWith(EVENT_SELECT);
     expect(result.success).toBe(true);
     expect(result.resolvedWindow?.startDateTime).toBe(WINDOW.startDateTime);
@@ -650,8 +654,8 @@ describe(SearchCalendarEventsQuery.name, () => {
     const result = await query.run(USER_PROFILE_ID, search({ range: 'today', now }));
 
     expect(request.query).toHaveBeenCalledWith({
-      startDateTime: '2026-08-25T00:00:00.000+02:00',
-      endDateTime: '2026-08-25T23:59:59.999+02:00',
+      startDateTime: '2026-08-25T00:00:00.000%2B02:00',
+      endDateTime: '2026-08-25T23:59:59.999%2B02:00',
     });
     expect(result.resolvedWindow?.interpretation).toContain('today = Tue 2026-08-25 00:00');
   });
@@ -727,9 +731,10 @@ describe(SearchCalendarEventsQuery.name, () => {
     );
 
     const expected = {
-      startDateTime: result.resolvedWindow?.startDateTime,
-      endDateTime: result.resolvedWindow?.endDateTime,
+      startDateTime: encodeGraphQueryInstant(result.resolvedWindow?.startDateTime ?? ''),
+      endDateTime: encodeGraphQueryInstant(result.resolvedWindow?.endDateTime ?? ''),
     };
     expect(queryCalls).toEqual([expected, expected, expected]);
+    expect(result.resolvedWindow?.startDateTime).toContain('+');
   });
 });

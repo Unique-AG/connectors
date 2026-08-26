@@ -19,7 +19,7 @@ import { CalendarRef, GraphEventCollectionSchema } from './calendar.schemas';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { isGraphBadRequestError } from './utils/calendar-graph-errors';
 import { calendarGraphLimit } from './utils/calendar-graph-limit';
-import { calendarViewPath } from './utils/calendar-graph-path';
+import { calendarViewPath, encodeGraphQueryInstant } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
@@ -374,8 +374,8 @@ export class SearchCalendarEventsQuery {
       const request = input.client.api(nextPath).header('Prefer', prefer);
       const first = request
         .query({
-          startDateTime: input.resolvedWindow.startDateTime,
-          endDateTime: input.resolvedWindow.endDateTime,
+          startDateTime: encodeGraphQueryInstant(input.resolvedWindow.startDateTime),
+          endDateTime: encodeGraphQueryInstant(input.resolvedWindow.endDateTime),
         })
         .select(EVENT_SELECT)
         .orderby(EVENT_ORDER_BY)

@@ -4,6 +4,7 @@ import {
   calendarCollectionPath,
   calendarViewPath,
   createEventPath,
+  encodeGraphQueryInstant,
   defaultCalendarPath,
   eventCancelPath,
   eventPath,
@@ -47,6 +48,21 @@ describe(calendarViewPath.name, () => {
     expect(
       calendarViewPath({ calendarId: delegated.calendarId, mailboxEmail: delegated.mailbox }),
     ).toBe('/users/banker@example.com/calendars/cal-2/calendarView');
+  });
+});
+
+describe(encodeGraphQueryInstant.name, () => {
+  it('percent-encodes a positive offset so Graph does not treat + as a space', () => {
+    expect(encodeGraphQueryInstant('2026-08-24T00:00:00.000+02:00')).toBe(
+      '2026-08-24T00:00:00.000%2B02:00',
+    );
+  });
+
+  it('leaves UTC and negative offsets unchanged', () => {
+    expect(encodeGraphQueryInstant('2026-08-24T00:00:00.000Z')).toBe('2026-08-24T00:00:00.000Z');
+    expect(encodeGraphQueryInstant('2026-08-24T00:00:00.000-07:00')).toBe(
+      '2026-08-24T00:00:00.000-07:00',
+    );
   });
 });
 

@@ -75,7 +75,9 @@ describe(RespondToInviteTool.name, () => {
 
     expect(elicit).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringMatching(/accept this invitation[\s\S]*Weekly sync[\s\S]*Alex Rivera/i),
+      expect.stringMatching(
+        /accept this invitation[\s\S]*Weekly sync[\s\S]*Wed 26 Aug 2026, 09:00–09:30 GMT\+2[\s\S]*Alex Rivera/i,
+      ),
     );
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       eventRef: EVENT_REF,

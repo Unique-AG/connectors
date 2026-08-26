@@ -95,7 +95,9 @@ describe(CancelEventTool.name, () => {
 
     expect(elicit).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringMatching(/your primary calendar[\s\S]*not a silent delete/i),
+      expect.stringMatching(
+        /your primary calendar[\s\S]*Wed 26 Aug 2026, 09:00–09:30 GMT\+2[\s\S]*not a silent delete/i,
+      ),
     );
     expect(run).toHaveBeenCalledWith(
       USER_PROFILE_ID,

@@ -81,7 +81,7 @@ The table is used **only as a list of candidate mailboxes to ask Graph about**. 
 | `subject.startsWith` | Graph — `startswith(subject,'…')` | Supported. |
 | `subject.contains` | in-process | `contains(subject, …)` is not supported on `calendarView`, and `$search` is documented on neither `calendarView` nor `/events`. `startswith` cannot stand in: it would drop real matches. |
 | `attendees` | in-process | `attendees` is a collection of complex types; Graph documents no lambda filter for it. Exact address match, organizer counted as present. |
-| window | Graph — `startDateTime` / `endDateTime` | Required parameters. |
+| window | Graph — `startDateTime` / `endDateTime` | Required parameters. The Graph JS SDK does not encode query values, so `+` in an offset is percent-encoded (`%2B`) before it is sent; otherwise Graph receives a space and rejects `StartDateTime`. `resolvedWindow` still reports the unencoded Instant. |
 
 **`attendees` and `categories` are AND filters.** Narrowing a calendar means every named person or category has to be on the event; a caller who wants either searches twice. Both are case-insensitive, and `attendees` compares whole addresses — there is no substring or name-similarity tier, so a name has to be resolved through `lookup_contacts` first.
 

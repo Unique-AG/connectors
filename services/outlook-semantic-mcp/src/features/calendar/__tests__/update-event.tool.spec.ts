@@ -175,6 +175,26 @@ describe(UpdateEventTool.name, () => {
     expect(result.message).toMatch(/not found/i);
   });
 
+  it('does not elicit when the calendar is read-only', async () => {
+    const { tool, run, elicit } = createTool({
+      getCalendar: vi.fn().mockResolvedValue({
+        ...OWN_PRIMARY,
+        calendar: { ...OWN_PRIMARY.calendar, canEdit: false },
+      }),
+    });
+
+    const result = await tool.updateEvent(
+      INPUT,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(elicit).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/read-only/i);
+  });
+
   it('rejects an update with no fields to change', async () => {
     const { tool, get, elicit } = createTool();
 

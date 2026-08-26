@@ -75,7 +75,9 @@ describe(CreateEventTool.name, () => {
 
     expect(elicit).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringMatching(/your primary calendar[\s\S]*invitations will be sent immediately/i),
+      expect.stringMatching(
+        /your primary calendar[\s\S]*Wed 26 Aug 2026, 09:00–09:30 GMT\+2[\s\S]*invitations will be sent immediately/i,
+      ),
     );
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       ...INPUT,
@@ -200,6 +202,24 @@ describe(CreateEventTool.name, () => {
     expect(elicit).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
+    expect(result.transactionId).toBe(INPUT.transactionId);
+  });
+
+  it('does not elicit when the calendar is read-only', async () => {
+    const { tool, run, elicit } = createTool({
+      calendar: { ...OWN_PRIMARY, canEdit: false },
+    });
+
+    const result = await tool.createEvent(
+      { ...INPUT, calendarRef: { calendarId: 'cal-own', mailbox: 'me@example.com' } },
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(elicit).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/read-only/i);
     expect(result.transactionId).toBe(INPUT.transactionId);
   });
 

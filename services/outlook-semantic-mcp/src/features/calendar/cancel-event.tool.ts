@@ -10,7 +10,7 @@ import { META } from './cancel-event-tool.meta';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
-import { describeCalendar, oneLine } from './utils/calendar-display';
+import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema } from './utils/calendar-output.schema';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
@@ -180,12 +180,13 @@ function elicitMessage(
     snapshot.attendeeCount > 0
       ? 'Attendees will be notified. This is not a silent delete.'
       : 'No attendees will be notified.';
+  const when = formatDisplayWhen(snapshot.start, snapshot.end);
   return [
     'Cancel this event?',
     `Calendar: ${describeCalendar(calendar)}`,
     series,
     `Title: ${oneLine(snapshot.subject ?? '(no title)')}.`,
-    snapshot.start !== null ? `When: ${snapshot.start.dateTime}.` : undefined,
+    when !== undefined ? `When: ${when}.` : undefined,
     comment,
     notify,
   ]
