@@ -1,14 +1,15 @@
-"""The Terraform module's copy of the tool registry, checked against the registry itself.
+"""The Terraform module's registry, and the three things generating it cannot check.
 
-`deploy/terraform/azure/office-365-mcp-entra-application/registry.tf` states, in HCL, what
-`tools/__init__.py`, `shared/seam.py` and `server/manifest.py` state in Python: which tools exist,
-which delegated Graph permissions each declares, what every preset means, which permissions this
-connector may ever ask for, and which of them need an Entra administrator. It is written out rather
-than generated, for the reason `test_tool_selection.py` gives above `PRESET_COST` — a derivation
-agrees with any mistake in what it derives from — and this file is what turns two copies into a
-check.
+`deploy/terraform/azure/office-365-mcp-entra-application/registry.generated.tf.json` states, in
+Terraform's JSON configuration syntax, what `tools/__init__.py`, `shared/seam.py` and
+`server/manifest.py` state in Python: which tools exist, which delegated Graph permissions each
+declares, what every preset means, which permissions this connector may ever ask for, and which of
+them need an Entra administrator. `scripts/render-terraform-registry.py` writes it from those
+modules, so comparing the tables here would compare the generator with itself. What this file checks
+is the drift — a committed file the generator would no longer produce — and the facts the generator
+is not the writer of.
 
-Two copies matter here more than anywhere else in this service, because they are two halves of one
+Those facts matter here more than anywhere else in this service, because they are two halves of one
 sentence spoken in two repositories. The app registration is written by Terraform; the pod's
 selection is written by an Argo overlay. A registration narrower than the pod fails every sign-in at
 the *authorize* hop, with nothing in this server's logs; a registration wider than the pod grants
@@ -20,160 +21,76 @@ What it cannot see: whether the deployed registration and the deployed pod agree
 diffing `GET /manifest` against `terraform output tool_surface` for it.
 """
 
-import importlib
+import importlib.util
 import json
 import pathlib
 import re
 from collections.abc import Mapping
 from typing import Protocol, cast
 
-import pytest
-
-import office_365_mcp.app as app_module
 from office_365_mcp.config import ToolsPreset
-from office_365_mcp.server.manifest import NEEDS_ADMIN_CONSENT
-from office_365_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
-from office_365_mcp.tools import ALWAYS_ON, PRESETS, TOOL_NAMES, resolve
-from tests.test_tool_selection import PRESET_COST
+from office_365_mcp.shared.seam import graph_scope
+from office_365_mcp.tools import resolve
 
 _SERVICE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 _MODULE = _SERVICE_ROOT / "deploy" / "terraform" / "azure" / "office-365-mcp-entra-application"
-_REGISTRY_TF = _MODULE / "registry.tf"
+_GENERATED = _MODULE / "registry.generated.tf.json"
+_GENERATOR = _SERVICE_ROOT / "scripts" / "render-terraform-registry.py"
 _SURFACE_TFTEST = _MODULE / "tests" / "surface.tftest.hcl"
 _AUTH = _SERVICE_ROOT / "src" / "office_365_mcp" / "auth.py"
 _CHART_SCHEMA = (
     _SERVICE_ROOT / "deploy" / "helm-charts" / "office-365-mcp" / "values.additional.schema.json"
 )
 
-# `{ name = "get_me", permissions = ["User.Read"] },` — one row per line, which `terraform fmt` was
-# checked to leave byte-identical. Whitespace-tolerant around every `=` because fmt aligns them
-# inside a map block, and every assertion below is guarded by a row count so a formatting change
-# that breaks these patterns fails loudly rather than matching nothing and passing.
-_TOOL_ROW = re.compile(
-    r'\{\s*name\s*=\s*"(?P<name>[a-z_]+)"\s*,\s*permissions\s*=\s*\[(?P<permissions>[^]]*)\]\s*\}'
-)
-# `teams-chat = ["list_chats"]`, or `teams = local.tool_names` for the one derived preset.
-_PRESET_ROW = re.compile(
-    r"^\s*(?P<name>[a-z][a-z-]*)\s*=\s*(?:\[(?P<names>[^]]*)\]|(?P<derived>local\.tool_names))\s*$",
-    re.MULTILINE,
-)
-_VERDICT_ROW = re.compile(
-    r'^\s*"(?P<permission>[A-Za-z.]+)"\s*=\s*(?P<verdict>true|false)\s*$', re.MULTILINE
-)
-_QUOTED = re.compile(r'"([^"]*)"')
 _REQUIRED_SCOPES = re.compile(r'_REQUIRED_SCOPES\s*=\s*\(\s*"(?P<scope>[a-z_]+)"\s*,\s*\)')
+_CALLBACK_PATH = re.compile(r'^_CALLBACK_PATH\s*=\s*"(?P<path>[^"]*)"\s*$', re.MULTILINE)
 
 
-class _ToolModule(Protocol):
-    """The part of a tool module's contract this file reads; `tools/__init__.py` owns the whole."""
+class _Generator(Protocol):
+    """The part of `scripts/render-terraform-registry.py` this file drives; the script owns the
+    rest. Loaded by path because the filename carries hyphens, mirroring the shell generator it was
+    modelled on."""
 
-    TOOL_NAME: str
-    GRAPH_PERMISSIONS: tuple[str, ...]
-
-
-def _tool_modules() -> dict[str, tuple[str, ...]]:
-    """Found on disk, not through the registry — the same idiom `test_app.py` uses, and for the same
-    reason: the point is to see a tool file the registry forgot."""
-    tools_dir = pathlib.Path(app_module.__file__).parent / "tools"
-    modules = [
-        cast(
-            "_ToolModule",
-            # Through `object`: a `ModuleType` never structurally overlaps a Protocol.
-            cast("object", importlib.import_module(f"office_365_mcp.tools.{source.stem}")),
-        )
-        for source in sorted(tools_dir.glob("*.py"))
-        if source.name != "__init__.py"
-    ]
-    return {module.TOOL_NAME: module.GRAPH_PERMISSIONS for module in modules}
+    @staticmethod
+    def render() -> str: ...
 
 
-def _block(source: str, name: str, opener: str, closer: str) -> str:
-    """The body of `name = <opener> … <closer>`, matched by depth so a nested list is not truncated
-    at the first closer. Asserts rather than returns None: a renamed local has to fail here, before
-    any comparison can quietly find nothing."""
-    start = source.find(f"{name} = {opener}")
-    assert start != -1, f"registry.tf has no `{name} = {opener}` — was the local renamed?"
-    cursor = start + len(f"{name} = ")
-    depth = 0
-    for index in range(cursor, len(source)):
-        if source[index] == opener:
-            depth += 1
-        elif source[index] == closer:
-            depth -= 1
-            if depth == 0:
-                return source[cursor + 1 : index]
-    raise AssertionError(f"registry.tf's `{name}` block is not closed")
+def _generator() -> _Generator:
+    spec = importlib.util.spec_from_file_location("render_terraform_registry", _GENERATOR)
 
-
-def _registry() -> str:
-    return _REGISTRY_TF.read_text()
-
-
-def _tf_tool_registry() -> list[tuple[str, tuple[str, ...]]]:
-    body = _block(_registry(), "tool_registry", "[", "]")
-    return [
-        (match.group("name"), tuple(_QUOTED.findall(match.group("permissions"))))
-        for match in _TOOL_ROW.finditer(body)
-    ]
-
-
-def _tf_presets() -> dict[str, tuple[str, ...]]:
-    """`teams` is `local.tool_names` in the HCL, mirroring `PRESETS["teams"] = TOOL_NAMES`, so it is
-    expanded here from the parsed registry rather than compared as a token. Keeping the derived form
-    in the module is the point: a tool landing in the registry widens `teams` in both places at
-    once, exactly as it does in the pod."""
-    body = _block(_registry(), "presets", "{", "}")
-    rows = list(_PRESET_ROW.finditer(body))
-    derived = [match.group("name") for match in rows if match.group("derived") is not None]
-
-    assert derived == ["teams"], (
-        "exactly one preset is expected to be derived from the registry, and it is `teams` — "
-        + f"found {derived}. Anything else means this expansion is matching the wrong rows."
+    assert spec is not None and spec.loader is not None, (
+        f"{_GENERATOR.name} could not be loaded as a module — was it renamed or moved?"
     )
-
-    registry_order = tuple(name for name, _permissions in _tf_tool_registry())
-    return {
-        match.group("name"): (
-            registry_order
-            if match.group("derived") is not None
-            else tuple(_QUOTED.findall(match.group("names")))
-        )
-        for match in rows
-    }
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    # Through `object`: a `ModuleType` never structurally overlaps a Protocol.
+    return cast("_Generator", cast("object", module))
 
 
-def _tf_requestable_permissions() -> tuple[str, ...]:
-    return tuple(_QUOTED.findall(_block(_registry(), "requestable_permissions", "[", "]")))
+def _locals() -> Mapping[str, object]:
+    """The committed file's one `locals` block, read rather than regenerated, so every check below
+    is against the artifact Terraform actually loads."""
+    document: object = cast("object", json.loads(_GENERATED.read_text()))
 
+    assert isinstance(document, Mapping), f"{_GENERATED.name} is not a JSON object"
+    blocks = cast("Mapping[str, object]", document).get("locals")
 
-def _tf_needs_admin_consent() -> dict[str, bool]:
-    body = _block(_registry(), "needs_admin_consent", "{", "}")
-    return {
-        match.group("permission"): match.group("verdict") == "true"
-        for match in _VERDICT_ROW.finditer(body)
-    }
-
-
-def _tf_scalar(name: str) -> str:
-    match = re.search(rf'^\s*{re.escape(name)}\s*=\s*"([^"]*)"\s*$', _registry(), re.MULTILINE)
-    assert match is not None, f"registry.tf has no `{name}` string — was the local renamed?"
-    return match.group(1)
-
-
-def _tf_resolve(selection: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """selection.tf's derivation, reimplemented: the ALWAYS_ON join, a filter over the registry's
-    order (never the caller's), and `distinct(flatten(...))`, which keeps first occurrence and is
-    what `dict.fromkeys` is in the pod.
-
-    Reimplemented rather than inferred from the tables, because a correct table with a wrong
-    derivation asks a tenant for the wrong permissions just as effectively.
-    """
-    wanted = {_tf_scalar("always_on"), *selection}
-    selected = [(name, declared) for name, declared in _tf_tool_registry() if name in wanted]
-    permissions = tuple(
-        dict.fromkeys(permission for _name, declared in selected for permission in declared)
+    assert isinstance(blocks, list) and len(cast("list[object]", blocks)) == 1, (
+        f"{_GENERATED.name} is expected to carry exactly one `locals` block"
     )
-    return tuple(name for name, _declared in selected), permissions
+    block = cast("list[object]", blocks)[0]
+
+    assert isinstance(block, Mapping), f"{_GENERATED.name}'s `locals` block is not a JSON object"
+    return cast("Mapping[str, object]", block)
+
+
+def _scalar(name: str) -> str:
+    value = _locals().get(name)
+
+    assert isinstance(value, str), (
+        f"{_GENERATED.name} has no `{name}` string — was the local renamed?"
+    )
+    return value
 
 
 def _chart_preset_enum() -> list[str]:
@@ -185,134 +102,46 @@ def _chart_preset_enum() -> list[str]:
     return [value for value in cast("list[object]", node) if isinstance(value, str)]
 
 
-class TestTheTablesParseAtAll:
-    """Guards, asserted before anything is compared. A `terraform fmt` change or a renamed local
-    that broke the patterns above would otherwise match zero rows, and every comparison below would
-    pass by comparing nothing.
-    """
-
-    def test_the_tool_registry_has_a_row_per_tool(self) -> None:
-        assert [name for name, _permissions in _tf_tool_registry()] != []
-        assert len(_tf_tool_registry()) == len(TOOL_NAMES)
-
-    def test_every_preset_has_a_row(self) -> None:
-        assert len(_tf_presets()) == len(ToolsPreset)
-
-    def test_the_ceiling_and_the_consent_verdicts_have_a_row_each(self) -> None:
-        assert len(_tf_requestable_permissions()) == len(REQUESTABLE_PERMISSIONS)
-        assert len(_tf_needs_admin_consent()) == len(NEEDS_ADMIN_CONSENT)
-
-
-class TestTheValidationsMayReadTheRegistry:
-    def test_the_registry_names_no_variable(self) -> None:
-        """What licenses a `variable ... validation` block in variables.tf reading these locals."""
-        code = "\n".join(
-            line
-            for line in _REGISTRY_TF.read_text().splitlines()
-            if not line.lstrip().startswith("#")
+class TestTheCommittedRegistryIsTheGeneratedOne:
+    def test_it_is_byte_for_byte_what_the_generator_produces(self) -> None:
+        """`--check` in process, so a stale generated file fails this suite and not only the CI step
+        that runs the script — and so a hand-edit of a file whose only warning is `.generated.` in
+        its name fails before it reaches a tenant."""
+        assert _GENERATED.read_text() == _generator().render(), (
+            f"{_GENERATED.name} is not what the registry renders to. It is generated: run "
+            + "`uv run python scripts/render-terraform-registry.py` rather than editing it."
         )
 
-        assert "var." not in code, (
-            "registry.tf names a variable, so every validation reading its locals is now a hard "
-            + "`Cycle: var.tools_enabled (validation), local.asked_for (expand), …`, which "
+    def test_the_registry_names_no_variable(self) -> None:
+        """What licenses a `variable ... validation` block in variables.tf reading these locals. A
+        `.tf.json` string is still a template, so `"${var.x}"` would interpolate exactly as HCL
+        does and the guard is no weaker for the file being JSON."""
+        assert "var." not in _GENERATED.read_text(), (
+            f"{_GENERATED.name} names a variable, so every validation reading its locals is now a "
+            + "hard `Cycle: var.tools_enabled (validation), local.asked_for (expand), …`, which "
             + "`terraform validate` refuses outright"
         )
 
 
-class TestTheModuleAsksForWhatTheToolsDeclare:
-    def test_the_rows_are_in_the_registrys_order(self) -> None:
-        """Order is the one thing a set-shaped copy would lose silently. It decides the order of
-        `tool_surface.permissions`, which is the artifact an operator diffs against GET /manifest.
-        """
-        assert tuple(name for name, _permissions in _tf_tool_registry()) == TOOL_NAMES
-
-    def test_every_tool_declares_the_same_permissions_on_both_sides(self) -> None:
-        assert dict(_tf_tool_registry()) == _tool_modules()
-
-    def test_the_presets_mean_the_same_thing_on_both_sides(self) -> None:
-        assert _tf_presets() == dict(PRESETS)
-
-    def test_the_always_on_tool_is_the_same_tool(self) -> None:
-        assert _tf_scalar("always_on") == ALWAYS_ON
-
-    def test_the_ceiling_is_the_same_closed_set(self) -> None:
-        """A misspelling in the HCL table satisfies every other check in the module — the index into
-        `oauth2_permission_scope_ids` is unknown at plan, so it would fail at apply."""
-        assert set(_tf_requestable_permissions()) == set(REQUESTABLE_PERMISSIONS)
-
-    def test_the_admin_consent_verdicts_are_the_same_verdicts(self) -> None:
-        """Including the `false` entries: a table holding only the names that need consent could not
-        tell "no" from "nobody said", and the module reports the difference to an operator as
-        whether an administrator is needed at all."""
-        assert _tf_needs_admin_consent() == dict(NEEDS_ADMIN_CONSENT)
-
-    def test_the_graph_scope_prefix_is_the_one_the_server_asks_with(self) -> None:
-        assert f"{_tf_scalar('graph_scope_prefix')}User.Read" == graph_scope("User.Read")
+class TestTheRegistrationExposesWhatTheApplicationEnforces:
+    """Two strings the generator reads out of `auth.py` and nothing else witnesses: the application
+    hard-codes both, so a registration carrying a different one applies cleanly and then fails every
+    request, or every sign-in, with nothing in the module wrong.
+    """
 
     def test_the_api_scope_is_the_one_the_provider_enforces(self) -> None:
-        """`access_as_user` is hard-coded in the application, so a registration exposing any other
-        name leaves every request failing FastMCP's own scope check with nothing here wrong."""
         match = _REQUIRED_SCOPES.search(_AUTH.read_text())
 
         assert match is not None, "auth.py no longer spells _REQUIRED_SCOPES as a one-tuple"
-        assert _tf_scalar("api_scope_name") == match.group("scope")
+        assert _scalar("api_scope_name") == match.group("scope")
 
     def test_the_callback_path_is_the_one_the_provider_uses(self) -> None:
-        """Text-level, and a tripwire rather than a barrier: the path is FastMCP's default and
-        auth.py's `build_auth` names it in the contract it documents. A registration carrying any
-        other path applies cleanly and then fails every sign-in."""
-        assert _tf_scalar("callback_path") in _AUTH.read_text()
+        """`build_auth` passes this to `AzureProvider` rather than letting it default, so the path
+        the registration carries and the path the provider serves are one constant."""
+        match = _CALLBACK_PATH.search(_AUTH.read_text())
 
-
-class TestTheModuleResolvesASelectionTheWayTheServerDoes:
-    """Checks the derivation and not only the data. A correct table filtered in the caller's order,
-    or deduped with a set, would ask a tenant for a different permission list than the pod computes
-    — and the consent screen and every cached On-Behalf-Of token key are keyed by that list.
-    """
-
-    @pytest.mark.parametrize("preset", list(ToolsPreset))
-    def test_a_preset_resolves_to_the_same_tools_and_permissions(self, preset: ToolsPreset) -> None:
-        expected = resolve(preset=preset, enabled=None)
-        tools, permissions = _tf_resolve(_tf_presets()[preset.value])
-
-        assert tools == expected.tools
-        assert permissions == expected.permissions
-
-    def test_the_callers_order_is_discarded(self) -> None:
-        forwards = _tf_resolve(("list_chats", "read_message"))
-        backwards = _tf_resolve(("read_message", "list_chats"))
-
-        expected = resolve(preset=None, enabled=["read_message", "list_chats"])
-
-        assert forwards == backwards
-        assert forwards == (expected.tools, expected.permissions)
-
-    def test_the_always_on_tool_joins_a_selection_that_does_not_name_it(self) -> None:
-        tools, permissions = _tf_resolve(("list_teams",))
-
-        assert tools[0] == ALWAYS_ON
-        assert permissions[0] == "User.Read"
-
-
-class TestWhatTheModuleCostsATenant:
-    """The third leg. `PRESET_COST` is this suite's hand-transcribed table of what each preset asks
-    a tenant for; reading it here rather than copying it is deliberate — a fourth copy of the same
-    fact would be one more thing to keep in step and no more witnesses.
-    """
-
-    @pytest.mark.parametrize(("preset", "permissions", "consents", "tools"), PRESET_COST)
-    def test_it_asks_for_exactly_the_permissions_the_design_promises(
-        self, preset: ToolsPreset, permissions: tuple[str, ...], consents: int, tools: int
-    ) -> None:
-        resolved_tools, resolved_permissions = _tf_resolve(_tf_presets()[preset.value])
-        verdicts = _tf_needs_admin_consent()
-        needing_an_administrator = [
-            permission for permission in resolved_permissions if verdicts[permission]
-        ]
-
-        assert set(resolved_permissions) == set(permissions)
-        assert len(needing_an_administrator) == consents
-        assert len(resolved_tools) == tools
+        assert match is not None, "auth.py no longer spells _CALLBACK_PATH as a module-level string"
+        assert _scalar("callback_path") == match.group("path")
 
 
 class TestTheThreePlacesThePresetNamesAreWritten:
@@ -320,14 +149,20 @@ class TestTheThreePlacesThePresetNamesAreWritten:
         """The chart schema carries the preset names as a JSON Schema enum, so a name only spelled
         correctly in two of the three places fails a `helm install` or a `terraform apply` rather
         than a sign-in — but only if something compares all three."""
-        assert {preset.value for preset in ToolsPreset} == set(_tf_presets())
+        presets = _locals().get("presets")
+
+        assert isinstance(presets, Mapping), f"{_GENERATED.name} carries no `presets` map"
+        assert {preset.value for preset in ToolsPreset} == set(
+            cast("Mapping[str, object]", presets)
+        )
         assert {preset.value for preset in ToolsPreset} == set(_chart_preset_enum())
 
 
 class TestTheTerraformTestsExpectWhatTheServerResolves:
     """`surface.tftest.hcl` transcribes a permission string per preset. Those strings are what prove
-    the module's HCL derivation is right, so they are checked here against `resolve()` itself — a
-    transcription there, a derivation here.
+    the module's HCL derivation is right — the `get_me` floor, the registry-order filter, the fold
+    to first occurrence, none of which the generated tables say anything about — so they are checked
+    here against `resolve()` itself: a transcription there, a derivation here.
     """
 
     def test_every_preset_is_exercised_with_the_permissions_it_resolves_to(self) -> None:
@@ -366,7 +201,7 @@ class TestTheTerraformTestsExpectWhatTheServerResolves:
             + "parameter of admin_consent_url is ungated"
         )
         scopes = asserted.group(1).split(" ")
-        prefix = _tf_scalar("graph_scope_prefix")
+        prefix = _scalar("graph_scope_prefix")
         permissions = [scope.removeprefix(prefix) for scope in scopes]
 
         assert scopes == [graph_scope(permission) for permission in permissions], (

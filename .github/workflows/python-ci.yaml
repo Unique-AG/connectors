@@ -121,6 +121,16 @@ jobs:
       - name: Sync dependencies
         run: uv sync --frozen
 
+      # In this job and not validate-terraform: the generator imports the service's own Python to
+      # render the module's registry locals, and needs no terraform binary to tell whether the
+      # committed file is stale. Guarded on the file rather than the matrix entry, so a second
+      # service gaining a generator needs no edit here.
+      - name: Check generated Terraform registry drift
+        run: |
+          if [ -f scripts/render-terraform-registry.py ]; then
+            uv run python scripts/render-terraform-registry.py --check
+          fi
+
       - name: Check formatting
         run: uv run ruff format --check .
 

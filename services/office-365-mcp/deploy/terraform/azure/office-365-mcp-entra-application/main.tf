@@ -72,11 +72,12 @@ resource "azuread_application" "office_365_mcp" {
     # azuread_application_identifier_uri just created. The two resources then fight forever.
     ignore_changes = [identifier_uris]
 
-    # Both read only registry.tf's literal locals, so neither can cycle. The alternative for the
-    # first is an `Invalid index` at apply, on a scope id only a live tenant can resolve.
+    # Both read only registry.generated.tf.json's literal locals, so neither can cycle. The
+    # alternative for the first is an `Invalid index` at apply, on a scope id only a live tenant
+    # can resolve.
     precondition {
       condition     = length(setsubtract(toset(flatten([for tool in local.tool_registry : tool.permissions])), toset(local.requestable_permissions))) == 0
-      error_message = "registry.tf declares ${join(", ", sort(setsubtract(toset(flatten([for tool in local.tool_registry : tool.permissions])), toset(local.requestable_permissions))))}, which is outside REQUESTABLE_PERMISSIONS — almost certainly a misspelling, which every other check in this module would accept."
+      error_message = "registry.generated.tf.json declares ${join(", ", sort(setsubtract(toset(flatten([for tool in local.tool_registry : tool.permissions])), toset(local.requestable_permissions))))}, which is outside REQUESTABLE_PERMISSIONS — almost certainly a misspelling, which every other check in this module would accept."
     }
 
     precondition {

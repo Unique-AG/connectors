@@ -31,8 +31,8 @@ variable "tools_enabled" {
   # of the two mistakes was made is the whole of what the operator needs told. They sit on this
   # variable so they also fire when the caller set only tools_preset, or neither.
   #
-  # TRAP: these read registry.tf's literal locals only. A validation naming a local that
-  # transitively depends on the variable it validates is a hard `Cycle: var.tools_enabled
+  # TRAP: these read registry.generated.tf.json's literal locals only. A validation naming a local
+  # that transitively depends on the variable it validates is a hard `Cycle: var.tools_enabled
   # (validation), local.asked_for (expand), …` — refused by `terraform validate`, not just plan.
   validation {
     condition     = !(var.tools_preset != null && var.tools_enabled != null)

@@ -16,11 +16,20 @@ There is deliberately no default. A default of "every tool" would make the wides
 what an operator gets by not choosing, which is the whole of what the knob exists to stop; `teams`
 keeps "everything" a one-word but chosen value.
 
-`registry.tf` is the module's own copy of that registry, and
-`services/office-365-mcp/tests/test_terraform_surface.py` fails the moment it and the Python
-disagree — including the presets, the closed set of permissions this connector may ask for, and
-which of them need an Entra administrator. `tests/surface.tftest.hcl` checks the derivation itself,
-credential-free, under `terraform test`.
+`registry.generated.tf.json` is that registry rendered into Terraform, and it is generated — never
+hand-edited. `services/office-365-mcp/scripts/render-terraform-registry.py` writes it from the
+Python itself, so the tables have one writer; `--check` fails on drift, in Python CI and in
+`services/office-365-mcp/tests/test_terraform_surface.py` alike. Regenerate it whenever a tool, a
+preset, the permission ceiling or an admin-consent verdict changes:
+
+```bash
+cd services/office-365-mcp && uv run python scripts/render-terraform-registry.py
+```
+
+What the generator cannot see is the derivation *around* the tables — the `get_me` floor, the
+registry-order filter, the fold to first occurrence. `tests/surface.tftest.hcl` transcribes what
+each preset must compose and checks that, credential-free, under `terraform test`;
+`test_terraform_surface.py` checks those transcriptions against `tools.resolve()` itself.
 
 ## Apply order: this is two acts, not one
 
