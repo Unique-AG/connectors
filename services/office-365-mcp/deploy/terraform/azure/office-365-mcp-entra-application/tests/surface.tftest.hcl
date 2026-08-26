@@ -1,11 +1,8 @@
-# Credential-free. `terraform validate` is a weak gate for this module and must not be trusted as
-# the only one: it accepts a self-referential `identifier_uris` while silently pruning the edge, and
-# it skips validations on defaulted variables — so it passes a configuration with no tool selection
-# at all. This file is the gate that catches both.
+# Credential-free, and the gate `terraform validate` cannot be: validate skips validations on
+# defaulted variables, so it passes a configuration with no tool selection at all.
 #
-# `services/office-365-mcp/tests/test_terraform_surface.py` checks the expected permission strings
-# below against `tools.resolve()` itself, so they cannot quietly go stale: they are a transcription
-# here and a derivation there.
+# `tests/test_terraform_surface.py` checks the permission strings below against `tools.resolve()`,
+# so they are a transcription here and a derivation there.
 #
 # Mock recipe, every line of which was found by a failing run rather than guessed:
 #   - `override_data` on the published-app-ids data source, because a mocked map is EMPTY and
@@ -17,8 +14,7 @@
 #   - `override_resource` on this app's own service principal, for a UUID `object_id`.
 #
 # TRAP: assert with `join(",", ...)`. `local.permissions` is a `list(string)` and an HCL literal
-# `["a", "b"]` is a tuple, so `==` between them never holds — it warns about mismatched types and
-# fails without saying why.
+# `["a", "b"]` is a tuple, so `==` between them never holds.
 mock_provider "azuread" {
   override_data {
     target = data.azuread_application_published_app_ids.well_known
@@ -89,8 +85,6 @@ run "preset_teams_is_the_whole_surface" {
     error_message = "teams composed ${join(",", local.permissions)}"
   }
 
-  # `teams` is derived from the registry in registry.tf exactly as `PRESETS["teams"] = TOOL_NAMES` is
-  # in the pod, so this run is also what fails when the two registries differ in length.
   assert {
     condition     = length(local.tools) == 10
     error_message = "teams resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
@@ -117,16 +111,17 @@ run "preset_teams_chat_costs_no_administrator" {
     error_message = "teams-chat should need no administrator, needs ${join(",", local.admin_consent)}"
   }
 
-  # The authorize request's own spelling, asserted in full rather than via the prefix constant. Every
-  # other derived value in selection.tf is checked against the server; this interpolation was not, and
-  # a corrupted one (a stray slash, a missing prefix) passed both this file and the pytest gate while
-  # making `scope=` in admin_consent_url malformed on every permission — the one output whose entire
-  # purpose is to be handed to a tenant administrator, and the only consent path there is when
-  # `service_principal_configuration` is null. test_terraform_surface.py compares this literal against
-  # `[graph_scope(p) for p in resolve(...)]`, so the transcription cannot rot either.
+  # In full rather than via the prefix constant: a corrupted interpolation (a stray slash, a dropped
+  # prefix) passed both gates while making every scope in admin_consent_url malformed.
   assert {
     condition     = join(" ", local.graph_scopes) == "https://graph.microsoft.com/User.Read https://graph.microsoft.com/Chat.Read"
     error_message = "the authorize request's spelling is ${join(" ", local.graph_scopes)}"
+  }
+
+  # `%20` and not the `+` that `urlencode` writes for the separators.
+  assert {
+    condition     = can(regex("scope=[^&]*%20", output.admin_consent_url)) && !can(regex("scope=[^&]*\\+", output.admin_consent_url))
+    error_message = "the scope separators in admin_consent_url are ${output.admin_consent_url}"
   }
 }
 
@@ -233,9 +228,6 @@ run "the_registration_is_signable_in_through" {
     tools_preset = "teams-chat"
   }
 
-  # The callback path is FastMCP's and not a caller's, so this asserts the derivation rather than a
-  # value somebody passed in. A registration carrying anything else applies cleanly and then fails
-  # every sign-in.
   assert {
     condition     = contains(local.redirect_uris, "https://office-365.mcp.qa.unique.app/auth/callback")
     error_message = "no callback URI was derived: ${join(", ", local.redirect_uris)}"
@@ -279,10 +271,8 @@ run "a_trailing_slash_does_not_produce_a_double_slash" {
 
 run "a_customer_tenant_can_own_its_own_consent" {
   variables {
-    # `teams-chat` and not a wider preset on purpose: `terraform test` escalates a failed `check`
-    # assertion to a test FAILURE, where plan and apply only warn. So the run that exercises the
-    # count-gated service principal has to be one whose selection needs no administrator — which is
-    # also the only shape of this configuration that is safe without a second party consenting.
+    # `teams-chat` on purpose: `terraform test` escalates a failed `check` assertion to a test
+    # FAILURE where plan and apply only warn, so this run's selection must need no administrator.
     tools_preset                    = "teams-chat"
     service_principal_configuration = null
   }
@@ -425,9 +415,6 @@ run "a_secret_name_prefix_in_the_wrong_charset_is_refused" {
   expect_failures = [var.secret_name_prefix]
 }
 
-# The pin, not just the charset. `teams-mcp` is in the right charset and composes exactly the secret
-# name teams-mcp's own module writes into the shared identity vault, so the charset rule alone let a
-# clean plan overwrite another service's live client secret.
 run "a_secret_name_prefix_naming_another_service_is_refused" {
   command = plan
 
@@ -439,8 +426,6 @@ run "a_secret_name_prefix_naming_another_service_is_refused" {
   expect_failures = [var.secret_name_prefix]
 }
 
-# Two environments cannot share one host: one callback URI for two secrets means the sign-ins that
-# work depend on which apply ran last.
 run "two_clients_on_one_base_url_are_refused" {
   command = plan
 
@@ -465,4 +450,89 @@ run "two_clients_on_one_base_url_are_refused" {
   }
 
   expect_failures = [var.confidential_clients]
+}
+
+run "a_composed_secret_name_over_127_characters_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat"
+    confidential_clients = {
+      unique-qa-in-an-environment-whose-name-is-long-enough-to-push-the-composed-secret-name-past-the-limit = {
+        public_base_url = "https://office-365.mcp.qa.unique.app"
+        client_secret = {
+          key_vault_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-identity-001/providers/Microsoft.KeyVault/vaults/kv-uq-identity-001"
+          end_date     = "2030-01-01T00:00:00Z"
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.secret_name_prefix]
+}
+
+run "a_blank_display_name_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat"
+    display_name = " "
+  }
+
+  expect_failures = [var.display_name]
+}
+
+run "an_end_date_that_is_not_rfc3339_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat"
+    confidential_clients = {
+      unique-qa = {
+        public_base_url = "https://office-365.mcp.qa.unique.app"
+        client_secret = {
+          key_vault_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-identity-001/providers/Microsoft.KeyVault/vaults/kv-uq-identity-001"
+          end_date     = "2030-01-01"
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.confidential_clients]
+}
+
+run "an_unsupported_sign_in_audience_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset     = "teams-chat"
+    sign_in_audience = "AzureADandPersonalMicrosoftAccount"
+  }
+
+  expect_failures = [var.sign_in_audience]
+}
+
+run "a_single_tenant_registration_emits_a_tenant_id" {
+  variables {
+    tools_preset = "teams-chat"
+  }
+
+  assert {
+    condition     = output.deployment_env["unique-qa"].ENTRA_TENANT_ID != null
+    error_message = "the overlay for a single-tenant registration carries no tenant id"
+  }
+}
+
+# The provider's client config names Unique's tenant, which is the wrong answer for a customer
+# tenant, so the overlay must fail on a missing required key instead of on a wrong issuer.
+run "a_multi_tenant_registration_emits_no_tenant_id" {
+  variables {
+    tools_preset     = "teams-chat"
+    sign_in_audience = "AzureADMultipleOrgs"
+  }
+
+  assert {
+    condition     = output.deployment_env["unique-qa"].ENTRA_TENANT_ID == null
+    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].ENTRA_TENANT_ID, "null")} as its tenant id"
+  }
 }

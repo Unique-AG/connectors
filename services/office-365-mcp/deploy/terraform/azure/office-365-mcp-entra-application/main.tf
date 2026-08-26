@@ -2,9 +2,8 @@ data "azuread_client_config" "current" {}
 
 data "azuread_application_published_app_ids" "well_known" {}
 
-# Microsoft Graph's service principal already exists in every tenant; `use_existing` adopts it. This
-# is what turns a permission NAME into the scope id `required_resource_access` wants, which is why
-# the module never carries a table of Graph permission UUIDs.
+# Adopted, not created, only for `oauth2_permission_scope_ids`: it turns a permission name into the
+# scope id `required_resource_access` wants, so this module carries no table of Graph UUIDs.
 resource "azuread_service_principal" "msgraph" {
   client_id    = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
   use_existing = true
@@ -15,40 +14,23 @@ resource "azuread_application" "office_365_mcp" {
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
 
-  # Entra itself permits duplicate display names; this asks the provider to refuse one anyway. Two
-  # registrations of this service in one tenant are normal (one per tool surface) and `display_name`
-  # is required so that each says which surface it carries — so a name collision here is not a second
-  # surface, it is the same surface applied twice from two states, which alternately overwrite each
-  # other's Key Vault secret and break each other's sign-ins with a clean plan every time.
-  # Limit worth knowing: the provider only checks this at CREATE. Renaming an existing registration
-  # onto a name another one already holds is not caught, and adopting a registration that already
-  # exists needs an import rather than an apply.
+  # Two registrations of this service in one tenant are normal (one per tool surface), so a name
+  # collision is the same surface applied twice from two states, which overwrite each other's Key
+  # Vault secret with a clean plan every time. Guards create only; adopting a registration that
+  # already exists needs an import, not an apply.
   prevent_duplicate_names = true
 
   api {
-    # TRAP: the provider defaults this to 1, and only *forces* 2 for the personal-account audiences
-    # this app is not — so nothing stops a v1 registration being created. A v1 access token's `iss`
-    # is `https://sts.windows.net/{tid}/`, while AzureProvider derives the one expected issuer
-    # `https://{authority}/{tenant_id}/v2.0` and offers no way to turn the check off. A v1
-    # registration therefore rejects every token, naming nothing.
+    # TRAP: the provider defaults this to 1 and forces 2 only for the personal-account audiences
+    # this app is not, so nothing stops a v1 registration being created.
     requested_access_token_version = 2
 
-    # The non-OIDC API scope FastMCP's AzureProvider demands (`auth.py:_REQUIRED_SCOPES`): Entra
-    # omits OIDC scopes from the `scp` claim, so a custom scope is the only gate on the session token
-    # there is.
-    #
-    # Inline rather than the granular `azuread_application_permission_scope`, because the scope's
-    # `value` references nothing of this app's own and so raises no self-reference. Going granular
-    # would cost a second documented `ignore_changes = [api[0].oauth2_permission_scope]` and lose the
-    # `enabled` attribute the granular resource does not have.
+    # The non-OIDC API scope FastMCP's AzureProvider demands: Entra omits OIDC scopes from the `scp`
+    # claim, so a custom scope is the only gate on the session token there is. Inline rather than
+    # granular because the scope's `value` references nothing of this app's own.
     oauth2_permission_scope {
-      # TRAP: `secret_name_prefix` is in the uuidv5 name, and it is the only thing in it that varies.
-      # Derived from a constant alone, every registration of this module in every tenant would expose
-      # the identical scope UUID — which is precisely the case the module documents as normal (two
-      # tool surfaces, two module blocks). The prefix is already the required distinguishing axis for
-      # the Key Vault secret, so reusing it here keeps one answer to "which registration is this".
-      # Changing this expression re-mints the scope id, which invalidates every token issued against
-      # the old one, so an already-applied registration must pin `api_scope_id` instead.
+      # TRAP: changing this expression re-mints the scope id and invalidates every token issued
+      # against the old one; an already-applied registration must pin `api_scope_id`.
       id                         = coalesce(var.api_scope_id, uuidv5("url", "api://${var.secret_name_prefix}/${local.api_scope_name}"))
       value                      = local.api_scope_name
       type                       = "User"
@@ -63,14 +45,9 @@ resource "azuread_application" "office_365_mcp" {
   required_resource_access {
     resource_app_id = azuread_service_principal.msgraph.client_id
 
-    # `toset` here and in the delegated grant below, and nowhere else. This block is a list nesting,
-    # so Terraform would diff on order, and whether Graph preserves the resourceAccess array on
-    # read-back is not something this module can rely on; the order carries no meaning to Entra
-    # either. The order that matters is `local.permissions`', and it survives in the outputs, which
-    # is where an operator compares it with GET /manifest.
-    #
-    # openid/profile/email/offline_access are deliberately absent: they are consented implicitly and
-    # are not delegated permission grants to manage here.
+    # `toset` because `resource_access` is a nested list: a set makes the iteration order canonical
+    # instead of positional. openid/profile/email/offline_access are deliberately absent — they are
+    # consented implicitly and are not delegated permission grants to manage here.
     dynamic "resource_access" {
       for_each = toset(local.permissions)
       content {
@@ -95,10 +72,8 @@ resource "azuread_application" "office_365_mcp" {
     # azuread_application_identifier_uri just created. The two resources then fight forever.
     ignore_changes = [identifier_uris]
 
-    # The two ceilings the application asserts in Python, checked at plan time. Both read only
-    # registry.tf's literal locals, so neither can cycle, and both fail before anything is created —
-    # which matters because the alternative for the first one is an `Invalid index` at apply, on a
-    # scope id that can only be resolved against a live tenant.
+    # Both read only registry.tf's literal locals, so neither can cycle. The alternative for the
+    # first is an `Invalid index` at apply, on a scope id only a live tenant can resolve.
     precondition {
       condition     = length(setsubtract(toset(flatten([for tool in local.tool_registry : tool.permissions])), toset(local.requestable_permissions))) == 0
       error_message = "registry.tf declares ${join(", ", sort(setsubtract(toset(flatten([for tool in local.tool_registry : tool.permissions])), toset(local.requestable_permissions))))}, which is outside REQUESTABLE_PERMISSIONS — almost certainly a misspelling, which every other check in this module would accept."
@@ -111,15 +86,9 @@ resource "azuread_application" "office_365_mcp" {
   }
 }
 
-# TRAP: a separate resource is FORCED here, not a style choice. The Application ID URI must be
-# `api://<this app's own client_id>`, which cannot be written on the resource above — a resource may
-# not refer to itself. `terraform validate` reports Success on the inline form and silently prunes
-# the self-edge; only plan says `Self-referential block`. That is why `terraform test` and not
-# `validate` is this module's gate.
-#
-# TRAP: `application_id` wants the `/applications/{object_id}` resource-ID form — `.id`. Neither
-# `.client_id` nor `.object_id` works, and both fail at apply with a segment-parse error rather than
-# at validate.
+# TRAP: forced, not style. The URI must be `api://<this app's own client_id>`, and a resource may
+# not refer to itself — `terraform plan` reports `Self-referential block`, `terraform validate` does
+# not.
 resource "azuread_application_identifier_uri" "api" {
   application_id = azuread_application.office_365_mcp.id
   identifier_uri = local.identifier_uri
@@ -140,9 +109,8 @@ resource "azuread_application_password" "client_secret" {
 resource "azurerm_key_vault_secret" "kv_client_secret" {
   for_each = var.confidential_clients
 
-  # The composed name is the only name — no `coalesce(explicit_name, ...)` escape hatch, because
-  # that is exactly what hides which name won when two registrations aim at one shared vault. See
-  # variables.tf on why secret_name_prefix has no default.
+  # No `explicit_name` escape hatch (teams-mcp has one): it hides which name won when two
+  # registrations aim at one shared vault.
   name            = "${var.secret_name_prefix}-${each.key}-client-secret"
   value           = azuread_application_password.client_secret[each.key].value
   content_type    = "application/x-ms-client-secret"
@@ -155,9 +123,7 @@ resource "azuread_service_principal" "office_365_mcp" {
 
   client_id    = azuread_application.office_365_mcp.client_id
   use_existing = true
-  # Not `coalesce`: both sides may legitimately be null, and `coalesce(null, null)` is a hard
-  # "no non-null, non-empty-string arguments" failure at plan — on the module's own defaults.
-  notes = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
+  notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
 }
 
 # Entra needs the application and its principal to be visible to the grant API. Without the wait the
@@ -169,12 +135,8 @@ resource "time_sleep" "wait_for_graph_propagation" {
   create_duration = "15s"
 }
 
-# AllPrincipals — no `user_object_id` — so this is the tenant-wide pre-consent, and Terraform is its
-# sole writer. A narrowing apply therefore REVOKES the difference wholesale, which is why the overlay
-# must be narrowed before this is applied and widened after (README, "Apply order").
-#
-# `claim_values` is set-typed in the provider, so the registry order is not expressible here and is
-# not missed; the ordered list is in `output.tool_surface`.
+# AllPrincipals — no `user_object_id` — so this is the tenant-wide pre-consent and Terraform is its
+# sole writer: a narrowing apply revokes the difference wholesale (README, "Apply order").
 resource "azuread_service_principal_delegated_permission_grant" "office_365_mcp_graph" {
   count = var.service_principal_configuration != null ? 1 : 0
 
@@ -185,14 +147,9 @@ resource "azuread_service_principal_delegated_permission_grant" "office_365_mcp_
   depends_on = [time_sleep.wait_for_graph_propagation]
 }
 
-# A warning and not a `precondition`, because skipping the grant is a supported state (a customer
-# tenant consenting for itself) and a hard failure would forbid the very case
-# service_principal_configuration = null exists for. What is not supported is skipping it and
-# assuming sign-in works: an unconsented admin-consent permission fails at the authorize hop with
-# "Need admin approval", for every user, with nothing in this service's logs.
-#
-# Note that `terraform test` escalates a failed `check` assertion to a test failure, where plan and
-# apply only warn — which is why tests/surface.tftest.hcl exercises the null case with `teams-chat`.
+# A `check` and not a `precondition`: skipping the grant is a supported state (a customer tenant
+# consenting for itself), so refusing it would forbid the case service_principal_configuration =
+# null exists for.
 check "admin_consent_is_granted_by_somebody" {
   assert {
     condition     = var.service_principal_configuration != null || length(local.admin_consent) == 0

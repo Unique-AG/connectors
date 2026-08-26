@@ -203,6 +203,22 @@ class TestTheTablesParseAtAll:
         assert len(_tf_needs_admin_consent()) == len(NEEDS_ADMIN_CONSENT)
 
 
+class TestTheValidationsMayReadTheRegistry:
+    def test_the_registry_names_no_variable(self) -> None:
+        """What licenses a `variable ... validation` block in variables.tf reading these locals."""
+        code = "\n".join(
+            line
+            for line in _REGISTRY_TF.read_text().splitlines()
+            if not line.lstrip().startswith("#")
+        )
+
+        assert "var." not in code, (
+            "registry.tf names a variable, so every validation reading its locals is now a hard "
+            + "`Cycle: var.tools_enabled (validation), local.asked_for (expand), …`, which "
+            + "`terraform validate` refuses outright"
+        )
+
+
 class TestTheModuleAsksForWhatTheToolsDeclare:
     def test_the_rows_are_in_the_registrys_order(self) -> None:
         """Order is the one thing a set-shaped copy would lose silently. It decides the order of
