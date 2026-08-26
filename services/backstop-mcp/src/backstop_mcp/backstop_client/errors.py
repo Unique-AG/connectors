@@ -9,13 +9,16 @@ both already handle their own failures. The benefit is that no tool has to catch
 and no upstream detail is lost on the way out. `auth.context.NotConnectedError` follows the
 same rule.
 
-Exceptions that are *not* meant for the MCP client — `BackstopAuthError`,
-`BackstopUnreachableError` below — stay plain `Exception`s, because each has a caller
-that must react to it (revoke tokens, re-render the login form) rather than surface it.
+`BackstopUnreachableError` stays a plain `Exception` — the login form must re-render, not
+surface a tool error. Mid-session 401s split: a re-check that still authenticates raises
+`BackstopTransientAuthError` (a `ToolError`, session kept); a re-check that confirms the
+credential is dead revokes MCP tokens and raises `BackstopSessionRevokedError`, which the
+HTTP middleware turns into 401 so the MCP client reconnects on this call, not the next one.
 """
 
 import logging
 import re
+from contextvars import ContextVar, Token
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Literal, cast
@@ -62,14 +65,51 @@ class _JsonApiErrorBody(BaseModel):
 
 _ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
 
+_BODY_EXCERPT_LIMIT = 500
+
+# Set when MCP tokens for this request have actually been revoked. The HTTP middleware
+# (`server/session_revoked.py`) rewrites the in-flight `/mcp` response to 401 so the client
+# learns on this call, not the next one. Default False; each request resets it.
+_mcp_session_revoked: ContextVar[bool] = ContextVar("backstop_mcp_session_revoked", default=False)
+
+
+def mark_mcp_session_revoked() -> None:
+    """Record that this request's MCP tokens were revoked, so the HTTP response becomes 401."""
+    _mcp_session_revoked.set(True)
+
+
+def mcp_session_was_revoked() -> bool:
+    return _mcp_session_revoked.get()
+
+
+def reset_mcp_session_revoked() -> Token[bool]:
+    """Start a request as not-revoked. Pair with `restore_mcp_session_revoked`."""
+    return _mcp_session_revoked.set(False)
+
+
+def restore_mcp_session_revoked(token: Token[bool]) -> None:
+    _mcp_session_revoked.reset(token)
+
 
 class BackstopAuthError(Exception):
     """Raised when Backstop rejects the stored credential (401) while calling a real endpoint.
 
-    Unlike `BackstopUnreachableError`, this means the credential itself is no longer valid
-    (e.g. the user's personal API token was revoked in Backstop) — the caller should prompt
-    the user to reconnect rather than retry.
+    Login-form verification catches this (a failed `/system-info` probe). Mid-session 401s
+    re-check first and then raise `BackstopTransientAuthError` or `BackstopSessionRevokedError`
+    instead of this base type, so a single 401 cannot log the user out.
     """
+
+
+class BackstopTransientAuthError(ToolError):
+    """Mid-session 401 that re-verified as still valid. Session kept; the client should retry."""
+
+
+class BackstopSessionRevokedError(BackstopAuthError):
+    """Credential confirmed dead and MCP tokens revoked. The HTTP layer turns this into 401."""
+
+    def __init__(self) -> None:
+        mark_mcp_session_revoked()
+        super().__init__("Backstop rejected the stored credential — please reconnect.")
 
 
 class BackstopUnreachableError(Exception):
@@ -198,6 +238,27 @@ class BackstopResponseSchemaError(ToolError):
         self.path = path
         self.schema_name = schema_name
         self.cause = cause
+
+
+def unauthorized_log_fields(response: httpx.Response, *, secret: str) -> dict[str, object]:
+    """Fields for `backstop.request.unauthorized`: parsed JSON:API errors, or a redacted excerpt."""
+    fields: dict[str, object] = {"status_code": response.status_code}
+    parsed = _parse_error_details(response)
+    if parsed is not None:
+        first = parsed[0]
+        fields["detail"] = first.detail
+        fields["title"] = first.title
+        fields["code"] = first.code
+        return fields
+    fields["body_excerpt"] = _body_excerpt(response.content, secret=secret)
+    return fields
+
+
+def _body_excerpt(content: bytes, *, secret: str) -> str:
+    text = content.decode("utf-8", errors="replace")
+    if secret:
+        text = text.replace(secret, "***")
+    return text[:_BODY_EXCERPT_LIMIT]
 
 
 def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail, ...] | None:

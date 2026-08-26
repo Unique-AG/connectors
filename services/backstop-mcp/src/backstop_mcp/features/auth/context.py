@@ -66,6 +66,9 @@ class BackstopAuthContext(BaseModel):
 
         return credential
 
+    def active_subject(self) -> str | None:
+        return current_subject()
+
     async def revoke_current_subject_tokens(self) -> None:
         """Revoke MCP tokens for the active subject after a mid-session Backstop 401."""
         subject = current_subject()

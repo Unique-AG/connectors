@@ -23,6 +23,7 @@ from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
+from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
 from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.teardown import close_singletons
 
@@ -83,6 +84,8 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
+            # Outermost so request-metrics / OTel see the rewritten 401, not the JSON-RPC 200.
+            Middleware(SessionRevokedToUnauthorizedMiddleware),
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
         ]

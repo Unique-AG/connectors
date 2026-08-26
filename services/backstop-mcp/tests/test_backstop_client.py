@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import logging
 import time
 from collections.abc import AsyncGenerator
 from typing import cast
@@ -16,6 +17,8 @@ from backstop_mcp.backstop_client import (
     BackstopCredentialSecret,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
+    BackstopSessionRevokedError,
+    BackstopTransientAuthError,
     BackstopUnreachableError,
     BackstopUntrustedUrlError,
     PageResult,
@@ -41,6 +44,10 @@ def _credential(
     username: str = "bob.smith", api_token: str = "p@55W0rd321!"
 ) -> BackstopCredentialSecret:
     return credential(username, api_token)
+
+
+async def _instant_sleep(_delay: float) -> None:
+    return None
 
 
 @pytest.fixture
@@ -103,31 +110,35 @@ class TestBackstopClientAutoRaises:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_calls_auth_failure_hook_on_401(self, factory: BackstopClientFactory) -> None:
+    async def test_calls_auth_failure_hook_on_401(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
         revoked: list[bool] = []
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
 
         async def on_auth_failure() -> None:
             revoked.append(True)
 
         client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
-        with pytest.raises(BackstopAuthError):
+        with pytest.raises(BackstopSessionRevokedError):
             await client.raw_request("GET", "/system-info")
 
         assert revoked == [True]
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_auth_failure_hook_error_still_raises_backstop_auth_error(
-        self, factory: BackstopClientFactory
+    async def test_auth_failure_hook_error_still_raises_without_revoking_the_session(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
 
         async def on_auth_failure() -> None:
             raise RuntimeError("revoke failed")
 
         client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
-        with pytest.raises(BackstopAuthError):
+        with pytest.raises(BackstopTransientAuthError):
             await client.raw_request("GET", "/system-info")
 
     @pytest.mark.asyncio
@@ -154,6 +165,162 @@ class TestBackstopClientAutoRaises:
         result = await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
         assert result.json() == {"version": "1.0"}
+
+
+class TestAuthRecheck:
+    """Mid-session 401s re-probe `/system-info` before revoking MCP tokens."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_does_not_recheck_without_an_auth_failure_hook(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        slept: list[float] = []
+
+        async def record_sleep(delay: float) -> None:
+            slept.append(delay)
+
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", record_sleep)
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+
+        with pytest.raises(BackstopAuthError):
+            await factory.for_credential(_credential()).raw_request("GET", "/people")
+
+        assert slept == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_keeps_the_session_when_a_probe_succeeds(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+        revoked: list[bool] = []
+
+        async def on_auth_failure() -> None:
+            revoked.append(True)
+
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with pytest.raises(BackstopTransientAuthError):
+            await client.raw_request("GET", "/people")
+
+        assert revoked == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_keeps_the_session_when_the_first_probe_is_unauthorized_then_ok(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+        revoked: list[bool] = []
+
+        async def on_auth_failure() -> None:
+            revoked.append(True)
+
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(
+            side_effect=[httpx.Response(401), httpx.Response(200, json={})]
+        )
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with pytest.raises(BackstopTransientAuthError):
+            await client.raw_request("GET", "/people")
+
+        assert revoked == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_revokes_only_when_every_probe_is_unauthorized(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+        revoked: list[bool] = []
+
+        async def on_auth_failure() -> None:
+            revoked.append(True)
+
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with pytest.raises(BackstopSessionRevokedError):
+            await client.raw_request("GET", "/people")
+
+        assert revoked == [True]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_does_not_revoke_when_probes_error_rather_than_unauthorized(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+        revoked: list[bool] = []
+
+        async def on_auth_failure() -> None:
+            revoked.append(True)
+
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(500))
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with pytest.raises(BackstopTransientAuthError):
+            await client.raw_request("GET", "/people")
+
+        assert revoked == []
+
+
+class TestUnauthorizedLogging:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_logs_parsed_json_api_errors_and_caller_identity(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/people").mock(
+            return_value=httpx.Response(
+                401,
+                json={
+                    "errors": [{"detail": "token rejected", "title": "Unauthorized", "code": "401"}]
+                },
+            )
+        )
+
+        with caplog.at_level(logging.INFO), pytest.raises(BackstopAuthError):
+            await factory.for_credential(_credential(), subject="user-42").raw_request(
+                "GET", "/people"
+            )
+
+        record = next(
+            item for item in caplog.records if item.message == "backstop.request.unauthorized"
+        )
+        assert record.__dict__["status_code"] == 401
+        assert record.__dict__["detail"] == "token rejected"
+        assert record.__dict__["title"] == "Unauthorized"
+        assert record.__dict__["code"] == "401"
+        assert record.__dict__["username"] == "bob.smith"
+        assert record.__dict__["subject"] == "user-42"
+        assert "body_excerpt" not in record.__dict__
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_logs_a_redacted_excerpt_when_the_body_does_not_parse(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        token = "p@55W0rd321!"
+        respx.get(f"{_BASE_URL}/people").mock(
+            return_value=httpx.Response(401, text=f"rejected token {token} and more")
+        )
+
+        with caplog.at_level(logging.INFO), pytest.raises(BackstopAuthError):
+            await factory.for_credential(_credential()).raw_request("GET", "/people")
+
+        record = next(
+            item for item in caplog.records if item.message == "backstop.request.unauthorized"
+        )
+        assert record.__dict__["body_excerpt"] == "rejected token *** and more"
+        assert token not in record.__dict__["body_excerpt"]
 
 
 class TestHeaders:

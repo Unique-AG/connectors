@@ -20,6 +20,7 @@ from backstop_mcp.backstop_client import (
     BackstopAuthError,
     BackstopClient,
     BackstopRateLimitError,
+    BackstopTransientAuthError,
 )
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
@@ -372,7 +373,7 @@ async def search_activities(
             include_description=include_description,
             max_rows=None if mode == "aggregate" else row_cap,
         )
-    except (BackstopAuthError, BackstopRateLimitError):
+    except (BackstopAuthError, BackstopTransientAuthError, BackstopRateLimitError):
         # Neither is "this endpoint is unavailable". A dead credential fails the documented
         # fallback the same way, and a rate limit is a "slow down" that naming a second tool
         # would answer with more load.

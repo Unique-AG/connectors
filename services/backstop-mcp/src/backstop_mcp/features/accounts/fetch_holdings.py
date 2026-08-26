@@ -34,6 +34,7 @@ from backstop_mcp.backstop_client import (
     BackstopAuthError,
     BackstopClient,
     BackstopRateLimitError,
+    BackstopTransientAuthError,
 )
 from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
 from backstop_mcp.features.accounts.fetch_holdings_table import fetch_holdings_table
@@ -86,7 +87,7 @@ async def fetch_holdings(
     """
     try:
         return await fetch_holdings_table(client, entity_id=owner_id, include_closed=include_closed)
-    except (BackstopAuthError, BackstopRateLimitError):
+    except (BackstopAuthError, BackstopTransientAuthError, BackstopRateLimitError):
         # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
         # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
         # account, so falling back would answer a "slow down" with an order of magnitude more
@@ -156,7 +157,7 @@ async def _row_with_figures(client: BackstopClient, account: AccountRecordDto) -
     figures: list[SeriesFigureDto | None] = []
     errors: list[HoldingFigureErrorDto] = []
     for figure_name, result in zip(_FALLBACK_FIGURES, results, strict=True):
-        if isinstance(result, BackstopAuthError):
+        if isinstance(result, BackstopAuthError | BackstopTransientAuthError):
             raise result
         if isinstance(result, BaseException):
             # One series failing costs that figure, not the row: an account with a balance and no

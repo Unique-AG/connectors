@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -187,6 +188,74 @@ class TestLoginFormSubmission:
         query = parse_qs(parsed.query)
         assert "code" in query
         assert query["state"] == ["state-1"]
+
+    @pytest.mark.asyncio
+    async def test_first_login_logs_that_the_credential_is_new(
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_info = await _register_client(provider, "provider-client-cred-new")
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
+
+        with caplog.at_level(logging.INFO):
+            response = await provider.handle_login_post(
+                _login_post_request(request_id, "pv-new.user", "token-first")
+            )
+
+        assert response.status_code == 302
+        record = next(item for item in caplog.records if item.message == "auth.login.succeeded")
+        assert record.__dict__["had_previous_credential"] is False
+        assert record.__dict__["credential_changed"] is False
+
+    @pytest.mark.asyncio
+    async def test_reconnect_logs_whether_the_token_changed(
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_info = await _register_client(provider, "provider-client-cred-changed")
+
+        first_redirect = await provider.authorize(client_info, _authorization_params())
+        first_id = parse_qs(urlparse(first_redirect).query)["request_id"][0]
+        first = await provider.handle_login_post(
+            _login_post_request(first_id, "pv-returning.user", "token-same")
+        )
+        assert first.status_code == 302
+
+        same_redirect = await provider.authorize(client_info, _authorization_params())
+        same_id = parse_qs(urlparse(same_redirect).query)["request_id"][0]
+        with caplog.at_level(logging.INFO):
+            same = await provider.handle_login_post(
+                _login_post_request(same_id, "pv-returning.user", "token-same")
+            )
+        assert same.status_code == 302
+        same_record = next(
+            item for item in caplog.records if item.message == "auth.login.succeeded"
+        )
+        assert same_record.__dict__["had_previous_credential"] is True
+        assert same_record.__dict__["credential_changed"] is False
+
+        caplog.clear()
+        new_redirect = await provider.authorize(client_info, _authorization_params())
+        new_id = parse_qs(urlparse(new_redirect).query)["request_id"][0]
+        with caplog.at_level(logging.INFO):
+            changed = await provider.handle_login_post(
+                _login_post_request(new_id, "pv-returning.user", "token-rotated")
+            )
+        assert changed.status_code == 302
+        changed_record = next(
+            item for item in caplog.records if item.message == "auth.login.succeeded"
+        )
+        assert changed_record.__dict__["had_previous_credential"] is True
+        assert changed_record.__dict__["credential_changed"] is True
 
     @pytest.mark.asyncio
     async def test_invalid_credentials_rerender_form_without_minting_code(
