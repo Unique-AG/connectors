@@ -6,7 +6,11 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { CheckAvailabilityQuery } from './check-availability.query';
 import { META } from './check-availability-tool.meta';
-import { GraphDateTimeSchema } from './utils/calendar-display';
+import {
+  ConsentRequiredSchema,
+  EventDateTimeSchema,
+  ResolvedWindowSchema,
+} from './utils/calendar-output.schema';
 import { BUSY_STATUSES } from './utils/decode-availability-view';
 import { GraphScheduleDateRangeSchema } from './utils/graph-schedule-date-range.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
@@ -74,8 +78,8 @@ const ScheduleItemSchema = z.object({
     .describe(
       'True when Graph marked the item private. Subject and location are then redacted even if a value was present.',
     ),
-  start: GraphDateTimeSchema.describe('Item start.'),
-  end: GraphDateTimeSchema.describe('Item end.'),
+  start: EventDateTimeSchema.describe('Item start.'),
+  end: EventDateTimeSchema.describe('Item end.'),
 });
 
 const WorkingHoursSchema = z.object({
@@ -130,34 +134,10 @@ export const CheckAvailabilityOutputSchema = z.object({
     .describe(
       'Notes about timezone fallback or per-person Graph errors. Display after the results.',
     ),
-  resolvedWindow: z
-    .object({
-      startDateTime: z
-        .string()
-        .describe('Absolute start sent to Graph, including timezone offset.'),
-      endDateTime: z.string().describe('Absolute end sent to Graph, including timezone offset.'),
-      timeZone: z
-        .string()
-        .describe(
-          'IANA timezone the window was resolved in, or UTC when the mailbox timezone was unavailable.',
-        ),
-      serverCurrentDateTime: z
-        .string()
-        .describe('Server clock in that timezone when the window was resolved, including offset.'),
-      interpretation: z
-        .string()
-        .describe(
-          'Human description of the window, e.g. "next week = Mon 2026-08-31 00:00 to Sun 2026-09-06 23:59 (Europe/Zurich)". State this when a relative range was used.',
-        ),
-    })
-    .optional()
-    .describe('The getSchedule window actually queried.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  resolvedWindow: ResolvedWindowSchema.optional().describe(
+    'The getSchedule window actually queried.',
+  ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()

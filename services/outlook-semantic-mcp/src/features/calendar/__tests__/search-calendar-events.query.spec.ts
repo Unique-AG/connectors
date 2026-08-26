@@ -9,7 +9,6 @@ import {
 } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import * as relativeRange from '~/utils/relative-range';
 import type { CalendarRef } from '../calendar.schemas';
 import { ListCalendarsQuery } from '../list-calendars.query';
 import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
@@ -129,11 +128,21 @@ function createQuery(opts: {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
   const measureSearch = vi.fn((_filters: unknown, fn: () => Promise<unknown>) => fn());
   const queryCalls: unknown[] = [];
+  const filterCalls: string[] = [];
+  const orderbyCalls: (string | string[])[] = [];
   const request = {
     header: vi.fn().mockReturnThis(),
     query: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     top: vi.fn().mockReturnThis(),
+    orderby: vi.fn().mockImplementation(function (this: object, value: string) {
+      orderbyCalls.push(value);
+      return this;
+    }),
+    filter: vi.fn().mockImplementation(function (this: object, value: string) {
+      filterCalls.push(value);
+      return this;
+    }),
     get,
   };
   const api =
@@ -153,6 +162,11 @@ function createQuery(opts: {
             }),
             select: vi.fn().mockReturnThis(),
             top: vi.fn().mockReturnThis(),
+            orderby: vi.fn().mockReturnThis(),
+            filter: vi.fn().mockImplementation(function (this: object, value: string) {
+              filterCalls.push(value);
+              return this;
+            }),
             get: pathGet,
           };
         });
@@ -180,7 +194,7 @@ function createQuery(opts: {
     { measureSearch } as unknown as CalendarMetricsService,
   );
 
-  return { query, api, request, measureSearch, queryCalls };
+  return { query, api, request, measureSearch, queryCalls, filterCalls, orderbyCalls };
 }
 
 describe(SearchCalendarEventsQuery.name, () => {
@@ -219,7 +233,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     ]);
   });
 
-  it('matches attendee against the organizer when Graph omitted them from attendees', async () => {
+  it('matches an attendee address against the organizer when Graph omitted them from attendees', async () => {
     const { query } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
@@ -237,13 +251,50 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, attendee: 'jordan' });
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      attendees: ['JORDAN@example.com'],
+    });
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });
 
-  it('filters by category', async () => {
+  it('requires every requested attendee address to be on the event', async () => {
+    const both = graphEvent({
+      id: 'both',
+      attendees: [
+        { emailAddress: { address: 'alex@example.com' }, status: { response: 'accepted' } },
+        { emailAddress: { address: 'pat@example.com' }, status: { response: 'accepted' } },
+      ],
+    });
+    const onlyOne = graphEvent({
+      id: 'only-one',
+      attendees: [{ emailAddress: { address: 'alex@example.com' }, status: { response: 'none' } }],
+    });
     const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [both, onlyOne] }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      attendees: ['alex@example.com', 'pat@example.com'],
+    });
+
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['both']);
+  });
+
+  it('does not match an attendee on a partial address', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [graphEvent()] }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, attendees: ['alex@example.co'] });
+
+    expect(result.events).toEqual([]);
+  });
+
+  it('sends the category filter to Graph and re-checks it in-process', async () => {
+    const { query, filterCalls } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
           graphEvent({ id: 'keep', categories: ['Client'] }),
@@ -252,9 +303,115 @@ describe(SearchCalendarEventsQuery.name, () => {
       }),
     });
 
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, category: 'client' });
+    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, categories: ['client'] });
+
+    expect(filterCalls).toEqual(["categories/any(c:c eq 'client')"]);
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
+  });
+
+  it('requires every requested category to be on the event', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          graphEvent({ id: 'both', categories: ['Client', 'Urgent'] }),
+          graphEvent({ id: 'only-one', categories: ['Client'] }),
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      categories: ['client', 'URGENT'],
+    });
+
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['both']);
+  });
+
+  it('sends subject startsWith to Graph and combines it with the category filter', async () => {
+    const { query, filterCalls, orderbyCalls } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [graphEvent({ categories: ['Client'] })] }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      categories: ["O'Brien"],
+      subject: { startsWith: 'Stand' },
+    });
+
+    expect(filterCalls).toEqual([
+      "categories/any(c:c eq 'O''Brien') and startswith(subject,'Stand')",
+    ]);
+    expect(orderbyCalls).toEqual(['start/dateTime']);
+    expect(result.success).toBe(true);
+  });
+
+  it('keeps subject contains out of the Graph request and matches it case-insensitively', async () => {
+    const { query, filterCalls } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          graphEvent({ id: 'keep', subject: 'Weekly STANDUP sync' }),
+          graphEvent({ id: 'drop', subject: 'Retro' }),
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      subject: { contains: 'standup' },
+    });
+
+    expect(filterCalls).toEqual([]);
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
+  });
+
+  it('matches subject startsWith case-insensitively in-process', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          graphEvent({ id: 'keep', subject: 'STANDUP with Alex' }),
+          graphEvent({ id: 'drop', subject: 'Alex standup' }),
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      subject: { startsWith: 'standup' },
+    });
 
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
+  });
+
+  it('retries the calendar without $filter when Graph rejects it, keeping in-process filtering', async () => {
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(makeGraphError(400, 'ErrorInvalidUrlQueryFilter'))
+      .mockResolvedValueOnce({
+        value: [
+          graphEvent({ id: 'keep', categories: ['Client'] }),
+          graphEvent({ id: 'drop', categories: ['Work'] }),
+        ],
+      });
+    const { query, filterCalls } = createQuery({ get });
+
+    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, categories: ['Client'] });
+
+    expect(filterCalls).toEqual(["categories/any(c:c eq 'Client')"]);
+    expect(result.success).toBe(true);
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
+  });
+
+  it('returns cancelled occurrences flagged rather than dropping them', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [graphEvent({ id: 'called-off', isCancelled: true })],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events?.[0]?.isCancelled).toBe(true);
   });
 
   it('notes private events on calendars that cannot show private details', async () => {
@@ -292,27 +449,50 @@ describe(SearchCalendarEventsQuery.name, () => {
     );
   });
 
-  it('follows calendarView nextLink and truncates to 100 events', async () => {
+  it('stops paging once the event cap is reached instead of draining nextLink', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => graphEvent({ id: `p1-${index}` }));
-    const overflow = graphEvent({
-      id: 'overflow',
-      start: { dateTime: '2026-08-25T10:00:00.0000000' },
+    const get = vi.fn().mockResolvedValue({
+      value: firstPage,
+      '@odata.nextLink':
+        'https://graph.microsoft.com/v1.0/users/me/calendars/cal-own/calendarView?$skiptoken=1',
     });
-    const get = vi
-      .fn()
-      .mockResolvedValueOnce({
-        value: firstPage,
-        '@odata.nextLink':
-          'https://graph.microsoft.com/v1.0/users/me/calendars/cal-own/calendarView?$skiptoken=1',
-      })
-      .mockResolvedValueOnce({ value: [overflow] });
     const { query } = createQuery({ get });
 
     const result = await query.run(USER_PROFILE_ID, WINDOW);
 
-    expect(get).toHaveBeenCalledTimes(2);
+    expect(get).toHaveBeenCalledTimes(1);
     expect(result.events).toHaveLength(100);
-    expect(result.searchNotes).toContain('Results truncated to 100 events.');
+    expect(result.searchNotes).toContain(
+      'Results are capped at 100 events and more exist in this window. Narrow the date range or add filters.',
+    );
+  });
+
+  it('follows nextLink while under the cap and reports when the page limit is hit', async () => {
+    const page = Array.from({ length: 10 }, (_, index) => graphEvent({ id: `e-${index}` }));
+    const get = vi.fn().mockResolvedValue({
+      value: page,
+      '@odata.nextLink':
+        'https://graph.microsoft.com/v1.0/users/me/calendars/cal-own/calendarView?$skiptoken=1',
+    });
+    const { query } = createQuery({ get });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(get).toHaveBeenCalledTimes(5);
+    expect(result.events).toHaveLength(50);
+    expect(result.searchNotes).toContain(
+      'Results are capped at 100 events and more exist in this window. Narrow the date range or add filters.',
+    );
+  });
+
+  it('reports no cap note when the window fits', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({ value: [graphEvent()] }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(result.searchNotes).toBeUndefined();
   });
 
   it('accepts Graph events whose optional objects are null', async () => {
@@ -346,7 +526,11 @@ describe(SearchCalendarEventsQuery.name, () => {
       get: vi.fn().mockResolvedValue({ value: [] }),
     });
 
-    await query.run(USER_PROFILE_ID, { ...WINDOW, attendee: 'alex', subject: 'Standup' });
+    await query.run(USER_PROFILE_ID, {
+      ...WINDOW,
+      attendees: ['alex@example.com'],
+      subject: { contains: 'Standup' },
+    });
 
     expect(measureSearch).toHaveBeenCalledWith(
       {
@@ -359,12 +543,15 @@ describe(SearchCalendarEventsQuery.name, () => {
     );
   });
 
-  it('keeps other calendars and records a note when one calendarView returns 403', async () => {
+  it.each([
+    ['403', makeGraphError(403, 'ErrorAccessDenied')],
+    ['404', makeGraphError(404, 'ErrorItemNotFound')],
+  ])('keeps other calendars and records a note when one calendarView returns %s', async (_label, error) => {
     const { query } = createQuery({
       calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
       getByPath: {
         [OWN_VIEW]: { value: [graphEvent()] },
-        [OWNER_VIEW]: makeGraphError(403, 'ErrorAccessDenied'),
+        [OWNER_VIEW]: error,
       },
     });
 
@@ -373,30 +560,6 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.success).toBe(true);
     expect(result.events).toHaveLength(1);
     expect(result.searchNotes).toEqual([`Could not read calendar "Banker" (${OWNER_EMAIL}).`]);
-  });
-
-  it('filters attendees in-process', async () => {
-    const { query } = createQuery({
-      get: vi.fn().mockResolvedValue({
-        value: [
-          graphEvent({ id: 'keep' }),
-          graphEvent({
-            id: 'drop',
-            subject: 'Other',
-            attendees: [
-              {
-                emailAddress: { name: 'Pat', address: 'pat@example.com' },
-                status: { response: 'none' },
-              },
-            ],
-          }),
-        ],
-      }),
-    });
-
-    const result = await query.run(USER_PROFILE_ID, { ...WINDOW, attendee: 'alex@' });
-
-    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });
 
   it('passes through consentRequired from list_calendars', async () => {
@@ -545,8 +708,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.searchNotes?.join(' ')).toMatch(/no longer accessible/i);
   });
 
-  it('resolves the query window once and reuses it across every calendar in the fan-out', async () => {
-    const resolveSpy = vi.spyOn(relativeRange, 'resolveQueryWindow');
+  it('sends one identical window to every calendar in the fan-out', async () => {
     const { query, queryCalls } = createQuery({
       calendars: [OWN_CALENDAR, DELEGATED_CALENDAR, SHARED_INTO_OWN_MAILBOX],
       getByPath: {
@@ -556,10 +718,14 @@ describe(SearchCalendarEventsQuery.name, () => {
       },
     });
 
-    await query.run(USER_PROFILE_ID, WINDOW);
+    // A relative range resolved per calendar could straddle midnight and produce different days.
+    const now = Temporal.ZonedDateTime.from('2026-08-25T23:59:59.999[Europe/Zurich]');
+    const result = await query.run(USER_PROFILE_ID, { range: 'today', now });
 
-    expect(resolveSpy).toHaveBeenCalledTimes(1);
-    expect(queryCalls).toEqual([WINDOW, WINDOW, WINDOW]);
-    resolveSpy.mockRestore();
+    const expected = {
+      startDateTime: result.resolvedWindow?.startDateTime,
+      endDateTime: result.resolvedWindow?.endDateTime,
+    };
+    expect(queryCalls).toEqual([expected, expected, expected]);
   });
 });

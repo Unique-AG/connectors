@@ -13,6 +13,14 @@ export function isCalendarPermissionDeniedError(error: unknown): boolean {
   return error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403);
 }
 
+export function isGraphBadRequestError(error: unknown): boolean {
+  return error instanceof GraphError && error.statusCode === 400;
+}
+
+export function isGraphNotFoundError(error: unknown): boolean {
+  return error instanceof GraphError && error.statusCode === 404;
+}
+
 export function isGetScheduleTooManyEntriesError(error: unknown): boolean {
   if (!(error instanceof GraphError)) {
     return false;

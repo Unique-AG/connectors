@@ -10,7 +10,8 @@ import { offsetDateTime } from '~/utils/relative-range';
 import { CreateEventCommand } from './create-event.command';
 import { META } from './create-event-tool.meta';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
-import { describeCalendar, GraphDateTimeSchema, oneLine } from './utils/calendar-display';
+import { describeCalendar, oneLine } from './utils/calendar-display';
+import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
 import { CalendarRefSchema } from './utils/calendar-ref.schema';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
@@ -89,8 +90,8 @@ export const CreateEventOutputSchema = z.object({
     'Internal handle of the created event. Never display it.',
   ),
   subject: z.string().nullable().optional().describe('Title of the created event.'),
-  start: GraphDateTimeSchema.optional().describe('Created event start.'),
-  end: GraphDateTimeSchema.optional().describe('Created event end.'),
+  start: EventDateTimeSchema.optional().describe('Created event start.'),
+  end: EventDateTimeSchema.optional().describe('Created event end.'),
   location: z.string().nullable().optional().describe('Location of the created event, or null.'),
   joinUrl: z
     .string()
@@ -106,12 +107,7 @@ export const CreateEventOutputSchema = z.object({
     .string()
     .optional()
     .describe('Idempotency key sent to Graph. Pass it again if this create is retried.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()

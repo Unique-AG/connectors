@@ -11,6 +11,7 @@ import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { describeCalendar, oneLine } from './utils/calendar-display';
+import { ConsentRequiredSchema } from './utils/calendar-output.schema';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
@@ -53,12 +54,7 @@ export const CancelEventOutputSchema = z.object({
       'True when Graph cancelled the event. False when the user declined, the event was already cancelled or not found, consent is missing, or only the organizer can cancel.',
     ),
   message: z.string().describe('Human-readable summary of the outcome.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()

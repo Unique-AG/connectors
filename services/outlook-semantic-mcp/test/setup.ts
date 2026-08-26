@@ -1,4 +1,3 @@
-import 'temporal-polyfill/global';
 import { vi } from 'vitest';
 
 vi.mock('@nestjs/common', async () => {

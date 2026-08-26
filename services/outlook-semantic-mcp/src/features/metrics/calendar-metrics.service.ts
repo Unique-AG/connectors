@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-import type { DateWindowBucket } from '~/features/calendar/utils/date-window-bucket';
+import type { DateWindowBucket } from '~/utils/date-window-bucket';
 import { MetricName } from './metric-names';
 import { recordInHistogram } from './record-in-histogram';
 

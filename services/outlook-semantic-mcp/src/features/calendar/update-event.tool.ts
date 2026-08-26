@@ -12,7 +12,8 @@ import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
-import { describeCalendar, GraphDateTimeSchema, oneLine } from './utils/calendar-display';
+import { describeCalendar, oneLine } from './utils/calendar-display';
+import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
@@ -134,8 +135,8 @@ export const UpdateEventOutputSchema = z.object({
     'Internal handle of the updated event. Never display it.',
   ),
   subject: z.string().nullable().optional().describe('Title after the update.'),
-  start: GraphDateTimeSchema.optional().describe('Start after the update.'),
-  end: GraphDateTimeSchema.optional().describe('End after the update.'),
+  start: EventDateTimeSchema.optional().describe('Start after the update.'),
+  end: EventDateTimeSchema.optional().describe('End after the update.'),
   location: z.string().nullable().optional().describe('Location after the update, or null.'),
   joinUrl: z.string().nullable().optional().describe('Teams join URL when present, or null.'),
   webLink: z
@@ -143,12 +144,7 @@ export const UpdateEventOutputSchema = z.object({
     .nullable()
     .optional()
     .describe('Outlook web link for the updated event. This is the user-facing URL.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()

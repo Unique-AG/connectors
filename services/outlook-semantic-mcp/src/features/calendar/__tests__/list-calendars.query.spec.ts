@@ -1,6 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
-import { GetFullDelegatedAccessQuery } from '~/features/delegated-access/queries/get-full-delegated-access.query';
+import type { DelegatedAccessConfig } from '~/config';
+import { GetFullAccessMailboxesQuery } from '~/features/delegated-access/queries/get-full-access-mailboxes.query';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -27,6 +28,7 @@ function createQuery(opts: {
   get?: ReturnType<typeof vi.fn>;
   responsesByPath?: Record<string, unknown | Error>;
   fullAccessOwners?: string[];
+  delegatedAccessScan?: DelegatedAccessConfig['scan'];
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
   const request = {
@@ -49,9 +51,13 @@ function createQuery(opts: {
             get: pathGet,
           };
         });
-  const getFullDelegatedAccess = vi
-    .fn()
-    .mockResolvedValue((opts.fullAccessOwners ?? []).map((ownerUserEmail) => ({ ownerUserEmail })));
+  const getFullAccessMailboxes = vi.fn().mockResolvedValue({
+    scanDisabled: opts.delegatedAccessScan === 'disabled',
+    ownerEmails:
+      opts.delegatedAccessScan === 'disabled'
+        ? []
+        : (opts.fullAccessOwners ?? []).map((email) => email.toLowerCase()),
+  });
 
   const query = new ListCalendarsQuery(
     { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
@@ -62,16 +68,16 @@ function createQuery(opts: {
         source: 'oauth',
       }),
     } as unknown as GetUserProfileQuery,
-    { run: getFullDelegatedAccess } as unknown as GetFullDelegatedAccessQuery,
+    { run: getFullAccessMailboxes } as unknown as GetFullAccessMailboxesQuery,
     passthroughCalendarMetrics() as unknown as CalendarMetricsService,
   );
 
-  return { query, api, request, getFullDelegatedAccess };
+  return { query, api, request, getFullAccessMailboxes };
 }
 
 describe(ListCalendarsQuery.name, () => {
   it('GETs /users/{email}/calendars and classifies own, delegated-primary, and shared-custom calendars', async () => {
-    const { query, api, request, getFullDelegatedAccess } = createQuery({
+    const { query, api, request, getFullAccessMailboxes } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
           {
@@ -109,7 +115,7 @@ describe(ListCalendarsQuery.name, () => {
 
     expect(api).toHaveBeenCalledWith(OWN_PATH);
     expect(request.select).toHaveBeenCalledWith(CALENDAR_SELECT);
-    expect(getFullDelegatedAccess).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
+    expect(getFullAccessMailboxes).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
     expect(result.success).toBe(true);
     expect(result.calendars).toEqual([
       expect.objectContaining({ calendarId: 'cal-own', isOwn: true, mailbox: OWN_EMAIL }),
@@ -204,6 +210,23 @@ describe(ListCalendarsQuery.name, () => {
       expect.objectContaining({ calendarId: 'cal-local-copy', ownerEmail: OWNER_EMAIL }),
     ]);
     expect(result.listNotes).toEqual([`Could not list calendars for ${OWNER_EMAIL}.`]);
+  });
+
+  it('says so instead of silently omitting Full Access calendars when the scan is disabled', async () => {
+    const { query, api, getFullAccessMailboxes } = createQuery({
+      delegatedAccessScan: 'disabled',
+      fullAccessOwners: [OWNER_EMAIL],
+      responsesByPath: {
+        [OWN_PATH]: { value: [{ id: 'cal-own', name: 'Calendar' }] },
+      },
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(getFullAccessMailboxes).toHaveBeenCalledWith(USER_PROFILE_ID.toString());
+    expect(api).not.toHaveBeenCalledWith(OWNER_PATH);
+    expect(result.calendars).toEqual([expect.objectContaining({ calendarId: 'cal-own' })]);
+    expect(result.listNotes?.join(' ')).toMatch(/delegated-access discovery is turned off/i);
   });
 
   it('returns consentRequired when Graph denies calendar scopes on the caller mailbox', async () => {

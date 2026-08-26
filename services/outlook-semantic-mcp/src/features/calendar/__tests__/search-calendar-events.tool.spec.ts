@@ -38,12 +38,70 @@ describe(SearchCalendarEventsTool.name, () => {
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       mailbox: 'me@example.com',
-      attendee: undefined,
-      subject: undefined,
-      category: undefined,
       range: 'today',
     });
     expect(SearchCalendarEventsOutputSchema.parse(result)).toEqual(output);
+  });
+
+  it('passes the subject and attendee filters through unchanged', async () => {
+    const run = vi.fn().mockResolvedValue({ success: true, message: 'ok', events: [] });
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
+
+    await tool.searchCalendarEvents(
+      {
+        dateRange: { rangeType: 'relative', range: 'thisWeek' },
+        subject: { startsWith: 'Weekly' },
+        attendees: ['alex@example.com', 'pat@example.com'],
+        categories: ['Client', 'Urgent'],
+      },
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
+      subject: { startsWith: 'Weekly' },
+      attendees: ['alex@example.com', 'pat@example.com'],
+      categories: ['Client', 'Urgent'],
+      range: 'thisWeek',
+    });
+  });
+
+  it('rejects a subject filter that sets both startsWith and contains', async () => {
+    const run = vi.fn();
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
+
+    await expect(
+      tool.searchCalendarEvents(
+        {
+          dateRange: { rangeType: 'relative', range: 'today' },
+          subject: { startsWith: 'Weekly', contains: 'Sales' },
+        } as unknown as Parameters<SearchCalendarEventsTool['searchCalendarEvents']>[0],
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
+      ),
+    ).rejects.toThrow();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('rejects an attendee that is not an SMTP address', async () => {
+    const run = vi.fn();
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
+
+    await expect(
+      tool.searchCalendarEvents(
+        {
+          dateRange: { rangeType: 'relative', range: 'today' },
+          attendees: ['Alex'],
+        },
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
+      ),
+    ).rejects.toThrow(/SMTP/i);
+    expect(run).not.toHaveBeenCalled();
   });
 
   it('passes an absolute window through to the query', async () => {
@@ -67,10 +125,6 @@ describe(SearchCalendarEventsTool.name, () => {
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
-      mailbox: undefined,
-      attendee: undefined,
-      subject: undefined,
-      category: undefined,
       startDateTime: '2026-08-25T00:00:00+02:00',
       endDateTime: '2026-08-26T00:00:00+02:00',
     });

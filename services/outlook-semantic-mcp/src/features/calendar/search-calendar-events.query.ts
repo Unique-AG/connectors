@@ -8,7 +8,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { nameSimilarity } from '~/utils/name-similarity-score';
+import { dateWindowFromSearchInput } from '~/utils/date-window-bucket';
 import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   type RelativeRange,
@@ -17,6 +17,7 @@ import {
 } from '~/utils/relative-range';
 import { CalendarRef, GraphEventCollectionSchema } from './calendar.schemas';
 import { ListCalendarsQuery } from './list-calendars.query';
+import { isGraphBadRequestError } from './utils/calendar-graph-errors';
 import { calendarGraphLimit } from './utils/calendar-graph-limit';
 import { calendarViewPath } from './utils/calendar-graph-path';
 import {
@@ -25,7 +26,7 @@ import {
   logCalendarRecovered,
 } from './utils/calendar-observability';
 import type { CalendarRefInput } from './utils/calendar-ref.schema';
-import { dateWindowFromSearchInput } from './utils/date-window-bucket';
+import { buildEventGraphFilter, type SubjectFilter } from './utils/event-graph-filter';
 import {
   type CalendarEvent,
   mapGraphEventToCalendarEvent,
@@ -33,10 +34,10 @@ import {
 
 const EVENT_SELECT =
   'id,subject,body,start,end,location,attendees,organizer,onlineMeeting,onlineMeetingUrl,webLink,isCancelled,isAllDay,sensitivity,categories,type,seriesMasterId,recurrence,showAs';
+const EVENT_ORDER_BY = 'start/dateTime';
 const CALENDAR_VIEW_TOP = 100;
 const MAX_CALENDAR_VIEW_PAGES = 5;
 const MAX_EVENTS = 100;
-const TEXT_FILTER_SIMILARITY = 0.75;
 
 export interface SearchCalendarEventsQueryOutput {
   success: boolean;
@@ -50,9 +51,11 @@ export interface SearchCalendarEventsQueryOutput {
 export interface SearchCalendarEventsQueryInput {
   mailbox?: string;
   calendars?: CalendarRefInput[];
-  attendee?: string;
-  subject?: string;
-  category?: string;
+  /** Every address must be on the event, as organizer or attendee. */
+  attendees?: string[];
+  subject?: SubjectFilter;
+  /** Every category must be on the event. */
+  categories?: string[];
   range?: RelativeRange;
   startDateTime?: string;
   endDateTime?: string;
@@ -80,9 +83,9 @@ export class SearchCalendarEventsQuery {
     this.logger.debug({
       userProfileId: userProfileIdString,
       mailbox: obfuscateEmail(input.mailbox),
-      hasAttendeeFilter: input.attendee !== undefined,
+      hasAttendeeFilter: hasAttendeeFilter(input),
       hasSubjectFilter: input.subject !== undefined,
-      hasCategoryFilter: input.category !== undefined,
+      hasCategoryFilter: hasCategoryFilter(input),
       range: input.range,
       msg: 'search_calendar_events started',
     });
@@ -94,9 +97,9 @@ export class SearchCalendarEventsQuery {
     return this.calendarMetrics.measureSearch(
       {
         dateWindow: dateWindowFromSearchInput(input),
-        hasAttendeeFilter: input.attendee !== undefined,
+        hasAttendeeFilter: hasAttendeeFilter(input),
         hasSubjectFilter: input.subject !== undefined,
-        hasCategoryFilter: input.category !== undefined,
+        hasCategoryFilter: hasCategoryFilter(input),
       },
       () => this.search(userProfileId, userProfileIdString, input),
     );
@@ -257,6 +260,7 @@ export class SearchCalendarEventsQuery {
             events: CalendarEvent[];
             notes: string[];
             fetched: number;
+            hasMore: boolean;
             calendar: CalendarRef;
           }> => {
             try {
@@ -268,12 +272,7 @@ export class SearchCalendarEventsQuery {
                 timeZone: input.timeZone,
                 resolvedWindow: input.resolvedWindow,
               });
-              return {
-                events: fetched.events,
-                notes: fetched.notes,
-                fetched: fetched.fetched,
-                calendar,
-              };
+              return { ...fetched, calendar };
             } catch (error) {
               if (isDelegatedAccessNotAvailableError(error)) {
                 logCalendarRecovered(this.logger, {
@@ -291,6 +290,7 @@ export class SearchCalendarEventsQuery {
                     `Could not read calendar "${calendar.name}"${calendar.ownerEmail ? ` (${calendar.ownerEmail})` : ''}.`,
                   ],
                   fetched: 0,
+                  hasMore: false,
                   calendar,
                 };
               }
@@ -306,6 +306,7 @@ export class SearchCalendarEventsQuery {
       .sort((left, right) => left.event.start.dateTime.localeCompare(right.event.start.dateTime));
     const truncated = matched.length > MAX_EVENTS;
     const kept = truncated ? matched.slice(0, MAX_EVENTS) : matched;
+    const incomplete = truncated || perCalendar.some((result) => result.hasMore);
     const totalFetched = perCalendar.reduce((sum, result) => sum + result.fetched, 0);
     const totalReturned = kept.length;
     this.logger.log({
@@ -313,7 +314,7 @@ export class SearchCalendarEventsQuery {
       calendarCount: input.calendars.length,
       totalFetched,
       totalReturned,
-      truncated,
+      incomplete,
       msg: 'search_calendar_events Graph fan-out',
     });
     const notes = [
@@ -321,7 +322,11 @@ export class SearchCalendarEventsQuery {
       ...(kept.some(({ event, calendar }) => event.isPrivate && !calendar.canViewPrivateItems)
         ? ['Some events are marked private; details may be redacted.']
         : []),
-      ...(truncated ? [`Results truncated to ${MAX_EVENTS} events.`] : []),
+      ...(incomplete
+        ? [
+            `Results are capped at ${MAX_EVENTS} events and more exist in this window. Narrow the date range or add filters.`,
+          ]
+        : []),
     ];
     if (totalReturned === 0) {
       this.logger.debug({
@@ -342,14 +347,45 @@ export class SearchCalendarEventsQuery {
     filters: SearchCalendarEventsQueryInput;
     timeZone: string;
     resolvedWindow: ResolvedWindow;
-  }): Promise<{ events: CalendarEvent[]; notes: string[]; fetched: number }> {
-    const mailbox = input.calendar.mailbox;
+  }): Promise<{ events: CalendarEvent[]; notes: string[]; fetched: number; hasMore: boolean }> {
     calendarTraceAttrs({
       userProfileId: input.userProfileId,
-      mailbox,
+      mailbox: input.calendar.mailbox,
       calendarId: input.calendar.calendarId,
       operation: 'search_calendar_events.fetch',
     });
+    const graphFilter = buildEventGraphFilter(input.filters);
+    try {
+      return await this.pageEvents({ ...input, graphFilter });
+    } catch (error) {
+      if (graphFilter === undefined || !isGraphBadRequestError(error)) {
+        throw error;
+      }
+      // calendarView documents only "some of the OData query parameters", so a $filter it rejects
+      // is a capability gap rather than a caller error. matchesFilters re-checks everything the
+      // filter expressed, so re-reading the window unfiltered returns the same events.
+      logCalendarRecovered(this.logger, {
+        userProfileId: input.userProfileId,
+        mailbox: input.calendar.mailbox,
+        calendarId: input.calendar.calendarId,
+        outcome: 'invalid',
+        msg: 'search_calendar_events retried without $filter',
+        err: error,
+      });
+      return this.pageEvents({ ...input, graphFilter: undefined });
+    }
+  }
+
+  private async pageEvents(input: {
+    client: Client;
+    userProfileId: string;
+    calendar: CalendarRef;
+    filters: SearchCalendarEventsQueryInput;
+    timeZone: string;
+    resolvedWindow: ResolvedWindow;
+    graphFilter: string | undefined;
+  }): Promise<{ events: CalendarEvent[]; notes: string[]; fetched: number; hasMore: boolean }> {
+    const mailbox = input.calendar.mailbox;
     const events: CalendarEvent[] = [];
     const prefer = `outlook.timezone="${input.timeZone}", outlook.body-content-type="text", IdType="ImmutableId"`;
     let nextPath: string | undefined = calendarViewPath({
@@ -360,17 +396,18 @@ export class SearchCalendarEventsQuery {
     let pages = 0;
     let fetched = 0;
 
-    while (nextPath && pages < MAX_CALENDAR_VIEW_PAGES) {
+    while (nextPath !== undefined && pages < MAX_CALENDAR_VIEW_PAGES) {
       const request = input.client.api(nextPath).header('Prefer', prefer);
+      const first = request
+        .query({
+          startDateTime: input.resolvedWindow.startDateTime,
+          endDateTime: input.resolvedWindow.endDateTime,
+        })
+        .select(EVENT_SELECT)
+        .orderby(EVENT_ORDER_BY)
+        .top(CALENDAR_VIEW_TOP);
       const raw = isFirst
-        ? await request
-            .query({
-              startDateTime: input.resolvedWindow.startDateTime,
-              endDateTime: input.resolvedWindow.endDateTime,
-            })
-            .select(EVENT_SELECT)
-            .top(CALENDAR_VIEW_TOP)
-            .get()
+        ? await (input.graphFilter === undefined ? first : first.filter(input.graphFilter)).get()
         : await request.get();
       isFirst = false;
       pages += 1;
@@ -381,11 +418,17 @@ export class SearchCalendarEventsQuery {
           event: item,
           calendar: input.calendar,
         });
-        if (this.matchesFilters(event, input.filters)) {
+        if (matchesFilters(event, input.filters)) {
           events.push(event);
         }
       }
       nextPath = parsed['@odata.nextLink'];
+      if (events.length >= MAX_EVENTS) {
+        // Ordered by start, so no later page can displace what is already held. If Graph ignored
+        // $orderby the cap still holds — the result is then an arbitrary MAX_EVENTS of the window,
+        // which is what hasMore reports.
+        break;
+      }
     }
 
     this.logger.debug({
@@ -398,53 +441,55 @@ export class SearchCalendarEventsQuery {
       msg: 'search_calendar_events calendar',
     });
 
-    return {
-      events,
-      fetched,
-      notes:
-        nextPath === undefined
-          ? []
-          : [
-              `Stopped paging calendar "${input.calendar.name}" after ${MAX_CALENDAR_VIEW_PAGES} pages.`,
-            ],
-    };
+    return { events, fetched, hasMore: nextPath !== undefined, notes: [] };
   }
+}
 
-  private matchesFilters(event: CalendarEvent, input: SearchCalendarEventsQueryInput): boolean {
-    if (input.subject !== undefined && !matchesText(event.subject ?? '', input.subject)) {
-      return false;
-    }
-    if (input.category !== undefined) {
-      const wanted = input.category.toLowerCase();
-      if (!event.categories.some((category) => category.toLowerCase() === wanted)) {
-        return false;
-      }
-    }
-    if (input.attendee !== undefined) {
-      const wanted = input.attendee;
-      const hit =
-        matchesPerson(event.organizerName, event.organizerEmail, wanted) ||
-        event.attendees.some((attendee) => matchesPerson(attendee.name, attendee.email, wanted));
-      if (!hit) {
-        return false;
-      }
-    }
-    return true;
+function hasAttendeeFilter(input: SearchCalendarEventsQueryInput): boolean {
+  return input.attendees !== undefined && input.attendees.length > 0;
+}
+
+function hasCategoryFilter(input: SearchCalendarEventsQueryInput): boolean {
+  return input.categories !== undefined && input.categories.length > 0;
+}
+
+function matchesFilters(event: CalendarEvent, input: SearchCalendarEventsQueryInput): boolean {
+  if (input.subject !== undefined && !matchesSubject(event.subject, input.subject)) {
+    return false;
   }
+  if (hasCategoryFilter(input) && !hasEvery(event.categories, input.categories ?? [])) {
+    return false;
+  }
+  if (hasAttendeeFilter(input) && !hasEvery(attendeeAddresses(event), input.attendees ?? [])) {
+    return false;
+  }
+  return true;
+}
+
+function matchesSubject(subject: string | null, filter: SubjectFilter): boolean {
+  const haystack = (subject ?? '').toLowerCase();
+  return 'startsWith' in filter
+    ? haystack.startsWith(filter.startsWith.trim().toLowerCase())
+    : haystack.includes(filter.contains.trim().toLowerCase());
+}
+
+/**
+ * Narrowing a calendar means every named thing has to be on the event, not any of them. A caller
+ * who wants either asks twice.
+ */
+function hasEvery(present: string[], wanted: string[]): boolean {
+  const have = new Set(present.map((value) => value.toLowerCase()));
+  return wanted.every((value) => have.has(value.trim().toLowerCase()));
+}
+
+/** The organizer counts as present: they are on the meeting whether or not Graph lists them. */
+function attendeeAddresses(event: CalendarEvent): string[] {
+  const addresses = event.attendees
+    .map((attendee) => attendee.email)
+    .filter((email): email is string => email !== null);
+  return event.organizerEmail === null ? addresses : [...addresses, event.organizerEmail];
 }
 
 function calendarKey(calendar: { calendarId: string; mailbox: string }): string {
   return `${calendar.mailbox.toLowerCase()}\u0000${calendar.calendarId}`;
-}
-
-function matchesPerson(name: string | null, email: string | null, wanted: string): boolean {
-  const emailHit = email?.toLowerCase().includes(wanted.toLowerCase()) ?? false;
-  return emailHit || matchesText(name ?? '', wanted);
-}
-
-function matchesText(haystack: string, needle: string): boolean {
-  if (haystack.toLowerCase().includes(needle.toLowerCase())) {
-    return true;
-  }
-  return nameSimilarity(needle, haystack) >= TEXT_FILTER_SIMILARITY;
 }

@@ -1,4 +1,3 @@
-import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -6,6 +5,8 @@ import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   CalendarConsentRequiredError,
   isCalendarPermissionDeniedError,
+  isGraphBadRequestError,
+  isGraphNotFoundError,
 } from './calendar-graph-errors';
 
 export type CalendarRecoveredOutcome =
@@ -127,13 +128,13 @@ export function classifyCalendarGraphError(input: {
       consentRequired?: true;
     }
   | undefined {
-  if (input.error instanceof GraphError && input.error.statusCode === 404) {
+  if (isGraphNotFoundError(input.error)) {
     if (input.notFoundMessage === undefined) {
       return undefined;
     }
     return { outcome: 'not_found', message: input.notFoundMessage };
   }
-  if (input.error instanceof GraphError && input.error.statusCode === 400) {
+  if (isGraphBadRequestError(input.error)) {
     if (input.invalidMessage === undefined) {
       return undefined;
     }

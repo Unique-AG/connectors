@@ -10,6 +10,7 @@ import { RespondToInviteCommand } from './respond-to-invite.command';
 import { META } from './respond-to-invite-tool.meta';
 import { oneLine } from './utils/calendar-display';
 import { EVENT_RESPONSES } from './utils/calendar-graph-path';
+import { ConsentRequiredSchema } from './utils/calendar-output.schema';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 
@@ -44,12 +45,7 @@ export const RespondToInviteOutputSchema = z.object({
     .enum(EVENT_RESPONSES)
     .optional()
     .describe('The response that was sent, when success is true.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()

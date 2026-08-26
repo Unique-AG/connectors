@@ -1,11 +1,16 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CancelEventCommand } from '../cancel-event.command';
 import { CancelEventOutputSchema, CancelEventTool } from '../cancel-event.tool';
 import { GetCalendarQuery } from '../get-calendar.query';
 import { GetCalendarEventQuery } from '../get-calendar-event.query';
+import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const EVENT_REF = {
@@ -122,8 +127,12 @@ describe(CancelEventTool.name, () => {
     expect(result.message).toMatch(/already cancelled/i);
   });
 
-  it('does not call the command when elicitation is declined', async () => {
-    const elicit = vi.fn().mockResolvedValue({ action: 'accept', content: { confirmed: false } });
+  it.each([
+    ['the confirmation is unchecked', { action: 'accept', content: { confirmed: false } }],
+    ['the prompt is dismissed', { action: 'cancel' }],
+    ['the prompt is declined', { action: 'decline' }],
+  ])('does not call the command when %s', async (_label, elicitResult) => {
+    const elicit = vi.fn().mockResolvedValue(elicitResult);
     const { tool, run } = createTool({ elicit });
 
     const result = await tool.cancelEvent(
@@ -133,6 +142,71 @@ describe(CancelEventTool.name, () => {
     );
 
     expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+  });
+
+  it('does not cancel when the confirmation prompt times out', async () => {
+    const elicit = vi
+      .fn()
+      .mockRejectedValue(new McpError(ErrorCode.RequestTimeout, 'Request timed out'));
+    const { tool, run } = createTool({ elicit });
+
+    const result = await tool.cancelEvent(
+      { eventRef: EVENT_REF },
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/timed out/i);
+  });
+
+  it('does not cancel when the client cannot show a confirmation prompt', async () => {
+    const elicit = vi.fn().mockRejectedValue(new Error('This client does not support elicitation'));
+    const { tool, run } = createTool({ elicit });
+
+    const result = await tool.cancelEvent(
+      { eventRef: EVENT_REF },
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/cannot show a confirmation prompt/i);
+  });
+
+  it('issues no Graph request at all when the confirmation is declined', async () => {
+    // The other decline tests assert on a mocked command. This one wires the real command to a
+    // mocked Graph client, because "the elicitation is the only thing between the model and a
+    // cancellation notice in an attendee's inbox" is a claim about HTTP, not about a spy.
+    const post = vi.fn().mockResolvedValue({});
+    const command = new CancelEventCommand(
+      {
+        createClientForUser: vi.fn().mockReturnValue({
+          api: vi.fn().mockReturnValue({ header: vi.fn().mockReturnThis(), post }),
+        }),
+      } as unknown as GraphClientFactory,
+      {
+        run: vi.fn().mockResolvedValue({ id: USER_PROFILE_ID.toString(), email: 'me@example.com' }),
+      } as unknown as GetUserProfileQuery,
+      passthroughCalendarMetrics() as unknown as CalendarMetricsService,
+    );
+    const tool = new CancelEventTool(
+      { run: vi.fn().mockResolvedValue(SNAPSHOT) } as unknown as GetCalendarEventQuery,
+      { run: vi.fn().mockResolvedValue(OWN_PRIMARY) } as unknown as GetCalendarQuery,
+      command,
+    );
+    const elicit = vi.fn().mockResolvedValue({ action: 'cancel' });
+
+    const result = await tool.cancelEvent(
+      { eventRef: EVENT_REF },
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(post).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetCalendarQuery } from '../get-calendar.query';
@@ -122,6 +123,40 @@ describe(UpdateEventTool.name, () => {
 
     expect(run).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
+  });
+
+  it('does not update when the confirmation prompt times out', async () => {
+    const { tool, run, elicit } = createTool({
+      elicit: vi
+        .fn()
+        .mockRejectedValue(new McpError(ErrorCode.RequestTimeout, 'Request timed out')),
+    });
+
+    const result = await tool.updateEvent(
+      INPUT,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/timed out/i);
+  });
+
+  it('does not update when the client cannot show a confirmation prompt', async () => {
+    const { tool, run, elicit } = createTool({
+      elicit: vi.fn().mockRejectedValue(new Error('This client does not support elicitation')),
+    });
+
+    const result = await tool.updateEvent(
+      INPUT,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/cannot show a confirmation prompt/i);
   });
 
   it('returns the query failure without eliciting', async () => {

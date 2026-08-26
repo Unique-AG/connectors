@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { GetFullDelegatedAccessQuery } from '~/features/delegated-access/queries/get-full-delegated-access.query';
+import { GetFullAccessMailboxesQuery } from '~/features/delegated-access/queries/get-full-access-mailboxes.query';
 import { isDelegatedAccessNotAvailableError } from '~/features/delegated-access/utils/is-delegated-access-not-available-error';
 import {
   type CalendarMetricErrorType,
@@ -45,7 +45,7 @@ export class ListCalendarsQuery {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-    private readonly getFullDelegatedAccessQuery: GetFullDelegatedAccessQuery,
+    private readonly getFullAccessMailboxesQuery: GetFullAccessMailboxesQuery,
     private readonly calendarMetrics: CalendarMetricsService,
   ) {}
 
@@ -110,23 +110,32 @@ export class ListCalendarsQuery {
       userProfileId: input.userProfileId,
       consentOnDenied: true,
     });
-    const accesses = await this.getFullDelegatedAccessQuery.run(input.userId);
-    const ownerEmails = [
-      ...new Set(
-        accesses
-          .map((access) => access.ownerUserEmail.toLowerCase())
-          .filter((email) => email !== input.callerEmail.toLowerCase()),
-      ),
-    ];
+    // Exchange Full Access is a mailbox-wide grant that includes the calendar, so the delegated-access
+    // table is a legitimate source of owner mailboxes to ask Graph about — and only that. Every
+    // candidate below is still probed, so a stale row cannot conjure access that does not exist.
+    // It is empty by configuration when discovery is off, which the note distinguishes.
+    const { scanDisabled, ownerEmails: fullAccessMailboxes } =
+      await this.getFullAccessMailboxesQuery.run(input.userId);
+    const ownerEmails = fullAccessMailboxes.filter(
+      (email) => email !== input.callerEmail.toLowerCase(),
+    );
     if (ownerEmails.length === 0) {
       this.logger.log({
         userProfileId: input.userProfileId,
         mailbox: obfuscateEmail(input.callerEmail),
         calendarCount: own.length,
         delegatedMailboxCount: 0,
+        delegatedScanDisabled: scanDisabled,
         msg: 'list_calendars',
       });
-      return { calendars: own, notes: [] };
+      return {
+        calendars: own,
+        notes: scanDisabled
+          ? [
+              'Calendars of mailboxes you have Full Access to are not listed because delegated-access discovery is turned off on this deployment. Calendars shared with you directly are listed.',
+            ]
+          : [],
+      };
     }
 
     using limit = calendarGraphLimit(input.userId);

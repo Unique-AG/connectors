@@ -27,7 +27,7 @@ export interface EventRef {
   mailbox: string;
 }
 
-const GraphEmailAddressSchema = z.object({
+export const GraphEmailAddressSchema = z.object({
   address: z.string().optional(),
   name: z.string().optional(),
 });
@@ -50,10 +50,12 @@ export const GraphCalendarCollectionSchema = z.object({
 
 export type GraphCalendar = z.infer<typeof GraphCalendarSchema>;
 
-const GraphDateTimeTimeZoneSchema = z.object({
+export const GraphDateTimeTimeZoneSchema = z.object({
   dateTime: z.string().optional(),
   timeZone: z.string().optional(),
 });
+
+export type GraphDateTimeTimeZone = z.infer<typeof GraphDateTimeTimeZoneSchema>;
 
 const GraphAttendeeSchema = z.object({
   type: z.string().optional(),
@@ -178,6 +180,23 @@ export const GraphFindMeetingTimesResponseSchema = z.object({
 });
 
 export type GraphMeetingTimeSuggestion = z.infer<typeof GraphMeetingTimeSuggestionSchema>;
+
+/**
+ * Narrow projection a write tool reads before its confirmation prompt: enough to name the event
+ * and decide occurrence vs. series, without pulling bodies or the full attendee list.
+ */
+export const GraphEventSnapshotSchema = z.object({
+  id: z.string(),
+  subject: z.string().nullish(),
+  start: GraphDateTimeTimeZoneSchema.nullish(),
+  end: GraphDateTimeTimeZoneSchema.nullish(),
+  location: GraphLocationSchema.nullish(),
+  attendees: z.array(z.unknown()).nullish(),
+  organizer: z.object({ emailAddress: GraphEmailAddressSchema.nullish() }).nullish(),
+  isCancelled: z.boolean().nullish(),
+  type: z.string().nullish(),
+  seriesMasterId: z.string().nullish(),
+});
 
 /** Shape Graph returns from POST /events and PATCH /events/{id}. */
 export const GraphWrittenEventSchema = z.object({

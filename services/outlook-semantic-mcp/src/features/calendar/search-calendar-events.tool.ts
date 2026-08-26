@@ -7,9 +7,39 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { DateRangeSchema } from '~/utils/relative-range';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
-import { GraphDateTimeSchema } from './utils/calendar-display';
+import {
+  ConsentRequiredSchema,
+  EventDateTimeSchema,
+  ResolvedWindowSchema,
+} from './utils/calendar-output.schema';
 import { CalendarRefSchema } from './utils/calendar-ref.schema';
 import { EventRefSchema } from './utils/event-ref.schema';
+import { smtpAddress } from './utils/smtp-address.schema';
+
+const SubjectFilterSchema = z
+  .union([
+    z.strictObject({
+      startsWith: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          'How the subject begins. Graph applies this before results are capped, so prefer it whenever you actually know the start of the title, e.g. "Weekly" for "Weekly Sales Review". A wrong prefix excludes the event outright, so do not guess one just to reach the server-side path.',
+        ),
+    }),
+    z.strictObject({
+      contains: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          'A word or phrase anywhere in the subject. Graph cannot evaluate this, so it is applied after results are capped rather than before: on a wide window it sees fewer events than startsWith would, and an empty result does not prove the meeting does not exist.',
+        ),
+    }),
+  ])
+  .describe(
+    'How to match the event subject. Supply exactly one of startsWith or contains, never both. Both are case-insensitive.',
+  );
 
 const FiltersSchema = z.object({
   calendars: z
@@ -23,25 +53,30 @@ const FiltersSchema = z.object({
     .string()
     .optional()
     .describe(
-      'SMTP address of a mailbox to search. Omit to search every calendar the user can access (own, shared, and Full Access). Do not put the mailbox in subject or attendee text.',
+      'SMTP address of a mailbox to search. Omit to search every calendar the user can access (own, shared, and Full Access). Do not put the mailbox in subject or attendees.',
     ),
-  attendee: z
-    .string()
+  attendees: z
+    .array(smtpAddress('SMTP address that must be on the event, as organizer or as an attendee.'))
+    .max(10)
     .optional()
     .describe(
-      'Matched against organizer or attendee email (substring) or name (substring or the same name-similarity used for contacts). Applied after Graph returns the window. Omit rather than guess.',
+      'Every address listed must be on the event for it to match, so use one address for "meetings with X" and several only for "meetings with X and Y together". Exact whole-address match, case-insensitive — this is not a name search, so resolve a name with lookup_contacts or ask the user rather than guessing an address, since a wrong address returns an empty result that looks like a free calendar. Graph cannot filter on attendees, so this is applied after results are capped: an empty result does not prove the meeting does not exist.',
     ),
-  subject: z
-    .string()
+  subject: SubjectFilterSchema.optional().describe(
+    'Match on the event subject. Omit rather than guess.',
+  ),
+  categories: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Outlook category name that must be on the event. Case-insensitive exact match.'),
+    )
+    .max(10)
     .optional()
     .describe(
-      'Matched against the event subject with a substring or the same name-similarity used for contacts. Applied after Graph returns the window. Omit rather than guess.',
-    ),
-  category: z
-    .string()
-    .optional()
-    .describe(
-      'Case-insensitive exact match against an Outlook category on the event. Omit rather than guess.',
+      'Every category listed must be on the event for it to match. To find events carrying either of two categories, search once per category rather than listing both. Graph applies the first value before results are capped; any further values are checked afterwards. Each must name an existing Outlook category exactly, so omit rather than guessing.',
     ),
 });
 
@@ -74,8 +109,8 @@ const CalendarEventSchema = z.object({
       'Plain-text event body, already converted by Graph. May be truncated; see bodyTruncated.',
     ),
   bodyTruncated: z.boolean().describe('True when body was cut to the per-event character cap.'),
-  start: GraphDateTimeSchema.describe('Event start.'),
-  end: GraphDateTimeSchema.describe('Event end.'),
+  start: EventDateTimeSchema.describe('Event start.'),
+  end: EventDateTimeSchema.describe('Event end.'),
   location: z
     .string()
     .nullable()
@@ -144,36 +179,12 @@ export const SearchCalendarEventsOutputSchema = z.object({
     .array(z.string())
     .optional()
     .describe(
-      'Notes about dropped calendars, truncated results, or timezone fallback. Display after the results.',
+      'Notes about dropped calendars, capped results, or timezone fallback. Display after the results.',
     ),
-  resolvedWindow: z
-    .object({
-      startDateTime: z
-        .string()
-        .describe('Absolute start sent to Graph, including timezone offset.'),
-      endDateTime: z.string().describe('Absolute end sent to Graph, including timezone offset.'),
-      timeZone: z
-        .string()
-        .describe(
-          'IANA timezone the window was resolved in, or UTC when the mailbox timezone was unavailable.',
-        ),
-      serverCurrentDateTime: z
-        .string()
-        .describe('Server clock in that timezone when the window was resolved, including offset.'),
-      interpretation: z
-        .string()
-        .describe(
-          'Human description of the window, e.g. "next week = Mon 2026-08-31 00:00 to Sun 2026-09-06 23:59 (Europe/Zurich)". State this when a relative range was used.',
-        ),
-    })
-    .optional()
-    .describe('The calendarView window actually queried.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  resolvedWindow: ResolvedWindowSchema.optional().describe(
+    'The calendarView window actually queried.',
+  ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()
@@ -184,7 +195,7 @@ export class SearchCalendarEventsTool {
     name: 'search_calendar_events',
     title: 'Search Calendar Events',
     description:
-      'Search Outlook calendar events in a time window across the signed-in user\'s calendars, including shared calendars and Full Access mailboxes. Prefer dateRange.rangeType=relative with a documented range (today, tomorrow, thisWeek, nextWeek, lastMonth, next7Days, …); weeks start Monday. Vague phrasing ("soon", "recently") should use the closest documented range. Absolute startDateTime/endDateTime must include a timezone offset — Graph does not reinterpret them via Prefer: outlook.timezone. Each result includes the full plain-text body (possibly truncated — see bodyTruncated); there is no second tool to open an event. eventRef, eventId, calendarId and mailbox are internal — never display them. If searchNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
+      'Search Outlook calendar events in a time window across the signed-in user\'s calendars, including shared calendars and Full Access mailboxes.\n\nTime window: prefer dateRange.rangeType=relative with a documented range (today, tomorrow, thisWeek, nextWeek, lastMonth, next7Days, …); weeks start Monday. Vague phrasing ("soon", "recently") should use the closest documented range. Absolute startDateTime/endDateTime must include a timezone offset — Graph does not reinterpret them via Prefer: outlook.timezone.\n\nWhere each filter runs, because it changes what an empty result means. Results are capped, and the cap is what makes an answer incomplete. subject.startsWith and the first value of categories are sent to Microsoft Graph, so they narrow BEFORE the cap: every event you get back is a real match, and searchNotes tells you when more of the same exist. subject.contains, attendees, and any category after the first are evaluated in this service AFTER the cap, on the events Graph already returned — so they are a convenience, not a guarantee. They can return nothing while matching events sit outside what was fetched.\n\nSo: an empty result from subject.contains or attendees does not prove the meeting does not exist. When searchNotes reports that results were capped, say the answer may be incomplete and offer a narrower window instead of answering "there are no such meetings".\n\nGather what you need before calling, rather than guessing a filter. attendees is an exact whole-address match, not a name search: a partial or wrong address silently returns nothing that reads exactly like an empty calendar. Resolve a name with lookup_contacts, or ask the user, first. categories must match an existing Outlook category exactly. Choosing subject.startsWith over subject.contains has to be a fact about the title, not a guess made to reach the server-side path — a wrong prefix excludes the event entirely. attendees and categories are AND filters: every value listed must be on the event, so search once per value when the user means either. If you cannot build a filter confidently, either ask the user or search on the time window alone and read the results.\n\nEach result includes the full plain-text body (possibly truncated — see bodyTruncated); there is no second tool to open an event. eventRef, eventId, calendarId and mailbox are internal — never display them. If searchNotes is present, show it after the results. If a relative range was used, state resolvedWindow.interpretation. If consentRequired is true, ask the user to reconnect Outlook.',
     parameters: SearchCalendarEventsInputSchema,
     outputSchema: SearchCalendarEventsOutputSchema,
     annotations: {

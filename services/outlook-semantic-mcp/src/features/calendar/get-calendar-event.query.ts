@@ -1,46 +1,24 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import * as z from 'zod';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { obfuscateEmail } from '~/utils/obfuscate-email';
-import type { EventRef } from './calendar.schemas';
+import { type EventRef, GraphEventSnapshotSchema } from './calendar.schemas';
 import { eventPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
   recoverCalendarGraphError,
 } from './utils/calendar-observability';
+import { type CalendarDateTime, mapGraphDateTime } from './utils/map-graph-date-time';
 import { type GraphEventType, parseGraphEventType } from './utils/resolve-write-event-id';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
 const EVENT_SELECT =
   'id,subject,start,end,location,attendees,organizer,isCancelled,type,seriesMasterId';
-
-const SnapshotSchema = z.object({
-  id: z.string(),
-  subject: z.string().optional().nullable(),
-  start: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
-  end: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
-  location: z.object({ displayName: z.string().optional() }).nullish(),
-  attendees: z.array(z.unknown()).nullish(),
-  organizer: z
-    .object({
-      emailAddress: z
-        .object({
-          name: z.string().optional(),
-          address: z.string().optional(),
-        })
-        .nullish(),
-    })
-    .nullish(),
-  isCancelled: z.boolean().nullish(),
-  type: z.string().nullish(),
-  seriesMasterId: z.string().nullish(),
-});
 
 export interface CalendarEventSnapshot {
   eventId: string;
@@ -49,8 +27,8 @@ export interface CalendarEventSnapshot {
   type: GraphEventType;
   seriesMasterId: string | null;
   subject: string | null;
-  start: { dateTime: string; timeZone: string | null } | null;
-  end: { dateTime: string; timeZone: string | null } | null;
+  start: CalendarDateTime | null;
+  end: CalendarDateTime | null;
   location: string | null;
   organizerName: string | null;
   organizerEmail: string | null;
@@ -121,7 +99,7 @@ export class GetCalendarEventQuery {
         .header('Prefer', `outlook.timezone="${outlookTimeZone}", IdType="ImmutableId"`)
         .select(EVENT_SELECT)
         .get();
-      const parsed = SnapshotSchema.parse(raw);
+      const parsed = GraphEventSnapshotSchema.parse(raw);
       this.logger.debug({
         userProfileId: userProfileIdString,
         mailbox: obfuscateEmail(mailbox),
@@ -144,8 +122,8 @@ export class GetCalendarEventQuery {
               ? parsed.seriesMasterId
               : null,
           subject: parsed.subject ?? null,
-          start: dateTime(parsed.start),
-          end: dateTime(parsed.end),
+          start: mapGraphDateTime(parsed.start),
+          end: mapGraphDateTime(parsed.end),
           location: parsed.location?.displayName ?? null,
           organizerName: parsed.organizer?.emailAddress?.name ?? null,
           organizerEmail: parsed.organizer?.emailAddress?.address ?? null,
@@ -172,13 +150,4 @@ export class GetCalendarEventQuery {
       return recovered;
     }
   }
-}
-
-function dateTime(
-  value: { dateTime?: string; timeZone?: string } | null | undefined,
-): { dateTime: string; timeZone: string | null } | null {
-  if (value?.dateTime === undefined || value.dateTime === '') {
-    return null;
-  }
-  return { dateTime: value.dateTime, timeZone: value.timeZone ?? null };
 }

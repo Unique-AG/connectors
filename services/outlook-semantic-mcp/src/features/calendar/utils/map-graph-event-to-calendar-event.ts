@@ -1,7 +1,10 @@
 import type { CalendarRef, EventRef, GraphEvent } from '../calendar.schemas';
+import { type CalendarDateTime, mapGraphDateTime } from './map-graph-date-time';
 import { summariseRecurrence } from './summarise-recurrence';
 
 const BODY_MAX_CHARS = 4000;
+/** A search result is always shaped as a time range, so a missing boundary still needs both keys. */
+const UNKNOWN_DATE_TIME: CalendarDateTime = { dateTime: '', timeZone: null };
 
 interface CalendarEventAttendee {
   name: string | null;
@@ -10,17 +13,12 @@ interface CalendarEventAttendee {
   type: string | null;
 }
 
-interface CalendarEventDateTime {
-  dateTime: string;
-  timeZone: string | null;
-}
-
 export interface CalendarEvent {
   subject: string | null;
   body: string;
   bodyTruncated: boolean;
-  start: CalendarEventDateTime;
-  end: CalendarEventDateTime;
+  start: CalendarDateTime;
+  end: CalendarDateTime;
   location: string | null;
   joinUrl: string | null;
   attendees: CalendarEventAttendee[];
@@ -50,14 +48,8 @@ export function mapGraphEventToCalendarEvent(input: {
     subject: input.event.subject ?? null,
     body: bodyTruncated ? rawBody.slice(0, BODY_MAX_CHARS) : rawBody,
     bodyTruncated,
-    start: {
-      dateTime: input.event.start?.dateTime ?? '',
-      timeZone: input.event.start?.timeZone ?? null,
-    },
-    end: {
-      dateTime: input.event.end?.dateTime ?? '',
-      timeZone: input.event.end?.timeZone ?? null,
-    },
+    start: mapGraphDateTime(input.event.start) ?? UNKNOWN_DATE_TIME,
+    end: mapGraphDateTime(input.event.end) ?? UNKNOWN_DATE_TIME,
     location: input.event.location?.displayName ?? null,
     joinUrl: input.event.onlineMeeting?.joinUrl ?? input.event.onlineMeetingUrl ?? null,
     attendees: (input.event.attendees ?? []).map((attendee) => ({

@@ -50,11 +50,49 @@ Rules:
 ## Contracts
 
 - Tools call queries for reads and commands for writes. Query/command I/O is TypeScript interfaces. Zod + `.describe()` only on tool I/O. `@Tool({ parameters })` is a ZodObject.
-- Relative ranges: `src/utils/relative-range` + `temporal-polyfill`. `engines.node` is 24, which has no native `Temporal`, so the polyfill is a real dependency rather than a wait for the Node 26 runtime image. Call sites import `{ Temporal } from 'temporal-polyfill'` directly — do not install it on `globalThis`, or the polyfill would shadow native `Temporal` on that image. Weeks start Monday. `endOfDay` uses `add({ days: 1 }).startOfDay().subtract({ milliseconds: 1 })`.
+- Relative ranges: `src/utils/relative-range` + `temporal-polyfill`. `engines.node` and the `deploy/Dockerfile` image are both Node 26, which has native `Temporal`, but CI runs Node 22, so the polyfill stays a real dependency. Call sites import `{ Temporal } from 'temporal-polyfill'` directly and nothing installs it on `globalThis` — that keeps tests and production on the same implementation instead of shadowing native `Temporal` under test only. Weeks start Monday. `endOfDay` uses `add({ days: 1 }).startOfDay().subtract({ milliseconds: 1 })`.
 - Absolute `startDateTime` / `endDateTime` must be valid Instants with `Z` or `±HH:MM`.
 - Fan-out: `using limit = calendarGraphLimit(userId)` — 5 in-flight, refcounted per user.
-- Search filters (attendee includes organizer, subject, category) run inside `fetchEvents`.
+- `list_calendars` unions `/users/{caller}/calendars` with `/users/{owner}/calendars` per Full Access owner. Those owners come from `GetFullAccessMailboxesQuery`, so `DELEGATED_ACCESS_SCAN=disabled` leaves only the caller's own and directly-shared calendars — `listNotes` says so rather than returning a short list as complete.
+
+### Why calendar reads the delegated-access table at all
+
+The two grants are separate in Exchange, and the two sources here mirror that:
+
+| Source | Covers | Path |
+|---|---|---|
+| `/users/{caller}/calendars` | the caller's own calendars, plus calendars shared with them that they accepted | caller's mailbox |
+| Full Access owners from `GetFullAccessMailboxesQuery` | mailboxes the caller holds Exchange "Read and manage (Full Access)" on | each owner's mailbox |
+
+**Verified against live Exchange on 2026-08-26.** A delegate holding Full Access on a mailbox whose calendar had *never* been shared still reads `GET /users/{owner}/calendars` successfully, and that mailbox's calendar does **not** appear in the delegate's own `/users/{caller}/calendars`. So Full Access is a mailbox-wide grant that includes the calendar, and neither source subsumes the other — the union is required. This corrects the design doc, which asserted the mail table "cannot be reused for calendar"; its actual objection was that the table *under-reports* by missing calendar-only sharees, and that half is covered by the first source.
+
+The table is used **only as a list of candidate mailboxes to ask Graph about**. Every candidate is still probed, and a 403/404 drops it with a note, so a stale or over-broad row cannot grant calendar access that does not exist.
+
+`GetFullAccessMailboxesQuery` exists rather than reusing `GetFullDelegatedAccessQuery` because the latter inner-joins `directories`, which holds *mail folders*. That join would hide a mailbox's calendar whenever mail sync had not yet populated the owner — mail bookkeeping deciding calendar visibility. Its caller needs `msGraphDirectoryIds` for KQL scoping; calendar needs only the address.
 - Search metric: `osm_search_calendar_events_duration_seconds` with labels `dateWindow`, `hasAttendeeFilter`, `hasSubjectFilter`, `hasCategoryFilter`.
+
+### Which search filters Graph evaluates
+
+`calendarView` documents only "some of the OData query parameters", so the split is deliberate and each half is verified by `buildEventGraphFilter` plus `matchesFilters`.
+
+| Filter | Where | Why |
+|---|---|---|
+| `categories` | Graph — `categories/any(c:c eq '…')`, first value only | `calendarView` accepts one category comparison. One clause is still correct narrowing, not a partial answer: events carrying every requested category are a subset of those carrying the first, and `matchesFilters` requires all of them. |
+| `subject.startsWith` | Graph — `startswith(subject,'…')` | Supported. |
+| `subject.contains` | in-process | `contains(subject, …)` is not supported on `calendarView`, and `$search` is documented on neither `calendarView` nor `/events`. `startswith` cannot stand in: it would drop real matches. |
+| `attendees` | in-process | `attendees` is a collection of complex types; Graph documents no lambda filter for it. Exact address match, organizer counted as present. |
+| window | Graph — `startDateTime` / `endDateTime` | Required parameters. |
+
+**`attendees` and `categories` are AND filters.** Narrowing a calendar means every named person or category has to be on the event; a caller who wants either searches twice. Both are case-insensitive, and `attendees` compares whole addresses — there is no substring or name-similarity tier, so a name has to be resolved through `lookup_contacts` first.
+
+**What the split means for the model, and why the prompts say it.** Results are capped (`MAX_EVENTS`, plus `MAX_CALENDAR_VIEW_PAGES` per calendar), so where a filter runs relative to that cap decides what an empty result proves. Graph-side filters narrow *before* the cap, so everything returned is a real match and `searchNotes` reports when more exist. In-process filters run *after* it, on what Graph already returned, so they can find nothing while matching events sit outside the fetched set. The tool description, the field `.describe()` strings, `_meta.systemPrompt` and `CALENDAR_INSTRUCTIONS` all state this, and all instruct the model to resolve an address or category with the user rather than guessing one — a wrong `attendees` value returns an empty result indistinguishable from a free calendar.
+
+Two invariants hold this together:
+
+- **Everything pushed to Graph is re-checked in-process.** The `$filter` is an optimisation, never the source of truth. That is what makes the 400 fallback safe: if Graph rejects a filter it does not support, `fetchEvents` re-reads the window without it and `matchesFilters` still produces the same events.
+- **Values are escaped, not interpolated.** OData doubles a single quote inside a string literal. Subject and category text comes from tool input, so `buildEventGraphFilter` is a boundary in the same sense as `SmtpAddressSchema`.
+
+`$orderby=start/dateTime` is sent so paging can stop as soon as `MAX_EVENTS` is held for a calendar, instead of draining five pages per calendar to sort in memory. Note that `$orderby` on `calendarView` is documented ambiguously and the 2026-08-25 probes could not confirm it live (every calendar endpoint returned 403 for want of `Calendars.ReadWrite.Shared`) — despite what the message on `6d9f998e` claims. If Graph ignores it the cap still holds; the result is then an arbitrary `MAX_EVENTS` from the window rather than the earliest, which is what the `searchNotes` cap message reports. Worth confirming once a calendar-scoped token exists.
 - Other calendar tools: `osm_calendar_operation_duration_seconds` (same second buckets), labelled by `operation` (`list_calendars`, `check_availability`, `suggest_meeting_times`, `create_event`, `update_event`, `cancel_event`, `respond_to_invite`) and `status`. Recovered Graph failures add `errorType` (`consent`, `not_found`, `permission`, `invalid`, `too_many_entries`, `other`). Availability and suggest also label `dateWindow`. Duration is measured on the query/command, not including elicit wait.
 - `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses and windows shorter than 62 days. Decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
 - `suggest_meeting_times` POSTs `/users/{email}/findMeetingTimes`. Default duration 30 minutes and `activityDomain` work. Surface `emptySuggestionsReason` instead of inventing slots.
@@ -77,7 +115,7 @@ Use `search_calendar_events` with `dateRange.rangeType: relative` and `range: ne
 
 > When is my next meeting with Alex Rivera?
 
-Use `search_calendar_events` with `dateRange.rangeType: relative` and `range: next7Days` (starts now) and `attendee` set to the name or SMTP. The attendee filter matches organizer or attendees after Graph returns the window. Answer with the soonest hit: when, where / join URL, and who else is on it. Widen the range only if that window is empty. Do not use `today` for this question — that window includes the whole mailbox-local day, so it can return a meeting that already happened.
+Use `search_calendar_events` with `dateRange.rangeType: relative` and `range: next7Days` (starts now) and `attendees: ['alex.rivera@…']`. `attendees` is an exact address match, not a name search, so resolve the name with `lookup_contacts` first rather than guessing. It matches organizer or attendees after Graph returns the window. Answer with the soonest hit: when, where / join URL, and who else is on it. Widen the range only if that window is empty. Do not use `today` for this question — that window includes the whole mailbox-local day, so it can return a meeting that already happened.
 
 ### Create a meeting invite for XY
 

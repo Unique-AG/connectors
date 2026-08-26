@@ -10,6 +10,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { dateWindowFromSearchInput } from '~/utils/date-window-bucket';
 import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   type RelativeRange,
@@ -28,7 +29,6 @@ import {
   calendarUserProfileId,
   logCalendarRecovered,
 } from './utils/calendar-observability';
-import { dateWindowFromSearchInput } from './utils/date-window-bucket';
 import { type AvailabilityBlock, decodeAvailabilityView } from './utils/decode-availability-view';
 import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
 import {

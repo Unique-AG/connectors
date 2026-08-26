@@ -84,6 +84,39 @@ function missingFieldDescriptions(
   return missing;
 }
 
+function fieldDescriptions(
+  schema: JsonSchema,
+  path: string,
+  defs: Record<string, JsonSchema>,
+  into: Map<string, Set<string>>,
+): void {
+  const resolved = resolveRef(schema, defs);
+  const nextDefs = resolved.$defs ?? defs;
+  for (const [key, value] of Object.entries(resolved.properties ?? {})) {
+    const childPath = path === '' ? key : `${path}.${key}`;
+    const child = resolveRef(value, nextDefs);
+    if (child.description !== undefined) {
+      const seen = into.get(childPath) ?? new Set<string>();
+      seen.add(child.description);
+      into.set(childPath, seen);
+    }
+    fieldDescriptions(value, childPath, nextDefs, into);
+  }
+  const nested = [
+    ...(resolved.anyOf ?? []),
+    ...(resolved.oneOf ?? []),
+    ...(resolved.allOf ?? []),
+    ...(Array.isArray(resolved.items)
+      ? resolved.items
+      : resolved.items === undefined
+        ? []
+        : [resolved.items]),
+  ];
+  for (const child of nested) {
+    fieldDescriptions(child, path, nextDefs, into);
+  }
+}
+
 const CAMEL_CASE_TOKEN = /\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*/g;
 
 function schemaTokens(schema: JsonSchema): Set<string> {
@@ -168,6 +201,26 @@ describe('calendar tool schema harmony', () => {
 
     expect(missingFieldDescriptions(input, 'input', input.$defs ?? {})).toEqual([]);
     expect(missingFieldDescriptions(output, 'output', output.$defs ?? {})).toEqual([]);
+  });
+
+  it('describes a shared output field the same way in every tool that returns it', () => {
+    // The three resolvedWindow blocks were copy-pasted and had already drifted on
+    // interpretation. Presence of a description was never the invariant; agreement is.
+    // Scoped to fields inside a shared fragment plus consentRequired — top-level success,
+    // message and the write tools' own subject/start/end describe different things by design.
+    const byPath = new Map<string, Set<string>>();
+    for (const { options } of registeredTools()) {
+      const output = z.toJSONSchema(
+        options.outputSchema as NonNullable<typeof options.outputSchema>,
+        { io: 'output' },
+      ) as JsonSchema;
+      fieldDescriptions(output, '', output.$defs ?? {}, byPath);
+    }
+    const conflicting = [...byPath.entries()]
+      .filter(([path]) => path.includes('.') || path === 'consentRequired')
+      .filter(([, descriptions]) => descriptions.size > 1)
+      .map(([path, descriptions]) => ({ path, descriptions: [...descriptions] }));
+    expect(conflicting).toEqual([]);
   });
 
   it('covers every registered calendar tool', () => {

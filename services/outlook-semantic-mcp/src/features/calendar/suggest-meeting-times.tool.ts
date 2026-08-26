@@ -6,7 +6,11 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SuggestMeetingTimesQuery } from './suggest-meeting-times.query';
 import { META } from './suggest-meeting-times-tool.meta';
-import { GraphDateTimeSchema } from './utils/calendar-display';
+import {
+  ConsentRequiredSchema,
+  EventDateTimeSchema,
+  ResolvedWindowSchema,
+} from './utils/calendar-output.schema';
 import { SuggestMeetingDateRangeSchema } from './utils/graph-schedule-date-range.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
 
@@ -68,8 +72,8 @@ const AttendeeAvailabilitySchema = z.object({
 });
 
 const MeetingTimeSuggestionSchema = z.object({
-  start: GraphDateTimeSchema.describe('Suggested slot start.'),
-  end: GraphDateTimeSchema.describe('Suggested slot end.'),
+  start: EventDateTimeSchema.describe('Suggested slot start.'),
+  end: EventDateTimeSchema.describe('Suggested slot end.'),
   confidence: z
     .number()
     .nullable()
@@ -111,32 +115,10 @@ export const SuggestMeetingTimesOutputSchema = z.object({
     .array(z.string())
     .optional()
     .describe('Notes about timezone fallback or empty results. Display after the results.'),
-  resolvedWindow: z
-    .object({
-      startDateTime: z
-        .string()
-        .describe('Absolute start sent to Graph, including timezone offset.'),
-      endDateTime: z.string().describe('Absolute end sent to Graph, including timezone offset.'),
-      timeZone: z
-        .string()
-        .describe(
-          'IANA timezone the window was resolved in, or UTC when the mailbox timezone was unavailable.',
-        ),
-      serverCurrentDateTime: z
-        .string()
-        .describe('Server clock in that timezone when the window was resolved, including offset.'),
-      interpretation: z
-        .string()
-        .describe('Human description of the window. State this when a relative range was used.'),
-    })
-    .optional()
-    .describe('The findMeetingTimes window actually queried.'),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  resolvedWindow: ResolvedWindowSchema.optional().describe(
+    'The findMeetingTimes window actually queried.',
+  ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()

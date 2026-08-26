@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { ListCalendarsQuery } from './list-calendars.query';
 import { META } from './list-calendars-tool.meta';
+import { ConsentRequiredSchema } from './utils/calendar-output.schema';
 import { CalendarRefSchema } from './utils/calendar-ref.schema';
 
 export const ListCalendarsInputSchema = z.object({});
@@ -53,12 +54,7 @@ export const ListCalendarsOutputSchema = z.object({
     .describe(
       'Notes about calendars that could not be listed, such as a Full Access mailbox that returned 403 or 404. Show these after the list.',
     ),
-  consentRequired: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when calendar scopes have not been granted yet. The user must reconnect Outlook before calendar tools will work.',
-    ),
+  consentRequired: ConsentRequiredSchema.optional(),
 });
 
 @Injectable()
