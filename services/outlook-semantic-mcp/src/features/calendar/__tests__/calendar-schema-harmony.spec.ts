@@ -1,6 +1,8 @@
 import { MCP_TOOL_METADATA_KEY, type ToolOptions } from '@unique-ag/mcp-server-module';
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
+import { CALENDAR_INSTRUCTIONS } from '../../../server.instructions';
+import { RELATIVE_RANGES } from '../../../utils/relative-range';
 import { CALENDAR_TOOLS } from '../../backend.module';
 
 interface JsonSchema {
@@ -12,6 +14,8 @@ interface JsonSchema {
   allOf?: JsonSchema[];
   $defs?: Record<string, JsonSchema>;
   $ref?: string;
+  enum?: unknown[];
+  const?: unknown;
 }
 
 /**
@@ -80,6 +84,70 @@ function missingFieldDescriptions(
   return missing;
 }
 
+const CAMEL_CASE_TOKEN = /\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*/g;
+
+function schemaTokens(schema: JsonSchema): Set<string> {
+  const tokens = new Set<string>();
+  const walk = (node: JsonSchema, defs: Record<string, JsonSchema>): void => {
+    const resolved = resolveRef(node, defs);
+    const nextDefs = resolved.$defs ?? defs;
+    if (resolved.properties !== undefined) {
+      for (const [key, value] of Object.entries(resolved.properties)) {
+        tokens.add(key);
+        walk(value, nextDefs);
+      }
+    }
+    for (const value of resolved.enum ?? []) {
+      if (typeof value === 'string') {
+        tokens.add(value);
+      }
+    }
+    if (typeof resolved.const === 'string') {
+      tokens.add(resolved.const);
+    }
+    const nested = [
+      ...(resolved.anyOf ?? []),
+      ...(resolved.oneOf ?? []),
+      ...(resolved.allOf ?? []),
+      ...(Array.isArray(resolved.items)
+        ? resolved.items
+        : resolved.items === undefined
+          ? []
+          : [resolved.items]),
+      ...Object.values(resolved.$defs ?? {}),
+    ];
+    for (const child of nested) {
+      walk(child, nextDefs);
+    }
+  };
+  walk(schema, schema.$defs ?? {});
+  return tokens;
+}
+
+function camelCaseTokens(text: string): string[] {
+  return [...new Set(text.match(CAMEL_CASE_TOKEN) ?? [])];
+}
+
+function toolSchemaTokens(options: ToolOptions): Set<string> {
+  const input = z.toJSONSchema(options.parameters, { io: 'input' }) as JsonSchema;
+  const output = z.toJSONSchema(options.outputSchema as NonNullable<typeof options.outputSchema>, {
+    io: 'output',
+  }) as JsonSchema;
+  return new Set([...schemaTokens(input), ...schemaTokens(output), ...RELATIVE_RANGES]);
+}
+
+const GRAPH_PROMPT_TOKENS = ['getSchedule', 'findMeetingTimes', 'availabilityView'] as const;
+
+function allCalendarSchemaTokens(): Set<string> {
+  const allowed = new Set<string>([...RELATIVE_RANGES, ...GRAPH_PROMPT_TOKENS]);
+  for (const { options } of registeredTools()) {
+    for (const token of toolSchemaTokens(options)) {
+      allowed.add(token);
+    }
+  }
+  return allowed;
+}
+
 describe('calendar tool schema harmony', () => {
   it.each(registeredTools())('$name has _meta and a description on every input and output field', ({
     name,
@@ -117,5 +185,32 @@ describe('calendar tool schema harmony', () => {
       'suggest_meeting_times',
       'update_event',
     ]);
+  });
+
+  it.each(
+    registeredTools(),
+  )('$name description and system prompt only name fields from calendar tool schemas', ({
+    name,
+    options,
+  }) => {
+    const allowed = allCalendarSchemaTokens();
+    const meta = options._meta as Record<string, string> | undefined;
+    const unknown = camelCaseTokens(
+      `${options.description ?? ''}\n${meta?.['unique.app/system-prompt'] ?? ''}`,
+    ).filter((token) => !allowed.has(token));
+    expect(unknown, `${name} unknown field tokens`).toEqual([]);
+  });
+
+  it('format information and server instructions only name fields that exist on calendar tools', () => {
+    const allowed = allCalendarSchemaTokens();
+    const formatInformation = registeredTools()[0]?.options._meta as
+      | Record<string, string>
+      | undefined;
+    const format = formatInformation?.['unique.app/tool-format-information'];
+    expect(format, 'shared tool-format-information').toBeDefined();
+    expect(camelCaseTokens(format ?? '').filter((token) => !allowed.has(token))).toEqual([]);
+    expect(camelCaseTokens(CALENDAR_INSTRUCTIONS).filter((token) => !allowed.has(token))).toEqual(
+      [],
+    );
   });
 });

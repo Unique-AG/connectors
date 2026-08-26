@@ -16,8 +16,7 @@ import { eventPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
 import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
@@ -51,6 +50,7 @@ export interface UpdateEventCommandOutput {
   joinUrl?: string | null;
   webLink?: string | null;
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -82,8 +82,8 @@ export class UpdateEventCommand {
       calendarId: input.eventRef.calendarId,
       operation: 'update_event',
     });
-    return this.calendarMetrics.measureOperation({ operation: 'update_event' }, (fail) =>
-      this.update(userProfileId, userProfileIdString, input, fail),
+    return this.calendarMetrics.measureOperation({ operation: 'update_event' }, () =>
+      this.update(userProfileId, userProfileIdString, input),
     );
   }
 
@@ -91,7 +91,6 @@ export class UpdateEventCommand {
     userProfileId: UserProfileTypeID,
     userProfileIdString: string,
     input: UpdateEventCommandInput,
-    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<UpdateEventCommandOutput> {
     assert.ok(
       SmtpAddressSchema.safeParse(input.eventRef.mailbox).success,
@@ -173,10 +172,14 @@ export class UpdateEventCommand {
         webLink: updated.webLink ?? null,
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        calendarId: input.eventRef.calendarId,
+        operation: 'update_event',
         notFoundMessage:
           'That event was not found. Search again and pass eventRef without changing it.',
         invalidMessage: 'Graph rejected the update. Check the times and fields and try again.',
@@ -185,20 +188,7 @@ export class UpdateEventCommand {
       if (recovered === undefined) {
         throw error;
       }
-      fail(recovered.outcome);
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        calendarId: input.eventRef.calendarId,
-        outcome: recovered.outcome,
-        msg: `update_event ${recovered.outcome}`,
-        err: error,
-      });
-      return {
-        success: false,
-        message: recovered.message,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
-      };
+      return recovered;
     }
   }
 }

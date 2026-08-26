@@ -1,5 +1,9 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
+import { GetFullDelegatedAccessQuery } from '~/features/delegated-access/queries/get-full-delegated-access.query';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { ListCalendarsQuery } from '../list-calendars.query';
 import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
@@ -50,16 +54,16 @@ function createQuery(opts: {
     .mockResolvedValue((opts.fullAccessOwners ?? []).map((ownerUserEmail) => ({ ownerUserEmail })));
 
   const query = new ListCalendarsQuery(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: opts.email ?? OWN_EMAIL,
         source: 'oauth',
       }),
-    } as never,
-    { run: getFullDelegatedAccess } as never,
-    passthroughCalendarMetrics() as never,
+    } as unknown as GetUserProfileQuery,
+    { run: getFullDelegatedAccess } as unknown as GetFullDelegatedAccessQuery,
+    passthroughCalendarMetrics() as unknown as CalendarMetricsService,
   );
 
   return { query, api, request, getFullDelegatedAccess };
@@ -199,6 +203,7 @@ describe(ListCalendarsQuery.name, () => {
     expect(result.calendars).toEqual([
       expect.objectContaining({ calendarId: 'cal-local-copy', ownerEmail: OWNER_EMAIL }),
     ]);
+    expect(result.listNotes).toEqual([`Could not list calendars for ${OWNER_EMAIL}.`]);
   });
 
   it('returns consentRequired when Graph denies calendar scopes on the caller mailbox', async () => {
@@ -211,6 +216,7 @@ describe(ListCalendarsQuery.name, () => {
     expect(result).toEqual({
       success: false,
       consentRequired: true,
+      errorType: 'consent',
       message: expect.stringContaining('re-authorization'),
     });
   });

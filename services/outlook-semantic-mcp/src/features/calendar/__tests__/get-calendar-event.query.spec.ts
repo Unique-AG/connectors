@@ -1,5 +1,8 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetCalendarEventQuery } from '../get-calendar-event.query';
 
@@ -29,6 +32,7 @@ function createQuery(opts: { get?: ReturnType<typeof vi.fn> } = {}) {
       end: { dateTime: '2026-08-26T09:30:00', timeZone: 'W. Europe Standard Time' },
       location: { displayName: 'Room A' },
       attendees: [{}, {}],
+      organizer: { emailAddress: { name: 'Alex', address: 'alex@example.com' } },
       isCancelled: false,
       type: 'occurrence',
       seriesMasterId: 'master-1',
@@ -40,21 +44,21 @@ function createQuery(opts: { get?: ReturnType<typeof vi.fn> } = {}) {
   };
   const api = vi.fn().mockReturnValue(request);
   const query = new GetCalendarEventQuery(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: OWN_EMAIL,
         source: 'oauth',
       }),
-    } as never,
+    } as unknown as GetUserProfileQuery,
     {
       run: vi.fn().mockResolvedValue({
         ianaTimeZone: 'Europe/Zurich',
         outlookTimeZone: 'W. Europe Standard Time',
         notes: [],
       }),
-    } as never,
+    } as unknown as ResolveMailboxTimezoneQuery,
   );
   return { query, api, request, get };
 }
@@ -74,6 +78,8 @@ describe(GetCalendarEventQuery.name, () => {
       seriesMasterId: 'master-1',
       attendeeCount: 2,
       mailbox: OWN_EMAIL,
+      organizerName: 'Alex',
+      organizerEmail: 'alex@example.com',
     });
   });
 

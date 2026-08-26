@@ -8,6 +8,7 @@ When listing calendars, use a markdown table with exactly 4 columns: Calendar, O
 - **Can edit**: Yes or No from \`canEdit\`.
 - **Private items**: "Visible" when \`canViewPrivateItems\` is true, otherwise "Redacted".
 - A row with \`isOwn: false\` and \`canEdit: true\` is a delegated or shared calendar the user can schedule on.
+- If \`listNotes\` is present, display those notes after the table.
 
 | Calendar | Owner | Can edit | Private items |
 |----------|-------|----------|---------------|

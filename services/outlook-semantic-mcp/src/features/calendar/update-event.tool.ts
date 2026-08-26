@@ -7,11 +7,12 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { offsetDateTime } from '~/utils/relative-range';
+import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
-import { GraphDateTimeSchema, oneLine } from './utils/calendar-display';
+import { describeCalendar, GraphDateTimeSchema, oneLine } from './utils/calendar-display';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
@@ -156,6 +157,7 @@ export class UpdateEventTool {
 
   public constructor(
     private readonly getCalendarEventQuery: GetCalendarEventQuery,
+    private readonly getCalendarQuery: GetCalendarQuery,
     private readonly updateEventCommand: UpdateEventCommand,
   ) {}
 
@@ -190,10 +192,23 @@ export class UpdateEventTool {
       return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
     }
     const snapshot = loaded.event;
+    const loadedCalendar = await this.getCalendarQuery.run(userProfileId, {
+      calendarRef: {
+        calendarId: snapshot.calendarId,
+        mailbox: snapshot.mailbox,
+      },
+    });
+    if (loadedCalendar.success !== true || loadedCalendar.calendar === undefined) {
+      return {
+        success: false,
+        message: loadedCalendar.message,
+        consentRequired: loadedCalendar.consentRequired,
+      };
+    }
     const confirmation = await confirmWrite({
       context,
       schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
-      message: elicitMessage(parsed, snapshot),
+      message: elicitMessage(parsed, snapshot, loadedCalendar.calendar),
       logger: this.logger,
       operation: 'update_event',
       userProfileId: userProfileId.toString(),
@@ -248,8 +263,8 @@ export class UpdateEventTool {
 function elicitMessage(
   input: z.infer<typeof UpdateEventInputSchema>,
   snapshot: CalendarEventSnapshot,
+  calendar: CalendarSummary,
 ): string {
-  const mailbox = `mailbox ${snapshot.mailbox}`;
   const series =
     snapshot.type === 'seriesMaster'
       ? 'This is the series master — the update applies to every date.'
@@ -275,5 +290,12 @@ function elicitMessage(
     snapshot.attendeeCount > 0 || (input.attendees !== undefined && input.attendees.length > 0)
       ? 'Attendees will be notified immediately.'
       : 'No attendees will be notified.';
-  return [`Update this event on ${mailbox}?`, series, current, ...changes, notify].join('\n');
+  return [
+    'Update this event?',
+    `Calendar: ${describeCalendar(calendar)}`,
+    series,
+    current,
+    ...changes,
+    notify,
+  ].join('\n');
 }

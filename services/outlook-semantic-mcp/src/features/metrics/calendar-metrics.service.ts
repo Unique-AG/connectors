@@ -35,6 +35,7 @@ interface CalendarSearchMetricResult {
 
 interface CalendarOperationMetricResult {
   success: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -80,9 +81,8 @@ export class CalendarMetricsService {
       operation: CalendarOperation;
       dateWindow?: DateWindowBucket;
     },
-    fn: (fail: (errorType: CalendarMetricErrorType) => void) => Promise<T>,
+    fn: () => Promise<T>,
   ): Promise<T> {
-    let errorType: CalendarMetricErrorType | undefined;
     return recordInHistogram({
       histogram: this.operationDuration,
       attributes: {
@@ -92,15 +92,12 @@ export class CalendarMetricsService {
       successAttributes: (result) =>
         result.success
           ? { status: 'success' }
-          : { status: 'failed', errorType: errorType ?? 'other' },
+          : { status: 'failed', errorType: result.errorType ?? 'other' },
       errorAttributes: () => ({
         status: 'failed',
-        errorType: errorType ?? 'other',
+        errorType: 'other',
       }),
-      fn: () =>
-        fn((type) => {
-          errorType = type;
-        }),
+      fn,
     });
   }
 }

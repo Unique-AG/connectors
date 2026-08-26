@@ -1,5 +1,8 @@
+import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type Context } from '@unique-ag/mcp-server-module';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { SuggestMeetingTimesQuery } from '../suggest-meeting-times.query';
 import {
   SuggestMeetingTimesOutputSchema,
   SuggestMeetingTimesTool,
@@ -23,7 +26,7 @@ describe(SuggestMeetingTimesTool.name, () => {
       },
     };
     const run = vi.fn().mockResolvedValue(output);
-    const tool = new SuggestMeetingTimesTool({ run } as never);
+    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
 
     const result = await tool.suggestMeetingTimes(
       {
@@ -31,8 +34,8 @@ describe(SuggestMeetingTimesTool.name, () => {
         durationMinutes: 45,
         dateRange: { rangeType: 'relative', range: 'tomorrow' },
       },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
@@ -54,7 +57,7 @@ describe(SuggestMeetingTimesTool.name, () => {
       message: 'Found 1 suggested time.',
       suggestions: [],
     });
-    const tool = new SuggestMeetingTimesTool({ run } as never);
+    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
 
     await tool.suggestMeetingTimes(
       {
@@ -64,8 +67,8 @@ describe(SuggestMeetingTimesTool.name, () => {
           endDateTime: '2026-08-26T18:00:00+02:00',
         },
       },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(
@@ -79,7 +82,7 @@ describe(SuggestMeetingTimesTool.name, () => {
 
   it('rejects an absolute window without a timezone offset', async () => {
     const run = vi.fn();
-    const tool = new SuggestMeetingTimesTool({ run } as never);
+    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
 
     await expect(
       tool.suggestMeetingTimes(
@@ -90,8 +93,10 @@ describe(SuggestMeetingTimesTool.name, () => {
             endDateTime: '2026-08-26T18:00:00+02:00',
           },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/offset/i);
     expect(run).not.toHaveBeenCalled();
@@ -99,13 +104,15 @@ describe(SuggestMeetingTimesTool.name, () => {
 
   it('rejects a window longer than 62 days', async () => {
     const run = vi.fn();
-    const tool = new SuggestMeetingTimesTool({ run } as never);
+    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
 
     await expect(
       tool.suggestMeetingTimes(
         { dateRange: { rangeType: 'relative', range: 'next90Days' } },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/62 days/);
     expect(run).not.toHaveBeenCalled();
@@ -113,13 +120,15 @@ describe(SuggestMeetingTimesTool.name, () => {
 
   it('rejects a past-only relative range', async () => {
     const run = vi.fn();
-    const tool = new SuggestMeetingTimesTool({ run } as never);
+    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
 
     await expect(
       tool.suggestMeetingTimes(
         { dateRange: { rangeType: 'relative', range: 'yesterday' } },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/past/);
     expect(run).not.toHaveBeenCalled();
@@ -127,13 +136,13 @@ describe(SuggestMeetingTimesTool.name, () => {
 
   it('accepts more than 20 attendees, since findMeetingTimes documents no cap', async () => {
     const run = vi.fn().mockResolvedValue({ success: true, message: 'ok', suggestions: [] });
-    const tool = new SuggestMeetingTimesTool({ run } as never);
+    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
     const attendees = Array.from({ length: 21 }, (_, index) => `user${index}@example.com`);
 
     await tool.suggestMeetingTimes(
       { attendees, dateRange: { rangeType: 'relative', range: 'today' } },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, expect.objectContaining({ attendees }));

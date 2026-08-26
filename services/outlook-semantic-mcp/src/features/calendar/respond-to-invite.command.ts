@@ -18,8 +18,7 @@ import {
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
@@ -34,6 +33,7 @@ export interface RespondToInviteCommandOutput {
   message: string;
   response?: EventResponse;
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -65,8 +65,8 @@ export class RespondToInviteCommand {
       calendarId: input.eventRef.calendarId,
       operation: 'respond_to_invite',
     });
-    return this.calendarMetrics.measureOperation({ operation: 'respond_to_invite' }, (fail) =>
-      this.respond(userProfileId, userProfileIdString, input, fail),
+    return this.calendarMetrics.measureOperation({ operation: 'respond_to_invite' }, () =>
+      this.respond(userProfileId, userProfileIdString, input),
     );
   }
 
@@ -74,7 +74,6 @@ export class RespondToInviteCommand {
     userProfileId: UserProfileTypeID,
     userProfileIdString: string,
     input: RespondToInviteCommandInput,
-    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<RespondToInviteCommandOutput> {
     assert.ok(
       (EVENT_RESPONSES as readonly string[]).includes(input.response),
@@ -119,10 +118,14 @@ export class RespondToInviteCommand {
         response: input.response,
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        calendarId: input.eventRef.calendarId,
+        operation: 'respond_to_invite',
         notFoundMessage:
           'That event was not found. Search again and pass eventRef without changing it.',
         deniedDelegatedMessage: `Could not respond to an invite on mailbox ${mailbox}.`,
@@ -130,20 +133,7 @@ export class RespondToInviteCommand {
       if (recovered === undefined) {
         throw error;
       }
-      fail(recovered.outcome);
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        calendarId: input.eventRef.calendarId,
-        outcome: recovered.outcome,
-        msg: `respond_to_invite ${recovered.outcome}`,
-        err: error,
-      });
-      return {
-        success: false,
-        message: recovered.message,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
-      };
+      return recovered;
     }
   }
 }

@@ -1,9 +1,17 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, vi } from 'vitest';
-import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import {
+  type ResolvedMailboxTimezone,
+  ResolveMailboxTimezoneQuery,
+} from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import * as relativeRange from '~/utils/relative-range';
 import type { CalendarRef } from '../calendar.schemas';
+import { ListCalendarsQuery } from '../list-calendars.query';
 import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
@@ -120,6 +128,7 @@ function createQuery(opts: {
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
   const measureSearch = vi.fn((_filters: unknown, fn: () => Promise<unknown>) => fn());
+  const queryCalls: unknown[] = [];
   const request = {
     header: vi.fn().mockReturnThis(),
     query: vi.fn().mockReturnThis(),
@@ -138,21 +147,24 @@ function createQuery(opts: {
               : vi.fn().mockResolvedValue(response ?? { value: [] });
           return {
             header: vi.fn().mockReturnThis(),
-            query: vi.fn().mockReturnThis(),
+            query: vi.fn().mockImplementation(function (this: object, args: unknown) {
+              queryCalls.push(args);
+              return this;
+            }),
             select: vi.fn().mockReturnThis(),
             top: vi.fn().mockReturnThis(),
             get: pathGet,
           };
         });
   const query = new SearchCalendarEventsQuery(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: OWN_EMAIL,
         source: 'oauth',
       }),
-    } as never,
+    } as unknown as GetUserProfileQuery,
     {
       run: vi.fn().mockResolvedValue(
         opts.listResult ?? {
@@ -161,14 +173,14 @@ function createQuery(opts: {
           calendars: opts.calendars ?? [OWN_CALENDAR],
         },
       ),
-    } as never,
+    } as unknown as ListCalendarsQuery,
     {
       run: vi.fn().mockResolvedValue(opts.timezone ?? DEFAULT_TIMEZONE),
-    } as never,
-    { measureSearch } as never,
+    } as unknown as ResolveMailboxTimezoneQuery,
+    { measureSearch } as unknown as CalendarMetricsService,
   );
 
-  return { query, api, request, measureSearch };
+  return { query, api, request, measureSearch, queryCalls };
 }
 
 describe(SearchCalendarEventsQuery.name, () => {
@@ -531,5 +543,23 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.success).toBe(true);
     expect(result.events).toEqual([]);
     expect(result.searchNotes?.join(' ')).toMatch(/no longer accessible/i);
+  });
+
+  it('resolves the query window once and reuses it across every calendar in the fan-out', async () => {
+    const resolveSpy = vi.spyOn(relativeRange, 'resolveQueryWindow');
+    const { query, queryCalls } = createQuery({
+      calendars: [OWN_CALENDAR, DELEGATED_CALENDAR, SHARED_INTO_OWN_MAILBOX],
+      getByPath: {
+        [OWN_VIEW]: { value: [] },
+        [OWNER_VIEW]: { value: [] },
+        [SHARED_VIEW]: { value: [] },
+      },
+    });
+
+    await query.run(USER_PROFILE_ID, WINDOW);
+
+    expect(resolveSpy).toHaveBeenCalledTimes(1);
+    expect(queryCalls).toEqual([WINDOW, WINDOW, WINDOW]);
+    resolveSpy.mockRestore();
   });
 });

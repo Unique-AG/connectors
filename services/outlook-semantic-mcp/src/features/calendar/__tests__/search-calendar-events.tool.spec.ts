@@ -1,5 +1,8 @@
+import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type Context } from '@unique-ag/mcp-server-module';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
 import {
   SearchCalendarEventsOutputSchema,
   SearchCalendarEventsTool,
@@ -22,15 +25,15 @@ describe(SearchCalendarEventsTool.name, () => {
       },
     };
     const run = vi.fn().mockResolvedValue(output);
-    const tool = new SearchCalendarEventsTool({ run } as never);
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
 
     const result = await tool.searchCalendarEvents(
       {
         mailbox: 'me@example.com',
         dateRange: { rangeType: 'relative', range: 'today' },
       },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
@@ -49,7 +52,7 @@ describe(SearchCalendarEventsTool.name, () => {
       message: 'No events matched the search.',
       events: [],
     });
-    const tool = new SearchCalendarEventsTool({ run } as never);
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
 
     await tool.searchCalendarEvents(
       {
@@ -59,8 +62,8 @@ describe(SearchCalendarEventsTool.name, () => {
           endDateTime: '2026-08-26T00:00:00+02:00',
         },
       },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
@@ -74,26 +77,36 @@ describe(SearchCalendarEventsTool.name, () => {
   });
 
   it('rejects a relative search without range', async () => {
-    const tool = new SearchCalendarEventsTool({ run: vi.fn() } as never);
+    const tool = new SearchCalendarEventsTool({
+      run: vi.fn(),
+    } as unknown as SearchCalendarEventsQuery);
 
     await expect(
       tool.searchCalendarEvents(
-        { dateRange: { rangeType: 'relative' } } as never,
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        { dateRange: { rangeType: 'relative' } } as unknown as Parameters<
+          SearchCalendarEventsTool['searchCalendarEvents']
+        >[0],
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/range/i);
   });
 
   it('rejects an absolute search without a window', async () => {
     const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as never);
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
 
     await expect(
       tool.searchCalendarEvents(
-        { dateRange: { rangeType: 'absolute' } } as never,
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        { dateRange: { rangeType: 'absolute' } } as unknown as Parameters<
+          SearchCalendarEventsTool['searchCalendarEvents']
+        >[0],
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/startDateTime|endDateTime/i);
     expect(run).not.toHaveBeenCalled();
@@ -101,7 +114,7 @@ describe(SearchCalendarEventsTool.name, () => {
 
   it('rejects an absolute window without a timezone offset', async () => {
     const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as never);
+    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
 
     await expect(
       tool.searchCalendarEvents(
@@ -112,8 +125,10 @@ describe(SearchCalendarEventsTool.name, () => {
             endDateTime: '2026-08-26T00:00:00+02:00',
           },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/offset/i);
     expect(run).not.toHaveBeenCalled();

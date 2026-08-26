@@ -62,6 +62,57 @@ export function logCalendarRecovered(
   });
 }
 
+export type CalendarGraphErrorType = Exclude<
+  CalendarRecoveredOutcome,
+  'delegated_skipped' | 'too_many_entries'
+>;
+
+export function recoverCalendarGraphError(input: {
+  error: unknown;
+  logger: Logger;
+  userProfileId: string;
+  mailbox: string;
+  callerEmail: string;
+  calendarId?: string;
+  operation: string;
+  notFoundMessage?: string;
+  invalidMessage?: string;
+  deniedDelegatedMessage: string;
+}):
+  | {
+      success: false;
+      message: string;
+      errorType: CalendarGraphErrorType;
+      consentRequired?: true;
+    }
+  | undefined {
+  const recovered = classifyCalendarGraphError({
+    error: input.error,
+    mailbox: input.mailbox,
+    callerEmail: input.callerEmail,
+    notFoundMessage: input.notFoundMessage,
+    invalidMessage: input.invalidMessage,
+    deniedDelegatedMessage: input.deniedDelegatedMessage,
+  });
+  if (recovered === undefined) {
+    return undefined;
+  }
+  logCalendarRecovered(input.logger, {
+    userProfileId: input.userProfileId,
+    mailbox: input.mailbox,
+    calendarId: input.calendarId,
+    outcome: recovered.outcome,
+    msg: `${input.operation} ${recovered.outcome}`,
+    err: input.error,
+  });
+  return {
+    success: false,
+    message: recovered.message,
+    errorType: recovered.outcome,
+    ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+  };
+}
+
 export function classifyCalendarGraphError(input: {
   error: unknown;
   mailbox: string;
@@ -71,7 +122,7 @@ export function classifyCalendarGraphError(input: {
   deniedDelegatedMessage: string;
 }):
   | {
-      outcome: Exclude<CalendarRecoveredOutcome, 'delegated_skipped' | 'too_many_entries'>;
+      outcome: CalendarGraphErrorType;
       message: string;
       consentRequired?: true;
     }

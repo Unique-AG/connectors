@@ -14,8 +14,7 @@ import { eventCancelPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
@@ -31,6 +30,7 @@ export interface CancelEventCommandOutput {
   success: boolean;
   message: string;
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -61,8 +61,8 @@ export class CancelEventCommand {
       calendarId: input.eventRef.calendarId,
       operation: 'cancel_event',
     });
-    return this.calendarMetrics.measureOperation({ operation: 'cancel_event' }, (fail) =>
-      this.cancel(userProfileId, userProfileIdString, input, fail),
+    return this.calendarMetrics.measureOperation({ operation: 'cancel_event' }, () =>
+      this.cancel(userProfileId, userProfileIdString, input),
     );
   }
 
@@ -70,7 +70,6 @@ export class CancelEventCommand {
     userProfileId: UserProfileTypeID,
     userProfileIdString: string,
     input: CancelEventCommandInput,
-    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<CancelEventCommandOutput> {
     assert.ok(
       SmtpAddressSchema.safeParse(input.eventRef.mailbox).success,
@@ -109,10 +108,14 @@ export class CancelEventCommand {
           : 'Cancelled the event.',
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        calendarId: input.eventRef.calendarId,
+        operation: 'cancel_event',
         notFoundMessage:
           'That event was not found. Search again and pass eventRef without changing it.',
         invalidMessage: 'Graph rejected the cancellation. Only the organizer can cancel a meeting.',
@@ -121,20 +124,7 @@ export class CancelEventCommand {
       if (recovered === undefined) {
         throw error;
       }
-      fail(recovered.outcome);
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        calendarId: input.eventRef.calendarId,
-        outcome: recovered.outcome,
-        msg: `cancel_event ${recovered.outcome}`,
-        err: error,
-      });
-      return {
-        success: false,
-        message: recovered.message,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
-      };
+      return recovered;
     }
   }
 }

@@ -1,7 +1,11 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, vi } from 'vitest';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import type { ResolvedMailboxTimezone } from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CheckAvailabilityQuery } from '../check-availability.query';
 import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
@@ -46,18 +50,18 @@ function createQuery(
   };
   const api = vi.fn().mockReturnValue(request);
   const query = new CheckAvailabilityQuery(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: opts.email ?? OWN_EMAIL,
         source: 'oauth',
       }),
-    } as never,
+    } as unknown as GetUserProfileQuery,
     {
       run: vi.fn().mockResolvedValue(opts.timezone ?? DEFAULT_TIMEZONE),
-    } as never,
-    passthroughCalendarMetrics() as never,
+    } as unknown as ResolveMailboxTimezoneQuery,
+    passthroughCalendarMetrics() as unknown as CalendarMetricsService,
   );
   return { query, api, request, post };
 }

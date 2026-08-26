@@ -17,8 +17,7 @@ import { createEventPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import type { CalendarRefInput } from './utils/calendar-ref.schema';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
@@ -50,6 +49,7 @@ export interface CreateEventCommandOutput {
   webLink?: string | null;
   transactionId?: string;
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -82,8 +82,8 @@ export class CreateEventCommand {
       calendarId: input.calendarRef.calendarId,
       operation: 'create_event',
     });
-    return this.calendarMetrics.measureOperation({ operation: 'create_event' }, (fail) =>
-      this.create(userProfileId, userProfileIdString, input, fail),
+    return this.calendarMetrics.measureOperation({ operation: 'create_event' }, () =>
+      this.create(userProfileId, userProfileIdString, input),
     );
   }
 
@@ -91,7 +91,6 @@ export class CreateEventCommand {
     userProfileId: UserProfileTypeID,
     userProfileIdString: string,
     input: CreateEventCommandInput,
-    fail: (errorType: CalendarMetricErrorType) => void,
   ): Promise<CreateEventCommandOutput> {
     assert.ok(input.subject.trim() !== '', 'subject must already be set');
     const start = Temporal.Instant.from(input.startDateTime);
@@ -198,10 +197,14 @@ export class CreateEventCommand {
         transactionId,
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        calendarId: input.calendarRef.calendarId,
+        operation: 'create_event',
         notFoundMessage:
           'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
         invalidMessage: 'Graph rejected the event. Check the start and end times and try again.',
@@ -210,21 +213,7 @@ export class CreateEventCommand {
       if (recovered === undefined) {
         throw error;
       }
-      fail(recovered.outcome);
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        calendarId: input.calendarRef.calendarId,
-        outcome: recovered.outcome,
-        msg: `create_event ${recovered.outcome}`,
-        err: error,
-      });
-      return {
-        success: false,
-        message: recovered.message,
-        transactionId,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
-      };
+      return { ...recovered, transactionId };
     }
   }
 }

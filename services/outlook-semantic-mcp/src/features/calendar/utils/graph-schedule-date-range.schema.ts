@@ -61,18 +61,24 @@ function refineScheduleWindow(value: z.infer<typeof DateRangeSchema>, ctx: z.Ref
     }
     return;
   }
+  if (!isValidInstant(value.startDateTime) || !isValidInstant(value.endDateTime)) {
+    return;
+  }
+  if (isScheduleWindowTooLong(value.startDateTime, value.endDateTime)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Window must be shorter than ${MAX_GRAPH_SCHEDULE_WINDOW_DAYS} days.`,
+      path: ['endDateTime'],
+    });
+  }
+}
+
+function isValidInstant(value: string): boolean {
   try {
-    if (isScheduleWindowTooLong(value.startDateTime, value.endDateTime)) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Window must be shorter than ${MAX_GRAPH_SCHEDULE_WINDOW_DAYS} days.`,
-        path: ['endDateTime'],
-      });
-    }
+    Temporal.Instant.from(value);
+    return true;
   } catch {
-    // DateRangeSchema only requires a Z / ±HH:MM suffix, so Instant.from can still
-    // throw (e.g. "not-a-date+02:00"). Swallow so Zod does not surface a Temporal
-    // RangeError. The 62-day check is skipped; we do not add a parse issue here.
+    return false;
   }
 }
 

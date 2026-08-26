@@ -4,7 +4,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { GetFullDelegatedAccessQuery } from '~/features/delegated-access/queries/get-full-delegated-access.query';
 import { isDelegatedAccessNotAvailableError } from '~/features/delegated-access/utils/is-delegated-access-not-available-error';
-import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import {
+  type CalendarMetricErrorType,
+  CalendarMetricsService,
+} from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -30,7 +33,9 @@ export interface ListCalendarsQueryOutput {
   success: boolean;
   message: string;
   calendars?: CalendarRef[];
+  listNotes?: string[];
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -49,12 +54,12 @@ export class ListCalendarsQuery {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({ userProfileId: userProfileIdString, msg: 'list_calendars started' });
     calendarTraceAttrs({ userProfileId: userProfileIdString, operation: 'list_calendars' });
-    return this.calendarMetrics.measureOperation({ operation: 'list_calendars' }, async (fail) => {
+    return this.calendarMetrics.measureOperation({ operation: 'list_calendars' }, async () => {
       const userProfile = await this.getUserProfileQuery.run(userProfileId);
       const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
       try {
-        const calendars = await this.fetchOauthCalendars({
+        const { calendars, notes } = await this.fetchOauthCalendars({
           client,
           userId: userProfile.id,
           userProfileId: userProfileIdString,
@@ -68,10 +73,10 @@ export class ListCalendarsQuery {
               ? 'No calendars were returned.'
               : `Found ${calendars.length} calendar${calendars.length === 1 ? '' : 's'}.`,
           calendars,
+          ...(notes.length > 0 ? { listNotes: notes } : {}),
         };
       } catch (error) {
         if (error instanceof CalendarConsentRequiredError) {
-          fail('consent');
           logCalendarRecovered(this.logger, {
             userProfileId: userProfileIdString,
             mailbox: userProfile.email,
@@ -83,6 +88,7 @@ export class ListCalendarsQuery {
             success: false,
             message: error.message,
             consentRequired: true,
+            errorType: 'consent' as const,
           };
         }
         throw error;
@@ -95,7 +101,7 @@ export class ListCalendarsQuery {
     userId: string;
     userProfileId: string;
     callerEmail: string;
-  }): Promise<CalendarRef[]> {
+  }): Promise<{ calendars: CalendarRef[]; notes: string[] }> {
     const own = await this.fetchCalendars({
       client: input.client,
       path: calendarCollectionPath(input.callerEmail),
@@ -120,21 +126,23 @@ export class ListCalendarsQuery {
         delegatedMailboxCount: 0,
         msg: 'list_calendars',
       });
-      return own;
+      return { calendars: own, notes: [] };
     }
 
     using limit = calendarGraphLimit(input.userId);
     const delegatedLists = await Promise.all(
       ownerEmails.map((ownerEmail) =>
-        limit(async () => {
+        limit(async (): Promise<{ calendars: CalendarRef[] } | { skippedMailbox: string }> => {
           try {
-            return await this.fetchCalendars({
-              client: input.client,
-              path: calendarCollectionPath(ownerEmail),
-              mailboxEmail: ownerEmail,
-              callerEmail: input.callerEmail,
-              userProfileId: input.userProfileId,
-            });
+            return {
+              calendars: await this.fetchCalendars({
+                client: input.client,
+                path: calendarCollectionPath(ownerEmail),
+                mailboxEmail: ownerEmail,
+                callerEmail: input.callerEmail,
+                userProfileId: input.userProfileId,
+              }),
+            };
           } catch (error) {
             if (isDelegatedAccessNotAvailableError(error)) {
               logCalendarRecovered(this.logger, {
@@ -145,7 +153,7 @@ export class ListCalendarsQuery {
                 msg: 'Skipped delegated mailbox calendars',
                 err: error,
               });
-              return null;
+              return { skippedMailbox: ownerEmail };
             }
             throw error;
           }
@@ -153,16 +161,21 @@ export class ListCalendarsQuery {
       ),
     );
 
+    const notes: string[] = [];
     const reachedOwners = new Set<string>();
     const delegated: CalendarRef[] = [];
     for (const [index, list] of delegatedLists.entries()) {
-      if (list === null || list.length === 0) {
-        continue;
-      }
       const ownerEmail = ownerEmails[index];
       assert.ok(ownerEmail);
+      if ('skippedMailbox' in list) {
+        notes.push(`Could not list calendars for ${list.skippedMailbox}.`);
+        continue;
+      }
+      if (list.calendars.length === 0) {
+        continue;
+      }
       reachedOwners.add(ownerEmail);
-      delegated.push(...list);
+      delegated.push(...list.calendars);
     }
 
     const fromMe = own.filter((calendar) => {
@@ -177,7 +190,7 @@ export class ListCalendarsQuery {
       delegatedMailboxCount: ownerEmails.length,
       msg: 'list_calendars',
     });
-    return calendars;
+    return { calendars, notes };
   }
 
   @Span()

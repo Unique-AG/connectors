@@ -1,5 +1,10 @@
+import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type Context } from '@unique-ag/mcp-server-module';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { GetCalendarQuery } from '../get-calendar.query';
+import { GetCalendarEventQuery } from '../get-calendar-event.query';
+import { UpdateEventCommand } from '../update-event.command';
 import { UpdateEventOutputSchema, UpdateEventTool } from '../update-event.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
@@ -22,19 +27,37 @@ const OCCURRENCE = {
     start: { dateTime: '2026-08-26T09:00:00', timeZone: 'W. Europe Standard Time' },
     end: { dateTime: '2026-08-26T09:30:00', timeZone: 'W. Europe Standard Time' },
     location: null,
+    organizerName: 'Me',
+    organizerEmail: 'me@example.com',
     isCancelled: false,
     attendeeCount: 2,
+  },
+};
+const OWN_PRIMARY = {
+  success: true,
+  message: 'Loaded the calendar.',
+  calendar: {
+    calendarId: 'cal-own',
+    mailbox: 'me@example.com',
+    name: 'Calendar',
+    isDefaultCalendar: true,
+    isOwn: true,
+    ownerEmail: 'me@example.com',
+    ownerName: 'Me',
+    canEdit: true,
   },
 };
 
 function createTool(
   opts: {
     get?: ReturnType<typeof vi.fn>;
+    getCalendar?: ReturnType<typeof vi.fn>;
     run?: ReturnType<typeof vi.fn>;
     elicit?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const get = opts.get ?? vi.fn().mockResolvedValue(OCCURRENCE);
+  const getCalendar = opts.getCalendar ?? vi.fn().mockResolvedValue(OWN_PRIMARY);
   const run =
     opts.run ??
     vi.fn().mockResolvedValue({
@@ -47,8 +70,12 @@ function createTool(
       action: 'accept',
       content: { confirmed: true, applyTo: 'entireSeries' },
     });
-  const tool = new UpdateEventTool({ run: get } as never, { run } as never);
-  return { tool, get, run, elicit };
+  const tool = new UpdateEventTool(
+    { run: get } as unknown as GetCalendarEventQuery,
+    { run: getCalendar } as unknown as GetCalendarQuery,
+    { run } as unknown as UpdateEventCommand,
+  );
+  return { tool, get, getCalendar, run, elicit };
 }
 
 describe(UpdateEventTool.name, () => {
@@ -61,14 +88,14 @@ describe(UpdateEventTool.name, () => {
 
     const result = await tool.updateEvent(
       INPUT,
-      { elicit } as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(get).toHaveBeenCalledWith(USER_PROFILE_ID, { eventRef: EVENT_REF });
     expect(elicit).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringMatching(/mailbox me@example.com[\s\S]*entire series/i),
+      expect.stringMatching(/your primary calendar[\s\S]*entire series/i),
     );
     expect(run).toHaveBeenCalledWith(
       USER_PROFILE_ID,
@@ -89,8 +116,8 @@ describe(UpdateEventTool.name, () => {
 
     const result = await tool.updateEvent(
       INPUT,
-      { elicit } as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).not.toHaveBeenCalled();
@@ -104,8 +131,8 @@ describe(UpdateEventTool.name, () => {
 
     const result = await tool.updateEvent(
       INPUT,
-      { elicit } as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(elicit).not.toHaveBeenCalled();
@@ -119,8 +146,10 @@ describe(UpdateEventTool.name, () => {
     await expect(
       tool.updateEvent(
         { eventRef: EVENT_REF },
-        { elicit } as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        { elicit } as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/at least one field/i);
     expect(get).not.toHaveBeenCalled();
@@ -132,8 +161,10 @@ describe(UpdateEventTool.name, () => {
     await expect(
       tool.updateEvent(
         { eventRef: EVENT_REF, subject: '   ' },
-        { elicit } as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        { elicit } as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow();
     expect(get).not.toHaveBeenCalled();
@@ -144,9 +175,13 @@ describe(UpdateEventTool.name, () => {
 
     await expect(
       tool.updateEvent(
-        { eventRef: EVENT_REF, isOnlineMeeting: false } as never,
-        { elicit } as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        { eventRef: EVENT_REF, isOnlineMeeting: false } as unknown as Parameters<
+          UpdateEventTool['updateEvent']
+        >[0],
+        { elicit } as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow();
     expect(get).not.toHaveBeenCalled();
@@ -158,8 +193,10 @@ describe(UpdateEventTool.name, () => {
     await expect(
       tool.updateEvent(
         { eventRef: EVENT_REF, startDateTime: 'not-a-date+02:00' },
-        { elicit } as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        { elicit } as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/offset-bearing timestamp/i);
     expect(get).not.toHaveBeenCalled();

@@ -12,13 +12,13 @@ import { eventPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import { type GraphEventType, parseGraphEventType } from './utils/resolve-write-event-id';
 import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
-const EVENT_SELECT = 'id,subject,start,end,location,attendees,isCancelled,type,seriesMasterId';
+const EVENT_SELECT =
+  'id,subject,start,end,location,attendees,organizer,isCancelled,type,seriesMasterId';
 
 const SnapshotSchema = z.object({
   id: z.string(),
@@ -27,6 +27,16 @@ const SnapshotSchema = z.object({
   end: z.object({ dateTime: z.string().optional(), timeZone: z.string().optional() }).nullish(),
   location: z.object({ displayName: z.string().optional() }).nullish(),
   attendees: z.array(z.unknown()).nullish(),
+  organizer: z
+    .object({
+      emailAddress: z
+        .object({
+          name: z.string().optional(),
+          address: z.string().optional(),
+        })
+        .nullish(),
+    })
+    .nullish(),
   isCancelled: z.boolean().nullish(),
   type: z.string().nullish(),
   seriesMasterId: z.string().nullish(),
@@ -42,6 +52,8 @@ export interface CalendarEventSnapshot {
   start: { dateTime: string; timeZone: string | null } | null;
   end: { dateTime: string; timeZone: string | null } | null;
   location: string | null;
+  organizerName: string | null;
+  organizerEmail: string | null;
   isCancelled: boolean;
   attendeeCount: number;
 }
@@ -135,15 +147,21 @@ export class GetCalendarEventQuery {
           start: dateTime(parsed.start),
           end: dateTime(parsed.end),
           location: parsed.location?.displayName ?? null,
+          organizerName: parsed.organizer?.emailAddress?.name ?? null,
+          organizerEmail: parsed.organizer?.emailAddress?.address ?? null,
           isCancelled: parsed.isCancelled ?? false,
           attendeeCount: parsed.attendees?.length ?? 0,
         },
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        calendarId: input.eventRef.calendarId,
+        operation: 'get_calendar_event',
         notFoundMessage:
           'That event was not found. Search again and pass eventRef without changing it.',
         deniedDelegatedMessage: `Could not read an event on mailbox ${mailbox}.`,
@@ -151,19 +169,7 @@ export class GetCalendarEventQuery {
       if (recovered === undefined) {
         throw error;
       }
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        calendarId: input.eventRef.calendarId,
-        outcome: recovered.outcome,
-        msg: `get_calendar_event ${recovered.outcome}`,
-        err: error,
-      });
-      return {
-        success: false,
-        message: recovered.message,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
-      };
+      return recovered;
     }
   }
 }

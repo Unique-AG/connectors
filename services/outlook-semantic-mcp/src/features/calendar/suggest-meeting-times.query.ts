@@ -2,7 +2,10 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
-import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import {
+  type CalendarMetricErrorType,
+  CalendarMetricsService,
+} from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -19,8 +22,7 @@ import { findMeetingTimesPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import { dateWindowFromSearchInput } from './utils/date-window-bucket';
 import { isScheduleWindowTooLong } from './utils/graph-schedule-date-range.schema';
@@ -61,6 +63,7 @@ export interface SuggestMeetingTimesQueryOutput {
   suggestionNotes?: string[];
   resolvedWindow?: ResolvedWindow;
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -97,7 +100,7 @@ export class SuggestMeetingTimesQuery {
         operation: 'suggest_meeting_times',
         dateWindow: dateWindowFromSearchInput(input),
       },
-      (fail) => this.suggest(userProfileId, userProfileIdString, input, fail),
+      () => this.suggest(userProfileId, userProfileIdString, input),
     );
   }
 
@@ -105,7 +108,6 @@ export class SuggestMeetingTimesQuery {
     userProfileId: UserProfileTypeID,
     userProfileIdString: string,
     input: SuggestMeetingTimesQueryInput,
-    fail: (errorType: 'consent' | 'permission' | 'invalid' | 'not_found') => void,
   ): Promise<SuggestMeetingTimesQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const {
@@ -126,7 +128,6 @@ export class SuggestMeetingTimesQuery {
       now: clock,
     });
     if (resolved.tooLate) {
-      fail('invalid');
       this.logger.debug({
         userProfileId: userProfileIdString,
         mailbox: obfuscateEmail(input.mailbox ?? userProfile.email),
@@ -139,6 +140,7 @@ export class SuggestMeetingTimesQuery {
           'The window is entirely in the past. Use a future range such as today, tomorrow, thisWeek, or next7Days.',
         suggestionNotes: notes.length > 0 ? notes : undefined,
         resolvedWindow: resolved.window,
+        errorType: 'invalid',
       };
     }
     if (resolved.notes.length > 0) {
@@ -251,29 +253,22 @@ export class SuggestMeetingTimesQuery {
         resolvedWindow,
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        operation: 'suggest_meeting_times',
         deniedDelegatedMessage: `Could not suggest times from mailbox ${mailbox}.`,
       });
       if (recovered === undefined) {
         throw error;
       }
-      fail(recovered.outcome);
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        outcome: recovered.outcome,
-        msg: `suggest_meeting_times ${recovered.outcome}`,
-        err: error,
-      });
       return {
-        success: false,
-        message: recovered.message,
+        ...recovered,
         suggestionNotes: notes.length > 0 ? notes : undefined,
         resolvedWindow,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
       };
     }
   }

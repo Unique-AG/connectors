@@ -9,6 +9,8 @@ Use this when the user asks which calendars they have, who a calendar belongs to
 
 A calendar with isOwn: false and canEdit: true is typically a delegated or shared calendar the user can create meetings on. canViewPrivateItems: false means private events on that calendar will be redacted.
 
+If listNotes is present, display those notes after the table — they explain Full Access mailboxes that could not be listed.
+
 If consentRequired is true, the user must reconnect Outlook to grant calendar permission. Do not invent calendar data.`,
   toolFormatInformation: CALENDAR_TOOL_FORMAT_INFORMATION,
 });

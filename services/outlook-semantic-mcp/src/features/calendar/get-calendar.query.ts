@@ -9,8 +9,7 @@ import { calendarPath, defaultCalendarPath } from './utils/calendar-graph-path';
 import {
   calendarTraceAttrs,
   calendarUserProfileId,
-  classifyCalendarGraphError,
-  logCalendarRecovered,
+  recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import type { CalendarRefInput } from './utils/calendar-ref.schema';
 
@@ -98,10 +97,14 @@ export class GetCalendarQuery {
         },
       };
     } catch (error) {
-      const recovered = classifyCalendarGraphError({
+      const recovered = recoverCalendarGraphError({
         error,
+        logger: this.logger,
+        userProfileId: userProfileIdString,
         mailbox,
         callerEmail: userProfile.email,
+        calendarId: input.calendarRef?.calendarId,
+        operation: 'get_calendar',
         notFoundMessage:
           'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
         deniedDelegatedMessage: `Could not read the calendar on mailbox ${mailbox}.`,
@@ -109,19 +112,7 @@ export class GetCalendarQuery {
       if (recovered === undefined) {
         throw error;
       }
-      logCalendarRecovered(this.logger, {
-        userProfileId: userProfileIdString,
-        mailbox,
-        calendarId: input.calendarRef?.calendarId,
-        outcome: recovered.outcome,
-        msg: `get_calendar ${recovered.outcome}`,
-        err: error,
-      });
-      return {
-        success: false,
-        message: recovered.message,
-        ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
-      };
+      return recovered;
     }
   }
 }

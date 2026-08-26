@@ -1,5 +1,9 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { UpdateEventCommand } from '../update-event.command';
 import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
@@ -37,22 +41,22 @@ function createCommand(opts: { patch?: ReturnType<typeof vi.fn> } = {}) {
   };
   const api = vi.fn().mockReturnValue(request);
   const command = new UpdateEventCommand(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: OWN_EMAIL,
         source: 'oauth',
       }),
-    } as never,
+    } as unknown as GetUserProfileQuery,
     {
       run: vi.fn().mockResolvedValue({
         ianaTimeZone: 'Europe/Zurich',
         outlookTimeZone: 'W. Europe Standard Time',
         notes: [],
       }),
-    } as never,
-    passthroughCalendarMetrics() as never,
+    } as unknown as ResolveMailboxTimezoneQuery,
+    passthroughCalendarMetrics() as unknown as CalendarMetricsService,
   );
   return { command, api, request, patch };
 }

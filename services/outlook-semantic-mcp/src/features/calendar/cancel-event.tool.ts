@@ -7,9 +7,10 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { CancelEventCommand } from './cancel-event.command';
 import { META } from './cancel-event-tool.meta';
+import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
-import { oneLine } from './utils/calendar-display';
+import { describeCalendar, oneLine } from './utils/calendar-display';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
@@ -66,6 +67,7 @@ export class CancelEventTool {
 
   public constructor(
     private readonly getCalendarEventQuery: GetCalendarEventQuery,
+    private readonly getCalendarQuery: GetCalendarQuery,
     private readonly cancelEventCommand: CancelEventCommand,
   ) {}
 
@@ -103,10 +105,23 @@ export class CancelEventTool {
     if (snapshot.isCancelled) {
       return { success: false, message: 'That event is already cancelled.' };
     }
+    const loadedCalendar = await this.getCalendarQuery.run(userProfileId, {
+      calendarRef: {
+        calendarId: snapshot.calendarId,
+        mailbox: snapshot.mailbox,
+      },
+    });
+    if (loadedCalendar.success !== true || loadedCalendar.calendar === undefined) {
+      return {
+        success: false,
+        message: loadedCalendar.message,
+        consentRequired: loadedCalendar.consentRequired,
+      };
+    }
     const confirmation = await confirmWrite({
       context,
       schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
-      message: elicitMessage(parsed, snapshot),
+      message: elicitMessage(parsed, snapshot, loadedCalendar.calendar),
       logger: this.logger,
       operation: 'cancel_event',
       userProfileId: userProfileId.toString(),
@@ -153,6 +168,7 @@ export class CancelEventTool {
 function elicitMessage(
   input: z.infer<typeof CancelEventInputSchema>,
   snapshot: CalendarEventSnapshot,
+  calendar: CalendarSummary,
 ): string {
   const series =
     snapshot.type === 'seriesMaster'
@@ -169,7 +185,8 @@ function elicitMessage(
       ? 'Attendees will be notified. This is not a silent delete.'
       : 'No attendees will be notified.';
   return [
-    `Cancel this event on mailbox ${snapshot.mailbox}?`,
+    'Cancel this event?',
+    `Calendar: ${describeCalendar(calendar)}`,
     series,
     `Title: ${oneLine(snapshot.subject ?? '(no title)')}.`,
     snapshot.start !== null ? `When: ${snapshot.start.dateTime}.` : undefined,

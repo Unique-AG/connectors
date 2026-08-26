@@ -16,7 +16,7 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 - When \`search_emails\` returns a \`syncWarning\` field, relay that warning message to the user so they know results may not reflect all emails.
 `;
 
-const CALENDAR_INSTRUCTIONS = `
+export const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar
 - Use \`list_calendars\` to see the user's own calendars, calendars shared with them, and calendars of mailboxes they have Full Access to.
 - Use \`search_calendar_events\` for meetings in a time window. Prefer \`dateRange\` with \`rangeType: relative\` (\`today\`, \`thisWeek\`, \`nextWeek\`, \`lastMonth\`, \`next7Days\`). Weeks start Monday. State \`resolvedWindow.interpretation\` in the answer.
@@ -26,7 +26,7 @@ const CALENDAR_INSTRUCTIONS = `
 - Use \`create_event\` to create a meeting. There is no draft — invitations are sent immediately after the user confirms. Reuse \`transactionId\` if the create is retried.
 - Use \`update_event\` to change an existing meeting. Pass \`eventRef\` unchanged. For a recurring meeting the user chooses this occurrence or the whole series. Attendees are notified immediately.
 - Use \`cancel_event\` to cancel a meeting (notifies attendees). Do not treat it as a silent delete. Pass \`eventRef\` unchanged. Only the organizer can cancel. For a recurring meeting the user chooses this occurrence or the whole series.
-- \`calendarId\`, \`eventId\`, \`accessPath\` and \`eventRef\` are internal identifiers. Never show them to the user.
+- \`calendarId\`, \`eventId\`, \`mailbox\` and \`eventRef\` are internal identifiers. Never show them to the user.
 - The search result already contains the full meeting body. There is no second tool to open an event.
 `;
 

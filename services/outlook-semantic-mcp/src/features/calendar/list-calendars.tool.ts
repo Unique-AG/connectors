@@ -47,6 +47,12 @@ export const ListCalendarsOutputSchema = z.object({
     .array(CalendarSchema)
     .optional()
     .describe('Calendars the signed-in user can access, including own, shared, and delegated.'),
+  listNotes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Notes about calendars that could not be listed, such as a Full Access mailbox that returned 403 or 404. Show these after the list.',
+    ),
   consentRequired: z
     .boolean()
     .optional()
@@ -63,7 +69,7 @@ export class ListCalendarsTool {
     name: 'list_calendars',
     title: 'List Calendars',
     description:
-      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. To list meetings in a time window, use search_calendar_events. Each calendar carries a calendarRef — pass it through unchanged to narrow search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
+      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether they can edit it, and whether private items are visible. To list meetings in a time window, use search_calendar_events. Each calendar carries a calendarRef — pass it through unchanged to narrow search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. If listNotes is present, show it after the list — a Full Access mailbox that could not be read is omitted from calendars and explained there. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
     parameters: ListCalendarsInputSchema,
     outputSchema: ListCalendarsOutputSchema,
     annotations: {

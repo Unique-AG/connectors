@@ -83,15 +83,12 @@ describe(CalendarMetricsService.name, () => {
     );
   });
 
-  it('labels recovered failures with the errorType passed to fail', async () => {
+  it('labels recovered failures with the errorType on the result', async () => {
     const service = new CalendarMetricsService({ getHistogram } as never);
 
     await service.measureOperation(
       { operation: 'check_availability', dateWindow: '<1week' },
-      async (fail) => {
-        fail('consent');
-        return { success: false };
-      },
+      async () => ({ success: false, errorType: 'consent' as const }),
     );
 
     expect(record).toHaveBeenCalledWith(

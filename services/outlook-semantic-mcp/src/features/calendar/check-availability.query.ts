@@ -2,7 +2,10 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
-import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import {
+  type CalendarMetricErrorType,
+  CalendarMetricsService,
+} from '~/features/metrics/calendar-metrics.service';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -70,6 +73,7 @@ export interface CheckAvailabilityQueryOutput {
   availabilityNotes?: string[];
   resolvedWindow?: ResolvedWindow;
   consentRequired?: boolean;
+  errorType?: CalendarMetricErrorType;
 }
 
 @Injectable()
@@ -106,7 +110,7 @@ export class CheckAvailabilityQuery {
         operation: 'check_availability',
         dateWindow: dateWindowFromSearchInput(input),
       },
-      (fail) => this.check(userProfileId, userProfileIdString, input, fail),
+      () => this.check(userProfileId, userProfileIdString, input),
     );
   }
 
@@ -114,7 +118,6 @@ export class CheckAvailabilityQuery {
     userProfileId: UserProfileTypeID,
     userProfileIdString: string,
     input: CheckAvailabilityQueryInput,
-    fail: (errorType: 'consent' | 'permission' | 'too_many_entries') => void,
   ): Promise<CheckAvailabilityQueryOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const {
@@ -220,7 +223,6 @@ export class CheckAvailabilityQuery {
       };
     } catch (error) {
       if (isGetScheduleTooManyEntriesError(error)) {
-        fail('too_many_entries');
         logCalendarRecovered(this.logger, {
           userProfileId: userProfileIdString,
           mailbox,
@@ -233,11 +235,11 @@ export class CheckAvailabilityQuery {
           message: TOO_MANY_ENTRIES_MESSAGE,
           availabilityNotes: notes.length > 0 ? notes : undefined,
           resolvedWindow,
+          errorType: 'too_many_entries',
         };
       }
       if (isCalendarPermissionDeniedError(error)) {
         if (mailbox.toLowerCase() === userProfile.email.toLowerCase()) {
-          fail('consent');
           logCalendarRecovered(this.logger, {
             userProfileId: userProfileIdString,
             mailbox,
@@ -250,9 +252,9 @@ export class CheckAvailabilityQuery {
             message: new CalendarConsentRequiredError().message,
             consentRequired: true,
             resolvedWindow,
+            errorType: 'consent',
           };
         }
-        fail('permission');
         logCalendarRecovered(this.logger, {
           userProfileId: userProfileIdString,
           mailbox,
@@ -265,6 +267,7 @@ export class CheckAvailabilityQuery {
           message: `Could not read availability from mailbox ${mailbox}.`,
           availabilityNotes: notes.length > 0 ? notes : undefined,
           resolvedWindow,
+          errorType: 'permission',
         };
       }
       throw error;

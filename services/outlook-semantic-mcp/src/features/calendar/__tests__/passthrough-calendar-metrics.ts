@@ -6,6 +6,6 @@ export function passthroughCalendarMetrics(): Pick<
 > {
   return {
     measureSearch: (_labels, fn) => fn(),
-    measureOperation: (_labels, fn) => fn(() => undefined),
+    measureOperation: (_labels, fn) => fn(),
   };
 }

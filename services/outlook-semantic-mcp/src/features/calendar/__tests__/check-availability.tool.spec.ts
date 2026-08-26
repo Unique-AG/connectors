@@ -1,5 +1,8 @@
+import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type Context } from '@unique-ag/mcp-server-module';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { CheckAvailabilityQuery } from '../check-availability.query';
 import { CheckAvailabilityOutputSchema, CheckAvailabilityTool } from '../check-availability.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
@@ -19,7 +22,7 @@ describe(CheckAvailabilityTool.name, () => {
       },
     };
     const run = vi.fn().mockResolvedValue(output);
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     const result = await tool.checkAvailability(
       {
@@ -28,8 +31,8 @@ describe(CheckAvailabilityTool.name, () => {
         intervalMinutes: 60,
         dateRange: { rangeType: 'relative', range: 'today' },
       },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
@@ -47,7 +50,7 @@ describe(CheckAvailabilityTool.name, () => {
       message: 'Checked availability for 1 person.',
       people: [],
     });
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     await tool.checkAvailability(
       {
@@ -58,8 +61,8 @@ describe(CheckAvailabilityTool.name, () => {
           endDateTime: '2026-08-25T18:00:00+02:00',
         },
       },
-      {} as never,
-      { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
@@ -73,7 +76,7 @@ describe(CheckAvailabilityTool.name, () => {
 
   it('rejects a mailbox that is not an SMTP address', async () => {
     const run = vi.fn();
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     await expect(
       tool.checkAvailability(
@@ -82,8 +85,10 @@ describe(CheckAvailabilityTool.name, () => {
           mailbox: 'not/an/email',
           dateRange: { rangeType: 'relative', range: 'today' },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/SMTP/i);
     expect(run).not.toHaveBeenCalled();
@@ -91,7 +96,7 @@ describe(CheckAvailabilityTool.name, () => {
 
   it('rejects a window longer than 62 days', async () => {
     const run = vi.fn();
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     await expect(
       tool.checkAvailability(
@@ -99,8 +104,10 @@ describe(CheckAvailabilityTool.name, () => {
           attendees: ['alex@example.com'],
           dateRange: { rangeType: 'relative', range: 'next90Days' },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/62 days/);
     expect(run).not.toHaveBeenCalled();
@@ -108,7 +115,7 @@ describe(CheckAvailabilityTool.name, () => {
 
   it('rejects a whitespace attendee', async () => {
     const run = vi.fn();
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     await expect(
       tool.checkAvailability(
@@ -116,8 +123,10 @@ describe(CheckAvailabilityTool.name, () => {
           attendees: ['  '],
           dateRange: { rangeType: 'relative', range: 'today' },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/SMTP/i);
     expect(run).not.toHaveBeenCalled();
@@ -125,7 +134,7 @@ describe(CheckAvailabilityTool.name, () => {
 
   it('rejects more than 20 attendees before calling the query', async () => {
     const run = vi.fn();
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     await expect(
       tool.checkAvailability(
@@ -133,8 +142,10 @@ describe(CheckAvailabilityTool.name, () => {
           attendees: Array.from({ length: 21 }, (_, index) => `user${index}@example.com`),
           dateRange: { rangeType: 'relative', range: 'today' },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/20/i);
     expect(run).not.toHaveBeenCalled();
@@ -142,7 +153,7 @@ describe(CheckAvailabilityTool.name, () => {
 
   it('rejects an absolute window without a timezone offset', async () => {
     const run = vi.fn();
-    const tool = new CheckAvailabilityTool({ run } as never);
+    const tool = new CheckAvailabilityTool({ run } as unknown as CheckAvailabilityQuery);
 
     await expect(
       tool.checkAvailability(
@@ -154,8 +165,10 @@ describe(CheckAvailabilityTool.name, () => {
             endDateTime: '2026-08-26T00:00:00+02:00',
           },
         },
-        {} as never,
-        { user: { userProfileId: USER_PROFILE_ID.toString() } } as never,
+        {} as unknown as Context,
+        {
+          user: { userProfileId: USER_PROFILE_ID.toString() },
+        } as unknown as McpAuthenticatedRequest,
       ),
     ).rejects.toThrow(/offset/i);
     expect(run).not.toHaveBeenCalled();

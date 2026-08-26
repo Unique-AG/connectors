@@ -5,8 +5,10 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { obfuscateEmail } from '~/utils/obfuscate-email';
+import { type CalendarEventSnapshot, GetCalendarEventQuery } from './get-calendar-event.query';
 import { RespondToInviteCommand } from './respond-to-invite.command';
 import { META } from './respond-to-invite-tool.meta';
+import { oneLine } from './utils/calendar-display';
 import { EVENT_RESPONSES } from './utils/calendar-graph-path';
 import { confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
@@ -54,7 +56,10 @@ export const RespondToInviteOutputSchema = z.object({
 export class RespondToInviteTool {
   private readonly logger = new Logger(RespondToInviteTool.name);
 
-  public constructor(private readonly respondToInviteCommand: RespondToInviteCommand) {}
+  public constructor(
+    private readonly getCalendarEventQuery: GetCalendarEventQuery,
+    private readonly respondToInviteCommand: RespondToInviteCommand,
+  ) {}
 
   @Tool({
     name: 'respond_to_invite',
@@ -80,10 +85,16 @@ export class RespondToInviteTool {
   ): Promise<z.infer<typeof RespondToInviteOutputSchema>> {
     const parsed = RespondToInviteInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
+    const loaded = await this.getCalendarEventQuery.run(userProfileId, {
+      eventRef: parsed.eventRef,
+    });
+    if (loaded.success !== true || loaded.event === undefined) {
+      return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
+    }
     const confirmation = await confirmWrite({
       context,
       schema: ConfirmSchema,
-      message: elicitMessage(parsed.response, parsed.comment),
+      message: elicitMessage(parsed.response, parsed.comment, loaded.event),
       logger: this.logger,
       operation: 'respond_to_invite',
       userProfileId: userProfileId.toString(),
@@ -111,6 +122,7 @@ export class RespondToInviteTool {
 function elicitMessage(
   response: z.infer<typeof RespondToInviteInputSchema>['response'],
   comment: string | undefined,
+  snapshot: CalendarEventSnapshot,
 ): string {
   const action =
     response === 'accept'
@@ -118,9 +130,21 @@ function elicitMessage(
       : response === 'tentativelyAccept'
         ? 'tentatively accept'
         : 'decline';
+  const organizer =
+    snapshot.organizerName !== null && snapshot.organizerEmail !== null
+      ? `${oneLine(snapshot.organizerName)} (${snapshot.organizerEmail})`
+      : (snapshot.organizerEmail ?? snapshot.organizerName ?? 'the organizer');
   const note =
     comment !== undefined && comment.trim() !== ''
-      ? ` The comment sent with it will be: "${comment.trim()}".`
+      ? ` The comment sent with it will be: "${oneLine(comment)}".`
       : '';
-  return `Confirm to ${action} this invitation. The organizer will be notified immediately.${note}`;
+  return [
+    `Confirm to ${action} this invitation.`,
+    `Title: ${oneLine(snapshot.subject ?? '(no title)')}.`,
+    snapshot.start !== null ? `When: ${snapshot.start.dateTime}.` : undefined,
+    `Organizer: ${organizer}.`,
+    `The organizer will be notified immediately.${note}`,
+  ]
+    .filter((line) => line !== undefined)
+    .join('\n');
 }

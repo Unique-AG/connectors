@@ -50,7 +50,7 @@ Rules:
 ## Contracts
 
 - Tools call queries for reads and commands for writes. Query/command I/O is TypeScript interfaces. Zod + `.describe()` only on tool I/O. `@Tool({ parameters })` is a ZodObject.
-- Relative ranges: `src/utils/relative-range` + `temporal-polyfill`. Weeks start Monday. `endOfDay` uses `add({ days: 1 }).startOfDay().subtract({ milliseconds: 1 })`.
+- Relative ranges: `src/utils/relative-range` + `temporal-polyfill`. `engines.node` is 24, which has no native `Temporal`, so the polyfill is a real dependency rather than a wait for the Node 26 runtime image. Call sites import `{ Temporal } from 'temporal-polyfill'` directly — do not install it on `globalThis`, or the polyfill would shadow native `Temporal` on that image. Weeks start Monday. `endOfDay` uses `add({ days: 1 }).startOfDay().subtract({ milliseconds: 1 })`.
 - Absolute `startDateTime` / `endDateTime` must be valid Instants with `Z` or `±HH:MM`.
 - Fan-out: `using limit = calendarGraphLimit(userId)` — 5 in-flight, refcounted per user.
 - Search filters (attendee includes organizer, subject, category) run inside `fetchEvents`.
@@ -59,7 +59,8 @@ Rules:
 - `check_availability` POSTs `/users/{email}/calendar/getSchedule`. Cap 20 addresses and windows shorter than 62 days. Decode `availabilityView` into non-free `busyBlocks`; redact `items` when `isPrivate`; error 5006 is a narrow-the-range message.
 - `suggest_meeting_times` POSTs `/users/{email}/findMeetingTimes`. Default duration 30 minutes and `activityDomain` work. Surface `emptySuggestionsReason` instead of inventing slots.
 - `create_event` POSTs after elicit, with `transactionId` (≤ 32 chars). If `calendarId` is omitted it GETs `/users/{email}/calendar`. All-day events are not supported yet.
-- `update_event` / `cancel_event` GET the event first so elicit can name the mailbox and, for `occurrence` / `exception`, let the user pick this occurrence vs the whole series. Then PATCH `/events/{id}` or POST `/events/{id}/cancel`.
+- `update_event` / `cancel_event` GET the event and calendar first so elicit can name the calendar by owner (never `mailbox`) and, for `occurrence` / `exception`, let the user pick this occurrence vs the whole series. Then PATCH `/events/{id}` or POST `/events/{id}/cancel`.
+- `respond_to_invite` GET the event first so elicit can name the invitation (title, when, organizer) before the response is sent.
 - 403 on the caller mailbox maps to `consentRequired`. 404/400 map to `success: false`.
 
 ## Example prompts

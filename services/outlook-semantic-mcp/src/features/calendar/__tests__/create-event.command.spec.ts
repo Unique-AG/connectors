@@ -1,5 +1,9 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { describe, expect, it, vi } from 'vitest';
+import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventCommand } from '../create-event.command';
 import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
@@ -46,23 +50,23 @@ function createCommand(
   };
   const api = vi.fn().mockReturnValue(request);
   const command = new CreateEventCommand(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
         email: OWN_EMAIL,
         source: 'oauth',
       }),
-    } as never,
-    { run: vi.fn().mockResolvedValue(DEFAULT_TZ) } as never,
-    passthroughCalendarMetrics() as never,
+    } as unknown as GetUserProfileQuery,
+    { run: vi.fn().mockResolvedValue(DEFAULT_TZ) } as unknown as ResolveMailboxTimezoneQuery,
+    passthroughCalendarMetrics() as unknown as CalendarMetricsService,
   );
   return { command, api, request, post, get };
 }
 
 describe(CreateEventCommand.name, () => {
   it('POSTs the event with transactionId and immutable IDs', async () => {
-    const { command, api, request, post, get } = createCommand();
+    const { command, api, request, post } = createCommand();
 
     const result = await command.run(USER_PROFILE_ID, {
       subject: 'Sync',
