@@ -188,7 +188,7 @@ export class UpdateEventCommand {
         webLink: updated.webLink ?? null,
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
+      return recoverCalendarGraphError({
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
@@ -201,10 +201,6 @@ export class UpdateEventCommand {
         invalidMessage: 'Graph rejected the update. Check the times and fields and try again.',
         deniedDelegatedMessage: `Could not update an event on mailbox ${mailbox}.`,
       });
-      if (recovered === undefined) {
-        throw error;
-      }
-      return recovered;
     }
   }
 }

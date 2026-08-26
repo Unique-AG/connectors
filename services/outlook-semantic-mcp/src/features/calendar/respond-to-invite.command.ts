@@ -118,7 +118,7 @@ export class RespondToInviteCommand {
         response: input.response,
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
+      return recoverCalendarGraphError({
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
@@ -130,10 +130,6 @@ export class RespondToInviteCommand {
           'That event was not found. Search again and pass eventRef without changing it.',
         deniedDelegatedMessage: `Could not respond to an invite on mailbox ${mailbox}.`,
       });
-      if (recovered === undefined) {
-        throw error;
-      }
-      return recovered;
     }
   }
 }

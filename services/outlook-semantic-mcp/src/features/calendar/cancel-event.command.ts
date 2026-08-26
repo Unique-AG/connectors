@@ -108,7 +108,7 @@ export class CancelEventCommand {
           : 'Cancelled the event.',
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
+      return recoverCalendarGraphError({
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
@@ -121,10 +121,6 @@ export class CancelEventCommand {
         invalidMessage: 'Graph rejected the cancellation. Only the organizer can cancel a meeting.',
         deniedDelegatedMessage: `Could not cancel an event on mailbox ${mailbox}.`,
       });
-      if (recovered === undefined) {
-        throw error;
-      }
-      return recovered;
     }
   }
 }

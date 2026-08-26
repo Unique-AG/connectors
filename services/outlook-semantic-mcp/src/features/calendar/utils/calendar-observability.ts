@@ -68,6 +68,21 @@ export type CalendarGraphErrorType = Exclude<
   'delegated_skipped' | 'too_many_entries'
 >;
 
+export interface CalendarGraphRecoveredFailure {
+  success: false;
+  message: string;
+  errorType: CalendarGraphErrorType;
+  consentRequired?: true;
+}
+
+export type CalendarGraphErrorClassification =
+  | {
+      outcome: CalendarGraphErrorType;
+      message: string;
+      consentRequired?: true;
+    }
+  | { outcome: 'unhandled' };
+
 export function recoverCalendarGraphError(input: {
   error: unknown;
   logger: Logger;
@@ -79,15 +94,8 @@ export function recoverCalendarGraphError(input: {
   notFoundMessage?: string;
   invalidMessage?: string;
   deniedDelegatedMessage: string;
-}):
-  | {
-      success: false;
-      message: string;
-      errorType: CalendarGraphErrorType;
-      consentRequired?: true;
-    }
-  | undefined {
-  const recovered = classifyCalendarGraphError({
+}): CalendarGraphRecoveredFailure {
+  const classified = classifyCalendarGraphError({
     error: input.error,
     mailbox: input.mailbox,
     callerEmail: input.callerEmail,
@@ -95,22 +103,22 @@ export function recoverCalendarGraphError(input: {
     invalidMessage: input.invalidMessage,
     deniedDelegatedMessage: input.deniedDelegatedMessage,
   });
-  if (recovered === undefined) {
-    return undefined;
+  if (classified.outcome === 'unhandled') {
+    throw input.error;
   }
   logCalendarRecovered(input.logger, {
     userProfileId: input.userProfileId,
     mailbox: input.mailbox,
     calendarId: input.calendarId,
-    outcome: recovered.outcome,
-    msg: `${input.operation} ${recovered.outcome}`,
+    outcome: classified.outcome,
+    msg: `${input.operation} ${classified.outcome}`,
     err: input.error,
   });
   return {
     success: false,
-    message: recovered.message,
-    errorType: recovered.outcome,
-    ...(recovered.consentRequired === true ? { consentRequired: true } : {}),
+    message: classified.message,
+    errorType: classified.outcome,
+    ...(classified.consentRequired === true ? { consentRequired: true } : {}),
   };
 }
 
@@ -121,27 +129,21 @@ export function classifyCalendarGraphError(input: {
   notFoundMessage?: string;
   invalidMessage?: string;
   deniedDelegatedMessage: string;
-}):
-  | {
-      outcome: CalendarGraphErrorType;
-      message: string;
-      consentRequired?: true;
-    }
-  | undefined {
+}): CalendarGraphErrorClassification {
   if (isGraphNotFoundError(input.error)) {
     if (input.notFoundMessage === undefined) {
-      return undefined;
+      return { outcome: 'unhandled' };
     }
     return { outcome: 'not_found', message: input.notFoundMessage };
   }
   if (isGraphBadRequestError(input.error)) {
     if (input.invalidMessage === undefined) {
-      return undefined;
+      return { outcome: 'unhandled' };
     }
     return { outcome: 'invalid', message: input.invalidMessage };
   }
   if (!isCalendarPermissionDeniedError(input.error)) {
-    return undefined;
+    return { outcome: 'unhandled' };
   }
   if (input.mailbox.toLowerCase() === input.callerEmail.toLowerCase()) {
     return {

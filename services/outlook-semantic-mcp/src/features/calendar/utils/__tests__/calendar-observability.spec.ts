@@ -56,7 +56,7 @@ describe(classifyCalendarGraphError.name, () => {
     ).toEqual({ outcome: 'permission', message: 'denied' });
   });
 
-  it('returns undefined for unhandled errors', () => {
+  it('returns unhandled for errors that are not mapped to a tool result', () => {
     expect(
       classifyCalendarGraphError({
         error: makeGraphError(500),
@@ -64,7 +64,18 @@ describe(classifyCalendarGraphError.name, () => {
         callerEmail: 'me@example.com',
         deniedDelegatedMessage: 'denied',
       }),
-    ).toBeUndefined();
+    ).toEqual({ outcome: 'unhandled' });
+  });
+
+  it('returns unhandled for 404 when the caller did not provide a not-found message', () => {
+    expect(
+      classifyCalendarGraphError({
+        error: makeGraphError(404),
+        mailbox: 'me@example.com',
+        callerEmail: 'me@example.com',
+        deniedDelegatedMessage: 'denied',
+      }),
+    ).toEqual({ outcome: 'unhandled' });
   });
 });
 
@@ -130,10 +141,11 @@ describe(recoverCalendarGraphError.name, () => {
     );
   });
 
-  it('returns undefined for unhandled errors so the caller can rethrow', () => {
-    expect(
+  it('rethrows unhandled errors so unexpected Graph failures stay exceptions', () => {
+    const error = makeGraphError(500);
+    expect(() =>
       recoverCalendarGraphError({
-        error: makeGraphError(500),
+        error,
         logger: { warn: vi.fn() } as unknown as Logger,
         userProfileId: 'user_profile_1',
         mailbox: 'me@example.com',
@@ -141,6 +153,6 @@ describe(recoverCalendarGraphError.name, () => {
         operation: 'create_event',
         deniedDelegatedMessage: 'denied',
       }),
-    ).toBeUndefined();
+    ).toThrow(error);
   });
 });

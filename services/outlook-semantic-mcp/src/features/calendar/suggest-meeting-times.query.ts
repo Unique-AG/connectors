@@ -249,20 +249,16 @@ export class SuggestMeetingTimesQuery {
         resolvedWindow,
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
-        error,
-        logger: this.logger,
-        userProfileId: userProfileIdString,
-        mailbox: userProfile.email,
-        callerEmail: userProfile.email,
-        operation: 'suggest_meeting_times',
-        deniedDelegatedMessage: `Could not suggest times from mailbox ${userProfile.email}.`,
-      });
-      if (recovered === undefined) {
-        throw error;
-      }
       return {
-        ...recovered,
+        ...recoverCalendarGraphError({
+          error,
+          logger: this.logger,
+          userProfileId: userProfileIdString,
+          mailbox: userProfile.email,
+          callerEmail: userProfile.email,
+          operation: 'suggest_meeting_times',
+          deniedDelegatedMessage: `Could not suggest times from mailbox ${userProfile.email}.`,
+        }),
         suggestionNotes: notes.length > 0 ? notes : undefined,
         resolvedWindow,
       };

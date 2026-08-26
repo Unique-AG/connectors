@@ -198,23 +198,22 @@ export class CreateEventCommand {
         transactionId,
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
-        error,
-        logger: this.logger,
-        userProfileId: userProfileIdString,
-        mailbox,
-        callerEmail: userProfile.email,
-        calendarId: input.calendarRef.calendarId,
-        operation: 'create_event',
-        notFoundMessage:
-          'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
-        invalidMessage: 'Graph rejected the event. Check the start and end times and try again.',
-        deniedDelegatedMessage: `Could not create an event on mailbox ${mailbox}.`,
-      });
-      if (recovered === undefined) {
-        throw error;
-      }
-      return { ...recovered, transactionId };
+      return {
+        ...recoverCalendarGraphError({
+          error,
+          logger: this.logger,
+          userProfileId: userProfileIdString,
+          mailbox,
+          callerEmail: userProfile.email,
+          calendarId: input.calendarRef.calendarId,
+          operation: 'create_event',
+          notFoundMessage:
+            'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
+          invalidMessage: 'Graph rejected the event. Check the start and end times and try again.',
+          deniedDelegatedMessage: `Could not create an event on mailbox ${mailbox}.`,
+        }),
+        transactionId,
+      };
     }
   }
 }

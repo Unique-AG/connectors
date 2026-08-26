@@ -97,7 +97,7 @@ export class GetCalendarQuery {
         },
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
+      return recoverCalendarGraphError({
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
@@ -109,10 +109,6 @@ export class GetCalendarQuery {
           'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
         deniedDelegatedMessage: `Could not read the calendar on mailbox ${mailbox}.`,
       });
-      if (recovered === undefined) {
-        throw error;
-      }
-      return recovered;
     }
   }
 }

@@ -132,7 +132,7 @@ export class GetCalendarEventQuery {
         },
       };
     } catch (error) {
-      const recovered = recoverCalendarGraphError({
+      return recoverCalendarGraphError({
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
@@ -144,10 +144,6 @@ export class GetCalendarEventQuery {
           'That event was not found. Search again and pass eventRef without changing it.',
         deniedDelegatedMessage: `Could not read an event on mailbox ${mailbox}.`,
       });
-      if (recovered === undefined) {
-        throw error;
-      }
-      return recovered;
     }
   }
 }
