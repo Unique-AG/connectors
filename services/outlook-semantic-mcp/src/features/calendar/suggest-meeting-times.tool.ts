@@ -146,7 +146,7 @@ export class SuggestMeetingTimesTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof SuggestMeetingTimesOutputSchema>> {
-    const { dateRange, ...filters } = SuggestMeetingTimesInputSchema.parse(input);
+    const { dateRange, ...filters } = input;
     return this.suggestMeetingTimesQuery.run(extractUserProfileId(request), {
       ...filters,
       ...(dateRange.rangeType === 'relative'

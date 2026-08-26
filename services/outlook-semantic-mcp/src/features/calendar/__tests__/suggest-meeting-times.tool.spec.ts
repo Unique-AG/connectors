@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SuggestMeetingTimesQuery } from '../suggest-meeting-times.query';
 import {
+  SuggestMeetingTimesInputSchema,
   SuggestMeetingTimesOutputSchema,
   SuggestMeetingTimesTool,
 } from '../suggest-meeting-times.tool';
@@ -79,60 +80,6 @@ describe(SuggestMeetingTimesTool.name, () => {
     );
   });
 
-  it('rejects an absolute window without a timezone offset', async () => {
-    const run = vi.fn();
-    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
-
-    await expect(
-      tool.suggestMeetingTimes(
-        {
-          dateRange: {
-            rangeType: 'absolute',
-            startDateTime: '2026-08-26T09:00:00',
-            endDateTime: '2026-08-26T18:00:00+02:00',
-          },
-        },
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/offset/i);
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it('rejects a window longer than 62 days', async () => {
-    const run = vi.fn();
-    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
-
-    await expect(
-      tool.suggestMeetingTimes(
-        { dateRange: { rangeType: 'relative', range: 'next90Days' } },
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/62 days/);
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it('rejects a past-only relative range', async () => {
-    const run = vi.fn();
-    const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
-
-    await expect(
-      tool.suggestMeetingTimes(
-        { dateRange: { rangeType: 'relative', range: 'yesterday' } },
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/past/);
-    expect(run).not.toHaveBeenCalled();
-  });
-
   it('accepts more than 20 attendees, since findMeetingTimes documents no cap', async () => {
     const run = vi.fn().mockResolvedValue({ success: true, message: 'ok', suggestions: [] });
     const tool = new SuggestMeetingTimesTool({ run } as unknown as SuggestMeetingTimesQuery);
@@ -145,5 +92,35 @@ describe(SuggestMeetingTimesTool.name, () => {
     );
 
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, expect.objectContaining({ attendees }));
+  });
+});
+
+describe('SuggestMeetingTimesInputSchema', () => {
+  it('rejects an absolute window without a timezone offset', () => {
+    expect(() =>
+      SuggestMeetingTimesInputSchema.parse({
+        dateRange: {
+          rangeType: 'absolute',
+          startDateTime: '2026-08-26T09:00:00',
+          endDateTime: '2026-08-26T18:00:00+02:00',
+        },
+      }),
+    ).toThrow(/offset/i);
+  });
+
+  it('rejects a window longer than 62 days', () => {
+    expect(() =>
+      SuggestMeetingTimesInputSchema.parse({
+        dateRange: { rangeType: 'relative', range: 'next90Days' },
+      }),
+    ).toThrow(/62 days/);
+  });
+
+  it('rejects a past-only relative range', () => {
+    expect(() =>
+      SuggestMeetingTimesInputSchema.parse({
+        dateRange: { rangeType: 'relative', range: 'yesterday' },
+      }),
+    ).toThrow(/past/);
   });
 });

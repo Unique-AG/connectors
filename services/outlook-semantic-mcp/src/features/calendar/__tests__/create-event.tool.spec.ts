@@ -4,7 +4,11 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventCommand } from '../create-event.command';
-import { CreateEventOutputSchema, CreateEventTool } from '../create-event.tool';
+import {
+  CreateEventInputSchema,
+  CreateEventOutputSchema,
+  CreateEventTool,
+} from '../create-event.tool';
 import { GetCalendarQuery } from '../get-calendar.query';
 import { ConfirmSchema } from '../utils/confirm-write';
 
@@ -100,46 +104,6 @@ describe(CreateEventTool.name, () => {
     expect(run).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
     expect(result.transactionId).toBe(INPUT.transactionId);
-  });
-
-  it('rejects a window without a timezone offset', async () => {
-    const { tool, run, elicit } = createTool();
-
-    await expect(
-      tool.createEvent(
-        {
-          subject: 'Sync',
-          startDateTime: '2026-08-26T09:00:00',
-          endDateTime: '2026-08-26T09:30:00+02:00',
-        },
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/offset/i);
-    expect(elicit).not.toHaveBeenCalled();
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it('rejects an end that is not after the start', async () => {
-    const { tool, run, elicit } = createTool();
-
-    await expect(
-      tool.createEvent(
-        {
-          subject: 'Sync',
-          startDateTime: '2026-08-26T09:30:00+02:00',
-          endDateTime: '2026-08-26T09:00:00+02:00',
-        },
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/after startDateTime/i);
-    expect(elicit).not.toHaveBeenCalled();
-    expect(run).not.toHaveBeenCalled();
   });
 
   it('names a shared calendar by its name and owner, and collapses newlines in the title', async () => {
@@ -276,5 +240,27 @@ describe(CreateEventTool.name, () => {
       USER_PROFILE_ID,
       expect.objectContaining({ transactionId: timedOut.transactionId }),
     );
+  });
+});
+
+describe('CreateEventInputSchema', () => {
+  it('rejects a window without a timezone offset', () => {
+    expect(() =>
+      CreateEventInputSchema.parse({
+        subject: 'Sync',
+        startDateTime: '2026-08-26T09:00:00',
+        endDateTime: '2026-08-26T09:30:00+02:00',
+      }),
+    ).toThrow(/offset/i);
+  });
+
+  it('rejects an end that is not after the start', () => {
+    expect(() =>
+      CreateEventInputSchema.parse({
+        subject: 'Sync',
+        startDateTime: '2026-08-26T09:30:00+02:00',
+        endDateTime: '2026-08-26T09:00:00+02:00',
+      }),
+    ).toThrow(/after startDateTime/i);
   });
 });

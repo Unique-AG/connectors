@@ -6,7 +6,11 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { GetCalendarQuery } from '../get-calendar.query';
 import { GetCalendarEventQuery } from '../get-calendar-event.query';
 import { UpdateEventCommand } from '../update-event.command';
-import { UpdateEventOutputSchema, UpdateEventTool } from '../update-event.tool';
+import {
+  UpdateEventInputSchema,
+  UpdateEventOutputSchema,
+  UpdateEventTool,
+} from '../update-event.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const EVENT_REF = {
@@ -194,66 +198,28 @@ describe(UpdateEventTool.name, () => {
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/read-only/i);
   });
+});
 
-  it('rejects an update with no fields to change', async () => {
-    const { tool, get, elicit } = createTool();
-
-    await expect(
-      tool.updateEvent(
-        { eventRef: EVENT_REF },
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/at least one field/i);
-    expect(get).not.toHaveBeenCalled();
+describe('UpdateEventInputSchema', () => {
+  it('rejects an update with no fields to change', () => {
+    expect(() => UpdateEventInputSchema.parse({ eventRef: EVENT_REF })).toThrow(
+      /at least one field/i,
+    );
   });
 
-  it('rejects a whitespace-only subject', async () => {
-    const { tool, get, elicit } = createTool();
-
-    await expect(
-      tool.updateEvent(
-        { eventRef: EVENT_REF, subject: '   ' },
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow();
-    expect(get).not.toHaveBeenCalled();
+  it('rejects a whitespace-only subject', () => {
+    expect(() => UpdateEventInputSchema.parse({ eventRef: EVENT_REF, subject: '   ' })).toThrow();
   });
 
-  it('rejects isOnlineMeeting false as the only change', async () => {
-    const { tool, get, elicit } = createTool();
-
-    await expect(
-      tool.updateEvent(
-        { eventRef: EVENT_REF, isOnlineMeeting: false } as unknown as Parameters<
-          UpdateEventTool['updateEvent']
-        >[0],
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow();
-    expect(get).not.toHaveBeenCalled();
+  it('rejects isOnlineMeeting false as the only change', () => {
+    expect(() =>
+      UpdateEventInputSchema.parse({ eventRef: EVENT_REF, isOnlineMeeting: false }),
+    ).toThrow();
   });
 
-  it('rejects a start-only timestamp that is not a real instant', async () => {
-    const { tool, get, elicit } = createTool();
-
-    await expect(
-      tool.updateEvent(
-        { eventRef: EVENT_REF, startDateTime: 'not-a-date+02:00' },
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/offset-bearing timestamp/i);
-    expect(get).not.toHaveBeenCalled();
+  it('rejects a start-only timestamp that is not a real instant', () => {
+    expect(() =>
+      UpdateEventInputSchema.parse({ eventRef: EVENT_REF, startDateTime: 'not-a-date+02:00' }),
+    ).toThrow(/offset-bearing timestamp/i);
   });
 });

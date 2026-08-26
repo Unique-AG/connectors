@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SearchCalendarEventsQuery } from '../search-calendar-events.query';
 import {
+  SearchCalendarEventsInputSchema,
   SearchCalendarEventsOutputSchema,
   SearchCalendarEventsTool,
 } from '../search-calendar-events.tool';
@@ -69,46 +70,6 @@ describe(SearchCalendarEventsTool.name, () => {
     });
   });
 
-  it('rejects a subject filter that sets both startsWith and contains', async () => {
-    const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
-
-    await expect(
-      tool.searchCalendarEvents(
-        {
-          calendars: CALENDARS,
-          dateRange: { rangeType: 'relative', range: 'today' },
-          subject: { startsWith: 'Weekly', contains: 'Sales' },
-        } as unknown as Parameters<SearchCalendarEventsTool['searchCalendarEvents']>[0],
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow();
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it('rejects an attendee that is not an SMTP address', async () => {
-    const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
-
-    await expect(
-      tool.searchCalendarEvents(
-        {
-          calendars: CALENDARS,
-          dateRange: { rangeType: 'relative', range: 'today' },
-          attendees: ['Alex'],
-        },
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/SMTP/i);
-    expect(run).not.toHaveBeenCalled();
-  });
-
   it('passes an absolute window through to the query', async () => {
     const run = vi.fn().mockResolvedValue({
       success: true,
@@ -136,81 +97,65 @@ describe(SearchCalendarEventsTool.name, () => {
       endDateTime: '2026-08-26T00:00:00+02:00',
     });
   });
+});
 
-  it('rejects a relative search without range', async () => {
-    const tool = new SearchCalendarEventsTool({
-      run: vi.fn(),
-    } as unknown as SearchCalendarEventsQuery);
-
-    await expect(
-      tool.searchCalendarEvents(
-        { calendars: CALENDARS, dateRange: { rangeType: 'relative' } } as unknown as Parameters<
-          SearchCalendarEventsTool['searchCalendarEvents']
-        >[0],
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/range/i);
+describe('SearchCalendarEventsInputSchema', () => {
+  it('rejects a subject filter that sets both startsWith and contains', () => {
+    expect(() =>
+      SearchCalendarEventsInputSchema.parse({
+        calendars: CALENDARS,
+        dateRange: { rangeType: 'relative', range: 'today' },
+        subject: { startsWith: 'Weekly', contains: 'Sales' },
+      }),
+    ).toThrow();
   });
 
-  it('rejects an absolute search without a window', async () => {
-    const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
-
-    await expect(
-      tool.searchCalendarEvents(
-        { calendars: CALENDARS, dateRange: { rangeType: 'absolute' } } as unknown as Parameters<
-          SearchCalendarEventsTool['searchCalendarEvents']
-        >[0],
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/startDateTime|endDateTime/i);
-    expect(run).not.toHaveBeenCalled();
+  it('rejects an attendee that is not an SMTP address', () => {
+    expect(() =>
+      SearchCalendarEventsInputSchema.parse({
+        calendars: CALENDARS,
+        dateRange: { rangeType: 'relative', range: 'today' },
+        attendees: ['Alex'],
+      }),
+    ).toThrow(/SMTP/i);
   });
 
-  it('rejects an absolute window without a timezone offset', async () => {
-    const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
+  it('rejects a relative search without range', () => {
+    expect(() =>
+      SearchCalendarEventsInputSchema.parse({
+        calendars: CALENDARS,
+        dateRange: { rangeType: 'relative' },
+      }),
+    ).toThrow(/range/i);
+  });
 
-    await expect(
-      tool.searchCalendarEvents(
-        {
-          calendars: CALENDARS,
-          dateRange: {
-            rangeType: 'absolute',
-            startDateTime: '2026-08-25T00:00:00',
-            endDateTime: '2026-08-26T00:00:00+02:00',
-          },
+  it('rejects an absolute search without a window', () => {
+    expect(() =>
+      SearchCalendarEventsInputSchema.parse({
+        calendars: CALENDARS,
+        dateRange: { rangeType: 'absolute' },
+      }),
+    ).toThrow(/startDateTime|endDateTime/i);
+  });
+
+  it('rejects an absolute window without a timezone offset', () => {
+    expect(() =>
+      SearchCalendarEventsInputSchema.parse({
+        calendars: CALENDARS,
+        dateRange: {
+          rangeType: 'absolute',
+          startDateTime: '2026-08-25T00:00:00',
+          endDateTime: '2026-08-26T00:00:00+02:00',
         },
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/offset/i);
-    expect(run).not.toHaveBeenCalled();
+      }),
+    ).toThrow(/offset/i);
   });
 
-  it('rejects a search without calendars', async () => {
-    const run = vi.fn();
-    const tool = new SearchCalendarEventsTool({ run } as unknown as SearchCalendarEventsQuery);
-
-    await expect(
-      tool.searchCalendarEvents(
-        {
-          dateRange: { rangeType: 'relative', range: 'today' },
-        } as unknown as Parameters<SearchCalendarEventsTool['searchCalendarEvents']>[0],
-        {} as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/calendars/i);
-    expect(run).not.toHaveBeenCalled();
+  it('rejects a search without calendars', () => {
+    expect(() =>
+      SearchCalendarEventsInputSchema.parse({
+        dateRange: { rangeType: 'relative', range: 'today' },
+      }),
+    ).toThrow(/calendars/i);
   });
 });

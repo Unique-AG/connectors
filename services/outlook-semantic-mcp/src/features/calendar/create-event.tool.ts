@@ -134,13 +134,12 @@ export class CreateEventTool {
     context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof CreateEventOutputSchema>> {
-    const parsed = CreateEventInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
-    const transactionId = parsed.transactionId ?? randomUUID().replaceAll('-', '');
+    const transactionId = input.transactionId ?? randomUUID().replaceAll('-', '');
     // Resolve first so the confirmation names the real calendar instead of an opaque id, and so
     // the command receives a concrete ref rather than resolving the default a second time.
     const loaded = await this.getCalendarQuery.run(userProfileId, {
-      calendarRef: parsed.calendarRef,
+      calendarRef: input.calendarRef,
     });
     if (loaded.success !== true || loaded.calendar === undefined) {
       return {
@@ -167,7 +166,7 @@ export class CreateEventTool {
     const confirmation = await confirmWrite({
       context,
       schema: ConfirmSchema,
-      message: elicitMessage(parsed, calendar),
+      message: elicitMessage(input, calendar),
       logger: this.logger,
       operation: 'create_event',
       userProfileId: userProfileId.toString(),
@@ -188,7 +187,7 @@ export class CreateEventTool {
       };
     }
     return this.createEventCommand.run(userProfileId, {
-      ...parsed,
+      ...input,
       calendarRef: { calendarId: calendar.calendarId, mailbox: calendar.mailbox },
       transactionId,
     });

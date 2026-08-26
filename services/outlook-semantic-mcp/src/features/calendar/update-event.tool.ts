@@ -171,10 +171,9 @@ export class UpdateEventTool {
     context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof UpdateEventOutputSchema>> {
-    const parsed = UpdateEventInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
     const loaded = await this.getCalendarEventQuery.run(userProfileId, {
-      eventRef: parsed.eventRef,
+      eventRef: input.eventRef,
     });
     if (loaded.success !== true || loaded.event === undefined) {
       return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
@@ -197,8 +196,8 @@ export class UpdateEventTool {
     if (!calendar.canEdit) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
-        calendarId: parsed.eventRef.calendarId,
+        mailbox: obfuscateEmail(input.eventRef.mailbox),
+        calendarId: input.eventRef.calendarId,
         msg: 'update_event rejected read-only calendar',
       });
       return {
@@ -209,7 +208,7 @@ export class UpdateEventTool {
     const confirmation = await confirmWrite({
       context,
       schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
-      message: elicitMessage(parsed, snapshot, calendar),
+      message: elicitMessage(input, snapshot, calendar),
       logger: this.logger,
       operation: 'update_event',
       userProfileId: userProfileId.toString(),
@@ -220,8 +219,8 @@ export class UpdateEventTool {
     if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
-        calendarId: parsed.eventRef.calendarId,
+        mailbox: obfuscateEmail(input.eventRef.mailbox),
+        calendarId: input.eventRef.calendarId,
         msg: 'update_event elicit cancelled',
       });
       return { success: false, message: 'Event update was cancelled. No attendees were notified.' };
@@ -229,8 +228,8 @@ export class UpdateEventTool {
     const applyTo = parseSeriesScope(confirmation.content);
     this.logger.debug({
       userProfileId: userProfileId.toString(),
-      mailbox: obfuscateEmail(parsed.eventRef.mailbox),
-      calendarId: parsed.eventRef.calendarId,
+      mailbox: obfuscateEmail(input.eventRef.mailbox),
+      calendarId: input.eventRef.calendarId,
       applyTo,
       msg: 'update_event series scope',
     });
@@ -241,22 +240,21 @@ export class UpdateEventTool {
       };
     }
     return this.updateEventCommand.run(userProfileId, {
-      eventRef: parsed.eventRef,
+      eventRef: input.eventRef,
       targetEventId: resolveWriteEventId({
-        eventId: parsed.eventRef.eventId,
+        eventId: input.eventRef.eventId,
         seriesMasterId: snapshot.seriesMasterId,
         applyTo,
       }),
-      subject: parsed.subject,
-      startDateTime: parsed.startDateTime,
-      endDateTime: parsed.endDateTime,
-      attendees: parsed.attendees,
-      location: parsed.location,
-      body: parsed.body,
-      isOnlineMeeting: parsed.isOnlineMeeting,
+      subject: input.subject,
+      startDateTime: input.startDateTime,
+      endDateTime: input.endDateTime,
+      attendees: input.attendees,
+      location: input.location,
+      body: input.body,
+      isOnlineMeeting: input.isOnlineMeeting,
       attendeesWereNotified:
-        snapshot.attendeeCount > 0 ||
-        (parsed.attendees !== undefined && parsed.attendees.length > 0),
+        snapshot.attendeeCount > 0 || (input.attendees !== undefined && input.attendees.length > 0),
     });
   }
 }

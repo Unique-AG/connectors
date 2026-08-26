@@ -5,7 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetCalendarEventQuery } from '../get-calendar-event.query';
 import { RespondToInviteCommand } from '../respond-to-invite.command';
-import { RespondToInviteOutputSchema, RespondToInviteTool } from '../respond-to-invite.tool';
+import {
+  RespondToInviteInputSchema,
+  RespondToInviteOutputSchema,
+  RespondToInviteTool,
+} from '../respond-to-invite.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const EVENT_REF = {
@@ -102,25 +106,6 @@ describe(RespondToInviteTool.name, () => {
     expect(result.message).toMatch(/cancelled/i);
   });
 
-  it('rejects an eventRef mailbox that is not an SMTP address', async () => {
-    const { tool, run, elicit } = createTool();
-
-    await expect(
-      tool.respondToInvite(
-        {
-          eventRef: { ...EVENT_REF, mailbox: 'not/an/email' },
-          response: 'accept',
-        },
-        { elicit } as unknown as Context,
-        {
-          user: { userProfileId: USER_PROFILE_ID.toString() },
-        } as unknown as McpAuthenticatedRequest,
-      ),
-    ).rejects.toThrow(/SMTP/i);
-    expect(elicit).not.toHaveBeenCalled();
-    expect(run).not.toHaveBeenCalled();
-  });
-
   it('does not respond when the confirmation prompt times out', async () => {
     const { tool, run, elicit } = createTool({
       elicit: vi
@@ -153,5 +138,16 @@ describe(RespondToInviteTool.name, () => {
     expect(elicit).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
     expect(result.message).toMatch(/not found/i);
+  });
+});
+
+describe('RespondToInviteInputSchema', () => {
+  it('rejects an eventRef mailbox that is not an SMTP address', () => {
+    expect(() =>
+      RespondToInviteInputSchema.parse({
+        eventRef: { ...EVENT_REF, mailbox: 'not/an/email' },
+        response: 'accept',
+      }),
+    ).toThrow(/SMTP/i);
   });
 });

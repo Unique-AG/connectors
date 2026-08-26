@@ -207,7 +207,7 @@ export class SearchCalendarEventsTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof SearchCalendarEventsOutputSchema>> {
-    const { dateRange, ...filters } = SearchCalendarEventsInputSchema.parse(input);
+    const { dateRange, ...filters } = input;
     return this.searchCalendarEventsQuery.run(extractUserProfileId(request), {
       ...filters,
       ...(dateRange.rangeType === 'relative'

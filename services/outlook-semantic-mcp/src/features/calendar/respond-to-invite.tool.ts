@@ -72,10 +72,9 @@ export class RespondToInviteTool {
     context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof RespondToInviteOutputSchema>> {
-    const parsed = RespondToInviteInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
     const loaded = await this.getCalendarEventQuery.run(userProfileId, {
-      eventRef: parsed.eventRef,
+      eventRef: input.eventRef,
     });
     if (loaded.success !== true || loaded.event === undefined) {
       return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
@@ -83,7 +82,7 @@ export class RespondToInviteTool {
     const confirmation = await confirmWrite({
       context,
       schema: ConfirmSchema,
-      message: elicitMessage(parsed.response, parsed.comment, loaded.event),
+      message: elicitMessage(input.response, input.comment, loaded.event),
       logger: this.logger,
       operation: 'respond_to_invite',
       userProfileId: userProfileId.toString(),
@@ -94,9 +93,9 @@ export class RespondToInviteTool {
     if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
-        calendarId: parsed.eventRef.calendarId,
-        response: parsed.response,
+        mailbox: obfuscateEmail(input.eventRef.mailbox),
+        calendarId: input.eventRef.calendarId,
+        response: input.response,
         msg: 'respond_to_invite elicit cancelled',
       });
       return {
@@ -104,7 +103,7 @@ export class RespondToInviteTool {
         message: 'Invite response was cancelled. The organizer was not notified.',
       };
     }
-    return this.respondToInviteCommand.run(userProfileId, parsed);
+    return this.respondToInviteCommand.run(userProfileId, input);
   }
 }
 

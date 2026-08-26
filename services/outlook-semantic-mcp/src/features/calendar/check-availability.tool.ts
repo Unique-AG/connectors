@@ -166,7 +166,7 @@ export class CheckAvailabilityTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof CheckAvailabilityOutputSchema>> {
-    const { dateRange, ...filters } = CheckAvailabilityInputSchema.parse(input);
+    const { dateRange, ...filters } = input;
     return this.checkAvailabilityQuery.run(extractUserProfileId(request), {
       ...filters,
       ...(dateRange.rangeType === 'relative'

@@ -81,10 +81,9 @@ export class CancelEventTool {
     context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof CancelEventOutputSchema>> {
-    const parsed = CancelEventInputSchema.parse(input);
     const userProfileId = extractUserProfileId(request);
     const loaded = await this.getCalendarEventQuery.run(userProfileId, {
-      eventRef: parsed.eventRef,
+      eventRef: input.eventRef,
     });
     if (loaded.success !== true || loaded.event === undefined) {
       return { success: false, message: loaded.message, consentRequired: loaded.consentRequired };
@@ -109,7 +108,7 @@ export class CancelEventTool {
     const confirmation = await confirmWrite({
       context,
       schema: isSeriesOccurrence(snapshot.type) ? SeriesConfirmSchema : ConfirmSchema,
-      message: elicitMessage(parsed, snapshot, loadedCalendar.calendar),
+      message: elicitMessage(input, snapshot, loadedCalendar.calendar),
       logger: this.logger,
       operation: 'cancel_event',
       userProfileId: userProfileId.toString(),
@@ -120,8 +119,8 @@ export class CancelEventTool {
     if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(parsed.eventRef.mailbox),
-        calendarId: parsed.eventRef.calendarId,
+        mailbox: obfuscateEmail(input.eventRef.mailbox),
+        calendarId: input.eventRef.calendarId,
         msg: 'cancel_event elicit cancelled',
       });
       return { success: false, message: 'Cancellation was declined. The event was left in place.' };
@@ -129,8 +128,8 @@ export class CancelEventTool {
     const applyTo = parseSeriesScope(confirmation.content);
     this.logger.debug({
       userProfileId: userProfileId.toString(),
-      mailbox: obfuscateEmail(parsed.eventRef.mailbox),
-      calendarId: parsed.eventRef.calendarId,
+      mailbox: obfuscateEmail(input.eventRef.mailbox),
+      calendarId: input.eventRef.calendarId,
       applyTo,
       msg: 'cancel_event series scope',
     });
@@ -141,13 +140,13 @@ export class CancelEventTool {
       };
     }
     return this.cancelEventCommand.run(userProfileId, {
-      eventRef: parsed.eventRef,
+      eventRef: input.eventRef,
       targetEventId: resolveWriteEventId({
-        eventId: parsed.eventRef.eventId,
+        eventId: input.eventRef.eventId,
         seriesMasterId: snapshot.seriesMasterId,
         applyTo,
       }),
-      comment: parsed.comment,
+      comment: input.comment,
       attendeesWereNotified: snapshot.attendeeCount > 0,
     });
   }
