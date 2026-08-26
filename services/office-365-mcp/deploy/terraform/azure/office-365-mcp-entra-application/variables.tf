@@ -1,12 +1,9 @@
 variable "tools_preset" {
   description = <<-EOT
     Which tools this deployment runs, as a named surface — the pod's TOOLS_PRESET, spelled the same
-    way (lowercase only). Set this or tools_enabled, never both, never neither: there is deliberately
-    no default, because the tools selected decide which delegated Graph permissions EVERY user of
-    this connector consents to at sign-in, so "every tool" has to be a choice (`teams`).
-    Narrowing a live registration costs nothing. Widening one adds a permission to the authorize
-    request, so every signed-in user meets AADSTS65001 on the new tool until they sign in again —
-    apply HERE BEFORE the overlay when widening, and AFTER it when narrowing (README, "Apply order").
+    way (lowercase only). Set this or tools_enabled, never both, never neither; there is no default.
+    Widening a live registration makes every signed-in user meet AADSTS65001 until they sign in
+    again, so apply HERE BEFORE the overlay when widening, and AFTER it when narrowing.
   EOT
   type        = string
   default     = null
@@ -21,19 +18,11 @@ variable "tools_enabled" {
   description = <<-EOT
     Which tools this deployment runs, named individually, for a surface no preset covers — the pod's
     TOOLS_ENABLED, as a list rather than a comma-separated string. `get_me` is always on and need not
-    be listed; naming it explicitly is accepted, not an error. Order is irrelevant.
-    Set this or tools_preset, never both, never neither.
+    be listed. Order is irrelevant. Set this or tools_preset, never both, never neither.
   EOT
   type        = list(string)
   default     = null
 
-  # Five conditions rather than one XOR: a single condition could carry only one message, and which
-  # of the two mistakes was made is the whole of what the operator needs told. They sit on this
-  # variable so they also fire when the caller set only tools_preset, or neither.
-  #
-  # TRAP: these read registry.generated.tf.json's literal locals only. A validation naming a local
-  # that transitively depends on the variable it validates is a hard `Cycle: var.tools_enabled
-  # (validation), local.asked_for (expand), …` — refused by `terraform validate`, not just plan.
   validation {
     condition     = !(var.tools_preset != null && var.tools_enabled != null)
     error_message = "tools_preset and tools_enabled are alternatives and both are set: remove one. Keep tools_preset for that named surface, or keep tools_enabled to name the tools yourself."
@@ -50,15 +39,11 @@ variable "tools_enabled" {
   }
 
   validation {
-    # A permission not consented at sign-in cannot be obtained later, so a name filtered out in
-    # silence costs a tool and a permission that nobody notices is missing.
     condition     = var.tools_enabled == null || length(setsubtract(toset(coalesce(var.tools_enabled, [])), toset(local.tool_names))) == 0
     error_message = "tools_enabled names ${join(", ", sort(setsubtract(toset(coalesce(var.tools_enabled, [])), toset(local.tool_names))))}, which this connector has no tool for. The tools it has are: ${join(", ", local.tool_names)}."
   }
 
   validation {
-    # A fifth rule bought purely for message quality: the rule above rejects this input too, with a
-    # confusing "no tool for list_chats,read_message".
     condition     = alltrue([for name in coalesce(var.tools_enabled, []) : !strcontains(name, ",")])
     error_message = "tools_enabled is a list of tool names, not the pod's comma-separated TOOLS_ENABLED string. Write [\"list_chats\", \"read_message\"], not [\"list_chats,read_message\"]."
   }
@@ -66,9 +51,8 @@ variable "tools_enabled" {
 
 variable "display_name" {
   description = <<-EOT
-    The display name for the Entra application registration. Required, and it should say which tool
-    surface it carries: two registrations of this service in one tenant are normal (one per surface),
-    and the name is all an administrator reading a consent screen has to go on.
+    The display name for the Entra application registration. Two registrations of this service in
+    one tenant are normal (one per tool surface), so say which surface this one carries.
   EOT
   type        = string
 
@@ -79,7 +63,7 @@ variable "display_name" {
 }
 
 variable "notes" {
-  description = "Notes for the Entra application. Inherited by the service principal unless service_principal_configuration.notes overrides it. The only place an operator can write down which cluster consumes this registration where somebody hunting it in the portal will read it."
+  description = "Notes for the Entra application, inherited by the service principal unless service_principal_configuration.notes overrides it. Where to write down which cluster consumes this registration."
   type        = string
   default     = null
 }
@@ -87,10 +71,8 @@ variable "notes" {
 variable "sign_in_audience" {
   description = <<-EOT
     The Microsoft identity platform audiences supported by this application.
-    Defaults to 'AzureADMyOrg': this service validates every token against one issuer derived from a
-    single tenant id, so a multi-org default would only widen who may consent, for no capability gained.
-    'AzureADMultipleOrgs' remains available for the customer-tenant flow, where the customer's own
-    administrator consents through admin_consent_url rather than through this module's own grant.
+    'AzureADMultipleOrgs' is for the customer-tenant flow, where the customer's own administrator
+    consents through admin_consent_url rather than through this module's own grant.
   EOT
   type        = string
   default     = "AzureADMyOrg"
@@ -104,10 +86,8 @@ variable "sign_in_audience" {
 variable "api_scope_id" {
   description = <<-EOT
     The UUID of the exposed `access_as_user` API scope. Leave null and the module derives it
-    deterministically with `uuidv5`, so a rebuilt state cannot mint a new one.
-    Set it ONLY to adopt an app registration that already exists: changing this UUID invalidates
-    every token already issued against the scope, so an imported registration must pin its existing
-    UUID here.
+    deterministically. Set it ONLY to adopt an app registration that already exists, pinning that
+    registration's existing UUID: changing it invalidates every token already issued.
   EOT
   type        = string
   default     = null
@@ -121,23 +101,20 @@ variable "api_scope_id" {
 variable "secret_name_prefix" {
   description = <<-EOT
     Prefix of the composed Key Vault secret name, `<prefix>-<confidential_clients key>-client-secret`.
-    Required, with no default. Two registrations of this service in one tenant are normal (one per
-    tool surface), and two `azurerm_key_vault_secret` resources with the same name in the same vault
-    do not conflict at plan time: each apply flips the stored value, and the two deployments then
-    alternately break each other's sign-ins with a clean plan every time.
-    Put the axis that distinguishes this registration into the suffix (e.g. "office-365-mcp-preview").
+    Two registrations of this service in one tenant are normal, and two secrets with the same name in
+    the same vault do not conflict at plan time — each apply flips the stored value. Put the axis
+    that distinguishes this registration into the suffix (e.g. "office-365-mcp-preview").
   EOT
   type        = string
 
   validation {
-    # Pinned to this service's own name, not merely undefaulted: teams-mcp writes into this same
-    # shared vault, so `secret_name_prefix = "teams-mcp"` would plan clean and overwrite its live secret.
+    # Pinned to this service's own name because teams-mcp writes into this same shared vault, so
+    # `secret_name_prefix = "teams-mcp"` would plan clean and overwrite its live secret.
     condition     = can(regex("^office-365-mcp(-[a-z0-9]([a-z0-9-]*[a-z0-9])?)?$", var.secret_name_prefix))
     error_message = "secret_name_prefix must be \"office-365-mcp\" or \"office-365-mcp-<suffix>\", lowercase alphanumerics and hyphens. It is pinned to this service's name so a prefix cannot name another service's secrets in a shared Key Vault."
   }
 
   validation {
-    # Fails at plan rather than deep inside azurerm at apply. 127 is Key Vault's limit.
     condition = alltrue([
       for key in keys(var.confidential_clients) :
       length("${var.secret_name_prefix}-${key}-client-secret") <= 127
@@ -148,18 +125,13 @@ variable "secret_name_prefix" {
 
 variable "confidential_clients" {
   description = <<-EOT
-    One entry per environment that signs in through this registration. Required and non-empty: the
-    On-Behalf-Of exchange cannot be done without a client secret, so a registration with no
-    confidential client is not a deployable state of this service.
-    One key means one environment: one secret, one redirect URI derived from its own
-    `public_base_url`, and one set of overlay values.
-    The client secret is stored in the Key Vault named by client_secret.key_vault_id. Per our
-    [Design Principles](https://github.com/Unique-AG/terraform-modules/blob/main/DESIGN.md) the
-    caller owns the permissions on that vault; this module outputs the secret ids for the caller to
-    grant granular read on. Tie one secret to exactly one workload identity.
-    Rotating `rotation_counter` signs every user in again: the client secret is also the key material
-    for this service's OAuth state rows in Postgres. Zero-downtime rotation is not supported.
-    `end_date` is mandatory on purpose, to keep expiry somebody's problem before it is everybody's.
+    One entry per environment that signs in through this registration, and at least one: the
+    On-Behalf-Of exchange cannot be done without a client secret. One key means one secret, one
+    redirect URI derived from its own `public_base_url`, and one set of overlay values.
+    The secret is stored in the Key Vault named by client_secret.key_vault_id; the caller owns the
+    permissions on that vault and this module outputs the secret ids to grant read on.
+    Rotating `rotation_counter` signs every user in again, because the client secret is also the key
+    material for this service's OAuth state rows. Zero-downtime rotation is not supported.
   EOT
   type = map(object({
     public_base_url = string
@@ -184,7 +156,6 @@ variable "confidential_clients" {
   }
 
   validation {
-    # https because `config.py` refuses a non-https PUBLIC_BASE_URL in production.
     condition = alltrue([
       for k, v in var.confidential_clients :
       can(regex("^https://[^/?#]+/?$", v.public_base_url))
@@ -193,8 +164,6 @@ variable "confidential_clients" {
   }
 
   validation {
-    # Compared with the trailing slash trimmed: `https://h` and `https://h/` are one environment
-    # written two ways and compose the identical redirect URI.
     condition = length(distinct([
       for v in var.confidential_clients : trimsuffix(v.public_base_url, "/")
     ])) == length(var.confidential_clients)
@@ -202,8 +171,6 @@ variable "confidential_clients" {
   }
 
   validation {
-    # A vault name or a vaultUrl here otherwise dies deep inside azurerm with an eight-segment
-    # resource-ID parse dump that names nothing about this module.
     condition = alltrue([
       for k, v in var.confidential_clients :
       can(regex("^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.KeyVault/vaults/[^/]+$", v.client_secret.key_vault_id))
@@ -213,13 +180,13 @@ variable "confidential_clients" {
 }
 
 variable "extra_redirect_uris" {
-  description = "Escape hatch for a redirect URI no confidential_clients entry implies — a local developer loopback, a one-off. Not the normal path: every deployment's callback is derived from its own public_base_url."
+  description = "Escape hatch for a redirect URI no confidential_clients entry implies — a local developer loopback, a one-off. Every deployment's own callback is derived from its public_base_url."
   type        = list(string)
   default     = []
 }
 
 variable "admin_consent_redirect_uri" {
-  description = "Branded landing page, registered as an additional redirect URI and used as the redirect_uri of admin_consent_url. It exists so a completed admin consent lands somewhere that reads like success: every other Web URI this module registers is an OAuth callback, which would render a successful consent as an error page."
+  description = "Branded landing page, registered as an additional redirect URI and used as the redirect_uri of admin_consent_url, so a completed admin consent lands somewhere that reads like success rather than on an OAuth callback."
   type        = string
   default     = "https://www.unique.ai/setup/consent-completed/entra-id"
 }
@@ -228,9 +195,7 @@ variable "service_principal_configuration" {
   description = <<-EOT
     `{}` (the default) creates the service principal and grants the resolved delegated permissions
     tenant-wide, on behalf of all users. Set it to null to skip both — for a customer tenant that
-    manages its own consent, which then has to be granted through admin_consent_url or the portal
-    before anyone signs in. Skipping it is a supported state, not a mistake: the module warns rather
-    than refuses, and names the permissions that need an administrator.
+    manages its own consent through admin_consent_url or the portal before anyone signs in.
   EOT
   type = object({
     notes = optional(string)

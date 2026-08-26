@@ -36,19 +36,13 @@ TARGET = (
 
 
 def document() -> dict[str, object]:
-    """The whole file, as the objects `json.dump` writes it from.
-
-    Native Terraform JSON rather than HCL, so this generator is the tables' only writer and the
-    `.generated.` in the filename is the only warning a reader gets — JSON carries no comment.
-    """
+    """The whole file, as the objects `json.dump` writes it from."""
     return {
-        # A list of blocks, which is what the JSON configuration syntax makes of a repeatable
-        # block; the module declares no other `locals`, so it is a list of exactly one.
         "locals": [
             {
-                # A list rather than a map, in `_TOOL_MODULES` order: a `for` over a map iterates
-                # in lexical key order, which would derive a permission order the pod never
-                # computes, and `tool_surface.permissions` is diffed against GET /manifest.
+                # A list in `_TOOL_MODULES` order, not a map: a `for` over a map iterates in lexical
+                # key order, deriving a permission order the pod never computes, and
+                # `tool_surface.permissions` is diffed against GET /manifest.
                 "tool_registry": [
                     {
                         "name": module.TOOL_NAME,
@@ -56,8 +50,6 @@ def document() -> dict[str, object]:
                     }
                     for module in _TOOL_MODULES
                 ],
-                # A plain list, not a `for` over `local.tool_registry`: a generated file has no
-                # reason to carry an expression.
                 "tool_names": [module.TOOL_NAME for module in _TOOL_MODULES],
                 "always_on": ALWAYS_ON,
                 "presets": {name: list(tools) for name, tools in PRESETS.items()},
@@ -76,11 +68,10 @@ def render() -> str:
 
 
 def _requestable_permissions() -> list[str]:
-    """`REQUESTABLE_PERMISSIONS` is a frozenset, so the order is this function's to decide.
+    """First appearance over the registry, then any undeclared ceiling entry sorted onto the end.
 
-    First appearance over the registry, which is the order every other permission list in the
-    module is in. A ceiling entry no tool declares yet — which `seam.py` permits — is sorted onto
-    the end, so the file stays byte-stable across runs whatever the set's iteration order is.
+    `REQUESTABLE_PERMISSIONS` is a frozenset, so this ordering is what keeps the generated file
+    byte-stable across runs.
     """
     declared = dict.fromkeys(
         permission for module in _TOOL_MODULES for permission in module.GRAPH_PERMISSIONS
@@ -90,9 +81,7 @@ def _requestable_permissions() -> list[str]:
 
 
 def _api_scope_name() -> str:
-    """The one scope `AzureProvider` is handed. A registration exposing any other name leaves every
-    request failing FastMCP's own scope check with nothing in the module wrong.
-    """
+    """The one scope `AzureProvider` is handed."""
     assert len(_REQUIRED_SCOPES) == 1, (
         "the module exposes exactly one `oauth2_permission_scope`, so auth.py declaring "
         + f"{len(_REQUIRED_SCOPES)} required scopes has outgrown this generator: {_REQUIRED_SCOPES}"

@@ -1,20 +1,9 @@
-# Credential-free, and the gate `terraform validate` cannot be: validate skips validations on
-# defaulted variables, so it passes a configuration with no tool selection at all.
-#
-# `tests/test_terraform_surface.py` checks the permission strings below against `tools.resolve()`,
-# so they are a transcription here and a derivation there.
-#
-# Mock recipe, every line of which was found by a failing run rather than guessed:
-#   - `override_data` on the published-app-ids data source, because a mocked map is EMPTY and
-#     `result["MicrosoftGraph"]` then fails with `Invalid index`;
-#   - `override_resource` on the Graph service principal, for `oauth2_permission_scope_ids`;
-#   - `override_resource` on `azuread_application`, whose `id` must be the `/applications/<uuid>`
-#     form or `azuread_application_identifier_uri` cannot parse it, and whose `client_id` the
-#     provider UUID-validates;
-#   - `override_resource` on this app's own service principal, for a UUID `object_id`.
-#
-# TRAP: assert with `join(",", ...)`. `local.permissions` is a `list(string)` and an HCL literal
-# `["a", "b"]` is a tuple, so `==` between them never holds.
+# `terraform validate` skips validations on defaulted variables, so it passes a configuration with
+# no tool selection at all; these credential-free runs are the only gate on that.
+
+# The mocks compensate for provider behaviour: a mocked map is EMPTY, so `result["MicrosoftGraph"]`
+# fails with `Invalid index`, and `azuread_application.id` must be the `/applications/<uuid>` form
+# or `azuread_application_identifier_uri` cannot parse it.
 mock_provider "azuread" {
   override_data {
     target = data.azuread_application_published_app_ids.well_known
@@ -111,14 +100,11 @@ run "preset_teams_chat_costs_no_administrator" {
     error_message = "teams-chat should need no administrator, needs ${join(",", local.admin_consent)}"
   }
 
-  # In full rather than via the prefix constant: a corrupted interpolation (a stray slash, a dropped
-  # prefix) passed both gates while making every scope in admin_consent_url malformed.
   assert {
     condition     = join(" ", local.graph_scopes) == "https://graph.microsoft.com/User.Read https://graph.microsoft.com/Chat.Read"
     error_message = "the authorize request's spelling is ${join(" ", local.graph_scopes)}"
   }
 
-  # `%20` and not the `+` that `urlencode` writes for the separators.
   assert {
     condition     = can(regex("scope=[^&]*%20", output.admin_consent_url)) && !can(regex("scope=[^&]*\\+", output.admin_consent_url))
     error_message = "the scope separators in admin_consent_url are ${output.admin_consent_url}"
@@ -523,8 +509,6 @@ run "a_single_tenant_registration_emits_a_tenant_id" {
   }
 }
 
-# The provider's client config names Unique's tenant, which is the wrong answer for a customer
-# tenant, so the overlay must fail on a missing required key instead of on a wrong issuer.
 run "a_multi_tenant_registration_emits_no_tenant_id" {
   variables {
     tools_preset     = "teams-chat"

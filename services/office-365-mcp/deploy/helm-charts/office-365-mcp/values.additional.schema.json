@@ -6,7 +6,7 @@
   "properties": {
     "env": {
       "type": "object",
-      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit. office-365-mcp additionally requires a tool surface here: exactly one of TOOLS_PRESET and TOOLS_ENABLED. This mirrors the base chart's own env contract because the chart schema is a shallow merge over it; keep it in step when the base chart changes. Naming the two selection keys here also takes them out of additionalProperties, so unlike every other key they must be plain strings — the base chart's {value, if} object form is refused for them, loudly, at validation.",
+      "description": "Environment variables rendered into a ConfigMap and mounted into the container. Each value is a plain string (tpl-evaluated), a number/boolean (converted to string as-is), or an object with 'value' (tpl expression to emit) and optional 'if' (tpl expression; key is omitted when result is '' or 'false'). Prefer quoting numeric values in YAML to keep types explicit. office-365-mcp additionally requires a tool surface here: exactly one of TOOLS_PRESET and TOOLS_ENABLED. PUBLIC_BASE_URL, ENTRA_TENANT_ID and ENTRA_CLIENT_ID are required too, whatever APP_ENV says. Those three are listed under 'required' and deliberately not under 'properties': naming a key in properties takes it out of additionalProperties, which is what forces TOOLS_PRESET and TOOLS_ENABLED to be plain strings and refuses the base chart's {value, if} object form for them. 'required' checks presence only, so both forms stay legal. This mirrors the base chart's own env contract because the chart schema is a shallow merge over it; keep it in step when the base chart changes.",
       "properties": {
         "TOOLS_PRESET": {
           "type": "string",
@@ -27,6 +27,7 @@
           "description": "Which tools this deployment runs, as a comma-separated list of tool names, for a surface no preset covers. get_me is always on and need not be listed, so no deployment asks for less than User.Read. Set this or TOOLS_PRESET, never both. Must name at least one tool: an empty value is a selection that says nothing, which the server refuses to start on, and catching it here is the difference between a failed helm install and a crash-looping pod. GET /manifest and the startup log print the resolved tools, the exact delegated permissions and which of them need admin consent — that list is what an Entra administrator has to grant."
         }
       },
+      "required": ["PUBLIC_BASE_URL", "ENTRA_TENANT_ID", "ENTRA_CLIENT_ID"],
       "oneOf": [
         {
           "required": ["TOOLS_PRESET"]

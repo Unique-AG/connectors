@@ -4,12 +4,12 @@ output "client_id" {
 }
 
 output "api_scope" {
-  description = "The scope an MCP client requests: `api://<client_id>/access_as_user`. A client asking for anything else is refused by the server (`auth.py:_REQUIRED_SCOPES`)."
+  description = "The scope an MCP client requests: `api://<client_id>/access_as_user`. A client asking for anything else is refused by the server."
   value       = local.api_scope
 }
 
 output "client_secrets" {
-  description = "Map of client secrets and their corresponding Key Vault secrets. Shape matches the sibling MCP modules, so a caller's Key Vault role assignment and service-account wiring copy across unchanged."
+  description = "Map of client secrets and their corresponding Key Vault secrets, keyed by confidential_clients key. Shape matches the sibling MCP modules."
   value = {
     for k, v in var.confidential_clients : k => {
       client_secret_end_date                   = azuread_application_password.client_secret[k].end_date
@@ -27,11 +27,8 @@ output "service_principal_object_id" {
 
 output "admin_consent_url" {
   description = <<-EOT
-    URL for a tenant administrator to consent to exactly the permissions this deployment asks for.
-    Scope-matched rather than `/.default`, which consents to whatever the registration happens to
-    carry when it is clicked.
-    Scope separators are `%20`, not the `+` that `urlencode` writes — both are RFC-correct, `%20` is
-    unambiguous to anything that percent-decodes without form-decoding first.
+    URL for a tenant administrator to consent to exactly the permissions this deployment asks for,
+    scope-matched rather than `/.default`.
   EOT
   value       = "https://login.microsoftonline.com/${var.sign_in_audience == "AzureADMyOrg" ? data.azuread_client_config.current.tenant_id : "organizations"}/v2.0/adminconsent?client_id=${azuread_application.office_365_mcp.client_id}&scope=${replace(urlencode(join(" ", local.graph_scopes)), "+", "%20")}${var.admin_consent_redirect_uri != null ? "&redirect_uri=${urlencode(var.admin_consent_redirect_uri)}" : ""}"
 }
@@ -39,9 +36,9 @@ output "admin_consent_url" {
 output "tool_surface" {
   description = <<-EOT
     What the selection resolved to: the tools registered, the delegated Graph permissions every user
-    of this registration consents to, and the subset an Entra administrator must grant.
-    `tools` and `permissions` are in the tool registry's order, so `permissions` diffs line for line
-    against GET /manifest on the running pod (README, "After the first apply").
+    of this registration consents to, and the subset an Entra administrator must grant. `tools` and
+    `permissions` are in the tool registry's order, so `permissions` diffs line for line against
+    GET /manifest on the running pod.
   EOT
   value = {
     preset        = var.tools_preset
@@ -55,14 +52,11 @@ output "tool_surface" {
 output "deployment_env" {
   description = <<-EOT
     Per confidential-client key, the pod's whole non-secret configuration in the chart's own key
-    names. Copy these into the Argo overlay rather than assembling them by hand, so the registered
-    redirect URI and the pod's base URL cannot drift.
+    names. Copy these into the Argo overlay rather than assembling them by hand.
     TOOLS_ENABLED carries the resolved expansion and there is deliberately no TOOLS_PRESET key: an
     overlay pinned to a preset name widens itself on a chart bump, past a registration nobody
-    re-applied (README, "Apply order").
-    ENTRA_TENANT_ID is null under `AzureADMultipleOrgs` on purpose: the provider's client config
-    names Unique's tenant, but the customer-tenant flow needs the consenting tenant's id, which this
-    module cannot know. A missing required key in the overlay is a better failure than a wrong issuer.
+    re-applied. ENTRA_TENANT_ID is null under `AzureADMultipleOrgs`, because the consenting tenant's
+    id is not something this module can know.
   EOT
   value = {
     for key, client in var.confidential_clients : key => {
