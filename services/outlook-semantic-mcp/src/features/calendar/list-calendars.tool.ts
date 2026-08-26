@@ -33,7 +33,7 @@ const CalendarSchema = z.object({
   isOwn: z
     .boolean()
     .describe(
-      'True when this calendar belongs to the signed-in user, false when it is shared or delegated.',
+      'True when this calendar belongs to the signed-in user, false when it is shared with them.',
     ),
   isDefaultCalendar: z
     .boolean()
@@ -58,12 +58,8 @@ export const ListCalendarsOutputSchema = z.object({
   calendars: z
     .array(CalendarSchema)
     .optional()
-    .describe('Calendars the signed-in user can access, including own, shared, and delegated.'),
-  listNotes: z
-    .array(z.string())
-    .optional()
     .describe(
-      'Notes about calendars that could not be listed, such as a Full Access mailbox that returned 403 or 404. Show these after the list.',
+      'Calendars the signed-in user can access, including their own and calendars shared with them.',
     ),
   consentRequired: ConsentRequiredSchema.optional(),
 });
@@ -76,7 +72,7 @@ export class ListCalendarsTool {
     name: 'list_calendars',
     title: 'List Calendars',
     description:
-      "List Outlook calendars the signed-in user can access: their own, calendars shared with them, and calendars of mailboxes they have Full Access to. Returns owner, whether the calendar is the user's own, whether it is the primary (isDefaultCalendar), whether they can edit it, and whether private items are visible. Primary calendars are listed first. The list can include holiday and birthday calendars — skip those by name. Shared calendars have isOwn false and isDefaultCalendar false and still hold meetings. To list meetings in a time window, call this first, then search_calendar_events with every isDefaultCalendar true calendarRef and every isOwn false calendarRef. Each calendar carries a calendarRef — pass it through unchanged to search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. ownerEmail on a calendar with isOwn true is the signed-in user SMTP: pass it in check_availability or suggest_meeting_times attendees when they want to attend. If listNotes is present, show it after the list — a Full Access mailbox that could not be read is omitted from calendars and explained there. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
+      "List Outlook calendars the signed-in user can access: their own, and calendars shared with them. Returns owner, whether the calendar is the user's own, whether it is the primary (isDefaultCalendar), whether they can edit it, and whether private items are visible. Primary calendars are listed first. The list can include holiday and birthday calendars — skip those by name. Shared calendars have isOwn false and isDefaultCalendar false and still hold meetings. To list meetings in a time window, call this first, then search_calendar_events with every isDefaultCalendar true calendarRef and every isOwn false calendarRef. Each calendar carries a calendarRef — pass it through unchanged to search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. ownerEmail on a calendar with isOwn true is the signed-in user SMTP: pass it in check_availability or suggest_meeting_times attendees when they want to attend. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
     parameters: ListCalendarsInputSchema,
     outputSchema: ListCalendarsOutputSchema,
     annotations: {

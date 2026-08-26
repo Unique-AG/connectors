@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { DelegatedAccessUtilsModule } from '~/features/delegated-access/delegated-access-utils.module';
 import { MetricsModule } from '~/features/metrics/metrics.module';
 import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
@@ -30,7 +29,7 @@ const COMMANDS = [
 ];
 
 @Module({
-  imports: [MsGraphModule, UserUtilsModule, DelegatedAccessUtilsModule, MetricsModule],
+  imports: [MsGraphModule, UserUtilsModule, MetricsModule],
   providers: [...QUERIES, ...COMMANDS],
   exports: [...QUERIES, ...COMMANDS],
 })

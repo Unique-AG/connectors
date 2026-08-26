@@ -12,7 +12,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Mail.ReadWrite.Shared` | Delegated | No | Yes (requested unconditionally; only used when `DELEGATED_ACCESS_SCAN` is enabled) | Read emails and create drafts in mailboxes the user has been granted delegated access to via Exchange admin |
 | `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
-| `Calendars.ReadWrite.Shared` | Delegated | Yes | Only when `CALENDAR_INTEGRATION=enabled` | List calendars and read/write events, including shared and delegated calendars |
+| `Calendars.ReadWrite.Shared` | Delegated | Yes | Only when `CALENDAR_INTEGRATION=enabled` | List calendars and read/write events, including calendars shared with the user |
 | `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
 
 **Mail permissions do not require admin consent.** Users can connect their own accounts without IT intervention. `Calendars.ReadWrite.Shared` typically does require admin consent — register it on the Entra app with the Terraform module's `calendar_integration = true` and grant tenant consent **before** setting `CALENDAR_INTEGRATION=enabled`. Admins can optionally pre-grant mail consent organisation-wide.
@@ -76,9 +76,9 @@ Each permission is the minimum required for its function. No narrower alternativ
 
 | Aspect | Detail |
 |--------|--------|
-| **Purpose** | Read and write the signed-in user's calendars, including calendars shared with them and mailboxes they have Exchange Full Access to |
+| **Purpose** | Read and write the signed-in user's calendars, including calendars shared with them |
 | **Used For** | Calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`). Live Graph query-through; no calendar ingest |
-| **Why Not `Calendars.Read`** | Writes (create/update/respond/cancel) need write. `Calendars.ReadWrite` does not cover shared or delegated calendars |
+| **Why Not `Calendars.Read`** | Writes (create/update/respond/cancel) need write. `Calendars.ReadWrite` does not cover calendars shared with the user |
 | **Note** | Requested at OAuth time only when `CALENDAR_INTEGRATION=enabled`. The Entra app registers the scope only when Terraform `calendar_integration = true`. Unlike `Mail.ReadWrite.Shared`, this is not on the mail-only consent screen |
 
 ### `offline_access`

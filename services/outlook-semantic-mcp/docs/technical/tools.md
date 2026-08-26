@@ -672,7 +672,7 @@ Restart the full sync from scratch, discarding all previous progress.
 
 | Tool | Mutating | What it does |
 |------|----------|----------------|
-| `list_calendars` | No | Own, shared, and Full Access calendars. Returns `calendarId` (internal). |
+| `list_calendars` | No | Own and shared calendars. Returns `calendarId` (internal). |
 | `search_calendar_events` | No | Events in a time window. Prefer relative `dateRange`. Returns `eventRef` (internal) and the full plain-text body. |
 | `check_availability` | No | Free/busy for up to 20 SMTP addresses. Window must be shorter than 62 days. |
 | `suggest_meeting_times` | No | Ranked free slots. If `emptySuggestionsReason` is set, explain it; do not invent times. |

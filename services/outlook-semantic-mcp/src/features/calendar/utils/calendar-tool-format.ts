@@ -7,9 +7,8 @@ When listing calendars, use a markdown table with exactly 4 columns: Calendar, O
 - **Owner**: Display as "Name (email)" when both are present, otherwise the email or name alone.
 - **Can edit**: Yes or No from \`canEdit\`.
 - **Private items**: "Visible" when \`canViewPrivateItems\` is true, otherwise "Redacted".
-- A row with \`isOwn: false\` and \`canEdit: true\` is a delegated or shared calendar the user can schedule on.
-- Primary calendars (\`isDefaultCalendar: true\`) are each mailbox's meeting calendar. Shared and delegated calendars (\`isOwn: false\`) also hold meetings even when \`isDefaultCalendar\` is false. Holiday and birthday calendars are not.
-- If \`listNotes\` is present, display those notes after the table.
+- A row with \`isOwn: false\` and \`canEdit: true\` is a shared calendar the user can schedule on.
+- Primary calendars (\`isDefaultCalendar: true\`) are each mailbox's meeting calendar. Shared calendars (\`isOwn: false\`) also hold meetings even when \`isDefaultCalendar\` is false. Holiday and birthday calendars are not.
 
 | Calendar | Owner | Can edit | Private items |
 |----------|-------|----------|---------------|

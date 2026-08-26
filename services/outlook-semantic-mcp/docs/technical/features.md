@@ -212,7 +212,7 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 
 - Relative search windows (`today`, `thisWeek`, `nextWeek`, …) resolve in the mailbox timezone. Weeks start Monday.
 - Writes have no draft state. The user confirms in-chat; invitations and cancellations notify attendees immediately. `cancel_event` is not a silent delete.
-- Delegated and shared calendars are supported. Pass `eventRef` from search unchanged. Internal IDs are never shown.
+- Shared calendars are supported. Pass `eventRef` from search unchanged. Internal IDs are never shown.
 - Existing users must reconnect Outlook after the flag is turned on (unless tenant admin consent already covers `Calendars.ReadWrite.Shared`).
 
 **What's not supported yet**

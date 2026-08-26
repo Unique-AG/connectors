@@ -320,7 +320,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.events).toEqual([]);
   });
 
-  it('sends the category filter to Graph and re-checks it in-process', async () => {
+  it('keeps the category filter out of the Graph request and matches it in-process', async () => {
     const { query, filterCalls } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
@@ -332,7 +332,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID, search({ categories: ['client'] }));
 
-    expect(filterCalls).toEqual(["categories/any(c:c eq 'client')"]);
+    expect(filterCalls).toEqual([]);
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });
 
@@ -351,9 +351,9 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['both']);
   });
 
-  it('sends subject startsWith to Graph and combines it with the category filter', async () => {
+  it('sends subject startsWith to Graph without the in-process category filter', async () => {
     const { query, filterCalls, orderbyCalls } = createQuery({
-      get: vi.fn().mockResolvedValue({ value: [graphEvent({ categories: ['Client'] })] }),
+      get: vi.fn().mockResolvedValue({ value: [graphEvent({ categories: ["O'Brien"] })] }),
     });
 
     const result = await query.run(
@@ -361,14 +361,12 @@ describe(SearchCalendarEventsQuery.name, () => {
       search({ categories: ["O'Brien"], subject: { startsWith: 'Stand' } }),
     );
 
-    expect(filterCalls).toEqual([
-      "categories/any(c:c eq 'O''Brien') and startswith(subject,'Stand')",
-    ]);
+    expect(filterCalls).toEqual(["subject ne null and startswith(subject,'Stand')"]);
     expect(orderbyCalls).toEqual(['start/dateTime']);
     expect(result.success).toBe(true);
   });
 
-  it('keeps subject contains out of the Graph request and matches it case-insensitively', async () => {
+  it('sends subject contains to Graph and re-matches it case-insensitively', async () => {
     const { query, filterCalls } = createQuery({
       get: vi.fn().mockResolvedValue({
         value: [
@@ -380,7 +378,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID, search({ subject: { contains: 'standup' } }));
 
-    expect(filterCalls).toEqual([]);
+    expect(filterCalls).toEqual(["subject ne null and contains(subject,'standup')"]);
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });
 
@@ -405,15 +403,15 @@ describe(SearchCalendarEventsQuery.name, () => {
       .mockRejectedValueOnce(makeGraphError(400, 'ErrorInvalidUrlQueryFilter'))
       .mockResolvedValueOnce({
         value: [
-          graphEvent({ id: 'keep', categories: ['Client'] }),
-          graphEvent({ id: 'drop', categories: ['Work'] }),
+          graphEvent({ id: 'keep', subject: 'Weekly standup' }),
+          graphEvent({ id: 'drop', subject: 'Retro' }),
         ],
       });
     const { query, filterCalls } = createQuery({ get });
 
-    const result = await query.run(USER_PROFILE_ID, search({ categories: ['Client'] }));
+    const result = await query.run(USER_PROFILE_ID, search({ subject: { contains: 'standup' } }));
 
-    expect(filterCalls).toEqual(["categories/any(c:c eq 'Client')"]);
+    expect(filterCalls).toEqual(["subject ne null and contains(subject,'standup')"]);
     expect(result.success).toBe(true);
     expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['keep']);
   });

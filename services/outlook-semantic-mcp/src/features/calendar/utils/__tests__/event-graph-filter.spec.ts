@@ -6,47 +6,34 @@ describe('buildEventGraphFilter', () => {
     expect(buildEventGraphFilter({})).toBeUndefined();
   });
 
-  it('builds a single-category clause', () => {
-    expect(buildEventGraphFilter({ categories: ['Client'] })).toBe(
-      "categories/any(c:c eq 'Client')",
-    );
-  });
-
-  it('pushes down only the first category because calendarView accepts one comparison', () => {
-    // Safe narrowing rather than a partial answer: events carrying both categories are a subset of
-    // those carrying the first, and matchesFilters still requires both.
-    expect(buildEventGraphFilter({ categories: ['Client', 'Urgent'] })).toBe(
-      "categories/any(c:c eq 'Client')",
-    );
-  });
-
   it('builds a startswith clause for a subject prefix', () => {
     expect(buildEventGraphFilter({ subject: { startsWith: 'Weekly' } })).toBe(
-      "startswith(subject,'Weekly')",
+      "subject ne null and startswith(subject,'Weekly')",
     );
   });
 
-  it('leaves a subject substring to in-process matching', () => {
-    expect(buildEventGraphFilter({ subject: { contains: 'Weekly' } })).toBeUndefined();
+  it('builds a contains clause for a subject substring', () => {
+    expect(buildEventGraphFilter({ subject: { contains: 'Weekly' } })).toBe(
+      "subject ne null and contains(subject,'Weekly')",
+    );
   });
 
-  it('ands a category and a subject prefix', () => {
-    expect(
-      buildEventGraphFilter({ categories: ['Client'], subject: { startsWith: 'Weekly' } }),
-    ).toBe("categories/any(c:c eq 'Client') and startswith(subject,'Weekly')");
+  it('guards every subject clause against a null subject', () => {
+    // Graph answers 500, not an empty match, when any event in the window has no subject.
+    expect(buildEventGraphFilter({ subject: { startsWith: 'Weekly' } })).toContain(
+      'subject ne null and ',
+    );
+    expect(buildEventGraphFilter({ subject: { contains: 'Weekly' } })).toContain(
+      'subject ne null and ',
+    );
   });
 
   it('doubles single quotes so a value cannot terminate the literal', () => {
-    expect(buildEventGraphFilter({ categories: ["O'Brien"] })).toBe(
-      "categories/any(c:c eq 'O''Brien')",
-    );
     expect(buildEventGraphFilter({ subject: { startsWith: "') or true or ('" } })).toBe(
-      "startswith(subject,''') or true or (''')",
+      "subject ne null and startswith(subject,''') or true or (''')",
     );
-  });
-
-  it('ignores blank and empty categories', () => {
-    expect(buildEventGraphFilter({ categories: ['   '] })).toBeUndefined();
-    expect(buildEventGraphFilter({ categories: [] })).toBeUndefined();
+    expect(buildEventGraphFilter({ subject: { contains: "') or true or ('" } })).toBe(
+      "subject ne null and contains(subject,''') or true or (''')",
+    );
   });
 });

@@ -540,7 +540,7 @@ The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-
 
 Existing connected users must reconnect Outlook after the flag is turned on, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` does not re-run OAuth — the user has to start a new Outlook connection. If a calendar tool returns `consentRequired`, ask them to reconnect; do not send them to `/auth/authorize`. Enablement order and the two Graph ID namespaces are in [Calendar integration](../technical/calendar-integration.md).
 
-Calendars of mailboxes the user has Exchange Full Access to are listed when delegated-access scanning has discovered those owners. Calendar-only shares come from Graph `GET /users/{caller}/calendars` (equivalent to `/me/calendars` for the signed-in user). Shared-mailbox **profiles** never call calendar tools — those profiles are ingestion-only; a logged-in oauth user queries a shared mailbox calendar via `/users/{owner}/calendars` after Full Access discovery.
+Calendar listing is Graph `GET /users/{caller}/calendars` (equivalent to `/me/calendars` for the signed-in user): the user's own calendars plus calendars shared with them that they accepted. Shared-mailbox **profiles** never call calendar tools — those profiles are ingestion-only.
 
 #### DELEGATED_ACCESS_SCAN
 

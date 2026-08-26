@@ -124,7 +124,7 @@ export class CreateEventTool {
     name: 'create_event',
     title: 'Create Event',
     description:
-      'Create an Outlook calendar event. There is no draft state — if attendees are included, invitations are sent immediately after the user confirms. startDateTime and endDateTime must include a timezone offset. To create on a shared or delegated calendar, call list_calendars and pass that calendar calendarRef through unchanged; omit calendarRef for the signed-in user default calendar. If you retry this create, pass the same transactionId. If consentRequired is true, ask the user to reconnect Outlook.',
+      'Create an Outlook calendar event. There is no draft state — if attendees are included, invitations are sent immediately after the user confirms. startDateTime and endDateTime must include a timezone offset. To create on a shared calendar, call list_calendars and pass that calendar calendarRef through unchanged; omit calendarRef for the signed-in user default calendar. If you retry this create, pass the same transactionId. If consentRequired is true, ask the user to reconnect Outlook.',
     parameters: CreateEventInputSchema,
     outputSchema: CreateEventOutputSchema,
     annotations: {
