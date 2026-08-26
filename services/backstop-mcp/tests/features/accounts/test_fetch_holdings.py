@@ -1,8 +1,9 @@
 """`fetch_holdings`: which path runs, and what the documented one can honestly produce.
 
-The interesting behaviour here is entirely about *when* the fallback fires. An empty table and an
-auth failure must not trigger it — the first because it is a real answer, the second because the
-documented walk would fail identically but slower.
+The interesting behaviour here is entirely about *when* the fallback fires. An empty table and a
+dead credential must not trigger it — the first because it is a real answer, the second because
+the documented walk would fail identically but slower. A 401 that re-verified still authenticates
+is the opposite: this unsupported endpoint refused us, so use the documented one.
 """
 
 from datetime import date
@@ -17,7 +18,7 @@ from backstop_mcp.backstop_client import (
     BackstopRateLimitError,
 )
 from backstop_mcp.features.accounts import FALLBACK_OMITTED_FIELDS, fetch_holdings
-from tests.helpers import BASE_URL
+from tests.helpers import BASE_URL, client_factory, credential
 
 _ORG = "341764767"
 _ACCOUNT = "27871657"
@@ -199,6 +200,36 @@ class TestFallbackTriggers:
             await fetch_holdings(client, owner_id=_ORG)
 
         assert not walk.called
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_reverified_401_on_the_table_falls_back(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Credential still works; the undocumented table refused us — same as a 404."""
+
+        async def instant_sleep(_delay: float) -> None:
+            return None
+
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", instant_sleep)
+
+        async def must_not_revoke() -> None:
+            raise AssertionError("must not revoke when /system-info still authenticates")
+
+        factory = client_factory()
+        client = factory.for_credential(credential(), on_auth_failure=must_not_revoke)
+        try:
+            respx.get(_TABLE_URL).mock(return_value=httpx.Response(401, json={"errors": []}))
+            respx.get(f"{BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+            walk = respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
+            _mock_fallback_series()
+
+            result = await fetch_holdings(client, owner_id=_ORG)
+
+            assert walk.called
+            assert result.source == "accounts-api"
+        finally:
+            await factory.aclose()
 
     @pytest.mark.asyncio
     @respx.mock

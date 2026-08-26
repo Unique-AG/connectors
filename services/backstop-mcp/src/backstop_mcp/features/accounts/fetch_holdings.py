@@ -4,8 +4,9 @@
 can disappear on another tenant, so this module owns the decision of when to stop trusting it and
 what the documented path can honestly produce instead.
 
-**What triggers the fallback.** Any HTTP error, timeout, or unparseable body from table-data.
-Deliberately *not*:
+**What triggers the fallback.** Any HTTP error, timeout, or unparseable body from table-data,
+including a mid-session 401 that re-verified (`BackstopTransientAuthError`): the credential still
+works, this unsupported endpoint did not — same as a 404. Deliberately *not*:
 
 - **An empty table.** `accounts: []` is a successful "owns nothing" and walking 815 accounts to
   confirm it would be pure cost. The catch is that table-data **fails open** — a nonexistent id
@@ -87,15 +88,16 @@ async def fetch_holdings(
     """
     try:
         return await fetch_holdings_table(client, entity_id=owner_id, include_closed=include_closed)
-    except (BackstopAuthError, BackstopTransientAuthError, BackstopRateLimitError):
+    except (BackstopAuthError, BackstopRateLimitError):
         # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
         # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
         # account, so falling back would answer a "slow down" with an order of magnitude more
         # load — and a rate limit is the likeliest transient failure of an unbounded payload.
         raise
     except Exception as exc:
-        # Broad on purpose: HTTP status, transport timeout, schema-validation failure and a
-        # counts-versus-rows contradiction all mean the same thing here — the unsupported
+        # Broad on purpose: HTTP status, transport timeout, schema-validation failure, a
+        # counts-versus-rows contradiction, and a 401 that re-verified
+        # (`BackstopTransientAuthError`) all mean the same thing here — the unsupported
         # endpoint did not answer usably, so use the documented one.
         logger.warning(
             "accounts.holdings.table_unavailable_using_documented_walk",

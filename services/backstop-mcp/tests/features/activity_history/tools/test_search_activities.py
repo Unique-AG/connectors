@@ -19,7 +19,7 @@ from backstop_mcp.features.activity_history.tools.search_activities import (
 )
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit
-from tests.helpers import BASE_URL, recorded_json_bodies
+from tests.helpers import BASE_URL, client_factory, credential, recorded_json_bodies
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _URL = f"{BASE_URL}/entity-activities"
@@ -189,6 +189,44 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 client=client,
             )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_reverified_401_names_the_documented_fallback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Credential still works; the undocumented search refused us — same as a 404."""
+
+        async def instant_sleep(_delay: float) -> None:
+            return None
+
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", instant_sleep)
+
+        async def must_not_revoke() -> None:
+            raise AssertionError("must not revoke when /system-info still authenticates")
+
+        factory = client_factory()
+        client = factory.for_credential(credential(), on_auth_failure=must_not_revoke)
+        try:
+            respx.post(_URL).mock(
+                return_value=httpx.Response(401, json={"errors": [{"title": "no"}]})
+            )
+            respx.get(f"{BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+
+            result = tool_model(
+                await search_activities(
+                    ctx_never_elicit(),
+                    start_date=date(2024, 1, 1),
+                    end_date=date(2026, 8, 20),
+                    client=client,
+                ),
+                SearchActivitiesUnavailableResponse,
+            )
+
+            assert result.fallback_tool == "get_activity_history"
+            assert "get_activity_history" in result.message
+        finally:
+            await factory.aclose()
 
     @pytest.mark.asyncio
     async def test_include_description_on_a_wide_sweep_is_refused(
