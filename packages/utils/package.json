@@ -16,16 +16,16 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "remeda": "2.32.0"
+    "remeda": "2.45.0"
   },
   "devDependencies": {
-    "@swc/core": "1.13.5",
-    "@types/node": "26.3.0",
+    "@swc/core": "1.16.1",
+    "@types/node": "26.4.0",
     "typeid-js": "1.2.0",
-    "typescript": "5.9.2",
-    "unplugin-swc": "1.5.7",
-    "vitest": "3.2.6",
-    "zod": "4.1.5"
+    "typescript": "5.9.3",
+    "unplugin-swc": "1.5.11",
+    "vitest": "3.2.7",
+    "zod": "4.4.3"
   },
   "peerDependencies": {
     "typeid-js": "^1.2.0",

@@ -18,21 +18,21 @@
     "test": "echo \"No tests for this demo server\""
   },
   "dependencies": {
-    "@nestjs/common": "11.1.18",
-    "@nestjs/core": "11.1.18",
-    "@nestjs/platform-express": "11.1.18",
-    "@opentelemetry/api": "1.9.0",
+    "@nestjs/common": "11.2.3",
+    "@nestjs/core": "11.2.3",
+    "@nestjs/platform-express": "11.2.3",
+    "@opentelemetry/api": "1.9.1",
     "@unique-ag/mcp-server-module": "workspace:*",
-    "nestjs-otel": "8.0.2",
+    "nestjs-otel": "8.1.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "zod": "4.1.5"
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@nestjs/cli": "11.0.18",
-    "@types/node": "26.3.0",
-    "typescript": "5.9.2",
-    "unplugin-swc": "1.5.7"
+    "@nestjs/cli": "11.0.24",
+    "@types/node": "26.4.0",
+    "typescript": "5.9.3",
+    "unplugin-swc": "1.5.11"
   },
   "packageManager": "pnpm@10.34.5"
 }
