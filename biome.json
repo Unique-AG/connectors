@@ -16,6 +16,7 @@
       "!**/.pnpm-store",
       "!**/.zed",
       "!**/@generated",
+      "!**/*.generated.tf.json",
       "!**/coverage",
       "!**/drizzle",
       "!**/helm-charts/**/values.schema.json",
