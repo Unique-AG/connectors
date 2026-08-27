@@ -36,10 +36,9 @@ describe(GetCalendarQuery.name, () => {
 
     const result = await query.run(USER_PROFILE_ID, {});
 
-    expect(api).toHaveBeenCalledWith(`/users/${OWN_EMAIL}/calendar`);
+    expect(api).toHaveBeenCalledWith(`/me/calendar`);
     expect(result.calendar).toEqual({
       calendarId: 'cal-own',
-      mailbox: OWN_EMAIL,
       name: 'Calendar',
       isDefaultCalendar: true,
       isOwn: true,
@@ -49,7 +48,7 @@ describe(GetCalendarQuery.name, () => {
     });
   });
 
-  it('reads a shared calendar from the mailbox on the ref, not from its owner', async () => {
+  it('reads a shared calendar under /me, not under its owner', async () => {
     const { query, api } = createQuery({
       get: vi.fn().mockResolvedValue({
         id: 'cal-shared',
@@ -61,14 +60,37 @@ describe(GetCalendarQuery.name, () => {
     });
 
     const result = await query.run(USER_PROFILE_ID, {
-      calendarRef: { calendarId: 'cal-shared', mailbox: OWN_EMAIL },
+      calendarRef: { calendarId: 'cal-shared' },
     });
 
-    expect(api).toHaveBeenCalledWith(`/users/${OWN_EMAIL}/calendars/cal-shared`);
+    expect(api).toHaveBeenCalledWith(`/me/calendars/cal-shared`);
     expect(result.calendar).toMatchObject({
-      mailbox: OWN_EMAIL,
       isOwn: false,
       ownerEmail: 'banker@example.com',
+    });
+  });
+
+  it('treats a Graph null owner as unknown rather than failing', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        id: 'cal-no-owner',
+        name: 'Holidays',
+        isDefaultCalendar: false,
+        canEdit: false,
+        owner: null,
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID, {
+      calendarRef: { calendarId: 'cal-no-owner' },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.calendar).toMatchObject({
+      calendarId: 'cal-no-owner',
+      isOwn: false,
+      ownerEmail: null,
+      ownerName: null,
     });
   });
 
@@ -78,7 +100,7 @@ describe(GetCalendarQuery.name, () => {
     });
 
     const result = await query.run(USER_PROFILE_ID, {
-      calendarRef: { calendarId: 'gone', mailbox: OWN_EMAIL },
+      calendarRef: { calendarId: 'gone' },
     });
 
     expect(result.success).toBe(false);

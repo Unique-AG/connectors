@@ -20,8 +20,8 @@ import { encodeGraphQueryInstant } from '../utils/calendar-graph-path';
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
 const OWNER_EMAIL = 'banker@example.com';
-const OWN_VIEW = `/users/${OWN_EMAIL}/calendars/cal-own/calendarView`;
-const OWNER_VIEW = `/users/${OWNER_EMAIL}/calendars/cal-banker/calendarView`;
+const OWN_VIEW = `/me/calendars/cal-own/calendarView`;
+const OWNER_VIEW = `/me/calendars/cal-banker/calendarView`;
 const WINDOW = {
   startDateTime: '2026-08-25T00:00:00+02:00',
   endDateTime: '2026-08-26T00:00:00+02:00',
@@ -51,7 +51,6 @@ const MISSING_TIMEZONE: ResolvedMailboxTimezone = {
 const OWN_CALENDAR: CalendarRef = {
   calendarId: 'cal-own',
   name: 'Calendar',
-  mailbox: OWN_EMAIL,
   ownerEmail: OWN_EMAIL,
   ownerName: 'Me',
   isOwn: true,
@@ -63,7 +62,6 @@ const OWN_CALENDAR: CalendarRef = {
 const DELEGATED_CALENDAR: CalendarRef = {
   calendarId: 'cal-banker',
   name: 'Banker',
-  mailbox: OWNER_EMAIL,
   ownerEmail: OWNER_EMAIL,
   ownerName: 'Banker',
   isOwn: false,
@@ -75,7 +73,6 @@ const DELEGATED_CALENDAR: CalendarRef = {
 const SHARED_INTO_OWN_MAILBOX: CalendarRef = {
   calendarId: 'cal-shared',
   name: 'Banker',
-  mailbox: OWN_EMAIL,
   ownerEmail: OWNER_EMAIL,
   ownerName: 'Banker',
   isOwn: false,
@@ -83,17 +80,11 @@ const SHARED_INTO_OWN_MAILBOX: CalendarRef = {
   canEdit: false,
   canViewPrivateItems: false,
 };
-const SHARED_VIEW = `/users/${OWN_EMAIL}/calendars/cal-shared/calendarView`;
+const SHARED_VIEW = `/me/calendars/cal-shared/calendarView`;
 
-const OWN_CALENDAR_REF = { calendarId: OWN_CALENDAR.calendarId, mailbox: OWN_CALENDAR.mailbox };
-const DELEGATED_CALENDAR_REF = {
-  calendarId: DELEGATED_CALENDAR.calendarId,
-  mailbox: DELEGATED_CALENDAR.mailbox,
-};
-const SHARED_CALENDAR_REF = {
-  calendarId: SHARED_INTO_OWN_MAILBOX.calendarId,
-  mailbox: SHARED_INTO_OWN_MAILBOX.mailbox,
-};
+const OWN_CALENDAR_REF = { calendarId: OWN_CALENDAR.calendarId };
+const DELEGATED_CALENDAR_REF = { calendarId: DELEGATED_CALENDAR.calendarId };
+const SHARED_CALENDAR_REF = { calendarId: SHARED_INTO_OWN_MAILBOX.calendarId };
 
 function search(
   overrides: Partial<SearchCalendarEventsQueryInput> = {},
@@ -251,10 +242,12 @@ describe(SearchCalendarEventsQuery.name, () => {
         isCancelled: false,
         isPrivate: false,
         calendarName: 'Calendar',
+        ownerEmail: OWN_EMAIL,
+        ownerName: 'Me',
+        isOwn: true,
         eventRef: {
           eventId: 'evt-1',
           calendarId: 'cal-own',
-          mailbox: OWN_EMAIL,
         },
       }),
     ]);
@@ -472,7 +465,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     const get = vi.fn().mockResolvedValue({
       value: firstPage,
       '@odata.nextLink':
-        'https://graph.microsoft.com/v1.0/users/me/calendars/cal-own/calendarView?$skiptoken=1',
+        'https://graph.microsoft.com/v1.0/me/calendars/cal-own/calendarView?$skiptoken=1',
     });
     const { query } = createQuery({ get });
 
@@ -490,7 +483,7 @@ describe(SearchCalendarEventsQuery.name, () => {
     const get = vi.fn().mockResolvedValue({
       value: page,
       '@odata.nextLink':
-        'https://graph.microsoft.com/v1.0/users/me/calendars/cal-own/calendarView?$skiptoken=1',
+        'https://graph.microsoft.com/v1.0/me/calendars/cal-own/calendarView?$skiptoken=1',
     });
     const { query } = createQuery({ get });
 
@@ -658,9 +651,9 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.resolvedWindow?.interpretation).toContain('today = Tue 2026-08-25 00:00');
   });
 
-  it('reads a calendar shared into the caller mailbox from the caller mailbox', async () => {
-    // Regression: classifying this as the owner's calendar sent the caller-namespace id to
-    // /users/{owner}/... , which live Graph answers with 404 ErrorItemNotFound.
+  it('reads a shared calendar under /me, keeping the owner only as display metadata', async () => {
+    // Graph stores a shared calendar as a local copy under the recipient, so its id resolves
+    // under /me. Addressing it by the owner instead answers 404 ErrorItemNotFound.
     const { query, api } = createQuery({
       calendars: [SHARED_INTO_OWN_MAILBOX],
       getByPath: { [SHARED_VIEW]: { value: [graphEvent({ id: 'shared-evt' })] } },
@@ -669,12 +662,19 @@ describe(SearchCalendarEventsQuery.name, () => {
     const result = await query.run(USER_PROFILE_ID, search({ calendars: [SHARED_CALENDAR_REF] }));
 
     expect(api).toHaveBeenCalledWith(SHARED_VIEW);
-    expect(api).not.toHaveBeenCalledWith(`/users/${OWNER_EMAIL}/calendars/cal-shared/calendarView`);
+    expect(api).not.toHaveBeenCalledWith(expect.stringContaining(OWNER_EMAIL));
     expect(result.events?.[0]?.eventRef).toEqual({
       eventId: 'shared-evt',
       calendarId: 'cal-shared',
-      mailbox: OWN_EMAIL,
     });
+    expect(result.events?.[0]).toEqual(
+      expect.objectContaining({
+        isOwn: false,
+        ownerEmail: OWNER_EMAIL,
+        ownerName: 'Banker',
+        calendarName: 'Banker',
+      }),
+    );
   });
 
   it('narrows the fan-out to the requested calendars', async () => {
@@ -698,7 +698,7 @@ describe(SearchCalendarEventsQuery.name, () => {
 
     const result = await query.run(
       USER_PROFILE_ID,
-      search({ calendars: [{ calendarId: 'cal-gone', mailbox: OWNER_EMAIL }] }),
+      search({ calendars: [{ calendarId: 'cal-gone' }] }),
     );
 
     expect(api).not.toHaveBeenCalled();

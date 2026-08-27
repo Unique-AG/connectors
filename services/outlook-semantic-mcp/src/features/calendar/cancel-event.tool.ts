@@ -4,7 +4,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { CancelEventCommand } from './cancel-event.command';
 import { META } from './cancel-event-tool.meta';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
@@ -93,10 +92,7 @@ export class CancelEventTool {
       return { success: false, message: 'That event is already cancelled.' };
     }
     const loadedCalendar = await this.getCalendarQuery.run(userProfileId, {
-      calendarRef: {
-        calendarId: snapshot.calendarId,
-        mailbox: snapshot.mailbox,
-      },
+      calendarRef: { calendarId: snapshot.calendarId },
     });
     if (loadedCalendar.success !== true || loadedCalendar.calendar === undefined) {
       return {
@@ -119,7 +115,6 @@ export class CancelEventTool {
     if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(input.eventRef.mailbox),
         calendarId: input.eventRef.calendarId,
         msg: 'cancel_event elicit cancelled',
       });
@@ -128,7 +123,6 @@ export class CancelEventTool {
     const applyTo = parseSeriesScope(confirmation.content);
     this.logger.debug({
       userProfileId: userProfileId.toString(),
-      mailbox: obfuscateEmail(input.eventRef.mailbox),
       calendarId: input.eventRef.calendarId,
       applyTo,
       msg: 'cancel_event series scope',

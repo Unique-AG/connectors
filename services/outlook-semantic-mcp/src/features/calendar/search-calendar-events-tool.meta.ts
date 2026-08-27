@@ -17,7 +17,9 @@ Evaluated here, after the cap, on the events Graph already returned: attendees a
 
 So when searchNotes reports capped results, say the answer may be incomplete and offer a narrower window rather than asserting the calendar is empty. Prefer the Graph-side filters, and prefer a narrower dateRange over a wide window trimmed in memory.
 
-Before calling, call list_calendars and pass its calendarRef values as calendars. That is the only way to choose which calendars to search; do not pass a mailbox address. For meetings between people, pass every isDefaultCalendar true calendar and every isOwn false calendar (shared). Skip holiday and birthday calendars by name — do not skip every isDefaultCalendar false calendar, because accepted shared calendars are also false. Pass every such calendarRef when the user wants all meeting calendars.
+Before calling, call list_calendars and pass its calendarRef values as calendars. That is the only way to choose which calendars to search. For meetings between people, pass every isDefaultCalendar true calendar and every isOwn false calendar (shared). Skip holiday and birthday calendars by name — do not skip every isDefaultCalendar false calendar, because accepted shared calendars are also false. Pass every such calendarRef when the user wants all meeting calendars.
+
+When the user asks what meetings another person has, or to look in that person's calendar, pass only the calendarRef whose ownerEmail matches them (isOwn false). If none is listed, do not search isOwn true calendars and present those events as theirs — use check_availability for free/busy and say you cannot read their event list. organizerName / organizerEmail is who created the meeting, not whose calendar you searched. attendees finds meetings with that person on calendars you can already read; it is not how you open their calendar.
 
 Then make sure you actually have the values you are filtering on:
 - attendees is an exact whole-address match, not a name search. A partial or misremembered address returns an empty result that looks identical to a free calendar. Resolve the name with lookup_contacts or ask the user.

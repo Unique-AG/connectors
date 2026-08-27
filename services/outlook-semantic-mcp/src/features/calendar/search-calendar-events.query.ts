@@ -9,7 +9,6 @@ import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailb
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { dateWindowFromSearchInput } from '~/utils/date-window-bucket';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   type RelativeRange,
   type ResolvedWindow,
@@ -201,7 +200,7 @@ export class SearchCalendarEventsQuery {
     for (const requested of input.requested) {
       const calendar = accessible.get(calendarKey(requested));
       if (calendar === undefined) {
-        unknown.push(requested.mailbox);
+        unknown.push(requested.calendarId);
         continue;
       }
       matched.push(calendar);
@@ -251,7 +250,6 @@ export class SearchCalendarEventsQuery {
               if (isDelegatedAccessNotAvailableError(error)) {
                 logCalendarRecovered(this.logger, {
                   userProfileId: input.userProfileId,
-                  mailbox: calendar.mailbox,
                   calendarId: calendar.calendarId,
                   ownerEmail: calendar.ownerEmail ?? undefined,
                   outcome: 'delegated_skipped',
@@ -324,7 +322,6 @@ export class SearchCalendarEventsQuery {
   }): Promise<{ events: CalendarEvent[]; notes: string[]; fetched: number; hasMore: boolean }> {
     calendarTraceAttrs({
       userProfileId: input.userProfileId,
-      mailbox: input.calendar.mailbox,
       calendarId: input.calendar.calendarId,
       operation: 'search_calendar_events.fetch',
     });
@@ -340,7 +337,6 @@ export class SearchCalendarEventsQuery {
       // filter expressed, so re-reading the window unfiltered returns the same events.
       logCalendarRecovered(this.logger, {
         userProfileId: input.userProfileId,
-        mailbox: input.calendar.mailbox,
         calendarId: input.calendar.calendarId,
         outcome: 'invalid',
         msg: 'search_calendar_events retried without $filter',
@@ -359,13 +355,9 @@ export class SearchCalendarEventsQuery {
     resolvedWindow: ResolvedWindow;
     graphFilter: string | undefined;
   }): Promise<{ events: CalendarEvent[]; notes: string[]; fetched: number; hasMore: boolean }> {
-    const mailbox = input.calendar.mailbox;
     const events: CalendarEvent[] = [];
     const prefer = `outlook.timezone="${input.timeZone}", outlook.body-content-type="text", IdType="ImmutableId"`;
-    let nextPath: string | undefined = calendarViewPath({
-      calendarId: input.calendar.calendarId,
-      mailboxEmail: mailbox,
-    });
+    let nextPath: string | undefined = calendarViewPath(input.calendar.calendarId);
     let isFirst = true;
     let pages = 0;
     let fetched = 0;
@@ -407,7 +399,6 @@ export class SearchCalendarEventsQuery {
 
     this.logger.debug({
       userProfileId: input.userProfileId,
-      mailbox: obfuscateEmail(mailbox),
       calendarId: input.calendar.calendarId,
       pages,
       fetched,
@@ -464,6 +455,6 @@ function attendeeAddresses(event: CalendarEvent): string[] {
   return event.organizerEmail === null ? addresses : [...addresses, event.organizerEmail];
 }
 
-function calendarKey(calendar: { calendarId: string; mailbox: string }): string {
-  return `${calendar.mailbox.toLowerCase()}\u0000${calendar.calendarId}`;
+function calendarKey(calendar: { calendarId: string }): string {
+  return calendar.calendarId;
 }

@@ -24,7 +24,6 @@ export type CalendarOperation =
 export type CalendarMetricErrorType =
   | 'consent'
   | 'not_found'
-  | 'permission'
   | 'invalid'
   | 'too_many_entries'
   | 'other';

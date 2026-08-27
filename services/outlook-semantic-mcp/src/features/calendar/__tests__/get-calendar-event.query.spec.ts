@@ -11,9 +11,8 @@ const OWN_EMAIL = 'me@example.com';
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  mailbox: OWN_EMAIL,
 };
-const PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events/evt-1`;
+const PATH = `/me/calendars/cal-own/events/evt-1`;
 const PREFER = 'outlook.timezone="W. Europe Standard Time", IdType="ImmutableId"';
 
 function makeGraphError(statusCode: number, code: string): GraphError {
@@ -77,7 +76,6 @@ describe(GetCalendarEventQuery.name, () => {
       type: 'occurrence',
       seriesMasterId: 'master-1',
       attendeeCount: 2,
-      mailbox: OWN_EMAIL,
       organizerName: 'Alex',
       organizerEmail: 'alex@example.com',
     });

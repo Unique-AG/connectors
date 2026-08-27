@@ -164,9 +164,9 @@ export interface CalendarDisplay {
 }
 
 /**
- * Names the calendar the way the user recognises it. Deliberately reports the owner rather than
- * CalendarRef.mailbox: for a calendar shared with the signed-in user the mailbox is their own, so
- * showing it would read as if the event were landing on their personal calendar.
+ * Names the calendar the way the user recognises it, by owner rather than by which account it is
+ * stored under: a calendar shared with the signed-in user is stored under their own account, so
+ * saying so would read as if the event were landing on their personal calendar.
  */
 export function describeCalendar(calendar: CalendarDisplay): string {
   const name = oneLine(calendar.name) === '' ? 'Calendar' : oneLine(calendar.name);

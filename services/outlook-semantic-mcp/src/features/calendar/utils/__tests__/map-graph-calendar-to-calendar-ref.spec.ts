@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GraphCalendar } from '../../calendar.schemas';
 import { mapGraphCalendarToCalendarRef } from '../map-graph-calendar-to-calendar-ref';
 
-const CALLER = 'me@example.com';
+const USER_PROFILE = 'me@example.com';
 const OWNER = 'banker@example.com';
 
 function calendar(overrides: Partial<GraphCalendar> & { id: string }): GraphCalendar {
@@ -15,7 +15,7 @@ function calendar(overrides: Partial<GraphCalendar> & { id: string }): GraphCale
 }
 
 describe(mapGraphCalendarToCalendarRef.name, () => {
-  it('takes the mailbox from the list it was fetched from, not from the owner', () => {
+  it('marks the calendar own when the owner is the signed-in user', () => {
     const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-own',
@@ -23,22 +23,19 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
         isTallyingResponses: true,
         owner: { address: 'ME@example.com', name: 'Me' },
       }),
-      callerEmail: CALLER,
-      mailboxEmail: CALLER,
+      userProfileEmail: USER_PROFILE,
     });
 
     expect(result).toMatchObject({
       calendarId: 'cal-own',
-      mailbox: CALLER,
       isOwn: true,
       isDefaultCalendar: true,
       ownerEmail: 'ME@example.com',
     });
   });
 
-  it("keeps a shared calendar in the caller mailbox even when it looks like the owner's primary", () => {
-    // Live Graph rejects the caller-namespace id under the owner mailbox with 404
-    // ErrorItemNotFound, so isTallyingResponses must not move the calendar to the owner.
+  it("marks a shared calendar not own even when it looks like the owner's primary", () => {
+    // isTallyingResponses is true on a shared primary, but the calendar is still not the caller's.
     const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-shared-primary',
@@ -48,19 +45,17 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
         canShare: false,
         owner: { address: OWNER, name: 'Banker' },
       }),
-      callerEmail: CALLER,
-      mailboxEmail: CALLER,
+      userProfileEmail: USER_PROFILE,
     });
 
     expect(result).toMatchObject({
-      mailbox: CALLER,
       isOwn: false,
       isDefaultCalendar: false,
       ownerEmail: OWNER,
     });
   });
 
-  it('keeps a shared custom calendar in the caller mailbox', () => {
+  it('marks a shared custom calendar not own', () => {
     const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({
         id: 'cal-custom',
@@ -69,45 +64,35 @@ describe(mapGraphCalendarToCalendarRef.name, () => {
         isTallyingResponses: false,
         owner: { address: OWNER, name: 'Banker' },
       }),
-      callerEmail: CALLER,
-      mailboxEmail: CALLER,
+      userProfileEmail: USER_PROFILE,
     });
 
-    expect(result).toMatchObject({ mailbox: CALLER, isOwn: false, ownerEmail: OWNER });
-  });
-
-  it('uses the owner mailbox when the calendar was listed from the owner mailbox', () => {
-    const result = mapGraphCalendarToCalendarRef({
-      calendar: calendar({
-        id: 'cal-owner',
-        name: 'Calendar',
-        isDefaultCalendar: true,
-        owner: { address: OWNER, name: 'Banker' },
-      }),
-      callerEmail: CALLER,
-      mailboxEmail: OWNER,
-    });
-
-    expect(result).toMatchObject({
-      mailbox: OWNER,
-      isOwn: false,
-      isDefaultCalendar: true,
-      ownerEmail: OWNER,
-    });
+    expect(result).toMatchObject({ isOwn: false, ownerEmail: OWNER });
   });
 
   it('is not own when Graph omits the owner', () => {
     const result = mapGraphCalendarToCalendarRef({
       calendar: calendar({ id: 'cal-unknown', isDefaultCalendar: true }),
-      callerEmail: CALLER,
-      mailboxEmail: CALLER,
+      userProfileEmail: USER_PROFILE,
     });
 
     expect(result).toMatchObject({
-      mailbox: CALLER,
       isOwn: false,
       isDefaultCalendar: true,
       ownerEmail: null,
+    });
+  });
+
+  it('is not own when Graph returns a null owner', () => {
+    const result = mapGraphCalendarToCalendarRef({
+      calendar: calendar({ id: 'cal-null-owner', owner: null, isDefaultCalendar: false }),
+      userProfileEmail: USER_PROFILE,
+    });
+
+    expect(result).toMatchObject({
+      isOwn: false,
+      ownerEmail: null,
+      ownerName: null,
     });
   });
 });

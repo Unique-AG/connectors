@@ -16,7 +16,6 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  mailbox: 'me@example.com',
 };
 const SNAPSHOT = {
   success: true,
@@ -24,7 +23,6 @@ const SNAPSHOT = {
   event: {
     eventId: 'evt-1',
     calendarId: 'cal-own',
-    mailbox: 'me@example.com',
     type: 'occurrence' as const,
     seriesMasterId: 'master-1',
     subject: 'Sync',
@@ -42,7 +40,6 @@ const OWN_PRIMARY = {
   message: 'Loaded the calendar.',
   calendar: {
     calendarId: 'cal-own',
-    mailbox: 'me@example.com',
     name: 'Calendar',
     isDefaultCalendar: true,
     isOwn: true,

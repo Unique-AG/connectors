@@ -4,7 +4,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { type CalendarEventSnapshot, GetCalendarEventQuery } from './get-calendar-event.query';
 import { RespondToInviteCommand } from './respond-to-invite.command';
 import { META } from './respond-to-invite-tool.meta';
@@ -93,7 +92,6 @@ export class RespondToInviteTool {
     if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(input.eventRef.mailbox),
         calendarId: input.eventRef.calendarId,
         response: input.response,
         msg: 'respond_to_invite elicit cancelled',

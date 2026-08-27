@@ -72,7 +72,7 @@ export class ListCalendarsTool {
     name: 'list_calendars',
     title: 'List Calendars',
     description:
-      "List Outlook calendars the signed-in user can access: their own, and calendars shared with them. Returns owner, whether the calendar is the user's own, whether it is the primary (isDefaultCalendar), whether they can edit it, and whether private items are visible. Primary calendars are listed first. The list can include holiday and birthday calendars — skip those by name. Shared calendars have isOwn false and isDefaultCalendar false and still hold meetings. To list meetings in a time window, call this first, then search_calendar_events with every isDefaultCalendar true calendarRef and every isOwn false calendarRef. Each calendar carries a calendarRef — pass it through unchanged to search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. ownerEmail on a calendar with isOwn true is the signed-in user SMTP: pass it in check_availability or suggest_meeting_times attendees when they want to attend. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
+      "List Outlook calendars the signed-in user can access: their own, and calendars shared with them. Returns owner, whether the calendar is the user's own, whether it is the primary (isDefaultCalendar), whether they can edit it, and whether private items are visible. Primary calendars are listed first. The list can include holiday and birthday calendars — skip those by name. Shared calendars have isOwn false and isDefaultCalendar false and still hold meetings. To list meetings in a time window, call this first, then search_calendar_events with every isDefaultCalendar true calendarRef and every isOwn false calendarRef. When the user asks what meetings another person has, or to look in that person's calendar, pick the calendar whose ownerEmail matches them (isOwn false). If none is listed, do not search isOwn true calendars as a substitute — use check_availability for free/busy and say so. Each calendar carries a calendarRef — pass it through unchanged to search_calendar_events or to pick the calendar for create_event, and never display it or take it apart. ownerEmail on a calendar with isOwn true is the signed-in user SMTP: pass it in check_availability or suggest_meeting_times attendees when they want to attend. If consentRequired is true, ask the user to reconnect Outlook before using calendar tools.",
     parameters: ListCalendarsInputSchema,
     outputSchema: ListCalendarsOutputSchema,
     annotations: {
@@ -94,7 +94,7 @@ export class ListCalendarsTool {
     return {
       ...result,
       calendars: result.calendars?.map((calendar) => ({
-        calendarRef: { calendarId: calendar.calendarId, mailbox: calendar.mailbox },
+        calendarRef: { calendarId: calendar.calendarId },
         name: calendar.name,
         ownerEmail: calendar.ownerEmail,
         ownerName: calendar.ownerName,

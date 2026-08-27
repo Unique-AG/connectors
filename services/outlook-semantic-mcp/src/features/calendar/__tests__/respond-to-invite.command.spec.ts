@@ -12,10 +12,9 @@ const OWN_EMAIL = 'me@example.com';
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  mailbox: OWN_EMAIL,
 };
-const PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events/evt-1/accept`;
-const DELEGATED_PATH = '/users/banker@example.com/calendars/cal-banker/events/evt-2/decline';
+const PATH = `/me/calendars/cal-own/events/evt-1/accept`;
+const SHARED_PATH = '/me/calendars/cal-banker/events/evt-2/decline';
 
 function makeGraphError(statusCode: number, code: string, message = 'Access denied'): GraphError {
   const err = new GraphError(statusCode, message);
@@ -91,24 +90,18 @@ describe(RespondToInviteCommand.name, () => {
     expect(result.message).toMatch(/re-authorization/i);
   });
 
-  it('does not ask for consent when a delegated mailbox is denied', async () => {
+  it('posts the decline action for a shared calendar under the caller', async () => {
     const { command, api } = createCommand({
-      post: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
+      post: vi.fn().mockResolvedValue(undefined),
     });
 
     const result = await command.run(USER_PROFILE_ID, {
-      eventRef: {
-        eventId: 'evt-2',
-        calendarId: 'cal-banker',
-        mailbox: 'banker@example.com',
-      },
+      eventRef: { eventId: 'evt-2', calendarId: 'cal-banker' },
       response: 'decline',
     });
 
-    expect(api).toHaveBeenCalledWith(DELEGATED_PATH);
-    expect(result.success).toBe(false);
-    expect(result.consentRequired).toBeUndefined();
-    expect(result.message).toMatch(/banker@example.com/);
+    expect(api).toHaveBeenCalledWith(SHARED_PATH);
+    expect(result.success).toBe(true);
   });
 
   it('returns a not-found message on 404', async () => {

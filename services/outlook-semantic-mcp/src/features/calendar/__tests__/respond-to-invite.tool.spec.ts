@@ -15,7 +15,6 @@ const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  mailbox: 'me@example.com',
 };
 
 const SNAPSHOT = {
@@ -24,7 +23,6 @@ const SNAPSHOT = {
   event: {
     eventId: 'evt-1',
     calendarId: 'cal-own',
-    mailbox: 'me@example.com',
     type: 'singleInstance' as const,
     seriesMasterId: null,
     subject: 'Weekly sync',
@@ -142,12 +140,12 @@ describe(RespondToInviteTool.name, () => {
 });
 
 describe('RespondToInviteInputSchema', () => {
-  it('rejects an eventRef mailbox that is not an SMTP address', () => {
+  it('rejects an eventRef that is missing its calendarId', () => {
     expect(() =>
       RespondToInviteInputSchema.parse({
-        eventRef: { ...EVENT_REF, mailbox: 'not/an/email' },
+        eventRef: { eventId: 'evt-1' },
         response: 'accept',
       }),
-    ).toThrow(/SMTP/i);
+    ).toThrow();
   });
 });

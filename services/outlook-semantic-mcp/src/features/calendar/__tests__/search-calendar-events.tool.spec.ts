@@ -10,7 +10,7 @@ import {
 } from '../search-calendar-events.tool';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
-const CALENDARS = [{ calendarId: 'cal-own', mailbox: 'me@example.com' }];
+const CALENDARS = [{ calendarId: 'cal-own' }];
 
 describe(SearchCalendarEventsTool.name, () => {
   it('passes a relative range through to the query', async () => {

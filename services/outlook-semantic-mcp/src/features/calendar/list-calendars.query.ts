@@ -8,7 +8,6 @@ import {
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { CalendarRef, GraphCalendarCollectionSchema } from './calendar.schemas';
 import {
   CalendarConsentRequiredError,
@@ -16,6 +15,7 @@ import {
 } from './utils/calendar-graph-errors';
 import { calendarCollectionPath } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   logCalendarRecovered,
@@ -56,15 +56,13 @@ export class ListCalendarsQuery {
         const calendars = rankCalendars(
           await this.fetchCalendars({
             client,
-            path: calendarCollectionPath(userProfile.email),
-            mailboxEmail: userProfile.email,
-            callerEmail: userProfile.email,
+            path: calendarCollectionPath(),
+            userProfileEmail: userProfile.email,
             userProfileId: userProfileIdString,
           }),
         );
         this.logger.log({
-          userProfileId: userProfileIdString,
-          mailbox: obfuscateEmail(userProfile.email),
+          ...calendarLogUser(userProfileIdString, userProfile.email),
           calendarCount: calendars.length,
           msg: 'list_calendars',
         });
@@ -80,7 +78,7 @@ export class ListCalendarsQuery {
         if (error instanceof CalendarConsentRequiredError) {
           logCalendarRecovered(this.logger, {
             userProfileId: userProfileIdString,
-            mailbox: userProfile.email,
+            userProfileEmail: userProfile.email,
             outcome: 'consent',
             msg: 'list_calendars consent required',
             err: error,
@@ -101,13 +99,12 @@ export class ListCalendarsQuery {
   private async fetchCalendars(input: {
     client: Client;
     path: string;
-    mailboxEmail: string;
-    callerEmail: string;
+    userProfileEmail: string;
     userProfileId: string;
   }): Promise<CalendarRef[]> {
     calendarTraceAttrs({
       userProfileId: input.userProfileId,
-      mailbox: input.mailboxEmail,
+      userProfileEmail: input.userProfileEmail,
       operation: 'list_calendars.fetch',
     });
     const calendars: CalendarRef[] = [];
@@ -126,8 +123,7 @@ export class ListCalendarsQuery {
           calendars.push(
             mapGraphCalendarToCalendarRef({
               calendar: item,
-              callerEmail: input.callerEmail,
-              mailboxEmail: input.mailboxEmail,
+              userProfileEmail: input.userProfileEmail,
             }),
           );
         }

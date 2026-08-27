@@ -5,17 +5,16 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { type EventRef, GraphEventSnapshotSchema } from './calendar.schemas';
 import { eventPath } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   recoverCalendarGraphError,
 } from './utils/calendar-observability';
 import { type CalendarDateTime, mapGraphDateTime } from './utils/map-graph-date-time';
 import { type GraphEventType, parseGraphEventType } from './utils/resolve-write-event-id';
-import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
 const EVENT_SELECT =
   'id,subject,start,end,location,attendees,organizer,isCancelled,type,seriesMasterId';
@@ -23,7 +22,6 @@ const EVENT_SELECT =
 export interface CalendarEventSnapshot {
   eventId: string;
   calendarId: string;
-  mailbox: string;
   type: GraphEventType;
   seriesMasterId: string | null;
   subject: string | null;
@@ -63,32 +61,25 @@ export class GetCalendarEventQuery {
     input: GetCalendarEventQueryInput,
   ): Promise<GetCalendarEventQueryOutput> {
     const userProfileIdString = calendarUserProfileId(userProfileId);
-    assert.ok(
-      SmtpAddressSchema.safeParse(input.eventRef.mailbox).success,
-      'eventRef.mailbox must already be an SMTP address',
-    );
     assert.ok(input.eventRef.eventId.length > 0, 'eventRef.eventId must already be set');
     assert.ok(input.eventRef.calendarId.length > 0, 'eventRef.calendarId must already be set');
 
-    const mailbox = input.eventRef.mailbox;
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(mailbox),
       calendarId: input.eventRef.calendarId,
       msg: 'get_calendar_event started',
     });
+
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox,
+      userProfileEmail: userProfile.email,
       calendarId: input.eventRef.calendarId,
       operation: 'get_calendar_event',
     });
-
-    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const { outlookTimeZone } = await this.resolveMailboxTimezoneQuery.run(userProfileId);
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
     const path = eventPath({
-      mailboxEmail: mailbox,
       calendarId: input.eventRef.calendarId,
       eventId: input.eventRef.eventId,
     });
@@ -101,8 +92,7 @@ export class GetCalendarEventQuery {
         .get();
       const parsed = GraphEventSnapshotSchema.parse(raw);
       this.logger.debug({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(mailbox),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         calendarId: input.eventRef.calendarId,
         type: parsed.type,
         msg: 'get_calendar_event',
@@ -113,7 +103,6 @@ export class GetCalendarEventQuery {
         event: {
           eventId: parsed.id,
           calendarId: input.eventRef.calendarId,
-          mailbox,
           type: parseGraphEventType(parsed.type),
           seriesMasterId:
             parsed.seriesMasterId !== undefined &&
@@ -136,13 +125,11 @@ export class GetCalendarEventQuery {
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
-        mailbox,
-        callerEmail: userProfile.email,
+        userProfileEmail: userProfile.email,
         calendarId: input.eventRef.calendarId,
         operation: 'get_calendar_event',
         notFoundMessage:
           'That event was not found. Search again and pass eventRef without changing it.',
-        deniedDelegatedMessage: `Could not read an event on mailbox ${mailbox}.`,
       });
     }
   }

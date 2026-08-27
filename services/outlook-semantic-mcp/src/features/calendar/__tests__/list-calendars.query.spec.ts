@@ -10,7 +10,7 @@ import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
 const OWNER_EMAIL = 'banker@example.com';
-const OWN_PATH = `/users/${OWN_EMAIL}/calendars`;
+const OWN_PATH = `/me/calendars`;
 const CALENDAR_SELECT =
   'id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses';
 
@@ -91,20 +91,17 @@ describe(ListCalendarsQuery.name, () => {
         calendarId: 'cal-own',
         isOwn: true,
         isDefaultCalendar: true,
-        mailbox: OWN_EMAIL,
       }),
       expect.objectContaining({
         calendarId: 'cal-primary',
         isOwn: false,
         isDefaultCalendar: false,
-        mailbox: OWN_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
       expect.objectContaining({
         calendarId: 'cal-custom',
         isOwn: false,
         isDefaultCalendar: false,
-        mailbox: OWN_EMAIL,
         ownerEmail: OWNER_EMAIL,
       }),
     ]);
@@ -168,7 +165,7 @@ describe(ListCalendarsQuery.name, () => {
       .fn()
       .mockResolvedValueOnce({
         value: [{ id: 'cal-1', owner: { address: OWN_EMAIL } }],
-        '@odata.nextLink': `https://graph.microsoft.com/v1.0/users/${OWN_EMAIL}/calendars?$skiptoken=abc`,
+        '@odata.nextLink': `https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc`,
       })
       .mockResolvedValueOnce({
         value: [{ id: 'cal-2', owner: { address: OWN_EMAIL } }],
@@ -180,7 +177,7 @@ describe(ListCalendarsQuery.name, () => {
     expect(api).toHaveBeenNthCalledWith(1, OWN_PATH);
     expect(api).toHaveBeenNthCalledWith(
       2,
-      `https://graph.microsoft.com/v1.0/users/${OWN_EMAIL}/calendars?$skiptoken=abc`,
+      `https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc`,
     );
     expect(result.success).toBe(true);
     expect(result.calendars?.map((calendar) => calendar.calendarId)).toEqual(['cal-1', 'cal-2']);
@@ -196,6 +193,46 @@ describe(ListCalendarsQuery.name, () => {
       message: 'No calendars were returned.',
       calendars: [],
     });
+  });
+
+  it('keeps calendars whose Graph owner is null', async () => {
+    const { query } = createQuery({
+      get: vi.fn().mockResolvedValue({
+        value: [
+          {
+            id: 'cal-own',
+            name: 'Calendar',
+            isDefaultCalendar: true,
+            owner: { address: OWN_EMAIL, name: 'Me' },
+          },
+          {
+            id: 'cal-shared',
+            name: 'Banker',
+            owner: { address: OWNER_EMAIL, name: 'Banker' },
+          },
+          {
+            id: 'cal-no-owner',
+            name: 'Holidays',
+            isDefaultCalendar: false,
+            owner: null,
+          },
+        ],
+      }),
+    });
+
+    const result = await query.run(USER_PROFILE_ID);
+
+    expect(result.success).toBe(true);
+    expect(result.calendars).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          calendarId: 'cal-no-owner',
+          isOwn: false,
+          ownerEmail: null,
+          ownerName: null,
+        }),
+      ]),
+    );
   });
 
   it('fails when Graph returns a calendar without an id', async () => {

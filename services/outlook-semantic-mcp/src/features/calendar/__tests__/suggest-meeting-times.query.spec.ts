@@ -13,7 +13,7 @@ import { passthroughCalendarMetrics } from './passthrough-calendar-metrics';
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const OWN_EMAIL = 'me@example.com';
 const ATTENDEE = 'alex@example.com';
-const PATH = `/users/${OWN_EMAIL}/findMeetingTimes`;
+const PATH = `/me/findMeetingTimes`;
 const PREFER = 'outlook.timezone="W. Europe Standard Time"';
 const NOW = Temporal.ZonedDateTime.from('2026-08-25T15:30:00+02:00[Europe/Zurich]');
 const DEFAULT_TIMEZONE: ResolvedMailboxTimezone = {

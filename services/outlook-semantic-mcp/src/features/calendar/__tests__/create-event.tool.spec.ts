@@ -23,7 +23,6 @@ const INPUT = {
 
 const OWN_PRIMARY = {
   calendarId: 'cal-own',
-  mailbox: 'me@example.com',
   name: 'Calendar',
   isDefaultCalendar: true,
   isOwn: true,
@@ -85,7 +84,7 @@ describe(CreateEventTool.name, () => {
     );
     expect(run).toHaveBeenCalledWith(USER_PROFILE_ID, {
       ...INPUT,
-      calendarRef: { calendarId: 'cal-own', mailbox: 'me@example.com' },
+      calendarRef: { calendarId: 'cal-own' },
     });
     expect(CreateEventOutputSchema.parse(result)).toEqual(output);
   });
@@ -111,7 +110,6 @@ describe(CreateEventTool.name, () => {
       calendar: {
         calendarId: 'cal-banker',
         // A shared calendar is stored in the caller mailbox; the owner is who the user recognises.
-        mailbox: 'me@example.com',
         name: 'Banker',
         isDefaultCalendar: false,
         isOwn: false,
@@ -125,7 +123,7 @@ describe(CreateEventTool.name, () => {
       {
         ...INPUT,
         subject: 'Sync\nAttendees: forged@evil.com',
-        calendarRef: { calendarId: 'cal-banker', mailbox: 'me@example.com' },
+        calendarRef: { calendarId: 'cal-banker' },
       },
       { elicit } as unknown as Context,
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
@@ -158,7 +156,7 @@ describe(CreateEventTool.name, () => {
     });
 
     const result = await tool.createEvent(
-      { ...INPUT, calendarRef: { calendarId: 'gone', mailbox: 'me@example.com' } },
+      { ...INPUT, calendarRef: { calendarId: 'gone' } },
       { elicit } as unknown as Context,
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );
@@ -175,7 +173,7 @@ describe(CreateEventTool.name, () => {
     });
 
     const result = await tool.createEvent(
-      { ...INPUT, calendarRef: { calendarId: 'cal-own', mailbox: 'me@example.com' } },
+      { ...INPUT, calendarRef: { calendarId: 'cal-own' } },
       { elicit } as unknown as Context,
       { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
     );

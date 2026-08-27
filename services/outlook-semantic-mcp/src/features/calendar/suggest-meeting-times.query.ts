@@ -11,7 +11,6 @@ import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailb
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { dateWindowFromSearchInput } from '~/utils/date-window-bucket';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import {
   type RelativeRange,
   type ResolvedWindow,
@@ -21,6 +20,7 @@ import {
 import { GraphFindMeetingTimesResponseSchema } from './calendar.schemas';
 import { findMeetingTimesPath } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   recoverCalendarGraphError,
@@ -31,7 +31,7 @@ import {
   mapGraphMeetingTimeSuggestionToMeetingTimeSuggestion,
 } from './utils/map-graph-meeting-time-suggestion-to-meeting-time-suggestion';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
+import { uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
 const MAX_ATTENDEES = 20;
 const MAX_CANDIDATES = 20;
@@ -126,8 +126,7 @@ export class SuggestMeetingTimesQuery {
     });
     if (resolved.tooLate) {
       this.logger.debug({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(userProfile.email),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         interpretation: resolved.window.interpretation,
         msg: 'suggest_meeting_times window entirely in the past',
       });
@@ -142,16 +141,14 @@ export class SuggestMeetingTimesQuery {
     }
     if (resolved.notes.length > 0) {
       this.logger.debug({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(userProfile.email),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         msg: 'suggest_meeting_times start clamped to now',
       });
     }
     notes.push(...resolved.notes);
     const resolvedWindow = resolved.window;
     this.logger.debug({
-      userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(userProfile.email),
+      ...calendarLogUser(userProfileIdString, userProfile.email),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
@@ -166,13 +163,9 @@ export class SuggestMeetingTimesQuery {
       attendees.length <= MAX_ATTENDEES,
       'attendees must already be at most 20 SMTP addresses',
     );
-    assert.ok(
-      SmtpAddressSchema.safeParse(userProfile.email).success,
-      'signed-in user email must already be an SMTP address',
-    );
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox: userProfile.email,
+      userProfileEmail: userProfile.email,
       operation: 'suggest_meeting_times',
     });
 
@@ -192,7 +185,7 @@ export class SuggestMeetingTimesQuery {
 
     try {
       const raw = await client
-        .api(findMeetingTimesPath(userProfile.email))
+        .api(findMeetingTimesPath())
         .header('Prefer', `outlook.timezone="${outlookTimeZone}"`)
         .post({
           attendees: attendees.map((address) => ({
@@ -221,16 +214,14 @@ export class SuggestMeetingTimesQuery {
         );
       }
       this.logger.log({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(userProfile.email),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         attendeeCount: attendees.length,
         returned: suggestions.length,
         msg: 'suggest_meeting_times findMeetingTimes',
       });
       if (suggestions.length === 0) {
         this.logger.debug({
-          userProfileId: userProfileIdString,
-          mailbox: obfuscateEmail(userProfile.email),
+          ...calendarLogUser(userProfileIdString, userProfile.email),
           emptySuggestionsReason: emptyReason,
           msg: 'suggest_meeting_times no slots',
         });
@@ -254,10 +245,8 @@ export class SuggestMeetingTimesQuery {
           error,
           logger: this.logger,
           userProfileId: userProfileIdString,
-          mailbox: userProfile.email,
-          callerEmail: userProfile.email,
+          userProfileEmail: userProfile.email,
           operation: 'suggest_meeting_times',
-          deniedDelegatedMessage: `Could not suggest times from mailbox ${userProfile.email}.`,
         }),
         suggestionNotes: notes.length > 0 ? notes : undefined,
         resolvedWindow,
