@@ -87,8 +87,10 @@ _mcp_session_revoked: ContextVar[_SessionRevokedFlag | None] = ContextVar(
 
 def mark_mcp_session_revoked() -> None:
     """Record that this request's MCP tokens were revoked, so the HTTP response becomes 401."""
+    # Production: session task finds the box on FastMCP's current request, not our ContextVar.
     flag = _flag_from_http_request()
     if flag is None:
+        # Tests / same-task handlers: no request_ctx, the ContextVar is the box.
         flag = _mcp_session_revoked.get()
     if flag is not None:
         flag.revoked = True
@@ -96,9 +98,9 @@ def mark_mcp_session_revoked() -> None:
 
 def mcp_session_was_revoked(scope: MutableMapping[str, object] | None = None) -> bool:
     if scope is not None:
-        boxed = scope.get(_SESSION_REVOKED_SCOPE_KEY)
+        boxed = scope.get(_SESSION_REVOKED_SCOPE_KEY)  # middleware: the box we hung on this request
         return isinstance(boxed, _SessionRevokedFlag) and boxed.revoked
-    boxed = _mcp_session_revoked.get()
+    boxed = _mcp_session_revoked.get()  # no scope: same-task tests that never touch ASGI
     return boxed is not None and boxed.revoked
 
 
@@ -111,8 +113,8 @@ def reset_mcp_session_revoked(
     no return path, and a plain dict is what survives the session task's ContextVar snapshot.
     """
     flag = _SessionRevokedFlag()
-    scope[_SESSION_REVOKED_SCOPE_KEY] = flag
-    return _mcp_session_revoked.set(flag)
+    scope[_SESSION_REVOKED_SCOPE_KEY] = flag  # cross-task: session reads this via request.scope
+    return _mcp_session_revoked.set(flag)  # same-task tests: ContextVar holds the same object
 
 
 def restore_mcp_session_revoked(token: Token[_SessionRevokedFlag | None]) -> None:
@@ -126,7 +128,7 @@ def _flag_from_http_request() -> _SessionRevokedFlag | None:
 
         request = get_http_request()
     except RuntimeError:
-        return None
+        return None  # no HTTP request in this task (unit tests)
     boxed = request.scope.get(_SESSION_REVOKED_SCOPE_KEY)
     return boxed if isinstance(boxed, _SessionRevokedFlag) else None
 
