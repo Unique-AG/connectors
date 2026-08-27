@@ -349,6 +349,25 @@ class ActivityHistoryConfig(BaseSettings):
     gist_chars: int = Field(default=300, gt=0)
 
 
+class ResolutionConfig(BaseSettings):
+    """Tuning knobs for the shared ambiguity policy in `features/resolution.py`.
+
+    `elicit_timeout_seconds` bounds how long a tool waits for the user to pick between
+    candidates before degrading to the structured candidate list (policy step 4). It exists
+    because `ctx.elicit` has no deadline of its own: an unanswered prompt otherwise blocks the
+    tool until the *client* cancels the call, which discards the candidates already fetched and
+    returns nothing at all.
+
+    It must stay below the calling client's tool-call deadline — 60s for the Unique chat client
+    that prompted this knob — and the margin has to cover the upstream search that runs before
+    the prompt. Configurable so that deadline can be matched per deployment without a release.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="RESOLUTION_")
+
+    elicit_timeout_seconds: float = Field(default=45.0, gt=0)
+
+
 class DatabaseConfig(BaseSettings):
     """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials.
 

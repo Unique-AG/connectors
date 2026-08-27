@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import cast
 
@@ -17,6 +18,7 @@ __all__ = [
     "ctx_decline",
     "ctx_never_elicit",
     "ctx_no_elicitation_capability",
+    "ctx_stalls",
     "ctx_unsupported",
     "resource",
 ]
@@ -95,6 +97,21 @@ def ctx_unsupported() -> Context:
     async def elicit(*, message: str, response_type: object) -> object:
         _ = message, response_type
         raise RuntimeError("elicitation not supported")
+
+    return as_context(FakeContext(elicit))
+
+
+def ctx_stalls() -> Context:
+    """A client that accepts the prompt and never answers it.
+
+    This is the shape the production incident took: elicitation is advertised, the request is
+    delivered, and no response ever comes back on its own.
+    """
+
+    async def elicit(*, message: str, response_type: object) -> object:
+        _ = message, response_type
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable: the event is never set")
 
     return as_context(FakeContext(elicit))
 

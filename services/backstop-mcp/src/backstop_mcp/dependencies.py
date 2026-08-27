@@ -22,6 +22,7 @@ from backstop_mcp.config import (
     BackstopConfig,
     DatabaseConfig,
     EncryptionConfig,
+    ResolutionConfig,
 )
 from backstop_mcp.db import create_engine, create_session_factory
 from backstop_mcp.features.auth import (
@@ -60,6 +61,11 @@ def get_auth_config() -> AuthConfig:
 @lru_cache(maxsize=1)
 def get_activity_history_config() -> ActivityHistoryConfig:
     return ActivityHistoryConfig()
+
+
+@lru_cache(maxsize=1)
+def get_resolution_config() -> ResolutionConfig:
+    return ResolutionConfig()
 
 
 @lru_cache(maxsize=1)

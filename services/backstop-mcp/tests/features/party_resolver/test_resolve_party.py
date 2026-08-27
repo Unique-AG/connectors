@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import httpx
 import pytest
@@ -6,8 +7,11 @@ import respx
 from fastmcp.server.elicitation import AcceptedElicitation
 from mcp.shared.exceptions import McpError
 from mcp.types import METHOD_NOT_FOUND, ClientCapabilities, ErrorData
+from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
+from backstop_mcp.config import ResolutionConfig
+from backstop_mcp.dependencies import get_resolution_config
 from backstop_mcp.features.party_resolver import (
     PartyResolveItemDto,
     QuickSearchOptionsDto,
@@ -37,6 +41,7 @@ from tests.features.party_resolver.helpers import (
     ctx_decline,
     ctx_never_elicit,
     ctx_no_elicitation_capability,
+    ctx_stalls,
     ctx_unsupported,
     resource,
 )
@@ -1403,3 +1408,112 @@ class TestElicitChoice:
         )
 
         assert result is ambiguous
+
+
+def _log_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogRecord:
+    """The single record logged for `event`.
+
+    Fields passed as `extra=` are merged into the record's `__dict__`, which is where the
+    assertions below read them from — `LogRecord` has no static attribute for them.
+    """
+    return next(r for r in caplog.records if r.getMessage() == event)
+
+
+class TestElicitTimeout:
+    """An unanswered prompt has to end in a payload, not in the client cancelling the call."""
+
+    @pytest.mark.asyncio
+    async def test_unanswered_prompt_degrades_to_ambiguous(self) -> None:
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        result = await elicit_choice(
+            ctx_stalls(), ambiguous, prompt="Which one?", timeout_seconds=0.01
+        )
+
+        assert result is ambiguous
+
+    @pytest.mark.asyncio
+    async def test_unanswered_prompt_returns_within_the_timeout(self) -> None:
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        started = asyncio.get_running_loop().time()
+        await elicit_choice(ctx_stalls(), ambiguous, prompt="Which one?", timeout_seconds=0.05)
+        elapsed = asyncio.get_running_loop().time() - started
+
+        assert elapsed < 1.0
+
+    @pytest.mark.asyncio
+    async def test_unanswered_prompt_is_logged_with_the_query(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        with caplog.at_level(logging.WARNING, logger="backstop_mcp.features.resolution"):
+            await elicit_choice(ctx_stalls(), ambiguous, prompt="Which one?", timeout_seconds=0.01)
+
+        record = _log_record(caplog, "resolution.elicit.timed_out")
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["query"] == "Capstone"
+        assert record.__dict__["scope"] == "organizations"
+        assert record.__dict__["candidates"] == 2
+        assert record.__dict__["timeout_seconds"] == 0.01
+
+    @pytest.mark.asyncio
+    async def test_caller_cancellation_still_propagates(self) -> None:
+        """The deadline is swallowed; the client giving up on the whole call is not."""
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        task = asyncio.create_task(
+            elicit_choice(ctx_stalls(), ambiguous, prompt="Which one?", timeout_seconds=30)
+        )
+        await asyncio.sleep(0)
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    def test_default_timeout_leaves_room_under_the_client_deadline(self) -> None:
+        """Regression guard: the point of the deadline is to beat the client's 60s cancel."""
+        assert 0 < ResolutionConfig().elicit_timeout_seconds < 60
+
+    @pytest.mark.asyncio
+    async def test_timeout_comes_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv("RESOLUTION_ELICIT_TIMEOUT_SECONDS", "0.01")
+        get_resolution_config.cache_clear()
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        with caplog.at_level(logging.WARNING, logger="backstop_mcp.features.resolution"):
+            result = await elicit_choice(ctx_stalls(), ambiguous, prompt="Which one?")
+
+        assert result is ambiguous
+        assert _log_record(caplog, "resolution.elicit.timed_out").__dict__[
+            "timeout_seconds"
+        ] == pytest.approx(0.01)
+
+    def test_a_non_positive_timeout_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A zero deadline would degrade every ambiguity without ever asking."""
+        monkeypatch.setenv("RESOLUTION_ELICIT_TIMEOUT_SECONDS", "0")
+
+        with pytest.raises(ValidationError):
+            ResolutionConfig()
+
+    @pytest.mark.asyncio
+    async def test_declined_prompt_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        with caplog.at_level(logging.INFO, logger="backstop_mcp.features.resolution"):
+            await elicit_choice(ctx_decline(), ambiguous, prompt="Which one?")
+
+        assert _log_record(caplog, "resolution.elicit.dismissed").__dict__["action"] == "declined"
+
+    @pytest.mark.asyncio
+    async def test_cancelled_prompt_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        with caplog.at_level(logging.INFO, logger="backstop_mcp.features.resolution"):
+            await elicit_choice(ctx_cancel(), ambiguous, prompt="Which one?")
+
+        record = _log_record(caplog, "resolution.elicit.dismissed")
+        assert record.__dict__["action"] == "cancelled"
