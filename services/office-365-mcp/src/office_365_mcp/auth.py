@@ -24,6 +24,11 @@ _REQUIRED_SCOPES = ("access_as_user",)
 
 _ENCRYPTION_SALT = "office-365-mcp-oauth-storage"
 
+# Passed to the provider rather than left to its default, because the Entra module's registry is
+# generated from this constant: a default read nowhere would be a path the app registration carries
+# and no Python names.
+_CALLBACK_PATH = "/auth/callback"
+
 
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
     """Trap: FastMCP's default store encrypts, so handing it a bare table would silently disable
@@ -49,8 +54,9 @@ def build_auth(
     client_storage: AsyncKeyValue,
     graph_scopes: Sequence[str],
 ) -> AzureProvider:
-    """The app registration must list `{base_url}/auth/callback` exactly, as a Web platform
-    redirect URI; that path is the provider's default.
+    """The app registration must list `{base_url}{_CALLBACK_PATH}` exactly, as a Web platform
+    redirect URI. `redirect_path` is passed rather than defaulted so that constant is what the
+    registration is generated from.
 
     `client_storage` is passed in so the readiness probe uses the same object: a separate readiness
     connection would pass while the provider's own fails, masking a sign-in outage.
@@ -65,6 +71,7 @@ def build_auth(
         tenant_id=entra.tenant_id,
         required_scopes=list(_REQUIRED_SCOPES),
         additional_authorize_scopes=list(graph_scopes),
+        redirect_path=_CALLBACK_PATH,
         base_url=base_url,
         client_storage=client_storage,
     )

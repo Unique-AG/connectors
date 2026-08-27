@@ -1,83 +1,38 @@
-# office-365-mcp chart defaults — portable app only.
-# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
-# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+# Portable app defaults: hostname, TLS and NetworkPolicy-on live in the monorepo Argo overlay.
 
 nameOverride: office-365-mcp
 fullnameOverride: office-365-mcp
 selectorComponentLabel: server
 
-# Loki scrapes use this label to parse stderr as pino-json
-# (unique_mcp.configure_logging).
+# Loki parses this pod's stderr as pino-json off this label.
 podLabels:
   logging.unique.app/format: pino-json
 
 env:
   APP_ENV: production
   LOG_LEVEL: info
+  # Inert: the base chart appends PORT last, from ports.application, and that wins.
   PORT: "8000"
-  # Tracing. `configure_tracing` installs a tracer provider only when one of these says where to
-  # send spans; with none of them set it returns False and every span in the process is a no-op, so
-  # the switch is `internalServices.dependencies.otelTraces.enabled` below and nothing else. Both
-  # endpoints are emitted, as in outlook-semantic-mcp, so an overlay reads the same two keys in
-  # every chart. The traces-specific one is what actually decides: `TracingSettings` prefers it
-  # (AliasChoices) and so does the OTLP/HTTP span exporter, which would otherwise append
-  # `/v1/traces` to the generic one itself.
-  # Metrics do not travel this way — they are scraped from /metrics — so OTEL_METRICS_EXPORTER and
-  # friends are deliberately absent.
   OTEL_EXPORTER_OTLP_ENDPOINT:
     if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
     value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}'
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
     if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
     value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}/v1/traces'
-  # `configure_tracing` sets service.name and service.version and nothing else, so which environment
-  # a span came from has to arrive as a resource attribute. Derived from APP_ENV above rather than
-  # written twice: an overlay that moves one and forgets the other would ship spans labelled
-  # production from a QA cluster, and nothing would complain.
   OTEL_RESOURCE_ATTRIBUTES:
     if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
     value: 'deployment.environment={{ .Values.env.APP_ENV }}'
-  # PUBLIC_BASE_URL must be the externally-reachable https OAuth issuer URL (set in overlay).
-  # ENTRA_TENANT_ID and ENTRA_CLIENT_ID identify the app registration users sign in through;
-  # both are required and set in the overlay (not secrets). ENTRA_TENANT_ID must be a single
-  # tenant's ID — a multi-tenant authority is rejected at startup.
-  #
-  # The overlay must also set exactly one of TOOLS_PRESET and TOOLS_ENABLED — the tool surface this
-  # deployment runs, and so which delegated Graph permissions every user consents to at sign-in.
-  # Neither is defaulted here on purpose: a chart-level default would make the widest consent screen
-  # what a deployment gets by not choosing, which is what the knob exists to stop. values.schema.json
-  # requires one of the two, so a missing selection fails `helm install` instead of crash-looping the
-  # pod, and TOOLS_PRESET carries the valid names as an enum so a typo fails there too.
-  #   TOOLS_PRESET: teams              # every tool there is
-  #   TOOLS_ENABLED: get_me,list_chats # or name them; get_me is always on
-  #
-  # How long one Microsoft Graph call may take, and how hard the SDK retries it. Optional and
-  # deliberately not set here: the defaults are sized for an interactive MCP client, and an overlay
-  # that raises them buys a slower failure rather than a better answer — what is really being turned
-  # is the worst case of one tool call, the request timeout times GRAPH_MAX_RETRIES + 1 attempts,
-  # before any Retry-After wait, per Graph call, and a paged walk makes several.
-  #   GRAPH_REQUEST_TIMEOUT_SECONDS: "30"   # must be > 0; httpx reads a timeout as a deadline
-  #   GRAPH_CONNECT_TIMEOUT_SECONDS: "10"   # must be > 0
-  #   GRAPH_MAX_RETRIES: "3"                # 0 is allowed: give up on the first 429
-  #
-  # Those, the tool surface and the two secrets below are the whole of this service's configuration.
-  # What the tools add is tenant-side onboarding, which no value here can carry (see README, "Auth"):
-  #   - the delegated Graph permissions the selected tools ask for, on that app registration. Some
-  #     need admin consent, among them OnlineMeetingTranscript.Read.All and
-  #     OnlineMeetingRecording.Read.All, which are granted independently of each other. GET /manifest
-  #     and the startup log print the exact list this deployment asks for and which of it needs an
-  #     administrator — the only place it is written down, because a scope the registration does not
-  #     carry fails at the authorize hop, for every user, with nothing in this service's logs;
-  #   - Graph access to Teams meeting transcripts, a tenant-wide Teams setting that is OFF by
-  #     default and that only a Teams administrator can turn on. Until they do,
-  #     list_meeting_transcripts answers 403 with that remedy and every other tool — recordings
-  #     included — is unaffected.
+  # values.schema.json requires PUBLIC_BASE_URL, ENTRA_TENANT_ID, ENTRA_CLIENT_ID and exactly one
+  # of the two keys below; the overlay supplies them. ENTRA_TENANT_ID must name a single tenant — a
+  # multi-tenant authority is rejected at startup. The tool surface decides which delegated Graph
+  # permissions every user consents to at sign-in, and which need an Entra administrator: README
+  # has the preset table, and GET /manifest prints what a running deployment asks for.
+  #   TOOLS_PRESET: teams
+  #   TOOLS_ENABLED: get_me,list_chats
 
+# Overlay must supply ENTRA_CLIENT_SECRET here — also the key material for the OAuth state rows,
+# so rotating it costs every signed-in user one re-login. DB_URL too, unless postgresql.enabled.
 envVars: []
-# Required secrets (provide via envVars in overlay):
-# - DB_URL (or rely on base-chart DATABASE_URL when postgresql.enabled — app accepts both)
-# - ENTRA_CLIENT_SECRET, the app registration's client secret. Also the key material for the
-#   OAuth state rows in Postgres, so rotating it costs every signed-in user one re-login.
 
 image:
   registry: ghcr.io
@@ -97,8 +52,8 @@ resources:
 
 probes:
   enabled: true
-  # /health is process-up (setup_ops); /ready checks Postgres. Liveness must not restart the pod
-  # when the database is briefly unreachable — readiness alone keeps it out of service.
+  # Liveness stays on /health (process-up) so a brief Postgres outage does not restart the pod;
+  # readiness alone takes it out of service.
   liveness:
     failureThreshold: 6
     httpGet:
@@ -113,9 +68,8 @@ probes:
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
-    # /ready gives its Postgres check a 2s deadline of its own. The Kubernetes default here is 1s,
-    # which would abandon the request before that deadline is ever reached; 3s lets the handler
-    # answer 503 itself. Keep the two in step — see _PROBE_TIMEOUT_SECONDS in server/readiness.py.
+    # Must stay above _PROBE_TIMEOUT_SECONDS in server/readiness.py (2s), or the request is
+    # abandoned before the handler can answer 503 itself.
     timeoutSeconds: 3
   startup:
     failureThreshold: 30
@@ -128,7 +82,6 @@ probes:
 serviceAccount:
   enabled: true
 
-# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
 volumes:
   - name: tmp
     emptyDir:
@@ -142,8 +95,6 @@ postgresql:
   enabled: true
   connection:
     sslMode: verify
-    # Overlay supplies host/url (CloudNativePG or external). Base chart injects
-    # DATABASE_URL / POSTGRESQL_* — office-365-mcp also accepts DB_URL.
 
 rabbitmq:
   enabled: false
@@ -151,13 +102,8 @@ rabbitmq:
 service:
   port: 80
 
-# Who this service calls and who may call it (used by base NetworkPolicy generators).
 internalServices:
   dependencies:
-    # The OTLP/HTTP trace collector. Off by default: a third-party install has no collector, and a
-    # pod that exports to one that is not there retries in the background for the life of the
-    # process. Turning it on is what enables tracing — it is what emits the OTEL_* keys above and
-    # what generates the Cilium egress rule that lets the spans out.
     otelTraces:
       enabled: false
       name: otel-traces
@@ -167,33 +113,20 @@ internalServices:
       name: gateway
       namespace: system
 
-# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
 routes:
   hostname: ""
   auth:
     jwt: false
 
-# No migration hook: this service has no schema of its own. Its one table (`oauth_kv`) is created
-# by the OAuth state store on first use, so the app's database user needs CREATE on its schema.
+# No migration hook: the OAuth state store creates its one table on first use, so the app's
+# database user needs CREATE on its schema.
 
-# The dashboard for the graph_* / mcp_* / python_http_* series this service exposes, shipped as a
-# ConfigMap the Grafana sidecar picks up (templates/grafana-dashboard.yaml, files/grafana-dashboard.json).
-# On by default: the ConfigMap is inert wherever no sidecar is watching, and a dashboard nobody
-# switched on is a dashboard nobody has during the first incident.
-#
-# The base chart has its own dashboard mechanism (`grafana.dashboards`, plural, reading
-# files/grafana/dashboards/*.json). It is not used here, and the template is not redundant: base
-# hardcodes `grafana_folder: apps`, and every MCP chart in this repo files its dashboard under
-# `mcp-servers` instead. Folder support in base would make this template deletable — until then,
-# deleting it moves the dashboard.
+# Not base's `grafana.dashboards`: that hardcodes `grafana_folder: apps`, not mcp-servers.
 grafana:
   dashboard:
-    # -- Enable Grafana dashboard ConfigMap creation
     enabled: true
-    # -- Grafana folder where the dashboard will be placed
     folder: mcp-servers
 
-# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 networkPolicy:
   enabled: false
   flavor: cilium
@@ -201,19 +134,15 @@ networkPolicy:
     ingress: true
     egress: true
   baseline:
-    # Scrapes reach this pod from Prometheus in `system`, not from the base chart's `monitoring`
-    # default — so the namespace is named, exactly as teams-mcp names it. What is not an option is
-    # switching the rule off: `enabled: false` emits no Prometheus ingress rule at all
-    # (base/templates/_networkPolicy.cilium.tpl, `$hasPrometheus`), so the moment the Unique QA
-    # overlay sets `networkPolicy.enabled: true` every scrape is dropped. /metrics stays up, the
-    # probes stay green and the pod logs nothing — the only symptom is a dashboard that goes blank,
-    # which is the failure this chart is least likely to notice.
+    # Prometheus lives in `system`, not the base chart's `monitoring` default, and `enabled: false`
+    # emits no Prometheus rule at all — either way every scrape is dropped silently once an overlay
+    # turns networkPolicy on. /metrics and the probes stay green; only the dashboard goes blank.
     prometheus:
       namespace: system
     ephemeralPorts:
       enabled: false
-    # Entra sign-in and Graph both run server-side over 443. Without this rule DNS still
-    # resolves and /ready still passes, so the only symptom is that every login fails.
+    # Entra sign-in and Graph both run server-side over 443. Without this, /ready still passes and
+    # only logins fail.
     egress:
       microsoft:
         toFQDNs:

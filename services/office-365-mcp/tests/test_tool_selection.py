@@ -463,7 +463,11 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 # Transcribed from the design document's own table: permissions consented to, how many need an
 # administrator, how many tools (counting the always-on floor). Written out rather than derived
 # from `PRESETS`, because a derivation agrees with any mistake in `PRESETS`.
-_PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
+#
+# Public rather than private because `test_terraform_surface.py` prices the Terraform module's own
+# copy of the registry against it: a second transcription there would be one more table to keep in
+# step and no more witnesses than this one already is.
+PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 2),
     (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 4),
     (
@@ -522,13 +526,13 @@ class TestWhatEachPresetCostsATenant:
 
     def test_every_preset_has_a_cost_written_down(self) -> None:
         """A preset added without a row here is a surface whose consent screen nothing checks."""
-        priced = {preset for preset, _permissions, _consents, _tools in _PRESET_COST}
+        priced = {preset for preset, _permissions, _consents, _tools in PRESET_COST}
 
         assert priced == set(ToolsPreset), (
             f"no cost recorded for {sorted(set(ToolsPreset) - priced)}"
         )
 
-    @pytest.mark.parametrize(("preset", "permissions", "consents", "tools"), _PRESET_COST)
+    @pytest.mark.parametrize(("preset", "permissions", "consents", "tools"), PRESET_COST)
     def test_it_asks_for_exactly_the_permissions_the_design_promises(
         self, preset: ToolsPreset, permissions: tuple[str, ...], consents: int, tools: int
     ) -> None:
