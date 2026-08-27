@@ -504,7 +504,7 @@ run "a_single_tenant_registration_emits_a_tenant_id" {
   }
 
   assert {
-    condition     = output.deployment_env["unique-qa"].ENTRA_TENANT_ID != null
+    condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId != null
     error_message = "the overlay for a single-tenant registration carries no tenant id"
   }
 }
@@ -516,7 +516,7 @@ run "a_multi_tenant_registration_emits_no_tenant_id" {
   }
 
   assert {
-    condition     = output.deployment_env["unique-qa"].ENTRA_TENANT_ID == null
-    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].ENTRA_TENANT_ID, "null")} as its tenant id"
+    condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == null
+    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id"
   }
 }
