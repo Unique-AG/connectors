@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.3.0...outlook-semantic-mcp@3.4.0) (2026-08-27)
+
+
+### Features
+
+* **outlook-semantic-mcp,deps:** add Outlook calendar integration behind CALENDAR_INTEGRATION ([#851](https://github.com/Unique-AG/connectors/issues/851)) ([069ce91](https://github.com/Unique-AG/connectors/commit/069ce912474aed704bc1b60e9af4187a5fdd6d38))
+
 ## [3.3.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.2.0...outlook-semantic-mcp@3.3.0) (2026-08-13)
 
 
