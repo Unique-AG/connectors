@@ -2,9 +2,22 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
-import { isDebugMode, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import {
+  isCalendarEnabled,
+  isDebugMode,
+  isMicrosoftGraphBackend,
+} from '~/utils/backend-config.utils';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
+import { CalendarModule } from './calendar/calendar.module';
+import { CancelEventTool } from './calendar/cancel-event.tool';
+import { CheckAvailabilityTool } from './calendar/check-availability.tool';
+import { CreateEventTool } from './calendar/create-event.tool';
+import { ListCalendarsTool } from './calendar/list-calendars.tool';
+import { RespondToInviteTool } from './calendar/respond-to-invite.tool';
+import { SearchCalendarEventsTool } from './calendar/search-calendar-events.tool';
+import { SuggestMeetingTimesTool } from './calendar/suggest-meeting-times.tool';
+import { UpdateEventTool } from './calendar/update-event.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { SearchEmailsTool, SearchModule } from './content';
@@ -37,12 +50,28 @@ import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 import { UserUtilsModule } from './user-utils/user-utils.module';
 
+/**
+ * Every calendar tool, exported so the schema-harmony test runs over the real registration list
+ * rather than a copy that can silently fall behind.
+ */
+export const CALENDAR_TOOLS = [
+  ListCalendarsTool,
+  SearchCalendarEventsTool,
+  CheckAvailabilityTool,
+  SuggestMeetingTimesTool,
+  RespondToInviteTool,
+  CreateEventTool,
+  UpdateEventTool,
+  CancelEventTool,
+] as const;
+
 @Module({})
 export class BackendModule {}
 
 export function registerBackendModule(): DynamicModule {
   const isGraph = isMicrosoftGraphBackend();
   const isDebug = isDebugMode();
+  const isCalendar = isCalendarEnabled();
 
   const uniqueAndMicrosoftBackendCommonTools = [
     ListMailboxesAndDirectoriesTool,
@@ -94,10 +123,12 @@ export function registerBackendModule(): DynamicModule {
       DelegatedAccessModule,
       PostAuthorizationUserFlowModule,
       DelegatedAccessUtilsModule,
+      ...(isCalendar ? [CalendarModule] : []),
     ],
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,
       ...uniqueOnlyTools,
+      ...(isCalendar ? CALENDAR_TOOLS : []),
       MailSubscriptionController,
     ],
     controllers: [MailSubscriptionController],

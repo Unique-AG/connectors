@@ -1,0 +1,151 @@
+{
+  "locals": [
+    {
+      "tool_registry": [
+        {
+          "name": "get_me",
+          "permissions": [
+            "User.Read"
+          ]
+        },
+        {
+          "name": "list_chats",
+          "permissions": [
+            "Chat.Read"
+          ]
+        },
+        {
+          "name": "list_teams",
+          "permissions": [
+            "Team.ReadBasic.All"
+          ]
+        },
+        {
+          "name": "list_channels",
+          "permissions": [
+            "Channel.ReadBasic.All"
+          ]
+        },
+        {
+          "name": "browse_channel",
+          "permissions": [
+            "ChannelMessage.Read.All"
+          ]
+        },
+        {
+          "name": "search_messages",
+          "permissions": [
+            "Chat.Read",
+            "ChannelMessage.Read.All"
+          ]
+        },
+        {
+          "name": "read_message",
+          "permissions": [
+            "Chat.Read",
+            "ChannelMessage.Read.All"
+          ]
+        },
+        {
+          "name": "list_meeting_transcripts",
+          "permissions": [
+            "OnlineMeetings.Read",
+            "OnlineMeetingTranscript.Read.All"
+          ]
+        },
+        {
+          "name": "read_transcript",
+          "permissions": [
+            "OnlineMeetingTranscript.Read.All"
+          ]
+        },
+        {
+          "name": "list_meeting_recordings",
+          "permissions": [
+            "OnlineMeetings.Read",
+            "OnlineMeetingRecording.Read.All",
+            "User.Read"
+          ]
+        }
+      ],
+      "tool_names": [
+        "get_me",
+        "list_chats",
+        "list_teams",
+        "list_channels",
+        "browse_channel",
+        "search_messages",
+        "read_message",
+        "list_meeting_transcripts",
+        "read_transcript",
+        "list_meeting_recordings"
+      ],
+      "always_on": "get_me",
+      "presets": {
+        "teams": [
+          "get_me",
+          "list_chats",
+          "list_teams",
+          "list_channels",
+          "browse_channel",
+          "search_messages",
+          "read_message",
+          "list_meeting_transcripts",
+          "read_transcript",
+          "list_meeting_recordings"
+        ],
+        "teams-chat": [
+          "list_chats"
+        ],
+        "teams-messages": [
+          "list_chats",
+          "search_messages",
+          "read_message"
+        ],
+        "teams-channels": [
+          "list_teams",
+          "list_channels",
+          "browse_channel"
+        ],
+        "teams-transcripts": [
+          "list_chats",
+          "list_meeting_transcripts",
+          "read_transcript"
+        ],
+        "teams-recordings": [
+          "list_chats",
+          "list_meeting_recordings"
+        ],
+        "teams-meetings": [
+          "list_chats",
+          "list_meeting_transcripts",
+          "read_transcript",
+          "list_meeting_recordings"
+        ]
+      },
+      "requestable_permissions": [
+        "User.Read",
+        "Chat.Read",
+        "Team.ReadBasic.All",
+        "Channel.ReadBasic.All",
+        "ChannelMessage.Read.All",
+        "OnlineMeetings.Read",
+        "OnlineMeetingTranscript.Read.All",
+        "OnlineMeetingRecording.Read.All"
+      ],
+      "needs_admin_consent": {
+        "User.Read": false,
+        "Chat.Read": false,
+        "Team.ReadBasic.All": false,
+        "Channel.ReadBasic.All": false,
+        "ChannelMessage.Read.All": true,
+        "OnlineMeetings.Read": false,
+        "OnlineMeetingTranscript.Read.All": true,
+        "OnlineMeetingRecording.Read.All": true
+      },
+      "graph_scope_prefix": "https://graph.microsoft.com/",
+      "api_scope_name": "access_as_user",
+      "callback_path": "/auth/callback"
+    }
+  ]
+}

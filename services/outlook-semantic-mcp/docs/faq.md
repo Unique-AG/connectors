@@ -70,28 +70,28 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 6 tools in `microsoft_graph` mode. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 mail tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 6 mail tools in `microsoft_graph` mode, and 8 more calendar tools when `CALENDAR_INTEGRATION` is enabled. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
 
 **What it does:**
 
 - Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters
-- Exposes 10 tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status
+- Exposes 10 mail tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status, and 8 calendar tools when the calendar flag is on
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Outlook account
-- 10 MCP tools available in their AI client immediately after connection (14 with debug mode enabled)
+- 10 mail MCP tools available in their AI client immediately after connection (14 with debug mode enabled; 8 more when calendar is enabled)
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
-The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 10 tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
+The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 10 mail tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 mail tools. Calendar tools are additive behind `CALENDAR_INTEGRATION`. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
 ### What tools are available?
 
-**Answer:** The server exposes 10 user-facing tools:
+**Answer:** The server exposes these user-facing tools:
 
 | Category | Tools |
 |----------|-------|
@@ -101,12 +101,13 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 | Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |
 | Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
 | Sync Monitoring | `sync_progress` |
+| Calendar (`CALENDAR_INTEGRATION`) | `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event` |
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
 In `microsoft_graph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools are not registered.
 
-**See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools)
+**See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools) — [Calendar](./technical/tools.md#Calendar)
 
 ### Do I need to do anything after connecting?
 
@@ -197,7 +198,7 @@ In Mode B (`microsoft_graph`), there is no inbox data to delete — `delete_inbo
 
 ### How do I set up delegated access?
 
-**Answer:** Delegated access setup happens in Microsoft 365, not in the MCP. The MCP supports three configurations: an Exchange admin grants Full Access (Read & Manage), a user shares specific folders via Outlook desktop (with a required root-mailbox visibility step), or a shared inbox is configured as a normal mailbox and connected to the MCP. See [Features — Delegated Access — Setup](./technical/features.md#Setup) for step-by-step instructions and the Outlook root-mailbox visibility gotcha.
+**Answer:** Delegated access setup happens in Microsoft 365, not in the MCP. The MCP supports Full Access grants from Exchange admin, folder-level shares from Outlook desktop (with a required root-mailbox visibility step), Microsoft 365 shared mailboxes with no sign-in (listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`), and sign-in-eligible mailboxes used either the same way or as a normal Outlook login. See [Features — Delegated Access — Setup](./technical/features.md#Setup) for step-by-step instructions and the Outlook root-mailbox visibility gotcha.
 
 ---
 
@@ -207,16 +208,22 @@ In Mode B (`microsoft_graph`), there is no inbox data to delete — `delete_inbo
 another user's mailbox — either Full Access (Read & Manage) or folder-level
 delegation configured via the Exchange admin center. The connector discovers
 these relationships automatically — no manual configuration is needed beyond
-enabling `DELEGATED_ACCESS_SCAN`.
+enabling `DELEGATED_ACCESS_SCAN`. Shared mailboxes that should be searchable
+without an MCP login must also be listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`.
 
 **Mode A (`microsoft_graph_and_unique_api`):** A background discovery job
 periodically tests which other mailboxes each connected user can access via
 Microsoft Graph. When a delegation is detected, the owner's already-ingested
 emails become searchable by the delegate through `search_emails` — no additional
-ingestion occurs. **Both users must be connected** to the MCP connector: the
-owner's emails are only available if the owner has also connected their account
-and completed ingestion. Each user's emails remain in their own isolated scope in
-the Unique knowledge base.
+ingestion occurs for ordinary user mailboxes. **Both users must be connected**
+for ordinary user mailboxes: the owner's emails are only available if the owner
+has also connected their account and completed ingestion. Each user's emails
+remain in their own isolated scope in the Unique knowledge base.
+
+**Shared mailboxes listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`:** the
+mailbox itself does not sign in. A shared-mailbox profile is created from the
+env list; Mode A ingest and Graph calls run as a connected Full Access
+delegate. Only those delegates need to connect.
 
 **Mode B (`microsoft_graph`):** The same background discovery job runs and
 records delegated mailbox relationships (`granular_access` is not supported in
@@ -229,7 +236,7 @@ mailbox. See [Why can't I search emails in a mailbox my colleague shared folders
 Microsoft Graph enforces permissions at query time — if the user no longer has
 access in Microsoft 365, that query returns no results. No ingestion occurs.
 
-**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
+**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) — [Features — Shared mailboxes](./technical/features.md#3-shared-mailboxes)
 
 ---
 
@@ -250,14 +257,19 @@ mailbox searchable. There are two jobs:
 
 **Mode A (`microsoft_graph_and_unique_api`):**
 
-- **Separate scopes, no new ingestion.** Each user's emails are stored in their
-  own isolated per-user scope in the Unique knowledge base. Discovery records the
-  access relationship — it does not trigger any ingestion. The delegate gains
-  search visibility into the owner's scope; nothing is copied or merged.
-- **Both users must be connected (both modes).** Discovery only considers
-  connected users — if the owner has not connected their MCP account there is
-  nothing to discover or search. In Mode A the owner must also have completed
-  the initial full sync for their emails to be visible to the delegate.
+- **Separate scopes, no new ingestion for ordinary user mailboxes.** Each user's
+  emails are stored in their own isolated per-user scope in the Unique knowledge
+  base. Discovery records the access relationship — it does not trigger any
+  extra ingestion of a delegated *user* mailbox. The delegate gains search
+  visibility into the owner's scope; nothing is copied or merged. Env-listed
+  shared mailboxes are ingested into their own profile via a Full Access
+  delegate's token.
+- **Both users must be connected (ordinary user mailboxes, both modes).**
+  Discovery only considers connected users — if the owner has not connected
+  their MCP account there is nothing to discover or search. In Mode A the owner
+  must also have completed the initial full sync for their emails to be visible
+  to the delegate. Env-listed shared mailboxes do not sign in; only the
+  delegates must be connected.
 - **Automatic detection.** New delegated access is picked up automatically on the
   next discovery run — no user action is needed. In `granular_access` mode,
   folder-level access details are kept up to date by the verification job.
@@ -267,9 +279,11 @@ mailbox searchable. There are two jobs:
   in `search_emails` to narrow results to a specific folder.
 
 **Mode B (`microsoft_graph`):** Discovery runs and records delegated mailbox
-relationships. **Both users must be connected** to the MCP server — discovery
-only considers connected users, so if the owner has not connected their account
-there is nothing to discover or search. Each `search_emails` call queries the
+relationships. **Both users must be connected** for ordinary user mailboxes —
+discovery only considers connected users, so if the owner has not connected
+their account there is nothing to discover or search. Env-listed shared
+mailboxes do not sign in; only the delegates must be connected. Each
+`search_emails` call queries the
 discovered delegated mailboxes via live Microsoft Graph KQL in addition to the
 user's own mailbox. **Only full mailbox access is supported in Mode B** —
 Microsoft Graph's `$search` parameter requires full mailbox access and returns
@@ -337,7 +351,7 @@ When a colleague shares individual folders with you (but has not granted you Ful
 **Workaround options:**
 
 - **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
-- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Shared inbox configured as a normal inbox](./technical/features.md#3-shared-inbox-configured-as-a-normal-inbox).
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, list it in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](./operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS), and grant Full Access to everyone who needs to search it. See [Shared mailboxes](./technical/features.md#3-shared-mailboxes).
 
 **See also:** [Features — Known Limitations](./technical/features.md#known-limitations) — [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
@@ -541,9 +555,23 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 ### Do any permissions require admin consent?
 
-**Answer:** No. All permissions are delegated and do not require admin consent. Users can connect and grant consent themselves without IT involvement.
+**Answer:** Mail permissions are delegated and do not require admin consent. Users can connect and grant those themselves without IT involvement.
 
-**See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
+Calendar is the same: `Calendars.ReadWrite.Shared` is user-consentable and does **not** require admin consent by itself. Admin consent only becomes necessary if the tenant has disabled user consent for applications, or if an admin wants to pre-grant organisation-wide.
+
+What calendar *does* require is that the scope is **registered on the Entra app** (`calendar_integration = "enabled"` on the Terraform module) before you set `CALENDAR_INTEGRATION=enabled`. Flipping the runtime flag against an app registration that does not expose the scope breaks mail token refresh (`invalid_grant`) — that failure is about registration, not consent.
+
+**See also:** [Permissions](./technical/permissions.md) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
+
+### What does `consentRequired: true` on a calendar tool mean?
+
+**Answer:** Graph denied calendar permission on the signed-in user's own mailbox — usually because `Calendars.ReadWrite.Shared` is not on their token yet. Ask the user to **reconnect Outlook** so Microsoft OAuth runs again with the calendar scope.
+
+Do **not** call `reconnect_inbox` — that only renews the mail webhook. Do **not** send the user to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a reconnect.
+
+A permission error on a *delegated* mailbox is different: that is not `consentRequired`; the tool returns a mailbox-specific denial instead.
+
+**See also:** [Tools — Calendar](./technical/tools.md#Calendar) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 

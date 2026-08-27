@@ -9,9 +9,9 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { markdownToHtml } from '~/utils/markdown-to-html';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
 import { AttachmentFailure } from './email-attachments/utils';
-import { markdownToHtml } from './markdown-to-html';
 
 const CreateMessageResponseSchema = z.object({
   id: z.string(),

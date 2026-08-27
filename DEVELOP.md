@@ -39,7 +39,7 @@ workspace and are driven by [uv](https://docs.astral.sh/uv/). `Python CI` runs e
 
 ```bash
 cd services/<service>
-uv sync --frozen
+uv sync --locked
 uv run ruff format --check . && uv run ruff check .
 uv run basedpyright
 uv run pytest

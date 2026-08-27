@@ -96,7 +96,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     // We need a cron job because once the mcp is setup we have no active user and we cannot sync the shared
     // mailboxes to database and we have to eighter login and restart the mcp or we can tell the client that
     // it takes at most until the next cron runs and there is a user which can list their ms graph users.
-    // Since the mcp has in SCOPES User.Read.All all uses should have the permission to do this sync.
+    // Since the mcp always requests User.Read.All, all users should have the permission to do this sync.
     const job = new CronJob(this.config.sharedMailboxSyncCronSchedule, async () => {
       try {
         await this.runSyncWithRetries();

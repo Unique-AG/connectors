@@ -121,6 +121,11 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/hello-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
     },
@@ -141,6 +146,11 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/kb-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
     },
@@ -161,6 +171,11 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/backstop-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
     },
@@ -181,6 +196,11 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/office-365-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
     }

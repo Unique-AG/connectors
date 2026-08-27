@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 MCP tools (plus 4 additional debug-mode tools).
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 mail MCP tools (plus 4 additional debug-mode tools), and query Outlook calendar through 8 more tools when `CALENDAR_INTEGRATION` is enabled.
 
 **Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
@@ -17,7 +17,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Provides AI clients with 10 MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status against a user's Microsoft Outlook mailbox
+**What it does:** Provides AI clients with 10 mail MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status, plus 8 calendar tools when `CALENDAR_INTEGRATION` is enabled
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -42,7 +42,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are delegated and require no admin consent. This includes `Mail.ReadWrite.Shared`, which is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`) and enables delegated mailbox access when configured. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
+All permissions are delegated. Mail permissions require no admin consent. This includes `Mail.ReadWrite.Shared`, which is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`) and enables delegated mailbox access when configured. `Calendars.ReadWrite.Shared` is requested only when `CALENDAR_INTEGRATION=enabled` and typically does require admin consent. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
 
 ## Features
 
@@ -70,12 +70,20 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 - List all accessible mailboxes and their folder trees via `list_mailboxes_and_directories` — folder IDs from this tool can be passed to `search_emails` filters
 - Retrieve email categories via `list_categories` to obtain category names for filtering searches
 
+**Calendar (Optional)**
+
+- When `CALENDAR_INTEGRATION` is enabled, AI clients can list calendars, search events, check free/busy, suggest meeting times, respond to invitations, and create, update, or cancel events
+- Live Microsoft Graph query-through — no calendar ingest. Writes notify attendees immediately after in-chat confirmation
+- See [Features — Calendar](./technical/features.md#Calendar) and [Tools — Calendar](./technical/tools.md#Calendar)
+
 **Delegated Mailbox Access (Optional)**
 
 - When `DELEGATED_ACCESS_SCAN` is enabled, the server automatically discovers users who have been granted Exchange mailbox delegation by other users
 - Delegates can search and access the inboxes of users who have granted them Full Access or folder-level delegation via Exchange admin
+- Microsoft 365 shared mailboxes with no sign-in are registered by listing them in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` — they do not log in to the MCP
+- A sign-in-eligible mailbox can either be listed the same way and never logged into, or connected during authorization as a normal Outlook account
 - See [Features — Delegated Access](./technical/features.md#Delegated-Access) for supported configurations and setup
-- See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) for configuration details
+- See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) and [DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS](./operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS) for configuration details
 
 **Subscription Management**
 
@@ -136,7 +144,7 @@ C4Context
         SystemQueue(mq, "RabbitMQ", "Message broker")
     }
 
-    System_Ext(graph, "Microsoft Graph API", "Email access via OAuth + REST")
+    System_Ext(graph, "Microsoft Graph API", "Email and calendar access via OAuth + REST")
     System_Ext(kb, "Unique Knowledge Base", "Semantic search & storage")
 
     Rel(client, app, "MCP tools", "search, draft, etc.")
@@ -216,6 +224,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
    - Compose drafts with `create_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
+   - When calendar is enabled: list calendars, search events, check availability, and create or update meetings
 
 ## Limitations and Constraints
 
@@ -255,7 +264,7 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 ### Not Supported
 
 - **Application permissions**: The server uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level permissions, so it cannot run as a background daemon accessing mailboxes without user sign-in
-- **Calendar or task data**: Only mail and contacts are in scope
+- **Task data**: Tasks are not in scope. Calendar is optional and flag-gated — see [Features — Calendar](./technical/features.md#Calendar)
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
 
 ## Related Documentation

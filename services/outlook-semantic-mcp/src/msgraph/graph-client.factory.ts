@@ -17,7 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { and, desc, eq, ilike, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
-import { SCOPES } from '../auth/microsoft.provider';
+import { getScopes } from '../auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase } from '../db/drizzle.module';
 import { userProfiles } from '../db/schema';
 import { MetricsMiddleware } from './metrics.middleware';
@@ -46,7 +46,7 @@ export class GraphClientFactory {
     this.clientSecret = this.configService.get('microsoft.clientSecret', {
       infer: true,
     }).value;
-    this.scopes = SCOPES;
+    this.scopes = getScopes();
   }
 
   // Use this when reading a MS Graph resource that any authenticated user can access (e.g. listing

@@ -29,13 +29,18 @@ export class GetMailboxTimezoneQuery {
       const raw = await client.api('/me/mailboxSettings').select('timeZone').get();
       const parsed = mailboxTimezoneSchema.safeParse(raw);
       if (!parsed.success) {
-        this.logger.warn({ msg: 'Unexpected mailboxSettings shape', err: parsed.error });
+        this.logger.warn({
+          userProfileId: key,
+          msg: 'Unexpected mailboxSettings shape',
+          err: parsed.error,
+        });
         return undefined;
       }
       this.cache.set(key, parsed.data.timeZone);
       return parsed.data.timeZone;
     } catch (error) {
       this.logger.warn({
+        userProfileId: key,
         msg: 'Failed to fetch mailbox timezone, falling back to UTC',
         err: error,
       });

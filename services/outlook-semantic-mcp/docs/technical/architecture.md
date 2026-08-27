@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2062254116 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook email with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, and contact lookup.
+The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, contact lookup, and — when `CALENDAR_INTEGRATION` is enabled — live Outlook calendar.
 
 ## High-Level Architecture
 
@@ -17,7 +17,7 @@ C4Context
         SystemQueue(mq, "RabbitMQ", "Message broker")
     }
 
-    System_Ext(graph, "Microsoft Graph API", "Email access via OAuth + REST")
+    System_Ext(graph, "Microsoft Graph API", "Email and calendar access via OAuth + REST")
     System_Ext(kb, "Unique Knowledge Base", "Semantic search & storage")
 
     Rel(client, app, "MCP tools", "search, draft, etc.")
@@ -59,6 +59,7 @@ Tools fall into these categories:
 - **Contact lookup** — Searches the user's Microsoft contacts directory via Graph API
 - **Mailbox utilities** — Lists folders and categories via Graph API for search filtering
 - **Connection management** — Checks webhook status, reconnects, or removes the mailbox connection
+- **Calendar** (when `CALENDAR_INTEGRATION` is enabled) — Live Graph query-through for calendars and events; no ingest, webhooks, or calendar tables
 
 See [Tools Reference](./tools.md) for the full list and behavior details.
 
@@ -79,7 +80,9 @@ After a user connects, the following pipelines keep the knowledge base in sync w
 **discovery job** (both `full_access_only` and `granular_access` modes) tests each
 connected user's access to other connected users' mailboxes via Microsoft Graph
 on a configurable schedule (default: every 12 hours; for `full_access_only`
-consider 4× per day since discovery is the sole revocation mechanism). The
+consider 4× per day since discovery is the sole revocation mechanism). Profiles
+created from `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` are included as owners
+even though they have no OAuth tokens. The
 **verification job** (`granular_access` mode only, default: every 4 hours)
 confirms which individual folders within each delegated mailbox are still
 readable. Neither job triggers email ingestion — they write permission records
@@ -91,7 +94,7 @@ if it stalls. See [Delegated Access Discovery Flow](./flows.md#Delegated-Access-
 
 PostgreSQL stores all persistent state:
 
-- **User profiles** — Identity, encrypted Microsoft OAuth tokens
+- **User profiles** — Identity, encrypted Microsoft OAuth tokens (OAuth profiles) or token-less shared-mailbox profiles from `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`
 - **MCP OAuth state** — Client registrations, sessions, authorization codes, access/refresh tokens with family-based revocation
 - **Webhook subscriptions** — Active Microsoft Graph subscriptions per user
 - **Sync state** — Full sync progress, live catch-up state, mail filters per user

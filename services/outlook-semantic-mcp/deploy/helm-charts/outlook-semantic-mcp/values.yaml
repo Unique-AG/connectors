@@ -56,7 +56,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/outlook-semantic-mcp
-  tag: 3.3.0 # x-release-please-version
+  tag: 3.4.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -308,6 +308,12 @@ mcpConfig:
     # -- Search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default).
     # microsoft_graph: direct Graph search, no ingestion, sync tools not registered.
     mcpBackend: microsoft_graph_and_unique_api
+    # -- Outlook calendar tools and Calendars.ReadWrite.Shared scope. Set to "enabled"
+    #    to register calendar tools and request the extra Graph scope on OAuth / token refresh.
+    #    Also set calendar_integration="enabled" on the Entra Terraform module before
+    #    flipping this flag; otherwise mail token refresh fails with invalid_grant.
+    #    Env var: CALENDAR_INTEGRATION
+    calendarIntegration: disabled
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'
@@ -339,8 +345,11 @@ mcpConfig:
     # -- Optional. Fraction (0–1) of eligible delegated users that may be stale before health is marked down.
     # Default: 0.15. Env var: DELEGATED_ACCESS_FAILURE_THRESHOLD
     # failureThreshold: 0.15
-    # -- Optional. Comma-separated list of shared mailbox email addresses to sync.
-    # Required when shared mailbox directory sync is needed. Env var: DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS
+    # -- Optional. Comma-separated mailbox addresses to register as shared-mailbox profiles
+    # without an MCP login. Use for typical Microsoft 365 shared mailboxes (no sign-in)
+    # and for sign-in-eligible mailboxes that nobody logs into in the MCP.
+    # Do not list a mailbox here if users will sign in to it as a normal Outlook account.
+    # Env var: DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS
     # sharedMailboxEmails: "mailbox1@example.com,mailbox2@example.com"
     # -- Optional. Cron schedule for shared mailbox sync. Default: every 6 hours.
     # Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE

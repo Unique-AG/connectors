@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -76,6 +76,7 @@
     "rxjs": "7.8.2",
     "safe-regex2": "5.0.0",
     "serialize-error-cjs": "0.2.0",
+    "temporal-polyfill": "1.0.4",
     "typeid-js": "1.2.0",
     "undici": "7.28.0",
     "windows-iana": "5.1.0",
