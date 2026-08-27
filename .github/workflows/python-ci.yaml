@@ -119,7 +119,7 @@ jobs:
         run: uv python install
 
       - name: Sync dependencies
-        run: uv sync --frozen
+        run: uv sync --locked
 
       # In this job and not validate-terraform: the generator imports the service's own Python to
       # render the module's registry locals, and needs no terraform binary to tell whether the
