@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.4.0...outlook-semantic-mcp@3.4.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** correct the documented calendarRef/eventRef contract ([#860](https://github.com/Unique-AG/connectors/issues/860)) ([4ffbefc](https://github.com/Unique-AG/connectors/commit/4ffbefcf7bfc6c899ade04312a80bd4a0b198ce3))
+
 ## [3.4.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.3.0...outlook-semantic-mcp@3.4.0) (2026-08-27)
 
 
