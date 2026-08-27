@@ -95,10 +95,10 @@ def _scalar(name: str) -> str:
 
 def _chart_preset_enum() -> list[str]:
     node: object = cast("object", json.loads(_CHART_SCHEMA.read_text()))
-    for key in ("properties", "env", "properties", "TOOLS_PRESET", "enum"):
+    for key in ("properties", "mcpConfig", "properties", "tools", "properties", "preset", "enum"):
         assert isinstance(node, Mapping), f"the chart schema has no {key} under this path"
         node = cast("Mapping[str, object]", node)[key]
-    assert isinstance(node, list), "TOOLS_PRESET carries no enum in the chart schema"
+    assert isinstance(node, list), "tools.preset carries no enum in the chart schema"
     return [value for value in cast("list[object]", node) if isinstance(value, str)]
 
 

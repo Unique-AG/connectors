@@ -22,16 +22,31 @@ env:
   OTEL_RESOURCE_ATTRIBUTES:
     if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
     value: 'deployment.environment={{ .Values.env.APP_ENV }}'
-  # values.schema.json requires PUBLIC_BASE_URL, ENTRA_TENANT_ID, ENTRA_CLIENT_ID and exactly one
-  # of the two keys below; the overlay supplies them. ENTRA_TENANT_ID must name a single tenant — a
-  # multi-tenant authority is rejected at startup. The tool surface decides which delegated Graph
-  # permissions every user consents to at sign-in, and which need an Entra administrator: README
-  # has the preset table, and GET /manifest prints what a running deployment asks for.
-  #   TOOLS_PRESET: teams
-  #   TOOLS_ENABLED: get_me,list_chats
 
-# Overlay must supply ENTRA_CLIENT_SECRET here — also the key material for the OAuth state rows,
-# so rotating it costs every signed-in user one re-login. DB_URL too, unless postgresql.enabled.
+# The office-365-mcp-entra-application Terraform module's `deployment_env` output publishes
+# app.publicBaseUrl/entra.tenantId/entra.clientId/tools.enabled in this exact shape per
+# confidential_clients key — copy it across rather than assembling it by hand. clientSecret is
+# separate (it's a secret, not in deployment_env): set it from the same module's `client_secrets`
+# output. fromSecretProvider.secretKey is that output's key_vault_secret_name; fromSecretProvider
+# is auto-collected into this chart's SecretProviderClass, so no secretProvider.vaults entry is
+# needed beyond secretProvider.tenantId/userAssignedIdentityID. No default given for clientSecret:
+# it is genuinely mandatory and, unlike the fail-guards below, an object can't sentinel itself.
+mcpConfig:
+  app:
+    publicBaseUrl: '{{ fail "mcpConfig.app.publicBaseUrl is mandatory. Override in your deployment values." }}'
+  entra:
+    tenantId: '{{ fail "mcpConfig.entra.tenantId is mandatory. Override in your deployment values." }}'
+    clientId: '{{ fail "mcpConfig.entra.clientId is mandatory. Override in your deployment values." }}'
+    # clientSecret:
+    #   fromSecretProvider:
+    #     vault: <key-vault-name>
+    #     secretKey: <client_secrets[key].key_vault_secret_name output>
+  # Set exactly one. Neither is defaulted on purpose — see values.additional.schema.json.
+  #   preset: teams
+  #   enabled: get_me,list_chats
+  tools: {}
+
+# DB_URL must be supplied here unless postgresql.enabled.
 envVars: []
 
 image:

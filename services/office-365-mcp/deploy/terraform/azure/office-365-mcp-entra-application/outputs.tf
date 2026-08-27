@@ -9,7 +9,7 @@ output "api_scope" {
 }
 
 output "client_secrets" {
-  description = "Map of client secrets and their corresponding Key Vault secrets, keyed by confidential_clients key. Shape matches the sibling MCP modules."
+  description = "Map of client secrets and their corresponding Key Vault secrets, keyed by confidential_clients key. Shape matches the sibling MCP modules. key_vault_secret_name is the chart's mcpConfig.entra.clientSecret.fromSecretProvider.secretKey."
   value = {
     for k, v in var.confidential_clients : k => {
       client_secret_end_date                   = azuread_application_password.client_secret[k].end_date
@@ -51,19 +51,30 @@ output "tool_surface" {
 
 output "deployment_env" {
   description = <<-EOT
-    Per confidential-client key, the pod's whole non-secret configuration in the chart's own key
-    names. Copy these into the Argo overlay rather than assembling them by hand.
-    TOOLS_ENABLED carries the resolved expansion and there is deliberately no TOOLS_PRESET key: an
-    overlay pinned to a preset name widens itself on a chart bump, past a registration nobody
-    re-applied. ENTRA_TENANT_ID is null under `AzureADMultipleOrgs`, because the consenting tenant's
-    id is not something this module can know.
+    Per confidential-client key, the pod's whole non-secret configuration in the chart's own
+    `mcpConfig` shape. Copy these into the Argo overlay rather than assembling them by hand.
+    `mcpConfig.tools.enabled` carries the resolved expansion and there is deliberately no `preset`
+    key: an overlay pinned to a preset name widens itself on a chart bump, past a registration
+    nobody re-applied. `mcpConfig.entra.tenantId` is null under `AzureADMultipleOrgs`, because the
+    consenting tenant's id is not something this module can know. `mcpConfig.entra.clientSecret` is
+    deliberately absent here (it's a secret, not non-secret config) — build it from the
+    `client_secrets` output instead: `{fromSecretProvider: {vault: <key-vault-name>, secretKey:
+    client_secrets[key].key_vault_secret_name}}`.
   EOT
   value = {
     for key, client in var.confidential_clients : key => {
-      PUBLIC_BASE_URL = trimsuffix(client.public_base_url, "/")
-      ENTRA_TENANT_ID = var.sign_in_audience == "AzureADMyOrg" ? data.azuread_client_config.current.tenant_id : null
-      ENTRA_CLIENT_ID = azuread_application.office_365_mcp.client_id
-      TOOLS_ENABLED   = join(",", local.tools)
+      mcpConfig = {
+        app = {
+          publicBaseUrl = trimsuffix(client.public_base_url, "/")
+        }
+        entra = {
+          tenantId = var.sign_in_audience == "AzureADMyOrg" ? data.azuread_client_config.current.tenant_id : null
+          clientId = azuread_application.office_365_mcp.client_id
+        }
+        tools = {
+          enabled = join(",", local.tools)
+        }
+      }
     }
   }
 }

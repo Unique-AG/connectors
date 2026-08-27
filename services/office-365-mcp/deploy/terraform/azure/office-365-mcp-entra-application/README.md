@@ -14,24 +14,37 @@ consent screen a tenant can be asked for, so it has to be chosen (`tools_preset 
 ## The selection lives in two places and they must agree
 
 The registration is written here. The pod's selection is written by the Argo overlay, as the
-`office-365-mcp` chart's `env.TOOLS_PRESET` or `env.TOOLS_ENABLED` in `values.yaml` — exactly one of
-the two there as well. Nothing at runtime compares the two.
+`office-365-mcp` chart's `mcpConfig.tools.preset` or `mcpConfig.tools.enabled` in `values.yaml` —
+exactly one of the two there as well. Nothing at runtime compares the two.
 
 Do not hand-write the overlay. `terraform output deployment_env` publishes, per `confidential_clients`
-key, the resolved values under the chart's own key names; copy them across:
+key, the resolved values in the chart's own `mcpConfig` shape; copy them across:
 
 | `deployment_env` key | Overlay value |
 | --- | --- |
-| `PUBLIC_BASE_URL` | `env.PUBLIC_BASE_URL` |
-| `ENTRA_TENANT_ID` | `env.ENTRA_TENANT_ID` |
-| `ENTRA_CLIENT_ID` | `env.ENTRA_CLIENT_ID` |
-| `TOOLS_ENABLED` | `env.TOOLS_ENABLED` (leave `env.TOOLS_PRESET` unset) |
+| `mcpConfig.app.publicBaseUrl` | `mcpConfig.app.publicBaseUrl` |
+| `mcpConfig.entra.tenantId` | `mcpConfig.entra.tenantId` |
+| `mcpConfig.entra.clientId` | `mcpConfig.entra.clientId` |
+| `mcpConfig.tools.enabled` | `mcpConfig.tools.enabled` (leave `mcpConfig.tools.preset` unset) |
 
 It carries the resolved tool list and never a preset name on purpose: an overlay pinned to a preset
-can widen itself on a chart bump, past a registration nobody re-applied. `ENTRA_CLIENT_SECRET` is
-absent because it is a secret — read it from the Key Vault secret named in the `client_secrets`
-output. If the pod ends up asking for more than the registration carries, sign-in fails at the
-*authorize* hop for every user, with nothing in the pod's logs.
+can widen itself on a chart bump, past a registration nobody re-applied. `mcpConfig.entra.clientSecret`
+is absent from `deployment_env` because it is a secret, not non-secret config — set it from the
+`client_secrets` output instead:
+
+```yaml
+mcpConfig:
+  entra:
+    clientSecret:
+      fromSecretProvider:
+        vault: <key-vault-name>
+        secretKey: <client_secrets[key].key_vault_secret_name>
+```
+
+`fromSecretProvider` is auto-collected into the chart's `SecretProviderClass`, so no separate
+`secretProvider.vaults` entry is needed — only `secretProvider.tenantId`/`userAssignedIdentityID` for
+the CSI driver identity. If the pod ends up asking for more than the registration carries, sign-in
+fails at the *authorize* hop for every user, with nothing in the pod's logs.
 
 ## Apply order
 
