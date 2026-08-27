@@ -70,10 +70,11 @@ After [granting admin consent](https://login.microsoftonline.com/organizations/a
   - `microsoft_graph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
   - `microsoft_graph_and_unique_api` *(default)* — emails ingested into Unique KB; semantic search merged with live KQL results; heavier but richer
 
-- [ ] **Delegated access scan** — only relevant if your organization uses Exchange mailbox delegation (i.e. users who have been granted access to another user's mailbox or folders); see [`DELEGATED_ACCESS_SCAN`](./configuration.md#DELEGATED_ACCESS_SCAN):
+- [ ] **Delegated access scan** — only relevant if your organization uses Exchange mailbox delegation (i.e. users who have been granted access to another user's mailbox or folders) or shared mailboxes; see [`DELEGATED_ACCESS_SCAN`](./configuration.md#DELEGATED_ACCESS_SCAN):
   - `disabled` *(default)* — no delegation scanning
   - `full_access_only` — Full Access (Read & Manage) grants via Exchange admin
   - `granular_access` — folder-level grants (e.g. shared Inbox or RFQ folder); subsumes `full_access_only`
+- [ ] **Shared mailbox emails** — only if you have Microsoft 365 shared mailboxes with no sign-in, or sign-in-eligible mailboxes that nobody will log into in the MCP. List those addresses in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](./configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS). Do not list a mailbox that users will connect as a normal Outlook account.
 
 Unique will configure your deployment using the following process:
 
@@ -115,7 +116,7 @@ Follow these steps to go from zero to a running deployment:
    2. Connect with an MCP client and complete the OAuth flow
    3. *(Mode A only)* Call `verify_inbox_connection` to confirm the webhook subscription is `active`, draft a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
    5. *(Mode B only)* Draft a test email to the connected account, call `search_emails` with a simple KQL query to confirm it returns results from Microsoft Graph
-9. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `full_access_only` or `granular_access` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
+9. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccess.scan` to `full_access_only` or `granular_access` in your Helm values. For ordinary user mailboxes, both users (delegate and owner) must connect their accounts. For Microsoft 365 shared mailboxes with no sign-in, list the addresses in `delegatedAccess.sharedMailboxEmails` instead of logging in as the shared mailbox; only the delegates need to connect. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN) and [DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS](./configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS).
 
 ## Scaling Considerations
 

@@ -208,6 +208,8 @@ Set via `mcpConfig.delegatedAccess` in Helm values:
 | `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE` | `recoveryCronSchedule` | `*/30 * * * *` | Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when `DELEGATED_ACCESS_SCAN` is not `disabled` |
 | `DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS` | `stalenessThresholdHours` | `24` | Hours after which a delegated access account is considered stale for the `/health` check |
 | `DELEGATED_ACCESS_FAILURE_THRESHOLD` | `failureThreshold` | `0.15` | Fraction (0–1) of eligible delegated users that may be stale before the `/health` check reports down |
+| `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` | `sharedMailboxEmails` | (empty) | Comma-separated mailbox addresses to register as shared-mailbox profiles without an MCP login — see [DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS](#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS) |
+| `DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE` | `sharedMailboxSyncCronSchedule` | `0 */6 * * *` | Cron schedule for syncing those addresses into user profiles. Active when `DELEGATED_ACCESS_SCAN` is not `disabled` |
 
 ### Ingestion Configuration
 
@@ -302,6 +304,7 @@ mcpConfig:
     scan: disabled
     # discoveryCronSchedule: '0 */12 * * *'   # required when scan != disabled
     # verificationCronSchedule: '0 */4 * * *'  # required when scan == granular_access
+    # sharedMailboxEmails: "support@example.com,team@example.com"  # env-listed shared mailboxes; no MCP login
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -578,11 +581,13 @@ Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for
     would require querying every accessible folder individually, which is not
     implemented due to API rate limits.
 
-> **Both users must be connected (both modes).** Discovery only considers
-> connected users — if the owner has not connected their account, there is
-> nothing to discover or search regardless of mode. In Mode A the owner must
-> also have completed the initial full sync for their emails to be available to
-> the delegate.
+> **Both users must be connected (ordinary user mailboxes, both modes).**
+> Discovery only considers connected users — if the owner has not connected
+> their account, there is nothing to discover or search regardless of mode. In
+> Mode A the owner must also have completed the initial full sync for their
+> emails to be available to the delegate. Shared mailboxes listed in
+> `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` do not sign in; only the delegates
+> must be connected. See [DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS](#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS).
 
 > **`full_access_only` — consider a more frequent discovery schedule.** When using
 > `full_access_only`, discovery is the only revocation detection mechanism.
@@ -590,6 +595,21 @@ Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for
 > day (e.g. `0 */6 * * *`) to reduce the window during which a revoked delegate
 > can still search the owner's emails. In `granular_access` mode this is less
 > critical because the verification job already runs every 4 hours.
+
+#### DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS
+
+Comma-separated list of mailbox addresses to register as shared-mailbox profiles **without an MCP login**. Ignored when `DELEGATED_ACCESS_SCAN` is `disabled`. Helm: `mcpConfig.delegatedAccess.sharedMailboxEmails`.
+
+Use this for:
+
+1. A typical Microsoft 365 shared mailbox that has **no sign-in**. Nobody logs into the MCP as that mailbox.
+2. A sign-in-eligible mailbox that you want treated as shared: list it here and **never** complete MCP authorization as that account. Delegates with Full Access then query it the same way as (1).
+
+Do **not** list a mailbox here if users will sign in to it during MCP authorization and use it as a normal Outlook account. That path is a regular OAuth connection; listing it is unnecessary. If the identity is already connected as an OAuth user, shared-mailbox sync does not convert it into a shared-mailbox profile.
+
+Sync runs at startup when the list has changed, and on `DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE` (default every 6 hours). At least one connected user in the mailbox's domain is required so Graph `/users` can resolve the addresses. Mode A ingest and later Graph calls for these profiles run as a Full Access **delegate** — grant Full Access to everyone who needs access, and have those users connect their own accounts.
+
+For setup steps see [Features — Shared mailboxes](../technical/features.md#3-shared-mailboxes).
 
 #### Mail Filters
 
