@@ -75,6 +75,18 @@ variable "confidential_clients" {
   }
 }
 
+variable "calendar_integration" {
+  description = <<-EOT
+    When true, register Calendars.ReadWrite.Shared on the Entra app and include it in the
+    admin-consent grant. Must match CALENDAR_INTEGRATION on the running service. Default
+    false keeps mail-only app registrations unchanged. Enabling calendar still requires
+    this apply (plus admin consent) before flipping the Helm/env flag, otherwise token
+    refresh requests a scope the app does not expose.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "service_principal_configuration" {
   description = <<-EOT
     Configuration for the service principal. Set to null to skip service principal creation

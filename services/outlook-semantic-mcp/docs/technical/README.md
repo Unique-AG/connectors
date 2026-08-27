@@ -5,7 +5,7 @@
 
 This section contains detailed technical documentation for developers and architects working with the Outlook Semantic MCP Server.
 
-**Note:** The Outlook Semantic MCP Server is both an MCP server and a connector — it exposes 10 MCP tools (plus 4 debug-mode tools) that AI clients invoke on demand, and once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background. This contrasts with pure connector-style servers (like Sharepoint Connector) which ingest data silently without exposing tools.
+**Note:** The Outlook Semantic MCP Server is both an MCP server and a connector — it exposes 10 mail MCP tools (plus 4 debug-mode tools), and 8 more calendar tools when `CALENDAR_INTEGRATION` is enabled. AI clients invoke those on demand, and once a user connects their account, the server automatically syncs their emails into the Unique knowledge base in the background. This contrasts with pure connector-style servers (like Sharepoint Connector) which ingest data silently without exposing tools.
 
 ## Documentation
 
@@ -17,6 +17,6 @@ This section contains detailed technical documentation for developers and archit
 | [Permissions](./permissions.md)                         | Microsoft Graph permissions with least-privilege justification                 |
 | [Security](./security.md)                               | Encryption, OAuth 2.1 with PKCE, token rotation, and threat model              |
 | [Subscription Management](./subscription-management.md) | Subscription lifecycle, renewal, status, and failure handling                  |
-| [Features](./features.md)                               | User-facing features, what's supported, what's not, and setup steps (including delegated access) |
-| [Tools](./tools.md)                                     | Full reference for all 10 MCP tools (plus 4 debug-mode tools)                  |
+| [Features](./features.md)                               | User-facing features, what's supported, what's not, and setup steps (including delegated access and calendar) |
+| [Tools](./tools.md)                                     | Full reference for mail tools, debug tools, and calendar tools                 |
 | [FAQ](../faq.md)                                        | Frequently asked questions                                                     |

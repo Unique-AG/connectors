@@ -2153,6 +2153,15 @@
               "description": "Selects the search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default). microsoft_graph: direct Graph search, no ingestion.",
               "default": "microsoft_graph_and_unique_api"
             },
+            "calendarIntegration": {
+              "type": "string",
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "description": "Enables Outlook calendar tools and requests Calendars.ReadWrite.Shared. Default disabled keeps the mail-only OAuth scope set unchanged.",
+              "default": "disabled"
+            },
             "delegatedAccessScan": {
               "type": "string",
               "enum": [

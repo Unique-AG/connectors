@@ -5,7 +5,7 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. None require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`).
+All permissions are **delegated** — they act on behalf of the signed-in user. Mail permissions do not require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`). `Calendars.ReadWrite.Shared` is requested only when `CALENDAR_INTEGRATION=enabled` and typically **does** require admin consent.
 
 | Permission | Type | Admin Consent |
 |------------|------|---------------|
@@ -14,6 +14,7 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `Mail.ReadWrite.Shared` | Delegated | No |
 | `MailboxSettings.Read` | Delegated | No |
 | `People.Read` | Delegated | No |
+| `Calendars.ReadWrite.Shared` | Delegated | Yes — only when `CALENDAR_INTEGRATION=enabled` |
 | `offline_access` | Delegated | No |
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
@@ -26,7 +27,7 @@ For full justifications, see [Microsoft Graph Permissions](../technical/permissi
 https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a
 ```
 
-The consent prompt lists the [Required Permissions](#Required-Permissions) above. None require admin consent — users can also approve permissions themselves on first connection. Granting admin consent up front is optional but skips the per-user consent prompt.
+The consent prompt lists the [Required Permissions](#Required-Permissions) above. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. If calendar is enabled, `Calendars.ReadWrite.Shared` typically requires admin consent.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `ba326974-edcf-49ef-bf7a-74b3e0ea450a`.
 
@@ -48,6 +49,10 @@ module "outlook_semantic_mcp_app" {
   display_name     = "Outlook Semantic MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
   notes            = "MCP server for Outlook email access"
+
+  # Optional. Registers Calendars.ReadWrite.Shared and includes it in admin consent.
+  # Enable this apply (and grant tenant consent) before setting CALENDAR_INTEGRATION=enabled.
+  calendar_integration = false
 
   redirect_uris = [
     "https://outlook.semantic.mcp.example.com/auth/callback"
@@ -78,6 +83,7 @@ module "outlook_semantic_mcp_app" {
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
    - Add all permissions listed under [Required Permissions](#Required-Permissions)
+   - If you will enable `CALENDAR_INTEGRATION`, also add `Calendars.ReadWrite.Shared` and grant admin consent before flipping the runtime flag
 
 3. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration

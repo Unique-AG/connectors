@@ -6,16 +6,15 @@ resource "azuread_service_principal" "msgraph" {
 }
 
 locals {
-  # Microsoft Graph delegated scopes required by Outlook Semantic MCP
-  # Based on SCOPES in services/outlook-semantic-mcp/src/auth/microsoft.provider.ts
-  graph_scopes = toset([
+  mail_scopes = toset([
     "User.Read",
     "User.Read.All",
     "Mail.ReadWrite",
     "Mail.ReadWrite.Shared",
     "MailboxSettings.Read",
-    "People.Read"
+    "People.Read",
   ])
+  graph_scopes = var.calendar_integration ? setunion(local.mail_scopes, toset(["Calendars.ReadWrite.Shared"])) : local.mail_scopes
 }
 
 resource "azuread_application" "outlook_semantic_mcp" {

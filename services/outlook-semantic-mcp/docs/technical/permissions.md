@@ -12,13 +12,14 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Mail.ReadWrite.Shared` | Delegated | No | Yes (requested unconditionally; only used when `DELEGATED_ACCESS_SCAN` is enabled) | Read emails and create drafts in mailboxes the user has been granted delegated access to via Exchange admin |
 | `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
+| `Calendars.ReadWrite.Shared` | Delegated | Yes | Only when `CALENDAR_INTEGRATION=enabled` | List calendars and read/write events, including calendars shared with the user |
 | `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
 
-**No permission requires admin consent.** Users can connect their own accounts without IT intervention. Note that `Mail.ReadWrite.Shared` is always included in the OAuth consent screen, even when `DELEGATED_ACCESS_SCAN=disabled` — see the [least-privilege justification](#Mail.ReadWrite.Shared) for details.
+**Mail permissions do not require admin consent.** Users can connect their own accounts without IT intervention. `Calendars.ReadWrite.Shared` typically does require admin consent — register it on the Entra app with the Terraform module's `calendar_integration = true` and grant tenant consent **before** setting `CALENDAR_INTEGRATION=enabled`. Admins can optionally pre-grant mail consent organisation-wide.
 
 ## Understanding Consent Requirements
 
-**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** No permission in this app requires admin consent — users can connect independently. Admins can optionally pre-grant consent organisation-wide.
+**Mail permissions are standard Microsoft delegated consent, not Outlook Semantic MCP specific.** Users can connect independently for mail. Calendar requires admin consent for `Calendars.ReadWrite.Shared`. Admins can optionally pre-grant consent organisation-wide.
 
 For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Consent Flows](../operator/authentication.md#Understanding-Consent-Flows).
 
@@ -71,6 +72,15 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Why Not Less** | This is the minimum permission for the People API |
 | **Why Not `Contacts.Read`** | `People.Read` provides the Microsoft People API which returns a richer relevance-ranked result set. `Contacts.Read` only covers the Contacts folder, not the full people graph. |
 
+### `Calendars.ReadWrite.Shared`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read and write the signed-in user's calendars, including calendars shared with them |
+| **Used For** | Calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`). Live Graph query-through; no calendar ingest |
+| **Why Not `Calendars.Read`** | Writes (create/update/respond/cancel) need write. `Calendars.ReadWrite` does not cover calendars shared with the user |
+| **Note** | Requested at OAuth time only when `CALENDAR_INTEGRATION=enabled`. The Entra app registers the scope only when Terraform `calendar_integration = true`. Unlike `Mail.ReadWrite.Shared`, this is not on the mail-only consent screen |
+
 ### `offline_access`
 
 | Aspect | Detail |
@@ -111,3 +121,5 @@ In addition to the Graph permissions above, the OAuth flow also requests the sta
 - [Authentication](../operator/authentication.md) - Entra ID app registration and consent flows
 - [Architecture](./architecture.md) - Token isolation and authentication layers
 - [Security](./security.md) - Encryption, PKCE, and threat model
+- [Tools — Calendar](./tools.md#Calendar) - Calendar tools that use `Calendars.ReadWrite.Shared`
+- [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) - Operator enablement order

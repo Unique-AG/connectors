@@ -6,6 +6,8 @@
   value: {{ .app.mcpDebugMode | quote }}
 - name: MCP_BACKEND
   value: {{ .app.mcpBackend | quote }}
+- name: CALENDAR_INTEGRATION
+  value: {{ .app.calendarIntegration | quote }}
 {{- if .app.directorySyncCronSchedule }}
 - name: DIRECTORY_SYNC_CRON_SCHEDULE
   value: {{ .app.directorySyncCronSchedule | quote }}
