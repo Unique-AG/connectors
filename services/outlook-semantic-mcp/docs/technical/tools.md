@@ -674,25 +674,15 @@ Write tools (`respond_to_invite`, `create_event`, `update_event`, `cancel_event`
 
 If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
 
-Do not display `calendarRef`, `eventRef`, `calendarId`, `eventId`, or `mailbox`. Pass `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) through unchanged — never assemble one from parts.
+Do not display `calendarRef`, `eventRef`, `calendarId`, or `eventId`. Pass `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) through unchanged — never assemble one from parts.
 
 ### ID namespaces
 
-Graph calendar and event IDs belong to **one mailbox**. An ID read from `/users/{a}/calendars` returns `404 ErrorItemNotFound` under `/users/{b}`, in both directions.
+Graph calendar and event IDs belong to **one mailbox**. Every calendar path is rooted at `/me`, which the delegated token resolves to the signed-in user, so all ids these tools hand out come from `/me/calendars` and resolve back under `/me/calendars`.
 
-So the mailbox is **provenance**, not a property of the calendar: it is whichever list the ID came out of. `list_calendars` reads `/users/{caller}/calendars` and records the caller as `mailbox`. Search and writes always use `/users/{email}/…` (never `/me/calendars`).
+That includes calendars somebody shared with the user: Graph stores an accepted share as a local copy in the recipient's own mailbox, so it lists and resolves under `/me` like any other calendar. There is no mailbox to carry alongside the id — the token already names it, which is why `calendarRef` and `eventRef` hold ids only.
 
-| How the user reaches the calendar | Listed from | `mailbox` | IDs are valid on |
-| --- | --- | --- | --- |
-| Their own calendars | `/users/{caller}/calendars` | caller SMTP | `/users/{caller}/calendars/{calendarId}/…` |
-| A calendar somebody shared with them (they accepted the invitation) | `/users/{caller}/calendars` | **caller SMTP** | `/users/{caller}/calendars/{calendarId}/…` |
-
-A shared calendar is owned by somebody else but **stored in the caller's mailbox**, so `mailbox` is the caller while `ownerEmail` is the owner. Those two fields answer different questions and must not be conflated:
-
-- `mailbox` — routing. Where the ID resolves. Never displayed.
-- `ownerEmail` / `ownerName` — display and filtering. Who it belongs to.
-
-Never infer `mailbox` from the payload. Graph sets `isTallyingResponses: true` on a shared calendar, and treating that as "this is the owner's primary calendar" routes shared calendars to a 404.
+`ownerEmail` / `ownerName` are display and filtering — who the calendar belongs to. They are not routing, and a calendar with `isOwn: false` is still read under `/me`.
 
 ### `list_calendars`
 
@@ -707,7 +697,7 @@ List Outlook calendars the signed-in user can access: their own, and calendars s
   success: boolean;
   message: string;
   calendars?: Array<{
-    calendarRef: { calendarId: string; mailbox: string }; // pass through unchanged; never display
+    calendarRef: { calendarId: string }; // pass through unchanged; never display
     name: string;
     ownerEmail: string | null;  // SMTP of the owner; on isOwn true this is the signed-in user
     ownerName: string | null;
@@ -737,7 +727,7 @@ Search events in a time window across calendars returned by `list_calendars`. Ea
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `calendars` | array of `calendarRef` (1–50) | Yes | From `list_calendars`. Pass each `calendarRef` through unchanged. Never assemble one from a mailbox address. |
+| `calendars` | array of `calendarRef` (1–50) | Yes | From `list_calendars`. Pass each `calendarRef` through unchanged. Never assemble one from a calendar id you did not get from `list_calendars`. |
 | `dateRange` | object | Yes | Prefer `rangeType: "relative"` with a documented range. Absolute `startDateTime` / `endDateTime` must include a timezone offset (`Z` or `±HH:MM`). |
 | `attendees` | email[] (max 10) | No | Every listed SMTP must be on the event (organizer or attendee). Exact whole-address match — resolve a name with `lookup_contacts` first. |
 | `subject` | `{ startsWith }` or `{ contains }` | No | Exactly one form. Prefer `contains` unless you know how the title begins. |
@@ -786,7 +776,7 @@ Results are capped. Where a filter runs relative to that cap decides what an emp
     showAs: string | null;        // free, tentative, busy, oof, workingElsewhere, unknown
     webLink: string | null;       // the only user-facing URL besides joinUrl
     calendarName: string;
-    eventRef: { eventId: string; calendarId: string; mailbox: string }; // never display
+    eventRef: { eventId: string; calendarId: string }; // never display
   }>;
   searchNotes?: string[];         // display after the results
   resolvedWindow?: {
