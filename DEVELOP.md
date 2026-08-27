@@ -45,22 +45,6 @@ uv run basedpyright
 uv run pytest
 ```
 
-### The service version lives in two files
-
-`uv.lock` repeats `[project].version` in the entry for the service's own package, so a release has
-to write both files or the lock goes stale. release-please does: each Python service declares its
-`uv.lock` as a `toml` extra-file in `release-please-config.json`, with the jsonpath
-`$.package[?(@.source.editable)].version` — the sole `editable` package in these single-project
-locks is the service itself, so the filter needs no service name and no comment hint (uv rewrites
-`uv.lock` from scratch on every re-lock, which strips the `x-release-please-version` comments the
-`generic` updater would need).
-
-CI syncs with `--locked` rather than `--frozen` so that a release which misses one of the two files
-fails the PR carrying it. `--frozen` installs the lock without ever comparing it to
-`pyproject.toml`, so a stale version line survives a green pipeline and only surfaces later, when
-someone's unrelated `uv add` re-locks and drags the line into their diff. The `Dockerfile`s keep `--frozen` on purpose: an
-image build must install the lock exactly and never re-resolve.
-
 ### Trap: basedpyright in a git worktree
 
 `[tool.basedpyright]` pins `venvPath = "."` and `venv = ".venv"`, so basedpyright resolves imports

@@ -118,9 +118,7 @@ jobs:
       - name: Set up Python
         run: uv python install
 
-      # `--locked`, not `--frozen`: `--frozen` installs the lock without ever comparing it to
-      # pyproject.toml, so a version bump that missed uv.lock passes here unnoticed. The other
-      # half is the `uv.lock` extra-file in release-please-config.json; DEVELOP.md has the why.
+      # `--locked`, not `--frozen`: `--frozen` never compares the lock to pyproject.toml.
       - name: Sync dependencies
         run: uv sync --locked
 
