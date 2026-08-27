@@ -80,7 +80,9 @@ After a user connects, the following pipelines keep the knowledge base in sync w
 **discovery job** (both `full_access_only` and `granular_access` modes) tests each
 connected user's access to other connected users' mailboxes via Microsoft Graph
 on a configurable schedule (default: every 12 hours; for `full_access_only`
-consider 4× per day since discovery is the sole revocation mechanism). The
+consider 4× per day since discovery is the sole revocation mechanism). Profiles
+created from `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` are included as owners
+even though they have no OAuth tokens. The
 **verification job** (`granular_access` mode only, default: every 4 hours)
 confirms which individual folders within each delegated mailbox are still
 readable. Neither job triggers email ingestion — they write permission records
@@ -92,7 +94,7 @@ if it stalls. See [Delegated Access Discovery Flow](./flows.md#Delegated-Access-
 
 PostgreSQL stores all persistent state:
 
-- **User profiles** — Identity, encrypted Microsoft OAuth tokens
+- **User profiles** — Identity, encrypted Microsoft OAuth tokens (OAuth profiles) or token-less shared-mailbox profiles from `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`
 - **MCP OAuth state** — Client registrations, sessions, authorization codes, access/refresh tokens with family-based revocation
 - **Webhook subscriptions** — Active Microsoft Graph subscriptions per user
 - **Sync state** — Full sync progress, live catch-up state, mail filters per user

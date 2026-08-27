@@ -345,8 +345,11 @@ mcpConfig:
     # -- Optional. Fraction (0–1) of eligible delegated users that may be stale before health is marked down.
     # Default: 0.15. Env var: DELEGATED_ACCESS_FAILURE_THRESHOLD
     # failureThreshold: 0.15
-    # -- Optional. Comma-separated list of shared mailbox email addresses to sync.
-    # Required when shared mailbox directory sync is needed. Env var: DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS
+    # -- Optional. Comma-separated mailbox addresses to register as shared-mailbox profiles
+    # without an MCP login. Use for typical Microsoft 365 shared mailboxes (no sign-in)
+    # and for sign-in-eligible mailboxes that nobody logs into in the MCP.
+    # Do not list a mailbox here if users will sign in to it as a normal Outlook account.
+    # Env var: DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS
     # sharedMailboxEmails: "mailbox1@example.com,mailbox2@example.com"
     # -- Optional. Cron schedule for shared mailbox sync. Default: every 6 hours.
     # Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE

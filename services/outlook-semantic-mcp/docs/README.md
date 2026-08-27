@@ -80,8 +80,10 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 
 - When `DELEGATED_ACCESS_SCAN` is enabled, the server automatically discovers users who have been granted Exchange mailbox delegation by other users
 - Delegates can search and access the inboxes of users who have granted them Full Access or folder-level delegation via Exchange admin
+- Microsoft 365 shared mailboxes with no sign-in are registered by listing them in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` — they do not log in to the MCP
+- A sign-in-eligible mailbox can either be listed the same way and never logged into, or connected during authorization as a normal Outlook account
 - See [Features — Delegated Access](./technical/features.md#Delegated-Access) for supported configurations and setup
-- See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) for configuration details
+- See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) and [DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS](./operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS) for configuration details
 
 **Subscription Management**
 

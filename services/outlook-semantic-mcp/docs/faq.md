@@ -198,7 +198,7 @@ In Mode B (`microsoft_graph`), there is no inbox data to delete — `delete_inbo
 
 ### How do I set up delegated access?
 
-**Answer:** Delegated access setup happens in Microsoft 365, not in the MCP. The MCP supports three configurations: an Exchange admin grants Full Access (Read & Manage), a user shares specific folders via Outlook desktop (with a required root-mailbox visibility step), or a shared inbox is configured as a normal mailbox and connected to the MCP. See [Features — Delegated Access — Setup](./technical/features.md#Setup) for step-by-step instructions and the Outlook root-mailbox visibility gotcha.
+**Answer:** Delegated access setup happens in Microsoft 365, not in the MCP. The MCP supports Full Access grants from Exchange admin, folder-level shares from Outlook desktop (with a required root-mailbox visibility step), Microsoft 365 shared mailboxes with no sign-in (listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`), and sign-in-eligible mailboxes used either the same way or as a normal Outlook login. See [Features — Delegated Access — Setup](./technical/features.md#Setup) for step-by-step instructions and the Outlook root-mailbox visibility gotcha.
 
 ---
 
@@ -208,16 +208,22 @@ In Mode B (`microsoft_graph`), there is no inbox data to delete — `delete_inbo
 another user's mailbox — either Full Access (Read & Manage) or folder-level
 delegation configured via the Exchange admin center. The connector discovers
 these relationships automatically — no manual configuration is needed beyond
-enabling `DELEGATED_ACCESS_SCAN`.
+enabling `DELEGATED_ACCESS_SCAN`. Shared mailboxes that should be searchable
+without an MCP login must also be listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`.
 
 **Mode A (`microsoft_graph_and_unique_api`):** A background discovery job
 periodically tests which other mailboxes each connected user can access via
 Microsoft Graph. When a delegation is detected, the owner's already-ingested
 emails become searchable by the delegate through `search_emails` — no additional
-ingestion occurs. **Both users must be connected** to the MCP connector: the
-owner's emails are only available if the owner has also connected their account
-and completed ingestion. Each user's emails remain in their own isolated scope in
-the Unique knowledge base.
+ingestion occurs for ordinary user mailboxes. **Both users must be connected**
+for ordinary user mailboxes: the owner's emails are only available if the owner
+has also connected their account and completed ingestion. Each user's emails
+remain in their own isolated scope in the Unique knowledge base.
+
+**Shared mailboxes listed in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`:** the
+mailbox itself does not sign in. A shared-mailbox profile is created from the
+env list; Mode A ingest and Graph calls run as a connected Full Access
+delegate. Only those delegates need to connect.
 
 **Mode B (`microsoft_graph`):** The same background discovery job runs and
 records delegated mailbox relationships (`granular_access` is not supported in
@@ -230,7 +236,7 @@ mailbox. See [Why can't I search emails in a mailbox my colleague shared folders
 Microsoft Graph enforces permissions at query time — if the user no longer has
 access in Microsoft 365, that query returns no results. No ingestion occurs.
 
-**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
+**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) — [Features — Shared mailboxes](./technical/features.md#3-shared-mailboxes)
 
 ---
 
@@ -251,14 +257,19 @@ mailbox searchable. There are two jobs:
 
 **Mode A (`microsoft_graph_and_unique_api`):**
 
-- **Separate scopes, no new ingestion.** Each user's emails are stored in their
-  own isolated per-user scope in the Unique knowledge base. Discovery records the
-  access relationship — it does not trigger any ingestion. The delegate gains
-  search visibility into the owner's scope; nothing is copied or merged.
-- **Both users must be connected (both modes).** Discovery only considers
-  connected users — if the owner has not connected their MCP account there is
-  nothing to discover or search. In Mode A the owner must also have completed
-  the initial full sync for their emails to be visible to the delegate.
+- **Separate scopes, no new ingestion for ordinary user mailboxes.** Each user's
+  emails are stored in their own isolated per-user scope in the Unique knowledge
+  base. Discovery records the access relationship — it does not trigger any
+  extra ingestion of a delegated *user* mailbox. The delegate gains search
+  visibility into the owner's scope; nothing is copied or merged. Env-listed
+  shared mailboxes are ingested into their own profile via a Full Access
+  delegate's token.
+- **Both users must be connected (ordinary user mailboxes, both modes).**
+  Discovery only considers connected users — if the owner has not connected
+  their MCP account there is nothing to discover or search. In Mode A the owner
+  must also have completed the initial full sync for their emails to be visible
+  to the delegate. Env-listed shared mailboxes do not sign in; only the
+  delegates must be connected.
 - **Automatic detection.** New delegated access is picked up automatically on the
   next discovery run — no user action is needed. In `granular_access` mode,
   folder-level access details are kept up to date by the verification job.
@@ -268,9 +279,11 @@ mailbox searchable. There are two jobs:
   in `search_emails` to narrow results to a specific folder.
 
 **Mode B (`microsoft_graph`):** Discovery runs and records delegated mailbox
-relationships. **Both users must be connected** to the MCP server — discovery
-only considers connected users, so if the owner has not connected their account
-there is nothing to discover or search. Each `search_emails` call queries the
+relationships. **Both users must be connected** for ordinary user mailboxes —
+discovery only considers connected users, so if the owner has not connected
+their account there is nothing to discover or search. Env-listed shared
+mailboxes do not sign in; only the delegates must be connected. Each
+`search_emails` call queries the
 discovered delegated mailboxes via live Microsoft Graph KQL in addition to the
 user's own mailbox. **Only full mailbox access is supported in Mode B** —
 Microsoft Graph's `$search` parameter requires full mailbox access and returns
@@ -338,7 +351,7 @@ When a colleague shares individual folders with you (but has not granted you Ful
 **Workaround options:**
 
 - **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
-- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Shared inbox configured as a normal inbox](./technical/features.md#3-shared-inbox-configured-as-a-normal-inbox).
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, list it in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](./operator/configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS), and grant Full Access to everyone who needs to search it. See [Shared mailboxes](./technical/features.md#3-shared-mailboxes).
 
 **See also:** [Features — Known Limitations](./technical/features.md#known-limitations) — [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
