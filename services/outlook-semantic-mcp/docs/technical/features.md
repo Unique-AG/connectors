@@ -236,7 +236,7 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 - Search events in a time window. Relative ranges (`today`, `thisWeek`, `nextWeek`, `next7Days`, …) resolve in the mailbox timezone. Weeks start Monday. Each result includes the full plain-text body (Graph already converted; may be truncated).
 - Free/busy (`check_availability`) and ranked slot suggestions (`suggest_meeting_times`).
 - Create, update, cancel, and respond to invitations. Writes have no draft state: the user confirms with Accept / Decline on the prompt; invitations and cancellations notify attendees immediately. `cancel_event` is not a silent delete. `create_event` / `update_event` `body` is an HTML fragment sent to Graph unchanged (not Markdown). Search still returns plain text.
-- Shared calendars. A shared calendar is owned by somebody else but stored in the caller's mailbox — `ownerEmail` is who it belongs to; internal `mailbox` is routing only and is never shown. Pass `calendarRef` / `eventRef` from list/search unchanged.
+- Shared calendars. A shared calendar is owned by somebody else but stored in the caller's mailbox, so it resolves under `/me` like any other calendar — `ownerEmail` is who it belongs to. Pass `calendarRef` / `eventRef` from list/search unchanged.
 
 **What's not supported yet**
 
