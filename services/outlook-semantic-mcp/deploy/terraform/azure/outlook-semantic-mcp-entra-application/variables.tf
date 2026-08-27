@@ -77,14 +77,19 @@ variable "confidential_clients" {
 
 variable "calendar_integration" {
   description = <<-EOT
-    When true, register Calendars.ReadWrite.Shared on the Entra app and include it in the
-    admin-consent grant. Must match CALENDAR_INTEGRATION on the running service. Default
-    false keeps mail-only app registrations unchanged. Enabling calendar still requires
-    this apply (plus admin consent) before flipping the Helm/env flag, otherwise token
-    refresh requests a scope the app does not expose.
+    When 'enabled', register Calendars.ReadWrite.Shared on the Entra app and include it in
+    the consent grant. Must match CALENDAR_INTEGRATION on the running service, which uses
+    the same 'enabled' / 'disabled' vocabulary. Default 'disabled' keeps mail-only app
+    registrations unchanged. Enabling calendar still requires this apply before flipping
+    the Helm/env flag, otherwise token refresh requests a scope the app does not expose.
   EOT
-  type        = bool
-  default     = false
+  type        = string
+  default     = "disabled"
+
+  validation {
+    condition     = contains(["enabled", "disabled"], var.calendar_integration)
+    error_message = "The calendar_integration must be one of: 'enabled', or 'disabled'."
+  }
 }
 
 variable "service_principal_configuration" {

@@ -557,7 +557,9 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **Answer:** Mail permissions are delegated and do not require admin consent. Users can connect and grant those themselves without IT involvement.
 
-Calendar is different. `Calendars.ReadWrite.Shared` typically **does** require admin consent. Register it on the Entra app (`calendar_integration = true` on the Terraform module) and grant tenant consent **before** setting `CALENDAR_INTEGRATION=enabled`. Enabling the runtime flag without that permission breaks mail token refresh (`invalid_grant`).
+Calendar is the same: `Calendars.ReadWrite.Shared` is user-consentable and does **not** require admin consent by itself. Admin consent only becomes necessary if the tenant has disabled user consent for applications, or if an admin wants to pre-grant organisation-wide.
+
+What calendar *does* require is that the scope is **registered on the Entra app** (`calendar_integration = "enabled"` on the Terraform module) before you set `CALENDAR_INTEGRATION=enabled`. Flipping the runtime flag against an app registration that does not expose the scope breaks mail token refresh (`invalid_grant`) — that failure is about registration, not consent.
 
 **See also:** [Permissions](./technical/permissions.md) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
 
