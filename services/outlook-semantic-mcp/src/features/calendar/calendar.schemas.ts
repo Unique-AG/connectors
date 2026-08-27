@@ -3,15 +3,6 @@ import * as z from 'zod';
 export interface CalendarRef {
   calendarId: string;
   name: string;
-  /**
-   * The mailbox this calendar was listed from, and the only mailbox its calendarId resolves in.
-   * Graph calendar and event ids are scoped to exactly one mailbox: an id read from
-   * /users/{a}/calendars returns 404 under /users/{b}. This is provenance, not a property of the
-   * calendar, so it can only ever be the path the id came from — never infer it from the owner or
-   * from isDefaultCalendar/isTallyingResponses. A calendar somebody shared with you lives in
-   * *your* mailbox even though ownerEmail is theirs.
-   */
-  mailbox: string;
   /** Display and filtering only. Who the calendar belongs to, which is not where its id resolves. */
   ownerEmail: string | null;
   ownerName: string | null;
@@ -25,8 +16,6 @@ export interface CalendarRef {
 export interface EventRef {
   eventId: string;
   calendarId: string;
-  /** The mailbox both ids resolve in. See CalendarRef.mailbox. */
-  mailbox: string;
 }
 
 export const GraphEmailAddressSchema = z.object({
@@ -37,7 +26,7 @@ export const GraphEmailAddressSchema = z.object({
 export const GraphCalendarSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
-  owner: GraphEmailAddressSchema.optional(),
+  owner: GraphEmailAddressSchema.nullish(),
   canEdit: z.boolean().optional(),
   canShare: z.boolean().optional(),
   canViewPrivateItems: z.boolean().optional(),

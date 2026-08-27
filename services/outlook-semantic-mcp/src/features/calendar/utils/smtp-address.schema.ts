@@ -1,11 +1,9 @@
 import * as z from 'zod';
 
 /**
- * Validates a mailbox address. This is a path-safety boundary, not just input hygiene: these
- * values are interpolated straight into Graph URLs (`/users/${mailbox}/calendars/...`), and some
- * of them arrive from tool input rather than the database. z.email() rejects the URL-structural
- * characters that would let a value escape its path segment, so do not relax it to a plain
- * z.string() — the asserts in calendar-graph-path.ts depend on it.
+ * Validates an attendee address. These arrive from tool input and go into Graph request bodies —
+ * attendee lists, `schedules` on getSchedule, `findMeetingTimes`. Graph rejects an entire request
+ * on one malformed entry, so screening here is what keeps one bad address from failing the call.
  */
 export const SmtpAddressSchema = z.email('Must be an SMTP address');
 
@@ -13,10 +11,7 @@ export function smtpAddress(description: string) {
   return SmtpAddressSchema.describe(description);
 }
 
-/**
- * Deduplicates a caller-supplied address list, preserving order and dropping anything that is not
- * an SMTP address. Graph rejects the whole request on one bad entry, so filtering beats failing.
- */
+/** Deduplicates a caller-supplied address list, preserving order and dropping non-addresses. */
 export function uniqueSmtpAddresses(addresses: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];

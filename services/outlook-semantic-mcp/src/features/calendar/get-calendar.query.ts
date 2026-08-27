@@ -3,10 +3,10 @@ import { Span } from 'nestjs-otel';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { GraphCalendarSchema } from './calendar.schemas';
 import { calendarPath, defaultCalendarPath } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   recoverCalendarGraphError,
@@ -17,7 +17,6 @@ const CALENDAR_SELECT = 'id,name,owner,canEdit,isDefaultCalendar';
 
 export interface CalendarSummary {
   calendarId: string;
-  mailbox: string;
   name: string;
   isDefaultCalendar: boolean;
   isOwn: boolean;
@@ -58,14 +57,13 @@ export class GetCalendarQuery {
   ): Promise<GetCalendarQueryOutput> {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const mailbox = input.calendarRef?.mailbox ?? userProfile.email;
     const path =
       input.calendarRef === undefined
-        ? defaultCalendarPath(mailbox)
-        : calendarPath({ mailboxEmail: mailbox, calendarId: input.calendarRef.calendarId });
+        ? defaultCalendarPath()
+        : calendarPath(input.calendarRef.calendarId);
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox,
+      userProfileEmail: userProfile.email,
       calendarId: input.calendarRef?.calendarId,
       operation: 'get_calendar',
     });
@@ -76,8 +74,7 @@ export class GetCalendarQuery {
       const parsed = GraphCalendarSchema.parse(raw);
       const ownerEmail = parsed.owner?.address ?? null;
       this.logger.debug({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(mailbox),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         calendarId: parsed.id,
         msg: 'get_calendar',
       });
@@ -86,7 +83,6 @@ export class GetCalendarQuery {
         message: 'Loaded the calendar.',
         calendar: {
           calendarId: parsed.id,
-          mailbox,
           name: parsed.name ?? '',
           isDefaultCalendar: parsed.isDefaultCalendar ?? false,
           isOwn:
@@ -101,13 +97,11 @@ export class GetCalendarQuery {
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
-        mailbox,
-        callerEmail: userProfile.email,
+        userProfileEmail: userProfile.email,
         calendarId: input.calendarRef?.calendarId,
         operation: 'get_calendar',
         notFoundMessage:
           'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
-        deniedDelegatedMessage: `Could not read the calendar on mailbox ${mailbox}.`,
       });
     }
   }

@@ -35,6 +35,9 @@ export interface CalendarEvent {
   showAs: string | null;
   webLink: string | null;
   calendarName: string;
+  ownerEmail: string | null;
+  ownerName: string | null;
+  isOwn: boolean;
   eventRef: EventRef;
 }
 
@@ -71,10 +74,12 @@ export function mapGraphEventToCalendarEvent(input: {
     showAs: input.event.showAs ?? null,
     webLink: input.event.webLink ?? null,
     calendarName: input.calendar.name,
+    ownerEmail: input.calendar.ownerEmail,
+    ownerName: input.calendar.ownerName,
+    isOwn: input.calendar.isOwn,
     eventRef: {
       eventId: input.event.id,
       calendarId: input.calendar.calendarId,
-      mailbox: input.calendar.mailbox,
     },
   };
 }

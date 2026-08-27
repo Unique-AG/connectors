@@ -50,9 +50,9 @@ module "outlook_semantic_mcp_app" {
   sign_in_audience = "AzureADMyOrg"  # Single tenant
   notes            = "MCP server for Outlook email access"
 
-  # Optional. Registers Calendars.ReadWrite.Shared and includes it in admin consent.
-  # Enable this apply (and grant tenant consent) before setting CALENDAR_INTEGRATION=enabled.
-  calendar_integration = false
+  # Optional. "enabled" registers Calendars.ReadWrite.Shared and includes it in the grant.
+  # Apply this before setting CALENDAR_INTEGRATION=enabled on the service.
+  calendar_integration = "disabled"
 
   redirect_uris = [
     "https://outlook.semantic.mcp.example.com/auth/callback"

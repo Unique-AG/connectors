@@ -14,7 +14,7 @@ locals {
     "MailboxSettings.Read",
     "People.Read",
   ])
-  graph_scopes = var.calendar_integration ? setunion(local.mail_scopes, toset(["Calendars.ReadWrite.Shared"])) : local.mail_scopes
+  graph_scopes = var.calendar_integration == "enabled" ? setunion(local.mail_scopes, toset(["Calendars.ReadWrite.Shared"])) : local.mail_scopes
 }
 
 resource "azuread_application" "outlook_semantic_mcp" {

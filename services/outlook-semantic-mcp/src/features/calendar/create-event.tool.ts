@@ -6,7 +6,6 @@ import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { offsetDateTime } from '~/utils/relative-range';
 import { CreateEventCommand } from './create-event.command';
 import { META } from './create-event-tool.meta';
@@ -158,7 +157,6 @@ export class CreateEventTool {
     if (!calendar.canEdit) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(calendar.mailbox),
         calendarId: calendar.calendarId,
         msg: 'create_event rejected read-only calendar',
       });
@@ -193,7 +191,7 @@ export class CreateEventTool {
     }
     return this.createEventCommand.run(userProfileId, {
       ...input,
-      calendarRef: { calendarId: calendar.calendarId, mailbox: calendar.mailbox },
+      calendarRef: { calendarId: calendar.calendarId },
       transactionId,
     });
   }

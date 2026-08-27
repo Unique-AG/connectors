@@ -11,10 +11,10 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { ResolveMailboxTimezoneQuery } from '~/features/user-utils/resolve-mailbox-timezone.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { type EventRef, GraphWrittenEventSchema } from './calendar.schemas';
 import { createEventPath } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   recoverCalendarGraphError,
@@ -22,7 +22,7 @@ import {
 import type { CalendarRefInput } from './utils/calendar-ref.schema';
 import { graphEventBody } from './utils/graph-event-body';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
+import { uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
 const TRANSACTION_ID_MAX = 32;
 
@@ -72,16 +72,9 @@ export class CreateEventCommand {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.calendarRef.mailbox),
       calendarId: input.calendarRef.calendarId,
       attendeeCount: input.attendees?.length ?? 0,
       msg: 'create_event started',
-    });
-    calendarTraceAttrs({
-      userProfileId: userProfileIdString,
-      mailbox: input.calendarRef.mailbox,
-      calendarId: input.calendarRef.calendarId,
-      operation: 'create_event',
     });
     return this.calendarMetrics.measureOperation({ operation: 'create_event' }, () =>
       this.create(userProfileId, userProfileIdString, input),
@@ -108,15 +101,9 @@ export class CreateEventCommand {
     );
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    // calendarRef pairs the id with the mailbox it resolves in, so the two cannot be mismatched.
-    const mailbox = input.calendarRef.mailbox;
-    assert.ok(
-      SmtpAddressSchema.safeParse(mailbox).success,
-      'mailbox must already be an SMTP address',
-    );
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox,
+      userProfileEmail: userProfile.email,
       calendarId: input.calendarRef.calendarId,
       operation: 'create_event',
     });
@@ -126,7 +113,7 @@ export class CreateEventCommand {
 
     try {
       const calendarId = input.calendarRef.calendarId;
-      const path = createEventPath({ mailboxEmail: mailbox, calendarId });
+      const path = createEventPath(calendarId);
       const startTime = mapIsoToGraphDateTimeTimeZone({
         iso: input.startDateTime,
         ianaTimeZone,
@@ -165,8 +152,7 @@ export class CreateEventCommand {
         });
       const created = GraphWrittenEventSchema.parse(raw);
       this.logger.log({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(mailbox),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         calendarId,
         transactionId,
         attendeeCount: attendees.length,
@@ -181,7 +167,6 @@ export class CreateEventCommand {
         eventRef: {
           eventId: created.id,
           calendarId,
-          mailbox,
         },
         subject: created.subject ?? input.subject.trim(),
         start: {
@@ -203,14 +188,12 @@ export class CreateEventCommand {
           error,
           logger: this.logger,
           userProfileId: userProfileIdString,
-          mailbox,
-          callerEmail: userProfile.email,
+          userProfileEmail: userProfile.email,
           calendarId: input.calendarRef.calendarId,
           operation: 'create_event',
           notFoundMessage:
             'That calendar was not found. Call list_calendars again and pass calendarRef without changing it.',
           invalidMessage: 'Graph rejected the event. Check the start and end times and try again.',
-          deniedDelegatedMessage: `Could not create an event on mailbox ${mailbox}.`,
         }),
         transactionId,
       };

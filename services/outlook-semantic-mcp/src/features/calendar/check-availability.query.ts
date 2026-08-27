@@ -25,6 +25,7 @@ import {
 } from './utils/calendar-graph-errors';
 import { getSchedulePath } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   logCalendarRecovered,
@@ -43,7 +44,7 @@ import {
   type WorkingHours,
 } from './utils/map-graph-working-hours-to-working-hours';
 import { mapIsoToGraphDateTimeTimeZone } from './utils/map-iso-to-graph-date-time-time-zone';
-import { SmtpAddressSchema, uniqueSmtpAddresses } from './utils/smtp-address.schema';
+import { uniqueSmtpAddresses } from './utils/smtp-address.schema';
 
 const DEFAULT_INTERVAL_MINUTES = 30;
 const MAX_BUSY_BLOCKS_PER_PERSON = 100;
@@ -134,8 +135,7 @@ export class CheckAvailabilityQuery {
       now: clock,
     });
     this.logger.debug({
-      userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(userProfile.email),
+      ...calendarLogUser(userProfileIdString, userProfile.email),
       ianaTimeZone,
       outlookTimeZone,
       interpretation: resolvedWindow.interpretation,
@@ -150,13 +150,9 @@ export class CheckAvailabilityQuery {
       !isScheduleWindowTooLong(resolvedWindow.startDateTime, resolvedWindow.endDateTime),
       'dateRange must already be shorter than 62 days',
     );
-    assert.ok(
-      SmtpAddressSchema.safeParse(userProfile.email).success,
-      'signed-in user email must already be an SMTP address',
-    );
     calendarTraceAttrs({
       userProfileId: userProfileIdString,
-      mailbox: userProfile.email,
+      userProfileEmail: userProfile.email,
       operation: 'check_availability',
     });
     const intervalMinutes = input.intervalMinutes ?? DEFAULT_INTERVAL_MINUTES;
@@ -164,7 +160,7 @@ export class CheckAvailabilityQuery {
 
     try {
       const raw = await client
-        .api(getSchedulePath(userProfile.email))
+        .api(getSchedulePath())
         .header('Prefer', `outlook.timezone="${outlookTimeZone}"`)
         .post({
           schedules,
@@ -190,22 +186,20 @@ export class CheckAvailabilityQuery {
           viewStart,
           intervalMinutes,
           userProfileId: userProfileIdString,
-          mailbox: userProfile.email,
+          userProfileEmail: userProfile.email,
         }),
       );
       const people = perPerson.map((entry) => entry.person);
       notes.push(...perPerson.flatMap((entry) => entry.notes));
       this.logger.log({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(userProfile.email),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         scheduleCount: schedules.length,
         returned: people.length,
         msg: 'check_availability getSchedule',
       });
       if (people.length === 0) {
         this.logger.debug({
-          userProfileId: userProfileIdString,
-          mailbox: obfuscateEmail(userProfile.email),
+          ...calendarLogUser(userProfileIdString, userProfile.email),
           msg: 'check_availability no availability returned',
         });
       }
@@ -223,7 +217,7 @@ export class CheckAvailabilityQuery {
       if (isGetScheduleTooManyEntriesError(error)) {
         logCalendarRecovered(this.logger, {
           userProfileId: userProfileIdString,
-          mailbox: userProfile.email,
+          userProfileEmail: userProfile.email,
           outcome: 'too_many_entries',
           msg: 'check_availability too many calendar entries',
           err: error,
@@ -239,7 +233,7 @@ export class CheckAvailabilityQuery {
       if (isCalendarPermissionDeniedError(error)) {
         logCalendarRecovered(this.logger, {
           userProfileId: userProfileIdString,
-          mailbox: userProfile.email,
+          userProfileEmail: userProfile.email,
           outcome: 'consent',
           msg: 'check_availability consent required',
           err: error,
@@ -261,22 +255,20 @@ export class CheckAvailabilityQuery {
     viewStart: Temporal.ZonedDateTime;
     intervalMinutes: number;
     userProfileId: string;
-    mailbox: string;
+    userProfileEmail: string;
   }): { person: PersonAvailability; notes: string[] } {
     const email = input.item.scheduleId ?? 'unknown';
     const notes: string[] = [];
     if (isTooManyEntries(input.item.error)) {
       this.logger.warn({
-        userProfileId: input.userProfileId,
-        mailbox: obfuscateEmail(input.mailbox),
+        ...calendarLogUser(input.userProfileId, input.userProfileEmail),
         scheduleId: obfuscateEmail(email),
         msg: 'check_availability person too many entries',
       });
       notes.push(`${email}: ${TOO_MANY_ENTRIES_MESSAGE}`);
     } else if (input.item.error?.message !== undefined) {
       this.logger.warn({
-        userProfileId: input.userProfileId,
-        mailbox: obfuscateEmail(input.mailbox),
+        ...calendarLogUser(input.userProfileId, input.userProfileEmail),
         scheduleId: obfuscateEmail(email),
         graphResponseCode: input.item.error.responseCode,
         msg: 'check_availability person error',
@@ -291,8 +283,7 @@ export class CheckAvailabilityQuery {
     const items = (input.item.scheduleItems ?? []).map(mapGraphScheduleItemToScheduleItem);
     if (busyBlocks.length > MAX_BUSY_BLOCKS_PER_PERSON) {
       this.logger.debug({
-        userProfileId: input.userProfileId,
-        mailbox: obfuscateEmail(input.mailbox),
+        ...calendarLogUser(input.userProfileId, input.userProfileEmail),
         scheduleId: obfuscateEmail(email),
         msg: 'check_availability busy blocks truncated',
       });
@@ -302,8 +293,7 @@ export class CheckAvailabilityQuery {
     }
     if (items.length > MAX_ITEMS_PER_PERSON) {
       this.logger.debug({
-        userProfileId: input.userProfileId,
-        mailbox: obfuscateEmail(input.mailbox),
+        ...calendarLogUser(input.userProfileId, input.userProfileEmail),
         scheduleId: obfuscateEmail(email),
         msg: 'check_availability schedule items truncated',
       });

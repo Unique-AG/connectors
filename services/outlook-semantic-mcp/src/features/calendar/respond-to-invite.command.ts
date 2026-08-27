@@ -8,7 +8,6 @@ import {
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import type { EventRef } from './calendar.schemas';
 import {
   EVENT_RESPONSES,
@@ -16,11 +15,11 @@ import {
   eventResponsePath,
 } from './utils/calendar-graph-path';
 import {
+  calendarLogUser,
   calendarTraceAttrs,
   calendarUserProfileId,
   recoverCalendarGraphError,
 } from './utils/calendar-observability';
-import { SmtpAddressSchema } from './utils/smtp-address.schema';
 
 export interface RespondToInviteCommandInput {
   eventRef: EventRef;
@@ -54,16 +53,9 @@ export class RespondToInviteCommand {
     const userProfileIdString = calendarUserProfileId(userProfileId);
     this.logger.debug({
       userProfileId: userProfileIdString,
-      mailbox: obfuscateEmail(input.eventRef.mailbox),
       calendarId: input.eventRef.calendarId,
       response: input.response,
       msg: 'respond_to_invite started',
-    });
-    calendarTraceAttrs({
-      userProfileId: userProfileIdString,
-      mailbox: input.eventRef.mailbox,
-      calendarId: input.eventRef.calendarId,
-      operation: 'respond_to_invite',
     });
     return this.calendarMetrics.measureOperation({ operation: 'respond_to_invite' }, () =>
       this.respond(userProfileId, userProfileIdString, input),
@@ -79,18 +71,18 @@ export class RespondToInviteCommand {
       (EVENT_RESPONSES as readonly string[]).includes(input.response),
       'response must already be accept, tentativelyAccept, or decline',
     );
-    assert.ok(
-      SmtpAddressSchema.safeParse(input.eventRef.mailbox).success,
-      'eventRef.mailbox must already be an SMTP address',
-    );
     assert.ok(input.eventRef.eventId.length > 0, 'eventRef.eventId must already be set');
     assert.ok(input.eventRef.calendarId.length > 0, 'eventRef.calendarId must already be set');
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const mailbox = input.eventRef.mailbox;
+    calendarTraceAttrs({
+      userProfileId: userProfileIdString,
+      userProfileEmail: userProfile.email,
+      calendarId: input.eventRef.calendarId,
+      operation: 'respond_to_invite',
+    });
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
     const path = eventResponsePath({
-      mailboxEmail: mailbox,
       calendarId: input.eventRef.calendarId,
       eventId: input.eventRef.eventId,
       response: input.response,
@@ -106,8 +98,7 @@ export class RespondToInviteCommand {
           ...(comment !== undefined && comment !== '' ? { comment } : {}),
         });
       this.logger.log({
-        userProfileId: userProfileIdString,
-        mailbox: obfuscateEmail(mailbox),
+        ...calendarLogUser(userProfileIdString, userProfile.email),
         calendarId: input.eventRef.calendarId,
         response: input.response,
         msg: 'respond_to_invite',
@@ -122,13 +113,11 @@ export class RespondToInviteCommand {
         error,
         logger: this.logger,
         userProfileId: userProfileIdString,
-        mailbox,
-        callerEmail: userProfile.email,
+        userProfileEmail: userProfile.email,
         calendarId: input.eventRef.calendarId,
         operation: 'respond_to_invite',
         notFoundMessage:
           'That event was not found. Search again and pass eventRef without changing it.',
-        deniedDelegatedMessage: `Could not respond to an invite on mailbox ${mailbox}.`,
       });
     }
   }

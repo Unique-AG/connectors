@@ -22,21 +22,15 @@ describe(classifyCalendarGraphError.name, () => {
     expect(
       classifyCalendarGraphError({
         error: makeGraphError(404),
-        mailbox: 'me@example.com',
-        callerEmail: 'me@example.com',
         notFoundMessage: 'missing',
-        deniedDelegatedMessage: 'denied',
       }),
     ).toEqual({ outcome: 'not_found', message: 'missing' });
   });
 
-  it('maps 403 on the caller mailbox to consent', () => {
+  it("maps 403 to consent, because every addressable calendar is the caller's own", () => {
     expect(
       classifyCalendarGraphError({
         error: makeGraphError(403),
-        mailbox: 'me@example.com',
-        callerEmail: 'me@example.com',
-        deniedDelegatedMessage: 'denied',
       }),
     ).toEqual({
       outcome: 'consent',
@@ -45,24 +39,10 @@ describe(classifyCalendarGraphError.name, () => {
     });
   });
 
-  it('maps 403 on a delegated mailbox to permission', () => {
-    expect(
-      classifyCalendarGraphError({
-        error: makeGraphError(403),
-        mailbox: 'banker@example.com',
-        callerEmail: 'me@example.com',
-        deniedDelegatedMessage: 'denied',
-      }),
-    ).toEqual({ outcome: 'permission', message: 'denied' });
-  });
-
   it('returns unhandled for errors that are not mapped to a tool result', () => {
     expect(
       classifyCalendarGraphError({
         error: makeGraphError(500),
-        mailbox: 'me@example.com',
-        callerEmail: 'me@example.com',
-        deniedDelegatedMessage: 'denied',
       }),
     ).toEqual({ outcome: 'unhandled' });
   });
@@ -71,9 +51,6 @@ describe(classifyCalendarGraphError.name, () => {
     expect(
       classifyCalendarGraphError({
         error: makeGraphError(404),
-        mailbox: 'me@example.com',
-        callerEmail: 'me@example.com',
-        deniedDelegatedMessage: 'denied',
       }),
     ).toEqual({ outcome: 'unhandled' });
   });
@@ -91,7 +68,6 @@ describe(logCalendarRecovered.name, () => {
 
     logCalendarRecovered(logger, {
       userProfileId: 'user_profile_1',
-      mailbox: 'me@example.com',
       ownerEmail: 'banker@example.com',
       outcome: 'consent',
       msg: 'list_calendars consent required',
@@ -100,13 +76,11 @@ describe(logCalendarRecovered.name, () => {
     // The sink de-identifies, so a caller cannot leak an address by forgetting to.
     expect(warn).toHaveBeenCalledWith({
       userProfileId: 'user_profile_1',
-      mailbox: obfuscateEmail('me@example.com'),
       ownerEmail: obfuscateEmail('banker@example.com'),
       msg: 'list_calendars consent required',
     });
     expect(traceEvent).toHaveBeenCalledWith('calendar.recovered', {
       outcome: 'consent',
-      mailbox: obfuscateEmail('me@example.com'),
       ownerEmail: obfuscateEmail('banker@example.com'),
     });
     expect(JSON.stringify(warn.mock.calls[0])).not.toContain('me@example.com');
@@ -120,12 +94,10 @@ describe(recoverCalendarGraphError.name, () => {
       error: makeGraphError(404),
       logger: { warn } as unknown as Logger,
       userProfileId: 'user_profile_1',
-      mailbox: 'me@example.com',
-      callerEmail: 'me@example.com',
+      userProfileEmail: 'me@example.com',
       calendarId: 'cal-own',
       operation: 'create_event',
       notFoundMessage: 'missing',
-      deniedDelegatedMessage: 'denied',
     });
 
     expect(recovered).toEqual({
@@ -148,10 +120,8 @@ describe(recoverCalendarGraphError.name, () => {
         error,
         logger: { warn: vi.fn() } as unknown as Logger,
         userProfileId: 'user_profile_1',
-        mailbox: 'me@example.com',
-        callerEmail: 'me@example.com',
+        userProfileEmail: 'me@example.com',
         operation: 'create_event',
-        deniedDelegatedMessage: 'denied',
       }),
     ).toThrow(error);
   });

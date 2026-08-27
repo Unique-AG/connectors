@@ -16,7 +16,7 @@ const DEFAULT_TZ = {
   outlookTimeZone: 'W. Europe Standard Time',
   notes: [],
 };
-const CREATE_PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events`;
+const CREATE_PATH = `/me/calendars/cal-own/events`;
 const PREFER = 'outlook.timezone="W. Europe Standard Time", IdType="ImmutableId"';
 
 function makeGraphError(statusCode: number, code: string): GraphError {
@@ -76,7 +76,7 @@ describe(CreateEventCommand.name, () => {
       attendees: ['alex@example.com'],
       location: 'Room A',
       isOnlineMeeting: true,
-      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
+      calendarRef: { calendarId: 'cal-own' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -97,7 +97,6 @@ describe(CreateEventCommand.name, () => {
     expect(result.eventRef).toEqual({
       eventId: 'evt-1',
       calendarId: 'cal-own',
-      mailbox: OWN_EMAIL,
     });
     expect(result.joinUrl).toBe('https://teams.example/join');
     expect(result.transactionId).toBe('abc123abc123abc123abc123abc123ab');
@@ -112,7 +111,7 @@ describe(CreateEventCommand.name, () => {
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
       body,
-      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
+      calendarRef: { calendarId: 'cal-own' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -131,7 +130,7 @@ describe(CreateEventCommand.name, () => {
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
       body: '   ',
-      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
+      calendarRef: { calendarId: 'cal-own' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -146,12 +145,12 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      calendarRef: { calendarId: 'cal-banker', mailbox: 'banker@example.com' },
+      calendarRef: { calendarId: 'cal-banker' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
     expect(get).not.toHaveBeenCalled();
-    expect(api).toHaveBeenCalledWith('/users/banker@example.com/calendars/cal-banker/events');
+    expect(api).toHaveBeenCalledWith('/me/calendars/cal-banker/events');
   });
 
   it('returns consentRequired when the caller mailbox is denied', async () => {
@@ -164,30 +163,12 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      calendarRef: { calendarId: 'cal-own', mailbox: OWN_EMAIL },
+      calendarRef: { calendarId: 'cal-own' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
     expect(result.success).toBe(false);
     expect(result.consentRequired).toBe(true);
-  });
-
-  it('does not ask for consent when a delegated mailbox is denied', async () => {
-    const { command } = createCommand({
-      post: vi.fn().mockRejectedValue(makeGraphError(403, 'ErrorAccessDenied')),
-    });
-
-    const result = await command.run(USER_PROFILE_ID, {
-      subject: 'Sync',
-      startDateTime: '2026-08-26T09:00:00+02:00',
-      endDateTime: '2026-08-26T09:30:00+02:00',
-      calendarRef: { calendarId: 'cal-banker', mailbox: 'banker@example.com' },
-      transactionId: 'abc123abc123abc123abc123abc123ab',
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.consentRequired).toBeUndefined();
-    expect(result.message).toMatch(/banker@example.com/);
   });
 
   it('returns success false when the calendar is not found', async () => {
@@ -199,7 +180,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      calendarRef: { calendarId: 'missing', mailbox: 'banker@example.com' },
+      calendarRef: { calendarId: 'missing' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 
@@ -217,7 +198,7 @@ describe(CreateEventCommand.name, () => {
       subject: 'Sync',
       startDateTime: '2026-08-26T09:00:00+02:00',
       endDateTime: '2026-08-26T09:30:00+02:00',
-      calendarRef: { calendarId: 'cal-own', mailbox: 'me@example.com' },
+      calendarRef: { calendarId: 'cal-own' },
       transactionId: 'abc123abc123abc123abc123abc123ab',
     });
 

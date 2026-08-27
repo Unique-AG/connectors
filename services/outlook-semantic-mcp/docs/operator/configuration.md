@@ -539,11 +539,11 @@ When set to `enabled`, exposes four additional debug tools to all connected MCP 
 
 Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. Write tools notify other people immediately after the user confirms — there is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
-The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers (and admin-consents) `Calendars.ReadWrite.Shared` when `calendar_integration = true`. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`.
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when `calendar_integration = "enabled"`. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`.
 
 Do this in order. Flipping the runtime flag before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
 
-1. Apply Terraform `outlook-semantic-mcp-entra-application` with `calendar_integration = true` and grant tenant admin consent for `Calendars.ReadWrite.Shared`.
+1. Apply Terraform `outlook-semantic-mcp-entra-application` with `calendar_integration = "enabled"`.
 2. Confirm the Entra app lists that delegated permission.
 3. Set `CALENDAR_INTEGRATION=enabled` (`mcpConfig.app.calendarIntegration`).
 4. Existing connected users must **reconnect Outlook**, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` only renews the mail webhook; it does not re-run OAuth. The user has to start a new Outlook connection.

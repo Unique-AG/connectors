@@ -5,7 +5,6 @@ import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { obfuscateEmail } from '~/utils/obfuscate-email';
 import { offsetDateTime } from '~/utils/relative-range';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
@@ -182,10 +181,7 @@ export class UpdateEventTool {
     }
     const snapshot = loaded.event;
     const loadedCalendar = await this.getCalendarQuery.run(userProfileId, {
-      calendarRef: {
-        calendarId: snapshot.calendarId,
-        mailbox: snapshot.mailbox,
-      },
+      calendarRef: { calendarId: snapshot.calendarId },
     });
     if (loadedCalendar.success !== true || loadedCalendar.calendar === undefined) {
       return {
@@ -198,7 +194,6 @@ export class UpdateEventTool {
     if (!calendar.canEdit) {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(input.eventRef.mailbox),
         calendarId: input.eventRef.calendarId,
         msg: 'update_event rejected read-only calendar',
       });
@@ -221,7 +216,6 @@ export class UpdateEventTool {
     if (confirmation.status !== 'accepted') {
       this.logger.debug({
         userProfileId: userProfileId.toString(),
-        mailbox: obfuscateEmail(input.eventRef.mailbox),
         calendarId: input.eventRef.calendarId,
         msg: 'update_event elicit cancelled',
       });
@@ -230,7 +224,6 @@ export class UpdateEventTool {
     const applyTo = parseSeriesScope(confirmation.content);
     this.logger.debug({
       userProfileId: userProfileId.toString(),
-      mailbox: obfuscateEmail(input.eventRef.mailbox),
       calendarId: input.eventRef.calendarId,
       applyTo,
       msg: 'update_event series scope',

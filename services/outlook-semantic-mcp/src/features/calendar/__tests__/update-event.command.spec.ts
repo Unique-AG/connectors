@@ -14,9 +14,8 @@ const OWN_EMAIL = 'me@example.com';
 const EVENT_REF = {
   eventId: 'evt-1',
   calendarId: 'cal-own',
-  mailbox: OWN_EMAIL,
 };
-const PATH = `/users/${OWN_EMAIL}/calendars/cal-own/events/master-1`;
+const PATH = `/me/calendars/cal-own/events/master-1`;
 const PREFER = 'outlook.timezone="W. Europe Standard Time", IdType="ImmutableId"';
 
 function makeGraphError(statusCode: number, code: string): GraphError {
