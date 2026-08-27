@@ -55,10 +55,10 @@ locks is the service itself, so the filter needs no service name and no comment 
 `uv.lock` from scratch on every re-lock, which strips the `x-release-please-version` comments the
 `generic` updater would need).
 
-CI syncs with `--locked` rather than `--frozen` for the same reason. `--frozen` installs the lock
-without ever comparing it to `pyproject.toml`, so a stale version line survives a green pipeline and
-only surfaces later, when someone's unrelated `uv add` re-locks and drags the line into their diff.
-`--locked` fails the PR that carries the mismatch. The `Dockerfile`s keep `--frozen` on purpose: an
+CI syncs with `--locked` rather than `--frozen` so that a release which misses one of the two files
+fails the PR carrying it. `--frozen` installs the lock without ever comparing it to
+`pyproject.toml`, so a stale version line survives a green pipeline and only surfaces later, when
+someone's unrelated `uv add` re-locks and drags the line into their diff. The `Dockerfile`s keep `--frozen` on purpose: an
 image build must install the lock exactly and never re-resolve.
 
 ### Trap: basedpyright in a git worktree

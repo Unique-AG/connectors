@@ -119,12 +119,8 @@ jobs:
         run: uv python install
 
       # `--locked`, not `--frozen`: `--frozen` installs the lock without ever comparing it to
-      # pyproject.toml, so a manifest/lock mismatch stays invisible here. The mismatch that
-      # actually happens is the release: release-please bumps `[project].version`, and uv.lock
-      # carries that same version in the workspace member's own `[[package]]` entry. Left
-      # unchecked it is silent until an unrelated `uv add`/`uv lock` drags the version line into
-      # someone else's diff. Both are kept aligned by the `uv.lock` extra-file in
-      # release-please-config.json; this is the gate that says so when they are not.
+      # pyproject.toml, so a version bump that missed uv.lock passes here unnoticed. The other
+      # half is the `uv.lock` extra-file in release-please-config.json; DEVELOP.md has the why.
       - name: Sync dependencies
         run: uv sync --locked
 
