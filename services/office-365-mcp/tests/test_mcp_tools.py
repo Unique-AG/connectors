@@ -650,6 +650,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_draft_reply",
         "outlook_send_draft",
         "outlook_set_automatic_reply",
+        "outlook_disable_mail_rule",
     }
 )
 

@@ -27,6 +27,7 @@ from office_365_mcp.tools import (
     list_meeting_transcripts,
     list_teams,
     outlook_browse_folders,
+    outlook_disable_mail_rule,
     outlook_draft_mail,
     outlook_draft_reply,
     outlook_find_recipient,
@@ -130,6 +131,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_draft_reply,
     outlook_send_draft,
     outlook_set_automatic_reply,
+    outlook_disable_mail_rule,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -228,6 +230,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_draft_reply",
         "outlook_send_draft",
         "outlook_set_automatic_reply",
+        "outlook_disable_mail_rule",
     ),
 }
 

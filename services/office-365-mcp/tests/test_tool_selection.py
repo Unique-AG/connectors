@@ -577,7 +577,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "MailboxSettings.ReadWrite",
         ),
         0,
-        14,
+        15,
     ),
 )
 
