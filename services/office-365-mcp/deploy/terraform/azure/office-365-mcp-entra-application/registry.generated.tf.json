@@ -99,6 +99,12 @@
           "permissions": [
             "Mail.Read"
           ]
+        },
+        {
+          "name": "outlook_list_mail",
+          "permissions": [
+            "Mail.Read"
+          ]
         }
       ],
       "tool_names": [
@@ -116,7 +122,8 @@
         "outlook_read_mail",
         "outlook_browse_folders",
         "outlook_find_recipient",
-        "outlook_read_thread"
+        "outlook_read_thread",
+        "outlook_list_mail"
       ],
       "always_on": "get_me",
       "presets": {
@@ -164,7 +171,8 @@
           "outlook_read_mail",
           "outlook_browse_folders",
           "outlook_find_recipient",
-          "outlook_read_thread"
+          "outlook_read_thread",
+          "outlook_list_mail"
         ]
       },
       "requestable_permissions": [
