@@ -44,11 +44,11 @@ env:
   BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED: "false"
   BACKSTOP_SYSTEM_USER_CACHE_ENABLED: "false"
 
-  # RESOLUTION_ELICIT_TIMEOUT_SECONDS (45) bounds how long a tool waits for the user to choose
-  # between ambiguous matches before returning the candidate list instead. Left to the app's
-  # default here, but it is a property of the *client*, not of this server: it must stay under
-  # that client's tool-call deadline, with margin for the upstream search that precedes the
-  # prompt. Lower it in an overlay whose client cancels sooner than 60s.
+  # Bounds how long a tool waits for the user to choose between ambiguous matches before
+  # returning the candidate list instead. A property of the *client*, not of this server: it
+  # must stay under that client's tool-call deadline, with margin for the upstream search that
+  # precedes the prompt. Lower it in an overlay whose client cancels sooner than 60s.
+  RESOLUTION_ELICIT_TIMEOUT_SECONDS: "45"
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
