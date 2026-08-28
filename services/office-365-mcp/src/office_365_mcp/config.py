@@ -92,6 +92,7 @@ class ToolsPreset(StrEnum):
     OUTLOOK_READ = "outlook-read"
     OUTLOOK_MAILBOX = "outlook-mailbox"
     OUTLOOK_WRITE = "outlook-write"
+    OUTLOOK_SEND = "outlook-send"
 
 
 class AppConfig(BaseSettings):

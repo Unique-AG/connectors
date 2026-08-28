@@ -199,6 +199,17 @@ run "preset_outlook_write" {
   }
 }
 
+run "preset_outlook_send" {
+  variables {
+    tools_preset = "outlook-send"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic"
+    error_message = "outlook-send composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "list_chats"]

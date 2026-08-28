@@ -647,6 +647,8 @@ GRAPH_STEPS = frozenset(
         "create_draft",
         "create_reply",
         "fill_reply",
+        "read_draft",
+        "send_draft",
         "transcript_attributed",
         "transcript_unattributed",
     }

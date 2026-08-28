@@ -138,6 +138,8 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "People.Read",
         "MailboxSettings.Read",
         "Mail.ReadWrite",
+        "Mail.Send",
+        "Mail.ReadBasic",
     }
 )
 

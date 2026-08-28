@@ -135,6 +135,13 @@
           "permissions": [
             "Mail.ReadWrite"
           ]
+        },
+        {
+          "name": "outlook_send_draft",
+          "permissions": [
+            "Mail.Send",
+            "Mail.ReadBasic"
+          ]
         }
       ],
       "tool_names": [
@@ -158,7 +165,8 @@
         "outlook_mark_mail",
         "outlook_move_mail",
         "outlook_draft_mail",
-        "outlook_draft_reply"
+        "outlook_draft_reply",
+        "outlook_send_draft"
       ],
       "always_on": "get_me",
       "presets": {
@@ -230,6 +238,20 @@
           "outlook_move_mail",
           "outlook_draft_mail",
           "outlook_draft_reply"
+        ],
+        "outlook-send": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail",
+          "outlook_get_mailbox_settings",
+          "outlook_mark_mail",
+          "outlook_move_mail",
+          "outlook_draft_mail",
+          "outlook_draft_reply",
+          "outlook_send_draft"
         ]
       },
       "requestable_permissions": [
@@ -244,7 +266,9 @@
         "Mail.Read",
         "People.Read",
         "MailboxSettings.Read",
-        "Mail.ReadWrite"
+        "Mail.ReadWrite",
+        "Mail.Send",
+        "Mail.ReadBasic"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -258,7 +282,9 @@
         "Mail.Read": false,
         "People.Read": false,
         "MailboxSettings.Read": false,
-        "Mail.ReadWrite": false
+        "Mail.ReadWrite": false,
+        "Mail.Send": false,
+        "Mail.ReadBasic": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",
