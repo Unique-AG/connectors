@@ -628,6 +628,8 @@ GRAPH_STEPS = frozenset(
         "resolve_meeting",
         "transcripts",
         "recordings",
+        "mail_search",
+        "mail_ids",
         "transcript_attributed",
         "transcript_unattributed",
     }

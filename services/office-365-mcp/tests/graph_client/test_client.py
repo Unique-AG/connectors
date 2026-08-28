@@ -14,8 +14,9 @@ from office_365_mcp.graph_client import GraphSettings, create_graph_transport, n
 from office_365_mcp.graph_client.client import (
     _CallerTokenProvider,  # pyright: ignore[reportPrivateUsage]
 )
+from tests.conftest import RecordedSleeps
 
-from .conftest import CALLER_TOKEN, GRAPH_V1, RecordedSleeps
+from .conftest import CALLER_TOKEN, GRAPH_V1
 
 
 def _handler_chain(transport: httpx.AsyncClient) -> list[str]:

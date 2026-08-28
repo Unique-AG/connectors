@@ -45,7 +45,7 @@ from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, Surfac
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 from office_365_mcp.server import readiness
 from office_365_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
-from office_365_mcp.tools import ALWAYS_ON, Selection, register_tools, resolve
+from office_365_mcp.tools import ALWAYS_ON, TOOL_NAMES, Selection, register_tools, resolve
 
 _PUBLIC_BASE_URL = "https://office-365-mcp.example"
 
@@ -329,7 +329,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     def test_every_tool_file_has_its_permissions_on_that_list(self) -> None:
         """Catches a tool file never added to `_TOOL_MODULES`: it registers and asks for nothing."""
-        asked_for = set(resolve(preset=ToolsPreset.TEAMS, enabled=None).graph_scopes)
+        asked_for = set(resolve(preset=None, enabled=list(TOOL_NAMES)).graph_scopes)
 
         missing = {
             f"{name}: {permission}"

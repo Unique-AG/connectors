@@ -229,8 +229,8 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 class TestTheManifestRefusesToGuess:
     async def test_a_permission_with_no_verdict_is_an_assertion_and_not_a_shrug(self) -> None:
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON,), permissions=("Mail.Read",), graph_scopes=()
+            preset=None, tools=(ALWAYS_ON,), permissions=("Files.Read.All",), graph_scopes=()
         )
 
-        with pytest.raises(AssertionError, match="no admin-consent verdict for Mail.Read"):
+        with pytest.raises(AssertionError, match="no admin-consent verdict for Files.Read.All"):
             await _manifest_of(selection)

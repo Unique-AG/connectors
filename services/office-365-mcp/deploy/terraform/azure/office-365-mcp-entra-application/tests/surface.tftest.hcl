@@ -166,6 +166,17 @@ run "preset_teams_meetings" {
   }
 }
 
+run "preset_outlook_read" {
+  variables {
+    tools_preset = "outlook-read"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read"
+    error_message = "outlook-read composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "list_chats"]

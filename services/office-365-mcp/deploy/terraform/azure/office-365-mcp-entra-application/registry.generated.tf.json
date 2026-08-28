@@ -66,6 +66,13 @@
             "OnlineMeetingRecording.Read.All",
             "User.Read"
           ]
+        },
+        {
+          "name": "outlook_search_mail",
+          "permissions": [
+            "Mail.Read",
+            "User.Read"
+          ]
         }
       ],
       "tool_names": [
@@ -78,7 +85,8 @@
         "teams_read_message",
         "list_meeting_transcripts",
         "read_transcript",
-        "list_meeting_recordings"
+        "list_meeting_recordings",
+        "outlook_search_mail"
       ],
       "always_on": "get_me",
       "presets": {
@@ -120,6 +128,9 @@
           "list_meeting_transcripts",
           "read_transcript",
           "list_meeting_recordings"
+        ],
+        "outlook-read": [
+          "outlook_search_mail"
         ]
       },
       "requestable_permissions": [
@@ -130,7 +141,8 @@
         "ChannelMessage.Read.All",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
-        "OnlineMeetingRecording.Read.All"
+        "OnlineMeetingRecording.Read.All",
+        "Mail.Read"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -140,7 +152,8 @@
         "ChannelMessage.Read.All": true,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
-        "OnlineMeetingRecording.Read.All": true
+        "OnlineMeetingRecording.Read.All": true,
+        "Mail.Read": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",

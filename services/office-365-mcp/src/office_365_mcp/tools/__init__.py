@@ -26,6 +26,7 @@ from office_365_mcp.tools import (
     list_meeting_recordings,
     list_meeting_transcripts,
     list_teams,
+    outlook_search_mail,
     read_transcript,
     teams_read_message,
     teams_search_messages,
@@ -104,6 +105,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     list_meeting_transcripts,
     read_transcript,
     list_meeting_recordings,
+    outlook_search_mail,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -144,6 +146,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "read_transcript",
         "list_meeting_recordings",
     ),
+    "outlook-read": ("outlook_search_mail",),
 }
 
 
