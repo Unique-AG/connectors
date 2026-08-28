@@ -150,13 +150,6 @@ networkPolicy:
     ingress: true
     egress: true
   baseline:
-    # Scrapes reach this pod from Prometheus in `system`, not from the base chart's `monitoring`
-    # default — so the namespace is named, exactly as office-365-mcp and teams-mcp name it.
-    # `enabled: false` emits no Prometheus ingress rule at all
-    # (base/templates/_networkPolicy.cilium.tpl, `$hasPrometheus`), so the moment the Unique QA
-    # overlay sets `networkPolicy.enabled: true` every scrape is dropped. /metrics stays up, the
-    # probes stay green and the pod logs nothing — which is why `backstop_*` OTel metrics were
-    # absent from prod Prometheus even though `GET /metrics` served them.
     prometheus:
       namespace: system
     ephemeralPorts:

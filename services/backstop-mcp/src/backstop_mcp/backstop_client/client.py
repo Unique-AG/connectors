@@ -3,10 +3,17 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
-from typing import Literal, NoReturn, cast
+from typing import NoReturn, cast
 
 import httpx
 
+from backstop_mcp.backstop_client.auth_recheck import (
+    TRANSIENT_AUTH_MESSAGE,
+    ProbeOutcome,
+    RecheckClock,
+    confirmed_rejection,
+    probe_outcome,
+)
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
@@ -42,13 +49,6 @@ logger = logging.getLogger(__name__)
 # Backstop call that still requires a valid credential. Login verification and mid-session
 # 401 re-checks both use it. Keep the path in one place so those two cannot drift.
 SYSTEM_INFO_PATH = "/system-info"
-
-# Mid-session 401 re-check: wait before the first probe so in-flight requests can drain,
-# retry with exponential backoff, give up after ~10s. A single-shot probe is not enough —
-# /system-info itself returned spurious 401s on roughly half of production login attempts.
-_AUTH_RECHECK_INITIAL_DELAY_SECONDS = 1.0
-_AUTH_RECHECK_BUDGET_SECONDS = 10.0
-_AUTH_RECHECK_BACKOFF_BASE = 2.0
 
 # /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
 # slow (up to ~30s per 500 records) — they get the extended timeout and the larger
@@ -99,6 +99,9 @@ class BackstopClient:
         self._http_client: HttpClientProvider = http_client
         self._gate: RequestGate = gate
         self._retry_policy: RetryPolicy = retry_policy
+        # None only for login (`verify_credential`): that call *is* the credential check, so a
+        # 401 must fail fast instead of re-probing `/system-info`. Mid-session clients always
+        # pass a revoke hook.
         self._on_auth_failure: AuthFailureHook | None = on_auth_failure
         self._subject: str | None = subject
 
@@ -351,119 +354,114 @@ class BackstopClient:
     async def _recheck_then_maybe_revoke(self, *, trigger_path: str) -> NoReturn:
         """Re-probe `/system-info` with backoff; revoke only if every probe is unauthorized."""
         assert self._on_auth_failure is not None
-        started = time.monotonic()
-        delay = _AUTH_RECHECK_INITIAL_DELAY_SECONDS
-        attempt = 0
-        saw_unauthorized = False
-        only_unauthorized = True
+        clock = RecheckClock()
+        outcomes: list[ProbeOutcome] = []
         while True:
-            elapsed = time.monotonic() - started
-            remaining = _AUTH_RECHECK_BUDGET_SECONDS - elapsed
-            if remaining <= 0 and attempt > 0:
+            wait = clock.next_wait()
+            if wait is None:
                 break
-            wait = delay if remaining <= 0 else min(delay, remaining)
             await asyncio.sleep(wait)
-            attempt += 1
-            outcome = await self._probe_system_info()
-            logger.info(
-                "backstop.auth_recheck.attempt",
-                extra=self._log_extra(
-                    trigger_path=trigger_path,
-                    attempt=attempt,
-                    outcome=outcome,
-                    elapsed_ms=int((time.monotonic() - started) * 1000),
-                ),
-            )
+            leftover = clock.leftover()
+            if leftover <= 0:
+                break
+            outcome = await self._probe_system_info(budget_seconds=leftover)
+            outcomes.append(outcome)
+            self._log_recheck_attempt(trigger_path, clock, attempt=len(outcomes), outcome=outcome)
             if outcome == "ok":
-                logger.info(
-                    "backstop.auth_recheck.decision",
-                    extra=self._log_extra(
-                        trigger_path=trigger_path,
-                        attempts=attempt,
-                        elapsed_ms=int((time.monotonic() - started) * 1000),
-                        revoked=False,
-                    ),
-                )
-                raise BackstopTransientAuthError(
-                    "Backstop temporarily rejected the request. Please retry."
-                )
-            if outcome == "unauthorized":
-                saw_unauthorized = True
-            else:
-                only_unauthorized = False
-            delay *= _AUTH_RECHECK_BACKOFF_BASE
-            if time.monotonic() - started + delay >= _AUTH_RECHECK_BUDGET_SECONDS:
+                self._raise_transient_auth(trigger_path, clock, attempts=len(outcomes))
+            if not clock.another_probe_fits():
                 break
 
-        elapsed_ms = int((time.monotonic() - started) * 1000)
-        should_revoke = saw_unauthorized and only_unauthorized and attempt > 0
-        if not should_revoke:
-            logger.info(
-                "backstop.auth_recheck.decision",
-                extra=self._log_extra(
-                    trigger_path=trigger_path,
-                    attempts=attempt,
-                    elapsed_ms=elapsed_ms,
-                    revoked=False,
-                ),
-            )
-            raise BackstopTransientAuthError(
-                "Backstop temporarily rejected the request. Please retry."
-            )
-
+        if not confirmed_rejection(outcomes):
+            self._raise_transient_auth(trigger_path, clock, attempts=len(outcomes))
         try:
+            # Notify the auth failed an that we need to revoke credentials
             await self._on_auth_failure()
         except Exception:
             logger.exception("backstop.auth_failure_hook.failed")
-            logger.info(
-                "backstop.auth_recheck.decision",
-                extra=self._log_extra(
-                    trigger_path=trigger_path,
-                    attempts=attempt,
-                    elapsed_ms=elapsed_ms,
-                    revoked=False,
-                ),
-            )
-            raise BackstopTransientAuthError(
-                "Backstop temporarily rejected the request. Please retry."
-            ) from None
+            self._log_recheck_decision(trigger_path, clock, attempts=len(outcomes), revoked=False)
+            raise BackstopTransientAuthError(TRANSIENT_AUTH_MESSAGE) from None
+        self._log_recheck_decision(trigger_path, clock, attempts=len(outcomes), revoked=True)
+        raise BackstopSessionRevokedError()
 
+    def _raise_transient_auth(
+        self, trigger_path: str, clock: RecheckClock, *, attempts: int
+    ) -> NoReturn:
+        self._log_recheck_decision(trigger_path, clock, attempts=attempts, revoked=False)
+        raise BackstopTransientAuthError(TRANSIENT_AUTH_MESSAGE)
+
+    def _log_recheck_attempt(
+        self,
+        trigger_path: str,
+        clock: RecheckClock,
+        *,
+        attempt: int,
+        outcome: ProbeOutcome,
+    ) -> None:
+        logger.info(
+            "backstop.auth_recheck.attempt",
+            extra=self._log_extra(
+                trigger_path=trigger_path,
+                attempt=attempt,
+                outcome=outcome,
+                elapsed_ms=clock.elapsed_ms,
+            ),
+        )
+
+    def _log_recheck_decision(
+        self, trigger_path: str, clock: RecheckClock, *, attempts: int, revoked: bool
+    ) -> None:
         logger.info(
             "backstop.auth_recheck.decision",
             extra=self._log_extra(
                 trigger_path=trigger_path,
-                attempts=attempt,
-                elapsed_ms=elapsed_ms,
-                revoked=True,
+                attempts=attempts,
+                elapsed_ms=clock.elapsed_ms,
+                revoked=revoked,
             ),
         )
-        raise BackstopSessionRevokedError()
 
-    async def _probe_system_info(self) -> Literal["ok", "unauthorized", "error"]:
-        """One `/system-info` GET. Does not invoke the auth-failure hook or re-check."""
+    async def _probe_system_info(self, *, budget_seconds: float) -> ProbeOutcome:
+        """One `/system-info` GET. Must not go through `raw_request`.
+
+        `raw_request` turns a 401 into this re-check. Probing through it would recurse:
+        401 → re-check → probe → 401 → re-check. This path hits httpx itself and only
+        classifies the status.
+        """
+        if budget_seconds <= 0:
+            return "error"
+        try:
+            response = await self._system_info_within(budget_seconds)
+        except Exception:
+            return "error"
+        return probe_outcome(response)
+
+    async def _system_info_within(self, budget_seconds: float) -> httpx.Response:
+        """GET `/system-info`; gate wait and HTTP share the leftover re-check window."""
         auth = httpx.BasicAuth(
             self._credential.username, self._credential.api_token.get_secret_value()
         )
-        timeout = self._settings.default_timeout_seconds
         url = resolve_request_url(self._settings.base_url, SYSTEM_INFO_PATH)
         shared_client = await self._http_client()
         route = metric_route(SYSTEM_INFO_PATH)
+        deadline = time.monotonic() + budget_seconds
         waiting_since = time.monotonic()
-        try:
-            async with self._gate(self._credential.username):
-                started = time.monotonic()
-                BACKSTOP_CONCURRENCY_WAIT.record(started - waiting_since, {"route": route})
-                try:
-                    response = await shared_client.request("GET", url, auth=auth, timeout=timeout)
-                finally:
-                    BACKSTOP_REQUEST_DURATION.record(
-                        time.monotonic() - started, {"method": "GET", "route": route}
-                    )
-        except Exception:
-            return "error"
+        async with asyncio.timeout(budget_seconds), self._gate(self._credential.username):
+            started = time.monotonic()
+            BACKSTOP_CONCURRENCY_WAIT.record(started - waiting_since, {"route": route})
+            leftover = deadline - started
+            if leftover <= 0:
+                raise TimeoutError
+            try:
+                response = await shared_client.request(
+                    "GET",
+                    url,
+                    auth=auth,
+                    timeout=min(self._settings.default_timeout_seconds, leftover),
+                )
+            finally:
+                BACKSTOP_REQUEST_DURATION.record(
+                    time.monotonic() - started, {"method": "GET", "route": route}
+                )
         BACKSTOP_REQUESTS.add(1, {"method": "GET", "route": route, "status": response.status_code})
-        if response.status_code in {401, 403}:
-            return "unauthorized"
-        if response.is_error:
-            return "error"
-        return "ok"
+        return response

@@ -3,6 +3,7 @@ import base64
 import logging
 import time
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import cast
 
 import httpx
@@ -270,6 +271,75 @@ class TestAuthRecheck:
             await client.raw_request("GET", "/people")
 
         assert revoked == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_probe_http_timeout_is_the_leftover_recheck_budget(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        route = respx.get(f"{_BASE_URL}/system-info").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        async def on_auth_failure() -> None:
+            raise AssertionError("must not revoke when a probe succeeds")
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with pytest.raises(BackstopTransientAuthError):
+            await client.raw_request("GET", "/people")
+
+        timeout = _read_timeout(route)
+        assert timeout <= 10.0
+        assert timeout < BackstopConfig().default_timeout_seconds
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_hung_probe_cannot_outrun_the_recheck_budget(
+        self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+        monkeypatch.setattr(
+            "backstop_mcp.backstop_client.auth_recheck.AUTH_RECHECK_BUDGET_SECONDS", 0.2
+        )
+        revoked: list[bool] = []
+
+        async def on_auth_failure() -> None:
+            revoked.append(True)
+
+        async def hang(_request: httpx.Request) -> httpx.Response:
+            await asyncio.Event().wait()
+            return httpx.Response(401)
+
+        respx.get(f"{_BASE_URL}/people").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(side_effect=hang)
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        started = time.monotonic()
+        with pytest.raises(BackstopTransientAuthError):
+            await client.raw_request("GET", "/people")
+
+        assert time.monotonic() - started < 2.0
+        assert revoked == []
+
+    @pytest.mark.asyncio
+    async def test_probe_gives_up_when_the_gate_does_not_admit_within_the_budget(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        @asynccontextmanager
+        async def stuck(_username: str) -> AsyncGenerator[None]:
+            await asyncio.Event().wait()
+            yield
+
+        client = factory.for_credential(_credential())
+        client._gate = stuck  # pyright: ignore[reportPrivateUsage]
+        started = time.monotonic()
+
+        outcome = await client._probe_system_info(budget_seconds=0.2)  # pyright: ignore[reportPrivateUsage]
+
+        assert outcome == "error"
+        assert time.monotonic() - started < 2.0
 
 
 class TestUnauthorizedLogging:

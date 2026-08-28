@@ -19,12 +19,6 @@ class NotConnectedError(ToolError):
     """
 
 
-def current_subject() -> str | None:
-    """Return the MCP access-token subject for the active request, if any."""
-    access_token = get_access_token()
-    return access_token.subject if access_token is not None else None
-
-
 class BackstopAuthContext(BaseModel):
     """Resolves "whose Backstop credential" for the in-flight MCP request.
 
@@ -49,7 +43,7 @@ class BackstopAuthContext(BaseModel):
         matching row from `credential_store`. Call this from within a tool implementation,
         where an authenticated request is active.
         """
-        subject = current_subject()
+        subject = self.current_subject()
         if subject is None:
             raise NotConnectedError(
                 "Not connected to Backstop yet — add this MCP server to your client and "
@@ -66,11 +60,13 @@ class BackstopAuthContext(BaseModel):
 
         return credential
 
-    def active_subject(self) -> str | None:
-        return current_subject()
+    def current_subject(self) -> str | None:
+        """MCP access-token subject for the in-flight request, if any."""
+        access_token = get_access_token()
+        return access_token.subject if access_token is not None else None
 
     async def revoke_current_subject_tokens(self) -> None:
         """Revoke MCP tokens for the active subject after a mid-session Backstop 401."""
-        subject = current_subject()
+        subject = self.current_subject()
         if subject is not None:
             await self.revoke_tokens_for_subject(subject)

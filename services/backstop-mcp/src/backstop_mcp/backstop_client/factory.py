@@ -142,6 +142,10 @@ class BackstopClientFactory:
         Concurrency is gated around each individual request inside `BackstopClient.raw_request`,
         so a caller can hold a client across an elicitation prompt, or fan several requests
         out of one client, without either starving itself or breaching Backstop's limit.
+
+        `on_auth_failure` is None only for login (`verify_credential`). That request *is* the
+        credential check — a hook would re-probe `/system-info` after the probe already 401'd.
+        Mid-session callers (`for_current_caller`) always pass a revoke hook.
         """
         return BackstopClient(
             credential,
@@ -170,7 +174,7 @@ class BackstopClientFactory:
         return self.for_credential(
             credential,
             on_auth_failure=auth.revoke_current_subject_tokens,
-            subject=auth.active_subject(),
+            subject=auth.current_subject(),
         )
 
     async def verify_credential(self, username: str, api_token: str) -> bool:
@@ -185,6 +189,7 @@ class BackstopClientFactory:
         shown to the user differently.
         """
         credential = BackstopCredentialSecret(username=username, api_token=SecretStr(api_token))
+        # No revoke hook — this GET is the login check; a 401 must not re-probe `/system-info`.
         client = self.for_credential(credential)
         try:
             await client.raw_request("GET", SYSTEM_INFO_PATH)

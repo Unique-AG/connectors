@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
-from starlette.types import Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backstop_mcp.backstop_client import BackstopSessionRevokedError
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
@@ -137,3 +137,37 @@ class TestSessionRevokedToUnauthorizedMiddleware:
 
         assert response.status_code == 401
         assert "invalid_token" in response.headers["www-authenticate"]
+
+    def test_outer_middleware_sees_the_rewritten_401_on_post(self) -> None:
+        """POST holds until the app returns, then `send`s 401. That `send` must be the outer
+        stack's, or request-metrics / OTel record the JSON-RPC 200 and never see the rewrite.
+        """
+        seen: list[int] = []
+
+        class _RecordStartStatus:
+            app: ASGIApp
+            statuses: list[int]
+
+            def __init__(self, app: ASGIApp, statuses: list[int]) -> None:
+                self.app = app
+                self.statuses = statuses
+
+            async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+                async def send_wrapper(message: Message) -> None:
+                    if message["type"] == "http.response.start":
+                        self.statuses.append(cast("int", message["status"]))
+                    await send(message)
+
+                await self.app(scope, receive, send_wrapper)
+
+        app = Starlette(
+            routes=[Route("/revoked", _revoked, methods=["POST"])],
+            middleware=[
+                Middleware(_RecordStartStatus, statuses=seen),
+                Middleware(SessionRevokedToUnauthorizedMiddleware),
+            ],
+        )
+        response = _post(TestClient(app), "/revoked")
+
+        assert response.status_code == 401
+        assert seen == [401]

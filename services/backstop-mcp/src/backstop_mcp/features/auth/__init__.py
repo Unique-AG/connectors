@@ -14,7 +14,6 @@ from backstop_mcp.features.auth.cleanup import cleanup_lifespan
 from backstop_mcp.features.auth.context import (
     BackstopAuthContext,
     NotConnectedError,
-    current_subject,
 )
 from backstop_mcp.features.auth.crypto import load_key
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider
@@ -26,6 +25,5 @@ __all__ = [
     "NotConnectedError",
     "ThrottleConfig",
     "cleanup_lifespan",
-    "current_subject",
     "load_key",
 ]

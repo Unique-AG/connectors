@@ -41,7 +41,7 @@ class CallerAuthContext(Protocol):
         """
         ...
 
-    def active_subject(self) -> str | None:
+    def current_subject(self) -> str | None:
         """MCP access-token subject for the in-flight request, if any."""
         ...
 

@@ -139,7 +139,7 @@ class TestRevokeCurrentSubjectTokens:
         assert revoked == []
 
 
-class TestActiveSubject:
+class TestCurrentSubject:
     def test_returns_the_access_token_subject(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -149,4 +149,4 @@ class TestActiveSubject:
             lambda: _access_token("user-9"),
         )
 
-        assert _auth(session_factory).active_subject() == "user-9"
+        assert _auth(session_factory).current_subject() == "user-9"

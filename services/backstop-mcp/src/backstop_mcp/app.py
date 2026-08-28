@@ -84,10 +84,12 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
-            # Outermost so request-metrics / OTel see the rewritten 401, not the JSON-RPC 200.
-            Middleware(SessionRevokedToUnauthorizedMiddleware),
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
+            # Innermost: Starlette wraps last-listed first, so the rewritten 401 is what
+            # request-metrics / OTel see. First-listed would rewrite on the raw send after they
+            # already recorded the JSON-RPC 200.
+            Middleware(SessionRevokedToUnauthorizedMiddleware),
         ]
     )
 
