@@ -1,11 +1,10 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import ClassVar, Generic, cast
+from typing import ClassVar, Generic, TypeVar, cast
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import TypeVar
 
 from backstop_mcp.backstop_client.utils import deserialize
 

@@ -2,7 +2,7 @@
 name = "office-365-mcp"
 version = "0.1.0"
 description = "Office 365 FastMCP server"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     # The `azure` extra (azure-identity, pyjwt) is what FastMCP's On-Behalf-Of exchange needs —
     # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
@@ -77,7 +77,7 @@ markers = ["docker: needs a live Postgres via testcontainers"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -88,7 +88,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests"]
 extraPaths = ["src", "."]

@@ -600,21 +600,21 @@ class TestABootedServerHonoursTheLogContract:
     lines to stdout in plain text; `main.py` passes `log_config=None` to stop that.
     """
 
-    def test_nothing_is_written_to_stdout(self, booted: "_BootedServer") -> None:
+    def test_nothing_is_written_to_stdout(self, booted: _BootedServer) -> None:
         assert booted.stdout == "", f"uvicorn wrote to stdout: {booted.stdout!r}"
 
-    def test_every_line_is_pino_json(self, booted: "_BootedServer") -> None:
+    def test_every_line_is_pino_json(self, booted: _BootedServer) -> None:
         for line in booted.stderr.splitlines():
             fields = cast("Mapping[str, object]", json.loads(line))
             assert isinstance(fields, dict), line
             assert {"level", "time", "msg", "context"} <= set(fields), line
 
-    def test_uvicorns_own_lifecycle_lines_are_in_it(self, booted: "_BootedServer") -> None:
+    def test_uvicorns_own_lifecycle_lines_are_in_it(self, booted: _BootedServer) -> None:
         contexts = {line["context"] for line in booted.lines}
 
         assert "uvicorn.error" in contexts, sorted(cast("set[str]", contexts))
 
-    def test_the_access_line_is_in_it(self, booted: "_BootedServer") -> None:
+    def test_the_access_line_is_in_it(self, booted: _BootedServer) -> None:
         access = [line for line in booted.lines if line["context"] == "uvicorn.access"]
 
         assert access, "no access line was logged as pino-json"
@@ -622,14 +622,14 @@ class TestABootedServerHonoursTheLogContract:
             line["msg"] for line in access
         ]
 
-    def test_the_access_line_carries_no_credential(self, booted: "_BootedServer") -> None:
+    def test_the_access_line_carries_no_credential(self, booted: _BootedServer) -> None:
         """End to end: the filter is on the handler uvicorn now propagates to."""
         assert "opaque-query-secret" not in booted.stderr
         assert any(f"api-key={CENSORED}" in cast("str", line["msg"]) for line in booted.lines), [
             line["msg"] for line in booted.lines
         ]
 
-    def test_the_probes_own_access_line_is_still_quiet(self, booted: "_BootedServer") -> None:
+    def test_the_probes_own_access_line_is_still_quiet(self, booted: _BootedServer) -> None:
         """`unique_mcp` drops access lines for the ops routes, and routing uvicorn through the root
         handler keeps that filter in the path."""
         assert not [
@@ -638,7 +638,7 @@ class TestABootedServerHonoursTheLogContract:
             if line["context"] == "uvicorn.access" and "/probe" in cast("str", line["msg"])
         ]
 
-    def test_every_line_is_joinable(self, booted: "_BootedServer") -> None:
+    def test_every_line_is_joinable(self, booted: _BootedServer) -> None:
         for line in booted.lines:
             assert line.get("correlation_id"), line
 

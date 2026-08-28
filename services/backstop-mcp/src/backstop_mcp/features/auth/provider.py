@@ -553,7 +553,7 @@ class BackstopOAuthProvider(OAuthProvider):
 
     async def _rotate_refresh_token(
         self, refresh_token: RefreshToken, scopes: list[str]
-    ) -> "_RefreshOutcome":
+    ) -> _RefreshOutcome:
         """Do the rotation and report what happened. Raises nothing the caller must translate."""
         token_hash = _hash_token(refresh_token.token)
         now = datetime.now(UTC)

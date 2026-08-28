@@ -2,7 +2,7 @@
 name = "backstop-mcp"
 version = "0.0.3"
 description = "Backstop CRM FastMCP server with OAuth credential bridging"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastmcp==3.4.7",
     "uvicorn[standard]==0.52.4",
@@ -58,7 +58,7 @@ filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -72,7 +72,7 @@ extend-immutable-calls = ["fastmcp.dependencies.Depends"]
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests", "agent-explore"]
 extraPaths = ["src", "."]

@@ -178,7 +178,7 @@ async def _sweep_forever(
 @asynccontextmanager
 async def cleanup_lifespan(
     session_factory: async_sessionmaker[AsyncSession], config: AuthConfig
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[None]:
     """Run the sweep loop in the background for the lifetime of the app."""
     task = asyncio.create_task(_sweep_forever(session_factory, config))
     try:

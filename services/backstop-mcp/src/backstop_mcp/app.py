@@ -46,7 +46,7 @@ def create_app() -> Starlette:
     auth_provider = get_auth_provider()
 
     @asynccontextmanager
-    async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
+    async def lifespan(_server: FastMCP) -> AsyncGenerator[None]:
         # Stop background tasks (auth sweep) before disposing the engine — otherwise
         # `cleanup_lifespan`'s cancel/await runs after the pool is already closed.
         try:

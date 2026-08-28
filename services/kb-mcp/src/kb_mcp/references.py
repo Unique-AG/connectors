@@ -56,7 +56,7 @@ def is_unique_ai_client() -> bool:
     """True when the connected MCP client is node-chat's own client."""
     try:
         ctx = get_context()
-    except (RuntimeError, LookupError):
+    except RuntimeError, LookupError:
         return False
     client_params = ctx.session.client_params
     if client_params is None:
