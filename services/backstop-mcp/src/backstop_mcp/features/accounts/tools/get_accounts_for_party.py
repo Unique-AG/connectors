@@ -107,9 +107,10 @@ async def get_accounts_for_party(
     `search`. Ownership is the account's owner, not its name: ACCOUNT quick-search matches names
     and will miss a differently named vehicle.
 
-    The primary path is Backstop's undocumented UI table-data endpoint and may 404 on another
-    tenant — that is not "holds nothing". This tool then falls back internally to the documented
-    `/accounts` walk; `data_caveat` (`fallback_note`) lists the fields that path omits. Each row
+    The primary path is Backstop's undocumented UI table-data endpoint and may 404, or refuse
+    the credential while documented endpoints still authenticate, on another tenant — that is
+    not "holds nothing". This tool then falls back internally to the documented `/accounts`
+    walk; `data_caveat` (`fallback_note`) lists the fields that path omits. Each row
     carries the account and product ids, tenure dates, and the snapshot figures —
     `balance`, `commitment`, `unfunded_commitment`, share of product and of master. This answers
     "how much does X have in fund Y", "summarise X's investments", and "how long have they been

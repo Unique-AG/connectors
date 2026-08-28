@@ -23,6 +23,7 @@ from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
+from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
 from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.teardown import close_singletons
 
@@ -85,6 +86,10 @@ def create_app() -> Starlette:
         middleware=[
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
+            # Innermost: Starlette wraps last-listed first, so the rewritten 401 is what
+            # request-metrics / OTel see. First-listed would rewrite on the raw send after they
+            # already recorded the JSON-RPC 200.
+            Middleware(SessionRevokedToUnauthorizedMiddleware),
         ]
     )
 

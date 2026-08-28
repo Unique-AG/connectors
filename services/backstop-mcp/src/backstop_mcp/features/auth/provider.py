@@ -32,7 +32,12 @@ from backstop_mcp.db import AuthorizationCode as AuthorizationCodeRow
 from backstop_mcp.db import OAuthClient as OAuthClientRow
 from backstop_mcp.db import OAuthToken as OAuthTokenRow
 from backstop_mcp.db import PendingAuthorization, read_session, transaction
-from backstop_mcp.features.auth.credential_store import save_credential
+from backstop_mcp.features.auth.credential_store import (
+    find_user_id_by_username,
+    get_credential,
+    save_credential,
+)
+from backstop_mcp.features.auth.crypto import InvalidCredentialEnvelopeError
 from backstop_mcp.features.auth.login_csrf import (
     clear_csrf_cookie,
     csrf_token_is_valid,
@@ -353,6 +358,29 @@ class BackstopOAuthProvider(OAuthProvider):
 
         # Authenticated, so the guessing budget is irrelevant for this username.
         await clear_failures(self._session_factory, username)
+
+        existing_id: str | None
+        previous: BackstopCredentialSecret | None = None
+        async with read_session(self._session_factory) as session:
+            existing_id = await find_user_id_by_username(session, username)
+            if existing_id is not None:
+                try:
+                    previous = await get_credential(session, existing_id, self._encryption_key)
+                except InvalidCredentialEnvelopeError:
+                    previous = None
+        had_previous_credential = existing_id is not None
+        credential_changed = (
+            had_previous_credential
+            if previous is None
+            else previous.api_token.get_secret_value() != api_token
+        )
+        logger.info(
+            "auth.login.succeeded",
+            extra={
+                "had_previous_credential": had_previous_credential,
+                "credential_changed": credential_changed,
+            },
+        )
 
         code = secrets.token_urlsafe(32)
         code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()

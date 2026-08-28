@@ -137,3 +137,16 @@ class TestRevokeCurrentSubjectTokens:
         await auth.revoke_current_subject_tokens()
 
         assert revoked == []
+
+
+class TestCurrentSubject:
+    def test_returns_the_access_token_subject(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, session_factory = db
+        monkeypatch.setattr(
+            "backstop_mcp.features.auth.context.get_access_token",
+            lambda: _access_token("user-9"),
+        )
+
+        assert _auth(session_factory).current_subject() == "user-9"

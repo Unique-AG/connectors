@@ -282,9 +282,11 @@ async def search_activities(
     filter `activity_tag_ids` (OR, unlike get_activity_history), and filter `authors` by email.
 
     This is the primary activity tool; `get_activity_history` is fallback only. It is an
-    undocumented UI search (`POST /entity-activities`) and may 404 on another tenant — that is
-    not "no activity exists". The failure payload names `get_activity_history`, which is
-    party-scoped only. `results: []` with status resolved is genuinely none in that window.
+    undocumented UI search (`POST /entity-activities`) and may 404 or refuse the credential
+    (a 401 that still authenticates on documented endpoints) on another tenant — that is not
+    "no activity exists" and not a reason to retry this tool. The failure payload names
+    `get_activity_history`, which is party-scoped only. `results: []` with status resolved is
+    genuinely none in that window.
 
     Counts are visible to you, not firm-wide. `totalCount` saturates at 10000; this tool clamps
     `pageNum × pageSize` before requesting so it never provokes that 500, and returns the
@@ -378,12 +380,13 @@ async def search_activities(
         # would answer with more load.
         raise
     except Exception as exc:
-        # Broad on purpose, matching `fetch_holdings`: HTTP status, transport timeout and
-        # schema-validation failure all mean the same thing here — the undocumented endpoint did
-        # not answer usably. A `httpx.TimeoutException` reaches this frame raw (the client lets
-        # transport errors out), and letting it propagate is the one path where the "name the
-        # fallback" contract silently would not fire, on the failure an unbounded-payload UI
-        # endpoint is likeliest to produce.
+        # Broad on purpose, matching `fetch_holdings`: HTTP status, transport timeout,
+        # schema-validation failure, and a 401 that re-verified (`BackstopTransientAuthError`)
+        # all mean the same thing here — the undocumented endpoint did not answer usably. A
+        # `httpx.TimeoutException` reaches this frame raw (the client lets transport errors
+        # out), and letting it propagate is the one path where the "name the fallback" contract
+        # silently would not fire, on the failure an unbounded-payload UI endpoint is likeliest
+        # to produce.
         logger.warning(
             "activity_history.search.primary_unavailable",
             extra={"error": f"{type(exc).__name__}: {exc}"},

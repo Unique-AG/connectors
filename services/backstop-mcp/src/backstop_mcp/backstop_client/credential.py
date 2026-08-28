@@ -41,6 +41,10 @@ class CallerAuthContext(Protocol):
         """
         ...
 
+    def current_subject(self) -> str | None:
+        """MCP access-token subject for the in-flight request, if any."""
+        ...
+
     async def revoke_current_subject_tokens(self) -> None:
         """Revoke the active subject's MCP tokens after a mid-session Backstop 401."""
         ...

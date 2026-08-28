@@ -23,6 +23,7 @@ from backstop_mcp.dependencies import (
     get_encryption_config,
     get_encryption_key,
     get_engine,
+    get_resolution_config,
     get_session_factory,
 )
 from backstop_mcp.features.activity_history import get_activity_history_settings
@@ -49,6 +50,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_encryption_config,
     get_auth_config,
     get_activity_history_config,
+    get_resolution_config,
     get_engine,
     get_session_factory,
     get_encryption_key,

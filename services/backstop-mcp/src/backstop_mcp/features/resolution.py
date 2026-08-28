@@ -16,11 +16,12 @@ The policy itself:
 2. Several matches, single-entity call → elicit a choice from the user.
 3. Several matches inside a batch → resolve what resolves and return **one** combined payload,
    so the model asks once rather than N times.
-4. Client can't elicit (or declines/cancels) → degrade from (2) to the same structured payload
-   as (3).
+4. Client can't elicit, declines, cancels, or doesn't answer before
+   `RESOLUTION_ELICIT_TIMEOUT_SECONDS` → degrade from (2) to the same structured payload as (3).
 5. Zero matches → `NotFound`, naming the query that was actually used.
 """
 
+import asyncio
 import logging
 from collections import Counter
 from collections.abc import Callable, Sequence
@@ -31,6 +32,8 @@ from fastmcp.server.elicitation import AcceptedElicitation
 from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
 from mcp.types import ClientCapabilities, ElicitationCapability
 from pydantic import BaseModel, ConfigDict, Field
+
+from backstop_mcp.dependencies import get_resolution_config
 
 logger = logging.getLogger(__name__)
 
@@ -228,37 +231,73 @@ async def elicit_choice[T](
     ambiguous: Ambiguous[T],
     *,
     prompt: str,
+    timeout_seconds: float | None = None,
 ) -> Resolution[T]:
     """Ask the user to pick one candidate, degrading to `ambiguous` if that isn't possible.
 
     Returns the original `Ambiguous` unchanged whenever a user-visible choice can't be
-    obtained — unsupported client, declined, cancelled, or any transport failure — so the
-    caller's single "not resolved" branch covers every degradation path.
+    obtained — unsupported client, declined, cancelled, timed out, or any transport failure —
+    so the caller's single "not resolved" branch covers every degradation path.
+
+    `timeout_seconds` defaults to `RESOLUTION_ELICIT_TIMEOUT_SECONDS`; see `ResolutionConfig`
+    for why a deadline is needed at all. Read through the cached provider rather than
+    constructed here, so every resolver in a process shares the one value `create_app` was
+    given.
+
+    Every one of those paths is logged. An unanswered prompt is otherwise indistinguishable
+    from a slow upstream: the tool reports success either way, because returning the candidate
+    list *is* the documented outcome, so duration is the only clue anything went wrong.
     """
     assert len(ambiguous.candidates) >= 2, "elicit_choice requires at least two candidates"
+
+    if timeout_seconds is None:
+        timeout_seconds = get_resolution_config().elicit_timeout_seconds
+
+    outcome_log: dict[str, object] = {
+        "query": ambiguous.query,
+        "scope": ambiguous.scope,
+        "candidates": len(ambiguous.candidates),
+    }
 
     if not client_supports_elicitation(ctx):
         logger.info(
             "resolution.elicit.skipped",
-            extra={"reason": "client lacks elicitation capability"},
+            extra={**outcome_log, "reason": "client lacks elicitation capability"},
         )
         return ambiguous
 
     by_label = _unique_labels(ambiguous.candidates)
     try:
-        result = await ctx.elicit(message=prompt, response_type=list(by_label))
+        # Only this deadline is swallowed. A `CancelledError` from the caller's own scope is a
+        # `BaseException`, so it keeps propagating and the tool still aborts when the client
+        # gives up on the whole call.
+        async with asyncio.timeout(timeout_seconds):
+            result = await ctx.elicit(message=prompt, response_type=list(by_label))
+    except TimeoutError:
+        logger.warning(
+            "resolution.elicit.timed_out",
+            extra={**outcome_log, "timeout_seconds": timeout_seconds},
+        )
+        return ambiguous
     except Exception as exc:
-        logger.warning("resolution.elicit.degraded", extra={"error": str(exc)})
+        logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
         return ambiguous
 
     if isinstance(result, AcceptedElicitation):
         chosen = by_label.get(result.data)
         if chosen is None:
-            logger.warning("resolution.elicit.unknown_choice")
+            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
             return ambiguous
         return Resolved(value=chosen.value)
 
     assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
+    logger.info(
+        "resolution.elicit.dismissed",
+        extra={
+            **outcome_log,
+            "action": "declined" if isinstance(result, DeclinedElicitation) else "cancelled",
+        },
+    )
     return ambiguous
 
 

@@ -21,8 +21,13 @@ from backstop_mcp.backstop_client.errors import (
     BackstopErrorDetail,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
+    BackstopSessionRevokedError,
+    BackstopTransientAuthError,
     BackstopUnreachableError,
     BackstopUntrustedUrlError,
+    mcp_session_was_revoked,
+    reset_mcp_session_revoked,
+    restore_mcp_session_revoked,
 )
 from backstop_mcp.backstop_client.factory import (
     BackstopClientFactory,
@@ -61,6 +66,8 @@ __all__ = [
     "BackstopErrorDetail",
     "BackstopRateLimitError",
     "BackstopResponseSchemaError",
+    "BackstopSessionRevokedError",
+    "BackstopTransientAuthError",
     "BackstopTransportSettings",
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
@@ -77,6 +84,9 @@ __all__ = [
     "included_by_type",
     "included_resource",
     "index_included",
+    "mcp_session_was_revoked",
     "paginate_all",
     "parse_page",
+    "reset_mcp_session_revoked",
+    "restore_mcp_session_revoked",
 ]

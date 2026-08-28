@@ -24,10 +24,11 @@ questions the documented route cannot answer at all:
   hardest; treat both as load-bearing rather than as shortcuts to clean up later.
 
 **What we owe for that.** An undocumented endpoint can change or be absent without notice, so
-callers must never treat its failure as "no activity exists": `search_activities` catches a 404
-or a schema drift and names `get_activity_history` — the documented, party-scoped fallback — in
-the failure payload. Keep that fallback working. Keep this module's schemas lenient, and keep
-`api_responses.py` degrading unreadable fields to `None` rather than raising.
+callers must never treat its failure as "no activity exists": `search_activities` catches a 404,
+a schema drift, or a 401 that re-verified (`BackstopTransientAuthError`) and names
+`get_activity_history` — the documented, party-scoped fallback — in the failure payload. Keep
+that fallback working. Keep this module's schemas lenient, and keep `api_responses.py`
+degrading unreadable fields to `None` rather than raising.
 
 **Measured behaviour.** The swagger name would call it a create; it is a search. Pagination is
 `pageNum` (1-based) × `pageSize` in the JSON body — not `paginate` / `links.next`.

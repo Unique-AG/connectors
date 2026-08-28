@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 import httpx
 from pydantic import SecretStr
 
-from backstop_mcp.backstop_client.client import AuthFailureHook, BackstopClient
+from backstop_mcp.backstop_client.client import SYSTEM_INFO_PATH, AuthFailureHook, BackstopClient
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret, CallerAuthContext
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
@@ -34,10 +34,6 @@ _SHARED_CLIENT_HEADERS = {
     "content-type": "application/vnd.api+json",
     "token": "true",
 }
-
-# GET /system-info takes no parameters and returns no business data — the cheapest real
-# Backstop call that still requires a valid credential, so it doubles as a login-time check.
-_VERIFICATION_PATH = "/system-info"
 
 # Cap on how many per-username gates are retained. Well above any plausible concurrent user
 # count for one process; exists only so a long-lived process with high user churn can't grow
@@ -138,6 +134,7 @@ class BackstopClientFactory:
         credential: BackstopCredentialSecret,
         *,
         on_auth_failure: AuthFailureHook | None = None,
+        subject: str | None = None,
     ) -> BackstopClient:
         """Build a client authenticated as `credential`.
 
@@ -145,6 +142,10 @@ class BackstopClientFactory:
         Concurrency is gated around each individual request inside `BackstopClient.raw_request`,
         so a caller can hold a client across an elicitation prompt, or fan several requests
         out of one client, without either starving itself or breaching Backstop's limit.
+
+        `on_auth_failure` is None only for login (`verify_credential`). That request *is* the
+        credential check — a hook would re-probe `/system-info` after the probe already 401'd.
+        Mid-session callers (`for_current_caller`) always pass a revoke hook.
         """
         return BackstopClient(
             credential,
@@ -153,6 +154,7 @@ class BackstopClientFactory:
             gate=self._gates.hold,
             retry_policy=self._retry_policy,
             on_auth_failure=on_auth_failure,
+            subject=subject,
         )
 
     async def for_current_caller(self) -> BackstopClient:
@@ -160,8 +162,8 @@ class BackstopClientFactory:
 
         Resolves that caller's own stored credential via the injected `CallerAuthContext` —
         raises `auth.context.NotConnectedError` if they haven't completed the login flow. A
-        mid-session Backstop 401 also revokes their MCP tokens, so the next request forces a
-        re-login.
+        mid-session Backstop 401 re-checks `/system-info` before revoking; only a confirmed
+        rejection revokes their MCP tokens, and that same `/mcp` call then returns HTTP 401.
         """
         assert self._auth is not None, (
             "BackstopClientFactory was built without an auth context; "
@@ -169,7 +171,11 @@ class BackstopClientFactory:
         )
         auth = self._auth
         credential = await auth.current_credential()
-        return self.for_credential(credential, on_auth_failure=auth.revoke_current_subject_tokens)
+        return self.for_credential(
+            credential,
+            on_auth_failure=auth.revoke_current_subject_tokens,
+            subject=auth.current_subject(),
+        )
 
     async def verify_credential(self, username: str, api_token: str) -> bool:
         """Check whether a Backstop username + personal API token actually authenticates.
@@ -183,9 +189,10 @@ class BackstopClientFactory:
         shown to the user differently.
         """
         credential = BackstopCredentialSecret(username=username, api_token=SecretStr(api_token))
+        # No revoke hook — this GET is the login check; a 401 must not re-probe `/system-info`.
         client = self.for_credential(credential)
         try:
-            await client.raw_request("GET", _VERIFICATION_PATH)
+            await client.raw_request("GET", SYSTEM_INFO_PATH)
         except BackstopAuthError:
             return False
         except BackstopApiError as exc:
