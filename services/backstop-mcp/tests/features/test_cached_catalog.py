@@ -61,7 +61,8 @@ class _CatalogUnderTest(BaseModel):
     # Attributes a row needs beyond `name` for the feature's projection to keep it.
     required_attributes: Mapping[str, object] = {}
     # Takes `caching_enabled`, because both modes ship: the protocol below is tested with it on,
-    # while a deployment picks per feature via `BACKSTOP_*_CACHE_ENABLED`, all off by default.
+    # while a deployment picks per feature via `BACKSTOP_*_CACHE_ENABLED` (custom-field on,
+    # activity tags and system users off).
     build: Callable[[bool], _Catalog]
 
     def service(self, *, caching_enabled: bool = True) -> _Catalog:
@@ -919,17 +920,24 @@ class TestCachingFlagsComeFromTheEnvironment:
     def _enabled(service: _Catalog) -> bool:
         return service._caching_enabled  # pyright: ignore[reportPrivateUsage]
 
-    def test_every_catalog_ships_with_its_cache_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_catalogs_ship_with_custom_field_cache_on_and_the_rest_off(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         for flag in self._FLAGS:
             monkeypatch.delenv(flag, raising=False)
 
-        assert [self._enabled(provider()) for provider in self._PROVIDERS] == [False] * 4
+        tags, users, fields, groups = (provider() for provider in self._PROVIDERS)
+        assert self._enabled(tags) is False
+        assert self._enabled(users) is False
+        assert self._enabled(fields) is True
+        assert self._enabled(groups) is True
 
     def test_a_flag_enables_only_its_own_feature(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The point of per-feature flags: one catalog's numbers cannot commit the others."""
         for flag in self._FLAGS:
             monkeypatch.delenv(flag, raising=False)
         monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED", "true")
+        monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "false")
 
         tags, users, fields, groups = (provider() for provider in self._PROVIDERS)
 
@@ -943,6 +951,12 @@ class TestCachingFlagsComeFromTheEnvironment:
     ) -> None:
         for flag in self._FLAGS:
             monkeypatch.delenv(flag, raising=False)
+        monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "false")
+
+        assert self._enabled(cast("_Catalog", get_custom_fields_service())) is False
+        assert self._enabled(cast("_Catalog", get_custom_field_groups_service())) is False
+
+        self._clear_caches()
         monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED", "true")
 
         # Cast for the same reason `_CATALOGS` does: `CachedCatalog[T]` is invariant in `T`, so

@@ -24,7 +24,7 @@ class OpportunityStagesService:
     array. The rest are named from here.
 
     Deliberately simpler than `CustomFieldsService`: no in-flight pin, no serve-stale path. That
-    catalog is ~1000 definitions over many pages, so refetching it is expensive enough to be
+    catalog is 3,274 definitions and 6.15 s unfiltered, so refetching it is expensive enough to be
     worth softening a failure; this vocabulary is seven rows in one page, and a stage history
     that silently loses half its entries reads as complete when it isn't. So a failed fetch
     propagates and the caller fails with it.

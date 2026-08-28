@@ -1,9 +1,15 @@
 from backstop_mcp.features.custom_fields.api_responses import (
     CustomFieldDefinitionAttributes,
     CustomFieldGroupAttributes,
+    CustomFieldValueAttributes,
+    RegularCustomFieldValues,
+    RegularCustomFieldValuesAttributes,
 )
 from backstop_mcp.features.custom_fields.custom_field_groups_service import CustomFieldGroupsService
-from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
+from backstop_mcp.features.custom_fields.custom_fields_service import (
+    CustomFieldFilters,
+    CustomFieldsService,
+)
 from backstop_mcp.features.custom_fields.dependencies import (
     get_custom_field_groups_service,
     get_custom_fields_service,
@@ -33,7 +39,9 @@ __all__ = [
     "CustomFieldDefinitionResponse",
     "CustomFieldDefinitionAttributes",
     "CustomFieldEntityReferenceResponse",
+    "CustomFieldValueAttributes",
     "CustomFieldEntityType",
+    "CustomFieldFilters",
     "CustomFieldGroupAttributes",
     "CustomFieldGroupDto",
     "CustomFieldGroupMemberResponse",
@@ -41,6 +49,8 @@ __all__ = [
     "CustomFieldGroupResponse",
     "CustomFieldGroupsService",
     "CustomFieldsService",
+    "RegularCustomFieldValues",
+    "RegularCustomFieldValuesAttributes",
     "ResolvedCustomFieldValueResponse",
     "custom_field_entity_type",
     "custom_field_entity_type_from_bean",

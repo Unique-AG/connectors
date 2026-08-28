@@ -13,12 +13,13 @@ _provider: MeterProvider | None = None
 # would have removed. Comparing them bucket-for-bucket only means something if the buckets are
 # identical, so one View defines them for both rather than each instrument carrying its own copy.
 #
-# A catalog walk is many paginated requests, not one: the custom-field schema is ~1000
-# definitions over many pages, while the activity-tag list is a handful. The default OTel
+# A catalog walk is not one HTTP call: activity tags and system users are small, but the
+# custom-field schema is 3,274 definitions / 2.77 MiB / 6.15 s (measured; `page[limit]` is
+# ignored on that endpoint, so the cost is server-side work in one request). The default OTel
 # boundaries are shaped for milliseconds-as-integers and would put every one of these in the
-# first bucket, hence sub-second resolution for the short catalogs and headroom past 30s for the
-# schema walk, which is the one this exists to size. A cache-served `get` lands in the first
-# bucket by construction, which is the point — that is the latency a TTL buys.
+# first bucket, hence sub-second resolution for the short catalogs and headroom past 30s for
+# the schema walk, which is the one this exists to size. A cache-served `get` lands in the
+# first bucket by construction, which is the point — that is the latency a TTL buys.
 _CATALOG_DURATION_BUCKETS = (
     0.001,
     0.005,

@@ -112,6 +112,7 @@ class TestSearchOpportunities:
         assert "login" in doc
         assert "list_system_users" in doc
         assert "get_opportunities" in doc
+        assert "get_opportunities_by_ids" in doc
         annotations = cast("dict[str, object]", search_opportunities.__annotations__)
         field_info = next(
             item
@@ -139,7 +140,7 @@ class TestSearchOpportunities:
                 await search_opportunities(
                     representative="blazarus",
                     client=client,
-                    opportunity_stages=opportunity_stages_service(),
+                    opportunity_stages_service=opportunity_stages_service(),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -188,7 +189,7 @@ class TestSearchOpportunities:
                     is_open=True,
                     stage="IDD",
                     client=client,
-                    opportunity_stages=opportunity_stages_service(),
+                    opportunity_stages_service=opportunity_stages_service(),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -217,7 +218,7 @@ class TestSearchOpportunities:
                     mode="aggregate",
                     group_by="stage",
                     client=client,
-                    opportunity_stages=opportunity_stages_service(),
+                    opportunity_stages_service=opportunity_stages_service(),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -247,7 +248,7 @@ class TestSearchOpportunities:
             result = tool_model(
                 await search_opportunities(
                     client=client,
-                    opportunity_stages=opportunity_stages_service(),
+                    opportunity_stages_service=opportunity_stages_service(),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -279,7 +280,7 @@ class TestSearchOpportunities:
             result = tool_model(
                 await search_opportunities(
                     client=client,
-                    opportunity_stages=opportunity_stages_service(),
+                    opportunity_stages_service=opportunity_stages_service(),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -291,6 +292,35 @@ class TestSearchOpportunities:
         assert params[1]["page[limit]"] == "1"
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
         assert {item["id"] for item in rows} == {"1", "2"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_id_is_always_on_the_row_even_when_fields_omit_it(self) -> None:
+        base_url = tenant("so-id")
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                _deal("2", name="Other", stage_id="42482"),
+                included=_included(),
+                total=2,
+            )
+        )
+        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    fields=["name"],
+                    client=client,
+                    opportunity_stages_service=opportunity_stages_service(),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [item["id"] for item in rows] == ["1", "2"]
+        assert [item["name"] for item in rows] == ["Koch - CATS Select", "Other"]
+        assert set(rows[0]) == {"id", "name"}
 
 
 class TestSearchOpportunitiesInput:

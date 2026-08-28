@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
@@ -10,6 +11,7 @@ from pydantic import Field
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.custom_fields import (
+    CustomFieldFilters,
     CustomFieldsService,
     ResolvedCustomFieldValueResponse,
     get_custom_fields_service,
@@ -246,25 +248,27 @@ async def get_person(
         return unresolved_party_response(result)
 
     party = result.value
-    fetched = await fetch_person(
-        client,
-        employment_index_factory,
-        search_type=party.search_type,
-        party_id=party.id,
-        include=include,
+    fetched, _ = await asyncio.gather(
+        fetch_person(
+            client,
+            employment_index_factory,
+            search_type=party.search_type,
+            party_id=party.id,
+            include=include,
+        ),
+        custom_fields.load_catalog(client),
     )
-    record, stored_values = custom_fields.take_stored_values(
-        fetched.person.model_dump(by_alias=True)
-    )
-    person = PersonRecordResponse.model_validate(record)
-    custom_field_values = await custom_fields.resolve_values(
+    person = fetched.person
+    custom_field_values = await custom_fields.join_values(
         client,
-        stored_values,
-        tabs=custom_field_tabs,
-        groups=custom_field_groups,
-        group_ids=custom_field_group_ids,
-        definition_ids=coerce_ids(custom_field_definition_ids),
-        names=custom_field_names,
+        person.regular_custom_field_values,
+        filters=CustomFieldFilters(
+            tabs=tuple(custom_field_tabs),
+            groups=tuple(custom_field_groups),
+            group_ids=tuple(custom_field_group_ids),
+            definition_ids=coerce_ids(custom_field_definition_ids),
+            names=tuple(custom_field_names),
+        ),
     )
     return PersonResolvedResponse(
         person=person,

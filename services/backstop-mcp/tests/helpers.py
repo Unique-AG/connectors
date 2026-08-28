@@ -121,8 +121,12 @@ def system_users_service(*, ttl_minutes: int = 60) -> SystemUsersService:
     return SystemUsersService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
-def custom_fields_service(*, ttl_minutes: int = 60) -> CustomFieldsService:
-    return CustomFieldsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+def custom_fields_service(
+    *, ttl_minutes: int = 60, caching_enabled: bool = True
+) -> CustomFieldsService:
+    return CustomFieldsService.with_ttl_minutes(
+        ttl_minutes=ttl_minutes, caching_enabled=caching_enabled
+    )
 
 
 def custom_field_groups_service(*, ttl_minutes: int = 60) -> CustomFieldGroupsService:

@@ -6,7 +6,7 @@ import pytest
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools import tool
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, ValidationError
 
 from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
 
@@ -64,5 +64,19 @@ def test_coerced_id_accepts_a_json_number() -> None:
     assert TypeAdapter(list[CoercedId]).validate_python([8746199, "202"]) == ["8746199", "202"]
 
 
+def test_coerced_id_strips_surrounding_whitespace() -> None:
+    assert TypeAdapter(CoercedId).validate_python("  8746199  ") == "8746199"
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_coerced_id_rejects_a_blank_value(blank: str) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(CoercedId).validate_python(blank)
+
+
 def test_coerce_ids_stringifies_json_numbers() -> None:
     assert coerce_ids([8746199, "202"]) == ("8746199", "202")
+
+
+def test_coerce_ids_strips_and_drops_blank_entries() -> None:
+    assert coerce_ids([8746199, "  ", "", "202", "  3  "]) == ("8746199", "202", "3")

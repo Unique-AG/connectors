@@ -227,32 +227,42 @@ class BackstopConfig(BaseSettings):
     page_limit_param: str = Field(default="page[limit]", min_length=1)
     page_offset_param: str = Field(default="page[offset]", min_length=1)
 
-    # How long a fetched custom-field catalog stays usable before it is re-fetched. Definitions
-    # change rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit
-    # for days after a CRM admin adds a field. `list_custom_fields(refresh=true)` (and the groups
-    # list) force a refetch when a field is missing. Values above the cap (including the previous
-    # documented example of 10080) are clamped so existing deploys still boot.
+    # How long a fetched custom-field catalog stays usable before it is re-fetched. Measured
+    # against fb-rm-lg-26: 3,274 definitions, 2.77 MiB, 6.15 s per unfiltered walk. Two hours
+    # bounds how long a CRM-admin-added field stays invisible; `list_custom_fields(refresh=true)`
+    # (and the groups list) force a refetch. Capped at 24 hours. Values above the cap (including
+    # the previous documented example of 10080) are clamped so existing deploys still boot.
     custom_field_schema_ttl_minutes: Annotated[
         int, BeforeValidator(_cap_custom_field_schema_ttl_minutes)
     ] = Field(
-        default=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES,
+        default=120,
         ge=1,
         le=_CUSTOM_FIELD_SCHEMA_TTL_MAX_MINUTES,
     )
 
-    # Whether the custom-field catalogs (definitions and groups) are held between calls at all.
-    # Off by default, along with the two flags below: the TTLs above are an assumption about how
-    # much a walk costs, and nothing measured it. With caching off every read walks Backstop and
-    # the pair of histograms in `features/cached_catalog.py` says what that costs and what a TTL
-    # would have saved — `catalog_get_duration_seconds_count` is the demand,
-    # `catalog_fetch_duration_seconds` the walk. Turn one on per feature once its numbers say so;
-    # the TTL above is what it then uses. Set `BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED=true`.
+    # Whether the custom-field catalogs (definitions and groups) are held between calls.
+    # On: every party and product read otherwise pays that 6.15 s walk. Cold start
+    # and TTL expiry still cost one caller the walk (~12 times a day per process);
+    # CachedCatalog's single-flight pin shares it with concurrent callers. After one successful
+    # load, a failed refresh re-serves the previous catalog.
     #
-    # Covers both custom-field catalogs, mirroring `custom_field_schema_ttl_minutes`, which they
-    # already share. The histograms label the two separately (`catalog="custom-field"` and
-    # `catalog="custom-field group"`), so if the definitions walk turns out to want a TTL and the
-    # much smaller group walk does not, splitting this flag is the next step.
-    custom_field_schema_cache_enabled: bool = False
+    # The held catalog is process-wide, so whichever caller loads it serves every other caller
+    # until the TTL expires — which is only sound because the definitions collection is tenant
+    # schema, not a per-caller projection. What was checked: `/custom-field-definitions` carries
+    # no permission attribute (`fieldClassification`, the only candidate, is null on all 3,274
+    # rows), the API publishes no permission, role or field-security endpoint, and Backstop's own
+    # per-caller marker — `restricted` on an inline `ResourceRef` — sits on the *value*, which
+    # arrives on the caller's own GET, never on the definition. Not proven by a second
+    # credential: one narrower user loading the catalog first would make `join_values` skip a
+    # definition a broader user can see, logged as `custom_fields.values.definition_missing` and
+    # invisible in the response. If that log ever fires for a definition `list_custom_fields`
+    # can show, this cache needs a per-caller key.
+    #
+    # Covers both custom-field catalogs, mirroring `custom_field_schema_ttl_minutes`. The
+    # histograms label the two separately (`catalog="custom-field"` and
+    # `catalog="custom-field group"`), so if they diverge, splitting this flag is the next step.
+    # Set `BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED=false` to turn it off.
+    custom_field_schema_cache_enabled: bool = True
 
     # How long a fetched opportunity-stage vocabulary stays usable. Seven rows on the instance
     # this was built against, and a stage is added about as often as a custom field, so the same
@@ -267,9 +277,9 @@ class BackstopConfig(BaseSettings):
     # collection.
     activity_tag_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
-    # Whether the activity-tag catalog is held between calls. Off by default — see
-    # `custom_field_schema_cache_enabled` for why and for what evidence flips it. Set
-    # `BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED=true`.
+    # Whether the activity-tag catalog is held between calls. Off by default: unlike the
+    # custom-field walk, this one has not been measured as expensive enough to justify the
+    # staleness. Set `BACKSTOP_ACTIVITY_TAG_CACHE_ENABLED=true` once its histograms say so.
     activity_tag_cache_enabled: bool = False
 
     # How long a fetched system-user catalog stays usable before it is re-fetched. The roster
@@ -278,9 +288,9 @@ class BackstopConfig(BaseSettings):
     # a refetch when someone is missing.
     system_user_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
-    # Whether the system-user catalog is held between calls. Off by default — see
-    # `custom_field_schema_cache_enabled` for why and for what evidence flips it. Set
-    # `BACKSTOP_SYSTEM_USER_CACHE_ENABLED=true`.
+    # Whether the system-user catalog is held between calls. Off by default: unlike the
+    # custom-field walk, this one has not been measured as expensive enough to justify the
+    # staleness. Set `BACKSTOP_SYSTEM_USER_CACHE_ENABLED=true` once its histograms say so.
     system_user_cache_enabled: bool = False
 
     # Which entity-relationship types mean employment, and which of those mean it has ended,

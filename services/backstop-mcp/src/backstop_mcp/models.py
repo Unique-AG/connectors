@@ -7,6 +7,7 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     SerializerFunctionWrapHandler,
+    StringConstraints,
     TypeAdapter,
     model_serializer,
 )
@@ -21,12 +22,21 @@ def _coerce_id(value: object) -> object:
     return value
 
 
-CoercedId = Annotated[str, BeforeValidator(_coerce_id)]
+# BeforeValidator is outermost so a JSON number is stringified before strip/`min_length`.
+# `min_length=1` is checked after stripping, so `"   "` fails the same way `""` does.
+CoercedId = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1),
+    BeforeValidator(_coerce_id),
+]
 
 
 def coerce_ids(values: Sequence[str | int]) -> tuple[str, ...]:
-    """Normalize tool id lists so a JSON number matches a catalog string id."""
-    return tuple(str(value) for value in values)
+    """Normalize tool id lists so a JSON number matches a catalog string id.
+
+    Blank and whitespace-only entries are dropped: they are not ids.
+    """
+    return tuple(stripped for value in values if (stripped := str(value).strip()))
 
 
 class OmitNoneModel(BaseModel):

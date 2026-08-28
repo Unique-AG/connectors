@@ -26,6 +26,7 @@ from backstop_mcp.features.accounts import (
     resolve_product_query,
 )
 from backstop_mcp.features.custom_fields import (
+    CustomFieldFilters,
     CustomFieldsService,
     ResolvedCustomFieldValueResponse,
     get_custom_fields_service,
@@ -92,8 +93,10 @@ async def _record(
     *,
     names: Sequence[str],
 ) -> ProductRecordResponse:
-    values = await custom_fields.resolve_values(
-        client, fetched.stored_custom_field_values, names=names
+    values = await custom_fields.join_values(
+        client,
+        fetched.stored_custom_field_values,
+        filters=CustomFieldFilters(names=tuple(names)),
     )
     return ProductRecordResponse(
         id=fetched.product.id,
@@ -171,7 +174,12 @@ async def get_product(
         raise ValueError("Pass at most one of product_id or product/search")
 
     if product_id is None and name is None:
-        catalog = await fetch_product_catalog(client)
+        # Overlap the product walk with a schema-cache warm. Each of the ~72 rows then joins
+        # against a filled catalog; the load return is unused because `_record` reads the cache.
+        catalog, _ = await asyncio.gather(
+            fetch_product_catalog(client),
+            custom_fields.load_catalog(client),
+        )
         # Concurrently: the catalog is ~72 rows and each row is a catalog join, so a sequential
         # comprehension is 72 awaits in a row for work that has no ordering between rows.
         products = await asyncio.gather(
@@ -197,7 +205,10 @@ async def get_product(
     if not isinstance(outcome, Resolved):
         return ProductAmbiguousResponse.from_unresolved(outcome)
 
-    item = await fetch_product(client, product_id=outcome.value.id)
+    item, _ = await asyncio.gather(
+        fetch_product(client, product_id=outcome.value.id),
+        custom_fields.load_catalog(client),
+    )
     return ProductResolvedResponse(
         products=(await _record(client, custom_fields, item, names=custom_field_names),)
     )
@@ -217,7 +228,10 @@ async def _by_trusted_id(
     is the parameter for a name.
     """
     try:
-        item = await fetch_product(client, product_id=product_id)
+        item, _ = await asyncio.gather(
+            fetch_product(client, product_id=product_id),
+            custom_fields.load_catalog(client),
+        )
     except BackstopApiError as exc:
         if exc.status_code != HTTPStatus.NOT_FOUND:
             raise

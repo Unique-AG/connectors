@@ -33,6 +33,12 @@ class TestInstructions:
         assert "search_opportunities" in INSTRUCTIONS
         assert INSTRUCTIONS.index("list_system_users") < INSTRUCTIONS.index("search_opportunities")
         assert "takes that login, not a display name" in INSTRUCTIONS
+        assert "get_opportunities_by_ids" in INSTRUCTIONS
+        assert "custom_fields_unavailable" in INSTRUCTIONS
+        assert 'not "no value recorded"' in INSTRUCTIONS
+        assert "opportunity values" in INSTRUCTIONS
+        assert "before answering anything the row cannot support" in INSTRUCTIONS
+        assert "say Backstop does not record it" in INSTRUCTIONS
         assert "get_capital_flows" in INSTRUCTIONS
         assert "account.id" in INSTRUCTIONS
         assert "get_tasks_for_party" in INSTRUCTIONS

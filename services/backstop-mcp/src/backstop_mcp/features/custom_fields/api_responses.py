@@ -1,7 +1,15 @@
+import logging
 from collections.abc import Mapping
 from typing import Annotated, ClassVar, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+)
 
 from backstop_mcp.lenient import LenientBool, LenientInt
 
@@ -10,7 +18,11 @@ __all__ = [
     "CustomFieldGroupAttributes",
     "CustomFieldGroupParentAttributes",
     "CustomFieldValueAttributes",
+    "RegularCustomFieldValues",
+    "RegularCustomFieldValuesAttributes",
 ]
+
+logger = logging.getLogger(__name__)
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
@@ -71,9 +83,59 @@ class CustomFieldValueAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    definition_id: _IdStr = Field(default=None, alias="definitionId")
-    name: _StrippedStr | None = None
-    value: object = None
+    definition_id: _IdStr = Field(
+        default=None,
+        alias="definitionId",
+        description="Backstop id of the custom-field definition this value belongs to.",
+    )
+    name: _StrippedStr | None = Field(
+        default=None,
+        description="Field name as stored on the record.",
+    )
+    value: object = Field(
+        default=None,
+        description="Stored value for this field, as Backstop sent it.",
+    )
+
+
+def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttributes]:
+    """A record's dump, or empty when Backstop omitted it or sent a non-list.
+
+    One unreadable row is skipped so it cannot fail the parent record.
+    """
+    if not isinstance(value, list):
+        return []
+    rows: list[CustomFieldValueAttributes] = []
+    for item in cast(list[object], value):
+        if isinstance(item, CustomFieldValueAttributes):
+            rows.append(item)
+            continue
+        if not isinstance(item, Mapping):
+            continue
+        try:
+            rows.append(CustomFieldValueAttributes.model_validate(item))
+        except ValidationError:
+            logger.warning("custom_fields.values.unreadable", exc_info=True)
+    return rows
+
+
+RegularCustomFieldValues = Annotated[
+    list[CustomFieldValueAttributes], BeforeValidator(_regular_custom_field_values)
+]
+
+
+class RegularCustomFieldValuesAttributes(BaseModel):
+    """The `regularCustomFieldValues` dump as it arrives on any Backstop record.
+
+    Used when the rest of the record is still an untyped dict (opportunities page items)
+    and the caller only needs this one field, typed.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    regular_custom_field_values: RegularCustomFieldValues = Field(
+        default_factory=list, alias="regularCustomFieldValues"
+    )
 
 
 class CustomFieldGroupParentAttributes(BaseModel):

@@ -5,6 +5,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstr
 
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt
 
 __all__ = [
@@ -60,7 +61,9 @@ class ProductAttributes(BaseModel):
 
     name: _StrippedStr | None = None
     configuration: ProductConfigurationAttributes | None = None
-    regular_custom_field_values: object = Field(default=None, alias="regularCustomFieldValues")
+    regular_custom_field_values: RegularCustomFieldValues = Field(
+        default_factory=list, alias="regularCustomFieldValues"
+    )
 
 
 class InvestorQualificationAttributes(BaseModel):

@@ -89,7 +89,12 @@ class ProductChipResponse(OmitNoneModel):
 class SearchOpportunityRowResponse(OmitNoneModel):
     """One deal from the firm-wide pipeline walk. Only requested `fields` are populated."""
 
-    id: str | None = Field(default=None, description="Backstop id of the opportunity.")
+    id: str | None = Field(
+        default=None,
+        description=(
+            "Backstop id of the opportunity. Always populated, even when omitted from `fields`."
+        ),
+    )
     name: str | None = Field(default=None, description="Deal name, usually 'investor - fund'.")
     stage: str | None = Field(default=None, description="The stage the deal is in now.")
     stage_id: str | None = Field(default=None, description="Backstop id of the current stage.")
@@ -150,7 +155,12 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
     )
     rows: tuple[SearchOpportunityRowResponse, ...] = Field(
         default=(),
-        description="Matching deals after client-side filters. Empty in aggregate mode.",
+        description=(
+            "Matching deals after client-side filters. Empty in aggregate mode. `id` is always "
+            "present so the row can be handed to get_opportunities_by_ids. Amounts are already "
+            "on this walk — select them with `fields`. Master Pipeline custom fields and stage "
+            "history are not; fetch those ids with get_opportunities_by_ids."
+        ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
         default=(),
@@ -285,10 +295,15 @@ async def search_opportunities(
     ] = _DEFAULT_MAX_ROWS,
     fields: Annotated[
         list[SearchRowField] | None,
-        Field(description="Sparse row fields. Defaults to id, name, stage, is_open, dates, chips."),
+        Field(
+            description=(
+                "Sparse row fields. Defaults to id, name, stage, is_open, dates, chips. "
+                "`id` is always included."
+            ),
+        ),
     ] = None,
     client: BackstopClient = Depends(get_backstop_client),
-    opportunity_stages: OpportunityStagesService = Depends(get_opportunity_stages_service),
+    opportunity_stages_service: OpportunityStagesService = Depends(get_opportunity_stages_service),
 ) -> SearchOpportunitiesResolvedResponse:
     """Walk the firm-wide pipeline.
 
@@ -296,6 +311,10 @@ async def search_opportunities(
     `representative` as a **login** from list_system_users — a display name silently returns
     zero rows. Stage, product, and open/closed are filtered here after the walk;
     filter[stage.name], filter[product.name], and filter[isOpen] are invalid on this collection.
+
+    This walk does not return custom fields or stage history. For those, call
+    get_opportunities_by_ids with the ids — `id` is always projected so that handoff works.
+    Amounts are on this walk; select them with `fields`.
 
     For one party's deals, call get_opportunities instead — that is one cheap sub-collection,
     not this walk. `mode=aggregate` with `group_by` answers a counting question without row
@@ -311,14 +330,12 @@ async def search_opportunities(
         extra={"representative": representative, "mode": mode, "stage": stage, "product": product},
     )
     fetch = await fetch_search_opportunities(
-        client,
-        representative=representative,
-        vocabulary=opportunity_stages.get(client),
+        client, representative=representative, opportunity_stages_service=opportunity_stages_service
     )
     matching = tuple(
         row for row in fetch.rows if _matches(row, is_open=is_open, stage=stage, product=product)
     )
-    selected_fields = frozenset(fields) if fields else _DEFAULT_FIELDS
+    selected_fields = (frozenset(fields) if fields else _DEFAULT_FIELDS) | {"id"}
     return _resolved(
         fetch,
         matching=matching,
