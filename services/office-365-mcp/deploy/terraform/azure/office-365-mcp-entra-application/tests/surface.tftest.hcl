@@ -210,6 +210,17 @@ run "preset_outlook_send" {
   }
 }
 
+run "preset_outlook_automate" {
+  variables {
+    tools_preset = "outlook-automate"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic,MailboxSettings.ReadWrite"
+    error_message = "outlook-automate composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "list_chats"]

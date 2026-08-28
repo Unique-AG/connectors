@@ -51,6 +51,7 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Mail.ReadWrite": False,
     "Mail.Send": False,
     "Mail.ReadBasic": False,
+    "MailboxSettings.ReadWrite": False,
 }
 
 _LABEL_WIDTH = 17

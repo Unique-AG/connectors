@@ -649,6 +649,8 @@ GRAPH_STEPS = frozenset(
         "fill_reply",
         "read_draft",
         "send_draft",
+        "read_mailbox_settings",
+        "write_automatic_reply",
         "transcript_attributed",
         "transcript_unattributed",
     }

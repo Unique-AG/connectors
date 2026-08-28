@@ -564,6 +564,21 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         0,
         13,
     ),
+    (
+        ToolsPreset.OUTLOOK_AUTOMATE,
+        (
+            "User.Read",
+            "Mail.Read",
+            "People.Read",
+            "MailboxSettings.Read",
+            "Mail.ReadWrite",
+            "Mail.Send",
+            "Mail.ReadBasic",
+            "MailboxSettings.ReadWrite",
+        ),
+        0,
+        14,
+    ),
 )
 
 

@@ -142,6 +142,12 @@
             "Mail.Send",
             "Mail.ReadBasic"
           ]
+        },
+        {
+          "name": "outlook_set_automatic_reply",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
@@ -166,7 +172,8 @@
         "outlook_move_mail",
         "outlook_draft_mail",
         "outlook_draft_reply",
-        "outlook_send_draft"
+        "outlook_send_draft",
+        "outlook_set_automatic_reply"
       ],
       "always_on": "get_me",
       "presets": {
@@ -252,6 +259,21 @@
           "outlook_draft_mail",
           "outlook_draft_reply",
           "outlook_send_draft"
+        ],
+        "outlook-automate": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail",
+          "outlook_get_mailbox_settings",
+          "outlook_mark_mail",
+          "outlook_move_mail",
+          "outlook_draft_mail",
+          "outlook_draft_reply",
+          "outlook_send_draft",
+          "outlook_set_automatic_reply"
         ]
       },
       "requestable_permissions": [
@@ -268,7 +290,8 @@
         "MailboxSettings.Read",
         "Mail.ReadWrite",
         "Mail.Send",
-        "Mail.ReadBasic"
+        "Mail.ReadBasic",
+        "MailboxSettings.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -284,7 +307,8 @@
         "MailboxSettings.Read": false,
         "Mail.ReadWrite": false,
         "Mail.Send": false,
-        "Mail.ReadBasic": false
+        "Mail.ReadBasic": false,
+        "MailboxSettings.ReadWrite": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",

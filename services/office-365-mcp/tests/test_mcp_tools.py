@@ -649,6 +649,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_draft_mail",
         "outlook_draft_reply",
         "outlook_send_draft",
+        "outlook_set_automatic_reply",
     }
 )
 

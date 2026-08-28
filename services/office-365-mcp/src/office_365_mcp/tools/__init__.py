@@ -38,6 +38,7 @@ from office_365_mcp.tools import (
     outlook_read_thread,
     outlook_search_mail,
     outlook_send_draft,
+    outlook_set_automatic_reply,
     read_transcript,
     teams_read_message,
     teams_search_messages,
@@ -128,6 +129,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_draft_mail,
     outlook_draft_reply,
     outlook_send_draft,
+    outlook_set_automatic_reply,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -211,6 +213,21 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_draft_mail",
         "outlook_draft_reply",
         "outlook_send_draft",
+    ),
+    "outlook-automate": (
+        "outlook_search_mail",
+        "outlook_read_mail",
+        "outlook_browse_folders",
+        "outlook_find_recipient",
+        "outlook_read_thread",
+        "outlook_list_mail",
+        "outlook_get_mailbox_settings",
+        "outlook_mark_mail",
+        "outlook_move_mail",
+        "outlook_draft_mail",
+        "outlook_draft_reply",
+        "outlook_send_draft",
+        "outlook_set_automatic_reply",
     ),
 }
 

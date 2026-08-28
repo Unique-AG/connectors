@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-two
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-three
 MCP tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
@@ -21,7 +21,8 @@ categories; and `outlook_mark_mail`, the first tool here that changes anything; 
 `outlook_move_mail`, which files messages into a folder and is how this connector erases one; and
 `outlook_draft_mail`, which composes a draft it cannot send; and `outlook_draft_reply`,
 which drafts a reply or a forward from a message this connector found; and `outlook_send_draft`,
-the only tool here that puts mail on the wire,
+the only tool here that puts mail on the wire; and `outlook_set_automatic_reply`,
+which turns the out-of-office on for a bounded window or off,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -141,6 +142,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` |
 | `Mail.Send` | Delegated | No | `outlook_send_draft` |
 | `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
+| `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -282,6 +284,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-mailbox` | the read surface, plus what is quietly acting on the mailbox | + `outlook_get_mailbox_settings` | + `MailboxSettings.Read` | 0 |
 | `outlook-write` | the above, plus changing a message's read state, flag or importance, filing it into a folder, and composing a draft or a reply | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
+| `outlook-automate` | the above, plus setting the automatic reply | + `outlook_set_automatic_reply` | + `MailboxSettings.ReadWrite` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those seven rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -329,6 +332,16 @@ what leaves the mailbox is exactly what a person can already read in their Draft
 one-shot `POST /me/sendMail` is deliberately never used, because it is the only send that can set
 `saveToSentItems: false` and leave no trace anywhere, and it answers `202` with an empty body so
 nothing can be reported about what it did.
+
+**`MailboxSettings.ReadWrite` is the permission to read hardest, and its display text does not say
+so.** Entra shows it as "Read and write user mailbox settings". It is also the only delegated
+permission that can create an inbox rule, and Microsoft's own worked example for that endpoint is
+`forwardTo` together with `stopProcessingRules` — a standing instruction that copies mail out of
+the tenant, survives the conversation that made it, and needs no `Mail.Send` anywhere in the
+deployment. Nothing here creates a rule, and `outlook_set_automatic_reply` refuses `alwaysEnabled`
+for the same family of reason: a reply with no end date outlives the session and fires at every
+future sender. `outlook-automate` is the one tier where "0 admin consents" is the least
+interesting number in the row.
 
 The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs
 **one** admin consent and does not drag in `ChannelMessage.Read.All`, the permission to read every

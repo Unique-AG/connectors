@@ -2080,7 +2080,8 @@
                 "outlook-read",
                 "outlook-mailbox",
                 "outlook-write",
-                "outlook-send"
+                "outlook-send",
+                "outlook-automate"
               ],
               "description": "Which tools this deployment runs, as a named surface. 'teams' is every Teams tool; each other name is one use case, and README's preset table says what each costs a tenant in permissions and admin consents. Set this or enabled, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
             },
