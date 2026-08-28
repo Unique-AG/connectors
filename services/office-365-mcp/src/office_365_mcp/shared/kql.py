@@ -31,6 +31,29 @@ _KQL_KEYWORDS = frozenset({"AND", "OR", "NOT", "NEAR", "ONEAR"})
 _PHRASE = re.compile(r'"([^"]*)"')
 
 
+def as_search_value(clause: str) -> str:
+    """A built KQL clause as the value of an OData `$search`, which is a quoted string.
+
+    Two quoting layers meet here and they are not the same rule. Inside the clause, KQL escapes a
+    quote by doubling it, which `phrase` does. Around the clause, `$search` takes a double-quoted
+    string, and the only escaping rule Microsoft publishes for it is "if it contains double quotes
+    or backslash, escape it with a backslash"
+    (https://learn.microsoft.com/en-us/graph/search-query-parameter).
+
+    TRAP: wrapping without escaping is what a naive f-string does, and it produces
+    `$search="from:"Bob Vance""` for any multi-word value — a string that ends at the third quote
+    and leaves the rest as syntax. Every single-word example Microsoft publishes for a mail
+    collection hides this, because a single word is never quoted by `phrase`.
+
+    Microsoft states that escaping rule in the directory-object section and publishes no
+    multi-word example for a mail collection, so the rule is applied here by the one document that
+    gives it rather than by a document about this endpoint. That is the weakest link in this
+    module and it is worth a live check.
+    """
+    escaped = clause.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def phrase(text: str) -> str:
     """`text` as a KQL phrase: matched where the words are adjacent, and read as no operator.
 

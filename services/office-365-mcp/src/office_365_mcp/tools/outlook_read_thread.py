@@ -66,8 +66,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_MESSAGES = 100
 
-# The id space the handle was minted in. Graph reads a path id in whichever space the request
-# declares, so a request without this reads an immutable id as a RestId and answers 404.
+# The id space every handle in this connector is minted in, sent so one id space runs through the
+# whole surface. Whether Graph also re-parses a path id in the space a header names is undocumented.
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _ANCHOR_FIELDS: tuple[str, ...] = ("id", "conversationId")
@@ -149,23 +149,31 @@ async def read_thread(client: GraphServiceClient, *, handle: MailMessageHandle) 
             page = await client.me.messages.get(request_configuration=_thread_request(conversation))
 
     found = list((page.value if page is not None else None) or [])
-    _make_sure_the_filter_was_applied(found, conversation=conversation, anchor=handle.message_id)
-    return _answer(found, complete=len(found) < MAX_MESSAGES)
+    # Graph's own "there is more" signal rather than a full window: a page can come back short of
+    # `$top` and still carry a next link, because `$skip` counts every item the service walked.
+    truncated = page is not None and page.odata_next_link is not None
+    _make_sure_the_filter_was_applied(
+        found, conversation=conversation, anchor=handle.message_id, truncated=truncated
+    )
+    return _answer(found, complete=not truncated)
 
 
 def _make_sure_the_filter_was_applied(
-    found: list[Message], *, conversation: str, anchor: str
+    found: list[Message], *, conversation: str, anchor: str, truncated: bool
 ) -> None:
     """Refuse an answer Graph did not filter.
 
-    Two checks rather than one. A foreign conversation proves the filter was dropped. All-matching
-    but anchor-absent is the subtler shape: it is what a filter applied to the wrong value looks
-    like, and answering it would report somebody else's thread as this one.
+    Two checks, and only one of them survives a truncated page. A foreign conversation proves the
+    filter was dropped whatever the page size. Anchor-absent is the subtler shape — it is what a
+    filter applied to the wrong value looks like, and answering it would report somebody else's
+    thread as this one — but a thread longer than one page can leave the anchor off it honestly,
+    with no `$orderby` to say which messages the page holds. Checking it there would refuse a
+    correct answer and blame Graph for a filter it applied.
     """
     if not found:
         return
     foreign = [message for message in found if message.conversation_id != conversation]
-    if foreign or all(message.id != anchor for message in found):
+    if foreign or (not truncated and all(message.id != anchor for message in found)):
         raise ToolError(_FILTER_IGNORED)
 
 

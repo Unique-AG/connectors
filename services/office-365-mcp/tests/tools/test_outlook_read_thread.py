@@ -46,6 +46,13 @@ def thread(graph: respx.MockRouter) -> respx.Route:
     return graph.get("/me/messages")
 
 
+def _page(messages: list[dict[str, object]], *, more: bool = False) -> dict[str, object]:
+    page: dict[str, object] = {"value": messages}
+    if more:
+        page["@odata.nextLink"] = "https://graph.microsoft.com/v1.0/me/messages?%24skip=100"
+    return page
+
+
 def _anchor_body(conversation: str | None = _CONVERSATION) -> dict[str, object]:
     return {"id": _ANCHOR_ID, "conversationId": conversation}
 
@@ -213,18 +220,45 @@ class TestWhatItAnswers:
         assert "archive" in result.searched_scope
         assert "delegated" in result.searched_scope
 
-    async def test_a_full_window_says_the_thread_may_be_incomplete(
+    async def test_a_thread_graph_had_more_of_says_it_is_incomplete(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
     ) -> None:
-        crowd = [_message(_ANCHOR_ID)] + [
-            _message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES - 1)
-        ]
+        """Graph's own next link, not a full window: a page can come back short of `$top` and
+        still carry one, because `$skip` counts every item the service walked."""
         anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
-        thread.mock(return_value=httpx.Response(200, json={"value": crowd}))
+        thread.mock(return_value=httpx.Response(200, json=_page([_message(_ANCHOR_ID)], more=True)))
 
         result = await read_thread(client, handle=_HANDLE)
 
         assert result.complete is False
+
+    async def test_a_thread_longer_than_one_page_answers_without_the_anchor_on_it(
+        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    ) -> None:
+        """The anchor check cannot run on a truncated page. There is no `$orderby` to say which
+        messages the page holds, so a long thread can leave the anchor off it honestly — and
+        refusing there would blame Graph for a filter it did apply."""
+        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES)]
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json=_page(crowd, more=True)))
+
+        result = await read_thread(client, handle=_HANDLE)
+
+        assert result.message_count == MAX_MESSAGES
+        assert result.complete is False
+
+    async def test_a_foreign_conversation_is_refused_even_on_a_truncated_page(
+        self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route
+    ) -> None:
+        """The half of the check that survives truncation. A row from another conversation proves
+        the filter was dropped whatever the page size."""
+        crowd = [_message(f"{_OLDER_ID}{index}") for index in range(MAX_MESSAGES - 1)]
+        crowd.append(_message(_OLDER_ID, conversation=_OTHER_CONVERSATION))
+        anchor.mock(return_value=httpx.Response(200, json=_anchor_body()))
+        thread.mock(return_value=httpx.Response(200, json=_page(crowd, more=True)))
+
+        with pytest.raises(ToolError, match="did not apply the filter"):
+            await read_thread(client, handle=_HANDLE)
 
     async def test_an_anchor_with_no_conversation_answers_nothing_rather_than_everything(
         self, client: GraphServiceClient, anchor: respx.Route, thread: respx.Route

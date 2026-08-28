@@ -83,9 +83,9 @@ class ToolModule(Protocol):
 
 @runtime_checkable
 class _NarrowsItsNotFound(Protocol):
-    """A tool that knows what a 404 on its own argument means. Two tools of ten, so runtime-checked.
+    """A tool that knows what a 404 on its own argument means. A minority, so runtime-checked.
 
-    Off `ToolModule` because the default advice is right for the other eight: their arguments are
+    Off `ToolModule` because the default advice is right for the rest: their arguments are
     ids a caller passed in, not handles this connector minted.
     """
 
@@ -97,10 +97,10 @@ class _NarrowsItsNotFound(Protocol):
 class _NarrowsItsCall(Protocol):
     """A tool whose `GRAPH_CALL_EXAMPLE` reaches Graph under fewer permissions than it declares.
 
-    One tool of ten, so runtime-checked and off `ToolModule`. `teams_read_message` is exchanged for
-    two
-    permissions and reads one surface per call, so its chat example's refusal must name `Chat.Read`
-    and not the channel permission. `narrowed_to` in `shared/seam.py` says the same per call.
+    One tool of them all, so runtime-checked and off `ToolModule`. `teams_read_message` is
+    exchanged for two permissions and reads one surface per call, so its chat example's refusal
+    must name `Chat.Read` and not the channel permission. `narrowed_to` in `shared/seam.py` says
+    the same per call.
     """
 
     @property

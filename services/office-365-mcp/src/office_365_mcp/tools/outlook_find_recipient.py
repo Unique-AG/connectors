@@ -280,7 +280,7 @@ async def _people(
 ) -> list[RecipientCandidate]:
     configuration = RequestConfiguration[_PeopleQuery](
         query_parameters=PeopleRequestBuilder.PeopleRequestBuilderGetQueryParameters(
-            search=kql.phrase(query),
+            search=kql.as_search_value(query),
             select=list(_PERSON_FIELDS),
             top=limit,
         ),
@@ -308,7 +308,7 @@ async def _correspondents(
     """
     configuration = RequestConfiguration[_MessagesQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-            search=f'"participants:{kql.quoted(query)}"',
+            search=kql.as_search_value(f"participants:{kql.quoted(query)}"),
             select=list(_PARTICIPANT_FIELDS),
             top=_PARTICIPANT_MESSAGES,
         )

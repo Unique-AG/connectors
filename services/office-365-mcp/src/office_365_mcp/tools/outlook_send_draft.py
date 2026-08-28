@@ -5,7 +5,8 @@ It takes one draft handle and nothing else. `outlook:///drafts/{id}` is a handle
 this tool's defence rather than a formality: Graph gives a draft the same id space as every other
 message, so a single family would let a message a reader *found* be spelled as a draft and handed
 here. Kept apart, "send the mail you just wrote" is expressible and "send that mail I found" is
-not — this tool can only send something this connector composed in the same session.
+not — this tool sends only a message the mailbox still reports as a draft, addressed by a handle
+of the drafts family, which only the two drafting tools mint.
 
 **No argument may change the message.** There is no recipient, subject, body or attachment
 argument, and their absence is the whole safety story: what is sent is exactly what a human can
@@ -111,7 +112,7 @@ agreement first: read them the recipients, the subject and the body that the dra
 answered with, and call this only once they have said to send it. It takes one argument, the \
 draft's own handle, and NOTHING it is given can change the message — there is no recipient, \
 subject, body or attachment argument here, so what goes out is exactly what the user can already \
-open in Outlook. Only a draft this connector composed can be sent: a message handle from \
+open in Outlook. Only a handle of the drafts family is accepted: a message handle from \
 outlook_search_mail, outlook_list_mail or outlook_read_thread is refused, and no message id, \
 subject line or Outlook web link becomes a draft handle. A message that has already been sent is \
 refused rather than sent again. Answers the recipients and subject Microsoft held for the draft \
@@ -124,7 +125,7 @@ _NOT_A_DRAFT_HANDLE = (
     + "shape:\n"
     + "  outlook:///drafts/{draft_id}\n"
     + "with the id percent-encoded, e.g. outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D. Only "
-    + "a draft this connector composed in this conversation can be sent, and that handle is the "
+    + "a handle of the drafts family is accepted, and only the two drafting tools mint one — "
     + "only thing that says so — a subject line, an email address, a message id and an Outlook "
     + "web link are none of them handles, and a folder or rule handle under the same scheme "
     + "addresses something that is not a draft. Nothing was sent. If the mail still needs "

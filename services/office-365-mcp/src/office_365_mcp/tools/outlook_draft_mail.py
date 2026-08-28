@@ -47,6 +47,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.item_body import ItemBody
@@ -184,7 +185,9 @@ async def draft_mail(
                 to_recipients=recipients,
                 cc_recipients=copies,
             ),
-            request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
+            request_configuration=RequestConfiguration[QueryParameters](
+                options=no_retry(), headers=_immutable_ids()
+            ),
         )
 
     assert draft is not None, "Graph answered a draft create with no message"
@@ -211,6 +214,19 @@ def _answer(draft: Message) -> MailDraft:
         subject=draft.subject,
         body=None if draft.body is None else draft.body.content,
     )
+
+
+# The id space every handle in this connector is minted in. Sent here so the draft handle matches
+# the message handles the readers mint, rather than being the one family in another id space.
+_PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
+
+
+def _immutable_ids() -> HeadersCollection:
+    """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared by
+    every configuration in the process, so a preference added to it leaks onto every Graph call."""
+    headers = HeadersCollection()
+    headers.add(*_PREFER_IMMUTABLE_IDS)
+    return headers
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

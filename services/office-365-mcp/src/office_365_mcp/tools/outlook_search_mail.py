@@ -137,7 +137,7 @@ async def search_mail(
             page = await client.me.messages.get(
                 request_configuration=RequestConfiguration(
                     query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-                        search=f'"{search}"',
+                        search=kql.as_search_value(search),
                         select=list(SUMMARY_FIELDS),
                         top=limit,
                     )

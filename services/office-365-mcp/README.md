@@ -238,7 +238,7 @@ preset past `teams-chat` costs one. That is Microsoft's rule about the permissio
 about a tenant: a tenant running a restricted user-consent policy still stops an unprivileged user
 at "Need admin approval", and nothing in this service's logs says so.
 
-`Mail.ReadBasic` is deliberately not used. It withholds `body`, `previewBody`, attachments and
+`Mail.ReadBasic` is deliberately not used *by the read surface*. It withholds `body`, `previewBody`, attachments and
 extended properties, and a hit list with no preview is a list of subjects a model cannot triage —
 so it would buy a second name on the consent screen and no narrower access to anything read here.
 
@@ -287,7 +287,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
 
-`get_me` is always on, which is why no preset lists it — each of those seven rows is one
+`get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
 is and the only one that asks for **no** administrator, and the reason it costs nothing is exactly
 that it cannot read a *chat* message — the two tools that can (`teams_search_messages`, `teams_read_message`)

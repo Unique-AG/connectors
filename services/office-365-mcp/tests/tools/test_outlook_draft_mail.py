@@ -98,6 +98,18 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 class TestWhatItSendsToGraph:
+    async def test_it_declares_the_immutable_id_space_the_handle_is_minted_in(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Every other handle this connector mints carries an immutable id. A draft handle in a
+        different id space would be the one family that does not, and outlook_send_draft reads it.
+        """
+        route = _creates(graph, _created())
+
+        _ = await _draft(client)
+
+        assert 'IdType="ImmutableId"' in route.calls.last.request.headers["Prefer"]
+
     async def test_it_creates_one_message_in_the_mailbox_collection(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

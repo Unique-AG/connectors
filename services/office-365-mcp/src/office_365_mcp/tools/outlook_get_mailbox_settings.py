@@ -159,7 +159,7 @@ class InboxRule(BaseModel):
     uri: str = Field(
         description=(
             "This rule's handle, `outlook:///rules/{id}`. It names this exact rule so a later "
-            + "answer can be about the same one; no tool here changes or deletes a rule, and a "
+            + "answer can be about the same one; no tool here deletes a rule, and a "
             + "user who wants it gone does that in Outlook or the Exchange admin centre."
         )
     )

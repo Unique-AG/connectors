@@ -103,14 +103,14 @@ class TestWhatItAsksThePeopleIndexFor:
     async def test_a_quote_in_the_query_cannot_close_the_search_phrase(
         self, client: GraphServiceClient, people: respx.Route
     ) -> None:
-        """KQL escapes a quote by doubling it, so the count stays even and the phrase this tool
-        opened cannot be closed from inside the caller's own text."""
+        """`$search` takes a double-quoted string and Microsoft's only published escaping rule for
+        it is a backslash, so a quote in the caller's own text cannot close the string."""
         people.mock(return_value=_found(_person()))
 
         _ = await find_recipient(client, query='Tyler "the closer"', limit=20)
 
         search = people.calls.last.request.url.params["$search"]
-        assert search == '"Tyler ""the closer"""'
+        assert search == '"Tyler \\"the closer\\""'
 
     async def test_it_projects_the_fields_it_grades_and_answers_with(
         self, client: GraphServiceClient, people: respx.Route
@@ -207,7 +207,11 @@ class TestWhenTheSecondIndexIsReached:
 
         _ = await find_recipient(client, query="Tyler Nguyen", limit=20)
 
-        assert messages.calls.last.request.url.params["$search"] == '"participants:"Tyler Nguyen""'
+        # This asserted the nested form until the branch review caught it: a value that
+        # closes the search string at its third quote and leaves the rest as syntax.
+        assert (
+            messages.calls.last.request.url.params["$search"] == '"participants:\\"Tyler Nguyen\\""'
+        )
 
 
 class TestHowItGradesARow:

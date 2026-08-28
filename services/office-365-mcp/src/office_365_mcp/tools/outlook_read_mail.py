@@ -12,11 +12,12 @@ own words. Both are selected here and `uniqueBody` wins when it holds words: Gra
 everything Outlook shows the user. Which one was returned is reported, because "they never said so"
 means two different things about the two.
 
-**`Prefer: IdType="ImmutableId"` is load-bearing on the way in, not only on the way out.** The
-handle carries the immutable id `outlook_search_mail` exchanged for, and Graph reads an id in the
-path in whichever id space the request declares. Without the header an immutable id is read as a
-`RestId`, and the answer is the 404 that means nothing in particular — so the header that made the
-handle durable has to be repeated by every reader of it.
+**`Prefer: IdType="ImmutableId"` is sent on every request that mints or reads a handle.**
+Microsoft documents it as how Graph is asked to *answer* in immutable ids, and this connector
+sends it on the reads too so that one id space runs through the whole surface rather than two.
+Whether Graph also re-parses a path id in the space the header names is **not** documented — a
+search of Microsoft Learn, Q&A and the SDK trackers found no statement either way — so the header
+is sent for consistency and not on the strength of that claim.
 
 **The text preference is a request; the response is the answer.** Microsoft documents
 `Prefer: outlook.body-content-type="text"` on this collection and, on the same page, that the

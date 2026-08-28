@@ -63,6 +63,31 @@ class TestWhatItAsksGraphFor:
         search = searched.calls.last.request.url.params["$search"]
         assert search == '"invoice from:bob@vance.invalid"'
 
+    async def test_a_multi_word_value_does_not_close_the_search_string_early(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        """`$search` takes a double-quoted string and KQL quotes a phrase inside it, so a naive
+        wrap emits `$search="from:"Bob Vance""` — a string that ends at the third quote and leaves
+        the rest as syntax. Every mail example Microsoft publishes is a single word, which hides it.
+        """
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(sender="Bob Vance"), limit=25)
+
+        assert searched.calls.last.request.url.params["$search"] == '"from:\\"Bob Vance\\""'
+
+    async def test_a_quote_a_caller_typed_cannot_end_the_search_string(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(subject='say "hello"'), limit=25)
+
+        sent = searched.calls.last.request.url.params["$search"]
+        assert sent.count('"') % 2 == 0
+
     async def test_it_asks_for_the_shared_summary_fields_and_the_callers_window(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
