@@ -210,6 +210,21 @@ def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]
     return [*quietened, GraphTelemetryHandler(options=telemetry_option)]
 
 
+def no_retry() -> list[RequestOption]:
+    """Options that make one Graph call non-retriable, for a request that must not happen twice.
+
+    The SDK's retry middleware retries `POST` as readily as `GET` — its allowed methods include
+    every verb and its retry statuses are 429, 503 and 504 — and Microsoft Graph publishes no
+    idempotency key for the mail operations that send or move. A 503 that arrives after Graph has
+    already accepted a request therefore performs it again, once per configured retry, and
+    `GRAPH_MAX_RETRIES` defaults to 3.
+
+    A fresh list per call: `RequestConfiguration.options` is a caller-owned collection and this
+    package does not hand out one that two requests share.
+    """
+    return [RetryHandlerOption(max_retries=0, should_retry=False)]
+
+
 def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:
     """Shared HTTP transport for all Graph calls. No base_url here on purpose; `graph_client_for`
     sets the one that is used, and says why.

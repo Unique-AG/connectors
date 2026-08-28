@@ -3,7 +3,11 @@
 This package knows nothing about Teams, mail, calendars, or the service config.
 """
 
-from office_365_mcp.graph_client.client import create_graph_transport, graph_client_for
+from office_365_mcp.graph_client.client import (
+    create_graph_transport,
+    graph_client_for,
+    no_retry,
+)
 from office_365_mcp.graph_client.errors import (
     GRAPH_STATUSES,
     GraphFailure,
@@ -52,4 +56,5 @@ __all__ = [
     "graph_client_for",
     "graph_errors",
     "graph_step",
+    "no_retry",
 ]

@@ -92,6 +92,35 @@ _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
 
 READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
 
+# What a tool that changes a mailbox says about itself. Every hint is written out rather than left
+# to a default, because MCP's defaults are the permissive ones: `destructiveHint` defaults to true
+# and `idempotentHint` to false, so an omitted hint reads as the worst case for a tool that is not
+# and as nothing at all for a tool that is.
+#
+# TRAP: these are hints and gate nothing. MCP's own specification says a client "should never make
+# tool use decisions based on ToolAnnotations received from untrusted servers". What actually stops
+# a write is that the Terraform module derives the Entra registration's permissions from the same
+# tool selection the pod runs, so a tool the selection does not name gets an On-Behalf-Of exchange
+# that fails before its body runs. The annotations are for a client that wants to prompt a human.
+WRITE_ADDITIVE: dict[str, bool] = {
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": False,
+    "openWorldHint": True,
+}
+WRITE_IDEMPOTENT: dict[str, bool] = {
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+}
+WRITE_DESTRUCTIVE: dict[str, bool] = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "idempotentHint": False,
+    "openWorldHint": True,
+}
+
 # What a tool file's own permissions are checked against. Without it a misspelling like `Chat.Raed`
 # is only ever compared with itself: Entra rejects an unknown scope at the authorize endpoint, and
 # one typo stops sign-in for every user of this connector.

@@ -623,6 +623,12 @@ def _record_text(record: logging.LogRecord) -> str:
     return f"{record.getMessage()} {record.__dict__!r}"
 
 
+# Every tool that changes a mailbox, written out by hand. Empty until one exists, which is the
+# point: the guard is exercised on a surface that has nothing to hide before it is asked to police
+# a surface that does.
+WRITE_TOOLS: frozenset[str] = frozenset()
+
+
 class TestTheToolsThisServerAdvertises:
     async def test_every_tool_is_listed_and_none_asks_for_a_client(
         self, mcp_client: Client[FastMCPTransport]
@@ -1322,14 +1328,49 @@ class TestTheToolsThisServerAdvertises:
             f"nothing names another tool any more, so this proves nothing: {mentioned}"
         )
 
-    async def test_the_tools_are_marked_read_only(
+    async def test_only_the_tools_written_down_here_change_anything(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
+        """`readOnlyHint: False` is one keyword on one line of one file, and it is the whole of
+        what tells a client this tool acts. Comparing the live surface against a hand-written set
+        makes adding a write tool an edit somebody reviews rather than an edit somebody makes."""
+        tools = _named(await mcp_client.list_tools())
+        writes = {
+            name
+            for name, tool in tools.items()
+            if tool.annotations is not None and tool.annotations.readOnlyHint is not True
+        }
+
+        assert writes == WRITE_TOOLS, (
+            f"the write surface is {sorted(writes)} and this file says {sorted(WRITE_TOOLS)} — "
+            + "add the tool here in the commit that gives it a write annotation"
+        )
+
+    async def test_every_tool_says_which_kind_it_is(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """The guard that fails once the rule above has nothing to check. An unannotated tool is
+        neither in the write set nor out of it: MCP reads a missing `readOnlyHint` as false, so it
+        would join the write surface by omission."""
         tools = _named(await mcp_client.list_tools())
 
-        for tool in tools.values():
-            assert tool.annotations is not None
-            assert tool.annotations.readOnlyHint is True
+        assert tools, "no tools are advertised, so the write surface proves nothing"
+        for name, tool in tools.items():
+            assert tool.annotations is not None, f"{name} carries no annotations"
+            assert tool.annotations.readOnlyHint is not None, f"{name} says neither read nor write"
+
+    async def test_a_write_tool_says_whether_it_can_destroy(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        """MCP defaults `destructiveHint` to true, so a write tool that omits it reads as the worst
+        case. Saying it either way is what makes the distinction reviewable."""
+        tools = _named(await mcp_client.list_tools())
+
+        for name in WRITE_TOOLS:
+            annotations = tools[name].annotations
+            assert annotations is not None
+            assert annotations.destructiveHint is not None, f"{name} does not say"
+            assert annotations.idempotentHint is not None, f"{name} does not say"
 
 
 class TestCallingThem:
