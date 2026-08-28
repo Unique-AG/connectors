@@ -79,14 +79,13 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 30_000
         assert config.default_page_size == 100
         assert config.report_page_size == 500
-        assert config.custom_field_schema_ttl_minutes == 24 * 60
+        assert config.custom_field_schema_ttl_minutes == 120
         assert config.opportunity_stage_ttl_minutes == 60
         assert config.activity_tag_ttl_minutes == 24 * 60
         assert config.system_user_ttl_minutes == 24 * 60
-        # Every catalog cache ships off. A TTL is only worth its staleness once the two
-        # `catalog_*_duration_seconds` histograms say what it saves, so the default is measure,
-        # not assume — see `features/cached_catalog.py`.
-        assert config.custom_field_schema_cache_enabled is False
+        # Custom-field catalogs ship on (measured 6.15 s walk). The other two stay off until
+        # their histograms say otherwise — see `features/cached_catalog.py`.
+        assert config.custom_field_schema_cache_enabled is True
         assert config.activity_tag_cache_enabled is False
         assert config.system_user_cache_enabled is False
         assert config.employment_relationship_type_ids == ()
@@ -120,7 +119,7 @@ class TestBackstopConfigDefaults:
         monkeypatch.setenv("BACKSTOP_MAX_RETRY_WAIT_MS", "5000")
         monkeypatch.setenv("BACKSTOP_DEFAULT_PAGE_SIZE", "50")
         monkeypatch.setenv("BACKSTOP_REPORT_PAGE_SIZE", "250")
-        monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "120")
+        monkeypatch.setenv("BACKSTOP_CUSTOM_FIELD_SCHEMA_TTL_MINUTES", "60")
         monkeypatch.setenv("BACKSTOP_OPPORTUNITY_STAGE_TTL_MINUTES", "30")
         monkeypatch.setenv("BACKSTOP_ACTIVITY_TAG_TTL_MINUTES", "90")
         monkeypatch.setenv("BACKSTOP_SYSTEM_USER_TTL_MINUTES", "45")
@@ -137,7 +136,7 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 5000
         assert config.default_page_size == 50
         assert config.report_page_size == 250
-        assert config.custom_field_schema_ttl_minutes == 120
+        assert config.custom_field_schema_ttl_minutes == 60
         assert config.opportunity_stage_ttl_minutes == 30
         assert config.activity_tag_ttl_minutes == 90
         assert config.system_user_ttl_minutes == 45

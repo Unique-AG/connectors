@@ -21,6 +21,7 @@ from backstop_mcp.features.accounts.api_responses import (
     TableDataMoneyAttributes,
     TableDataShareAttributes,
 )
+from backstop_mcp.features.custom_fields import CustomFieldValueAttributes
 from backstop_mcp.features.resolution import Candidate, Resolution
 
 __all__ = [
@@ -167,12 +168,12 @@ type ProductResolution = Resolution[ResolvedProductDto]
 
 
 class ProductFetchDto(BaseModel):
-    """A product identity plus the raw custom-field dump `get_product` joins to the catalog."""
+    """A product identity plus the custom-field dump `get_product` joins to the catalog."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     product: ResolvedProductDto
-    stored_custom_field_values: object = None
+    stored_custom_field_values: tuple[CustomFieldValueAttributes, ...] = ()
 
 
 class AccountOwnerDto(BaseModel):

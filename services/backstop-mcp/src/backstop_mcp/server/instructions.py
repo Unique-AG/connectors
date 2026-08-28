@@ -54,12 +54,18 @@ Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \
 A disabled login returning empty is not "no coverage". One party's deals: \
 get_opportunities (cheap; do not walk the firm for that). `previous_stage` is the stage \
-the deal just left, not where it is now.
+the deal just left, not where it is now. Master Pipeline custom fields and stage history \
+are not on a search row — fetch those ids with get_opportunities_by_ids before answering \
+anything the row cannot support. Amounts are on the row; ask for them with `fields`. If \
+the field is absent from the fetched record too, say Backstop does not record it — never \
+infer a value from the deal's name, stage, amounts or another deal. When \
+`custom_fields_unavailable` is true, an empty custom_field_values list is not "no value \
+recorded" — say you cannot answer rather than infer.
 
 Open follow-ups: get_tasks_for_party. Both entity filters are required; status is \
 client-side.
 
 Custom-field names and types: list_custom_fields. Read party values through \
-get_organization / get_person, product values through get_product, not through \
-people-for-party.
+get_organization / get_person, product values through get_product, opportunity values \
+through get_opportunities / get_opportunities_by_ids, not through people-for-party.
 """

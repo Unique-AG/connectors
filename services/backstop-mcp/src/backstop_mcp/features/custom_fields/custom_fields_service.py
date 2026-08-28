@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Self, cast, override
 
@@ -23,6 +24,18 @@ from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class CustomFieldFilters:
+    tabs: tuple[str, ...] = ()
+    groups: tuple[str, ...] = ()
+    group_ids: tuple[int, ...] = ()
+    definition_ids: tuple[str, ...] = ()
+    names: tuple[str, ...] = ()
+
+
+_NO_FILTERS = CustomFieldFilters()
+
+
 class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
     """Process-wide custom-field schema catalog, and the join of record values onto it.
 
@@ -34,9 +47,6 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
     one catalog that meters its loads, so it overrides `record_load`.
     """
 
-    _STORED_VALUE_KEYS: frozenset[str] = frozenset(
-        {"regularCustomFieldValues", "regular_custom_field_values"}
-    )
     _ENTITY_FIELD_TYPE: str = "entity"
     _OPTION_TEXT_KEYS: tuple[str, ...] = ("label", "value", "name", "id")
 
@@ -57,77 +67,48 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
     def record_load(self, source: CatalogSource) -> None:
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": source})
 
-    def take_stored_values(
-        self, attributes: Mapping[str, object]
-    ) -> tuple[dict[str, object], object]:
-        """Pull Backstop's `regularCustomFieldValues` dump off a party record.
+    async def load_catalog(
+        self, client: BackstopClient
+    ) -> dict[str, CustomFieldDefinitionDto] | None:
+        """The definition catalog, or `None` when it could not be loaded.
 
-        Returns the record without that key, and the dump (or None). The dump is
-        `{definitionId, value}` rows — names and types come from `resolve_values`.
-        """
-        stored: object = None
-        record: dict[str, object] = {}
-        for key, value in attributes.items():
-            if key in self._STORED_VALUE_KEYS:
-                if stored is None:
-                    stored = value
-                continue
-            record[key] = value
-        return record, stored
-
-    async def resolve_values(
-        self,
-        client: BackstopClient,
-        stored_values: object,
-        *,
-        tabs: Sequence[str] = (),
-        groups: Sequence[str] = (),
-        group_ids: Sequence[int] = (),
-        definition_ids: Sequence[str] = (),
-        names: Sequence[str] = (),
-    ) -> list[ResolvedCustomFieldValueResponse]:
-        """Look up each stored `{definitionId, value}` in the catalog.
-
-        Party and entity-specific definitions both appear on one record, so this uses the
-        full catalog. ENTITY values become party references; picklist values that left the
-        current option list are kept and flagged. A cold-cache fetch failure returns an empty
-        list rather than raising, so the party lookup still succeeds.
+        `None` is distinct from an empty catalog: the caller can tell "unavailable" from
+        "no custom fields on this record". Overlap this with another GET so `join_values`
+        hits a warm cache.
         """
         try:
             catalog, _status = await self.get(client)
         except Exception:
             logger.warning("custom_fields.values.catalog_unavailable", exc_info=True)
-            return []
+            return None
+        return catalog
 
+    async def join_values(
+        self,
+        client: BackstopClient,
+        regular_custom_field_values: Sequence[CustomFieldValueAttributes] | None,
+        *,
+        filters: CustomFieldFilters = _NO_FILTERS,
+    ) -> list[ResolvedCustomFieldValueResponse]:
+        """Load the catalog (or reuse a warm cache) and join stored values onto it.
+
+        Party and entity-specific definitions both appear on one record, so this uses the
+        full catalog. ENTITY values become party references; picklist values that left the
+        current option list are kept and flagged. A cold-cache fetch failure returns an
+        empty list rather than raising, so the parent lookup still succeeds.
+        """
+        catalog = await self.load_catalog(client)
+        if catalog is None:
+            return []
         published: list[ResolvedCustomFieldValueResponse] = []
-        for stored in self._stored_rows(stored_values):
+        for stored in regular_custom_field_values or ():
             resolved = self._with_catalog_definition(stored, catalog)
             if resolved is None:
                 continue
-            if not self._included_by_filters(
-                resolved,
-                tabs=tabs,
-                groups=groups,
-                group_ids=group_ids,
-                definition_ids=definition_ids,
-                names=names,
-            ):
+            if not self._included_by_filters(resolved, filters):
                 continue
             published.append(ResolvedCustomFieldValueResponse.from_dto(resolved))
         return published
-
-    def _stored_rows(self, stored_values: object) -> list[CustomFieldValueAttributes]:
-        if not isinstance(stored_values, list):
-            return []
-        rows: list[CustomFieldValueAttributes] = []
-        for item in cast(list[object], stored_values):
-            if not isinstance(item, Mapping):
-                continue
-            try:
-                rows.append(CustomFieldValueAttributes.model_validate(item))
-            except ValidationError:
-                logger.warning("custom_fields.values.unreadable", exc_info=True)
-        return rows
 
     def _with_catalog_definition(
         self,
@@ -139,6 +120,13 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
             return None
         definition = catalog.get(definition_id)
         if definition is None:
+            logger.warning(
+                "custom_fields.values.definition_missing",
+                extra={
+                    "definition_id": definition_id,
+                    "remedy": "list_custom_fields(refresh=true)",
+                },
+            )
             return None
         return ResolvedCustomFieldValueDto.from_definition(
             definition,
@@ -200,26 +188,19 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
         return None
 
     def _included_by_filters(
-        self,
-        resolved: ResolvedCustomFieldValueDto,
-        *,
-        tabs: Sequence[str],
-        groups: Sequence[str],
-        group_ids: Sequence[int],
-        definition_ids: Sequence[str],
-        names: Sequence[str],
+        self, resolved: ResolvedCustomFieldValueDto, filters: CustomFieldFilters
     ) -> bool:
-        if tabs and not self._equals_ignore_case(resolved.tab_name, tabs):
+        if filters.tabs and not self._equals_ignore_case(resolved.tab_name, filters.tabs):
             return False
-        if groups and not self._equals_ignore_case(resolved.group_name, groups):
+        if filters.groups and not self._equals_ignore_case(resolved.group_name, filters.groups):
             return False
-        if group_ids and resolved.group_id not in set(group_ids):
+        if filters.group_ids and resolved.group_id not in set(filters.group_ids):
             return False
-        if definition_ids and resolved.definition_id not in {
-            entry.strip() for entry in definition_ids
+        if filters.definition_ids and resolved.definition_id not in {
+            entry.strip() for entry in filters.definition_ids
         }:
             return False
-        return not names or self._equals_ignore_case(resolved.name, names)
+        return not filters.names or self._equals_ignore_case(resolved.name, filters.names)
 
     def _equals_ignore_case(self, actual: str | None, wanted: Sequence[str]) -> bool:
         if actual is None:

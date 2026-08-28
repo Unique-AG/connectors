@@ -9,13 +9,14 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.opportunities import (
     OpportunityFetchResponse,
     OpportunityStageDto,
     OpportunityStatus,
     fetch_opportunities,
 )
-from tests.helpers import BASE_URL, resource
+from tests.helpers import BASE_URL, custom_fields_service, opportunity_stages_service, resource
 
 # The instance's whole vocabulary, as `OpportunityStagesService` hands it over.
 VOCABULARY: dict[str, OpportunityStageDto] = {
@@ -33,7 +34,16 @@ VOCABULARY: dict[str, OpportunityStageDto] = {
 
 _ENTITY_ID = "341764767"
 _OPPORTUNITIES_URL = f"{BASE_URL}/organizations/{_ENTITY_ID}/opportunities"
+_STAGES_URL = f"{BASE_URL}/opportunity-stages"
 _NEXT_PAGE = f"/organizations/{_ENTITY_ID}/opportunities?page[offset]=100"
+_EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+
+
+@pytest.fixture(autouse=True)
+def _empty_custom_field_definitions() -> None:
+    respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+        return_value=httpx.Response(200, json=_EMPTY_DEFINITIONS)
+    )
 
 
 def _opportunity(
@@ -113,18 +123,43 @@ def _page(
     )
 
 
+def _stages_response(
+    vocabulary: dict[str, OpportunityStageDto] | None = None,
+) -> httpx.Response:
+    stages = VOCABULARY if vocabulary is None else vocabulary
+    return httpx.Response(
+        200,
+        json={
+            "data": [
+                resource(
+                    stage.id,
+                    "opportunity-stages",
+                    name=stage.name,
+                    sortOrder=stage.sort_order,
+                    closed=stage.closed,
+                )
+                for stage in stages.values()
+            ],
+            "links": {"next": None},
+        },
+    )
+
+
 async def _fetch(
     client: BackstopClient,
     *,
     status: OpportunityStatus = "all",
     vocabulary: dict[str, OpportunityStageDto] | None = None,
 ) -> OpportunityFetchResponse:
+    respx.get(_STAGES_URL).mock(return_value=_stages_response(vocabulary))
     return await fetch_opportunities(
         client,
         segment="organizations",
         entity_id=_ENTITY_ID,
         status=status,
-        vocabulary=VOCABULARY if vocabulary is None else vocabulary,
+        opportunity_stages_service=opportunity_stages_service(),
+        custom_fields_service=custom_fields_service(),
+        custom_field_filters=CustomFieldFilters(),
     )
 
 
@@ -335,7 +370,6 @@ class TestProjection:
     async def test_measured_attributes_are_projected_onto_the_response(
         self, client: BackstopClient
     ) -> None:
-        custom_fields = [{"definitionId": 343439, "name": "Status", "value": "Attended"}]
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity(
@@ -352,7 +386,6 @@ class TestProjection:
                     daysOpen=216,
                     daysInCurrentStage=640,
                     dateEnteredCurrentStage="2024-11-13T00:00:00.000-0500",
-                    regularCustomFieldValues=custom_fields,
                 ),
                 included=[_side_loaded_stage("96016")],
             )
@@ -372,7 +405,7 @@ class TestProjection:
         assert deal.days_open == 216
         assert deal.days_in_current_stage == 640
         assert deal.date_entered_current_stage == date(2024, 11, 13)
-        assert deal.custom_field_values == tuple(custom_fields)
+        assert deal.custom_field_values == ()
 
     @pytest.mark.asyncio
     @respx.mock
@@ -701,16 +734,10 @@ class TestMalformedRecords:
     async def test_a_malformed_record_is_dropped_on_its_own_and_the_rest_returned(
         self, client: BackstopClient, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The reason the page is not deserialized against a typed schema in one pass.
-
-        `regularCustomFieldValues` is the field this was found on in review: a value the model
-        cannot read used to fail every opportunity the party has, not just the record carrying it.
-        """
+        """The reason the page is not deserialized against a typed schema in one pass."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
-                _opportunity(
-                    "malformed", stage_id="42482", regularCustomFieldValues="not-a-list-of-fields"
-                ),
+                _opportunity("malformed", stage_id="42482", probability=["not-a-number"]),
                 _opportunity("intact", stage_id="42482", name="Koch - CATS Select", isOpen=True),
                 included=[_side_loaded_stage("42482")],
             )
@@ -726,16 +753,21 @@ class TestMalformedRecords:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_null_custom_field_values_cost_neither_record_nor_page(
-        self, client: BackstopClient
+    @pytest.mark.parametrize(
+        "stored",
+        [None, "not-a-list-of-fields", [{"definitionId": 343439, "value": "Attended"}]],
+    )
+    async def test_wire_custom_field_values_are_ignored_and_the_deal_survives(
+        self, client: BackstopClient, stored: object
     ) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
-                _opportunity("no-fields", stage_id="42482", regularCustomFieldValues=None),
                 _opportunity(
-                    "with-fields",
+                    "kept",
                     stage_id="42482",
-                    regularCustomFieldValues=[{"definitionId": 343439, "value": "Attended"}],
+                    name="Koch - CATS Select",
+                    isOpen=True,
+                    regularCustomFieldValues=stored,
                 ),
                 included=[_side_loaded_stage("42482")],
             )
@@ -743,11 +775,8 @@ class TestMalformedRecords:
 
         result = await _fetch(client)
 
-        by_id = {deal.id: deal for deal in result.opportunities}
-        assert by_id["no-fields"].custom_field_values == ()
-        assert by_id["with-fields"].custom_field_values == (
-            {"definitionId": 343439, "value": "Attended"},
-        )
+        assert [deal.id for deal in result.opportunities] == ["kept"]
+        assert result.opportunities[0].custom_field_values == ()
 
     @pytest.mark.asyncio
     @respx.mock

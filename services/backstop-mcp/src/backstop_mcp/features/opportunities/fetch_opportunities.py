@@ -31,14 +31,15 @@ omits the name, rather than being dropped or guessed at.
 
 **Records are validated one at a time.** The fetch pages with the attributes left as a plain
 dict, and `OpportunityResponse` then reads each record's own attributes through its aliases. A
-typed page schema would deserialize the whole page in one pass, so one malformed record — a
-`regularCustomFieldValues` that is not a list, say — would fail every opportunity the party has.
-Here it is warned about and dropped on its own.
+typed page schema would deserialize the whole page in one pass, so one malformed record would
+fail every opportunity the party has. Here it is warned about and dropped on its own.
+`regularCustomFieldValues` is parsed through `RegularCustomFieldValuesAttributes`, so a value
+that is not a list no longer costs the deal.
 """
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
 from typing import Literal
 from urllib.parse import quote
@@ -52,9 +53,15 @@ from backstop_mcp.backstop_client import (
     follow_included,
     included_by_type,
 )
+from backstop_mcp.features.custom_fields import (
+    CustomFieldFilters,
+    CustomFieldsService,
+    RegularCustomFieldValuesAttributes,
+)
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
+from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import (
     OpportunityFetchResponse,
     OpportunityResponse,
@@ -119,8 +126,8 @@ def stage_names_from_included(included: Sequence[dict[str, object]]) -> dict[str
 def resolve_stage_name(
     stage_id: str | None,
     *,
-    side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStageDto],
+    opportunity_id_to_name_map: Mapping[str, str] | None = None,
+    opportynity_id_to_stage_map: Mapping[str, OpportunityStageDto],
 ) -> str | None:
     """Name a stage from this response's side-loads, then from the cached vocabulary.
 
@@ -130,10 +137,11 @@ def resolve_stage_name(
     """
     if stage_id is None:
         return None
-    side_loaded_name = side_loaded.get(stage_id)
-    if side_loaded_name is not None:
-        return side_loaded_name
-    known = vocabulary.get(stage_id)
+    if opportunity_id_to_name_map is not None:
+        side_loaded_name = opportunity_id_to_name_map.get(stage_id)
+        if side_loaded_name is not None:
+            return side_loaded_name
+    known = opportynity_id_to_stage_map.get(stage_id)
     return known.name if known is not None else None
 
 
@@ -189,7 +197,7 @@ def stage_history(
     *,
     included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
-    vocabulary: Mapping[str, OpportunityStageDto],
+    opportuynity_stages: Mapping[str, OpportunityStageDto],
 ) -> tuple[StageChangeResponse, ...]:
     """One deal's stage moves, in the order Backstop links them.
 
@@ -217,7 +225,9 @@ def stage_history(
                 {
                     **attributes,
                     "stage": resolve_stage_name(
-                        stage_id, side_loaded=side_loaded, vocabulary=vocabulary
+                        stage_id,
+                        opportunity_id_to_name_map=side_loaded,
+                        opportynity_id_to_stage_map=opportuynity_stages,
                     ),
                     "stage_id": stage_id,
                 }
@@ -226,11 +236,14 @@ def stage_history(
     return tuple(changes)
 
 
-def _project_opportunities(
+async def _project_opportunities(
     resources: Sequence[OpportunityResource],
     *,
+    client: BackstopClient,
     included: Sequence[dict[str, object]],
-    vocabulary: Mapping[str, OpportunityStageDto],
+    opportynity_id_to_stage_map: Mapping[str, OpportunityStageDto],
+    custom_fields_service: CustomFieldsService,
+    custom_fields_filters: CustomFieldFilters,
 ) -> tuple[OpportunityResponse, ...]:
     """Project the fetched resources, indexing the side-loaded stages once for all of them.
 
@@ -241,24 +254,36 @@ def _project_opportunities(
     other deals are still an answer, and this is the whole reason the fetch does not hand the
     page a typed schema.
     """
-    side_loaded = stage_names_from_included(included)
+    opportunity_id_to_name_map = stage_names_from_included(included)
     projected: list[OpportunityResponse] = []
     for resource in resources:
         try:
             stage_id = current_stage_id(resource)
+
+            custom_field_values = await custom_fields_service.join_values(
+                client,
+                RegularCustomFieldValuesAttributes.model_validate(
+                    resource.attributes
+                ).regular_custom_field_values,
+                filters=custom_fields_filters,
+            )
+
             projected.append(
                 OpportunityResponse.from_resource(
                     resource,
                     stage=resolve_stage_name(
-                        stage_id, side_loaded=side_loaded, vocabulary=vocabulary
+                        stage_id,
+                        opportunity_id_to_name_map=opportunity_id_to_name_map,
+                        opportynity_id_to_stage_map=opportynity_id_to_stage_map,
                     ),
                     stage_id=stage_id,
                     stage_history=stage_history(
                         resource,
                         included=included,
-                        side_loaded=side_loaded,
-                        vocabulary=vocabulary,
+                        side_loaded=opportunity_id_to_name_map,
+                        opportuynity_stages=opportynity_id_to_stage_map,
                     ),
+                    custom_field_values=tuple(custom_field_values),
                 )
             )
         except ValidationError as exc:
@@ -270,27 +295,15 @@ def _project_opportunities(
     return tuple(projected)
 
 
-async def await_vocabulary(
-    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
-) -> dict[str, OpportunityStageDto]:
-    """The vocabulary mapping, whether the caller already had it or is still fetching it.
-
-    A Mapping is returned as a new dict; an awaitable is awaited. `fetch_opportunities` gathers
-    this with the sub-collection page so the tool can pass `stages_service.get(client)` and the
-    two HTTP calls run together.
-    """
-    if isinstance(vocabulary, Mapping):
-        return dict(vocabulary)
-    return dict(await vocabulary)
-
-
 async def fetch_opportunities(
     client: BackstopClient,
     *,
     segment: SearchType,
     entity_id: str,
     status: OpportunityStatus = "all",
-    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
+    opportunity_stages_service: OpportunityStagesService,
+    custom_fields_service: CustomFieldsService,
+    custom_field_filters: CustomFieldFilters,
 ) -> OpportunityFetchResponse:
     """Every opportunity for one party, `status`-filtered and newest stage move first.
 
@@ -302,7 +315,7 @@ async def fetch_opportunities(
     in-flight coroutine. Either failure fails the call: a pipeline that silently omits stages
     is worse than an error.
     """
-    page, resolved_vocabulary = await asyncio.gather(
+    page, opportuynity_stages, catalog = await asyncio.gather(
         client.paginate(
             f"/{segment}/{quote(entity_id, safe='')}/opportunities",
             # Attributes left as a plain dict so each record is validated on its own — see the
@@ -315,10 +328,16 @@ async def fetch_opportunities(
             max_records=None,
             page_size=_PAGE_SIZE,
         ),
-        await_vocabulary(vocabulary),
+        opportunity_stages_service.get(client),
+        custom_fields_service.load_catalog(client),
     )
-    fetched = _project_opportunities(
-        page.items, included=page.included, vocabulary=resolved_vocabulary
+    fetched = await _project_opportunities(
+        page.items,
+        client=client,
+        included=page.included,
+        opportynity_id_to_stage_map=opportuynity_stages,
+        custom_fields_service=custom_fields_service,
+        custom_fields_filters=custom_field_filters,
     )
     selected = _order_by_date_entered(
         opportunity for opportunity in fetched if _matches_status(opportunity, status)
@@ -328,6 +347,7 @@ async def fetch_opportunities(
         total=len(fetched),
         open_count=sum(1 for opportunity in fetched if opportunity.is_open is True),
         closed_count=sum(1 for opportunity in fetched if opportunity.is_open is False),
+        custom_fields_unavailable=catalog is None,
     )
     logger.info(
         "opportunities.fetched",

@@ -10,6 +10,9 @@ it absorbs.
 `OpportunityStagesService` is the TTL-cached instance stage vocabulary the fetch is handed: an
 opportunity's stage history names only some of the stages it points at, and the rest come from
 here. See `opportunity_stages_service.py`.
+
+`fetch_opportunities_by_ids` is the bounded fan-out behind `get_opportunities_by_ids`: one GET
+per trusted id, one catalog load for the batch, per-id not-found/error reporting.
 """
 
 from backstop_mcp.features.opportunities.aggregate_search_opportunities import (
@@ -21,6 +24,10 @@ from backstop_mcp.features.opportunities.dependencies import get_opportunity_sta
 from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityStatus,
     fetch_opportunities,
+)
+from backstop_mcp.features.opportunities.fetch_opportunities_by_ids import (
+    MAX_OPPORTUNITY_IDS,
+    fetch_opportunities_by_ids,
 )
 from backstop_mcp.features.opportunities.fetch_search_opportunities import (
     MAX_OPPORTUNITY_SCAN_RECORDS,
@@ -34,14 +41,17 @@ from backstop_mcp.features.opportunities.internal_dto import (
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import (
     OpportunityFetchResponse,
+    OpportunityIdErrorResponse,
     OpportunityResponse,
     StageChangeResponse,
 )
 
 __all__ = [
+    "MAX_OPPORTUNITY_IDS",
     "MAX_OPPORTUNITY_SCAN_RECORDS",
     "OpportunityFetchResponse",
     "OpportunityGroupBy",
+    "OpportunityIdErrorResponse",
     "OpportunityResponse",
     "OpportunityStageDto",
     "OpportunityStageAttributes",
@@ -52,6 +62,7 @@ __all__ = [
     "StageChangeResponse",
     "aggregate_search_opportunities",
     "fetch_opportunities",
+    "fetch_opportunities_by_ids",
     "fetch_search_opportunities",
     "get_opportunity_stages_service",
 ]

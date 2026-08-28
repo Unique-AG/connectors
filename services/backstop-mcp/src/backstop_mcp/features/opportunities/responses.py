@@ -7,9 +7,9 @@ stage name with no direction is where a reader guesses wrong.
 Both models are validated straight from a record's raw `attributes` — the camelCase aliases and
 `extra="ignore"` below are what make that possible, and are the reason there is no separate wire
 model to copy field for field. The few things Backstop does not put in `attributes` (the resource
-id, the resolved stage name and id, the stage history) are supplied alongside by
-`OpportunityResponse.from_resource`. Validating one record at a time is deliberate: it is what keeps
-a single malformed deal from costing a party their whole pipeline.
+id, the resolved stage name and id, the stage history, and custom-field values) are supplied
+alongside by `OpportunityResponse.from_resource`. Validating one record at a time is deliberate:
+it is what keeps a single malformed deal from costing a party their whole pipeline.
 
 Backstop's names arrive as `validation_alias`, not `alias`, so they are read on the way in without
 being published on the way out: the schema and `model_dump` keep the snake_case field names these
@@ -24,23 +24,14 @@ still a fact even when the vocabulary has moved on.
 
 from typing import Annotated, ClassVar, Self
 
-from pydantic import BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import ConfigDict, Field, StringConstraints
 
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.dates import LenientDate
+from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
 from backstop_mcp.models import OmitNoneModel
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
-
-
-def _custom_field_values(value: object) -> object:
-    """Read Backstop's explicit `regularCustomFieldValues: null` as "no custom fields".
-
-    Measured on the live instance and not the same statement as an absent key: the attribute is
-    present and null on records that simply have none, which is not a defect worth dropping the
-    deal over.
-    """
-    return () if value is None else value
 
 
 class StageChangeResponse(OmitNoneModel):
@@ -180,22 +171,21 @@ class OpportunityResponse(OmitNoneModel):
         validation_alias="dateEnteredCurrentStage",
         description="Day the deal entered `stage`. Deals are returned newest-first by this day.",
     )
-    custom_field_values: Annotated[
-        tuple[dict[str, object], ...], BeforeValidator(_custom_field_values)
-    ] = Field(
+    custom_field_values: tuple[ResolvedCustomFieldValueResponse, ...] = Field(
         default=(),
-        validation_alias="regularCustomFieldValues",
         description=(
-            "This instance's own custom fields on the deal, as Backstop stores them — one entry "
-            + "per populated field, carrying its `definitionId`, `name` and `value`. Call "
-            + "`list_custom_fields` for what a definition means."
+            "Custom-field values on the deal, joined to list_custom_fields definitions "
+            "(definition id, name, type, and value). Empty when the deal has none or the "
+            "catalog could not be loaded. Slice with custom_field_names / "
+            "custom_field_definition_ids rather than fetching again."
         ),
     )
     stage_history: tuple[StageChangeResponse, ...] = Field(
         default=(),
         description=(
             "Every stage this deal has entered, in the order Backstop links them — the trail "
-            + "behind `stage`."
+            + "behind `stage`. Empty on get_opportunities_by_ids unless include_stage_history "
+            + "was requested — that is omission, not 'never moved'."
         ),
     )
 
@@ -207,11 +197,12 @@ class OpportunityResponse(OmitNoneModel):
         stage: str | None,
         stage_id: str | None,
         stage_history: tuple[StageChangeResponse, ...],
+        custom_field_values: tuple[ResolvedCustomFieldValueResponse, ...],
     ) -> Self:
         """Project one `opportunities` resource, naming its current stage and its history.
 
-        The response model reads the record's attributes through its own aliases, so the four
-        things Backstop does not put in `attributes` are all that is supplied here. Raises
+        The response model reads the record's attributes through its own aliases, so the things
+        Backstop does not put in `attributes` are all that is supplied here. Raises
         `ValidationError` for a record the model cannot read, which the caller drops on its own.
         """
         return cls.model_validate(
@@ -221,6 +212,7 @@ class OpportunityResponse(OmitNoneModel):
                 "stage": stage,
                 "stage_id": stage_id,
                 "stage_history": stage_history,
+                "custom_field_values": custom_field_values,
             }
         )
 
@@ -257,3 +249,30 @@ class OpportunityFetchResponse(OmitNoneModel):
     closed_count: int = Field(
         description="How many of those are closed, counted the same way as `open_count`."
     )
+    custom_fields_unavailable: bool = Field(
+        default=False,
+        description=(
+            "True when the custom-field catalog could not be loaded, so `custom_field_values` "
+            "is empty rather than 'none recorded'."
+        ),
+    )
+
+
+class OpportunityIdErrorResponse(OmitNoneModel):
+    """One id in a by-ids batch that failed for a reason other than 404."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(description="The opportunity id that failed.")
+    detail: str = Field(description="Why this id was not returned.")
+
+
+class OpportunitiesByIdsFetchResponse(OmitNoneModel):
+    """A by-id batch after each GET settled: found deals, missing ids, and per-id errors."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    opportunities: tuple[OpportunityResponse, ...]
+    not_found: tuple[str, ...]
+    errors: tuple[OpportunityIdErrorResponse, ...]
+    custom_fields_unavailable: bool = False

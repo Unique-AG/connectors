@@ -12,6 +12,7 @@ opportunities, so the whole sub-collection is walked.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp import Context
@@ -22,6 +23,11 @@ from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.features.custom_fields import (
+    CustomFieldFilters,
+    CustomFieldsService,
+    get_custom_fields_service,
+)
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
     OpportunityFetchResponse,
@@ -38,7 +44,7 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.models import OmitNoneModel, published_output_schema
+from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +88,13 @@ class OpportunitiesResolvedResponse(OmitNoneModel):
     closed_count: int = Field(
         description="How many of those are closed, counted the same way as `open_count`."
     )
+    custom_fields_unavailable: bool = Field(
+        default=False,
+        description=(
+            "True when the custom-field catalog could not be loaded, so `custom_field_values` "
+            "is empty rather than 'none recorded'."
+        ),
+    )
 
 
 type GetOpportunitiesResponse = (
@@ -98,6 +111,7 @@ def _resolved_response(
         total=fetched.total,
         open_count=fetched.open_count,
         closed_count=fetched.closed_count,
+        custom_fields_unavailable=fetched.custom_fields_unavailable,
     )
 
 
@@ -152,8 +166,29 @@ async def get_opportunities(
             ),
         ),
     ] = "all",
+    custom_field_definition_ids: Annotated[
+        Sequence[CoercedId],
+        Field(
+            description=(
+                "Custom-field definition ids whose values to keep, as published on "
+                "list_custom_fields `id` and on `custom_field_values[].definition_id`. "
+                "JSON numbers are accepted. Combined with custom_field_names with AND. "
+                "Omit to keep every definition."
+            ),
+        ),
+    ] = (),
+    custom_field_names: Annotated[
+        Sequence[str],
+        Field(
+            description=(
+                "Custom-field names whose values to keep. Case-insensitive. Combined with "
+                "custom_field_definition_ids with AND. Omit to keep every name."
+            ),
+        ),
+    ] = (),
     client: BackstopClient = Depends(get_backstop_client),
-    opportunity_stages: OpportunityStagesService = Depends(get_opportunity_stages_service),
+    opportunity_stages_service: OpportunityStagesService = Depends(get_opportunity_stages_service),
+    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
 
@@ -172,7 +207,10 @@ async def get_opportunities(
     `weighted_allocated_value` are Backstop's own products of amount and probability.
     `probability` is the standard attribute; a rep-entered probability custom field stays in
     `custom_field_values` under its own name. Master Pipeline fields are those custom-field
-    entries — call `list_custom_fields` with entity_types opportunities for definitions.
+    entries, joined to list_custom_fields (field_type included). Slice with
+    `custom_field_names` / `custom_field_definition_ids` — filters AND together. When
+    `custom_fields_unavailable` is true, an empty list means the catalog could not be loaded,
+    not that the deal has no Master Pipeline data.
     """
     result = await resolve_party(
         ctx,
@@ -194,7 +232,12 @@ async def get_opportunities(
         segment=party.search_type,
         entity_id=party.id,
         status=status,
-        vocabulary=opportunity_stages.get(client),
+        opportunity_stages_service=opportunity_stages_service,
+        custom_fields_service=custom_fields_service,
+        custom_field_filters=CustomFieldFilters(
+            definition_ids=coerce_ids(custom_field_definition_ids),
+            names=tuple(custom_field_names),
+        ),
     )
     logger.info(
         "opportunities.get.completed",

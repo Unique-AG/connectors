@@ -3,7 +3,9 @@
 from typing import ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
+from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.features.data_hygiene import EmploymentLinkResponse, ProvenanceAttributes
 from backstop_mcp.features.org_people.internal_dto import (
     OrgPeopleListingDto,
@@ -22,6 +24,11 @@ class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
         default=None,
         description="Display name as Backstop stores it, usually 'Last, First'.",
     )
+    regular_custom_field_values: SkipJsonSchema[RegularCustomFieldValues] = Field(
+        default_factory=list,
+        alias="regularCustomFieldValues",
+        exclude=True,
+    )
 
 
 class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
@@ -37,6 +44,11 @@ class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
     name: str | None = Field(
         default=None,
         description="Organization name as Backstop stores it.",
+    )
+    regular_custom_field_values: SkipJsonSchema[RegularCustomFieldValues] = Field(
+        default_factory=list,
+        alias="regularCustomFieldValues",
+        exclude=True,
     )
 
 

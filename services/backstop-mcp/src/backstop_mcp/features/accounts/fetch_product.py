@@ -38,7 +38,7 @@ _ProductDocument = BackstopApiResourceDocument[ProductAttributes]
 def _to_dto(resource: BackstopApiResource[ProductAttributes]) -> ProductFetchDto:
     return ProductFetchDto(
         product=ResolvedProductDto.from_attributes(resource.id, resource.attributes),
-        stored_custom_field_values=resource.attributes.regular_custom_field_values,
+        stored_custom_field_values=tuple(resource.attributes.regular_custom_field_values),
     )
 
 

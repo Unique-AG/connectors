@@ -9,7 +9,7 @@ sparse key is `fields[contacts]`, not `fields[organizations]`.
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from pydantic import ValidationError
 
@@ -28,7 +28,6 @@ from backstop_mcp.features.opportunities.api_responses import (
 )
 from backstop_mcp.features.opportunities.fetch_opportunities import (
     OpportunityResource,
-    await_vocabulary,
     current_stage_id,
     resolve_stage_name,
     stage_names_from_included,
@@ -40,6 +39,7 @@ from backstop_mcp.features.opportunities.internal_dto import (
     SearchOpportunitiesFetchDto,
     SearchOpportunityDto,
 )
+from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import OpportunityResponse
 
 logger = logging.getLogger(__name__)
@@ -136,7 +136,7 @@ def _project(
     items: Sequence[OpportunityResource],
     *,
     included: Sequence[dict[str, object]],
-    vocabulary: Mapping[str, OpportunityStageDto],
+    opportunity_id_to_stage_map: Mapping[str, OpportunityStageDto],
 ) -> tuple[tuple[SearchOpportunityDto, ...], int]:
     side_loaded = stage_names_from_included(included)
     # Indexed once for the whole walk. `follow_included` indexes on every call, and this loop
@@ -150,9 +150,14 @@ def _project(
         try:
             deal = OpportunityResponse.from_resource(
                 resource,
-                stage=resolve_stage_name(stage_id, side_loaded=side_loaded, vocabulary=vocabulary),
+                stage=resolve_stage_name(
+                    stage_id,
+                    opportunity_id_to_name_map=side_loaded,
+                    opportynity_id_to_stage_map=opportunity_id_to_stage_map,
+                ),
                 stage_id=stage_id,
                 stage_history=(),
+                custom_field_values=(),
             )
         except ValidationError as exc:
             dropped += 1
@@ -189,10 +194,10 @@ async def fetch_search_opportunities(
     client: BackstopClient,
     *,
     representative: str | None = None,
-    vocabulary: Mapping[str, OpportunityStageDto] | Awaitable[Mapping[str, OpportunityStageDto]],
+    opportunity_stages_service: OpportunityStagesService,
 ) -> SearchOpportunitiesFetchDto:
     """Walk the firm-wide opportunities collection, optionally filtered by login."""
-    page, vocabulary_rows = await asyncio.gather(
+    page, opportunity_id_to_stage_map = await asyncio.gather(
         client.paginate(
             _PATH,
             schema=BackstopApiResource[dict[str, object]],
@@ -201,9 +206,11 @@ async def fetch_search_opportunities(
             page_size=_PAGE_SIZE,
             parallel=True,
         ),
-        await_vocabulary(vocabulary),
+        opportunity_stages_service.get(client),
     )
-    rows, dropped = _project(page.items, included=page.included, vocabulary=vocabulary_rows)
+    rows, dropped = _project(
+        page.items, included=page.included, opportunity_id_to_stage_map=opportunity_id_to_stage_map
+    )
     return SearchOpportunitiesFetchDto(
         rows=rows,
         rows_received=len(page.items),

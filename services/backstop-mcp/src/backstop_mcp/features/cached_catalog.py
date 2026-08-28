@@ -27,13 +27,12 @@ copy. What it has to get right, once:
 Subclasses supply the DTO, the fetch, and the names this logs under. `get` is the whole public
 surface and its shape — `(catalog, "ok" | "stale")` — is what every caller already reads.
 
-**Caching is off by default, per feature, from the environment.** Everything above is an
-argument, not a measurement: nobody has numbers for what a walk costs or how often one happens,
-and a stale catalog served from an unmeasured TTL is a correctness risk taken for an unknown
-saving. So each provider in a feature's `dependencies.py` passes `caching_enabled` from a
-`BACKSTOP_*_CACHE_ENABLED` flag, all of which default to false. Nothing here is deleted for
-that: the TTL, the double-check, the in-flight pin and the serve-stale path all still work, and
-turning one catalog on is one env var — no deploy of new code.
+**Caching is per feature, from the environment.** Each provider in a feature's
+`dependencies.py` passes `caching_enabled` from a `BACKSTOP_*_CACHE_ENABLED` flag. The
+custom-field catalogs default on (3,274 definitions, 2.77 MiB, 6.15 s measured); activity tags
+and system users still default off. Nothing here is deleted for a flag that is off: the TTL,
+the double-check, the in-flight pin and the serve-stale path all still work, and flipping one
+catalog is one env var.
 
 **The two histograms that decide it.** They are one view, and the gap between them is the whole
 answer:
@@ -98,7 +97,7 @@ class CachedCatalog[T]:
     and its own `with_ttl_minutes`, and so `get`'s return type narrows to that feature's DTO.
 
     `caching_enabled=False` keeps every mechanism below and consults none of it — see the module
-    docstring for why every production site currently passes it.
+    docstring for which catalogs currently pass that.
     """
 
     def __init__(

@@ -24,7 +24,7 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
-from tests.helpers import opportunity_stages_service
+from tests.helpers import custom_fields_service, opportunity_stages_service
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
 
 _ORG_ID = "341764767"
@@ -32,6 +32,14 @@ _OPPORTUNITIES_URL = f"{BASE_URL}/organizations/{_ORG_ID}/opportunities"
 _STAGES_URL = f"{BASE_URL}/opportunity-stages"
 _PEOPLE_OPPORTUNITIES_URL = f"{BASE_URL}/people/p9/opportunities"
 _CONTACTS_OPPORTUNITIES_URL = f"{BASE_URL}/contacts/c7/opportunities"
+_EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+
+
+@pytest.fixture(autouse=True)
+def _empty_custom_field_definitions() -> None:
+    respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+        return_value=httpx.Response(200, json=_EMPTY_DEFINITIONS)
+    )
 
 
 def _opportunity(
@@ -128,7 +136,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -164,7 +173,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 search="Koch",
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -189,7 +199,8 @@ class TestGetOpportunities:
                 search_type="people",
                 party_id="p9",
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -214,7 +225,8 @@ class TestGetOpportunities:
                 search_type="contacts",
                 party_id="c7",
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -242,7 +254,8 @@ class TestGetOpportunities:
                 party_id=_ORG_ID,
                 status="open",
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             OpportunitiesResolvedResponse,
         )
@@ -278,7 +291,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             )
         )
 
@@ -306,7 +320,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 search="NoSuchOrg",
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             GetOpportunitiesResponse,
         )
@@ -334,7 +349,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 search="Koch",
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             ),
             GetOpportunitiesResponse,
         )
@@ -360,7 +376,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             )
 
     @pytest.mark.asyncio
@@ -378,7 +395,8 @@ class TestGetOpportunities:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
-                opportunity_stages=opportunity_stages_service(),
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
             )
 
     def test_docstring_says_there_is_no_cursor_and_names_previous_stage(self) -> None:
@@ -401,3 +419,242 @@ class TestGetOpportunities:
         assert "LEFT" in dumped
         assert "Omitted until the deal has moved" in dumped
         assert "Omitted when this instance no longer publishes" in dumped
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_custom_field_values_are_joined_with_field_type(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity(
+                    "5755031",
+                    stage_id="42482",
+                    name="Koch - CATS Select",
+                    isOpen=True,
+                    regularCustomFieldValues=[
+                        {"definitionId": 8648265, "name": "Probability", "value": 0.3},
+                    ],
+                ),
+                included=[_side_loaded_stage("42482")],
+            )
+        )
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "8648265",
+                            "custom-field-definitions",
+                            name="Probability",
+                            entityType="OpportunityBean",
+                            fieldType="PERCENT",
+                        )
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
+                client=client,
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
+            ),
+            OpportunitiesResolvedResponse,
+        )
+
+        values = result.opportunities[0].custom_field_values
+        assert len(values) == 1
+        assert values[0].name == "Probability"
+        assert values[0].field_type == "PERCENT"
+        assert values[0].value == 0.3
+        assert result.custom_fields_unavailable is False
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_one_catalog_load_covers_every_deal_on_the_page(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _open_deal(),
+                _closed_deal(),
+                included=[_side_loaded_stage("42482"), _side_loaded_stage("96016")],
+            )
+        )
+        definitions = respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(200, json=_EMPTY_DEFINITIONS)
+        )
+
+        result = tool_model(
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
+                client=client,
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
+            ),
+            OpportunitiesResolvedResponse,
+        )
+
+        assert definitions.call_count == 1
+        assert [row.id for row in result.opportunities] == ["5755031", "5072909"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_catalog_failure_keeps_the_pipeline_and_flags_unavailable(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(_open_deal(), included=[_side_loaded_stage("42482")])
+        )
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
+        )
+
+        result = tool_model(
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
+                client=client,
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
+            ),
+            OpportunitiesResolvedResponse,
+        )
+
+        assert result.opportunities[0].id == "5755031"
+        assert result.opportunities[0].custom_field_values == ()
+        assert result.custom_fields_unavailable is True
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_custom_field_name_filter_keeps_only_that_field(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity(
+                    "5755031",
+                    stage_id="42482",
+                    name="Koch - CATS Select",
+                    isOpen=True,
+                    regularCustomFieldValues=[
+                        {"definitionId": "8648265", "value": 0.3},
+                        {"definitionId": "1", "value": 50000},
+                    ],
+                ),
+                included=[_side_loaded_stage("42482")],
+            )
+        )
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "8648265",
+                            "custom-field-definitions",
+                            name="Probability",
+                            entityType="OpportunityBean",
+                            fieldType="PERCENT",
+                        ),
+                        resource(
+                            "1",
+                            "custom-field-definitions",
+                            name="Estimated Fees",
+                            entityType="OpportunityBean",
+                            fieldType="MONEY",
+                        ),
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
+                custom_field_names=["Probability"],
+                client=client,
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
+            ),
+            OpportunitiesResolvedResponse,
+        )
+
+        assert [row.name for row in result.opportunities[0].custom_field_values] == ["Probability"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_custom_field_filters_and_together(self, client: BackstopClient) -> None:
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(
+                _opportunity(
+                    "5755031",
+                    stage_id="42482",
+                    name="Koch - CATS Select",
+                    isOpen=True,
+                    regularCustomFieldValues=[
+                        {"definitionId": "8648265", "value": 0.3},
+                        {"definitionId": "1", "value": 50000},
+                    ],
+                ),
+                included=[_side_loaded_stage("42482")],
+            )
+        )
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "8648265",
+                            "custom-field-definitions",
+                            name="Probability",
+                            entityType="OpportunityBean",
+                            fieldType="PERCENT",
+                        ),
+                        resource(
+                            "1",
+                            "custom-field-definitions",
+                            name="Estimated Fees",
+                            entityType="OpportunityBean",
+                            fieldType="MONEY",
+                        ),
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_opportunities(
+                ctx_never_elicit(),
+                search_type="organizations",
+                party_id=_ORG_ID,
+                custom_field_names=["Probability"],
+                custom_field_definition_ids=["8648265"],
+                client=client,
+                opportunity_stages_service=opportunity_stages_service(),
+                custom_fields_service=custom_fields_service(),
+            ),
+            OpportunitiesResolvedResponse,
+        )
+
+        assert [row.name for row in result.opportunities[0].custom_field_values] == ["Probability"]
