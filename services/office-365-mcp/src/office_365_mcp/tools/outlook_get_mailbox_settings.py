@@ -143,9 +143,8 @@ is set outside the rules (Set-Mailbox -ForwardingSmtpAddress, or the Forwarding 
 Exchange admin centre) and which Microsoft Graph publishes nowhere. So an empty rule list means \
 "no inbox rule forwards mail", never "this mailbox is not being forwarded" — say that out loud \
 rather than reassuring the user. It also does not report which mail a rule applies to, only what \
-the rule does. \
-Read-only: nothing here creates, changes or deletes a rule, a reply or a category. Pass `include` \
-to ask one of the three questions for one Graph call instead of three.\
+the rule does. Read-only: nothing here creates, changes or deletes a rule, a reply or a category. \
+Pass `include` to ask one of the three questions for one Graph call instead of three.\
 """
 
 

@@ -128,8 +128,8 @@ receipt order and cannot be bounded by date — so use it for "find the mail whe
 anything about recency. Name a well-known folder with `folder` (`inbox`, `sentitems`, `drafts`, \
 `archive`, `deleteditems`, `junkemail`, `clutter`), or any other folder with `folder_ref`, the \
 `uri` of an outlook_browse_folders result; pass one or the other, never both. Only mail filed \
-directly in that folder is listed, never its subfolders. Rows carry metadata and a short preview \
-— pass a row's `uri` to outlook_read_mail for what the message says. The folder's own item and \
+directly in that folder is listed, never its subfolders. Rows carry metadata and a short preview — \
+pass a row's `uri` to outlook_read_mail for what the message says. The folder's own item and \
 unread counts come back beside the rows, which is how "that is all of them" is told apart from \
 "that is the first slice".\
 """

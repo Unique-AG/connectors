@@ -50,12 +50,11 @@ MAX_POSTS = 50
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Read one Teams channel's posts in full. Use it for "what is in this channel", with `team_id` \
-from teams_list_my_teams and `channel_id` from teams_list_channels; for a keyword, a person or any \
-date bound, \
-use teams_search_messages — there is no date filter here. One call is one request: raise \
-`limit` rather than calling again. Microsoft orders by reply-chain activity, not post date: \
-read `created_at` before trusting the order. Returns each post with its newest replies, whole.\
+Read one Teams channel's posts in full. Use it for "what is in this channel", with `team_id` from \
+teams_list_my_teams and `channel_id` from teams_list_channels; for a keyword, a person or any date \
+bound, use teams_search_messages — there is no date filter here. One call is one request: raise \
+`limit` rather than calling again. Microsoft orders by reply-chain activity, not post date: read \
+`created_at` before trusting the order. Returns each post with its newest replies, whole.\
 """
 
 

@@ -47,13 +47,10 @@ type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParam
 
 _DESCRIPTION = """\
 List one team's channels. Pass the `team_id` from teams_list_my_teams, then hand `team_id` and \
-`channel_id` \
-together to teams_browse_channel — a channel id alone addresses nothing, and every team has a \
-`General`. \
-No message text comes back here: teams_browse_channel reads the posts. A channel missing from the \
-list \
-is one the signed-in user cannot access, not one the team lacks. Returns each channel's id, name, \
-description, membership type and creation date.\
+`channel_id` together to teams_browse_channel — a channel id alone addresses nothing, and every \
+team has a `General`. No message text comes back here: teams_browse_channel reads the posts. A \
+channel missing from the list is one the signed-in user cannot access, not one the team lacks. \
+Returns each channel's id, name, description, membership type and creation date.\
 """
 
 

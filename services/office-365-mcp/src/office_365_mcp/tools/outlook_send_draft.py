@@ -115,8 +115,8 @@ subject, body or attachment argument here, so what goes out is exactly what the 
 open in Outlook. Only a handle of the drafts family is accepted: a message handle from \
 outlook_search_mail, outlook_list_mail or outlook_read_thread is refused, and no message id, \
 subject line or Outlook web link becomes a draft handle. A message that has already been sent is \
-refused rather than sent again. Answers the recipients and subject Microsoft held for the draft \
-at the moment it went, which is the only record of what left the mailbox — repeat it to the user.\
+refused rather than sent again. Answers the recipients and subject Microsoft held for the draft at \
+the moment it went, which is the only record of what left the mailbox — repeat it to the user.\
 """
 
 _NOT_A_DRAFT_HANDLE = (

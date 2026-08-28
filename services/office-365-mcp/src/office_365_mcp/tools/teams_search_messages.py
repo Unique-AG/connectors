@@ -67,9 +67,8 @@ _DESCRIPTION = """\
 Search every Teams message the signed-in user can see, by keyword, sender, mention, date, \
 attachment or read state. Use it for "find the message where…" and for every date-bounded \
 question, including one about a named channel — teams_browse_channel has no date filter. Search \
-takes \
-no chat or channel scope: read `channel_id` on each hit to see where it came from. At least one \
-criterion is required and all are ANDed. Hits carry metadata and Microsoft's `summary` snippet \
+takes no chat or channel scope: read `channel_id` on each hit to see where it came from. At least \
+one criterion is required and all are ANDed. Hits carry metadata and Microsoft's `summary` snippet \
 only — pass a hit's `uri` to teams_read_message for the actual words.\
 """
 

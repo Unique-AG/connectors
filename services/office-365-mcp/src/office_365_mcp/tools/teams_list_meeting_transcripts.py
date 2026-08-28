@@ -71,12 +71,11 @@ TranscriptStatus = Literal[
 
 _DESCRIPTION = """\
 List a Teams meeting's transcripts, from the `meeting_uri` teams_list_chats reports. Call it to \
-learn \
-whether a meeting was transcribed; teams_read_transcript returns the words. Read `status` first: \
-`not_ready` means wait, `not_transcribed` means none, `scan_incomplete` means unknowable — stop, \
-narrowing the window changes nothing. A tenant switch can block transcripts and never recordings, \
-so try teams_list_meeting_recordings on refusal. Returns `status` and each transcript's `uri` and \
-times. \
+learn whether a meeting was transcribed; teams_read_transcript returns the words. Read `status` \
+first: `not_ready` means wait, `not_transcribed` means none, `scan_incomplete` means unknowable — \
+stop, narrowing the window changes nothing. A tenant switch can block transcripts and never \
+recordings, so try teams_list_meeting_recordings on refusal. Returns `status` and each \
+transcript's `uri` and times. \
 """
 
 _NOT_A_MEETING_HANDLE = (

@@ -78,12 +78,12 @@ type _AnchorQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryP
 type _ThreadQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Read every message of one conversation that this mailbox holds, oldest first, from any one \
-message of it. Use it for "what happened in this thread" and for "did I ever reply" — the answer \
-spans Sent Items as well as the folder the anchor is in, which is why a reply of the user's own \
-shows up here and not in a folder listing. Pass the `uri` of a hit from outlook_search_mail or a \
-row from outlook_list_mail. Read `searched_scope` before reporting that something is missing: \
-this is the mailbox's copy of a conversation, not the conversation.\
+Read every message of one conversation that this mailbox holds, oldest first, from any one message \
+of it. Use it for "what happened in this thread" and for "did I ever reply" — the answer spans \
+Sent Items as well as the folder the anchor is in, which is why a reply of the user's own shows up \
+here and not in a folder listing. Pass the `uri` of a hit from outlook_search_mail or a row from \
+outlook_list_mail. Read `searched_scope` before reporting that something is missing: this is the \
+mailbox's copy of a conversation, not the conversation.\
 """
 
 _BAD_HANDLE = (

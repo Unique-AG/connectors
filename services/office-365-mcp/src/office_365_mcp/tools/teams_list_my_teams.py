@@ -31,10 +31,9 @@ MAX_TEAMS = 200
 _DESCRIPTION = """\
 List the teams the signed-in user belongs to. Start here for any question about a team or a \
 channel: `team_id` is what teams_list_channels needs, and a channel id alone addresses nothing. \
-For \
-chats, group chats and meeting chats — the other surface entirely — use teams_list_chats. Returns \
-each \
-team's id, name, description and archived flag; fewer than `limit` means the end of the list.\
+For chats, group chats and meeting chats — the other surface entirely — use teams_list_chats. \
+Returns each team's id, name, description and archived flag; fewer than `limit` means the end of \
+the list.\
 """
 
 

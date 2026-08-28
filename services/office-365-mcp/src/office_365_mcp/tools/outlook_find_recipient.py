@@ -113,8 +113,8 @@ _DESCRIPTION = """\
 Resolve a person's name to the email address they send from, before addressing a draft to a guess. \
 Answers candidates for a human to confirm — never an address to send to unprompted, and never a \
 row to pick because it came first. Microsoft's person index matches fuzzily, so `tiler` returns \
-Tyler: read `match_kind` on every row, and treat `ambiguous` as "ask the user which one". An \
-empty answer means this user's index holds nobody by that name, which is not the same as nobody \
+Tyler: read `match_kind` on every row, and treat `ambiguous` as "ask the user which one". An empty \
+answer means this user's index holds nobody by that name, which is not the same as nobody \
 existing. Returns each candidate's address, display name, match kind, type, whether they are \
 outside the user's own domain, job title and department.\
 """

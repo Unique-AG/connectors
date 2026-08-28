@@ -75,13 +75,11 @@ ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
 _DESCRIPTION = """\
 List a Teams meeting's recordings from the `meeting_uri` teams_list_chats reports. Call it to \
-learn \
-whether a meeting was recorded, how long, and who may download it — no video is returned or \
+learn whether a meeting was recorded, how long, and who may download it — no video is returned or \
 reachable here; for the words, call teams_list_meeting_transcripts. Read `status` first: \
-`not_ready` \
-means wait, not "the call was not recorded". An `organizer_only` recording exists but is out of \
-reach: never report it as missing. Returns `status` and each recording's times, duration and \
-access.\
+`not_ready` means wait, not "the call was not recorded". An `organizer_only` recording exists but \
+is out of reach: never report it as missing. Returns `status` and each recording's times, duration \
+and access.\
 """
 
 # Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids

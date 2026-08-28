@@ -77,9 +77,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Search the signed-in user's own mailbox by keyword, sender, recipient or subject. Use it for \
-"find the mail where…" and for anything about a person. At least one criterion is required and \
-all are combined with AND. Hits carry metadata and a short preview only — pass a hit's `uri` to \
+Search the signed-in user's own mailbox by keyword, sender, recipient or subject. Use it for "find \
+the mail where…" and for anything about a person. At least one criterion is required and all are \
+combined with AND. Hits carry metadata and a short preview only — pass a hit's `uri` to \
 outlook_read_mail for what the message actually says. There is no date filter and no sort here: \
 Microsoft's index returns its own order, so for "the newest" or "this week" use outlook_list_mail, \
 which orders by receipt within one folder. Searches this user's mailbox only, never a shared one.\
