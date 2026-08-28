@@ -308,24 +308,52 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
     "outlook_list_mail": {"folder_ref": ("outlook_browse_folders",)},
+    "outlook_search_mail": {"recipient": ("get_me",)},
+    "outlook_mark_mail": {
+        "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_move_mail": {
+        "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread"),
+        "folder_ref": ("outlook_browse_folders",),
+    },
+    "outlook_draft_mail": {"to": ("outlook_find_recipient",)},
+    "outlook_draft_reply": {
+        "message_ref": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_send_draft": {"draft_ref": ("outlook_draft_mail", "outlook_draft_reply")},
+    "outlook_disable_mail_rule": {"rule_ref": ("outlook_get_mailbox_settings",)},
 }
 
 
-# `teams_search_messages` requires at least one search criterion, which its schema says with
-# one-name
-# `anyOf` branches. None of them is a handle, so none needs a producer.
-_COMPOSED_BY_THE_CALLER: frozenset[str] = frozenset(
-    {
-        "query",
-        "sender",
-        "recipient",
-        "sent_after",
-        "sent_before",
-        "has_attachment",
-        "is_read",
-        "mentions_me",
-    }
-)
+# Arguments a caller writes rather than copies from another tool's answer, per tool.
+#
+# TRAP: keyed by tool, not a flat set of names, because one name can be both. `recipient` is free
+# text on `teams_search_messages` and is the signed-in user's own address on `outlook_search_mail`,
+# whose description says to take it from `get_me` — under a flat set the second would inherit the
+# first's classification and the reachability check below would never ask about it.
+_COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
+    "teams_search_messages": frozenset(
+        {
+            "query",
+            "sender",
+            "recipient",
+            "sent_after",
+            "sent_before",
+            "has_attachment",
+            "is_read",
+            "mentions_me",
+        }
+    ),
+    "outlook_search_mail": frozenset({"query", "sender", "subject"}),
+    "outlook_list_mail": frozenset({"folder"}),
+    "outlook_find_recipient": frozenset({"query"}),
+    "outlook_mark_mail": frozenset({"is_read", "flagged", "importance"}),
+    "outlook_move_mail": frozenset({"destination"}),
+    "outlook_draft_mail": frozenset({"subject", "body_text"}),
+    "outlook_draft_reply": frozenset({"mode", "body_text"}),
+    "outlook_set_automatic_reply": frozenset({"status"}),
+    "outlook_disable_mail_rule": frozenset({"enabled"}),
+}
 
 
 def _required_arguments(schema: Mapping[str, object]) -> set[str]:
@@ -382,7 +410,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         """Read off the live schemas, which is the side that goes stale: that is how the table came
         to record only one of `browse_channel`'s two required ids.
         """
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(preset=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("argument-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -391,9 +419,15 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
             }
 
         unclassified = {
-            name: sorted(arguments - set(_ARGUMENT_SOURCES.get(name, {})) - _COMPOSED_BY_THE_CALLER)
+            name: sorted(
+                arguments
+                - set(_ARGUMENT_SOURCES.get(name, {}))
+                - _COMPOSED_BY_THE_CALLER.get(name, frozenset())
+            )
             for name, arguments in required.items()
-            if arguments - set(_ARGUMENT_SOURCES.get(name, {})) - _COMPOSED_BY_THE_CALLER
+            if arguments
+            - set(_ARGUMENT_SOURCES.get(name, {}))
+            - _COMPOSED_BY_THE_CALLER.get(name, frozenset())
         }
 
         assert not unclassified, (
@@ -407,7 +441,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         satisfy the completeness check above and quietly stop the reachability check below from
         asking about that tool at all.
         """
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(preset=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("prose-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -428,12 +462,16 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         )
 
     def test_nothing_is_both_minted_and_composed(self) -> None:
-        """An argument in both places is checked under whichever the code consults first."""
-        minted = {argument for arguments in _ARGUMENT_SOURCES.values() for argument in arguments}
+        """An argument in both places is checked under whichever the code consults first. Compared
+        per tool, because the same name is legitimately minted for one tool and composed for
+        another."""
+        twice = {
+            f"{tool}.{argument}"
+            for tool, minted in _ARGUMENT_SOURCES.items()
+            for argument in set(minted) & _COMPOSED_BY_THE_CALLER.get(tool, frozenset())
+        }
 
-        assert not minted & _COMPOSED_BY_THE_CALLER, (
-            f"classified twice: {sorted(minted & _COMPOSED_BY_THE_CALLER)}"
-        )
+        assert not twice, f"classified twice: {sorted(twice)}"
 
     @pytest.mark.parametrize("preset", list(ToolsPreset))
     def test_every_tool_in_it_can_obtain_its_arguments_from_another_member(
