@@ -455,9 +455,24 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         selection = resolve(preset=preset, enabled=None)
 
         if preset is ToolsPreset.TEAMS:
-            assert set(selection.tools) == set(TOOL_NAMES)
+            assert set(selection.tools) <= set(TOOL_NAMES)
         else:
             assert set(selection.tools) < set(TOOL_NAMES), f"{preset} is the whole surface"
+
+    def test_no_preset_is_derived_from_the_registry(self) -> None:
+        """`teams` naming a tuple rather than `TOOL_NAMES` is the whole point: a derived preset
+        takes in the first tool of another product and puts its permission on every `teams`
+        tenant's consent screen."""
+        derived = [name for name, tools in PRESETS.items() if tools is TOOL_NAMES]
+
+        assert not derived, f"{derived} would grow with the registry rather than with a review"
+
+    def test_every_registered_tool_is_reachable_through_some_preset(self) -> None:
+        """The cost of writing `teams` out by hand: a tool can now land in the registry and be
+        named by no preset at all, reachable only by `TOOLS_ENABLED`."""
+        named = {tool for tools in PRESETS.values() for tool in tools} | {ALWAYS_ON}
+
+        assert set(TOOL_NAMES) == named, f"no preset names {sorted(set(TOOL_NAMES) - named)}"
 
 
 # Transcribed from the design document's own table: permissions consented to, how many need an

@@ -115,8 +115,22 @@ ALWAYS_ON: str = get_me.TOOL_NAME
 # What each `config.ToolsPreset` name means.
 # TRAP: permissions do not encode reachability. `teams-messages` without `search_messages` asks for
 # the identical three permissions and exposes a `read_message` nothing in it can address.
+# TRAP: `teams` is written out rather than derived from `TOOL_NAMES`. A derived preset takes in
+# every tool that joins the registry, so the first tool of another product would put its permission
+# on the consent screen of every `teams` deployment without an edit anybody reviewed — and widening
+# a live deployment costs every signed-in user a fresh sign-in.
 PRESETS: Mapping[str, tuple[str, ...]] = {
-    "teams": TOOL_NAMES,
+    "teams": (
+        "list_chats",
+        "list_teams",
+        "list_channels",
+        "browse_channel",
+        "search_messages",
+        "read_message",
+        "list_meeting_transcripts",
+        "read_transcript",
+        "list_meeting_recordings",
+    ),
     "teams-chat": ("list_chats",),
     "teams-messages": ("list_chats", "search_messages", "read_message"),
     "teams-channels": ("list_teams", "list_channels", "browse_channel"),

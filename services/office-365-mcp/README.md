@@ -249,18 +249,23 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams-transcripts` | find a meeting and read what was said | `list_chats`, `list_meeting_transcripts`, `read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `list_chats`, `list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
 | `teams-meetings` | both of the above for one meeting | `list_chats`, `list_meeting_transcripts`, `read_transcript`, `list_meeting_recordings` | + both meeting permissions | 2 |
-| `teams` | everything | every tool there is | all eight | 3 |
+| `teams` | every Teams tool | the nine of them | all eight | 3 |
 
-`get_me` is always on, which is why no *curated* preset lists it — each of those six rows is one
-tool wider than its third column. (`teams` is the registry itself, `get_me` included.) Read the second column before choosing: `teams-chat` is the narrowest surface there
+`get_me` is always on, which is why no preset lists it — each of those seven rows is one
+tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
 is and the only one that asks for **no** administrator, and the reason it costs nothing is exactly
 that it cannot read a *chat* message — the two tools that can (`search_messages`, `read_message`)
 both declare `ChannelMessage.Read.All`, which an administrator has to grant even though the message
 is a chat. Reading chat messages is `teams-messages`.
 
-`teams` is *derived* — every tool in the registry — so it needs no maintenance as tools land. The rest
-are named sets, each with a test asserting what it costs a tenant and that every *argument* its tools
-require can be minted by another member of the same preset. The names carry a product axis from the
+Every preset is a named set written out by hand, `teams` included, each with a test asserting what
+it costs a tenant and that every *argument* its tools require can be minted by another member of
+the same preset. `teams` names the nine Teams tools rather than the registry, and that is the one
+line of maintenance this table buys: a preset derived from the registry would take in the first
+tool of another product on the day it lands, put that tool's permission on the consent screen of
+every `teams` deployment, and cost every signed-in user a fresh sign-in — with no edit for anyone
+to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses a registered tool
+that no preset names. The names carry a product axis from the
 start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
 
 The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs

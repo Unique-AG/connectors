@@ -83,7 +83,6 @@
       "always_on": "get_me",
       "presets": {
         "teams": [
-          "get_me",
           "list_chats",
           "list_teams",
           "list_channels",
