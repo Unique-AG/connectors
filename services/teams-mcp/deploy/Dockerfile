@@ -7,7 +7,7 @@ ARG APP_NAME=teams-mcp
 # Shared foundation for pruner, deps, and builder stages.
 # Using full trixie image (not slim) because we need build tools for native modules.
 # ------------------------------------------------------------------------------
-FROM node:26.7.0-trixie@sha256:bde0dae02f2b12d2bce5ee72b2432f0e511767b7b2dc4dd3b064df11ae422fee AS base
+FROM node:26.7.0-trixie@sha256:40fd8249a701dab7431d15074ac4cf4f1c18eecd713807599cd76a7a6caad48b AS base
 ENV CI=1 \
     PNPM_STORE_DIR=/root/.local/share/pnpm/store
 # Keep the version in sync with "packageManager" in the root and service package.json.
@@ -66,7 +66,7 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 # Stage 5: runner
 # Minimal production image. Only this stage is included in the final image.
 # ------------------------------------------------------------------------------
-FROM node:26.7.0-trixie-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS runner
+FROM node:26.7.0-trixie-slim@sha256:5758d367d7b4f48b73a9bb3530e687e47efb289f3b43f9c0450a25225ae0db5d AS runner
 ARG APP_NAME
 WORKDIR /app
 
