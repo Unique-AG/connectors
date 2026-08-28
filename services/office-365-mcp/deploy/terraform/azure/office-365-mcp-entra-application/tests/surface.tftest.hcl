@@ -177,6 +177,17 @@ run "preset_outlook_read" {
   }
 }
 
+run "preset_outlook_mailbox" {
+  variables {
+    tools_preset = "outlook-mailbox"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read"
+    error_message = "outlook-mailbox composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "list_chats"]

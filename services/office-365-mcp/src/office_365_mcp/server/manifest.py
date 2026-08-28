@@ -47,6 +47,7 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     # restricted user-consent policy still stops an unprivileged user at "Need admin approval".
     "Mail.Read": False,
     "People.Read": False,
+    "MailboxSettings.Read": False,
 }
 
 _LABEL_WIDTH = 17

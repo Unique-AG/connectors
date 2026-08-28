@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes sixteen
+Users sign in with their own Microsoft account and the server acts as them. It exposes seventeen
 MCP tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
@@ -15,7 +15,9 @@ which finds a message in the signed-in user's own Outlook mailbox, and `outlook_
 which reads one of those in full; and `outlook_browse_folders`, one level of the mail folder
 tree; and `outlook_find_recipient`, which resolves a name to the address it sends from — each
 one a file of its own — plus `outlook_read_thread`, every message of one conversation this
-mailbox holds, and `outlook_list_mail`, the newest messages of one folder in receipt order,
+mailbox holds; `outlook_list_mail`, the newest messages of one folder in receipt order; and
+`outlook_get_mailbox_settings`, which shows the inbox rules, the automatic reply and the
+categories,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -131,6 +133,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `list_meeting_recordings` |
 | `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
 | `People.Read` | Delegated | No | `outlook_find_recipient` |
+| `MailboxSettings.Read` | Delegated | No | `outlook_get_mailbox_settings` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -269,6 +272,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams-meetings` | both of the above for one meeting | `list_chats`, `list_meeting_transcripts`, `read_transcript`, `list_meeting_recordings` | + both meeting permissions | 2 |
 | `teams` | every Teams tool | the nine of them | all eight | 3 |
 | `outlook-read` | find a message in your own mailbox, read it in full, walk the folder tree, resolve a name to an address, read a whole thread, and list a folder in receipt order | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
+| `outlook-mailbox` | the read surface, plus what is quietly acting on the mailbox | + `outlook_get_mailbox_settings` | + `MailboxSettings.Read` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those seven rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -286,6 +290,14 @@ every `teams` deployment, and cost every signed-in user a fresh sign-in — with
 to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses a registered tool
 that no preset names. The names carry a product axis from the
 start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
+
+**`outlook-mailbox` exists so the audit read is not priced with the write surface.**
+`outlook_get_mailbox_settings` answers "is something forwarding my mail?", and a tenant that wants
+that answer should not have to grant anything that can change a mailbox to get it. It sits one rung
+above `outlook-read` and below every write tier for that reason. It also cannot answer its own
+headline question completely, and says so in every response: Exchange mailbox forwarding set with
+`Set-Mailbox -ForwardingSmtpAddress` is invisible to every endpoint this connector can call, so an
+empty rule list is not evidence that mail is not being forwarded.
 
 The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs
 **one** admin consent and does not drag in `ChannelMessage.Read.All`, the permission to read every

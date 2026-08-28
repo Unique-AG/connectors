@@ -90,6 +90,7 @@ class ToolsPreset(StrEnum):
     TEAMS_RECORDINGS = "teams-recordings"
     TEAMS_MEETINGS = "teams-meetings"
     OUTLOOK_READ = "outlook-read"
+    OUTLOOK_MAILBOX = "outlook-mailbox"
 
 
 class AppConfig(BaseSettings):

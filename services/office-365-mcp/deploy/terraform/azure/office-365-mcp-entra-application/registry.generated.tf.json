@@ -105,6 +105,12 @@
           "permissions": [
             "Mail.Read"
           ]
+        },
+        {
+          "name": "outlook_get_mailbox_settings",
+          "permissions": [
+            "MailboxSettings.Read"
+          ]
         }
       ],
       "tool_names": [
@@ -123,7 +129,8 @@
         "outlook_browse_folders",
         "outlook_find_recipient",
         "outlook_read_thread",
-        "outlook_list_mail"
+        "outlook_list_mail",
+        "outlook_get_mailbox_settings"
       ],
       "always_on": "get_me",
       "presets": {
@@ -173,6 +180,15 @@
           "outlook_find_recipient",
           "outlook_read_thread",
           "outlook_list_mail"
+        ],
+        "outlook-mailbox": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail",
+          "outlook_get_mailbox_settings"
         ]
       },
       "requestable_permissions": [
@@ -185,7 +201,8 @@
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
         "Mail.Read",
-        "People.Read"
+        "People.Read",
+        "MailboxSettings.Read"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -197,7 +214,8 @@
         "OnlineMeetingTranscript.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "Mail.Read": false,
-        "People.Read": false
+        "People.Read": false,
+        "MailboxSettings.Read": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",
