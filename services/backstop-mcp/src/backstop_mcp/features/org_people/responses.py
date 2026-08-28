@@ -28,6 +28,10 @@ class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
         default_factory=list,
         alias="regularCustomFieldValues",
         exclude=True,
+        description=(
+            "Wire dump of regularCustomFieldValues used to resolve published "
+            "custom_field_values; omitted from the tool payload."
+        ),
     )
 
 
@@ -49,6 +53,10 @@ class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
         default_factory=list,
         alias="regularCustomFieldValues",
         exclude=True,
+        description=(
+            "Wire dump of regularCustomFieldValues used to resolve published "
+            "custom_field_values; omitted from the tool payload."
+        ),
     )
 
 

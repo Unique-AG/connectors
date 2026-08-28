@@ -83,9 +83,19 @@ class CustomFieldValueAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    definition_id: _IdStr = Field(default=None, alias="definitionId")
-    name: _StrippedStr | None = None
-    value: object = None
+    definition_id: _IdStr = Field(
+        default=None,
+        alias="definitionId",
+        description="Backstop id of the custom-field definition this value belongs to.",
+    )
+    name: _StrippedStr | None = Field(
+        default=None,
+        description="Field name as stored on the record.",
+    )
+    value: object = Field(
+        default=None,
+        description="Stored value for this field, as Backstop sent it.",
+    )
 
 
 def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttributes]:
