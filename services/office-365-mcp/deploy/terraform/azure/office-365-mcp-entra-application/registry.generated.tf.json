@@ -79,6 +79,12 @@
           "permissions": [
             "Mail.Read"
           ]
+        },
+        {
+          "name": "outlook_browse_folders",
+          "permissions": [
+            "Mail.Read"
+          ]
         }
       ],
       "tool_names": [
@@ -93,7 +99,8 @@
         "read_transcript",
         "list_meeting_recordings",
         "outlook_search_mail",
-        "outlook_read_mail"
+        "outlook_read_mail",
+        "outlook_browse_folders"
       ],
       "always_on": "get_me",
       "presets": {
@@ -138,7 +145,8 @@
         ],
         "outlook-read": [
           "outlook_search_mail",
-          "outlook_read_mail"
+          "outlook_read_mail",
+          "outlook_browse_folders"
         ]
       },
       "requestable_permissions": [

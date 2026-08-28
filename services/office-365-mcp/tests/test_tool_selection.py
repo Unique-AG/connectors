@@ -305,6 +305,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "read_transcript": {"uri": ("list_meeting_transcripts",)},
     "list_meeting_recordings": {"meeting_uri": ("list_chats",)},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
+    "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
 }
 
 
@@ -534,7 +535,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         3,
         10,
     ),
-    (ToolsPreset.OUTLOOK_READ, ("User.Read", "Mail.Read"), 0, 3),
+    (ToolsPreset.OUTLOOK_READ, ("User.Read", "Mail.Read"), 0, 4),
 )
 
 

@@ -631,6 +631,7 @@ GRAPH_STEPS = frozenset(
         "mail_search",
         "mail_ids",
         "mail_message",
+        "mail_folders",
         "transcript_attributed",
         "transcript_unattributed",
     }
