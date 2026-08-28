@@ -20,7 +20,6 @@ reads at one request per second per app per tenant on a given channel or chat
 sweep of fifty chats degrades every other user in the tenant.
 """
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import date, datetime
@@ -45,6 +44,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, MessageHandle
+from office_365_mcp.shared.kql import flag, free_text, quoted
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -240,78 +240,6 @@ _NO_CRITERIA = (
     + "can see, not an answer. Add the keywords, person or date range the question is about."
 )
 
-# Characters KQL would read as syntax rather than text: whitespace separates terms, `:` `<` `>` `=`
-# introduce a property restriction, `(` `)` group, `"` closes the quoting applied here, `*` is the
-# wildcard. A leading `-` is NOT. `+` is AND, the default anyway, so it needs no handling.
-_KQL_OPERATORS = re.compile(r'[\s:"<>=()*]')
-
-
-def _needs_quoting(text: str) -> bool:
-    return _KQL_OPERATORS.search(text) is not None or text.startswith("-")
-
-
-# TRAP: a filter value needs the wildcard rule as much as a word does. KQL documents `<property>:*`
-# as matching every item with a value, so a `sender` of `*` asks for every message that has one —
-# the arbitrary sample `_NO_CRITERIA` refuses, reached past it through a non-empty query string.
-def _quoted(value: str) -> str:
-    """A filter value, safe to put after a scope term. One value, therefore at most one term."""
-    if _needs_quoting(value):
-        return _phrase(value)
-    return value
-
-
-# Quoting a caller's free text like a filter value costs them every match whose words are not
-# adjacent: KQL documents a quoted phrase as matching only words "located next to each other", and
-# unquoted free-text expressions as ANDed
-# (https://learn.microsoft.com/en-us/sharepoint/dev/general-development/keyword-query-language-kql-syntax-reference).
-# So free text is guarded one word at a time, and `_PHRASE` preserves a caller's own quotes.
-_PHRASE = re.compile(r'"([^"]*)"')
-
-# KQL's boolean and proximity operators are themselves words, and "the operators are case-sensitive
-# (uppercase)", so the comparison below is too: a bare `OR` between two of the caller's words turns
-# the promised AND into an OR. `_quoted` skips this — `from:OR` names a sender, not an operator.
-_KQL_KEYWORDS = frozenset({"AND", "OR", "NOT", "NEAR", "ONEAR"})
-
-
-def _free_text(query: str) -> str:
-    """A caller's own words, as terms Graph will AND. Empty when they typed nothing to look for.
-
-    Double-quoted runs stay one phrase; an unbalanced quote is one character in a word.
-    """
-    terms: list[str] = []
-    words_from = 0
-    for phrase in _PHRASE.finditer(query):
-        terms.extend(_keywords(query[words_from : phrase.start()]))
-        quoted = phrase.group(1).strip()
-        if quoted:
-            terms.append(_phrase(quoted))
-        words_from = phrase.end()
-    terms.extend(_keywords(query[words_from:]))
-    return " ".join(terms)
-
-
-def _keywords(text: str) -> list[str]:
-    return [_keyword(word) for word in text.split()]
-
-
-def _keyword(word: str) -> str:
-    if _needs_quoting(word) or word in _KQL_KEYWORDS:
-        return _phrase(word)
-    return word
-
-
-def _phrase(text: str) -> str:
-    """`text` as a KQL phrase: matched where the words are adjacent, and read as no operator.
-
-    The quoting is the guard as much as the phrase. KQL escapes a quote by doubling it, which keeps
-    the count even, so the quoting cannot be closed from inside.
-    """
-    return '"' + text.replace('"', '""') + '"'
-
-
-def _flag(value: bool) -> str:
-    return "true" if value else "false"
-
 
 def _query_string(criteria: SearchCriteria) -> str:
     """The `queryString` these criteria become. Empty exactly when nothing was asked for.
@@ -323,13 +251,13 @@ def _query_string(criteria: SearchCriteria) -> str:
     """
     terms: list[str] = []
     if criteria.query:
-        free_text = _free_text(criteria.query)
-        if free_text:
-            terms.append(free_text)
+        rendered = free_text(criteria.query)
+        if rendered:
+            terms.append(rendered)
     if criteria.sender:
-        terms.append(f"from:{_quoted(criteria.sender)}")
+        terms.append(f"from:{quoted(criteria.sender)}")
     if criteria.recipient:
-        terms.append(f"to:{_quoted(criteria.recipient)}")
+        terms.append(f"to:{quoted(criteria.recipient)}")
     if criteria.mentions is not None:
         # Microsoft's example is a user id "without '-'", which is exactly `UUID.hex`. Typing the
         # parameter as a UUID is also what makes this the one term that needs no quoting.
@@ -339,11 +267,11 @@ def _query_string(criteria: SearchCriteria) -> str:
     if criteria.sent_before is not None:
         terms.append(f"sent<={criteria.sent_before.isoformat()}")
     if criteria.has_attachment is not None:
-        terms.append(f"hasAttachment:{_flag(criteria.has_attachment)}")
+        terms.append(f"hasAttachment:{flag(criteria.has_attachment)}")
     if criteria.is_read is not None:
-        terms.append(f"IsRead:{_flag(criteria.is_read)}")
+        terms.append(f"IsRead:{flag(criteria.is_read)}")
     if criteria.mentions_me is not None:
-        terms.append(f"IsMentioned:{_flag(criteria.mentions_me)}")
+        terms.append(f"IsMentioned:{flag(criteria.mentions_me)}")
     return " ".join(terms)
 
 
