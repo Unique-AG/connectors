@@ -127,7 +127,7 @@ def resolve_stage_name(
     stage_id: str | None,
     *,
     opportunity_id_to_name_map: Mapping[str, str] | None = None,
-    opportynity_id_to_stage_map: Mapping[str, OpportunityStageDto],
+    opportunity_id_to_stage_map: Mapping[str, OpportunityStageDto],
 ) -> str | None:
     """Name a stage from this response's side-loads, then from the cached vocabulary.
 
@@ -141,7 +141,7 @@ def resolve_stage_name(
         side_loaded_name = opportunity_id_to_name_map.get(stage_id)
         if side_loaded_name is not None:
             return side_loaded_name
-    known = opportynity_id_to_stage_map.get(stage_id)
+    known = opportunity_id_to_stage_map.get(stage_id)
     return known.name if known is not None else None
 
 
@@ -197,7 +197,7 @@ def stage_history(
     *,
     included: Sequence[dict[str, object]],
     side_loaded: Mapping[str, str],
-    opportuynity_stages: Mapping[str, OpportunityStageDto],
+    opportunity_stages: Mapping[str, OpportunityStageDto],
 ) -> tuple[StageChangeResponse, ...]:
     """One deal's stage moves, in the order Backstop links them.
 
@@ -227,7 +227,7 @@ def stage_history(
                     "stage": resolve_stage_name(
                         stage_id,
                         opportunity_id_to_name_map=side_loaded,
-                        opportynity_id_to_stage_map=opportuynity_stages,
+                        opportunity_id_to_stage_map=opportunity_stages,
                     ),
                     "stage_id": stage_id,
                 }
@@ -241,7 +241,7 @@ async def _project_opportunities(
     *,
     client: BackstopClient,
     included: Sequence[dict[str, object]],
-    opportynity_id_to_stage_map: Mapping[str, OpportunityStageDto],
+    opportunity_id_to_stage_map: Mapping[str, OpportunityStageDto],
     custom_fields_service: CustomFieldsService,
     custom_fields_filters: CustomFieldFilters,
 ) -> tuple[OpportunityResponse, ...]:
@@ -274,14 +274,14 @@ async def _project_opportunities(
                     stage=resolve_stage_name(
                         stage_id,
                         opportunity_id_to_name_map=opportunity_id_to_name_map,
-                        opportynity_id_to_stage_map=opportynity_id_to_stage_map,
+                        opportunity_id_to_stage_map=opportunity_id_to_stage_map,
                     ),
                     stage_id=stage_id,
                     stage_history=stage_history(
                         resource,
                         included=included,
                         side_loaded=opportunity_id_to_name_map,
-                        opportuynity_stages=opportynity_id_to_stage_map,
+                        opportunity_stages=opportunity_id_to_stage_map,
                     ),
                     custom_field_values=tuple(custom_field_values),
                 )
@@ -315,7 +315,7 @@ async def fetch_opportunities(
     in-flight coroutine. Either failure fails the call: a pipeline that silently omits stages
     is worse than an error.
     """
-    page, opportuynity_stages, catalog = await asyncio.gather(
+    page, opportunity_stages, catalog = await asyncio.gather(
         client.paginate(
             f"/{segment}/{quote(entity_id, safe='')}/opportunities",
             # Attributes left as a plain dict so each record is validated on its own — see the
@@ -335,7 +335,7 @@ async def fetch_opportunities(
         page.items,
         client=client,
         included=page.included,
-        opportynity_id_to_stage_map=opportuynity_stages,
+        opportunity_id_to_stage_map=opportunity_stages,
         custom_fields_service=custom_fields_service,
         custom_fields_filters=custom_field_filters,
     )

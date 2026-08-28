@@ -153,7 +153,7 @@ def _project(
                 stage=resolve_stage_name(
                     stage_id,
                     opportunity_id_to_name_map=side_loaded,
-                    opportynity_id_to_stage_map=opportunity_id_to_stage_map,
+                    opportunity_id_to_stage_map=opportunity_id_to_stage_map,
                 ),
                 stage_id=stage_id,
                 stage_history=(),

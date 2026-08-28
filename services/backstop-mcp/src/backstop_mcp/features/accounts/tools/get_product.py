@@ -174,6 +174,8 @@ async def get_product(
         raise ValueError("Pass at most one of product_id or product/search")
 
     if product_id is None and name is None:
+        # Overlap the product walk with a schema-cache warm. Each of the ~72 rows then joins
+        # against a filled catalog; the load return is unused because `_record` reads the cache.
         catalog, _ = await asyncio.gather(
             fetch_product_catalog(client),
             custom_fields.load_catalog(client),

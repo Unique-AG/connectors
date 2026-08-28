@@ -89,7 +89,7 @@ async def _project_one(
     *,
     client: BackstopClient,
     resource_included_relations: Sequence[dict[str, object]],
-    opportynity_id_to_stage_map: Mapping[str, OpportunityStageDto],
+    opportunity_id_to_stage_map: Mapping[str, OpportunityStageDto],
     custom_fields_service: CustomFieldsService,
     custom_field_filters: CustomFieldFilters,
     include_stage_history: bool,
@@ -110,7 +110,7 @@ async def _project_one(
             stage=resolve_stage_name(
                 stage_id,
                 opportunity_id_to_name_map=side_loaded,
-                opportynity_id_to_stage_map=opportynity_id_to_stage_map,
+                opportunity_id_to_stage_map=opportunity_id_to_stage_map,
             ),
             stage_id=stage_id,
             stage_history=(
@@ -118,7 +118,7 @@ async def _project_one(
                     resource,
                     included=resource_included_relations,
                     side_loaded=side_loaded,
-                    opportuynity_stages=opportynity_id_to_stage_map,
+                    opportunity_stages=opportunity_id_to_stage_map,
                 )
                 if include_stage_history
                 else ()
@@ -149,7 +149,7 @@ async def fetch_opportunities_by_ids(
         f"which the tool's own `max_length` already rejects"
     )
     include_query_param = _STAGE_HISTORY_INCLUDE if include_stage_history else _STAGE_INCLUDE
-    catalog, opportynity_id_to_stage_map, settled = await asyncio.gather(
+    catalog, opportunity_id_to_stage_map, settled = await asyncio.gather(
         custom_fields_service.load_catalog(client),
         opportunity_stages_service.get(client),
         asyncio.gather(
@@ -184,7 +184,7 @@ async def fetch_opportunities_by_ids(
         projected = await _project_one(
             item.resource,
             resource_included_relations=item.included,
-            opportynity_id_to_stage_map=opportynity_id_to_stage_map,
+            opportunity_id_to_stage_map=opportunity_id_to_stage_map,
             custom_field_filters=custom_fields_filters,
             include_stage_history=include_stage_history,
             client=client,
