@@ -172,7 +172,7 @@ run "preset_outlook_read" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read"
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read"
     error_message = "outlook-read composed ${join(",", local.permissions)}"
   }
 }

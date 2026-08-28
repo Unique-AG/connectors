@@ -46,6 +46,7 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     # Microsoft's rule about the permission and not a promise about a tenant: a tenant running a
     # restricted user-consent policy still stops an unprivileged user at "Need admin approval".
     "Mail.Read": False,
+    "People.Read": False,
 }
 
 _LABEL_WIDTH = 17
