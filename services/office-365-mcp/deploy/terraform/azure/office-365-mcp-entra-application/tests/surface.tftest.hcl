@@ -188,6 +188,17 @@ run "preset_outlook_mailbox" {
   }
 }
 
+run "preset_outlook_write" {
+  variables {
+    tools_preset = "outlook-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read,Mail.ReadWrite"
+    error_message = "outlook-write composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "list_chats"]

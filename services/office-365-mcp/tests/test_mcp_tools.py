@@ -28,6 +28,7 @@ from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, Surfac
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 from office_365_mcp.shared import meetings
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
+from office_365_mcp.tools import TOOL_NAMES, register_tools, resolve
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -513,6 +514,21 @@ async def mcp_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
         yield client
 
 
+@pytest.fixture
+async def every_tool() -> AsyncIterator[Client[FastMCPTransport]]:
+    """Every tool in the registry, which is what the write surface has to be judged against.
+
+    `app` runs one preset, so a write tool outside it would be absent rather than read-only, and a
+    guard comparing against that surface would pass by not looking.
+    """
+    server = FastMCP[None](name="every-tool")
+    transport = httpx.AsyncClient()
+    register_tools(server, transport, resolve(preset=None, enabled=list(TOOL_NAMES)))
+    async with Client(FastMCPTransport(server)) as client:
+        yield client
+    await transport.aclose()
+
+
 def _named(tools: Sequence[Tool]) -> dict[str, Tool]:
     return {tool.name: tool for tool in tools}
 
@@ -626,7 +642,7 @@ def _record_text(record: logging.LogRecord) -> str:
 # Every tool that changes a mailbox, written out by hand. Empty until one exists, which is the
 # point: the guard is exercised on a surface that has nothing to hide before it is asked to police
 # a surface that does.
-WRITE_TOOLS: frozenset[str] = frozenset()
+WRITE_TOOLS: frozenset[str] = frozenset({"outlook_mark_mail"})
 
 
 class TestTheToolsThisServerAdvertises:
@@ -1329,12 +1345,12 @@ class TestTheToolsThisServerAdvertises:
         )
 
     async def test_only_the_tools_written_down_here_change_anything(
-        self, mcp_client: Client[FastMCPTransport]
+        self, every_tool: Client[FastMCPTransport]
     ) -> None:
         """`readOnlyHint: False` is one keyword on one line of one file, and it is the whole of
         what tells a client this tool acts. Comparing the live surface against a hand-written set
         makes adding a write tool an edit somebody reviews rather than an edit somebody makes."""
-        tools = _named(await mcp_client.list_tools())
+        tools = _named(await every_tool.list_tools())
         writes = {
             name
             for name, tool in tools.items()
@@ -1347,12 +1363,12 @@ class TestTheToolsThisServerAdvertises:
         )
 
     async def test_every_tool_says_which_kind_it_is(
-        self, mcp_client: Client[FastMCPTransport]
+        self, every_tool: Client[FastMCPTransport]
     ) -> None:
         """The guard that fails once the rule above has nothing to check. An unannotated tool is
         neither in the write set nor out of it: MCP reads a missing `readOnlyHint` as false, so it
         would join the write surface by omission."""
-        tools = _named(await mcp_client.list_tools())
+        tools = _named(await every_tool.list_tools())
 
         assert tools, "no tools are advertised, so the write surface proves nothing"
         for name, tool in tools.items():
@@ -1360,11 +1376,11 @@ class TestTheToolsThisServerAdvertises:
             assert tool.annotations.readOnlyHint is not None, f"{name} says neither read nor write"
 
     async def test_a_write_tool_says_whether_it_can_destroy(
-        self, mcp_client: Client[FastMCPTransport]
+        self, every_tool: Client[FastMCPTransport]
     ) -> None:
         """MCP defaults `destructiveHint` to true, so a write tool that omits it reads as the worst
         case. Saying it either way is what makes the distinction reviewable."""
-        tools = _named(await mcp_client.list_tools())
+        tools = _named(await every_tool.list_tools())
 
         for name in WRITE_TOOLS:
             annotations = tools[name].annotations

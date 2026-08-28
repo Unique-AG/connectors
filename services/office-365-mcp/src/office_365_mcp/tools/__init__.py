@@ -30,6 +30,7 @@ from office_365_mcp.tools import (
     outlook_find_recipient,
     outlook_get_mailbox_settings,
     outlook_list_mail,
+    outlook_mark_mail,
     outlook_read_mail,
     outlook_read_thread,
     outlook_search_mail,
@@ -118,6 +119,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_read_thread,
     outlook_list_mail,
     outlook_get_mailbox_settings,
+    outlook_mark_mail,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -174,6 +176,16 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_read_thread",
         "outlook_list_mail",
         "outlook_get_mailbox_settings",
+    ),
+    "outlook-write": (
+        "outlook_search_mail",
+        "outlook_read_mail",
+        "outlook_browse_folders",
+        "outlook_find_recipient",
+        "outlook_read_thread",
+        "outlook_list_mail",
+        "outlook_get_mailbox_settings",
+        "outlook_mark_mail",
     ),
 }
 

@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes seventeen
+Users sign in with their own Microsoft account and the server acts as them. It exposes eighteen
 MCP tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
@@ -17,7 +17,7 @@ tree; and `outlook_find_recipient`, which resolves a name to the address it send
 one a file of its own — plus `outlook_read_thread`, every message of one conversation this
 mailbox holds; `outlook_list_mail`, the newest messages of one folder in receipt order; and
 `outlook_get_mailbox_settings`, which shows the inbox rules, the automatic reply and the
-categories,
+categories; and `outlook_mark_mail`, the first tool here that changes anything,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -134,6 +134,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
 | `People.Read` | Delegated | No | `outlook_find_recipient` |
 | `MailboxSettings.Read` | Delegated | No | `outlook_get_mailbox_settings` |
+| `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -273,6 +274,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams` | every Teams tool | the nine of them | all eight | 3 |
 | `outlook-read` | find a message in your own mailbox, read it in full, walk the folder tree, resolve a name to an address, read a whole thread, and list a folder in receipt order | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
 | `outlook-mailbox` | the read surface, plus what is quietly acting on the mailbox | + `outlook_get_mailbox_settings` | + `MailboxSettings.Read` | 0 |
+| `outlook-write` | the above, plus changing a message's read state, flag or importance | + `outlook_mark_mail` | + `Mail.ReadWrite` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those seven rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -298,6 +300,19 @@ above `outlook-read` and below every write tier for that reason. It also cannot 
 headline question completely, and says so in every response: Exchange mailbox forwarding set with
 `Set-Mailbox -ForwardingSmtpAddress` is invisible to every endpoint this connector can call, so an
 empty rule list is not evidence that mail is not being forwarded.
+
+**A write tier asks for `Mail.Read` and `Mail.ReadWrite` both, and that is deliberate.**
+`Mail.ReadWrite` supersedes `Mail.Read`, so a consent screen carrying a reader and a writer shows
+two mail permissions where one would do. `resolve()` unions what the *selected tools* declare and
+each tool declares what its own request needs, which is what makes a 403 name the permission that
+was actually missing rather than the widest one in the deployment — the same reason
+`Team.ReadBasic.All` is separate from `ChannelMessage.Read.All` above. Collapsing them here would
+buy one line on a consent screen and cost every refusal its precision.
+
+**Zero admin consents is not zero administrator.** Every delegated Outlook permission here is
+published by Microsoft as `AdminConsentRequired: No`, so the preset table's last column is honestly
+zero for all five Outlook rows. A tenant running a restricted user-consent policy still stops an
+unprivileged user at "Need admin approval", and nothing in this service's logs says so.
 
 The `teams-transcripts` row is the one this knob was built for: reading meeting transcripts costs
 **one** admin consent and does not drag in `ChannelMessage.Read.All`, the permission to read every
