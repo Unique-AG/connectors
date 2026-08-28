@@ -1,5 +1,5 @@
-"""`teams_read_message` — one Microsoft Teams message in full, from a handle another tool "
-+ "creates."""
+"""`teams_read_message`: one Microsoft Teams message in full, from a handle another tool
+made."""
 
 from collections.abc import Mapping
 from typing import Annotated

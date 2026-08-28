@@ -1,5 +1,5 @@
-"""`teams_browse_channel`: the one request it spends, the order it must not correct, and the "
-+ "traps."""
+"""`teams_browse_channel`: the one request it spends, the order it must not correct, and
+the traps."""
 
 from collections.abc import Mapping, Sequence
 
