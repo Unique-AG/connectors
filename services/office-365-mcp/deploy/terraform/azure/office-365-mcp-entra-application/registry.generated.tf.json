@@ -117,6 +117,12 @@
           "permissions": [
             "Mail.ReadWrite"
           ]
+        },
+        {
+          "name": "outlook_move_mail",
+          "permissions": [
+            "Mail.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
@@ -137,7 +143,8 @@
         "outlook_read_thread",
         "outlook_list_mail",
         "outlook_get_mailbox_settings",
-        "outlook_mark_mail"
+        "outlook_mark_mail",
+        "outlook_move_mail"
       ],
       "always_on": "get_me",
       "presets": {
@@ -205,7 +212,8 @@
           "outlook_read_thread",
           "outlook_list_mail",
           "outlook_get_mailbox_settings",
-          "outlook_mark_mail"
+          "outlook_mark_mail",
+          "outlook_move_mail"
         ]
       },
       "requestable_permissions": [

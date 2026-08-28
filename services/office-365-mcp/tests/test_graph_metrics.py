@@ -642,6 +642,8 @@ GRAPH_STEPS = frozenset(
         "mail_rules",
         "mail_categories",
         "mark_message",
+        "move_message",
+        "destination_folder",
         "transcript_attributed",
         "transcript_unattributed",
     }

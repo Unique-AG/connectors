@@ -642,7 +642,7 @@ def _record_text(record: logging.LogRecord) -> str:
 # Every tool that changes a mailbox, written out by hand. Empty until one exists, which is the
 # point: the guard is exercised on a surface that has nothing to hide before it is asked to police
 # a surface that does.
-WRITE_TOOLS: frozenset[str] = frozenset({"outlook_mark_mail"})
+WRITE_TOOLS: frozenset[str] = frozenset({"outlook_mark_mail", "outlook_move_mail"})
 
 
 class TestTheToolsThisServerAdvertises:
