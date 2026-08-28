@@ -231,15 +231,6 @@
           "outlook_read_thread",
           "outlook_list_mail"
         ],
-        "outlook-mailbox": [
-          "outlook_search_mail",
-          "outlook_read_mail",
-          "outlook_browse_folders",
-          "outlook_find_recipient",
-          "outlook_read_thread",
-          "outlook_list_mail",
-          "outlook_get_mailbox_settings"
-        ],
         "outlook-write": [
           "outlook_search_mail",
           "outlook_read_mail",
@@ -247,7 +238,6 @@
           "outlook_find_recipient",
           "outlook_read_thread",
           "outlook_list_mail",
-          "outlook_get_mailbox_settings",
           "outlook_mark_mail",
           "outlook_move_mail",
           "outlook_draft_mail",
@@ -260,26 +250,17 @@
           "outlook_find_recipient",
           "outlook_read_thread",
           "outlook_list_mail",
-          "outlook_get_mailbox_settings",
           "outlook_mark_mail",
           "outlook_move_mail",
           "outlook_draft_mail",
           "outlook_draft_reply",
           "outlook_send_draft"
         ],
+        "outlook-mailbox": [
+          "outlook_get_mailbox_settings"
+        ],
         "outlook-automate": [
-          "outlook_search_mail",
-          "outlook_read_mail",
-          "outlook_browse_folders",
-          "outlook_find_recipient",
-          "outlook_read_thread",
-          "outlook_list_mail",
           "outlook_get_mailbox_settings",
-          "outlook_mark_mail",
-          "outlook_move_mail",
-          "outlook_draft_mail",
-          "outlook_draft_reply",
-          "outlook_send_draft",
           "outlook_set_automatic_reply",
           "outlook_disable_mail_rule"
         ]

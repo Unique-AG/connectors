@@ -183,7 +183,7 @@ run "preset_outlook_mailbox" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read"
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read"
     error_message = "outlook-mailbox composed ${join(",", local.permissions)}"
   }
 }
@@ -194,7 +194,7 @@ run "preset_outlook_write" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read,Mail.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,Mail.ReadWrite"
     error_message = "outlook-write composed ${join(",", local.permissions)}"
   }
 }
@@ -205,7 +205,7 @@ run "preset_outlook_send" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic"
+    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic"
     error_message = "outlook-send composed ${join(",", local.permissions)}"
   }
 }
@@ -216,7 +216,7 @@ run "preset_outlook_automate" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Mail.Read,People.Read,MailboxSettings.Read,Mail.ReadWrite,Mail.Send,Mail.ReadBasic,MailboxSettings.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite"
     error_message = "outlook-automate composed ${join(",", local.permissions)}"
   }
 }

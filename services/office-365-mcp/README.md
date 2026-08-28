@@ -281,10 +281,10 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `list_chats`, `list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
 | `teams-meetings` | both of the above for one meeting | `list_chats`, `list_meeting_transcripts`, `read_transcript`, `list_meeting_recordings` | + both meeting permissions | 2 |
 | `teams` | every Teams tool | the nine of them | all eight | 3 |
-| `outlook-read` | find a message in your own mailbox, read it in full, walk the folder tree, resolve a name to an address, read a whole thread, and list a folder in receipt order | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
-| `outlook-mailbox` | the read surface, plus what is quietly acting on the mailbox | + `outlook_get_mailbox_settings` | + `MailboxSettings.Read` | 0 |
-| `outlook-write` | the above, plus changing a message's read state, flag or importance, filing it into a folder, and composing a draft or a reply | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
+| `outlook-read` | find a message, read it in full, walk the folder tree, read a thread, list a folder in receipt order, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
+| `outlook-write` | the read surface, plus marking, filing and drafting | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
+| `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
@@ -304,11 +304,18 @@ to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses 
 that no preset names. The names carry a product axis from the
 start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
 
-**`outlook-mailbox` exists so the audit read is not priced with the write surface.**
-`outlook_get_mailbox_settings` answers "is something forwarding my mail?", and a tenant that wants
-that answer should not have to grant anything that can change a mailbox to get it. It sits one rung
-above `outlook-read` and below every write tier for that reason. It also cannot answer its own
-headline question completely, and says so in every response: Exchange mailbox forwarding set with
+**The Outlook rows are two axes, not one ladder.** Mail content goes `outlook-read` →
+`outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
+configuration goes `outlook-mailbox` → `outlook-automate`, and touches no `Mail.*` permission at
+all. The two axes never meet, because they are unrelated: an out-of-office reply has nothing to do
+with sending mail as the user, and a forwarding-rule audit has nothing to do with reading one. A
+single cumulative chain made `outlook-automate` require `Mail.Send`, which is the defect this shape
+exists to prevent. A deployment that wants both axes names the tools in `TOOLS_ENABLED`.
+
+**`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
+answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
+grant the ability to read a message body to get it. It also cannot answer its own headline question
+completely, and says so in every response: Exchange mailbox forwarding set with
 `Set-Mailbox -ForwardingSmtpAddress` is invisible to every endpoint this connector can call, so an
 empty rule list is not evidence that mail is not being forwarded.
 

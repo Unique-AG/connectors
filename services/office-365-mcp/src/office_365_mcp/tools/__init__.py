@@ -172,6 +172,11 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "read_transcript",
         "list_meeting_recordings",
     ),
+    # Two axes, not one ladder. Mail content is read, then write, then send; mailbox configuration
+    # is read, then write. They are independent, and welding them into one chain is how
+    # `outlook-automate` came to require `Mail.Send` — an out-of-office reply has nothing to do
+    # with sending mail as the user, and a forwarding-rule audit has nothing to do with reading
+    # one. Each row below asks for exactly what its own tools declare.
     "outlook-read": (
         "outlook_search_mail",
         "outlook_read_mail",
@@ -180,15 +185,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_read_thread",
         "outlook_list_mail",
     ),
-    "outlook-mailbox": (
-        "outlook_search_mail",
-        "outlook_read_mail",
-        "outlook_browse_folders",
-        "outlook_find_recipient",
-        "outlook_read_thread",
-        "outlook_list_mail",
-        "outlook_get_mailbox_settings",
-    ),
     "outlook-write": (
         "outlook_search_mail",
         "outlook_read_mail",
@@ -196,7 +192,6 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_find_recipient",
         "outlook_read_thread",
         "outlook_list_mail",
-        "outlook_get_mailbox_settings",
         "outlook_mark_mail",
         "outlook_move_mail",
         "outlook_draft_mail",
@@ -209,26 +204,15 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_find_recipient",
         "outlook_read_thread",
         "outlook_list_mail",
-        "outlook_get_mailbox_settings",
         "outlook_mark_mail",
         "outlook_move_mail",
         "outlook_draft_mail",
         "outlook_draft_reply",
         "outlook_send_draft",
     ),
+    "outlook-mailbox": ("outlook_get_mailbox_settings",),
     "outlook-automate": (
-        "outlook_search_mail",
-        "outlook_read_mail",
-        "outlook_browse_folders",
-        "outlook_find_recipient",
-        "outlook_read_thread",
-        "outlook_list_mail",
         "outlook_get_mailbox_settings",
-        "outlook_mark_mail",
-        "outlook_move_mail",
-        "outlook_draft_mail",
-        "outlook_draft_reply",
-        "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
     ),
