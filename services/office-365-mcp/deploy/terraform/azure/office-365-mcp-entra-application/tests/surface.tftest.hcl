@@ -223,11 +223,11 @@ run "preset_outlook_automate" {
 
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
-    tools_enabled = ["teams_read_message", "list_chats"]
+    tools_enabled = ["teams_read_message", "teams_list_chats"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_chats,teams_read_message"
+    condition     = join(",", local.tools) == "get_me,teams_list_chats,teams_read_message"
     error_message = "caller order leaked into the tool list: ${join(",", local.tools)}"
   }
 
@@ -239,11 +239,11 @@ run "the_order_is_the_registrys_and_never_the_callers" {
 
 run "get_me_joins_every_selection" {
   variables {
-    tools_enabled = ["list_teams"]
+    tools_enabled = ["teams_list_teams"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_teams"
+    condition     = join(",", local.tools) == "get_me,teams_list_teams"
     error_message = "ALWAYS_ON was not joined: ${join(",", local.tools)}"
   }
 
@@ -255,11 +255,11 @@ run "get_me_joins_every_selection" {
 
 run "naming_the_always_on_tool_explicitly_is_accepted" {
   variables {
-    tools_enabled = ["get_me", "list_chats"]
+    tools_enabled = ["get_me", "teams_list_chats"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_chats"
+    condition     = join(",", local.tools) == "get_me,teams_list_chats"
     error_message = "resolved ${join(",", local.tools)}"
   }
 }
@@ -339,7 +339,7 @@ run "both_selections_are_refused" {
 
   variables {
     tools_preset  = "teams"
-    tools_enabled = ["list_chats"]
+    tools_enabled = ["teams_list_chats"]
   }
 
   expect_failures = [var.tools_enabled]
@@ -359,7 +359,7 @@ run "an_unknown_tool_is_refused" {
   command = plan
 
   variables {
-    tools_enabled = ["list_chats", "read_transcripts"]
+    tools_enabled = ["teams_list_chats", "read_transcripts"]
   }
 
   expect_failures = [var.tools_enabled]
@@ -369,7 +369,7 @@ run "the_comma_separated_env_var_form_is_refused" {
   command = plan
 
   variables {
-    tools_enabled = ["list_chats,teams_read_message"]
+    tools_enabled = ["teams_list_chats,teams_read_message"]
   }
 
   expect_failures = [var.tools_enabled]

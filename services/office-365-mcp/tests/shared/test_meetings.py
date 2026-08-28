@@ -1,6 +1,7 @@
 """The meeting vocabulary: the `$filter` that reaches a meeting, and the window that scopes it.
 
-`list_meeting_transcripts`, `list_meeting_recordings` and `read_transcript` all rest on this, so it
+`teams_list_meeting_transcripts`, `teams_list_meeting_recordings` and `teams_read_transcript` all
+rest on this, so it
 is tested here once rather than once per lister. Every payload is synthesised.
 """
 

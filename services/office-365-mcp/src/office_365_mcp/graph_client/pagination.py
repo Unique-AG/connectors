@@ -7,14 +7,16 @@ return False for a page with no items and `iterate` reads that as the end of the
 that line on the next SDK bump.
 
 Not hypothetical: a live known issue has `getAllRecordings` and `getAllTranscripts` — behind
-`list_meeting_recordings` and `list_meeting_transcripts` — reset their pagination token mid-walk
+`teams_list_meeting_recordings` and `teams_list_meeting_transcripts` — reset their pagination
+token mid-walk
 and answer 200 with an empty collection and an `@odata.nextLink`
 (https://learn.microsoft.com/en-us/graph/known-issues, "Teamwork and communications"). Its expected
 end date of 2026-08-31 dates that incident, not this guard.
 
 TRAP: a channel's messages are deliberately not walked here, though they are what the scan cap was
 written against. Graph's throttling limit there is per *app* per tenant on a given channel, so even
-a capped walk spends a budget belonging to every other user of this connector; `browse_channel`
+a capped walk spends a budget belonging to every other user of this connector;
+`teams_browse_channel`
 makes one request, uses `$top` as its window, and never comes here.
 
 TRAP: headers do not travel with the cursor. `PageIterator` starts with an empty header collection,
@@ -62,7 +64,7 @@ MAX_SCANNED_ITEMS = 1000
 #
 # TRAP for anyone tempted to pool this with `max_scanned`: a collection answering nothing but empty
 # pages spends *no* scan budget, so the whole pool goes to empty pages — a measured 1010 of them on
-# `list_chats` when the budgets were shared.
+# `teams_list_chats` when the budgets were shared.
 #
 # Per run, not per walk: `[3 items, nothing, 1 item]` is a shape Graph really sends, so a page
 # carrying an item restarts the count and only an unbroken run means Graph will not end this

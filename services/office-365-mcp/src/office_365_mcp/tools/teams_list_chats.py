@@ -1,4 +1,4 @@
-"""`list_chats` — the signed-in user's Teams chats, most recent first.
+"""`teams_list_chats` — the signed-in user's Teams chats, most recent first.
 
 TRAP: Graph's `lastUpdatedDateTime` changes on a rename or a member change and is not recency. Only
 the last message sent decides `last_message_at` and the sort order, which needs `Chat.Read` rather
@@ -23,7 +23,7 @@ from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "list_chats"
+TOOL_NAME = "teams_list_chats"
 
 STEP = "chats"
 
@@ -43,7 +43,7 @@ _DESCRIPTION = """\
 List the signed-in user's Teams chats — one-to-one, group and meeting — ordered by last message \
 sent. Call it to see who is in a conversation, when it was last active, or for a meeting's \
 `meeting_uri`, the only route to its transcripts and recordings — no filter exists, so match it by \
-subject in `topic`. Channel activity is listed nowhere here: browse_channel walks one, \
+subject in `topic`. Channel activity is listed nowhere here: teams_browse_channel walks one, \
 teams_search_messages finds a message. Returns id, type, topic, last-message time and members for \
 unnamed chats.\
 """
@@ -93,7 +93,8 @@ class ChatSummary(BaseModel):
     meeting_uri: str | None = Field(
         description=(
             "For meeting chats: a handle for the Teams meeting. The only route from conversation "
-            + "to meeting. Pass it verbatim to list_meeting_transcripts to find out whether the "
+            + "to meeting. Pass it verbatim to teams_list_meeting_transcripts to find out whether "
+            + "the "
             + "meeting was transcribed. Null when no join URL exists, in which case that meeting's "
             + "transcripts are unreachable from this connector."
         )
@@ -201,7 +202,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
-    async def list_chats(
+    async def teams_list_chats(
         limit: Annotated[
             int,
             Field(

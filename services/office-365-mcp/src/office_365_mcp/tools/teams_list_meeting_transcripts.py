@@ -1,8 +1,9 @@
-"""`list_meeting_transcripts` — transcripts a Teams meeting holds and whether it was transcribed.
+"""`teams_list_meeting_transcripts` — transcripts a Teams meeting holds and whether it was
+transcribed.
 
 TRAP: transcript access is a tenant-wide Teams switch, OFF by default, and every call answers 403
 while it is off. It is not a permission; it needs admin action. Microsoft scopes the switch to
-transcripts, so in an untouched tenant this fails and `list_meeting_recordings` answers.
+transcripts, so in an untouched tenant this fails and `teams_list_meeting_recordings` answers.
 
 TRAP: Graph can return an empty page that still carries a next link, so an empty page is not the
 end of the collection. `graph_client/pagination.py` follows the link; without that, a meeting Graph
@@ -40,13 +41,14 @@ from office_365_mcp.shared.meetings import (
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "list_meeting_transcripts"
+TOOL_NAME = "teams_list_meeting_transcripts"
 
 # The meeting resolve before this one counts under `shared/meetings.py`'s own step, not this.
 STEP_TRANSCRIPTS = "transcripts"
 
 # Meeting resolve and transcript read, redeemed under one token by Entra. The transcript permission
-# lives in `shared/meetings.py`: `tests/test_layering.py` rule 4 forbids importing read_transcript.
+# lives in `shared/meetings.py`: `tests/test_layering.py` rule 4 forbids importing
+# teams_read_transcript.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 # Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
@@ -68,23 +70,27 @@ TranscriptStatus = Literal[
 ]
 
 _DESCRIPTION = """\
-List a Teams meeting's transcripts, from the `meeting_uri` list_chats reports. Call it to learn \
-whether a meeting was transcribed; read_transcript returns the words. Read `status` first: \
+List a Teams meeting's transcripts, from the `meeting_uri` teams_list_chats reports. Call it to \
+learn \
+whether a meeting was transcribed; teams_read_transcript returns the words. Read `status` first: \
 `not_ready` means wait, `not_transcribed` means none, `scan_incomplete` means unknowable — stop, \
 narrowing the window changes nothing. A tenant switch can block transcripts and never recordings, \
-so try list_meeting_recordings on refusal. Returns `status` and each transcript's `uri` and times.\
+so try teams_list_meeting_recordings on refusal. Returns `status` and each transcript's `uri` and \
+times. \
 """
 
 _NOT_A_MEETING_HANDLE = (
-    "list_meeting_transcripts takes teams:///meetings/{join_web_url} from list_chats, not this. "
-    "Call list_chats and use its `meeting_uri`. A `teams:///transcripts/...` handle is "
-    "read_transcript's; this tool is what produces it. Retrying this value will fail identically."
+    "teams_list_meeting_transcripts takes teams:///meetings/{join_web_url} from teams_list_chats, "
+    + "not this. "
+    + "Call teams_list_chats and use its `meeting_uri`. A `teams:///transcripts/...` handle is "
+    + "teams_read_transcript's; this tool is what produces it. Retrying this value will fail "
+    + "identically."
 )
 
 
 class TranscriptSummary(BaseModel):
     uri: str = Field(
-        description="Handle for this transcript. Pass to read_transcript to get the words."
+        description="Handle for this transcript. Pass to teams_read_transcript to get the words."
     )
     transcript_id: str = Field(
         description="Transcript Graph id. Use `uri` to identify a transcript, not this alone."
@@ -92,7 +98,7 @@ class TranscriptSummary(BaseModel):
     started_at: datetime | None = Field(
         description=(
             "Transcription start. For recurring meetings, distinguishes one occurrence from "
-            "another."
+            + "another."
         )
     )
     ended_at: datetime | None = Field(description="Transcription end.")
@@ -116,22 +122,24 @@ class MeetingTranscripts(BaseModel):
     status: TranscriptStatus = Field(
         description=(
             "What was found and what to do next. One of:\n"
-            "- `available` — transcripts are listed, newest first.\n"
-            "- `not_ready` — nothing is there yet and something may still arrive. Wait and call "
-            "again later. This is NOT 'there is no transcript'. A window that has demonstrably "
-            "passed is never reported this way, however far in the future a recurring series "
-            "runs. This is inferred; Microsoft publishes no availability SLA.\n"
-            "- `scan_incomplete` — this meeting has more transcripts than one call reads "
-            f"({MAX_ARTIFACT_SCAN}) and none read fall in your window, so whether one exists there "
-            "is NOT known. There is nothing to try. Stop here. This status is final and cannot be "
-            "retried or worked around by narrowing the window. Never report this as 'there is no "
-            "transcript'.\n"
-            "- `not_transcribed` — the window is over; nothing is there; nothing expected. "
-            "Retrying will not change this.\n"
-            "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
-            "see. Do not retry and do not rebuild the handle.\n"
-            "A refusal is about this user, not about the meeting: a participant may be refused "
-            "where the organiser succeeds."
+            + "- `available` — transcripts are listed, newest first.\n"
+            + "- `not_ready` — nothing is there yet and something may still arrive. Wait and call "
+            + "again later. This is NOT 'there is no transcript'. A window that has demonstrably "
+            + "passed is never reported this way, however far in the future a recurring series "
+            + "runs. This is inferred; Microsoft publishes no availability SLA.\n"
+            + "- `scan_incomplete` — this meeting has more transcripts than one call reads "
+            + f"({MAX_ARTIFACT_SCAN}) and none read fall in your window, so whether one exists "
+            + "there "
+            + "is NOT known. There is nothing to try. Stop here. This status is final and cannot "
+            + "be "
+            + "retried or worked around by narrowing the window. Never report this as 'there is no "
+            + "transcript'.\n"
+            + "- `not_transcribed` — the window is over; nothing is there; nothing expected. "
+            + "Retrying will not change this.\n"
+            + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
+            + "see. Do not retry and do not rebuild the handle.\n"
+            + "A refusal is about this user, not about the meeting: a participant may be refused "
+            + "where the organiser succeeds."
         )
     )
     meeting_id: str | None = Field(
@@ -143,7 +151,7 @@ class MeetingTranscripts(BaseModel):
     meeting_type: str | None = Field(
         description=(
             "`scheduled`, `recurring`, `adhoc`, `meetNow`, `broadcast`, or null. When `recurring`, "
-            "use `started_after`/`started_before` to reach one occurrence."
+            + "use `started_after`/`started_before` to reach one occurrence."
         )
     )
     started_at: datetime | None = Field(
@@ -155,26 +163,29 @@ class MeetingTranscripts(BaseModel):
     transcripts: list[TranscriptSummary] = Field(
         description=(
             "Transcripts that fall inside the requested window, newest first. The order is over "
-            f"every transcript this call read (up to {MAX_ARTIFACT_SCAN}), not over one page of "
-            "Microsoft's answer. For meetings with fewer transcripts than that cap — all but "
-            "series recorded daily for most of a year — the first entry is the latest of the "
-            "window. Past the cap the first entry is the latest of what was READ; Microsoft "
-            "returns this collection in its own order and offers no `$orderby`. Set "
-            "`include_scan_completeness` to learn if the read reached the end. As many as `limit` "
-            "means the window may hold older ones; fewer means the window holds no more than was "
-            "read. Empty for every status other than `available`."
+            + f"every transcript this call read (up to {MAX_ARTIFACT_SCAN}), not over one page of "
+            + "Microsoft's answer. For meetings with fewer transcripts than that cap — all but "
+            + "series recorded daily for most of a year — the first entry is the latest of the "
+            + "window. Past the cap the first entry is the latest of what was READ; Microsoft "
+            + "returns this collection in its own order and offers no `$orderby`. Set "
+            + "`include_scan_completeness` to learn if the read reached the end. As many as "
+            + "`limit` "
+            + "means the window may hold older ones; fewer means the window holds no more than was "
+            + "read. Empty for every status other than `available`."
         )
     )
     scan_incomplete: bool | None = Field(
         description=(
             f"Whether read stopped at {MAX_ARTIFACT_SCAN} transcripts (true), read all (false), or "
-            "null if not requested. Set only when `include_scan_completeness` is true. True means "
-            "transcripts ordered over those read, not all. False means order and absence are exact."
+            + "null if not requested. Set only when `include_scan_completeness` is true. True "
+            + "means "
+            + "transcripts ordered over those read, not all. False means order and absence are "
+            + "exact."
         )
     )
 
 
-async def list_meeting_transcripts(
+async def teams_list_meeting_transcripts(
     client: GraphServiceClient,
     *,
     handle: MeetingHandle,
@@ -248,8 +259,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Meeting handle from list_chats: teams:///meetings/{join_web_url}. Copy "
-                    "verbatim."
+                    "Meeting handle from teams_list_chats: teams:///meetings/{join_web_url}. Copy "
+                    + "verbatim."
                 ),
             ),
         ],
@@ -258,9 +269,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Scope to one occurrence by filtering transcription start time. Shapes: "
-                    "2026-08-11T09:00:00+02:00 (with offset), 2026-08-11T09:00:00 (IS READ AS "
-                    "UTC), or 2026-08-11 (whole UTC day, first instant). Pass offset for local "
-                    "time — 09:00 in Zurich is 07:00Z."
+                    + "2026-08-11T09:00:00+02:00 (with offset), 2026-08-11T09:00:00 (IS READ AS "
+                    + "UTC), or 2026-08-11 (whole UTC day, first instant). Pass offset for local "
+                    + "time — 09:00 in Zurich is 07:00Z."
                 )
             ),
         ] = None,
@@ -269,7 +280,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Upper bound for transcription start. Pair with `started_after`. A bare "
-                    "`2026-08-11` means the END of that UTC day."
+                    + "`2026-08-11` means the END of that UTC day."
                 )
             ),
         ] = None,
@@ -280,10 +291,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_TRANSCRIPTS,
                 description=(
                     f"How many transcripts to return. Default 20, maximum {MAX_TRANSCRIPTS}. These "
-                    "are the NEWEST that many of the window. All transcripts are read (up to "
-                    f"{MAX_ARTIFACT_SCAN}, the call's whole cost) and ordered before this cuts "
-                    "them. Past that cap they are the newest OF THE ONES READ, not the meeting's "
-                    "newest."
+                    + "are the NEWEST that many of the window. All transcripts are read (up to "
+                    + f"{MAX_ARTIFACT_SCAN}, the call's whole cost) and ordered before this cuts "
+                    + "them. Past that cap they are the newest OF THE ONES READ, not the meeting's "
+                    + "newest."
                 ),
             ),
         ] = 20,
@@ -292,7 +303,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Report whether read reached the end of transcripts, as `scan_incomplete`. Off "
-                    "by default."
+                    + "by default."
                 )
             ),
         ] = False,
@@ -301,7 +312,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         handle = meeting_handle(meeting_uri)
         if handle is None:
             raise ToolError(_NOT_A_MEETING_HANDLE)
-        return await list_meeting_transcripts(
+        return await teams_list_meeting_transcripts(
             client,
             handle=handle,
             started_after=started_after,

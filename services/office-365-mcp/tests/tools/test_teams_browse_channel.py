@@ -1,4 +1,5 @@
-"""`browse_channel`: the one request it spends, the order it must not correct, and the traps."""
+"""`teams_browse_channel`: the one request it spends, the order it must not correct, and the "
++ "traps."""
 
 from collections.abc import Mapping, Sequence
 
@@ -10,7 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import message_handle
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
-from office_365_mcp.tools import browse_channel as browser
+from office_365_mcp.tools import teams_browse_channel as browser
 
 from .conftest import GRAPH_V1
 
@@ -108,7 +109,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
 
-        _ = await browser.browse_channel(
+        _ = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -126,7 +127,7 @@ class TestTheQueryItSends:
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await browser.browse_channel(
+            _ = await browser.teams_browse_channel(
                 client,
                 team_id=_TEAM_ID,
                 channel_id=_CHANNEL_ID,
@@ -153,7 +154,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -185,7 +186,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -224,7 +225,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -267,7 +268,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -308,7 +309,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -354,7 +355,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -393,7 +394,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -425,7 +426,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -446,7 +447,7 @@ class TestBrowsingOneChannel:
             return_value=httpx.Response(200, json={"value": [_post_payload("1770000000000")]})
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -475,7 +476,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -503,7 +504,7 @@ class TestBrowsingOneChannel:
             )
         )
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -520,7 +521,7 @@ class TestBrowsingOneChannel:
     ) -> None:
         graph.get(_MESSAGES_PATH).mock(return_value=httpx.Response(200, json={"value": []}))
 
-        browsed = await browser.browse_channel(
+        browsed = await browser.teams_browse_channel(
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
@@ -541,7 +542,7 @@ class TestGraphFailures:
         graph.get(_MESSAGES_PATH).mock(return_value=denied)
 
         with pytest.raises(GraphForbidden):
-            _ = await browser.browse_channel(
+            _ = await browser.teams_browse_channel(
                 client,
                 team_id=_TEAM_ID,
                 channel_id=_CHANNEL_ID,

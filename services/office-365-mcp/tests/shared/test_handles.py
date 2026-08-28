@@ -46,7 +46,7 @@ _REPLY_HANDLE = handles.MessageHandle(
 
 
 class TestTheMessageHandleGrammar:
-    """`teams_search_messages` mints two of these, `browse_channel` the third, and
+    """`teams_search_messages` mints two of these, `teams_browse_channel` the third, and
     `teams_read_message` reads
     all three back. The grammar is neither tool's: a handle one mints and another 404s on does not
     look like a disagreement."""
@@ -61,7 +61,7 @@ class TestTheMessageHandleGrammar:
     def test_it_reads_the_reply_shape_that_only_browsing_a_channel_can_mint(self) -> None:
         """Graph addresses a channel reply under the post it answers, and the search projection
         carries no `replyToId`, so a search hit on a reply degrades to the unreadable root-post
-        shape; only `browse_channel`, walking post by post, knows each reply's parent."""
+        shape; only `teams_browse_channel`, walking post by post, knows each reply's parent."""
         reply = handles.message_handle(_REPLY_URI)
 
         assert reply == _REPLY_HANDLE

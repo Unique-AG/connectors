@@ -14,7 +14,8 @@ Three of the five shapes are Graph's three ways to address a Teams message
 (https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a search
 cannot mint: Graph addresses a reply *under* its parent post, and the search projection carries no
 `replyToId`, so a channel hit that is really a reply becomes the plain channel shape, which Graph
-answers 404 to. Only `browse_channel` walks a channel post by post and knows each reply's parent.
+answers 404 to. Only `teams_browse_channel` walks a channel post by post and knows each reply's
+parent.
 
 A meeting is addressed by join URL because that is the only route Graph gives a delegated caller
 from chat to meeting; no chat id, topic or date turns into one. A transcript is addressed by the two

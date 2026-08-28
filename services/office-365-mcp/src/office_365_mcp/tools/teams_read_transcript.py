@@ -1,4 +1,4 @@
-"""`read_transcript` — speaker-attributed, timestamped turns from a Teams meeting transcript.
+"""`teams_read_transcript` — speaker-attributed, timestamped turns from a Teams meeting transcript.
 
 The handle holds both ids, so one call reaches `/content`. Taking `meeting_uri` instead would
 re-resolve the join URL, spend a second permission, and answer a 403 meaning either failure.
@@ -26,7 +26,7 @@ from office_365_mcp.shared.handles import TranscriptHandle, transcript_handle
 from office_365_mcp.shared.meetings import TRANSCRIPT_PERMISSION
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "read_transcript"
+TOOL_NAME = "teams_read_transcript"
 
 # Counted apart so the rate of `transcript_unattributed` shows how often a tenant's setting costs a
 # caller the speaker names. No operation-level series can show that rate.
@@ -34,7 +34,8 @@ STEP_ATTRIBUTED = "transcript_attributed"
 STEP_UNATTRIBUTED = "transcript_unattributed"
 
 # Admin-consented and independent from the recording permissions. The name lives in
-# `shared/meetings.py`: `tests/test_layering.py` rule 4 forbids importing list_meeting_transcripts.
+# `shared/meetings.py`: `tests/test_layering.py` rule 4 forbids importing
+# teams_list_meeting_transcripts.
 GRAPH_PERMISSIONS: tuple[str, ...] = (TRANSCRIPT_PERMISSION,)
 
 # Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
@@ -48,7 +49,7 @@ MAX_TURNS = 500
 
 _DESCRIPTION = """\
 Return a Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from the \
-`uri` list_meeting_transcripts reports. Call it for what was actually said or decided. \
+`uri` teams_list_meeting_transcripts reports. Call it for what was actually said or decided. \
 teams_read_message is the other reader and takes a different handle; a `meeting_uri` is not \
 one. When `speaker_attribution` is false every `speaker` is null and a `speaker` filter matches \
 nothing — read that flag before reporting that somebody did not speak. Returns turns with \
@@ -56,8 +57,9 @@ speaker, seconds and text.\
 """
 
 _NOT_A_TRANSCRIPT_HANDLE = (
-    "read_transcript takes teams:///transcripts/{meeting_id}/{transcript_id} from "
-    + "list_meeting_transcripts. This is not that shape. Call list_meeting_transcripts and use its "
+    "teams_read_transcript takes teams:///transcripts/{meeting_id}/{transcript_id} from "
+    + "teams_list_meeting_transcripts. This is not that shape. Call "
+    + "teams_list_meeting_transcripts and use its "
     + "`uri`, not the meeting's `meeting_uri` or a Teams message handle. Retrying will fail "
     + "identically."
 )
@@ -77,7 +79,8 @@ _BLANK_SPEAKER = (
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this transcript. The handle is well formed. Most likely the "
     + "meeting expires after about 60 days for a one-off; transcripts age out with it. Call "
-    + "list_meeting_transcripts again to see what remains. If not listed there, retrying will not "
+    + "teams_list_meeting_transcripts again to see what remains. If not listed there, retrying "
+    + "will not "
     + "help."
 )
 
@@ -148,7 +151,7 @@ class Transcript(BaseModel):
     )
 
 
-async def read_transcript(
+async def teams_read_transcript(
     client: GraphServiceClient,
     *,
     handle: TranscriptHandle,
@@ -312,7 +315,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The transcript from list_meeting_transcripts: "
+                    "The transcript from teams_list_meeting_transcripts: "
                     "teams:///transcripts/{meeting_id}/{transcript_id}. A `meeting_uri` is not "
                     "readable here."
                 ),
@@ -378,7 +381,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             raise ToolError(_INVERTED_TIME_WINDOW)
         if speaker is not None and not speaker.strip():
             raise ToolError(_BLANK_SPEAKER)
-        return await read_transcript(
+        return await teams_read_transcript(
             client,
             handle=handle,
             offset=offset,

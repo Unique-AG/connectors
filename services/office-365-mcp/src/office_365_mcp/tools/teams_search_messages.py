@@ -66,7 +66,8 @@ MAX_RESULTS = 50
 _DESCRIPTION = """\
 Search every Teams message the signed-in user can see, by keyword, sender, mention, date, \
 attachment or read state. Use it for "find the message where…" and for every date-bounded \
-question, including one about a named channel — browse_channel has no date filter. Search takes \
+question, including one about a named channel — teams_browse_channel has no date filter. Search \
+takes \
 no chat or channel scope: read `channel_id` on each hit to see where it came from. At least one \
 criterion is required and all are ANDed. Hits carry metadata and Microsoft's `summary` snippet \
 only — pass a hit's `uri` to teams_read_message for the actual words.\
@@ -89,7 +90,8 @@ class MessageHit(BaseModel):
             + "One handle here can fail to read: Microsoft "
             + "addresses a reply in a channel thread under its parent post and its search index "
             + "does not say which post that is, so a hit that is a reply gets the root-post form "
-            + "above and teams_read_message may answer that it could not be read. browse_channel "
+            + "above and teams_read_message may answer that it could not be read. "
+            + "teams_browse_channel "
             + "is the "
             + "only tool that emits a reply's own handle, and it reaches only the newest "
             + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page, following "
@@ -107,7 +109,7 @@ class MessageHit(BaseModel):
     )
     chat_id: str | None = Field(
         description=(
-            "Chat this message is in, unencoded, e.g. `19:...@thread.v2`. Same as list_chats "
+            "Chat this message is in, unencoded, e.g. `19:...@thread.v2`. Same as teams_list_chats "
             + "reports. Null for channel messages."
         )
     )

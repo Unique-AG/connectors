@@ -1,4 +1,4 @@
-"""`browse_channel` — one Teams channel's posts with their newest replies.
+"""`teams_browse_channel` — one Teams channel's posts with their newest replies.
 
 TRAP: Graph orders by reply-chain last modified, so a two-year-old post moves to the first page
 when someone replies to it. That order is kept, because re-sorting would invent an order Graph
@@ -32,7 +32,7 @@ from office_365_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage, event_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "browse_channel"
+TOOL_NAME = "teams_browse_channel"
 
 STEP = "channel_messages"
 
@@ -51,7 +51,8 @@ type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParam
 
 _DESCRIPTION = """\
 Read one Teams channel's posts in full. Use it for "what is in this channel", with `team_id` \
-from list_teams and `channel_id` from list_channels; for a keyword, a person or any date bound, \
+from teams_list_teams and `channel_id` from teams_list_channels; for a keyword, a person or any \
+date bound, \
 use teams_search_messages — there is no date filter here. One call is one request: raise \
 `limit` rather than calling again. Microsoft orders by reply-chain activity, not post date: \
 read `created_at` before trusting the order. Returns each post with its newest replies, whole.\
@@ -98,7 +99,7 @@ class ChannelPosts(BaseModel):
     )
 
 
-async def browse_channel(
+async def teams_browse_channel(
     client: GraphServiceClient,
     *,
     team_id: str,
@@ -195,7 +196,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The team the channel is in, exactly as `list_teams` reported. A channel id "
+                    "The team the channel is in, exactly as `teams_list_teams` reported. A "
+                    + "channel id "
                     + "alone does not address a channel."
                 ),
             ),
@@ -205,7 +207,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The channel to read, exactly as `list_channels` or `teams_search_messages` "
+                    "The channel to read, exactly as `teams_list_channels` or "
+                    + "`teams_search_messages` "
                     + "reported "
                     + "it. Opaque — copy it, do not build it from a channel name."
                 ),
@@ -243,7 +246,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = False,
         client: GraphServiceClient = graph,
     ) -> ChannelPosts:
-        return await browse_channel(
+        return await teams_browse_channel(
             client,
             team_id=team_id,
             channel_id=channel_id,

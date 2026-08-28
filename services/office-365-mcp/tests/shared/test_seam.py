@@ -325,7 +325,7 @@ class TestWhatTheMiddlewareLeavesAlone:
         assert _PERMISSION not in str(advised)
 
     async def test_a_tool_error_about_an_argument_is_not_a_graph_failure(self) -> None:
-        refusal = ToolError("read_transcript takes teams:///transcripts/{a}/{b}.")
+        refusal = ToolError("teams_read_transcript takes teams:///transcripts/{a}/{b}.")
 
         assert await _middleware_message(refusal) == str(refusal)
 

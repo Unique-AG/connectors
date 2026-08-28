@@ -51,7 +51,8 @@ disagree with it about. `graph_client/` is the transport they borrow.
    that a model cannot watch, and its `recordingContentUrl` is a Graph URL only this connector's
    bearer token opens, so handing it to a caller is either useless or a token leak. "Return
    metadata and availability, never the bytes" is the whole shape of
-   `tools/list_meeting_recordings.py`, and it is a failing test rather than a paragraph because the
+   `tools/teams_list_meeting_recordings.py`, and it is a failing test rather than a paragraph
+   because the
    change that breaks it is a small-looking convenience someone adds later.
 
 8. **A package is entered through its `__init__`, never through its modules.** Applies to the
@@ -474,7 +475,7 @@ def _handle_violations(source: pathlib.Path) -> list[str]:
 
 def _registry_imports() -> set[str]:
     """Both spellings, because either is how a module gets into `_TOOL_MODULES`: the names of
-    `from office_365_mcp.tools import get_me, list_chats`, and the tail of
+    `from office_365_mcp.tools import get_me, teams_list_chats`, and the tail of
     `import office_365_mcp.tools.get_me`."""
     tree = ast.parse((_TOOLS / "__init__.py").read_text())
     found: set[str] = set()
@@ -514,10 +515,11 @@ def _a_tool_file_containing(
     source: str, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> pathlib.Path:
     """On disk rather than as a string because a relative import resolves only against a real
-    package: `from .. import tools` is `office_365_mcp` seen from `office_365_mcp.tools.list_chats`,
+    package: `from .. import tools` is `office_365_mcp` seen from
+    `office_365_mcp.tools.teams_list_chats`,
     and nothing but the file's own path says which. `_SRC` is repointed at the copy, so the
     violation comes back named the way the real rules name one."""
-    module = tmp_path / "office_365_mcp" / "tools" / "list_chats.py"
+    module = tmp_path / "office_365_mcp" / "tools" / "teams_list_chats.py"
     module.parent.mkdir(parents=True)
     module.write_text(source)
     monkeypatch.setattr(sys.modules[__name__], "_SRC", tmp_path / "office_365_mcp")
@@ -554,7 +556,7 @@ class TestTheDetectionItself:
         module = _a_tool_file_containing("from .. import tools\n", tmp_path, monkeypatch)
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:1 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:1 imports office_365_mcp.tools"
         ]
 
     def test_catches_the_same_reach_spelled_absolutely(
@@ -565,7 +567,7 @@ class TestTheDetectionItself:
         )
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:1 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:1 imports office_365_mcp.tools"
         ]
 
     def test_catches_it_under_an_alias(
@@ -579,7 +581,7 @@ class TestTheDetectionItself:
         )
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:1 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:1 imports office_365_mcp.tools"
         ]
 
     def test_catches_it_inside_a_function_body(
@@ -594,7 +596,7 @@ class TestTheDetectionItself:
         )
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:2 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:2 imports office_365_mcp.tools"
         ]
 
     def test_does_not_fire_on_a_member_that_is_not_the_package(self) -> None:

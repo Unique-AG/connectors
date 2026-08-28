@@ -250,23 +250,24 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
     async def test_a_refused_step_a_tool_recovers_from_leaves_the_operation_counted_as_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`read_transcript`'s shape. Under two `graph_errors` blocks the first refusal counted as
+        """`teams_read_transcript`'s shape. Under two `graph_errors` blocks the first refusal
+        counted as
         a failed *operation*, so any alert on refusals fired on a tenant behaving as designed."""
         _ = graph.get("/me").mock(
             side_effect=[httpx.Response(403, json={}), httpx.Response(200, json=_ME)]
         )
-        answered = _value(GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="ok")
+        answered = _value(GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="ok")
         refused_operations = _value(
-            GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="forbidden"
+            GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="forbidden"
         )
         refused_steps = _value(
             GRAPH_STEPS_TOTAL,
-            operation="read_transcript",
+            operation="teams_read_transcript",
             step="transcript_attributed",
             status="forbidden",
         )
 
-        with graph_errors("read_transcript"):
+        with graph_errors("teams_read_transcript"):
             try:
                 with graph_step("transcript_attributed"):
                     _ = await client.me.get()
@@ -275,16 +276,17 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
                     _ = await client.me.get()
 
         assert (
-            _value(GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="ok") == answered + 1
+            _value(GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="ok")
+            == answered + 1
         )
         assert (
-            _value(GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="forbidden")
+            _value(GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="forbidden")
             == refused_operations
         ), "the tool answered, so the operation is not a refusal"
         assert (
             _value(
                 GRAPH_STEPS_TOTAL,
-                operation="read_transcript",
+                operation="teams_read_transcript",
                 step="transcript_attributed",
                 status="forbidden",
             )
@@ -302,7 +304,7 @@ class TestTheOperationLabelIsANameThisCodeChose:
         chat_id = "19%3Aunbounded-cardinality%40thread.v2"
         _ = graph.get(f"/chats/{chat_id}").mock(return_value=httpx.Response(200, json={"id": "c"}))
 
-        with graph_errors("list_chats"):
+        with graph_errors("teams_list_chats"):
             _ = await client.chats.by_chat_id("19:unbounded-cardinality@thread.v2").get()
 
         families = (
@@ -386,12 +388,12 @@ class TestAPagedWalkReportsWhatItRead:
                 httpx.Response(200, json=_page(["c-3"])),
             ]
         )
-        before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats")
+        before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats")
 
-        with graph_errors("list_chats"):
+        with graph_errors("teams_list_chats"):
             await _walk_chats(client, limit=50)
 
-        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == before + 3
+        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == before + 3
 
     async def test_a_nested_unnamed_block_does_not_erase_the_name_in_scope(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -405,22 +407,24 @@ class TestAPagedWalkReportsWhatItRead:
                 httpx.Response(200, json=_page(["c-2"])),
             ]
         )
-        pages = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats")
-        counted = _value(GRAPH_OPERATIONS_TOTAL, operation="list_chats", status="ok")
+        pages = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats")
+        counted = _value(GRAPH_OPERATIONS_TOTAL, operation="teams_list_chats", status="ok")
 
-        steps = _value(GRAPH_STEPS_TOTAL, operation="list_chats", step="chats", status="ok")
+        steps = _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
 
-        with graph_errors("list_chats"), graph_step("chats"):
+        with graph_errors("teams_list_chats"), graph_step("chats"):
             await _walk_chats(client, limit=50)
 
-        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == pages + 2
-        assert _value(GRAPH_OPERATIONS_TOTAL, operation="list_chats", status="ok") == counted + 1, (
+        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == pages + 2
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="teams_list_chats", status="ok") == counted + 1
+        ), (
             "the inner block is a step, so it counts against the step instruments and leaves the "
             + "operation counted once — otherwise a tool that names its calls would look like a "
             + "tool called several times"
         )
         assert (
-            _value(GRAPH_STEPS_TOTAL, operation="list_chats", step="chats", status="ok")
+            _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
             == steps + 1
         )
 
@@ -475,7 +479,8 @@ def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
 
 class TestEveryToolNamesItselfWhenItCallsGraph:
     """What `graph_errors`' signature cannot say is that the name has to be *this tool's own*:
-    `graph_errors("get_me")` inside `list_chats.py` type-checks, compiles, and files one tool's
+    `graph_errors("get_me")` inside `teams_list_chats.py` type-checks, compiles, and files one
+    tool's
     latency under another's name. Asserted through the AST, so a call written across two lines
     counts and a `graph_errors` inside a docstring does not.
     """
@@ -897,7 +902,8 @@ def _panel_graph_metrics(panel: Mapping[str, object]) -> set[str]:
 
 class TestNoPanelPromisesGraphCallsAndPlotsOperations:
     """A wrong title is worse than an empty panel: it renders a real number a reader takes for a
-    different measurement. `list_meeting_recordings` makes three Graph calls per invocation, so an
+    different measurement. `teams_list_meeting_recordings` makes three Graph calls per invocation,
+    so an
     operation rate read as a Graph call rate understates Graph traffic by the fan-out.
     """
 

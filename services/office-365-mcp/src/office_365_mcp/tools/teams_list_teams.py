@@ -1,4 +1,4 @@
-"""`list_teams` — the teams the signed-in user is a member of.
+"""`teams_list_teams` — the teams the signed-in user is a member of.
 
 TRAP: Graph accepts no OData query on this collection. `$top`, `$select` and `$filter` all return
 400, so this tool sends no request configuration. services/teams-mcp shipped `$top` and removed it.
@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "list_teams"
+TOOL_NAME = "teams_list_teams"
 
 STEP = "joined_teams"
 
@@ -30,8 +30,10 @@ MAX_TEAMS = 200
 
 _DESCRIPTION = """\
 List the teams the signed-in user belongs to. Start here for any question about a team or a \
-channel: `team_id` is what list_channels needs, and a channel id alone addresses nothing. For \
-chats, group chats and meeting chats — the other surface entirely — use list_chats. Returns each \
+channel: `team_id` is what teams_list_channels needs, and a channel id alone addresses nothing. \
+For \
+chats, group chats and meeting chats — the other surface entirely — use teams_list_chats. Returns \
+each \
 team's id, name, description and archived flag; fewer than `limit` means the end of the list.\
 """
 
@@ -39,7 +41,7 @@ team's id, name, description and archived flag; fewer than `limit` means the end
 class TeamSummary(BaseModel):
     team_id: str = Field(
         description=(
-            "The team's Graph id. This is what list_channels takes, and the same id "
+            "The team's Graph id. This is what teams_list_channels takes, and the same id "
             + "teams_search_messages reports on channel messages. Opaque—copy it verbatim, never "
             + "build one from a name."
         )
@@ -78,7 +80,7 @@ class TeamList(BaseModel):
     )
 
 
-async def list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
+async def teams_list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
     assert 1 <= limit <= MAX_TEAMS, f"limit must be within 1..{MAX_TEAMS}, got {limit}"
 
     with graph_errors(TOOL_NAME, step=STEP):
@@ -114,4 +116,4 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = 50,
         client: GraphServiceClient = graph,
     ) -> TeamList:
-        return await list_teams(client, limit=limit)
+        return await teams_list_teams(client, limit=limit)

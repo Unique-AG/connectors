@@ -9,25 +9,25 @@
           ]
         },
         {
-          "name": "list_chats",
+          "name": "teams_list_chats",
           "permissions": [
             "Chat.Read"
           ]
         },
         {
-          "name": "list_teams",
+          "name": "teams_list_teams",
           "permissions": [
             "Team.ReadBasic.All"
           ]
         },
         {
-          "name": "list_channels",
+          "name": "teams_list_channels",
           "permissions": [
             "Channel.ReadBasic.All"
           ]
         },
         {
-          "name": "browse_channel",
+          "name": "teams_browse_channel",
           "permissions": [
             "ChannelMessage.Read.All"
           ]
@@ -47,20 +47,20 @@
           ]
         },
         {
-          "name": "list_meeting_transcripts",
+          "name": "teams_list_meeting_transcripts",
           "permissions": [
             "OnlineMeetings.Read",
             "OnlineMeetingTranscript.Read.All"
           ]
         },
         {
-          "name": "read_transcript",
+          "name": "teams_read_transcript",
           "permissions": [
             "OnlineMeetingTranscript.Read.All"
           ]
         },
         {
-          "name": "list_meeting_recordings",
+          "name": "teams_list_meeting_recordings",
           "permissions": [
             "OnlineMeetings.Read",
             "OnlineMeetingRecording.Read.All",
@@ -158,15 +158,15 @@
       ],
       "tool_names": [
         "get_me",
-        "list_chats",
-        "list_teams",
-        "list_channels",
-        "browse_channel",
+        "teams_list_chats",
+        "teams_list_teams",
+        "teams_list_channels",
+        "teams_browse_channel",
         "teams_search_messages",
         "teams_read_message",
-        "list_meeting_transcripts",
-        "read_transcript",
-        "list_meeting_recordings",
+        "teams_list_meeting_transcripts",
+        "teams_read_transcript",
+        "teams_list_meeting_recordings",
         "outlook_search_mail",
         "outlook_read_mail",
         "outlook_browse_folders",
@@ -185,43 +185,43 @@
       "always_on": "get_me",
       "presets": {
         "teams": [
-          "list_chats",
-          "list_teams",
-          "list_channels",
-          "browse_channel",
+          "teams_list_chats",
+          "teams_list_teams",
+          "teams_list_channels",
+          "teams_browse_channel",
           "teams_search_messages",
           "teams_read_message",
-          "list_meeting_transcripts",
-          "read_transcript",
-          "list_meeting_recordings"
+          "teams_list_meeting_transcripts",
+          "teams_read_transcript",
+          "teams_list_meeting_recordings"
         ],
         "teams-chat": [
-          "list_chats"
+          "teams_list_chats"
         ],
         "teams-messages": [
-          "list_chats",
+          "teams_list_chats",
           "teams_search_messages",
           "teams_read_message"
         ],
         "teams-channels": [
-          "list_teams",
-          "list_channels",
-          "browse_channel"
+          "teams_list_teams",
+          "teams_list_channels",
+          "teams_browse_channel"
         ],
         "teams-transcripts": [
-          "list_chats",
-          "list_meeting_transcripts",
-          "read_transcript"
+          "teams_list_chats",
+          "teams_list_meeting_transcripts",
+          "teams_read_transcript"
         ],
         "teams-recordings": [
-          "list_chats",
-          "list_meeting_recordings"
+          "teams_list_chats",
+          "teams_list_meeting_recordings"
         ],
         "teams-meetings": [
-          "list_chats",
-          "list_meeting_transcripts",
-          "read_transcript",
-          "list_meeting_recordings"
+          "teams_list_chats",
+          "teams_list_meeting_transcripts",
+          "teams_read_transcript",
+          "teams_list_meeting_recordings"
         ],
         "outlook-read": [
           "outlook_search_mail",

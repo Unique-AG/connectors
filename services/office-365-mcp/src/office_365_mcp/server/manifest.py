@@ -13,7 +13,7 @@ FastMCP's OAuth callback, which would render a *successful* consent as an error.
 The description scan only ever **warns**: requiring every mention would drag
 `teams_search_messages`, and
 with it `ChannelMessage.Read.All` and an administrator's signature, into a deployment that asked for
-nothing but `list_chats`.
+nothing but `teams_list_chats`.
 """
 
 import re

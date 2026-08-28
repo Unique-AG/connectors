@@ -13,7 +13,8 @@ from office_365_mcp.graph_client import graph_step
 # User.Read is the least-privileged delegated permission for /me. It needs no admin consent.
 GRAPH_PERMISSION = "User.Read"
 
-# `get_me` and `list_meeting_recordings` both reach this call, and a step named by each of them
+# `get_me` and `teams_list_meeting_recordings` both reach this call, and a step named by each of
+# them
 # would be the same request under two names.
 STEP = "signed_in_user"
 

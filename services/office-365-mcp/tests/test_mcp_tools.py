@@ -547,7 +547,11 @@ def _object(value: object) -> dict[str, object]:
 
 # Tool names and field names are both `verb_noun`, so the verb discriminates: no answer field
 # starts with one of these. Not a stop-list of unlanded tools — that is one somebody forgets.
-_TOOL_MENTION = re.compile(r"\b(?:get|list|read|search|browse|find)_[a-z]+(?:_[a-z]+)*\b")
+# Every tool name is `get_me` or carries its product as a prefix, so the prefix is what makes a
+# token tool-shaped. Written out rather than derived from TOOL_NAMES on purpose: a derived
+# pattern could not tell prose naming a tool that does not exist — a typo — from prose naming
+# one this deployment merely left out, and the first is the failure worth catching.
+_TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook)_[a-z]+(?:_[a-z]+)*\b")
 
 
 def _described(schema: Mapping[str, object] | None) -> list[str]:
@@ -600,7 +604,11 @@ def _optional_type(schema: object) -> dict[str, object]:
     return typed[0]
 
 
-_MESSAGE_TOOLS: tuple[str, ...] = ("teams_read_message", "browse_channel", "teams_search_messages")
+_MESSAGE_TOOLS: tuple[str, ...] = (
+    "teams_read_message",
+    "teams_browse_channel",
+    "teams_search_messages",
+)
 
 
 def _items(schema: object) -> dict[str, object]:
@@ -663,15 +671,15 @@ class TestTheToolsThisServerAdvertises:
 
         assert set(tools) == {
             "get_me",
-            "list_chats",
-            "list_teams",
-            "list_channels",
-            "browse_channel",
+            "teams_list_chats",
+            "teams_list_teams",
+            "teams_list_channels",
+            "teams_browse_channel",
             "teams_search_messages",
             "teams_read_message",
-            "list_meeting_transcripts",
-            "read_transcript",
-            "list_meeting_recordings",
+            "teams_list_meeting_transcripts",
+            "teams_read_transcript",
+            "teams_list_meeting_recordings",
         }
         for tool in tools.values():
             arguments = _properties(tool.inputSchema)
@@ -684,11 +692,11 @@ class TestTheToolsThisServerAdvertises:
         assert _properties(tools["get_me"].inputSchema) == {}
         assert tools["get_me"].inputSchema.get("required", []) == []
 
-    async def test_list_chats_bounds_its_limit_where_graph_bounds_it(
+    async def test_teams_list_chats_bounds_its_limit_where_graph_bounds_it(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        limit = _object(_properties(tools["list_chats"].inputSchema)["limit"])
+        limit = _object(_properties(tools["teams_list_chats"].inputSchema)["limit"])
 
         assert limit["type"] == "integer", "not `number`: a fractional page size is meaningless"
         assert (limit["minimum"], limit["maximum"], limit["default"]) == (1, 50, 25)
@@ -705,10 +713,10 @@ class TestTheToolsThisServerAdvertises:
             "user_principal_name",
             "job_title",
         }
-        assert set(_properties(tools["list_chats"].outputSchema)) == {"chats"}
-        assert set(_properties(tools["list_teams"].outputSchema)) == {"teams"}
-        assert set(_properties(tools["list_channels"].outputSchema)) == {"channels"}
-        assert set(_properties(tools["browse_channel"].outputSchema)) == {
+        assert set(_properties(tools["teams_list_chats"].outputSchema)) == {"chats"}
+        assert set(_properties(tools["teams_list_teams"].outputSchema)) == {"teams"}
+        assert set(_properties(tools["teams_list_channels"].outputSchema)) == {"channels"}
+        assert set(_properties(tools["teams_browse_channel"].outputSchema)) == {
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
@@ -736,7 +744,7 @@ class TestTheToolsThisServerAdvertises:
             "mentions",
             "attachments",
         }
-        assert set(_properties(tools["list_meeting_transcripts"].outputSchema)) == {
+        assert set(_properties(tools["teams_list_meeting_transcripts"].outputSchema)) == {
             "status",
             "meeting_id",
             "subject",
@@ -746,7 +754,7 @@ class TestTheToolsThisServerAdvertises:
             "transcripts",
             "scan_incomplete",
         }
-        assert set(_properties(tools["read_transcript"].outputSchema)) == {
+        assert set(_properties(tools["teams_read_transcript"].outputSchema)) == {
             "uri",
             "meeting_id",
             "transcript_id",
@@ -754,7 +762,7 @@ class TestTheToolsThisServerAdvertises:
             "turns",
             "next_offset",
         }
-        assert set(_properties(tools["list_meeting_recordings"].outputSchema)) == {
+        assert set(_properties(tools["teams_list_meeting_recordings"].outputSchema)) == {
             "status",
             "meeting_id",
             "subject",
@@ -778,7 +786,7 @@ class TestTheToolsThisServerAdvertises:
         }
 
         # Guards the guard: a walk that stopped descending would pass by finding nothing to check.
-        assert "list_chats.chats[].members[].email" in published
+        assert "teams_list_chats.chats[].members[].email" in published
 
         undescribed = sorted(
             path for path, field in published.items() if not _object(field).get("description")
@@ -800,12 +808,12 @@ class TestTheToolsThisServerAdvertises:
                 assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
         for name, tool in tools.items():
             assert "truncated" not in _properties(tool.outputSchema), name
-        for name in ("teams_search_messages", "read_transcript"):
+        for name in ("teams_search_messages", "teams_read_transcript"):
             assert "next_offset" in _properties(tools[name].outputSchema), name
         for name, flag in (
-            ("browse_channel", "include_window_completeness"),
-            ("list_meeting_transcripts", "include_scan_completeness"),
-            ("list_meeting_recordings", "include_scan_completeness"),
+            ("teams_browse_channel", "include_window_completeness"),
+            ("teams_list_meeting_transcripts", "include_scan_completeness"),
+            ("teams_list_meeting_recordings", "include_scan_completeness"),
         ):
             asked_for = _object(_properties(tools[name].inputSchema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"
@@ -886,7 +894,7 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         taught = {name: _sender_schema(tools[name].outputSchema) for name in _MESSAGE_TOOLS}
 
-        for name in ("teams_read_message", "browse_channel"):
+        for name in ("teams_read_message", "teams_browse_channel"):
             written = taught[name]["description"]
             assert isinstance(written, str)
             # A docstring keeps its line breaks in the schema; the sentence is pinned, not the wrap.
@@ -925,16 +933,16 @@ class TestTheToolsThisServerAdvertises:
             in described
         )
         assert "teams_search_messages" in described
-        assert "browse_channel" in described, "the reply shape has exactly one source"
+        assert "teams_browse_channel" in described, "the reply shape has exactly one source"
 
-    async def test_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
+    async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """Two readers deliberately: a token is exchanged per tool, so one polymorphic reader
         would have to redeem transcript access to read a chat message."""
         tools = _named(await mcp_client.list_tools())
-        schema = tools["read_transcript"].inputSchema
-        description = tools["read_transcript"].description
+        schema = tools["teams_read_transcript"].inputSchema
+        description = tools["teams_read_transcript"].description
         handle = str(_object(_properties(schema)["uri"])["description"])
         assert description is not None
 
@@ -948,17 +956,17 @@ class TestTheToolsThisServerAdvertises:
         }
         assert schema.get("required") == ["uri"]
         assert "teams:///transcripts/{meeting_id}/{transcript_id}" in handle
-        assert "list_meeting_transcripts" in handle, "the one tool that mints this shape"
+        assert "teams_list_meeting_transcripts" in handle, "the one tool that mints this shape"
         assert "`meeting_uri` is not readable here" in handle, "the handle a model reaches for"
-        assert "list_meeting_transcripts" in description
+        assert "teams_list_meeting_transcripts" in description
         assert "teams_read_message" in description, "the two readers must not be confusable"
         assert "a `meeting_uri` is not one" in description
 
-    async def test_read_transcript_narrows_by_seconds_and_by_speaker_in_its_own_schema(
+    async def test_teams_read_transcript_narrows_by_seconds_and_by_speaker_in_its_own_schema(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["read_transcript"].inputSchema)
+        properties = _properties(tools["teams_read_transcript"].inputSchema)
 
         for bound in ("from_seconds", "to_seconds"):
             assert _optional_type(properties[bound])["type"] == "number", bound
@@ -966,12 +974,12 @@ class TestTheToolsThisServerAdvertises:
         for name in ("from_seconds", "to_seconds", "speaker"):
             assert _object(properties[name]).get("description"), f"{name} is undescribed"
 
-    async def test_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
+    async def test_teams_browse_channel_needs_both_ids_and_bounds_its_page_where_graph_does(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """20 and 50 are Graph's own default and maximum for this collection."""
         tools = _named(await mcp_client.list_tools())
-        schema = tools["browse_channel"].inputSchema
+        schema = tools["teams_browse_channel"].inputSchema
         limit = _object(_properties(schema)["limit"])
 
         assert set(_properties(schema)) == {
@@ -988,13 +996,13 @@ class TestTheToolsThisServerAdvertises:
             20,
         )
 
-    async def test_browse_channel_says_what_the_order_actually_is(
+    async def test_teams_browse_channel_says_what_the_order_actually_is(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """Graph orders this collection by the reply chain's last-modified date, so the first post
         is the most recently *active* thread and may be years old."""
         tools = _named(await mcp_client.list_tools())
-        description = tools["browse_channel"].description
+        description = tools["teams_browse_channel"].description
         assert description is not None
 
         assert "reply-chain" in description
@@ -1003,15 +1011,15 @@ class TestTheToolsThisServerAdvertises:
             "where a keyword, a person or a date goes instead"
         )
 
-    async def test_browse_channel_says_what_one_call_costs_and_where_it_stops(
+    async def test_teams_browse_channel_says_what_one_call_costs_and_where_it_stops(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """Microsoft allows this whole connector about one request a second on a given channel
         across the tenant, so the tool makes exactly one and `limit` is the entire window."""
         tools = _named(await mcp_client.list_tools())
-        description = tools["browse_channel"].description
-        limit = _object(_properties(tools["browse_channel"].inputSchema)["limit"])
-        posts = _object(_properties(tools["browse_channel"].outputSchema)["messages"])
+        description = tools["teams_browse_channel"].description
+        limit = _object(_properties(tools["teams_browse_channel"].inputSchema)["limit"])
+        posts = _object(_properties(tools["teams_browse_channel"].outputSchema)["messages"])
         assert description is not None
 
         assert "One call is one request" in description
@@ -1024,16 +1032,18 @@ class TestTheToolsThisServerAdvertises:
         )
         assert "stop looking" in str(posts["description"])
 
-    async def test_list_meeting_transcripts_names_its_five_answers_and_their_remedies(
+    async def test_teams_list_meeting_transcripts_names_its_five_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """The negative has to sit on the `not_ready` bullet itself, not on the `scan_incomplete`
         one two lines down, which is a different status."""
         tools = _named(await mcp_client.list_tools())
-        description = tools["list_meeting_transcripts"].description
-        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        description = tools["teams_list_meeting_transcripts"].description
+        status = _object(
+            _properties(tools["teams_list_meeting_transcripts"].outputSchema)["status"]
+        )
         meeting_type = _object(
-            _properties(tools["list_meeting_transcripts"].outputSchema)["meeting_type"]
+            _properties(tools["teams_list_meeting_transcripts"].outputSchema)["meeting_type"]
         )
         assert description is not None
         taught = str(status.get("description"))
@@ -1069,12 +1079,12 @@ class TestTheToolsThisServerAdvertises:
         ("tool", "artifact", "finality"),
         [
             (
-                "list_meeting_transcripts",
+                "teams_list_meeting_transcripts",
                 "transcripts",
                 "This status is final and cannot be retried",
             ),
             (
-                "list_meeting_recordings",
+                "teams_list_meeting_recordings",
                 "recordings",
                 "reads the same recordings and returns this same status",
             ),
@@ -1100,11 +1110,11 @@ class TestTheToolsThisServerAdvertises:
             not in (description + status).lower()
         ), "the remedy that cannot work, in either place a model reads it"
 
-    async def test_list_meeting_transcripts_takes_a_meeting_handle_and_an_occurrence_window(
+    async def test_teams_list_meeting_transcripts_takes_a_meeting_handle_and_an_occurrence_window(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["list_meeting_transcripts"].inputSchema
+        schema = tools["teams_list_meeting_transcripts"].inputSchema
         properties = _properties(schema)
         limit = _object(properties["limit"])
 
@@ -1131,7 +1141,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport], bound: str
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["list_meeting_transcripts"].inputSchema)
+        properties = _properties(tools["teams_list_meeting_transcripts"].inputSchema)
 
         assert _optional_types(properties[bound]) == [
             {"type": "string", "format": "date"},
@@ -1142,7 +1152,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["list_meeting_transcripts"].inputSchema)
+        properties = _properties(tools["teams_list_meeting_transcripts"].inputSchema)
         after = str(_object(properties["started_after"])["description"])
         before = str(_object(properties["started_before"])["description"])
 
@@ -1151,13 +1161,15 @@ class TestTheToolsThisServerAdvertises:
         assert "END of that UTC day" in before, "the same date in both bounds must be that one day"
         assert "07:00Z" in after, "a worked example beats the word 'timezone'"
 
-    async def test_list_meeting_transcripts_says_the_verdict_is_about_the_window(
+    async def test_teams_list_meeting_transcripts_says_the_verdict_is_about_the_window(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """A recurring series' `endDateTime` can be years in the future, so a caller told to wait
         for an occurrence that ended last month polls forever."""
         tools = _named(await mcp_client.list_tools())
-        status = _object(_properties(tools["list_meeting_transcripts"].outputSchema)["status"])
+        status = _object(
+            _properties(tools["teams_list_meeting_transcripts"].outputSchema)["status"]
+        )
         taught = str(status["description"])
 
         assert "demonstrably passed is never reported this way" in taught
@@ -1165,11 +1177,11 @@ class TestTheToolsThisServerAdvertises:
             "the series' own end date is what the verdict must not be read off"
         )
 
-    async def test_list_meeting_recordings_takes_the_same_handle_and_window(
+    async def test_teams_list_meeting_recordings_takes_the_same_handle_and_window(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["list_meeting_recordings"].inputSchema
+        schema = tools["teams_list_meeting_recordings"].inputSchema
         properties = _properties(schema)
         limit = _object(properties["limit"])
 
@@ -1198,35 +1210,37 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        transcripts_schema = set(_properties(tools["list_meeting_transcripts"].outputSchema))
-        recordings_schema = set(_properties(tools["list_meeting_recordings"].outputSchema))
+        transcripts_schema = set(_properties(tools["teams_list_meeting_transcripts"].outputSchema))
+        recordings_schema = set(_properties(tools["teams_list_meeting_recordings"].outputSchema))
 
         assert transcripts_schema - recordings_schema == {"transcripts"}
         assert recordings_schema - transcripts_schema == {"recordings"}
-        assert set(_properties(tools["list_meeting_transcripts"].inputSchema)) == set(
-            _properties(tools["list_meeting_recordings"].inputSchema)
+        assert set(_properties(tools["teams_list_meeting_transcripts"].inputSchema)) == set(
+            _properties(tools["teams_list_meeting_recordings"].inputSchema)
         )
 
-    async def test_list_meeting_recordings_promises_no_video_and_sends_content_elsewhere(
+    async def test_teams_list_meeting_recordings_promises_no_video_and_sends_content_elsewhere(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        description = tools["list_meeting_recordings"].description
+        description = tools["teams_list_meeting_recordings"].description
         assert description is not None
-        rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
+        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].outputSchema)
 
         assert "no video is returned or reachable here" in description
-        assert "list_meeting_transcripts" in description, "where a question about content goes"
+        assert "teams_list_meeting_transcripts" in description, (
+            "where a question about content goes"
+        )
         assert "content_correlation_id" in rendered, "and how to get to the right transcript"
 
-    async def test_list_meeting_recordings_relays_the_organiser_only_rule(
+    async def test_teams_list_meeting_recordings_relays_the_organiser_only_rule(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        description = tools["list_meeting_recordings"].description
+        description = tools["teams_list_meeting_recordings"].description
         assert description is not None
         # The whole schema, `$defs` included: a recording's fields are described there, not inline.
-        rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
+        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].outputSchema)
 
         assert "Meeting participants don't have permission to download meeting recordings" in (
             rendered
@@ -1238,18 +1252,18 @@ class TestTheToolsThisServerAdvertises:
         assert "organizer_user_id" in rendered, "who to ask for it"
         assert "you_are_the_organizer" in rendered and "organizer_only" in rendered
         assert "Meeting participants don't have permission" in json.dumps(
-            tools["list_meeting_recordings"].outputSchema
+            tools["teams_list_meeting_recordings"].outputSchema
         ), "the constraint belongs where the result is read, not only in the tool's prose"
 
-    async def test_list_meeting_recordings_names_its_five_answers_and_their_remedies(
+    async def test_teams_list_meeting_recordings_names_its_five_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        description = tools["list_meeting_recordings"].description
-        status = _object(_properties(tools["list_meeting_recordings"].outputSchema)["status"])
+        description = tools["teams_list_meeting_recordings"].description
+        status = _object(_properties(tools["teams_list_meeting_recordings"].outputSchema)["status"])
         assert description is not None
         taught = str(status.get("description"))
-        rendered = description + json.dumps(tools["list_meeting_recordings"].outputSchema)
+        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].outputSchema)
 
         for value in (
             "available",
@@ -1277,22 +1291,22 @@ class TestTheToolsThisServerAdvertises:
         shared = {"available", "not_ready", "scan_incomplete", "meeting_not_found"}
         statuses = {
             name: str(_object(_properties(tools[name].outputSchema)["status"]).get("description"))
-            for name in ("list_meeting_transcripts", "list_meeting_recordings")
+            for name in ("teams_list_meeting_transcripts", "teams_list_meeting_recordings")
         }
 
         for name, rendered in statuses.items():
             for value in shared:
                 assert f"`{value}`" in rendered, f"{name} does not name {value}"
-        assert "`not_transcribed`" in statuses["list_meeting_transcripts"]
-        assert "`not_recorded`" in statuses["list_meeting_recordings"]
-        assert "`not_recorded`" not in statuses["list_meeting_transcripts"]
-        assert "`not_transcribed`" not in statuses["list_meeting_recordings"]
+        assert "`not_transcribed`" in statuses["teams_list_meeting_transcripts"]
+        assert "`not_recorded`" in statuses["teams_list_meeting_recordings"]
+        assert "`not_recorded`" not in statuses["teams_list_meeting_transcripts"]
+        assert "`not_transcribed`" not in statuses["teams_list_meeting_recordings"]
 
     @pytest.mark.parametrize(
         ("tool", "collection"),
         [
-            ("list_meeting_transcripts", "transcripts"),
-            ("list_meeting_recordings", "recordings"),
+            ("teams_list_meeting_transcripts", "transcripts"),
+            ("teams_list_meeting_recordings", "recordings"),
         ],
         ids=["transcripts", "recordings"],
     )
@@ -1315,13 +1329,13 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        recordings_description = tools["list_meeting_recordings"].description
-        transcripts_description = tools["list_meeting_transcripts"].description
+        recordings_description = tools["teams_list_meeting_recordings"].description
+        transcripts_description = tools["teams_list_meeting_transcripts"].description
         assert recordings_description is not None and transcripts_description is not None
 
         assert "can block transcripts and never recordings" in transcripts_description
-        assert "try list_meeting_recordings on refusal" in transcripts_description
-        assert "for the words, call list_meeting_transcripts" in recordings_description
+        assert "try teams_list_meeting_recordings on refusal" in transcripts_description
+        assert "for the words, call teams_list_meeting_transcripts" in recordings_description
         assert "refus" not in recordings_description, (
             "a model reading this one has already chosen recordings; a fallback here is noise"
         )
@@ -1414,7 +1428,7 @@ class TestCallingThem:
         assert route.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
         assert obo.requested_scopes == [("https://graph.microsoft.com/User.Read",)]
 
-    async def test_list_chats_returns_a_structured_page(
+    async def test_teams_list_chats_returns_a_structured_page(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
@@ -1422,7 +1436,7 @@ class TestCallingThem:
     ) -> None:
         graph.get("/me/chats").mock(return_value=httpx.Response(200, json=_CHATS))
 
-        result = await mcp_client.call_tool("list_chats", {"limit": 5})
+        result = await mcp_client.call_tool("teams_list_chats", {"limit": 5})
 
         body = _structured(result)
         assert "truncated" not in body, "a window says whether it may have more by being full"
@@ -1431,7 +1445,7 @@ class TestCallingThem:
         assert listed[0]["last_message_at"] == "2026-02-11T09:15:22.310000Z"
         assert obo.requested_scopes == [("https://graph.microsoft.com/Chat.Read",)]
 
-    async def test_list_teams_sends_no_query_and_spends_only_its_own_permission(
+    async def test_teams_list_teams_sends_no_query_and_spends_only_its_own_permission(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
@@ -1441,7 +1455,7 @@ class TestCallingThem:
         reaching Graph is a 400, not a narrower answer."""
         route = graph.get("/me/joinedTeams").mock(return_value=httpx.Response(200, json=_TEAMS))
 
-        listed = _structured(await mcp_client.call_tool("list_teams", {}))
+        listed = _structured(await mcp_client.call_tool("teams_list_teams", {}))
 
         assert "truncated" not in listed, "a window says whether it may have more by being full"
         found = cast("Sequence[Mapping[str, object]]", listed["teams"])
@@ -1464,15 +1478,17 @@ class TestCallingThem:
         )
         read = graph.get(_REPLY_PATH).mock(return_value=httpx.Response(200, json=_REPLY))
 
-        listed = _structured(await mcp_client.call_tool("list_teams", {}))
+        listed = _structured(await mcp_client.call_tool("teams_list_teams", {}))
         found = cast("Sequence[Mapping[str, object]]", listed["teams"])
         team_id = found[0]["team_id"]
-        channels = _structured(await mcp_client.call_tool("list_channels", {"team_id": team_id}))
+        channels = _structured(
+            await mcp_client.call_tool("teams_list_channels", {"team_id": team_id})
+        )
         in_team = cast("Sequence[Mapping[str, object]]", channels["channels"])
         channel_id = in_team[0]["channel_id"]
         browsed = _structured(
             await mcp_client.call_tool(
-                "browse_channel", {"team_id": team_id, "channel_id": channel_id}
+                "teams_browse_channel", {"team_id": team_id, "channel_id": channel_id}
             )
         )
         messages = cast("Sequence[Mapping[str, object]]", browsed["messages"])
@@ -1519,16 +1535,16 @@ class TestCallingThem:
         )
         ids = {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}
 
-        unasked = _structured(await mcp_client.call_tool("browse_channel", ids))
+        unasked = _structured(await mcp_client.call_tool("teams_browse_channel", ids))
         told = _structured(
             await mcp_client.call_tool(
-                "browse_channel", {**ids, "include_window_completeness": True}
+                "teams_browse_channel", {**ids, "include_window_completeness": True}
             )
         )
         route.mock(return_value=httpx.Response(200, json=posts))
         whole = _structured(
             await mcp_client.call_tool(
-                "browse_channel", {**ids, "include_window_completeness": True}
+                "teams_browse_channel", {**ids, "include_window_completeness": True}
             )
         )
 
@@ -1565,9 +1581,9 @@ class TestCallingThem:
             )
         )
 
-        listed = await mcp_client.call_tool("list_chats", {}, raise_on_error=False)
+        listed = await mcp_client.call_tool("teams_list_chats", {}, raise_on_error=False)
         transcribed = await mcp_client.call_tool(
-            "list_meeting_transcripts", {"meeting_uri": _MEETING_URI}, raise_on_error=False
+            "teams_list_meeting_transcripts", {"meeting_uri": _MEETING_URI}, raise_on_error=False
         )
 
         assert listed.is_error, "a walk that gave up must not answer short: a short answer is a cap"
@@ -1703,7 +1719,7 @@ class TestCallingThem:
         caplog.set_level(logging.DEBUG)
 
         result = await mcp_client.call_tool(
-            "browse_channel", {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}
+            "teams_browse_channel", {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID}
         )
 
         messages = cast("Sequence[Mapping[str, object]]", _structured(result)["messages"])
@@ -1808,15 +1824,19 @@ class TestCallingThem:
             )
         )
 
-        listed = _structured(await mcp_client.call_tool("list_chats", {"limit": 5}))
+        listed = _structured(await mcp_client.call_tool("teams_list_chats", {"limit": 5}))
         found = cast("Sequence[Mapping[str, object]]", listed["chats"])
         meeting_uri = found[0]["meeting_uri"]
         available = _structured(
-            await mcp_client.call_tool("list_meeting_transcripts", {"meeting_uri": meeting_uri})
+            await mcp_client.call_tool(
+                "teams_list_meeting_transcripts", {"meeting_uri": meeting_uri}
+            )
         )
         listed_transcripts = cast("Sequence[Mapping[str, object]]", available["transcripts"])
         read = _structured(
-            await mcp_client.call_tool("read_transcript", {"uri": listed_transcripts[0]["uri"]})
+            await mcp_client.call_tool(
+                "teams_read_transcript", {"uri": listed_transcripts[0]["uri"]}
+            )
         )
 
         assert all(route.called for route in (chats_route, meeting, listing, content))
@@ -1851,14 +1871,14 @@ class TestCallingThem:
         ("tool", "path", "collection", "items", "identifier"),
         [
             (
-                "list_meeting_transcripts",
+                "teams_list_meeting_transcripts",
                 _TRANSCRIPTS_PATH,
                 "transcripts",
                 _SERIES_TRANSCRIPTS,
                 "transcript_id",
             ),
             (
-                "list_meeting_recordings",
+                "teams_list_meeting_recordings",
                 _RECORDINGS_PATH,
                 "recordings",
                 _SERIES_RECORDINGS,
@@ -1902,8 +1922,8 @@ class TestCallingThem:
     @pytest.mark.parametrize(
         ("tool", "path", "collection", "identifier"),
         [
-            ("list_meeting_transcripts", _TRANSCRIPTS_PATH, "transcripts", "transcript_id"),
-            ("list_meeting_recordings", _RECORDINGS_PATH, "recordings", "recording_id"),
+            ("teams_list_meeting_transcripts", _TRANSCRIPTS_PATH, "transcripts", "transcript_id"),
+            ("teams_list_meeting_recordings", _RECORDINGS_PATH, "recordings", "recording_id"),
         ],
         ids=["transcripts", "recordings"],
     )
@@ -1978,11 +1998,13 @@ class TestCallingThem:
             return_value=httpx.Response(200, content=b"synthetic mp4 bytes")
         )
 
-        listed = _structured(await mcp_client.call_tool("list_chats", {"limit": 5}))
+        listed = _structured(await mcp_client.call_tool("teams_list_chats", {"limit": 5}))
         found = cast("Sequence[Mapping[str, object]]", listed["chats"])
         meeting_uri = found[0]["meeting_uri"]
         available = _structured(
-            await mcp_client.call_tool("list_meeting_recordings", {"meeting_uri": meeting_uri})
+            await mcp_client.call_tool(
+                "teams_list_meeting_recordings", {"meeting_uri": meeting_uri}
+            )
         )
 
         assert all(route.called for route in (chats_route, meeting, listing, me))
@@ -2023,10 +2045,10 @@ class TestCallingThem:
         graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
         refused = await mcp_client.call_tool(
-            "list_meeting_transcripts", {"meeting_uri": _MEETING_URI}, raise_on_error=False
+            "teams_list_meeting_transcripts", {"meeting_uri": _MEETING_URI}, raise_on_error=False
         )
         answered = await mcp_client.call_tool(
-            "list_meeting_recordings", {"meeting_uri": _MEETING_URI}, raise_on_error=False
+            "teams_list_meeting_recordings", {"meeting_uri": _MEETING_URI}, raise_on_error=False
         )
 
         assert refused.is_error
@@ -2052,7 +2074,7 @@ class TestCallingThem:
         caplog.set_level(logging.DEBUG)
 
         result = await mcp_client.call_tool(
-            "list_meeting_recordings", {"meeting_uri": _MEETING_URI}
+            "teams_list_meeting_recordings", {"meeting_uri": _MEETING_URI}
         )
 
         assert _structured(result)["subject"] == secret, "the subject has to have been returned"
@@ -2079,7 +2101,7 @@ class TestCallingThem:
         caplog.set_level(logging.DEBUG)
 
         result = await mcp_client.call_tool(
-            "read_transcript",
+            "teams_read_transcript",
             {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"},
         )
 
@@ -2104,10 +2126,10 @@ class TestCallingThem:
         uri = f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"
 
         by_speaker = _structured(
-            await mcp_client.call_tool("read_transcript", {"uri": uri, "speaker": "grace"})
+            await mcp_client.call_tool("teams_read_transcript", {"uri": uri, "speaker": "grace"})
         )
         by_time = _structured(
-            await mcp_client.call_tool("read_transcript", {"uri": uri, "from_seconds": 20})
+            await mcp_client.call_tool("teams_read_transcript", {"uri": uri, "from_seconds": 20})
         )
 
         assert [
@@ -2132,7 +2154,7 @@ class TestCallingThem:
 
         read = _structured(
             await mcp_client.call_tool(
-                "read_transcript",
+                "teams_read_transcript",
                 {
                     "uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}",
                     "speaker": " grace ",
@@ -2167,7 +2189,7 @@ class TestCallingThem:
         )
 
         result = await mcp_client.call_tool(
-            "read_transcript",
+            "teams_read_transcript",
             {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}", **filters},
             raise_on_error=False,
         )
@@ -2231,16 +2253,22 @@ class TestWhatAModelIsToldWhenGraphRefuses:
     @pytest.mark.parametrize(
         ("tool", "arguments", "path", "permission", "not_named"),
         [
-            ("list_teams", {}, "/me/joinedTeams", "Team.ReadBasic.All", "Channel.ReadBasic.All"),
             (
-                "list_channels",
+                "teams_list_teams",
+                {},
+                "/me/joinedTeams",
+                "Team.ReadBasic.All",
+                "Channel.ReadBasic.All",
+            ),
+            (
+                "teams_list_channels",
                 {"team_id": _TEAM_ID},
                 _CHANNELS_PATH,
                 "Channel.ReadBasic.All",
                 "Team.ReadBasic.All",
             ),
             (
-                "browse_channel",
+                "teams_browse_channel",
                 {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID},
                 _CHANNEL_MESSAGES_PATH,
                 "ChannelMessage.Read.All",
@@ -2295,7 +2323,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "browse_channel",
+            "teams_browse_channel",
             {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID},
             raise_on_error=False,
         )
@@ -2367,7 +2395,9 @@ class TestWhatAModelIsToldWhenGraphRefuses:
 
     @pytest.mark.usefixtures("obo")
     @pytest.mark.parametrize(
-        "tool", ["list_meeting_transcripts", "read_transcript"], ids=["listing", "reading"]
+        "tool",
+        ["teams_list_meeting_transcripts", "teams_read_transcript"],
+        ids=["listing", "reading"],
     )
     async def test_the_tenant_transcript_switch_sends_the_caller_to_a_teams_administrator(
         self,
@@ -2387,8 +2417,10 @@ class TestWhatAModelIsToldWhenGraphRefuses:
             )
         )
         arguments = {
-            "list_meeting_transcripts": {"meeting_uri": _MEETING_URI},
-            "read_transcript": {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"},
+            "teams_list_meeting_transcripts": {"meeting_uri": _MEETING_URI},
+            "teams_read_transcript": {
+                "uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"
+            },
         }[tool]
 
         refused = await mcp_client.call_tool(tool, arguments, raise_on_error=False)
@@ -2407,12 +2439,12 @@ class TestWhatAModelIsToldWhenGraphRefuses:
     @pytest.mark.parametrize(
         ("tool", "argument", "uri"),
         [
-            ("list_meeting_transcripts", "meeting_uri", "teams:///transcripts/a/b"),
-            ("list_meeting_transcripts", "meeting_uri", "19:meeting_x@thread.v2"),
-            ("read_transcript", "uri", "teams:///meetings/https%3A%2F%2Fx.invalid%2Fa"),
-            ("read_transcript", "uri", "teams:///chats/19%3Ax%40thread.v2/messages/1"),
-            ("list_meeting_recordings", "meeting_uri", "teams:///transcripts/a/b"),
-            ("list_meeting_recordings", "meeting_uri", "19:meeting_x@thread.v2"),
+            ("teams_list_meeting_transcripts", "meeting_uri", "teams:///transcripts/a/b"),
+            ("teams_list_meeting_transcripts", "meeting_uri", "19:meeting_x@thread.v2"),
+            ("teams_read_transcript", "uri", "teams:///meetings/https%3A%2F%2Fx.invalid%2Fa"),
+            ("teams_read_transcript", "uri", "teams:///chats/19%3Ax%40thread.v2/messages/1"),
+            ("teams_list_meeting_recordings", "meeting_uri", "teams:///transcripts/a/b"),
+            ("teams_list_meeting_recordings", "meeting_uri", "19:meeting_x@thread.v2"),
         ],
     )
     async def test_each_meeting_tool_refuses_the_other_ones_handle_and_says_where_to_get_its_own(
@@ -2434,12 +2466,18 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert not meetings.called and not content.called, "a bad handle costs no Graph request"
         message = _error_text(result)
         expected = {
-            "list_meeting_transcripts": ("teams:///meetings/{join_web_url}", "list_chats"),
-            "read_transcript": (
-                "teams:///transcripts/{meeting_id}/{transcript_id}",
-                "list_meeting_transcripts",
+            "teams_list_meeting_transcripts": (
+                "teams:///meetings/{join_web_url}",
+                "teams_list_chats",
             ),
-            "list_meeting_recordings": ("teams:///meetings/{join_web_url}", "list_chats"),
+            "teams_read_transcript": (
+                "teams:///transcripts/{meeting_id}/{transcript_id}",
+                "teams_list_meeting_transcripts",
+            ),
+            "teams_list_meeting_recordings": (
+                "teams:///meetings/{join_web_url}",
+                "teams_list_chats",
+            ),
         }[tool]
         for fragment in expected:
             assert fragment in message, message
@@ -2450,11 +2488,11 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         ("tool", "clause"),
         [
             (
-                "list_meeting_transcripts",
-                "handle is read_transcript's; this tool is what produces it",
+                "teams_list_meeting_transcripts",
+                "handle is teams_read_transcript's; this tool is what produces it",
             ),
             (
-                "list_meeting_recordings",
+                "teams_list_meeting_recordings",
                 "No recording is addressable here",
             ),
         ],
@@ -2487,7 +2525,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "read_transcript",
+            "teams_read_transcript",
             {"uri": f"teams:///transcripts/{_MEETING_ID}/{_TRANSCRIPT_ID}"},
             raise_on_error=False,
         )
@@ -2495,8 +2533,8 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         assert result.is_error
         message = _error_text(result)
         assert "expires" in message
-        assert "list_meeting_transcripts" in message
-        assert "browse_channel" not in message
+        assert "teams_list_meeting_transcripts" in message
+        assert "teams_browse_channel" not in message
         assert "synthetic-request-id" in message
 
     @pytest.mark.parametrize(

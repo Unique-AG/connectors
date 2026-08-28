@@ -2,7 +2,8 @@
 
 An **operation** is one tool call; a **step** is one Graph call inside it.
 
-HARD RULE: both labels are names this code chose — `list_chats`, `resolve_meeting` — and never a
+HARD RULE: both labels are names this code chose — `teams_list_chats`, `resolve_meeting` — and
+never a
 URL or a path. A label taken off a Graph URL is a new time series per chat, per message and per
 meeting, and an unbounded label set takes a Prometheus down rather than showing up as a bad
 dashboard. `tests/test_graph_metrics.py` enforces this over every module in `src/` and pins the

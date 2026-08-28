@@ -316,7 +316,7 @@ class TestWhereTheMappingSits:
         """The `GraphForbidden` under the logged exception has to survive: it carries the status
         and request id that make a production 403 traceable."""
         with caplog.at_level(logging.ERROR, logger="unique_mcp"), pytest.raises(ToolError):
-            _ = await mcp_client.call_tool("list_chats", {})
+            _ = await mcp_client.call_tool("teams_list_chats", {})
 
         logged = [record for record in caplog.records if record.exc_info is not None]
         assert logged, "the operations layer logged nothing about a failed call"

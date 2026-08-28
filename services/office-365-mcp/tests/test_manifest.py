@@ -154,7 +154,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
     """It warns and never aborts: the references are dense and mutual, so requiring every mention
     would drag `teams_search_messages` — and an administrator's signature on
     `ChannelMessage.Read.All` —
-    into a deployment that asked for nothing but `list_chats`."""
+    into a deployment that asked for nothing but `teams_list_chats`."""
 
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_pointing_at_a_tool_this_deployment_lacks_is_reported(self) -> None:

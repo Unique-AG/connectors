@@ -1,4 +1,4 @@
-"""`list_channels` — channels of one team the signed-in user can access.
+"""`teams_list_channels` — channels of one team the signed-in user can access.
 
 TRAP: `$select` is a requirement, not an optimisation — it excludes `email`, which Graph documents
 as "an expensive operation that results in slow performance". The collection accepts no `$top`
@@ -21,11 +21,12 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "list_channels"
+TOOL_NAME = "teams_list_channels"
 
 STEP = "channels"
 
-# Not `ChannelMessage.Read.All`, which browse_channel declares to read what was posted: a tenant
+# Not `ChannelMessage.Read.All`, which teams_browse_channel declares to read what was posted: a
+# tenant
 # commonly grants one and withholds the other.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 
@@ -45,9 +46,12 @@ _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List one team's channels. Pass the `team_id` from list_teams, then hand `team_id` and `channel_id` \
-together to browse_channel — a channel id alone addresses nothing, and every team has a `General`. \
-No message text comes back here: browse_channel reads the posts. A channel missing from the list \
+List one team's channels. Pass the `team_id` from teams_list_teams, then hand `team_id` and \
+`channel_id` \
+together to teams_browse_channel — a channel id alone addresses nothing, and every team has a \
+`General`. \
+No message text comes back here: teams_browse_channel reads the posts. A channel missing from the \
+list \
 is one the signed-in user cannot access, not one the team lacks. Returns each channel's id, name, \
 description, membership type and creation date.\
 """
@@ -57,7 +61,8 @@ class ChannelSummary(BaseModel):
     channel_id: str = Field(
         description=(
             "The channel's Graph id, e.g. `19:...@thread.tacv2`. Pass it with its `team_id` to "
-            + "browse_channel; it is also the id teams_search_messages reports as `channel_id` on "
+            + "teams_browse_channel; it is also the id teams_search_messages reports as "
+            + "`channel_id` on "
             + "a "
             + "channel message. Opaque — copy it rather than constructing one from a name."
         )
@@ -104,7 +109,9 @@ class ChannelList(BaseModel):
     )
 
 
-async def list_channels(client: GraphServiceClient, *, team_id: str, limit: int) -> ChannelList:
+async def teams_list_channels(
+    client: GraphServiceClient, *, team_id: str, limit: int
+) -> ChannelList:
     assert 1 <= limit <= MAX_CHANNELS, f"limit must be within 1..{MAX_CHANNELS}, got {limit}"
 
     headers = _headers()
@@ -149,7 +156,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The team whose channels to list, exactly as list_teams reported it. "
+                    "The team whose channels to list, exactly as teams_list_teams reported it. "
                     + "Opaque — copy it rather than constructing it. A team name is not one; "
                     + "names can repeat within a tenant, but team_ids do not."
                 ),
@@ -169,4 +176,4 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = 50,
         client: GraphServiceClient = graph,
     ) -> ChannelList:
-        return await list_channels(client, team_id=team_id, limit=limit)
+        return await teams_list_channels(client, team_id=team_id, limit=limit)

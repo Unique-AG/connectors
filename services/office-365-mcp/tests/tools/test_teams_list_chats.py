@@ -1,4 +1,4 @@
-"""`list_chats`: the query Graph is sent, and the traps in what comes back."""
+"""`teams_list_chats`: the query Graph is sent, and the traps in what comes back."""
 
 from collections.abc import Mapping, Sequence
 
@@ -9,7 +9,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphThrottled
 from office_365_mcp.shared import handles
-from office_365_mcp.tools import list_chats as chats
+from office_365_mcp.tools import teams_list_chats as chats
 
 from .conftest import GRAPH_V1
 

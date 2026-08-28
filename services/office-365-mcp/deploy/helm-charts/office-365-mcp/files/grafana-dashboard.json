@@ -1522,7 +1522,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Which Graph call inside a tool is failing, and how. A step counted `forbidden` while its operation is counted `ok` is a tool recovering \u2014 read_transcript falling back to an unattributed transcript is the one that does this by design.",
+      "description": "Which Graph call inside a tool is failing, and how. A step counted `forbidden` while its operation is counted `ok` is a tool recovering \u2014 teams_read_transcript falling back to an unattributed transcript is the one that does this by design.",
       "fieldConfig": {
         "defaults": {
           "color": {

@@ -78,21 +78,21 @@ class TestTheTwoVariablesAreOneChoice:
         assert config.tools_enabled is None
 
     def test_a_list_alone_is_a_selection(self) -> None:
-        config = SurfaceConfig.model_validate({"tools_enabled": "get_me,list_chats"})
+        config = SurfaceConfig.model_validate({"tools_enabled": "get_me,teams_list_chats"})
 
         assert config.tools_preset is None
-        assert config.tools_enabled == ("get_me", "list_chats")
+        assert config.tools_enabled == ("get_me", "teams_list_chats")
 
     def test_the_spelling_an_operator_writes_is_the_one_that_works(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Read out of the environment rather than handed in: a collection-typed setting is
         JSON-decoded before any validator of ours."""
-        monkeypatch.setenv("TOOLS_ENABLED", "get_me, list_chats ,teams_read_message,")
+        monkeypatch.setenv("TOOLS_ENABLED", "get_me, teams_list_chats ,teams_read_message,")
 
         config = SurfaceConfig()
 
-        assert config.tools_enabled == ("get_me", "list_chats", "teams_read_message")
+        assert config.tools_enabled == ("get_me", "teams_list_chats", "teams_read_message")
 
     def test_neither_set_is_refused_and_says_what_to_set(self) -> None:
         """There is no default anywhere: a default of "every tool" would make the widest consent
@@ -293,17 +293,17 @@ class TestRegisteringWhatWasSelected:
 # `src/` guards it (F4 of the design): a selection that enables a consumer without its producer
 # starts, and the tool's own refusal names the missing tool on first use.
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
-    "list_channels": {"team_id": ("list_teams",)},
-    "browse_channel": {
-        "team_id": ("list_teams",),
-        "channel_id": ("list_channels", "teams_search_messages"),
+    "teams_list_channels": {"team_id": ("teams_list_teams",)},
+    "teams_browse_channel": {
+        "team_id": ("teams_list_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
     },
-    "teams_read_message": {"uri": ("teams_search_messages", "browse_channel")},
+    "teams_read_message": {"uri": ("teams_search_messages", "teams_browse_channel")},
     # Always satisfied, `get_me` being the floor; recorded so the guard below sees it as minted.
     "teams_search_messages": {"mentions": ("get_me",)},
-    "list_meeting_transcripts": {"meeting_uri": ("list_chats",)},
-    "read_transcript": {"uri": ("list_meeting_transcripts",)},
-    "list_meeting_recordings": {"meeting_uri": ("list_chats",)},
+    "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
+    "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
+    "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
@@ -408,7 +408,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 
     async def test_the_table_answers_for_every_argument_a_tool_requires(self) -> None:
         """Read off the live schemas, which is the side that goes stale: that is how the table came
-        to record only one of `browse_channel`'s two required ids.
+        to record only one of `teams_browse_channel`'s two required ids.
         """
         selection = resolve(preset=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("argument-survey", version="0")
@@ -477,7 +477,8 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
     def test_every_tool_in_it_can_obtain_its_arguments_from_another_member(
         self, preset: ToolsPreset
     ) -> None:
-        """Every argument, not every tool: `browse_channel` takes its `team_id` and `channel_id`
+        """Every argument, not every tool: `teams_browse_channel` takes its `team_id` and
+        `channel_id`
         from two different tools, so a preset can hold one producer and not the other."""
         selection = resolve(preset=preset, enabled=None)
         exposed = set(selection.tools)

@@ -376,14 +376,17 @@ class TestTheHandleItMints:
         assert "or infer from its absence" in described
 
     def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
-        """A hit on a channel reply carries the root-post shape, which Graph 404s. `browse_channel`
+        """A hit on a channel reply carries the root-post shape, which Graph 404s.
+        `teams_browse_channel`
         mints a reply's own handle but reaches only the newest replies of each post and follows no
         cursor past them, so "browse instead" is a route for a recent reply and a loop for an older
         one."""
         described = teams_search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
-        assert "browse_channel" in described, "the one tool that can, when the reply is recent"
+        assert "teams_browse_channel" in described, (
+            "the one tool that can, when the reply is recent"
+        )
         assert f"only the newest {MAX_REPLIES_PER_POST} replies" in described, (
             "and where it stops, in the number the browser actually applies rather than in prose "
             + "of its own"
@@ -426,7 +429,7 @@ class TestWhatTheCallerIsTold:
             + "/channels/19%3Ageneral%40thread.tacv2/messages/1770000000002",
         ]
         # The raw ids are returned alongside, unencoded, so a hit can be lined up with the
-        # `chat_id` list_chats reports without anyone unpicking the handle to get one back.
+        # `chat_id` teams_list_chats reports without anyone unpicking the handle to get one back.
         assert found.messages[0].chat_id == "19:release@thread.v2"
         assert (found.messages[1].team_id, found.messages[1].channel_id) == (
             "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
