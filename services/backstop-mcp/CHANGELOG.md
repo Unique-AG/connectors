@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.4](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.3...backstop-mcp@0.0.4) (2026-08-28)
+
+
+### Features
+
+* **backstop-mcp,main:** add agent-explore scripts and combined API/docs skill ([#840](https://github.com/Unique-AG/connectors/issues/840)) ([4aafd4a](https://github.com/Unique-AG/connectors/commit/4aafd4adea74454b97b7933a82e1cdb4c761f719))
+* **backstop-mcp:** surface custom fields on opportunities and add get_opportunities_by_ids ([#867](https://github.com/Unique-AG/connectors/issues/867)) ([ee83f4c](https://github.com/Unique-AG/connectors/commit/ee83f4c069180fd0d7f54fc868954c12aef85d5c))
+
+
+### Bug Fixes
+
+* **backstop-mcp:** stop spurious 401s revoking sessions, and bound the ambiguity elicitation ([#852](https://github.com/Unique-AG/connectors/issues/852)) ([0aa0d79](https://github.com/Unique-AG/connectors/commit/0aa0d7905dc5331ebb03927588ecbefa7eb12c49))
+
 ## [0.0.3](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.2...backstop-mcp@0.0.3) (2026-08-21)
 
 
