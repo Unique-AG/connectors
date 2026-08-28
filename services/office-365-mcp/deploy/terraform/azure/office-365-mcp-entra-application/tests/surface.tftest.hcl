@@ -26,6 +26,13 @@ mock_provider "azuread" {
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
+        "Mail.Read"                        = "a1111111-1111-1111-1111-111111111111"
+        "People.Read"                      = "a2222222-2222-2222-2222-222222222222"
+        "MailboxSettings.Read"             = "a3333333-3333-3333-3333-333333333333"
+        "Mail.ReadWrite"                   = "a4444444-4444-4444-4444-444444444444"
+        "Mail.Send"                        = "a5555555-5555-5555-5555-555555555555"
+        "Mail.ReadBasic"                   = "a6666666-6666-6666-6666-666666666666"
+        "MailboxSettings.ReadWrite"        = "a7777777-7777-7777-7777-777777777777"
       }
     }
   }
@@ -163,6 +170,20 @@ run "preset_teams_meetings" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingTranscript.Read.All,OnlineMeetingRecording.Read.All"
     error_message = "teams-meetings composed ${join(",", local.permissions)}"
+  }
+}
+
+run "the_mock_covers_every_requestable_permission" {
+  variables {
+    tools_preset = "teams"
+  }
+
+  assert {
+    condition = length(setsubtract(
+      toset(local.requestable_permissions),
+      toset(keys(azuread_service_principal.msgraph.oauth2_permission_scope_ids)),
+    )) == 0
+    error_message = "the azuread mock has no scope id for ${join(", ", sort(setsubtract(toset(local.requestable_permissions), toset(keys(azuread_service_principal.msgraph.oauth2_permission_scope_ids)))))} — every other run that names one fails with a bare `Invalid index` on main.tf, which does not say the mock is what is short."
   }
 }
 
