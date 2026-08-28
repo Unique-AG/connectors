@@ -11,7 +11,7 @@ Microsoft warns that a large page without one risks a gateway timeout, and `body
 messages is tens of thousands of tokens nobody asked for.
 """
 
-from typing import Self
+from typing import Literal, Self
 
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
@@ -38,6 +38,30 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 # Microsoft's own documented length for `bodyPreview`, named here because two tools quote it to a
 # model and a number that drifted in one of them would be a promise the other did not make.
 PREVIEW_CHARACTERS = 255
+
+
+# The well-known folder names Graph accepts in a URL path, and the seven of seventeen a person
+# says out loud. Locale-independent, so `inbox` reaches the Inbox of a mailbox in any language.
+#
+# The ten left out are left out on purpose. `conflicts`, `localfailures`, `serverfailures` and
+# `syncissues` are Outlook's own sync diagnostics rather than mail; `msgfolderroot` and
+# `searchfolders` are parents, not message folders; `recoverableitemsdeletions` is the purge bin
+# and Microsoft says it "isn't visible in any Outlook email client"; `outbox` holds a message for
+# the seconds before it leaves, so listing it is a race; `conversationhistory` is Skype and Teams
+# history; `scheduled` exists for Outlook on iOS alone.
+#
+# A folder outside this list is reached by its handle from outlook_browse_folders, never by name:
+# a custom folder's name is the user's, and matching one by string is how a tool files mail into
+# the wrong place.
+type WellKnownFolder = Literal[
+    "inbox",
+    "sentitems",
+    "drafts",
+    "archive",
+    "deleteditems",
+    "junkemail",
+    "clutter",
+]
 
 
 class MailAddress(BaseModel):

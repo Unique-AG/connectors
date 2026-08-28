@@ -93,6 +93,12 @@
             "Mail.Read",
             "User.Read"
           ]
+        },
+        {
+          "name": "outlook_read_thread",
+          "permissions": [
+            "Mail.Read"
+          ]
         }
       ],
       "tool_names": [
@@ -109,7 +115,8 @@
         "outlook_search_mail",
         "outlook_read_mail",
         "outlook_browse_folders",
-        "outlook_find_recipient"
+        "outlook_find_recipient",
+        "outlook_read_thread"
       ],
       "always_on": "get_me",
       "presets": {
@@ -156,7 +163,8 @@
           "outlook_search_mail",
           "outlook_read_mail",
           "outlook_browse_folders",
-          "outlook_find_recipient"
+          "outlook_find_recipient",
+          "outlook_read_thread"
         ]
       },
       "requestable_permissions": [

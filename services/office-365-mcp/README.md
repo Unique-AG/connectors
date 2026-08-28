@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes fourteen
+Users sign in with their own Microsoft account and the server acts as them. It exposes fifteen
 MCP tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
@@ -14,7 +14,8 @@ was recorded, how long each recording runs and who may download it; and `outlook
 which finds a message in the signed-in user's own Outlook mailbox, and `outlook_read_mail`,
 which reads one of those in full; and `outlook_browse_folders`, one level of the mail folder
 tree; and `outlook_find_recipient`, which resolves a name to the address it sends from — each
-one a file of its own,
+one a file of its own — plus `outlook_read_thread`, every message of one conversation this
+mailbox holds,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -128,7 +129,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts`, `list_meeting_recordings` (resolving a join URL to a meeting) |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts`, `read_transcript` |
 | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `list_meeting_recordings` |
-| `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback) |
+| `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread` |
 | `People.Read` | Delegated | No | `outlook_find_recipient` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
@@ -267,7 +268,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `list_chats`, `list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
 | `teams-meetings` | both of the above for one meeting | `list_chats`, `list_meeting_transcripts`, `read_transcript`, `list_meeting_recordings` | + both meeting permissions | 2 |
 | `teams` | every Teams tool | the nine of them | all eight | 3 |
-| `outlook-read` | find a message in your own mailbox, read it in full, walk the folder tree, and resolve a name to an address | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
+| `outlook-read` | find a message in your own mailbox, read it in full, walk the folder tree, resolve a name to an address, and read a whole thread | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those seven rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there

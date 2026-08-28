@@ -29,6 +29,7 @@ from office_365_mcp.tools import (
     outlook_browse_folders,
     outlook_find_recipient,
     outlook_read_mail,
+    outlook_read_thread,
     outlook_search_mail,
     read_transcript,
     teams_read_message,
@@ -112,6 +113,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_read_mail,
     outlook_browse_folders,
     outlook_find_recipient,
+    outlook_read_thread,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -157,6 +159,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_read_mail",
         "outlook_browse_folders",
         "outlook_find_recipient",
+        "outlook_read_thread",
     ),
 }
 
