@@ -643,7 +643,12 @@ def _record_text(record: logging.LogRecord) -> str:
 # point: the guard is exercised on a surface that has nothing to hide before it is asked to police
 # a surface that does.
 WRITE_TOOLS: frozenset[str] = frozenset(
-    {"outlook_mark_mail", "outlook_move_mail", "outlook_draft_mail"}
+    {
+        "outlook_mark_mail",
+        "outlook_move_mail",
+        "outlook_draft_mail",
+        "outlook_draft_reply",
+    }
 )
 
 

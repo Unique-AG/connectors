@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-one
 MCP tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
@@ -19,7 +19,8 @@ mailbox holds; `outlook_list_mail`, the newest messages of one folder in receipt
 `outlook_get_mailbox_settings`, which shows the inbox rules, the automatic reply and the
 categories; and `outlook_mark_mail`, the first tool here that changes anything; and
 `outlook_move_mail`, which files messages into a folder and is how this connector erases one; and
-`outlook_draft_mail`, which composes a draft it cannot send,
+`outlook_draft_mail`, which composes a draft it cannot send; and `outlook_draft_reply`,
+which drafts a reply or a forward from a message this connector found,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -136,7 +137,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.Read` | Delegated | No | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient` (the fallback), `outlook_read_thread`, `outlook_list_mail` |
 | `People.Read` | Delegated | No | `outlook_find_recipient` |
 | `MailboxSettings.Read` | Delegated | No | `outlook_get_mailbox_settings` |
-| `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail` |
+| `Mail.ReadWrite` | Delegated | No | `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -276,7 +277,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `teams` | every Teams tool | the nine of them | all eight | 3 |
 | `outlook-read` | find a message in your own mailbox, read it in full, walk the folder tree, resolve a name to an address, read a whole thread, and list a folder in receipt order | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | `User.Read`, `Mail.Read`, `People.Read` | 0 |
 | `outlook-mailbox` | the read surface, plus what is quietly acting on the mailbox | + `outlook_get_mailbox_settings` | + `MailboxSettings.Read` | 0 |
-| `outlook-write` | the above, plus changing a message's read state, flag or importance, filing it into a folder, and composing a draft | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail` | + `Mail.ReadWrite` | 0 |
+| `outlook-write` | the above, plus changing a message's read state, flag or importance, filing it into a folder, and composing a draft or a reply | + `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | + `Mail.ReadWrite` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those seven rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there

@@ -129,6 +129,12 @@
           "permissions": [
             "Mail.ReadWrite"
           ]
+        },
+        {
+          "name": "outlook_draft_reply",
+          "permissions": [
+            "Mail.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
@@ -151,7 +157,8 @@
         "outlook_get_mailbox_settings",
         "outlook_mark_mail",
         "outlook_move_mail",
-        "outlook_draft_mail"
+        "outlook_draft_mail",
+        "outlook_draft_reply"
       ],
       "always_on": "get_me",
       "presets": {
@@ -221,7 +228,8 @@
           "outlook_get_mailbox_settings",
           "outlook_mark_mail",
           "outlook_move_mail",
-          "outlook_draft_mail"
+          "outlook_draft_mail",
+          "outlook_draft_reply"
         ]
       },
       "requestable_permissions": [

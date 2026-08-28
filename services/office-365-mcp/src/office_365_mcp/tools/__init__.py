@@ -28,6 +28,7 @@ from office_365_mcp.tools import (
     list_teams,
     outlook_browse_folders,
     outlook_draft_mail,
+    outlook_draft_reply,
     outlook_find_recipient,
     outlook_get_mailbox_settings,
     outlook_list_mail,
@@ -124,6 +125,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_mark_mail,
     outlook_move_mail,
     outlook_draft_mail,
+    outlook_draft_reply,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -192,6 +194,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_mark_mail",
         "outlook_move_mail",
         "outlook_draft_mail",
+        "outlook_draft_reply",
     ),
 }
 

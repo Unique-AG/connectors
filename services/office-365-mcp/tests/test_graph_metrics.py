@@ -645,6 +645,8 @@ GRAPH_STEPS = frozenset(
         "move_message",
         "destination_folder",
         "create_draft",
+        "create_reply",
+        "fill_reply",
         "transcript_attributed",
         "transcript_unattributed",
     }
