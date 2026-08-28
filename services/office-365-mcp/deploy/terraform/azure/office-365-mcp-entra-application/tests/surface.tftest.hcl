@@ -239,11 +239,11 @@ run "the_order_is_the_registrys_and_never_the_callers" {
 
 run "get_me_joins_every_selection" {
   variables {
-    tools_enabled = ["teams_list_teams"]
+    tools_enabled = ["teams_list_my_teams"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,teams_list_teams"
+    condition     = join(",", local.tools) == "get_me,teams_list_my_teams"
     error_message = "ALWAYS_ON was not joined: ${join(",", local.tools)}"
   }
 

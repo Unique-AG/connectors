@@ -1,4 +1,4 @@
-"""`teams_list_teams` — the teams the signed-in user is a member of.
+"""`teams_list_my_teams` — the teams the signed-in user is a member of.
 
 TRAP: Graph accepts no OData query on this collection. `$top`, `$select` and `$filter` all return
 400, so this tool sends no request configuration. services/teams-mcp shipped `$top` and removed it.
@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "teams_list_teams"
+TOOL_NAME = "teams_list_my_teams"
 
 STEP = "joined_teams"
 
@@ -80,7 +80,7 @@ class TeamList(BaseModel):
     )
 
 
-async def teams_list_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
+async def teams_list_my_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
     assert 1 <= limit <= MAX_TEAMS, f"limit must be within 1..{MAX_TEAMS}, got {limit}"
 
     with graph_errors(TOOL_NAME, step=STEP):
@@ -116,4 +116,4 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = 50,
         client: GraphServiceClient = graph,
     ) -> TeamList:
-        return await teams_list_teams(client, limit=limit)
+        return await teams_list_my_teams(client, limit=limit)

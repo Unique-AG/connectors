@@ -672,7 +672,7 @@ class TestTheToolsThisServerAdvertises:
         assert set(tools) == {
             "get_me",
             "teams_list_chats",
-            "teams_list_teams",
+            "teams_list_my_teams",
             "teams_list_channels",
             "teams_browse_channel",
             "teams_search_messages",
@@ -714,7 +714,7 @@ class TestTheToolsThisServerAdvertises:
             "job_title",
         }
         assert set(_properties(tools["teams_list_chats"].outputSchema)) == {"chats"}
-        assert set(_properties(tools["teams_list_teams"].outputSchema)) == {"teams"}
+        assert set(_properties(tools["teams_list_my_teams"].outputSchema)) == {"teams"}
         assert set(_properties(tools["teams_list_channels"].outputSchema)) == {"channels"}
         assert set(_properties(tools["teams_browse_channel"].outputSchema)) == {
             "messages",
@@ -1445,7 +1445,7 @@ class TestCallingThem:
         assert listed[0]["last_message_at"] == "2026-02-11T09:15:22.310000Z"
         assert obo.requested_scopes == [("https://graph.microsoft.com/Chat.Read",)]
 
-    async def test_teams_list_teams_sends_no_query_and_spends_only_its_own_permission(
+    async def test_teams_list_my_teams_sends_no_query_and_spends_only_its_own_permission(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
@@ -1455,7 +1455,7 @@ class TestCallingThem:
         reaching Graph is a 400, not a narrower answer."""
         route = graph.get("/me/joinedTeams").mock(return_value=httpx.Response(200, json=_TEAMS))
 
-        listed = _structured(await mcp_client.call_tool("teams_list_teams", {}))
+        listed = _structured(await mcp_client.call_tool("teams_list_my_teams", {}))
 
         assert "truncated" not in listed, "a window says whether it may have more by being full"
         found = cast("Sequence[Mapping[str, object]]", listed["teams"])
@@ -1478,7 +1478,7 @@ class TestCallingThem:
         )
         read = graph.get(_REPLY_PATH).mock(return_value=httpx.Response(200, json=_REPLY))
 
-        listed = _structured(await mcp_client.call_tool("teams_list_teams", {}))
+        listed = _structured(await mcp_client.call_tool("teams_list_my_teams", {}))
         found = cast("Sequence[Mapping[str, object]]", listed["teams"])
         team_id = found[0]["team_id"]
         channels = _structured(
@@ -2254,7 +2254,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         ("tool", "arguments", "path", "permission", "not_named"),
         [
             (
-                "teams_list_teams",
+                "teams_list_my_teams",
                 {},
                 "/me/joinedTeams",
                 "Team.ReadBasic.All",

@@ -39,7 +39,7 @@ from office_365_mcp.tools import (
     teams_list_chats,
     teams_list_meeting_recordings,
     teams_list_meeting_transcripts,
-    teams_list_teams,
+    teams_list_my_teams,
     teams_read_message,
     teams_read_transcript,
     teams_search_messages,
@@ -110,7 +110,7 @@ class _NarrowsItsCall(Protocol):
 _TOOL_MODULES: tuple[ToolModule, ...] = (
     get_me,
     teams_list_chats,
-    teams_list_teams,
+    teams_list_my_teams,
     teams_list_channels,
     teams_browse_channel,
     teams_search_messages,
@@ -152,7 +152,7 @@ ALWAYS_ON: str = get_me.TOOL_NAME
 PRESETS: Mapping[str, tuple[str, ...]] = {
     "teams": (
         "teams_list_chats",
-        "teams_list_teams",
+        "teams_list_my_teams",
         "teams_list_channels",
         "teams_browse_channel",
         "teams_search_messages",
@@ -163,7 +163,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
     ),
     "teams-chat": ("teams_list_chats",),
     "teams-messages": ("teams_list_chats", "teams_search_messages", "teams_read_message"),
-    "teams-channels": ("teams_list_teams", "teams_list_channels", "teams_browse_channel"),
+    "teams-channels": ("teams_list_my_teams", "teams_list_channels", "teams_browse_channel"),
     "teams-transcripts": (
         "teams_list_chats",
         "teams_list_meeting_transcripts",

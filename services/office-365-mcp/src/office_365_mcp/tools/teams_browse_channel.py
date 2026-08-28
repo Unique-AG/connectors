@@ -51,7 +51,7 @@ type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParam
 
 _DESCRIPTION = """\
 Read one Teams channel's posts in full. Use it for "what is in this channel", with `team_id` \
-from teams_list_teams and `channel_id` from teams_list_channels; for a keyword, a person or any \
+from teams_list_my_teams and `channel_id` from teams_list_channels; for a keyword, a person or any \
 date bound, \
 use teams_search_messages — there is no date filter here. One call is one request: raise \
 `limit` rather than calling again. Microsoft orders by reply-chain activity, not post date: \
@@ -196,7 +196,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The team the channel is in, exactly as `teams_list_teams` reported. A "
+                    "The team the channel is in, exactly as `teams_list_my_teams` reported. A "
                     + "channel id "
                     + "alone does not address a channel."
                 ),

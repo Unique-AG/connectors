@@ -293,9 +293,9 @@ class TestRegisteringWhatWasSelected:
 # `src/` guards it (F4 of the design): a selection that enables a consumer without its producer
 # starts, and the tool's own refusal names the missing tool on first use.
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
-    "teams_list_channels": {"team_id": ("teams_list_teams",)},
+    "teams_list_channels": {"team_id": ("teams_list_my_teams",)},
     "teams_browse_channel": {
-        "team_id": ("teams_list_teams",),
+        "team_id": ("teams_list_my_teams",),
         "channel_id": ("teams_list_channels", "teams_search_messages"),
     },
     "teams_read_message": {"uri": ("teams_search_messages", "teams_browse_channel")},

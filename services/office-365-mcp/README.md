@@ -4,7 +4,7 @@ An MCP server for Microsoft 365 via Microsoft Graph API.
 
 Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-four
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
-most recently active first; `teams_list_teams`, the teams they are a member of; `teams_list_channels`, the
+most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
 `teams_search_messages`, full-text search across every Teams message they can see; `teams_read_message`,
 one of those messages in full; `teams_list_meeting_transcripts`, whether a Teams meeting was
@@ -131,7 +131,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organiser-only check) |
 | `Chat.Read` | Delegated | No | `teams_list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
-| `Team.ReadBasic.All` | Delegated | No | `teams_list_teams` |
+| `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
 | `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `teams_browse_channel`, `teams_search_messages`, `teams_read_message` (channels) |
 | `OnlineMeetings.Read` | Delegated | No | `teams_list_meeting_transcripts`, `teams_list_meeting_recordings` (resolving a join URL to a meeting) |
@@ -147,7 +147,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
-`ChannelMessage.Read.All` can still list its teams, and `teams_list_teams`' own 403 names only the
+`ChannelMessage.Read.All` can still list its teams, and `teams_list_my_teams`' own 403 names only the
 permission its own request needed rather than sending an administrator after one that was never
 missing.
 
@@ -276,7 +276,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | --- | --- | --- | --- | :-: |
 | `teams-chat` | name the live conversations — not read them | `teams_list_chats` | `User.Read`, `Chat.Read` | 0 |
 | `teams-messages` | find a message anywhere and read it in full | `teams_list_chats`, `teams_search_messages`, `teams_read_message` | + `ChannelMessage.Read.All` | 1 |
-| `teams-channels` | walk a team's channels and read what was posted | `teams_list_teams`, `teams_list_channels`, `teams_browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
+| `teams-channels` | walk a team's channels and read what was posted | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
 | `teams-transcripts` | find a meeting and read what was said | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `teams_list_chats`, `teams_list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
 | `teams-meetings` | both of the above for one meeting | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | + both meeting permissions | 2 |

@@ -46,7 +46,7 @@ _PREFER_UNKNOWN_ENUMS = ("Prefer", "include-unknown-enum-members")
 type _ChannelsQuery = ChannelsRequestBuilder.ChannelsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List one team's channels. Pass the `team_id` from teams_list_teams, then hand `team_id` and \
+List one team's channels. Pass the `team_id` from teams_list_my_teams, then hand `team_id` and \
 `channel_id` \
 together to teams_browse_channel — a channel id alone addresses nothing, and every team has a \
 `General`. \
@@ -156,7 +156,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The team whose channels to list, exactly as teams_list_teams reported it. "
+                    "The team whose channels to list, exactly as teams_list_my_teams reported it. "
                     + "Opaque — copy it rather than constructing it. A team name is not one; "
                     + "names can repeat within a tenant, but team_ids do not."
                 ),

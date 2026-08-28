@@ -15,7 +15,7 @@
           ]
         },
         {
-          "name": "teams_list_teams",
+          "name": "teams_list_my_teams",
           "permissions": [
             "Team.ReadBasic.All"
           ]
@@ -159,7 +159,7 @@
       "tool_names": [
         "get_me",
         "teams_list_chats",
-        "teams_list_teams",
+        "teams_list_my_teams",
         "teams_list_channels",
         "teams_browse_channel",
         "teams_search_messages",
@@ -186,7 +186,7 @@
       "presets": {
         "teams": [
           "teams_list_chats",
-          "teams_list_teams",
+          "teams_list_my_teams",
           "teams_list_channels",
           "teams_browse_channel",
           "teams_search_messages",
@@ -204,7 +204,7 @@
           "teams_read_message"
         ],
         "teams-channels": [
-          "teams_list_teams",
+          "teams_list_my_teams",
           "teams_list_channels",
           "teams_browse_channel"
         ],
