@@ -344,7 +344,7 @@ class TestWhatTheCallerIsTold:
             "naming what a handle is missing is a recipe for assembling one, and this tool has no "
             + "message id to hand a model that follows it"
         )
-        assert "read_message" in description, (
+        assert "teams_read_message" in description, (
             "a model told not to build a handle still needs to know where a real one comes from"
         )
 

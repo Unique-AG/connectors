@@ -152,7 +152,8 @@ class TestWhatTheManifestSays:
 
 class TestTheDescriptionScanWarnsAboutStalePromises:
     """It warns and never aborts: the references are dense and mutual, so requiring every mention
-    would drag `search_messages` — and an administrator's signature on `ChannelMessage.Read.All` —
+    would drag `teams_search_messages` — and an administrator's signature on
+    `ChannelMessage.Read.All` —
     into a deployment that asked for nothing but `list_chats`."""
 
     @pytest.mark.usefixtures("registry_of_three")

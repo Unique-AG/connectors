@@ -6,7 +6,7 @@ Users sign in with their own Microsoft account and the server acts as them. It e
 tools so far — `get_me`, the signed-in user's own profile; `list_chats`, their Microsoft Teams chats
 most recently active first; `list_teams`, the teams they are a member of; `list_channels`, the
 channels of one of those teams; `browse_channel`, what was posted in one of those channels;
-`search_messages`, full-text search across every Teams message they can see; `read_message`,
+`teams_search_messages`, full-text search across every Teams message they can see; `teams_read_message`,
 one of those messages in full; `list_meeting_transcripts`, whether a Teams meeting was
 transcribed and a handle for each transcript; `read_transcript`, what was said in one of those
 meetings as speaker-attributed, timestamped turns; and `list_meeting_recordings`, whether a meeting
@@ -117,10 +117,10 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
 | `User.Read` | Delegated | No | `get_me`, `list_meeting_recordings` (the organiser-only check) |
-| `Chat.Read` | Delegated | No | `list_chats`, `search_messages`, `read_message` (chats) |
+| `Chat.Read` | Delegated | No | `list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `list_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `list_channels` |
-| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `search_messages`, `read_message` (channels) |
+| `ChannelMessage.Read.All` | Delegated | Yes, in most tenants | `browse_channel`, `teams_search_messages`, `teams_read_message` (channels) |
 | `OnlineMeetings.Read` | Delegated | No | `list_meeting_transcripts`, `list_meeting_recordings` (resolving a join URL to a meeting) |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** | `list_meeting_transcripts`, `read_transcript` |
 | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** | `list_meeting_recordings` |
@@ -139,7 +139,7 @@ its own tuple, which is what its 403 is worded from.
 
 The two rows a tool appears in *parenthesised* are the per-surface case, and it is the reason
 `MessageHandle.permission` exists. Graph's permissions for a message read are per surface, so
-`read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
+`teams_read_message` has to redeem both — the token is exchanged before the tool sees its argument — while
 its 403 names only the one the read was actually made under. Naming both there would be the same
 defect as naming none: an administrator handed two names may grant the one that was never missing.
 
@@ -199,10 +199,10 @@ returns more than the equivalent GET would, and every channel-message GET in v1.
 `ChannelMessage.Read.All` — so without it a search silently covers chats only and reports nothing
 missing. Asking for it at sign-in makes a tenant that withholds it fail visibly at consent rather
 than serve half an answer per query. It is also what `browse_channel` spends on its one request, and
-what `read_message` needs for a channel message. It is the first permission here that needs an
+what `teams_read_message` needs for a channel message. It is the first permission here that needs an
 administrator, and the first row where one tool needs two: neither Graph's 403 nor Entra's
 AADSTS65001 says which of the two was missing, so
-`search_messages` names both in every refusal — handed one name, an administrator may grant the
+`teams_search_messages` names both in every refusal — handed one name, an administrator may grant the
 permission that was never missing and watch the identical failure. A search has no choice about
 that, because a search happens before anything knows which surface a hit will be on; a *read* does,
 which is why its 403 names one. `shared/seam.py` writes the same names out once more, by hand, as
@@ -244,7 +244,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | preset | what it can do | tools besides `get_me` | permissions | admin consents |
 | --- | --- | --- | --- | :-: |
 | `teams-chat` | name the live conversations — not read them | `list_chats` | `User.Read`, `Chat.Read` | 0 |
-| `teams-messages` | find a message anywhere and read it in full | `list_chats`, `search_messages`, `read_message` | + `ChannelMessage.Read.All` | 1 |
+| `teams-messages` | find a message anywhere and read it in full | `list_chats`, `teams_search_messages`, `teams_read_message` | + `ChannelMessage.Read.All` | 1 |
 | `teams-channels` | walk a team's channels and read what was posted | `list_teams`, `list_channels`, `browse_channel` | `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` | 1 |
 | `teams-transcripts` | find a meeting and read what was said | `list_chats`, `list_meeting_transcripts`, `read_transcript` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | 1 |
 | `teams-recordings` | say whether a meeting was recorded and who may get at it | `list_chats`, `list_meeting_recordings` | `User.Read`, `Chat.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | 1 |
@@ -254,7 +254,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 `get_me` is always on, which is why no preset lists it — each of those seven rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
 is and the only one that asks for **no** administrator, and the reason it costs nothing is exactly
-that it cannot read a *chat* message — the two tools that can (`search_messages`, `read_message`)
+that it cannot read a *chat* message — the two tools that can (`teams_search_messages`, `teams_read_message`)
 both declare `ChannelMessage.Read.All`, which an administrator has to grant even though the message
 is a chat. Reading chat messages is `teams-messages`.
 

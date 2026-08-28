@@ -1,4 +1,5 @@
-"""`read_message` — one Microsoft Teams message in full, from a handle another tool creates."""
+"""`teams_read_message` — one Microsoft Teams message in full, from a handle another tool "
++ "creates."""
 
 from collections.abc import Mapping
 from typing import Annotated
@@ -31,7 +32,7 @@ from office_365_mcp.shared.handles import (
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, TeamsMessage
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
 
-TOOL_NAME = "read_message"
+TOOL_NAME = "teams_read_message"
 
 # Three steps, not one: a single step would report a tenant that refuses channel messages as a tool
 # that is merely slow. The name comes from the handle's shape, never from the handle itself.
@@ -54,14 +55,15 @@ GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = """\
 Read one Teams message in full: the whole text, sender, @-mentions, attachments, and edit or \
-delete status. Call it on the `uri` of a search_messages hit whenever the answer depends on what \
-somebody actually said — a hit carries a snippet and no message body. A message browse_channel \
-returned is already complete and needs no read. `uri` must be a handle a tool result carried; no \
-name, chat topic or Teams link becomes one.\
+delete status. Call it on the `uri` of a teams_search_messages hit whenever the answer depends \
+on what somebody actually said — a hit carries a snippet and no message body. A message \
+browse_channel returned is already complete and needs no read. `uri` must be a handle a tool \
+result carried; no name, chat topic or Teams link becomes one.\
 """
 
 _BAD_HANDLE = (
-    "read_message takes a `uri` handle that search_messages or browse_channel produced, and this "
+    "teams_read_message takes a `uri` handle that teams_search_messages or browse_channel "
+    + "produced, and this "
     + "is not one. A readable handle has one of exactly three shapes:\n"
     + "  teams:///chats/{chat_id}/messages/{message_id}\n"
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
@@ -105,7 +107,7 @@ type _ChannelMessageQuery = (
 type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuilderGetQueryParameters
 
 
-async def read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
+async def teams_read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
     """The message `handle` addresses. One request; the endpoint supports no `$select` or
     `$expand`, so mentions and attachments always arrive with it.
     """
@@ -182,7 +184,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
                     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}"
                     + "/replies/{reply_id}\n"
-                    + "search_messages emits the first two. The third only browse_channel emits: "
+                    + "teams_search_messages emits the first two. The third only browse_channel "
+                    + "emits: "
                     + "Microsoft addresses a reply under the post it answers, and a search result "
                     + "does not say which post that is. No other shape is readable. Chat topics, "
                     + "person names and Teams web links cannot be turned into handles."
@@ -197,4 +200,4 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             raise ToolError(_BAD_HANDLE)
         # The 403 table is built at startup and never sees the handle; this names the surface read.
         await narrowed_to(ctx, handle.permission)
-        return await read_message(client, handle=handle)
+        return await teams_read_message(client, handle=handle)

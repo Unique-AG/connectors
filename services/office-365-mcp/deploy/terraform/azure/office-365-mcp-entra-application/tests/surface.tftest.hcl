@@ -168,11 +168,11 @@ run "preset_teams_meetings" {
 
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
-    tools_enabled = ["read_message", "list_chats"]
+    tools_enabled = ["teams_read_message", "list_chats"]
   }
 
   assert {
-    condition     = join(",", local.tools) == "get_me,list_chats,read_message"
+    condition     = join(",", local.tools) == "get_me,list_chats,teams_read_message"
     error_message = "caller order leaked into the tool list: ${join(",", local.tools)}"
   }
 
@@ -314,7 +314,7 @@ run "the_comma_separated_env_var_form_is_refused" {
   command = plan
 
   variables {
-    tools_enabled = ["list_chats,read_message"]
+    tools_enabled = ["list_chats,teams_read_message"]
   }
 
   expect_failures = [var.tools_enabled]

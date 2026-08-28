@@ -584,7 +584,7 @@ def _optional_type(schema: object) -> dict[str, object]:
     return typed[0]
 
 
-_MESSAGE_TOOLS: tuple[str, ...] = ("read_message", "browse_channel", "search_messages")
+_MESSAGE_TOOLS: tuple[str, ...] = ("teams_read_message", "browse_channel", "teams_search_messages")
 
 
 def _items(schema: object) -> dict[str, object]:
@@ -635,8 +635,8 @@ class TestTheToolsThisServerAdvertises:
             "list_teams",
             "list_channels",
             "browse_channel",
-            "search_messages",
-            "read_message",
+            "teams_search_messages",
+            "teams_read_message",
             "list_meeting_transcripts",
             "read_transcript",
             "list_meeting_recordings",
@@ -681,11 +681,11 @@ class TestTheToolsThisServerAdvertises:
             "more_posts_in_channel",
             "posts_cut_to_limit",
         }
-        assert set(_properties(tools["search_messages"].outputSchema)) == {
+        assert set(_properties(tools["teams_search_messages"].outputSchema)) == {
             "messages",
             "next_offset",
         }
-        assert set(_properties(tools["read_message"].outputSchema)) == {
+        assert set(_properties(tools["teams_read_message"].outputSchema)) == {
             "uri",
             "message_id",
             "chat_id",
@@ -768,7 +768,7 @@ class TestTheToolsThisServerAdvertises:
                 assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
         for name, tool in tools.items():
             assert "truncated" not in _properties(tool.outputSchema), name
-        for name in ("search_messages", "read_transcript"):
+        for name in ("teams_search_messages", "read_transcript"):
             assert "next_offset" in _properties(tools[name].outputSchema), name
         for name, flag in (
             ("browse_channel", "include_window_completeness"),
@@ -778,11 +778,11 @@ class TestTheToolsThisServerAdvertises:
             asked_for = _object(_properties(tools[name].inputSchema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"
 
-    async def test_search_messages_makes_its_criteria_optional_but_not_all_of_them(
+    async def test_teams_search_messages_makes_its_criteria_optional_but_not_all_of_them(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["search_messages"].inputSchema
+        schema = tools["teams_search_messages"].inputSchema
         properties = _properties(schema)
 
         assert schema.get("required", []) == [], "each criterion is individually optional"
@@ -802,12 +802,12 @@ class TestTheToolsThisServerAdvertises:
         for (name,) in required:
             assert name in properties, f"{name} is constrained but is not a parameter"
 
-    async def test_search_messages_types_the_parameters_graph_is_fussy_about(
+    async def test_teams_search_messages_types_the_parameters_graph_is_fussy_about(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         """Microsoft matches a mention on the id alone: a display name silently matches nothing."""
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["search_messages"].inputSchema)
+        properties = _properties(tools["teams_search_messages"].inputSchema)
 
         assert _optional_type(properties["mentions"]) == {"type": "string", "format": "uuid"}
         assert _optional_type(properties["sent_after"]) == {"type": "string", "format": "date"}
@@ -817,7 +817,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        query = _object(_properties(tools["search_messages"].inputSchema)["query"])
+        query = _object(_properties(tools["teams_search_messages"].inputSchema)["query"])
         description = cast("str", query["description"])
 
         assert "Every word must appear" in description
@@ -825,11 +825,11 @@ class TestTheToolsThisServerAdvertises:
         assert "not matched as phrases unless quoted" in description
         assert '"release notes"' in description, "the phrase syntax needs an example to be usable"
 
-    async def test_search_messages_bounds_its_page_where_microsoft_documents_it(
+    async def test_teams_search_messages_bounds_its_page_where_microsoft_documents_it(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["search_messages"].inputSchema)
+        properties = _properties(tools["teams_search_messages"].inputSchema)
         size = _object(properties["size"])
         offset = _object(properties["offset"])
 
@@ -854,7 +854,7 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         taught = {name: _sender_schema(tools[name].outputSchema) for name in _MESSAGE_TOOLS}
 
-        for name in ("read_message", "browse_channel"):
+        for name in ("teams_read_message", "browse_channel"):
             written = taught[name]["description"]
             assert isinstance(written, str)
             # A docstring keeps its line breaks in the schema; the sentence is pinned, not the wrap.
@@ -870,20 +870,20 @@ class TestTheToolsThisServerAdvertises:
             + "type in shared/messages.py, and a model reads them as one server"
         )
 
-    async def test_read_message_takes_exactly_one_required_handle(
+    async def test_teams_read_message_takes_exactly_one_required_handle(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["read_message"].inputSchema
+        schema = tools["teams_read_message"].inputSchema
 
         assert set(_properties(schema)) == {"uri"}
         assert schema.get("required") == ["uri"]
 
-    async def test_read_message_names_every_handle_shape_and_no_others(
+    async def test_teams_read_message_names_every_handle_shape_and_no_others(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        uri = _object(_properties(tools["read_message"].inputSchema)["uri"])
+        uri = _object(_properties(tools["teams_read_message"].inputSchema)["uri"])
         described = cast("str", uri["description"])
 
         assert "teams:///chats/{chat_id}/messages/{message_id}" in described
@@ -892,7 +892,7 @@ class TestTheToolsThisServerAdvertises:
             "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}"
             in described
         )
-        assert "search_messages" in described
+        assert "teams_search_messages" in described
         assert "browse_channel" in described, "the reply shape has exactly one source"
 
     async def test_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
@@ -919,7 +919,7 @@ class TestTheToolsThisServerAdvertises:
         assert "list_meeting_transcripts" in handle, "the one tool that mints this shape"
         assert "`meeting_uri` is not readable here" in handle, "the handle a model reaches for"
         assert "list_meeting_transcripts" in description
-        assert "read_message" in description, "the two readers must not be confusable"
+        assert "teams_read_message" in description, "the two readers must not be confusable"
         assert "a `meeting_uri` is not one" in description
 
     async def test_read_transcript_narrows_by_seconds_and_by_speaker_in_its_own_schema(
@@ -967,7 +967,9 @@ class TestTheToolsThisServerAdvertises:
 
         assert "reply-chain" in description
         assert "created_at" in description, "the field that does tell the truth about age"
-        assert "search_messages" in description, "where a keyword, a person or a date goes instead"
+        assert "teams_search_messages" in description, (
+            "where a keyword, a person or a date goes instead"
+        )
 
     async def test_browse_channel_says_what_one_call_costs_and_where_it_stops(
         self, mcp_client: Client[FastMCPTransport]
@@ -1408,7 +1410,7 @@ class TestCallingThem:
         )
         messages = cast("Sequence[Mapping[str, object]]", browsed["messages"])
         result = _structured(
-            await mcp_client.call_tool("read_message", {"uri": messages[1]["uri"]})
+            await mcp_client.call_tool("teams_read_message", {"uri": messages[1]["uri"]})
         )
 
         assert (team_id, channel_id) == (_TEAM_ID, _CHANNEL_ID)
@@ -1514,7 +1516,7 @@ class TestCallingThem:
             "scan budget, so the two bounds are counted separately"
         )
 
-    async def test_search_messages_returns_hits_with_handles_and_no_invented_total(
+    async def test_teams_search_messages_returns_hits_with_handles_and_no_invented_total(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
@@ -1522,7 +1524,7 @@ class TestCallingThem:
     ) -> None:
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
 
-        result = await mcp_client.call_tool("search_messages", {"query": "release"})
+        result = await mcp_client.call_tool("teams_search_messages", {"query": "release"})
 
         body = _structured(result)
         assert body["next_offset"] is None, "the last page of results, and the whole of saying so"
@@ -1549,10 +1551,12 @@ class TestCallingThem:
         search = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
         read = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_MESSAGE))
 
-        found = _structured(await mcp_client.call_tool("search_messages", {"query": "release"}))
+        found = _structured(
+            await mcp_client.call_tool("teams_search_messages", {"query": "release"})
+        )
         hits = cast("Sequence[Mapping[str, object]]", found["messages"])
         uri = hits[0]["uri"]
-        result = await mcp_client.call_tool("read_message", {"uri": uri})
+        result = await mcp_client.call_tool("teams_read_message", {"uri": uri})
 
         assert search.called
         body = _structured(result)
@@ -1579,7 +1583,7 @@ class TestCallingThem:
     ) -> None:
         _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_SYSTEM_MESSAGE))
 
-        result = await mcp_client.call_tool("read_message", {"uri": _MESSAGE_URI})
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
 
         body = _structured(result)
         assert body["event"] == "members joined"
@@ -1602,7 +1606,7 @@ class TestCallingThem:
         _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=payload))
         caplog.set_level(logging.DEBUG)
 
-        result = await mcp_client.call_tool("read_message", {"uri": _MESSAGE_URI})
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
 
         assert _structured(result)["text"] == secret, "the text has to have been returned"
         for record in caplog.records:
@@ -1652,7 +1656,7 @@ class TestCallingThem:
     ) -> None:
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
 
-        _ = await mcp_client.call_tool("search_messages", {"query": "cut the release"})
+        _ = await mcp_client.call_tool("teams_search_messages", {"query": "cut the release"})
 
         assert _search_query_string(route) == "cut the release"
 
@@ -1666,7 +1670,9 @@ class TestCallingThem:
         `anyOf` alone would not stop this."""
         route = graph.post("/search/query").mock(return_value=httpx.Response(200, json=_SEARCH))
 
-        result = await mcp_client.call_tool("search_messages", {"size": 5}, raise_on_error=False)
+        result = await mcp_client.call_tool(
+            "teams_search_messages", {"size": 5}, raise_on_error=False
+        )
 
         assert result.is_error
         assert not route.called
@@ -1687,7 +1693,7 @@ class TestCallingThem:
         caplog.set_level(logging.DEBUG)
 
         _ = await mcp_client.call_tool(
-            "search_messages", {"query": secret, "sender": "ada@example.invalid"}
+            "teams_search_messages", {"query": secret, "sender": "ada@example.invalid"}
         )
 
         assert secret in route.calls.last.request.content.decode(), (
@@ -2252,7 +2258,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "search_messages", {"query": "release"}, raise_on_error=False
+            "teams_search_messages", {"query": "release"}, raise_on_error=False
         )
 
         assert result.is_error
@@ -2280,7 +2286,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "search_messages", {"query": "release"}, raise_on_error=False
+            "teams_search_messages", {"query": "release"}, raise_on_error=False
         )
 
         assert result.is_error
@@ -2443,14 +2449,16 @@ class TestWhatAModelIsToldWhenGraphRefuses:
     ) -> None:
         route = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_MESSAGE))
 
-        result = await mcp_client.call_tool("read_message", {"uri": uri}, raise_on_error=False)
+        result = await mcp_client.call_tool(
+            "teams_read_message", {"uri": uri}, raise_on_error=False
+        )
 
         assert result.is_error
         assert not route.called
         message = _error_text(result)
         assert "teams:///chats/{chat_id}/messages/{message_id}" in message
         assert "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}" in message
-        assert "search_messages" in message
+        assert "teams_search_messages" in message
         assert obo.requested_scopes, "the handle is parsed inside the tool, after the exchange"
 
     @pytest.mark.usefixtures("obo")
@@ -2468,7 +2476,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+            "teams_read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
         )
 
         assert result.is_error
@@ -2495,7 +2503,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+            "teams_read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
         )
 
         message = _error_text(result)
@@ -2517,7 +2525,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
+            "teams_read_message", {"uri": _MESSAGE_URI}, raise_on_error=False
         )
 
         assert result.is_error
@@ -2542,7 +2550,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         result = await mcp_client.call_tool(
-            "read_message",
+            "teams_read_message",
             {
                 "uri": (
                     f"teams:///teams/{team}/channels/19%3Ageneral%40thread.tacv2"

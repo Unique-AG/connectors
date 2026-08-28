@@ -33,14 +33,14 @@
           ]
         },
         {
-          "name": "search_messages",
+          "name": "teams_search_messages",
           "permissions": [
             "Chat.Read",
             "ChannelMessage.Read.All"
           ]
         },
         {
-          "name": "read_message",
+          "name": "teams_read_message",
           "permissions": [
             "Chat.Read",
             "ChannelMessage.Read.All"
@@ -74,8 +74,8 @@
         "list_teams",
         "list_channels",
         "browse_channel",
-        "search_messages",
-        "read_message",
+        "teams_search_messages",
+        "teams_read_message",
         "list_meeting_transcripts",
         "read_transcript",
         "list_meeting_recordings"
@@ -87,8 +87,8 @@
           "list_teams",
           "list_channels",
           "browse_channel",
-          "search_messages",
-          "read_message",
+          "teams_search_messages",
+          "teams_read_message",
           "list_meeting_transcripts",
           "read_transcript",
           "list_meeting_recordings"
@@ -98,8 +98,8 @@
         ],
         "teams-messages": [
           "list_chats",
-          "search_messages",
-          "read_message"
+          "teams_search_messages",
+          "teams_read_message"
         ],
         "teams-channels": [
           "list_teams",

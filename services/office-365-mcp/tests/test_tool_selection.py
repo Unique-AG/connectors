@@ -88,11 +88,11 @@ class TestTheTwoVariablesAreOneChoice:
     ) -> None:
         """Read out of the environment rather than handed in: a collection-typed setting is
         JSON-decoded before any validator of ours."""
-        monkeypatch.setenv("TOOLS_ENABLED", "get_me, list_chats ,read_message,")
+        monkeypatch.setenv("TOOLS_ENABLED", "get_me, list_chats ,teams_read_message,")
 
         config = SurfaceConfig()
 
-        assert config.tools_enabled == ("get_me", "list_chats", "read_message")
+        assert config.tools_enabled == ("get_me", "list_chats", "teams_read_message")
 
     def test_neither_set_is_refused_and_says_what_to_set(self) -> None:
         """There is no default anywhere: a default of "every tool" would make the widest consent
@@ -296,18 +296,19 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "list_channels": {"team_id": ("list_teams",)},
     "browse_channel": {
         "team_id": ("list_teams",),
-        "channel_id": ("list_channels", "search_messages"),
+        "channel_id": ("list_channels", "teams_search_messages"),
     },
-    "read_message": {"uri": ("search_messages", "browse_channel")},
+    "teams_read_message": {"uri": ("teams_search_messages", "browse_channel")},
     # Always satisfied, `get_me` being the floor; recorded so the guard below sees it as minted.
-    "search_messages": {"mentions": ("get_me",)},
+    "teams_search_messages": {"mentions": ("get_me",)},
     "list_meeting_transcripts": {"meeting_uri": ("list_chats",)},
     "read_transcript": {"uri": ("list_meeting_transcripts",)},
     "list_meeting_recordings": {"meeting_uri": ("list_chats",)},
 }
 
 
-# `search_messages` requires at least one search criterion, which its schema says with one-name
+# `teams_search_messages` requires at least one search criterion, which its schema says with
+# one-name
 # `anyOf` branches. None of them is a handle, so none needs a producer.
 _COMPOSED_BY_THE_CALLER: frozenset[str] = frozenset(
     {
@@ -326,7 +327,7 @@ _COMPOSED_BY_THE_CALLER: frozenset[str] = frozenset(
 def _required_arguments(schema: Mapping[str, object]) -> set[str]:
     """Not just the top-level `required`: a tool that requires "at least one of these" says it with
     a `required` inside each branch of an `anyOf`, and reading only the top level would report
-    `search_messages` as requiring nothing at all."""
+    `teams_search_messages` as requiring nothing at all."""
     found: set[str] = set()
     pending: list[object] = [schema]
     while pending:
@@ -352,8 +353,10 @@ def _tools_named_by(schema: Mapping[str, object], argument: str, *, besides: str
 
 class TestEveryCuratedPresetIsUsableOnItsOwn:
     """The failure this catches can have **no permission signature at all**. `teams-messages`
-    without `search_messages` asks for the identical three permissions, because `read_message`
-    declares `Chat.Read` and `ChannelMessage.Read.All` itself — while exposing a `read_message`
+    without `teams_search_messages` asks for the identical three permissions, because
+    `teams_read_message`
+    declares `Chat.Read` and `ChannelMessage.Read.All` itself — while exposing a
+    `teams_read_message`
     nothing in the preset can address. A table rather than a mechanism in the registry is the trade
     the design records (F4).
     """

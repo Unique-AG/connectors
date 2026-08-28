@@ -1,4 +1,4 @@
-"""`read_message`: what a read asks Graph for, and what a Teams body really holds."""
+"""`teams_read_message`: what a read asks Graph for, and what a Teams body really holds."""
 
 import httpx
 import pytest
@@ -8,8 +8,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared import handles, identity
 from office_365_mcp.shared.handles import MessageHandle
-from office_365_mcp.tools import read_message, search_messages
-from office_365_mcp.tools.search_messages import SearchCriteria
+from office_365_mcp.tools import teams_read_message, teams_search_messages
+from office_365_mcp.tools.teams_search_messages import SearchCriteria
 
 from .conftest import ME, chat_hit, message_payload, search_response
 
@@ -46,7 +46,7 @@ class TestTheRequestItMakes:
     ) -> None:
         route = graph.get(_CHAT_PATH).mock(return_value=httpx.Response(200, json=message_payload()))
 
-        _ = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        _ = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert route.called
 
@@ -57,7 +57,7 @@ class TestTheRequestItMakes:
             return_value=httpx.Response(200, json=message_payload())
         )
 
-        _ = await read_message.read_message(client, handle=_CHANNEL_HANDLE)
+        _ = await teams_read_message.teams_read_message(client, handle=_CHANNEL_HANDLE)
 
         assert route.called
 
@@ -72,7 +72,7 @@ class TestTheRequestItMakes:
             )
         )
 
-        message = await read_message.read_message(client, handle=_REPLY_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_REPLY_HANDLE)
 
         assert route.called
         assert message.message_id == _REPLY_ID
@@ -88,7 +88,7 @@ class TestTheRequestItMakes:
             return_value=httpx.Response(200, json=message_payload(message_id=_REPLY_ID))
         )
 
-        message = await read_message.read_message(client, handle=_REPLY_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_REPLY_HANDLE)
 
         assert message.reply_to_id == _MESSAGE_ID
 
@@ -109,7 +109,7 @@ class TestTheRequestItMakes:
             )
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert route.call_count == 1, "one message, one request"
         assert route.calls.last.request.url.query == b"", "no $select and no $expand"
@@ -123,7 +123,7 @@ class TestTheRequestItMakes:
         """Without this header Graph reports `systemEventMessage` as `unknownFutureValue`."""
         route = graph.get(_CHAT_PATH).mock(return_value=httpx.Response(200, json=message_payload()))
 
-        _ = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        _ = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert route.calls.last.request.headers["prefer"] == "include-unknown-enum-members"
 
@@ -139,7 +139,7 @@ class TestTheRequestItMakes:
         _reads(graph, message_payload())
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
-        _ = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        _ = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
         _ = await identity.signed_in_user(client)
 
         assert "prefer" not in profile.calls.last.request.headers
@@ -151,7 +151,7 @@ class TestWhatItReportsAboutTheMessage:
     ) -> None:
         _reads(graph, message_payload())
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.uri == _CHAT_URI
         assert (message.message_id, message.chat_id) == (_MESSAGE_ID, _CHAT_ID)
@@ -163,7 +163,7 @@ class TestWhatItReportsAboutTheMessage:
         """`teamworkUserIdentity` has no email property at all, so `user_id` carries the sender."""
         _reads(graph, message_payload())
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.sender is not None
         assert message.sender.display_name == "Ada Lovelace"
@@ -189,7 +189,7 @@ class TestWhatItReportsAboutTheMessage:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.sender is not None
         assert message.sender.display_name is None, "an empty name is not a name"
@@ -213,7 +213,7 @@ class TestWhatItReportsAboutTheMessage:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.sender is not None
         assert (message.sender.display_name, message.sender.user_id) == ("Release Bot", None)
@@ -230,7 +230,7 @@ class TestWhatItReportsAboutTheMessage:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.last_edited_at is not None
         assert message.last_edited_at.isoformat() == "2026-02-11T10:00:00+00:00"
@@ -240,7 +240,7 @@ class TestWhatItReportsAboutTheMessage:
     ) -> None:
         _reads(graph, message_payload())
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.last_edited_at is None
         assert message.deleted_at is None
@@ -257,7 +257,7 @@ class TestWhatItReportsAboutTheMessage:
             _CHANNEL_PATH,
         )
 
-        message = await read_message.read_message(client, handle=_CHANNEL_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHANNEL_HANDLE)
 
         assert message.reply_to_id == "1770000000001"
         assert message.web_url is not None
@@ -269,7 +269,7 @@ class TestTheBodyItNormalises:
     ) -> None:
         _reads(graph, message_payload(content="cut the release on Friday", content_type="text"))
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "cut the release on Friday"
 
@@ -287,7 +287,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == (
             "Ship today & tell support.\nBlockers:\n- build #7\n- docs\ndone\nthanks"
@@ -316,7 +316,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "@Ada Lovelace can you review?"
         assert [(m.text, m.user_id) for m in message.mentions] == [
@@ -335,7 +335,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "@Release planning heads up"
 
@@ -362,7 +362,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert [(m.text, m.user_id) for m in message.mentions] == [("Everyone", None)]
 
@@ -384,7 +384,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "see this\n[attachment: plan.xlsx]"
         assert [(a.name, a.content_type) for a in message.attachments] == [
@@ -410,7 +410,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[attachment]"
         assert message.attachments[0].url is None, (
@@ -430,7 +430,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "looking \U0001f440teams_party"
 
@@ -447,7 +447,7 @@ class TestTheBodyItNormalises:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[image]"
 
@@ -456,7 +456,7 @@ class TestTheBodyItNormalises:
     ) -> None:
         _reads(graph, message_payload(content="<div>   </div>"))
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text is None
 
@@ -489,7 +489,7 @@ class TestWhatCountsAsACard:
         pasted = '{"type":"service","replicas":3,"image":"office-365-mcp:1.4.0"}'
         _reads(graph, message_payload(content=f"<div><p>{pasted}</p></div>"))
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == pasted
         assert message.attachments == [], "nothing was attached, so nothing was a card"
@@ -504,7 +504,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == '{"type":"TextBlock"} — is this the bit that broke prod?'
 
@@ -524,7 +524,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "ready?\n[card]"
         assert [a.content_type for a in message.attachments] == [
@@ -568,7 +568,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == expected
 
@@ -589,7 +589,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[attachment: deploy.sh]"
 
@@ -599,7 +599,7 @@ class TestWhatCountsAsACard:
         """Teams sometimes puts the card's own JSON in `body.content` instead of the placeholder."""
         _reads(graph, message_payload(content=_CARD_PAYLOAD, attachments=[_CARD_ATTACHMENT]))
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[card]"
 
@@ -617,7 +617,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[card]"
 
@@ -637,7 +637,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[card]"
 
@@ -655,7 +655,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[card]"
 
@@ -678,7 +678,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[card]"
 
@@ -706,7 +706,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == "[card]"
 
@@ -716,7 +716,7 @@ class TestWhatCountsAsACard:
         pasted = '{"type":"Deployment","replicas":3}'
         _reads(graph, message_payload(content=f"<p>{pasted}</p>", attachments=[_CARD_ATTACHMENT]))
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == pasted
         assert [a.content_type for a in message.attachments] == [
@@ -742,7 +742,7 @@ class TestWhatCountsAsACard:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text == f"{pasted}\n[attachment: values.yaml]"
 
@@ -756,7 +756,7 @@ class TestTheMessagesThatHaveNoText:
             message_payload(deleted_at="2026-02-12T08:00:00Z", content="<div></div>"),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.text is None
         assert message.deleted_at is not None
@@ -781,7 +781,7 @@ class TestTheMessagesThatHaveNoText:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.event == "members joined"
         assert message.text is None, "`<systemEventMessage/>` is not text"
@@ -820,7 +820,7 @@ class TestTheMessagesThatHaveNoText:
             ),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.event == expected
 
@@ -833,7 +833,7 @@ class TestTheMessagesThatHaveNoText:
             message_payload(sender=None, content="", message_type="unknownFutureValue"),
         )
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.event is not None
         assert message.text is None
@@ -853,7 +853,7 @@ class TestTheMessagesThatHaveNoText:
         nobody."""
         _reads(graph, message_payload(sender=sender, content=""))
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.sender is None
         assert message.event is not None, "a null sender must always be explained by an event"
@@ -863,7 +863,7 @@ class TestTheMessagesThatHaveNoText:
     ) -> None:
         _reads(graph, message_payload())
 
-        message = await read_message.read_message(client, handle=_CHAT_HANDLE)
+        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.event is None
 
@@ -880,7 +880,7 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphNotFound):
-            _ = await read_message.read_message(client, handle=_CHAT_HANDLE)
+            _ = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
     async def test_a_refused_permission_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -892,14 +892,15 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await read_message.read_message(client, handle=_CHANNEL_HANDLE)
+            _ = await teams_read_message.teams_read_message(client, handle=_CHANNEL_HANDLE)
 
 
 class TestTheRoundTripFromASearchResult:
     async def test_a_hit_from_search_is_read_by_its_own_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Whatever `search_messages` puts in `uri`, `read_message` resolves with no part of it
+        """Whatever `teams_search_messages` puts in `uri`, `teams_read_message` resolves with no
+        part of it
         reassembled by hand. Which strings are handles at all is `shared/handles.py`'s question,
         covered by `TestTheMessageHandleGrammar` in `tests/shared/test_handles.py`.
         """
@@ -914,14 +915,14 @@ class TestTheRoundTripFromASearchResult:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
         uri = found.messages[0].uri
         assert uri is not None
         handle = handles.message_handle(uri)
-        assert handle is not None, f"search produced a handle read_message rejects: {uri}"
-        message = await read_message.read_message(client, handle=handle)
+        assert handle is not None, f"search produced a handle teams_read_message rejects: {uri}"
+        message = await teams_read_message.teams_read_message(client, handle=handle)
 
         assert route.called
         assert message.uri == uri

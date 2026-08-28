@@ -46,7 +46,8 @@ _REPLY_HANDLE = handles.MessageHandle(
 
 
 class TestTheMessageHandleGrammar:
-    """`search_messages` mints two of these, `browse_channel` the third, and `read_message` reads
+    """`teams_search_messages` mints two of these, `browse_channel` the third, and
+    `teams_read_message` reads
     all three back. The grammar is neither tool's: a handle one mints and another 404s on does not
     look like a disagreement."""
 

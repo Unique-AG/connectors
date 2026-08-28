@@ -40,7 +40,7 @@ class TeamSummary(BaseModel):
     team_id: str = Field(
         description=(
             "The team's Graph id. This is what list_channels takes, and the same id "
-            + "search_messages reports on channel messages. Opaque—copy it verbatim, never "
+            + "teams_search_messages reports on channel messages. Opaque—copy it verbatim, never "
             + "build one from a name."
         )
     )

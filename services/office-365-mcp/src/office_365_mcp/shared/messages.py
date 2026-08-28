@@ -184,7 +184,8 @@ class TeamsMessage(BaseModel):
 
     uri: str = Field(
         description=(
-            "The handle this message was read from, in the form read_message takes. Echoed so "
+            "The handle this message was read from, in the form teams_read_message takes. Echoed "
+            + "so "
             + "messages can be quoted, cached or re-read without reassembling. For a reply in a "
             + "channel thread this is its only handle, because Microsoft addresses a reply under "
             + "its parent post and search cannot express that shape."
@@ -203,7 +204,8 @@ class TeamsMessage(BaseModel):
     channel_id: str | None = Field(description="The channel, for channel messages. Null for chats.")
     sender: MessageSender | None = Field(
         description=(
-            "Who wrote the message, in the same shape search_messages reports. Null only when "
+            "Who wrote the message, in the same shape teams_search_messages reports. Null only "
+            + "when "
             + "nobody wrote it: Graph sends no author for system event messages, which `event` "
             + "then describes. Reads identify senders by Entra id rather than email—the Teams "
             + "identity has no email address at all—so `email` is normally null here."

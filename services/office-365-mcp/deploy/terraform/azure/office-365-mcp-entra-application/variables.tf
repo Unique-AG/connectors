@@ -45,7 +45,7 @@ variable "tools_enabled" {
 
   validation {
     condition     = alltrue([for name in coalesce(var.tools_enabled, []) : !strcontains(name, ",")])
-    error_message = "tools_enabled is a list of tool names, not the pod's comma-separated TOOLS_ENABLED string. Write [\"list_chats\", \"read_message\"], not [\"list_chats,read_message\"]."
+    error_message = "tools_enabled is a list of tool names, not the pod's comma-separated TOOLS_ENABLED string. Write [\"list_chats\", \"teams_read_message\"], not [\"list_chats,teams_read_message\"]."
   }
 }
 

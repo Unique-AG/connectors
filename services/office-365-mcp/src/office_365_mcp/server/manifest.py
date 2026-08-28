@@ -10,7 +10,8 @@ carry rather than to what this deployment asks for, and a scope-matched admin-co
 `redirect_uri` matching a registered one — and the only Web redirect URI office-365-mcp registers is
 FastMCP's OAuth callback, which would render a *successful* consent as an error.
 
-The description scan only ever **warns**: requiring every mention would drag `search_messages`, and
+The description scan only ever **warns**: requiring every mention would drag
+`teams_search_messages`, and
 with it `ChannelMessage.Read.All` and an administrator's signature, into a deployment that asked for
 nothing but `list_chats`.
 """
@@ -112,7 +113,8 @@ def _stale_promises(tools: Sequence[Tool], selection: Selection) -> list[str]:
 
 
 def _mentions(prose: str, name: str) -> bool:
-    """Whole word, not substring: `read_message` is not mentioned by prose saying `read_messages`.
+    """Whole word, not substring: `teams_read_message` is not mentioned by prose saying
+    `read_messages`.
     Tool names are `[a-z_]`, so a word boundary lands where the eye does."""
     return re.search(rf"\b{re.escape(name)}\b", prose) is not None
 

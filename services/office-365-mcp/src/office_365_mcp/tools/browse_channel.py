@@ -8,7 +8,8 @@ One request only: Graph rate-limits channel reads to one request per second for 
 the tenant. The collection accepts only `$top` and `$expand=replies`, and Graph documents no
 `$orderby` and no date filter for it.
 
-The reply handle minted here follows `shared/handles.py`'s grammar, so `read_message` resolves it;
+The reply handle minted here follows `shared/handles.py`'s grammar, so `teams_read_message`
+resolves it;
 the shape is `shared/messages.py`'s, so a browsed post and a read message are one type.
 """
 
@@ -51,9 +52,9 @@ type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParam
 _DESCRIPTION = """\
 Read one Teams channel's posts in full. Use it for "what is in this channel", with `team_id` \
 from list_teams and `channel_id` from list_channels; for a keyword, a person or any date bound, \
-use search_messages — there is no date filter here. One call is one request: raise `limit` rather \
-than calling again. Microsoft orders by reply-chain activity, not post date: read `created_at` \
-before trusting the order. Returns each post with its newest replies, whole.\
+use teams_search_messages — there is no date filter here. One call is one request: raise \
+`limit` rather than calling again. Microsoft orders by reply-chain activity, not post date: \
+read `created_at` before trusting the order. Returns each post with its newest replies, whole.\
 """
 
 
@@ -62,7 +63,8 @@ class ChannelPosts(BaseModel):
         description=(
             "Posts and their replies, in thread order. Each root post is followed by its replies, "
             + "oldest first. Replies carry `reply_to_id` with their parent post. Each message is "
-            + "complete — same shape and text as `read_message` returns — no second read needed.\n"
+            + "complete — same shape and text as `teams_read_message` returns — no second read "
+            + "needed.\n"
             + "Up to `limit` posts returned (raise it, up to "
             + f"{MAX_POSTS}). Up to {MAX_REPLIES_PER_POST} newest replies per post; older ones "
             + "are unreachable and browsing again returns the same newest ones, so when a search "
@@ -72,14 +74,14 @@ class ChannelPosts(BaseModel):
             + "proof the channel holds no more — Microsoft drops system messages after counting "
             + "them. Set `include_window_completeness` for `more_posts_in_channel` (the only way "
             + "to know if more exists). Microsoft orders by reply-chain last modified, not date; "
-            + "use `search_messages` with `sent_before` to reach back in time."
+            + "use `teams_search_messages` with `sent_before` to reach back in time."
         )
     )
     more_posts_in_channel: bool | None = Field(
         description=(
             "Microsoft's cursor on the page (`@odata.nextLink`), or null if "
             + "`include_window_completeness` was not set (the default). True: more posts "
-            + "exist beyond this page; a wider `limit` gets a little more, `search_messages` "
+            + "exist beyond this page; a wider `limit` gets a little more, `teams_search_messages` "
             + "with `sent_before` reaches older posts. False: this window was the whole "
             + "channel (subject to `limit` and reply limits). Null means this field was not "
             + "requested. A short page alone does NOT mean the channel ran out."
@@ -203,7 +205,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The channel to read, exactly as `list_channels` or `search_messages` reported "
+                    "The channel to read, exactly as `list_channels` or `teams_search_messages` "
+                    + "reported "
                     + "it. Opaque — copy it, do not build it from a channel name."
                 ),
             ),

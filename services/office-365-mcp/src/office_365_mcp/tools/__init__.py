@@ -26,9 +26,9 @@ from office_365_mcp.tools import (
     list_meeting_recordings,
     list_meeting_transcripts,
     list_teams,
-    read_message,
     read_transcript,
-    search_messages,
+    teams_read_message,
+    teams_search_messages,
 )
 
 # The whole of what this package promises: importing `tools/get_me.py` directly names a tool module
@@ -83,7 +83,8 @@ class _NarrowsItsNotFound(Protocol):
 class _NarrowsItsCall(Protocol):
     """A tool whose `GRAPH_CALL_EXAMPLE` reaches Graph under fewer permissions than it declares.
 
-    One tool of ten, so runtime-checked and off `ToolModule`. `read_message` is exchanged for two
+    One tool of ten, so runtime-checked and off `ToolModule`. `teams_read_message` is exchanged for
+    two
     permissions and reads one surface per call, so its chat example's refusal must name `Chat.Read`
     and not the channel permission. `narrowed_to` in `shared/seam.py` says the same per call.
     """
@@ -98,8 +99,8 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     list_teams,
     list_channels,
     browse_channel,
-    search_messages,
-    read_message,
+    teams_search_messages,
+    teams_read_message,
     list_meeting_transcripts,
     read_transcript,
     list_meeting_recordings,
@@ -113,8 +114,9 @@ TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES
 ALWAYS_ON: str = get_me.TOOL_NAME
 
 # What each `config.ToolsPreset` name means.
-# TRAP: permissions do not encode reachability. `teams-messages` without `search_messages` asks for
-# the identical three permissions and exposes a `read_message` nothing in it can address.
+# TRAP: permissions do not encode reachability. `teams-messages` without `teams_search_messages`
+# asks for
+# the identical three permissions and exposes a `teams_read_message` nothing in it can address.
 # TRAP: `teams` is written out rather than derived from `TOOL_NAMES`. A derived preset takes in
 # every tool that joins the registry, so the first tool of another product would put its permission
 # on the consent screen of every `teams` deployment without an edit anybody reviewed — and widening
@@ -125,14 +127,14 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "list_teams",
         "list_channels",
         "browse_channel",
-        "search_messages",
-        "read_message",
+        "teams_search_messages",
+        "teams_read_message",
         "list_meeting_transcripts",
         "read_transcript",
         "list_meeting_recordings",
     ),
     "teams-chat": ("list_chats",),
-    "teams-messages": ("list_chats", "search_messages", "read_message"),
+    "teams-messages": ("list_chats", "teams_search_messages", "teams_read_message"),
     "teams-channels": ("list_teams", "list_channels", "browse_channel"),
     "teams-transcripts": ("list_chats", "list_meeting_transcripts", "read_transcript"),
     "teams-recordings": ("list_chats", "list_meeting_recordings"),

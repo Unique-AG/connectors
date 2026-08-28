@@ -49,10 +49,10 @@ MAX_TURNS = 500
 _DESCRIPTION = """\
 Return a Teams meeting transcript's spoken turns, timestamped and speaker-attributed, from the \
 `uri` list_meeting_transcripts reports. Call it for what was actually said or decided. \
-read_message is the other reader and takes a different handle; a `meeting_uri` is not one. When \
-`speaker_attribution` is false every `speaker` is null and a `speaker` filter matches nothing — \
-read that flag before reporting that somebody did not speak. Returns turns with speaker, seconds \
-and text.\
+teams_read_message is the other reader and takes a different handle; a `meeting_uri` is not \
+one. When `speaker_attribution` is false every `speaker` is null and a `speaker` filter matches \
+nothing — read that flag before reporting that somebody did not speak. Returns turns with \
+speaker, seconds and text.\
 """
 
 _NOT_A_TRANSCRIPT_HANDLE = (

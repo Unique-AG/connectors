@@ -57,7 +57,8 @@ class ChannelSummary(BaseModel):
     channel_id: str = Field(
         description=(
             "The channel's Graph id, e.g. `19:...@thread.tacv2`. Pass it with its `team_id` to "
-            + "browse_channel; it is also the id search_messages reports as `channel_id` on a "
+            + "browse_channel; it is also the id teams_search_messages reports as `channel_id` on "
+            + "a "
             + "channel message. Opaque — copy it rather than constructing one from a name."
         )
     )

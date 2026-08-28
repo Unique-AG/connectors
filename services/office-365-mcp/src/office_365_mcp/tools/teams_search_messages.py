@@ -1,4 +1,4 @@
-"""`search_messages` — full-text search across every Teams message the signed-in user can see.
+"""`teams_search_messages` — full-text search across every Teams message the signed-in user can see.
 
 `POST /search/query` with `entityTypes: ["chatMessage"]` is the only full-text path Graph offers
 over Teams messages, and it runs in delegated context only
@@ -48,7 +48,7 @@ from office_365_mcp.shared.handles import CHANNEL_PERMISSION, CHAT_PERMISSION, M
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST, MessageSender
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
-TOOL_NAME = "search_messages"
+TOOL_NAME = "teams_search_messages"
 
 STEP = "search_query"
 
@@ -69,7 +69,7 @@ attachment or read state. Use it for "find the message where…" and for every d
 question, including one about a named channel — browse_channel has no date filter. Search takes \
 no chat or channel scope: read `channel_id` on each hit to see where it came from. At least one \
 criterion is required and all are ANDed. Hits carry metadata and Microsoft's `summary` snippet \
-only — pass a hit's `uri` to read_message for the actual words.\
+only — pass a hit's `uri` to teams_read_message for the actual words.\
 """
 
 
@@ -81,14 +81,16 @@ class MessageHit(BaseModel):
             "A handle for this exact message, e.g. "
             + "`teams:///chats/{chatId}/messages/{messageId}` or "
             + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
-            + "percent-encoded. Pass it verbatim to read_message; this search returns no message "
+            + "percent-encoded. Pass it verbatim to teams_read_message; this search returns no "
+            + "message "
             + "body, so it is the only route to the full text, the attachments and the mentions. "
             + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
             + "identity, which cannot be addressed at all. "
             + "One handle here can fail to read: Microsoft "
             + "addresses a reply in a channel thread under its parent post and its search index "
             + "does not say which post that is, so a hit that is a reply gets the root-post form "
-            + "above and read_message may answer that it could not be read. browse_channel is the "
+            + "above and teams_read_message may answer that it could not be read. browse_channel "
+            + "is the "
             + "only tool that emits a reply's own handle, and it reaches only the newest "
             + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page, following "
             + "no cursor further back. If "
@@ -136,7 +138,8 @@ class MessageHit(BaseModel):
         description=(
             "When the message was last modified. Microsoft counts adding or removing a reaction "
             + "as a modification, so a difference from `created_at` is not evidence of an edit — "
-            + "read_message reports `last_edited_at`, which is the property behind Teams' own "
+            + "teams_read_message reports `last_edited_at`, which is the property behind Teams' "
+            + "own "
             + "'Edited' flag and is what to read when an edit is the question."
         )
     )
@@ -231,7 +234,7 @@ CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria)
 # TRAP: Graph answers a criteria-free search with an arbitrary slice of everything the user can
 # read, and that slice reads like a real result set — the one failure a model cannot detect.
 _NO_CRITERIA = (
-    "search_messages needs at least one of "
+    "teams_search_messages needs at least one of "
     + ", ".join(CRITERIA)
     + ". Searching with none of them would return an arbitrary sample of every message the user "
     + "can see, not an answer. Add the keywords, person or date range the question is about."
@@ -344,12 +347,14 @@ def _query_string(criteria: SearchCriteria) -> str:
     return " ".join(terms)
 
 
-async def search_messages(
+async def teams_search_messages(
     client: GraphServiceClient, *, criteria: SearchCriteria, offset: int, size: int
 ) -> MessageSearchResults:
     """One page of matches for `criteria`. Exactly one Graph request, whatever the criteria."""
     query = _query_string(criteria)
-    assert query, "search_messages needs at least one criterion; the tool refuses an empty set"
+    assert query, (
+        "teams_search_messages needs at least one criterion; the tool refuses an empty set"
+    )
     assert 1 <= size <= MAX_RESULTS, f"size must be within 1..{MAX_RESULTS}, got {size}"
     assert offset >= 0, f"offset must not be negative, got {offset}"
 
@@ -519,7 +524,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         )
         if criteria.is_empty:
             raise ToolError(_NO_CRITERIA)
-        return await search_messages(
+        return await teams_search_messages(
             client,
             criteria=criteria,
             offset=offset,

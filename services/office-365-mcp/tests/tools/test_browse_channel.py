@@ -242,7 +242,7 @@ class TestBrowsingOneChannel:
             "the first message is the oldest post, revived by a reply"
         )
 
-    async def test_a_reply_carries_a_handle_read_message_can_actually_resolve(
+    async def test_a_reply_carries_a_handle_teams_read_message_can_actually_resolve(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """Graph addresses a reply under the post it answers, so the root-post handle shape cannot

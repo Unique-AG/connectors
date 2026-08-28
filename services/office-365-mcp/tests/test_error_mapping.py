@@ -247,21 +247,22 @@ class TestEveryToolTranslatesItsOwnRefusal:
     async def test_a_narrowed_refusal_does_not_word_the_next_call_in_the_session(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
-        """`read_message` narrows its declared permissions on the state of one call. Said on the
+        """`teams_read_message` narrows its declared permissions on the state of one call. Said on
+        the
         session's state instead, one keyword apart, the refused search below would name `Chat.Read`
         alone. Two calls on one client, because a fresh client per call would hide that.
         """
         with pytest.raises(ToolError) as narrowed:
             _ = await mcp_client.call_tool(
-                "read_message", dict(_EVERY_TOOL["read_message"].arguments)
+                "teams_read_message", dict(_EVERY_TOOL["teams_read_message"].arguments)
             )
         with pytest.raises(ToolError) as after:
             _ = await mcp_client.call_tool(
-                "search_messages", dict(_EVERY_TOOL["search_messages"].arguments)
+                "teams_search_messages", dict(_EVERY_TOOL["teams_search_messages"].arguments)
             )
 
-        assert str(narrowed.value) == _advice_for(_EVERY_TOOL["read_message"].permissions)
-        assert str(after.value) == _advice_for(_EVERY_TOOL["search_messages"].permissions)
+        assert str(narrowed.value) == _advice_for(_EVERY_TOOL["teams_read_message"].permissions)
+        assert str(after.value) == _advice_for(_EVERY_TOOL["teams_search_messages"].permissions)
 
 
 class TestWhereTheMappingSits:

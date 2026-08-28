@@ -44,7 +44,7 @@ List the signed-in user's Teams chats — one-to-one, group and meeting — orde
 sent. Call it to see who is in a conversation, when it was last active, or for a meeting's \
 `meeting_uri`, the only route to its transcripts and recordings — no filter exists, so match it by \
 subject in `topic`. Channel activity is listed nowhere here: browse_channel walks one, \
-search_messages finds a message. Returns id, type, topic, last-message time and members for \
+teams_search_messages finds a message. Returns id, type, topic, last-message time and members for \
 unnamed chats.\
 """
 
@@ -76,7 +76,7 @@ class ChatSummary(BaseModel):
         description=(
             "Graph id for this chat (e.g. `19:...@thread.v2`). Microsoft puts this on every "
             + "message in the chat. Not a `teams:///` handle and cannot be assembled into one. "
-            + "read_message takes only a handle a tool result carries."
+            + "teams_read_message takes only a handle a tool result carries."
         )
     )
     chat_type: str = Field(
