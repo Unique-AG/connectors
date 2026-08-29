@@ -1,6 +1,5 @@
-"""`fetch_opportunities`: a party's pipeline walk, projected, filtered, and ordered."""
+"""`GetOpportunitiesQuery`: a party's pipeline walk, projected, filtered, and ordered."""
 
-import logging
 from collections.abc import Sequence
 from datetime import date
 
@@ -10,27 +9,13 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
-from backstop_mcp.features.opportunities import (
-    GetOpportunitiesResponse,
-    OpportunityStageDto,
+from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
+from backstop_mcp.features.opportunities.queries.get_opportunities_query import (
     OpportunityStatus,
-    fetch_opportunities,
 )
-from tests.helpers import BASE_URL, custom_fields_service, opportunity_stages_service, resource
-
-# The instance's whole vocabulary, as `OpportunityStagesService` hands it over.
-VOCABULARY: dict[str, OpportunityStageDto] = {
-    stage.id: stage
-    for stage in (
-        OpportunityStageDto(id="42478", name="Prospect", closed=False, sort_order=1),
-        OpportunityStageDto(id="42480", name="Project", closed=False, sort_order=2),
-        OpportunityStageDto(id="42482", name="IDD", closed=False, sort_order=3),
-        OpportunityStageDto(id="85446", name="Client Approval", closed=False, sort_order=4),
-        OpportunityStageDto(id="85444", name="Execution", closed=False, sort_order=5),
-        OpportunityStageDto(id="96016", name="Invested", closed=True, sort_order=6),
-        OpportunityStageDto(id="96018", name="Closed", closed=True, sort_order=7),
-    )
-}
+from backstop_mcp.features.opportunities.responses import GetOpportunitiesResponse
+from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_query
+from tests.helpers import BASE_URL, resource
 
 _ENTITY_ID = "341764767"
 _OPPORTUNITIES_URL = f"{BASE_URL}/organizations/{_ENTITY_ID}/opportunities"
@@ -145,21 +130,18 @@ def _stages_response(
     )
 
 
-async def _fetch(
+async def _run(
     client: BackstopClient,
     *,
     status: OpportunityStatus = "all",
     vocabulary: dict[str, OpportunityStageDto] | None = None,
 ) -> GetOpportunitiesResponse:
     respx.get(_STAGES_URL).mock(return_value=_stages_response(vocabulary))
-    return await fetch_opportunities(
-        client,
+    return await make_get_opportunities_query(client).run(
         segment="organizations",
         entity_id=_ENTITY_ID,
         status=status,
-        opportunity_stages_service=opportunity_stages_service(),
-        custom_fields_service=custom_fields_service(),
-        custom_field_filters=CustomFieldFilters(),
+        custom_fields_filters=CustomFieldFilters(),
     )
 
 
@@ -171,7 +153,7 @@ class TestTheRequest:
     ) -> None:
         route = respx.get(_OPPORTUNITIES_URL).mock(return_value=_page())
 
-        await _fetch(client)
+        await _run(client)
 
         params = route.calls.last.request.url.params
         assert params["include"] == "stage,stageHistory"
@@ -185,7 +167,7 @@ class TestTheRequest:
     ) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(return_value=_page())
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert result.opportunities == ()
         assert (result.total, result.open_count, result.closed_count) == (0, 0, 0)
@@ -201,7 +183,7 @@ class TestTheRequest:
             ]
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert route.call_count == 2
         assert result.total == 3
@@ -221,7 +203,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client, vocabulary={})
+        result = await _run(client, vocabulary={})
 
         deal = result.opportunities[0]
         assert deal.stage == "IDD"
@@ -248,7 +230,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert result.opportunities[0].stage == "Renamed"
 
@@ -262,7 +244,7 @@ class TestProjection:
             return_value=_page(_opportunity("5072909", stage_id="42478", isOpen=True))
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         deal = result.opportunities[0]
         assert deal.stage == "Prospect"
@@ -277,7 +259,7 @@ class TestProjection:
             return_value=_page(_opportunity("5072909", stage_id="70707", isOpen=True))
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         deal = result.opportunities[0]
         assert deal.stage is None
@@ -297,7 +279,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client, vocabulary={})
+        result = await _run(client, vocabulary={})
 
         deal = result.opportunities[0]
         assert deal.stage == "IDD"
@@ -320,7 +302,7 @@ class TestProjection:
             ]
         )
 
-        result = await _fetch(client, vocabulary={})
+        result = await _run(client, vocabulary={})
 
         assert {deal.id: deal.stage for deal in result.opportunities} == {
             "page-1": "IDD",
@@ -342,7 +324,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert result.opportunities[0].previous_stage == "Client Approval"
         assert result.opportunities[0].stage == "IDD"
@@ -360,7 +342,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert result.opportunities[0].previous_stage is None
         assert result.opportunities[0].stage == "Client Approval"
@@ -391,7 +373,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         deal = result.opportunities[0]
         assert deal.name == "Koch - CATS Select"
@@ -428,7 +410,7 @@ class TestProjection:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         dumped = result.opportunities[0].model_dump()
         assert dumped["weighted_value"] == 100000000.0
@@ -464,7 +446,7 @@ class TestStageHistory:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         history = result.opportunities[0].stage_history
         assert len(history) == 1
@@ -492,7 +474,7 @@ class TestStageHistory:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         history = result.opportunities[0].stage_history
         assert [change.stage for change in history] == ["Prospect", "Invested"]
@@ -515,7 +497,7 @@ class TestStageHistory:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         history = result.opportunities[0].stage_history
         assert len(history) == 1
@@ -548,7 +530,7 @@ class TestStageHistory:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         by_id = {deal.id: deal for deal in result.opportunities}
         assert [change.stage for change in by_id["5072909"].stage_history] == ["Invested"]
@@ -574,7 +556,7 @@ class TestStatusFiltering:
     async def test_open_returns_only_open_deals(self, client: BackstopClient) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(return_value=self._mixed_page())
 
-        result = await _fetch(client, status="open")
+        result = await _run(client, status="open")
 
         assert [deal.id for deal in result.opportunities] == ["open-1"]
 
@@ -583,7 +565,7 @@ class TestStatusFiltering:
     async def test_closed_returns_only_closed_deals(self, client: BackstopClient) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(return_value=self._mixed_page())
 
-        result = await _fetch(client, status="closed")
+        result = await _run(client, status="closed")
 
         assert [deal.id for deal in result.opportunities] == ["closed-1", "closed-2"]
 
@@ -592,7 +574,7 @@ class TestStatusFiltering:
     async def test_all_returns_every_deal(self, client: BackstopClient) -> None:
         respx.get(_OPPORTUNITIES_URL).mock(return_value=self._mixed_page())
 
-        result = await _fetch(client, status="all")
+        result = await _run(client, status="all")
 
         assert len(result.opportunities) == 3
 
@@ -604,7 +586,7 @@ class TestStatusFiltering:
         """So an answer about open deals still says how many closed ones exist."""
         respx.get(_OPPORTUNITIES_URL).mock(return_value=self._mixed_page())
 
-        result = await _fetch(client, status="open")
+        result = await _run(client, status="open")
 
         assert (result.total, result.open_count, result.closed_count) == (3, 1, 2)
 
@@ -622,7 +604,7 @@ class TestStatusFiltering:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert result.total == 2
 
@@ -640,9 +622,9 @@ class TestStatusFiltering:
             )
         )
 
-        opened = await _fetch(client, status="open")
-        closed = await _fetch(client, status="closed")
-        all_deals = await _fetch(client, status="all")
+        opened = await _run(client, status="open")
+        closed = await _run(client, status="closed")
+        all_deals = await _run(client, status="all")
 
         assert [deal.id for deal in opened.opportunities] == ["open-1"]
         assert [deal.id for deal in closed.opportunities] == ["closed-1"]
@@ -671,7 +653,7 @@ class TestOrdering:
             ]
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert [deal.id for deal in result.opportunities] == ["newest", "middle", "oldest"]
 
@@ -687,7 +669,7 @@ class TestOrdering:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert [deal.id for deal in result.opportunities] == ["dated", "undated"]
 
@@ -704,7 +686,7 @@ class TestOrdering:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert [deal.id for deal in result.opportunities] == ["dated", "unreadable"]
         assert result.opportunities[1].date_entered_current_stage is None
@@ -721,20 +703,20 @@ class TestOrdering:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert [deal.id for deal in result.opportunities] == ["first", "second"]
 
 
 class TestMalformedRecords:
-    """Records are validated one at a time, so one bad record costs only itself."""
+    """Junk scalars are coerced; a structurally broken history entry costs only itself."""
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_malformed_record_is_dropped_on_its_own_and_the_rest_returned(
-        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    async def test_a_junk_scalar_is_coerced_and_the_deal_survives(
+        self, client: BackstopClient
     ) -> None:
-        """The reason the page is not deserialized against a typed schema in one pass."""
+        """The typed page schema uses Lenient* so one junk field cannot fail the record."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity("malformed", stage_id="42482", probability=["not-a-number"]),
@@ -743,13 +725,12 @@ class TestMalformedRecords:
             )
         )
 
-        with caplog.at_level(logging.WARNING):
-            result = await _fetch(client)
+        result = await _run(client)
 
-        assert [deal.id for deal in result.opportunities] == ["intact"]
-        assert result.opportunities[0].name == "Koch - CATS Select"
-        assert (result.total, result.open_count) == (1, 1)
-        assert "opportunities.record.unreadable" in caplog.text
+        by_id = {deal.id: deal for deal in result.opportunities}
+        assert set(by_id) == {"malformed", "intact"}
+        assert by_id["malformed"].probability is None
+        assert by_id["intact"].name == "Koch - CATS Select"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -773,7 +754,7 @@ class TestMalformedRecords:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         assert [deal.id for deal in result.opportunities] == ["kept"]
         assert result.opportunities[0].custom_field_values == ()
@@ -799,7 +780,7 @@ class TestMalformedRecords:
             )
         )
 
-        result = await _fetch(client)
+        result = await _run(client)
 
         history = result.opportunities[0].stage_history
         assert len(history) == 2

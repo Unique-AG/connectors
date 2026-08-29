@@ -1,35 +1,20 @@
-"""`get_opportunities_by_ids`: per-id GET, catalog join, not-found, and opt-in history."""
+"""`GetOpportunitiesByIdsQuery`: per-id GET, catalog join, not-found, and opt-in history."""
 
 from collections.abc import Sequence
 
 import httpx
 import pytest
 import respx
-from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.opportunities.queries.get_opportunities_by_ids_query import (
-    MAX_OPPORTUNITY_IDS,
-)
+from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.opportunities.responses import GetOpportunitiesByIdsResponse
-from backstop_mcp.features.opportunities.tools.get_opportunities_by_ids import (
-    get_opportunities_by_ids,
-)
-from backstop_mcp.server.tools import TOOLS
 from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_by_ids_query
-from tests.helpers import (
-    BASE_URL,
-    recorded_requests,
-    resource,
-)
-from tests.server.tools.helpers import tool_model
+from tests.helpers import BASE_URL, recorded_requests, resource
 
 _STAGES_URL = f"{BASE_URL}/opportunity-stages"
 _DEFINITIONS_URL = f"{BASE_URL}/custom-field-definitions"
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
-
-_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(get_opportunities_by_ids))
 
 
 @pytest.fixture(autouse=True)
@@ -176,7 +161,7 @@ def _deal_included() -> list[dict[str, object]]:
     ]
 
 
-async def _call(
+async def _run(
     client: BackstopClient,
     *,
     ids: Sequence[str],
@@ -184,23 +169,21 @@ async def _call(
     custom_field_names: Sequence[str] = (),
     custom_field_definition_ids: Sequence[str] = (),
 ) -> GetOpportunitiesByIdsResponse:
-    return tool_model(
-        await get_opportunities_by_ids(
-            ids=ids,
-            include_stage_history=include_stage_history,
-            custom_field_names=custom_field_names,
-            custom_field_definition_ids=custom_field_definition_ids,
-            get_opportunities_by_ids_query=make_get_opportunities_by_ids_query(client),
+    respx.get(_STAGES_URL).mock(return_value=_stages_response())
+    return await make_get_opportunities_by_ids_query(client).run(
+        opportunity_ids=ids,
+        include_stage_history=include_stage_history,
+        custom_fields_filters=CustomFieldFilters(
+            definition_ids=tuple(custom_field_definition_ids),
+            names=tuple(custom_field_names),
         ),
-        GetOpportunitiesByIdsResponse,
     )
 
 
-class TestGetOpportunitiesByIds:
+class TestGetOpportunitiesByIdsQuery:
     @pytest.mark.asyncio
     @respx.mock
     async def test_returns_full_records_in_request_order(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         first = respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -216,7 +199,7 @@ class TestGetOpportunitiesByIds:
             )
         )
 
-        result = await _call(client, ids=["5755031", "5072909"])
+        result = await _run(client, ids=["5755031", "5072909"])
 
         assert first.call_count == 1
         assert second.call_count == 1
@@ -229,13 +212,12 @@ class TestGetOpportunitiesByIds:
     @pytest.mark.asyncio
     @respx.mock
     async def test_omits_stage_history_unless_asked(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         route = respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
 
-        omitted = await _call(client, ids=["5755031"])
-        included = await _call(client, ids=["5755031"], include_stage_history=True)
+        omitted = await _run(client, ids=["5755031"])
+        included = await _run(client, ids=["5755031"], include_stage_history=True)
 
         params = [request.url.params.get("include") for request in recorded_requests(route.calls)]
         assert params == ["stage", "stage,stageHistory"]
@@ -245,7 +227,6 @@ class TestGetOpportunitiesByIds:
     @pytest.mark.asyncio
     @respx.mock
     async def test_reports_a_missing_id_and_keeps_the_rest(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -253,7 +234,7 @@ class TestGetOpportunitiesByIds:
             return_value=httpx.Response(404, json={"errors": [{"detail": "not found"}]})
         )
 
-        result = await _call(client, ids=["5755031", "missing"])
+        result = await _run(client, ids=["5755031", "missing"])
 
         assert [row.id for row in result.opportunities] == ["5755031"]
         assert result.not_found == ("missing",)
@@ -262,7 +243,6 @@ class TestGetOpportunitiesByIds:
     @pytest.mark.asyncio
     @respx.mock
     async def test_survives_one_failing_id(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -270,7 +250,7 @@ class TestGetOpportunitiesByIds:
             return_value=httpx.Response(500, json={"errors": [{"detail": "boom"}]})
         )
 
-        result = await _call(client, ids=["5755031", "broken"])
+        result = await _run(client, ids=["5755031", "broken"])
 
         assert [row.id for row in result.opportunities] == ["5755031"]
         assert result.not_found == ()
@@ -282,13 +262,12 @@ class TestGetOpportunitiesByIds:
     @respx.mock
     async def test_a_timeout_on_one_id_keeps_the_rest(self, client: BackstopClient) -> None:
         """Only a `concurrency` 429 is retried, so a timeout must not cost the other ids."""
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
         respx.get(f"{BASE_URL}/opportunities/slow").mock(side_effect=httpx.ReadTimeout("timed out"))
 
-        result = await _call(client, ids=["5755031", "slow"])
+        result = await _run(client, ids=["5755031", "slow"])
 
         assert [row.id for row in result.opportunities] == ["5755031"]
         assert result.not_found == ()
@@ -301,7 +280,6 @@ class TestGetOpportunitiesByIds:
     async def test_custom_field_values_are_joined_with_field_type(
         self, client: BackstopClient
     ) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -323,7 +301,7 @@ class TestGetOpportunitiesByIds:
             )
         )
 
-        result = await _call(client, ids=["5755031"])
+        result = await _run(client, ids=["5755031"])
 
         assert definitions.call_count == 1
         values = result.opportunities[0].custom_field_values
@@ -337,13 +315,12 @@ class TestGetOpportunitiesByIds:
     async def test_custom_field_name_filter_keeps_only_that_field(
         self, client: BackstopClient
     ) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_two_field_deal(), included=_deal_included())
         )
         respx.get(_DEFINITIONS_URL).mock(return_value=_two_field_definitions())
 
-        result = await _call(client, ids=["5755031"], custom_field_names=["probability"])
+        result = await _run(client, ids=["5755031"], custom_field_names=["probability"])
 
         values = result.opportunities[0].custom_field_values
         assert [value.name for value in values] == ["Probability"]
@@ -351,13 +328,12 @@ class TestGetOpportunitiesByIds:
     @pytest.mark.asyncio
     @respx.mock
     async def test_definition_id_filter_keeps_only_that_field(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_two_field_deal(), included=_deal_included())
         )
         respx.get(_DEFINITIONS_URL).mock(return_value=_two_field_definitions())
 
-        result = await _call(client, ids=["5755031"], custom_field_definition_ids=["1"])
+        result = await _run(client, ids=["5755031"], custom_field_definition_ids=["1"])
 
         values = result.opportunities[0].custom_field_values
         assert [value.name for value in values] == ["Estimated Fees"]
@@ -365,19 +341,18 @@ class TestGetOpportunitiesByIds:
     @pytest.mark.asyncio
     @respx.mock
     async def test_custom_field_filters_and_together(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_two_field_deal(), included=_deal_included())
         )
         respx.get(_DEFINITIONS_URL).mock(return_value=_two_field_definitions())
 
-        both = await _call(
+        both = await _run(
             client,
             ids=["5755031"],
             custom_field_names=["Probability"],
             custom_field_definition_ids=["8648265"],
         )
-        disjoint = await _call(
+        disjoint = await _run(
             client,
             ids=["5755031"],
             custom_field_names=["Probability"],
@@ -392,7 +367,6 @@ class TestGetOpportunitiesByIds:
     @pytest.mark.asyncio
     @respx.mock
     async def test_one_catalog_load_covers_the_whole_batch(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -406,14 +380,13 @@ class TestGetOpportunitiesByIds:
             return_value=httpx.Response(200, json=_EMPTY_DEFINITIONS)
         )
 
-        await _call(client, ids=["5755031", "5072909"])
+        await _run(client, ids=["5755031", "5072909"])
 
         assert definitions.call_count == 1
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_catalog_failure_keeps_the_deals(self, client: BackstopClient) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -421,30 +394,16 @@ class TestGetOpportunitiesByIds:
             return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
         )
 
-        result = await _call(client, ids=["5755031"])
+        result = await _run(client, ids=["5755031"])
 
         assert result.opportunities[0].id == "5755031"
         assert result.opportunities[0].custom_field_values == ()
-
-    def test_rejects_more_than_fifty_ids(self) -> None:
-        with pytest.raises(ValidationError):
-            _INPUT.validate_python({"ids": [str(i) for i in range(MAX_OPPORTUNITY_IDS + 1)]})
-
-    def test_rejects_an_empty_id_list(self) -> None:
-        with pytest.raises(ValidationError):
-            _INPUT.validate_python({"ids": []})
-
-    @pytest.mark.parametrize("blank", ["", "   "])
-    def test_rejects_a_blank_id(self, blank: str) -> None:
-        with pytest.raises(ValidationError):
-            _INPUT.validate_python({"ids": [blank]})
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_unreadable_document_for_one_id_keeps_the_rest(
         self, client: BackstopClient
     ) -> None:
-        respx.get(_STAGES_URL).mock(return_value=_stages_response())
         respx.get(f"{BASE_URL}/opportunities/5755031").mock(
             return_value=_document(_open_deal(), included=_deal_included())
         )
@@ -452,20 +411,10 @@ class TestGetOpportunitiesByIds:
             return_value=httpx.Response(200, json={"data": []})
         )
 
-        result = await _call(client, ids=["5755031", "broken"])
+        result = await _run(client, ids=["5755031", "broken"])
 
         assert [row.id for row in result.opportunities] == ["5755031"]
         assert result.not_found == ()
         assert len(result.errors) == 1
         assert result.errors[0].id == "broken"
         assert result.errors[0].detail == "unreadable opportunity document"
-
-    def test_is_registered(self) -> None:
-        assert get_opportunities_by_ids in TOOLS
-
-    def test_docstring_names_the_token_cost_and_batching(self) -> None:
-        doc = get_opportunities_by_ids.__doc__
-        assert doc is not None
-        assert "37,000" in doc
-        assert "batch" in doc.lower()
-        assert "not_found" in doc

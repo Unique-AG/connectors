@@ -1,9 +1,10 @@
+import logging
 from datetime import date
 from typing import Literal
+from urllib.parse import quote
 
 from pydantic import ValidationError
 
-from backstop_mcp.app import logger
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
@@ -19,6 +20,8 @@ from backstop_mcp.features.opportunities.responses import (
     GetOpportunitiesResponse,
     OpportunityResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 type OpportunityStatus = Literal["open", "closed", "all"]
 
@@ -42,9 +45,9 @@ class GetOpportunitiesQuery:
         entity_id: str,
         status: OpportunityStatus = "all",
         custom_fields_filters: CustomFieldFilters,
-    ) -> GetOpportunitiesResponse | None:
+    ) -> GetOpportunitiesResponse:
         pages = await self._client.paginate(
-            f"/{segment}/{entity_id}/opportunities",
+            f"/{segment}/{quote(entity_id, safe='')}/opportunities",
             schema=OpportunityResource,
             params={"include": "stage,stageHistory"},
             # Explicitly unbounded: `paginate` caps at 10_000 records by default, so passing
@@ -68,16 +71,21 @@ class GetOpportunitiesQuery:
                     exc_info=exc,
                 )
 
-        opportunities = tuple(sorted(opportunities_mapped, key=_date_entered_order_key))
-        open_count = sum(1 for opportunity in pages.items if opportunity.attributes.is_open is True)
-        closed_count = sum(
-            1 for opportunity in pages.items if opportunity.attributes.is_open is False
+        selected = tuple(
+            opportunity
+            for opportunity in opportunities_mapped
+            if _matches_status(opportunity, status)
         )
+        opportunities = tuple(sorted(selected, key=_date_entered_order_key, reverse=True))
         result = GetOpportunitiesResponse(
             opportunities=opportunities,
-            total=len(pages.items),
-            open_count=open_count,
-            closed_count=closed_count,
+            total=len(opportunities_mapped),
+            open_count=sum(
+                1 for opportunity in opportunities_mapped if opportunity.is_open is True
+            ),
+            closed_count=sum(
+                1 for opportunity in opportunities_mapped if opportunity.is_open is False
+            ),
         )
         logger.info(
             "opportunities.fetched",
@@ -90,6 +98,19 @@ class GetOpportunitiesQuery:
             },
         )
         return result
+
+
+def _matches_status(opportunity: OpportunityResponse, status: OpportunityStatus) -> bool:
+    """Whether one deal belongs in an answer asked for `status`.
+
+    A deal whose `isOpen` did not arrive matches neither `open` nor `closed` — it is as wrong to
+    file it under one as the other — and is only returned by `all`.
+    """
+    if status == "all":
+        return True
+    if opportunity.is_open is None:
+        return False
+    return opportunity.is_open is (status == "open")
 
 
 def _date_entered_order_key(opportunity: OpportunityResponse) -> tuple[bool, date]:

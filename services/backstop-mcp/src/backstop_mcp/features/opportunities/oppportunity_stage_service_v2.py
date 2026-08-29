@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Self
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
-from backstop_mcp.features.opportunities import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.fetch_opportunity_stages import fetch_opportunity_stages
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.timed_gate import TimedGate

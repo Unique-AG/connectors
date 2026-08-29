@@ -1,10 +1,12 @@
+import logging
 from collections.abc import Mapping, Sequence
 
 from pydantic import ValidationError
 
-from backstop_mcp.app import logger
 from backstop_mcp.backstop_client import included_by_type
-from backstop_mcp.features.opportunities import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+
+logger = logging.getLogger(__name__)
 
 
 def get_stage_id_to_name_map(
