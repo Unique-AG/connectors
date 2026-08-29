@@ -15,8 +15,14 @@ from dataclasses import dataclass, field
 import httpx
 from pydantic import SecretStr
 
-from backstop_mcp.backstop_client.client import SYSTEM_INFO_PATH, AuthFailureHook, BackstopClient
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret, CallerAuthContext
+from backstop_mcp.backstop_client.client import SYSTEM_INFO_PATH, BackstopClient
+from backstop_mcp.backstop_client.credential import (
+    AuthFailureHook,
+    BackstopCredentialSecret,
+    CallerAuthContext,
+    CallerSession,
+    CallerSessionProvider,
+)
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopAuthError,
@@ -112,6 +118,7 @@ class BackstopClientFactory:
         self._retry_policy: RetryPolicy = RetryPolicy.from_settings(retry_settings)
         self._http_client: httpx.AsyncClient | None = None
         self._http_client_lock: asyncio.Lock = asyncio.Lock()
+        self._caller_client: BackstopClient | None = None
 
     @property
     def settings(self) -> BackstopTransportSettings:
@@ -136,45 +143,65 @@ class BackstopClientFactory:
         on_auth_failure: AuthFailureHook | None = None,
         subject: str | None = None,
     ) -> BackstopClient:
-        """Build a client authenticated as `credential`.
+        """Build a client pinned to `credential` for its whole life.
+
+        The counterpart to `for_current_caller`, which pins nothing and resolves per call.
+        Used where there is no ambient MCP caller to read one from — login verification, and
+        tests.
 
         Deliberately *not* an async context manager: there is nothing per-client to release.
-        Concurrency is gated around each individual request inside `BackstopClient.raw_request`,
-        so a caller can hold a client across an elicitation prompt, or fan several requests
-        out of one client, without either starving itself or breaching Backstop's limit.
+        Concurrency is gated around each individual request inside `BackstopClient`, so a
+        caller can hold a client across an elicitation prompt, or fan several requests out of
+        one client, without either starving itself or breaching Backstop's limit.
 
         `on_auth_failure` is None only for login (`verify_credential`). That request *is* the
         credential check — a hook would re-probe `/system-info` after the probe already 401'd.
-        Mid-session callers (`for_current_caller`) always pass a revoke hook.
+        Mid-session callers (`for_current_caller`) always carry a revoke hook.
         """
-        return BackstopClient(
-            credential,
-            self._settings,
-            http_client=self._shared_http_client,
-            gate=self._gates.hold,
-            retry_policy=self._retry_policy,
-            on_auth_failure=on_auth_failure,
-            subject=subject,
+        pinned = CallerSession(
+            credential=credential, subject=subject, on_auth_failure=on_auth_failure
         )
 
-    async def for_current_caller(self) -> BackstopClient:
-        """Build a client authenticated as the in-flight MCP caller.
+        async def pinned_session() -> CallerSession:
+            return pinned
 
-        Resolves that caller's own stored credential via the injected `CallerAuthContext` —
-        raises `auth.context.NotConnectedError` if they haven't completed the login flow. A
-        mid-session Backstop 401 re-checks `/system-info` before revoking; only a confirmed
-        rejection revokes their MCP tokens, and that same `/mcp` call then returns HTTP 401.
+        return self._client(pinned_session)
+
+    def for_current_caller(self) -> BackstopClient:
+        """The one process-wide client that authenticates as whoever is mid-request.
+
+        A singleton rather than a per-request object: it holds no credential, only a provider
+        that resolves the in-flight caller's from the injected `CallerAuthContext` at the start
+        of each call. So the lookup — and the `auth.context.NotConnectedError` it raises when
+        the caller never completed the login flow — happens when a tool first *uses* the
+        client, not when it is injected. A mid-session Backstop 401 re-checks `/system-info`
+        before revoking; only a confirmed rejection revokes their MCP tokens, and that same
+        `/mcp` call then returns HTTP 401.
         """
         assert self._auth is not None, (
             "BackstopClientFactory was built without an auth context; "
             "for_current_caller() needs one to resolve the caller's credential"
         )
+        if self._caller_client is None:
+            self._caller_client = self._client(self._current_caller_session)
+        return self._caller_client
+
+    async def _current_caller_session(self) -> CallerSession:
+        assert self._auth is not None
         auth = self._auth
-        credential = await auth.current_credential()
-        return self.for_credential(
-            credential,
-            on_auth_failure=auth.revoke_current_subject_tokens,
+        return CallerSession(
+            credential=await auth.current_credential(),
             subject=auth.current_subject(),
+            on_auth_failure=auth.revoke_current_subject_tokens,
+        )
+
+    def _client(self, session: CallerSessionProvider) -> BackstopClient:
+        return BackstopClient(
+            self._settings,
+            session=session,
+            http_client=self._shared_http_client,
+            gate=self._gates.hold,
+            retry_policy=self._retry_policy,
         )
 
     async def verify_credential(self, username: str, api_token: str) -> bool:

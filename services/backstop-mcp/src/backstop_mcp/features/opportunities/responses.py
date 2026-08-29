@@ -22,13 +22,15 @@ both `OpportunityResponse.stage` and `StageChangeResponse.stage`, because a move
 still a fact even when the vocabulary has moved on.
 """
 
-from typing import Annotated, ClassVar, Self
+from typing import Annotated, ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field, StringConstraints
 
-from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
+from backstop_mcp.features.opportunities.queries.opportuntity_resource import (
+    OpportunityResource,
+)
 from backstop_mcp.models import OmitNoneModel
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
@@ -192,7 +194,7 @@ class OpportunityResponse(OmitNoneModel):
     @classmethod
     def from_resource(
         cls,
-        resource: BackstopApiResource[dict[str, object]],
+        resource: OpportunityResource,
         *,
         stage: str | None,
         stage_id: str | None,
@@ -207,7 +209,7 @@ class OpportunityResponse(OmitNoneModel):
         """
         return cls.model_validate(
             {
-                **resource.attributes,
+                **resource.attributes.model_dump(by_alias=True),
                 "id": resource.id,
                 "stage": stage,
                 "stage_id": stage_id,
@@ -217,7 +219,7 @@ class OpportunityResponse(OmitNoneModel):
         )
 
 
-class OpportunityFetchResponse(OmitNoneModel):
+class GetOpportunitiesResponse(OmitNoneModel):
     """One party's opportunities after filtering and ordering, plus what the whole set says.
 
     `total` and the two counts are over everything fetched — the party's complete set, since the
@@ -249,13 +251,6 @@ class OpportunityFetchResponse(OmitNoneModel):
     closed_count: int = Field(
         description="How many of those are closed, counted the same way as `open_count`."
     )
-    custom_fields_unavailable: bool = Field(
-        default=False,
-        description=(
-            "True when the custom-field catalog could not be loaded, so `custom_field_values` "
-            "is empty rather than 'none recorded'."
-        ),
-    )
 
 
 class OpportunityIdErrorResponse(OmitNoneModel):
@@ -267,12 +262,21 @@ class OpportunityIdErrorResponse(OmitNoneModel):
     detail: str = Field(description="Why this id was not returned.")
 
 
-class OpportunitiesByIdsFetchResponse(OmitNoneModel):
-    """A by-id batch after each GET settled: found deals, missing ids, and per-id errors."""
+class GetOpportunitiesByIdsResponse(OmitNoneModel):
+    """A completed by-id batch: found deals, missing ids, and per-id errors."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    opportunities: tuple[OpportunityResponse, ...]
-    not_found: tuple[str, ...]
-    errors: tuple[OpportunityIdErrorResponse, ...]
-    custom_fields_unavailable: bool = False
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': every requested id was attempted.",
+    )
+    opportunities: tuple[OpportunityResponse, ...] = Field(
+        description="Deals that were found, in the order their ids were requested."
+    )
+    not_found: tuple[str, ...] = Field(
+        default=(),
+        description="Requested ids that Backstop answered as 404.",
+    )
+    errors: tuple[OpportunityIdErrorResponse, ...] = Field(
+        default=(),
+        description="Requested ids that failed for a reason other than 404.",
+    )

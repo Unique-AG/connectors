@@ -11,7 +11,7 @@ import respx
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.opportunities import (
-    OpportunityFetchResponse,
+    GetOpportunitiesResponse,
     OpportunityStageDto,
     OpportunityStatus,
     fetch_opportunities,
@@ -150,7 +150,7 @@ async def _fetch(
     *,
     status: OpportunityStatus = "all",
     vocabulary: dict[str, OpportunityStageDto] | None = None,
-) -> OpportunityFetchResponse:
+) -> GetOpportunitiesResponse:
     respx.get(_STAGES_URL).mock(return_value=_stages_response(vocabulary))
     return await fetch_opportunities(
         client,

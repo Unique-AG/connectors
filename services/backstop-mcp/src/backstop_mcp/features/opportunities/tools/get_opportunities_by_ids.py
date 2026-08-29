@@ -2,58 +2,25 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
-    CustomFieldsService,
-    get_custom_fields_service,
 )
-from backstop_mcp.features.opportunities import (
+from backstop_mcp.features.opportunities.dependencies import get_opportunities_by_ids_query_factory
+from backstop_mcp.features.opportunities.queries.get_opportunities_by_ids_query import (
     MAX_OPPORTUNITY_IDS,
-    OpportunityIdErrorResponse,
-    OpportunityResponse,
-    OpportunityStagesService,
-    fetch_opportunities_by_ids,
-    get_opportunity_stages_service,
+    GetOpportunitiesByIdsQuery,
 )
-from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
+from backstop_mcp.features.opportunities.responses import GetOpportunitiesByIdsResponse
+from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
-
-
-class OpportunitiesByIdsResolvedResponse(OmitNoneModel):
-    """A completed by-id batch: found deals, missing ids, and per-id errors."""
-
-    status: Literal["resolved"] = Field(
-        default="resolved",
-        description="Always 'resolved': every requested id was attempted.",
-    )
-    opportunities: tuple[OpportunityResponse, ...] = Field(
-        description="Deals that were found, in the order their ids were requested."
-    )
-    not_found: tuple[str, ...] = Field(
-        default=(),
-        description="Requested ids that Backstop answered as 404.",
-    )
-    errors: tuple[OpportunityIdErrorResponse, ...] = Field(
-        default=(),
-        description="Requested ids that failed for a reason other than 404.",
-    )
-    custom_fields_unavailable: bool = Field(
-        default=False,
-        description=(
-            "True when the custom-field catalog could not be loaded, so `custom_field_values` "
-            "is empty rather than 'none recorded'."
-        ),
-    )
 
 
 @tool(
@@ -63,7 +30,7 @@ class OpportunitiesByIdsResolvedResponse(OmitNoneModel):
         idempotentHint=True,
         openWorldHint=False,
     ),
-    output_schema=published_output_schema(OpportunitiesByIdsResolvedResponse),
+    output_schema=published_output_schema(GetOpportunitiesByIdsResponse),
 )
 async def get_opportunities_by_ids(
     ids: Annotated[
@@ -108,10 +75,10 @@ async def get_opportunities_by_ids(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client),
-    opportunity_stages_service: OpportunityStagesService = Depends(get_opportunity_stages_service),
-    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
-) -> OpportunitiesByIdsResolvedResponse:
+    get_opportunities_by_ids_query: GetOpportunitiesByIdsQuery = Depends(
+        get_opportunities_by_ids_query_factory
+    ),
+) -> GetOpportunitiesByIdsResponse:
     """Fetch up to 50 opportunities by id, with resolved custom fields.
 
     Use after search_opportunities when the question needs a field that is not on the search
@@ -127,12 +94,9 @@ async def get_opportunities_by_ids(
         "opportunities.by_ids.start",
         extra={"count": len(opportunity_ids), "include_stage_history": include_stage_history},
     )
-    fetched = await fetch_opportunities_by_ids(
-        client,
+    result = await get_opportunities_by_ids_query.run(
         opportunity_ids=opportunity_ids,
         include_stage_history=include_stage_history,
-        opportunity_stages_service=opportunity_stages_service,
-        custom_fields_service=custom_fields_service,
         custom_fields_filters=CustomFieldFilters(
             definition_ids=coerce_ids(custom_field_definition_ids),
             names=tuple(custom_field_names),
@@ -141,14 +105,9 @@ async def get_opportunities_by_ids(
     logger.info(
         "opportunities.by_ids.completed",
         extra={
-            "returned": len(fetched.opportunities),
-            "not_found": len(fetched.not_found),
-            "errors": len(fetched.errors),
+            "returned": len(result.opportunities),
+            "not_found": len(result.not_found),
+            "errors": len(result.errors),
         },
     )
-    return OpportunitiesByIdsResolvedResponse(
-        opportunities=fetched.opportunities,
-        not_found=fetched.not_found,
-        errors=fetched.errors,
-        custom_fields_unavailable=fetched.custom_fields_unavailable,
-    )
+    return result

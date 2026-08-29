@@ -6,7 +6,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.includes import InternalOwnerResponse
 from backstop_mcp.features.system_users import (
     SystemUserDto,
@@ -80,7 +80,7 @@ async def list_system_users(
         bool,
         Field(description="Do not pass true unless the user reports a missing colleague."),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     system_users: SystemUsersService = Depends(get_system_users_service),
 ) -> ListSystemUsersResponse:
     """List our colleagues' Backstop logins.

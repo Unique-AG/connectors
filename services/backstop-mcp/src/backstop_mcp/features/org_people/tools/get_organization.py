@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
     CustomFieldsService,
@@ -189,7 +189,7 @@ async def get_organization(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> GetOrganizationResponse:
     """Fetch one Backstop organization by trusted Party ID or by name/email search.

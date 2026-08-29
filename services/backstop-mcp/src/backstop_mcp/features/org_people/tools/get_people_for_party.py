@@ -18,7 +18,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     get_employment_index_factory,
@@ -92,7 +92,7 @@ async def get_people_for_party(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
 ) -> GetPeopleForPartyResponse:
     """List the people Backstop links to an organization, with employment status at that org.

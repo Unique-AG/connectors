@@ -20,15 +20,7 @@ from backstop_mcp.features.opportunities.aggregate_search_opportunities import (
     aggregate_search_opportunities,
 )
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
-from backstop_mcp.features.opportunities.dependencies import get_opportunity_stages_service
-from backstop_mcp.features.opportunities.fetch_opportunities import (
-    OpportunityStatus,
-    fetch_opportunities,
-)
-from backstop_mcp.features.opportunities.fetch_opportunities_by_ids import (
-    MAX_OPPORTUNITY_IDS,
-    fetch_opportunities_by_ids,
-)
+from backstop_mcp.features.opportunities.dependencies import get_opportunity_stages_service_factory
 from backstop_mcp.features.opportunities.fetch_search_opportunities import (
     MAX_OPPORTUNITY_SCAN_RECORDS,
     fetch_search_opportunities,
@@ -40,29 +32,25 @@ from backstop_mcp.features.opportunities.internal_dto import (
 )
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import (
-    OpportunityFetchResponse,
+    GetOpportunitiesResponse,
     OpportunityIdErrorResponse,
     OpportunityResponse,
     StageChangeResponse,
 )
 
 __all__ = [
-    "MAX_OPPORTUNITY_IDS",
     "MAX_OPPORTUNITY_SCAN_RECORDS",
-    "OpportunityFetchResponse",
+    "GetOpportunitiesResponse",
     "OpportunityGroupBy",
     "OpportunityIdErrorResponse",
     "OpportunityResponse",
     "OpportunityStageDto",
     "OpportunityStageAttributes",
     "OpportunityStagesService",
-    "OpportunityStatus",
     "SearchOpportunitiesFetchDto",
     "SearchOpportunityDto",
     "StageChangeResponse",
     "aggregate_search_opportunities",
-    "fetch_opportunities",
-    "fetch_opportunities_by_ids",
     "fetch_search_opportunities",
-    "get_opportunity_stages_service",
+    "get_opportunity_stages_service_factory",
 ]

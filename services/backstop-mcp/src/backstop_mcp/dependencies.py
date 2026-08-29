@@ -121,10 +121,15 @@ def get_auth_provider() -> BackstopOAuthProvider:
     )
 
 
-async def get_backstop_client(
+def get_backstop_client_for_current_caller(
     factory: BackstopClientFactory = Depends(get_backstop_client_factory),
 ) -> BackstopClient:
-    return await factory.for_current_caller()
+    """The shared client that authenticates as whoever the in-flight request belongs to.
+
+    Hands back the factory's singleton rather than building one per call — the credential
+    lookup happens inside the client, when a tool actually issues a request.
+    """
+    return factory.for_current_caller()
 
 
 def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:

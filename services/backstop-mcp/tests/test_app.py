@@ -17,6 +17,7 @@ from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.app import create_app
+from backstop_mcp.backstop_client.client import SYSTEM_INFO_PATH
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import (
     get_backstop_client_factory,
@@ -27,7 +28,7 @@ from backstop_mcp.features.activity_history import get_activity_history_settings
 from backstop_mcp.features.auth import NotConnectedError
 from backstop_mcp.features.custom_fields import get_custom_fields_service
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
-from backstop_mcp.features.opportunities import get_opportunity_stages_service
+from backstop_mcp.features.opportunities import get_opportunity_stages_service_factory
 from backstop_mcp.server.tools import TOOLS
 
 _BASE_URL = "https://api.backstopsolutions.com"
@@ -101,7 +102,9 @@ class TestWiring:
         needs the provider (for the token-revocation hook), so this is the one step in the graph
         that can't be expressed by constructor order alone. If the cycle were open,
         `for_current_caller` would raise an `AssertionError` from the factory itself rather than
-        reaching the credential lookup that raises `NotConnectedError` below.
+        reaching the credential lookup that raises `NotConnectedError` below. That lookup is
+        lazy — the client is a singleton holding only a session provider — so it takes a
+        request to reach it, and it raises before any HTTP call is attempted.
 
         Deliberately built with `create_app` rather than taking `app_client`: `TestClient` runs
         the lifespan on its own portal thread and loop, and `cleanup_lifespan`'s sweep-on-start
@@ -123,7 +126,11 @@ class TestWiring:
         )
 
         with pytest.raises(NotConnectedError):
-            await get_backstop_client_factory().for_current_caller()
+            await (
+                get_backstop_client_factory()
+                .for_current_caller()
+                .raw_request("GET", SYSTEM_INFO_PATH)
+            )
 
     def test_the_factory_owns_the_settings_create_app_was_given(
         self, app_client: TestClient
@@ -178,7 +185,7 @@ class TestWiring:
         _ = app_client
         assert get_custom_fields_service() is not None
         assert get_backstop_client_factory() is not None
-        assert get_opportunity_stages_service() is not None
+        assert get_opportunity_stages_service_factory() is not None
 
     def test_lifespan_teardown_releases_the_services(
         self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch

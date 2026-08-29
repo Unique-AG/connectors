@@ -31,7 +31,7 @@ from backstop_mcp.features.opportunities.fetch_opportunities import (
 from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.responses import (
-    OpportunitiesByIdsFetchResponse,
+    GetOpportunitiesByIdsResponse,
     OpportunityIdErrorResponse,
     OpportunityResponse,
 )
@@ -117,7 +117,7 @@ async def _project_one(
                 stage_history(
                     resource,
                     included=resource_included_relations,
-                    side_loaded=side_loaded,
+                    opportunity_id_to_name_map=side_loaded,
                     opportunity_stages=opportunity_id_to_stage_map,
                 )
                 if include_stage_history
@@ -142,7 +142,7 @@ async def fetch_opportunities_by_ids(
     opportunity_stages_service: OpportunityStagesService,
     custom_fields_service: CustomFieldsService,
     custom_fields_filters: CustomFieldFilters,
-) -> OpportunitiesByIdsFetchResponse:
+) -> GetOpportunitiesByIdsResponse:
     """GET each id through the client gate; join custom fields from one catalog load."""
     assert len(opportunity_ids) <= MAX_OPPORTUNITY_IDS, (
         f"at most {MAX_OPPORTUNITY_IDS} opportunity ids per call, "
@@ -198,7 +198,7 @@ async def fetch_opportunities_by_ids(
             )
             continue
         opportunities.append(projected)
-    return OpportunitiesByIdsFetchResponse(
+    return GetOpportunitiesByIdsResponse(
         opportunities=tuple(opportunities),
         not_found=tuple(not_found),
         errors=tuple(errors),

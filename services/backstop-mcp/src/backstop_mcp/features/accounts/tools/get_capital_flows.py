@@ -10,7 +10,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
     MAX_CAPITAL_FLOW_SCAN_RECORDS,
     CapitalFlowDto,
@@ -180,7 +180,7 @@ async def get_capital_flows(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> CapitalFlowsResolvedResponse:
     """Subscriptions and redemptions in a date window — also the only share-class source.
 

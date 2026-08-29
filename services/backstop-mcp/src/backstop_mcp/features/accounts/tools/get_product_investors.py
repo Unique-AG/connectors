@@ -15,7 +15,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
     ProductAmbiguousResponse,
     ProductInvestorsResolvedResponse,
@@ -84,7 +84,7 @@ async def get_product_investors(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> GetProductInvestorsResponse:
     """The accounts in one product, and who owns them. No balances, no series.
 

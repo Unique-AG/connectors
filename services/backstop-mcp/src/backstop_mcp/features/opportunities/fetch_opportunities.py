@@ -138,7 +138,7 @@ def resolve_stage_name(
     if stage_id is None:
         return None
     if opportunity_id_to_name_map is not None:
-        side_loaded_name = opportunity_id_to_name_map.get(stage_id)
+        side_loaded_name = opportunity_id_to_name_map.get(stage_id, None)
         if side_loaded_name is not None:
             return side_loaded_name
     known = opportunity_id_to_stage_map.get(stage_id)
@@ -196,7 +196,7 @@ def stage_history(
     resource: OpportunityResource,
     *,
     included: Sequence[dict[str, object]],
-    side_loaded: Mapping[str, str],
+    opportunity_id_to_name_map: Mapping[str, str],
     opportunity_stages: Mapping[str, OpportunityStageDto],
 ) -> tuple[StageChangeResponse, ...]:
     """One deal's stage moves, in the order Backstop links them.
@@ -226,7 +226,7 @@ def stage_history(
                     **attributes,
                     "stage": resolve_stage_name(
                         stage_id,
-                        opportunity_id_to_name_map=side_loaded,
+                        opportunity_id_to_name_map=opportunity_id_to_name_map,
                         opportunity_id_to_stage_map=opportunity_stages,
                     ),
                     "stage_id": stage_id,
@@ -280,7 +280,7 @@ async def _project_opportunities(
                     stage_history=stage_history(
                         resource,
                         included=included,
-                        side_loaded=opportunity_id_to_name_map,
+                        opportunity_id_to_name_map=opportunity_id_to_name_map,
                         opportunity_stages=opportunity_id_to_stage_map,
                     ),
                     custom_field_values=tuple(custom_field_values),

@@ -24,7 +24,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
     PartyAccountsResolvedResponse,
     fetch_holdings,
@@ -99,7 +99,7 @@ async def get_accounts_for_party(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> GetAccountsForPartyResponse:
     """What a person or organization holds: their accounts, with balances, across products.
 

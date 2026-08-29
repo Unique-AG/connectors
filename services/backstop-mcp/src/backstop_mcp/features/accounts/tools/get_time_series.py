@@ -18,7 +18,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
     ProductAmbiguousResponse,
     TimeSeriesEntityType,
@@ -117,7 +117,7 @@ async def get_time_series(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> GetTimeSeriesResponse:
     """Dated points of one time series on one account or one product.
 

@@ -6,7 +6,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_tags import (
     ActivityTagResponse,
     ActivityTagsService,
@@ -55,7 +55,7 @@ async def list_activity_tags(
         bool,
         Field(description="Do not pass true unless the user reports a missing field."),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     activity_tags: ActivityTagsService = Depends(get_activity_tags_service),
 ) -> ListActivityTagsResponse:
     """List the standard Backstop activity-tag catalog.

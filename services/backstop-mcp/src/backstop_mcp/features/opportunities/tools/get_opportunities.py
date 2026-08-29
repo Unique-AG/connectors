@@ -22,20 +22,18 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
-    CustomFieldsService,
-    get_custom_fields_service,
 )
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
-    OpportunityFetchResponse,
     OpportunityResponse,
-    OpportunityStagesService,
+)
+from backstop_mcp.features.opportunities.dependencies import get_opportunities_query_factory
+from backstop_mcp.features.opportunities.queries.get_opportunities_query import (
+    GetOpportunitiesQuery,
     OpportunityStatus,
-    fetch_opportunities,
-    get_opportunity_stages_service,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -100,19 +98,6 @@ class OpportunitiesResolvedResponse(OmitNoneModel):
 type GetOpportunitiesResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OpportunitiesResolvedResponse
 )
-
-
-def _resolved_response(
-    *, resolved: ResolvedPartyResponse, fetched: OpportunityFetchResponse
-) -> OpportunitiesResolvedResponse:
-    return OpportunitiesResolvedResponse(
-        resolved=resolved,
-        opportunities=fetched.opportunities,
-        total=fetched.total,
-        open_count=fetched.open_count,
-        closed_count=fetched.closed_count,
-        custom_fields_unavailable=fetched.custom_fields_unavailable,
-    )
 
 
 @tool(
@@ -186,9 +171,8 @@ async def get_opportunities(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client),
-    opportunity_stages_service: OpportunityStagesService = Depends(get_opportunity_stages_service),
-    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    get_opportunities_query: GetOpportunitiesQuery = Depends(get_opportunities_query_factory),
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
 
@@ -227,26 +211,20 @@ async def get_opportunities(
         "opportunities.get.start",
         extra={"segment": party.search_type, "entity_id": party.id, "status": status},
     )
-    fetched = await fetch_opportunities(
-        client,
+    fetched = await get_opportunities_query.run(
         segment=party.search_type,
         entity_id=party.id,
         status=status,
-        opportunity_stages_service=opportunity_stages_service,
-        custom_fields_service=custom_fields_service,
-        custom_field_filters=CustomFieldFilters(
+        custom_fields_filters=CustomFieldFilters(
             definition_ids=coerce_ids(custom_field_definition_ids),
             names=tuple(custom_field_names),
         ),
     )
-    logger.info(
-        "opportunities.get.completed",
-        extra={
-            "segment": party.search_type,
-            "entity_id": party.id,
-            "status": status,
-            "total": fetched.total,
-            "returned": len(fetched.opportunities),
-        },
+    assert fetched is not None, "GetOpportunitiesQuery.run answers or raises, never returns None"
+    return OpportunitiesResolvedResponse(
+        resolved=ResolvedPartyResponse.from_party(party),
+        opportunities=fetched.opportunities,
+        total=fetched.total,
+        open_count=fetched.open_count,
+        closed_count=fetched.closed_count,
     )
-    return _resolved_response(resolved=ResolvedPartyResponse.from_party(party), fetched=fetched)
