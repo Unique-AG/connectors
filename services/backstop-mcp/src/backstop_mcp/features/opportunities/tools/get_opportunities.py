@@ -220,7 +220,6 @@ async def get_opportunities(
             names=tuple(custom_field_names),
         ),
     )
-    assert fetched is not None, "GetOpportunitiesQuery.run answers or raises, never returns None"
     return OpportunitiesResolvedResponse(
         resolved=ResolvedPartyResponse.from_party(party),
         opportunities=fetched.opportunities,

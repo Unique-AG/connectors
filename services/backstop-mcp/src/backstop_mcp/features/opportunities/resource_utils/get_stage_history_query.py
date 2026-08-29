@@ -1,16 +1,18 @@
+import logging
 from collections.abc import Mapping, Sequence
 
 from pydantic import TypeAdapter, ValidationError
 
-from backstop_mcp.app import logger
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef, follow_included
-from backstop_mcp.features.opportunities import StageChangeResponse
 from backstop_mcp.features.opportunities.oppportunity_stage_service_v2 import (
     OpportunityStagesServiceV2,
 )
 from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map import (
     get_stage_id_to_name_map,
 )
+from backstop_mcp.features.opportunities.responses import StageChangeResponse
+
+logger = logging.getLogger(__name__)
 
 _DictAttributesAdapter: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
 
@@ -49,12 +51,9 @@ class GetStageHistoryQuery:
                 continue
 
             stage_ref = ResourceRef.safe_model_validate(attributes.get("stage", None))
-
-            if stage_ref is None:
-                continue
-
+            stage_id = stage_ref.resource_id if stage_ref is not None else None
             stage_name = await self._opportunity_stages_service.get_stage_name(
-                stage_id=stage_ref.resource_id,
+                stage_id=stage_id,
                 preloaded_opportunity_id_to_name=preloaded_opportunity_id_to_name,
             )
             changes.append(
@@ -62,7 +61,7 @@ class GetStageHistoryQuery:
                     {
                         **attributes,
                         "stage": stage_name,
-                        "stage_id": stage_ref.resource_id,
+                        "stage_id": stage_id,
                     }
                 )
             )

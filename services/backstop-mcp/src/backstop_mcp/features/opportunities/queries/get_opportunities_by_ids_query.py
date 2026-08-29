@@ -1,11 +1,13 @@
 import asyncio
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from http import HTTPStatus
+from urllib.parse import quote
 
 import httpx
+from pydantic import ValidationError
 
-from backstop_mcp.app import logger
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiResourceDocument,
@@ -24,6 +26,8 @@ from backstop_mcp.features.opportunities.responses import (
     OpportunityIdErrorResponse,
     OpportunityResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 MAX_OPPORTUNITY_IDS = 50
 
@@ -72,6 +76,7 @@ class GetOpportunitiesByIdsQuery:
                     opportunity_id=opportunity_id,
                     include_query_param=include_query_param,
                     custom_fields_filters=custom_fields_filters,
+                    include_stage_history=include_stage_history,
                 )
                 for opportunity_id in opportunity_ids
             ),
@@ -111,8 +116,9 @@ class GetOpportunitiesByIdsQuery:
         opportunity_id: str,
         include_query_param: str,
         custom_fields_filters: CustomFieldFilters,
+        include_stage_history: bool,
     ) -> _FetchedOne:
-        path = f"/opportunities/{opportunity_id}"
+        path = f"/opportunities/{quote(opportunity_id, safe='')}"
         try:
             document = await self._client.get(
                 path,
@@ -124,6 +130,7 @@ class GetOpportunitiesByIdsQuery:
                 row=resource_raw,
                 api_include_resources=document.included,
                 custom_fields_filters=custom_fields_filters,
+                include_stage_history=include_stage_history,
             )
             return _FetchedOne(
                 opportunity_id=opportunity_id,
@@ -138,6 +145,13 @@ class GetOpportunitiesByIdsQuery:
             return _FetchedOne(
                 opportunity_id=opportunity_id, error="unreadable opportunity document"
             )
+        except ValidationError:
+            logger.warning(
+                "opportunities.by_ids.record.unreadable",
+                extra={"opportunity_id": opportunity_id},
+                exc_info=True,
+            )
+            return _FetchedOne(opportunity_id=opportunity_id, error="unreadable opportunity record")
         except httpx.RequestError:
             # Only a 429 classified as `concurrency` is retried, so a timeout on one of 50 ids
             # arrives here. Failing the batch over it would cost the caller the other 49.

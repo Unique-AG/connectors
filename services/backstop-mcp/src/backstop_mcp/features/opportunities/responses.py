@@ -26,10 +26,11 @@ from typing import Annotated, ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field, StringConstraints
 
+from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
 from backstop_mcp.features.opportunities.queries.opportuntity_resource import (
-    OpportunityResource,
+    OpportunityResourceAttributes,
 )
 from backstop_mcp.models import OmitNoneModel
 
@@ -194,7 +195,7 @@ class OpportunityResponse(OmitNoneModel):
     @classmethod
     def from_resource(
         cls,
-        resource: OpportunityResource,
+        resource: BackstopApiResource[OpportunityResourceAttributes | dict[str, object]],
         *,
         stage: str | None,
         stage_id: str | None,
@@ -207,9 +208,13 @@ class OpportunityResponse(OmitNoneModel):
         Backstop does not put in `attributes` are all that is supplied here. Raises
         `ValidationError` for a record the model cannot read, which the caller drops on its own.
         """
+        attributes = resource.attributes
+        dumped = (
+            attributes if isinstance(attributes, dict) else attributes.model_dump(by_alias=True)
+        )
         return cls.model_validate(
             {
-                **resource.attributes.model_dump(by_alias=True),
+                **dumped,
                 "id": resource.id,
                 "stage": stage,
                 "stage_id": stage_id,

@@ -12,7 +12,7 @@ from backstop_mcp.features.opportunities.tools.search_opportunities import (
     search_opportunities,
 )
 from backstop_mcp.server.tools import TOOLS
-from tests.features.opportunities.test_fetch_opportunities import VOCABULARY
+from tests.features.opportunities.conftest import VOCABULARY
 from tests.helpers import (
     BASE_URL,
     opportunity_stages_service,

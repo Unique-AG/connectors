@@ -26,12 +26,6 @@ from backstop_mcp.features.opportunities.api_responses import (
     SearchContactAttributes,
     SearchProductAttributes,
 )
-from backstop_mcp.features.opportunities.fetch_opportunities import (
-    OpportunityResource,
-    current_stage_id,
-    resolve_stage_name,
-    stage_names_from_included,
-)
 from backstop_mcp.features.opportunities.internal_dto import (
     InvestorChipDto,
     OpportunityStageDto,
@@ -40,7 +34,9 @@ from backstop_mcp.features.opportunities.internal_dto import (
     SearchOpportunityDto,
 )
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
+from backstop_mcp.features.opportunities.resource_utils import get_stage_id_to_name_map
 from backstop_mcp.features.opportunities.responses import OpportunityResponse
+from backstop_mcp.utils import first_item
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +61,12 @@ _OPPORTUNITY_FIELDS = (
 
 __all__ = ["MAX_OPPORTUNITY_SCAN_RECORDS", "fetch_search_opportunities"]
 
+type SearchOpportunityResource = BackstopApiResource[dict[str, object]]
+
 
 def _chip_from_index[T](
     index: IncludedIndex,
-    resource: OpportunityResource,
+    resource: SearchOpportunityResource,
     relationship: str,
     *,
     schema: type[IncludedResource[T]],
@@ -79,7 +77,7 @@ def _chip_from_index[T](
     return included_resource(matches[0], schema=schema)
 
 
-def _investor(index: IncludedIndex, resource: OpportunityResource) -> InvestorChipDto | None:
+def _investor(index: IncludedIndex, resource: SearchOpportunityResource) -> InvestorChipDto | None:
     chip = _chip_from_index(
         index, resource, "investor", schema=IncludedResource[SearchContactAttributes]
     )
@@ -94,7 +92,7 @@ def _investor(index: IncludedIndex, resource: OpportunityResource) -> InvestorCh
     )
 
 
-def _product(index: IncludedIndex, resource: OpportunityResource) -> ProductChipDto | None:
+def _product(index: IncludedIndex, resource: SearchOpportunityResource) -> ProductChipDto | None:
     chip = _chip_from_index(
         index, resource, "product", schema=IncludedResource[SearchProductAttributes]
     )
@@ -132,13 +130,28 @@ def _from_deal(
     )
 
 
+def _resolve_stage_name(
+    stage_id: str | None,
+    *,
+    side_loaded: Mapping[str, str],
+    opportunity_id_to_stage_map: Mapping[str, OpportunityStageDto],
+) -> str | None:
+    if stage_id is None:
+        return None
+    side_loaded_name = side_loaded.get(stage_id)
+    if side_loaded_name is not None:
+        return side_loaded_name
+    known = opportunity_id_to_stage_map.get(stage_id)
+    return known.name if known is not None else None
+
+
 def _project(
-    items: Sequence[OpportunityResource],
+    items: Sequence[SearchOpportunityResource],
     *,
     included: Sequence[dict[str, object]],
     opportunity_id_to_stage_map: Mapping[str, OpportunityStageDto],
 ) -> tuple[tuple[SearchOpportunityDto, ...], int]:
-    side_loaded = stage_names_from_included(included)
+    side_loaded = get_stage_id_to_name_map(included)
     # Indexed once for the whole walk. `follow_included` indexes on every call, and this loop
     # follows two relationships per row against one array holding every side-loaded investor,
     # product and stage from every page — 1,206 rows would rebuild that map 2,412 times.
@@ -146,13 +159,13 @@ def _project(
     projected: list[SearchOpportunityDto] = []
     dropped = 0
     for resource in items:
-        stage_id = current_stage_id(resource)
+        stage_id = first_item(resource.related_ids("stage"))
         try:
             deal = OpportunityResponse.from_resource(
                 resource,
-                stage=resolve_stage_name(
+                stage=_resolve_stage_name(
                     stage_id,
-                    opportunity_id_to_name_map=side_loaded,
+                    side_loaded=side_loaded,
                     opportunity_id_to_stage_map=opportunity_id_to_stage_map,
                 ),
                 stage_id=stage_id,
