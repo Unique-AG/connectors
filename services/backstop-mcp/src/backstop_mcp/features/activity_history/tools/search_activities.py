@@ -21,7 +21,7 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
     BackstopRateLimitError,
 )
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
@@ -272,7 +272,7 @@ async def search_activities(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> GetSearchActivitiesResponse:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 

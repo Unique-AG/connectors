@@ -14,7 +14,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.collection_scan import (
     AggregateBucketResponse,
     ScanCoverageResponse,
@@ -29,7 +29,7 @@ from backstop_mcp.features.opportunities import (
     SearchOpportunityDto,
     aggregate_search_opportunities,
     fetch_search_opportunities,
-    get_opportunity_stages_service,
+    get_opportunity_stages_service_factory,
 )
 from backstop_mcp.models import OmitNoneModel, published_output_schema
 
@@ -302,8 +302,10 @@ async def search_opportunities(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
-    opportunity_stages_service: OpportunityStagesService = Depends(get_opportunity_stages_service),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    opportunity_stages_service: OpportunityStagesService = Depends(
+        get_opportunity_stages_service_factory
+    ),
 ) -> SearchOpportunitiesResolvedResponse:
     """Walk the firm-wide pipeline.
 

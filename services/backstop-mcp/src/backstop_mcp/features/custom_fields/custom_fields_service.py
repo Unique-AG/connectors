@@ -83,6 +83,10 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
             return None
         return catalog
 
+    async def is_catalog_available(self, client: BackstopClient) -> bool:
+        catalog = await self.load_catalog(client=client)
+        return catalog is not None
+
     async def join_values(
         self,
         client: BackstopClient,

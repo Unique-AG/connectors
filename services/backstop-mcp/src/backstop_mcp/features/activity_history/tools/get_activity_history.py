@@ -27,7 +27,7 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     BackstopClient,
 )
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_history import (
     ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
@@ -76,7 +76,7 @@ __all__ = [
 async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     activity_history: ActivityHistorySettings = Depends(get_activity_history_settings),
 ) -> GetActivityHistoryResponse:
     """Party-scoped stream pages. Do not start here — always use `search_activities` first.

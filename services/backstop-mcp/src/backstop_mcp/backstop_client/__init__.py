@@ -12,8 +12,11 @@ from backstop_mcp.backstop_client.client import (
     BackstopClient,
 )
 from backstop_mcp.backstop_client.credential import (
+    AuthFailureHook,
     BackstopCredentialSecret,
     CallerAuthContext,
+    CallerSession,
+    CallerSessionProvider,
 )
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
@@ -55,6 +58,7 @@ from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
 __all__ = [
+    "AuthFailureHook",
     "BackstopApiCollectionDocument",
     "BackstopApiError",
     "BackstopApiResource",
@@ -72,6 +76,8 @@ __all__ = [
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
+    "CallerSession",
+    "CallerSessionProvider",
     "IncludedIndex",
     "IncludedResource",
     "PageResult",

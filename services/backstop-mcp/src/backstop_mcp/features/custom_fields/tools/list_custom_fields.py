@@ -7,7 +7,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.custom_fields import (
     CustomFieldDefinitionDto,
     CustomFieldDefinitionResponse,
@@ -71,7 +71,7 @@ async def list_custom_fields(
         bool,
         Field(description="Do not pass true unless the user reports a missing field."),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> ListCustomFieldsResponse:
     """List custom-field definitions for the requested standard Backstop entity types.

@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 from http import HTTPStatus
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Self
 
 from pydantic import (
     BaseModel,
@@ -49,7 +49,7 @@ class BackstopRelationship(BaseModel):
         if self.data is None:
             return ()
         refs = self.data if isinstance(self.data, list) else [self.data]
-        return tuple(ref.id for ref in refs if ref.id)
+        return tuple(ref.id.strip() for ref in refs if ref.id and ref.id.strip() != "")
 
 
 class BackstopApiResource[AttrT](BaseModel):
@@ -179,6 +179,13 @@ class ResourceRef(BaseModel):
         alias="resourceLink",
         description="Backstop API URL of the referenced record.",
     )
+
+    @classmethod
+    def safe_model_validate(cls, value: object) -> Self | None:
+        try:
+            return cls.model_validate(value)
+        except ValidationError:
+            return None
 
 
 def index_included(

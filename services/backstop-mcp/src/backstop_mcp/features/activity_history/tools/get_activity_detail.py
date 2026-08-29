@@ -31,7 +31,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_history import (
     ActivityDetailResponse,
     ResourceIdentifierDto,
@@ -73,7 +73,7 @@ async def get_activity_detail(
             ),
         ),
     ],
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, attendees, and attachment list.
 

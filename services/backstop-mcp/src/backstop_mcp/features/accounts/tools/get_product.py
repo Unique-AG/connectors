@@ -16,7 +16,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
     MAX_PRODUCT_SCAN_RECORDS,
     ProductAmbiguousResponse,
@@ -155,7 +155,7 @@ async def get_product(
             ),
         ),
     ] = (),
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> GetProductResponse:
     """Product identity and custom-field values — Strategy, Domicile, Fee Structure, and the rest.

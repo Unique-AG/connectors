@@ -10,7 +10,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -121,7 +121,7 @@ async def get_tasks_for_party(
             )
         ),
     ] = "all",
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> GetTasksForPartyResponse:
     """List a party's CRM tasks.
 
