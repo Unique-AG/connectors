@@ -13,7 +13,7 @@ opportunities, so the whole sub-collection is walked.
 
 import logging
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
@@ -23,13 +23,11 @@ from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
-from backstop_mcp.features.custom_fields import (
-    CustomFieldFilters,
-)
+from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
     GetOpportunitiesQuery,
-    OpportunityResponse,
+    OpportunitiesResolvedResponse,
     OpportunityStatus,
 )
 from backstop_mcp.features.opportunities.dependencies import get_opportunities_query_factory
@@ -40,58 +38,9 @@ from backstop_mcp.features.party_resolver import (
     unresolved_party_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
-from backstop_mcp.models import CoercedId, OmitNoneModel, coerce_ids, published_output_schema
+from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
-
-
-class OpportunitiesResolvedResponse(OmitNoneModel):
-    """`get_opportunities` once the party was found and its pipeline fetched.
-
-    `total` / `open_count` / `closed_count` are over everything fetched — the party's complete
-    set — so `status="open"` still reports how many closed deals exist. `previous_stage` on each
-    deal names the stage it just left, and is omitted until it has moved at all.
-    """
-
-    status: Literal["resolved"] = Field(
-        default="resolved",
-        description="Always 'resolved': the party was found and its pipeline fetched.",
-    )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
-    opportunities: tuple[OpportunityResponse, ...] = Field(
-        description=(
-            "The deals matching the requested status, newest first by the day each entered "
-            + "its current stage."
-        )
-    )
-    total: int = Field(
-        description=(
-            "Every opportunity fetched for this party, before filtering by status — so the "
-            + "number they have in total."
-        )
-    )
-    open_count: int = Field(
-        description=(
-            "How many of those are open, whatever status was asked for — so an answer about "
-            + "open deals still says how many exist."
-        )
-    )
-    closed_count: int = Field(
-        description="How many of those are closed, counted the same way as `open_count`."
-    )
-    custom_fields_unavailable: bool = Field(
-        default=False,
-        description=(
-            "True when the custom-field catalog could not be loaded, so `custom_field_values` "
-            "is empty rather than 'none recorded'."
-        ),
-    )
-
 
 type GetOpportunitiesResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OpportunitiesResolvedResponse
@@ -224,4 +173,5 @@ async def get_opportunities(
         total=fetched.total,
         open_count=fetched.open_count,
         closed_count=fetched.closed_count,
+        custom_fields_unavailable=fetched.custom_fields_unavailable,
     )

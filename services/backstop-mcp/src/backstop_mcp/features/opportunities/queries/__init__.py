@@ -8,6 +8,7 @@ from backstop_mcp.features.opportunities.queries.get_opportunities_query import 
 )
 from backstop_mcp.features.opportunities.queries.search_opportunities_query import (
     MAX_OPPORTUNITY_SCAN_RECORDS,
+    OpportunityGroupBy,
     SearchMode,
     SearchOpportunitiesQuery,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "MAX_OPPORTUNITY_SCAN_RECORDS",
     "GetOpportunitiesByIdsQuery",
     "GetOpportunitiesQuery",
+    "OpportunityGroupBy",
     "OpportunityStatus",
     "SearchMode",
     "SearchOpportunitiesQuery",

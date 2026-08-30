@@ -425,6 +425,7 @@ class TestGetOpportunitiesByIds:
 
         assert result.opportunities[0].id == "5755031"
         assert result.opportunities[0].custom_field_values == ()
+        assert result.custom_fields_unavailable is True
 
     def test_rejects_more_than_fifty_ids(self) -> None:
         with pytest.raises(ValidationError):

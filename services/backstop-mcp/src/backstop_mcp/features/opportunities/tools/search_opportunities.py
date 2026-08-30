@@ -14,6 +14,7 @@ from pydantic import Field
 
 from backstop_mcp.features.opportunities import (
     MAX_OPPORTUNITY_SCAN_RECORDS,
+    OpportunityGroupBy,
     SearchMode,
     SearchOpportunitiesQuery,
     SearchOpportunitiesResolvedResponse,
@@ -137,8 +138,10 @@ async def search_opportunities(
     zero rows. Stage, product, and open/closed are filtered here after the walk;
     filter[stage.name], filter[product.name], and filter[isOpen] are invalid on this collection.
 
-    This walk does not return custom fields or stage history. For those, call
+    This walk does not return custom-field values or stage history. For those, call
     get_opportunities_by_ids with the ids — `id` is always projected so that handoff works.
+    `custom_fields_unavailable` is still set: a catalog miss here is the same miss that
+    get_opportunities_by_ids would report.
     Amounts are on this walk; select them with `fields`.
 
     For one party's deals, call get_opportunities instead — that is one cheap sub-collection,

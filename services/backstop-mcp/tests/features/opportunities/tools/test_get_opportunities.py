@@ -9,9 +9,9 @@ from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
+from backstop_mcp.features.opportunities import OpportunitiesResolvedResponse
 from backstop_mcp.features.opportunities.tools.get_opportunities import (
     GetOpportunitiesResponse,
-    OpportunitiesResolvedResponse,
     get_opportunities,
 )
 from backstop_mcp.features.resolution import NotFoundResponse
@@ -147,6 +147,7 @@ class TestGetOpportunities:
         assert result.closed_count == 0
         assert result.opportunities[0].stage == "IDD"
         assert result.opportunities[0].previous_stage == "Client Approval"
+        assert result.custom_fields_unavailable is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -515,6 +516,7 @@ class TestGetOpportunities:
 
         assert result.opportunities[0].id == "5755031"
         assert result.opportunities[0].custom_field_values == ()
+        assert result.custom_fields_unavailable is True
 
     @pytest.mark.asyncio
     @respx.mock

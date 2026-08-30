@@ -18,6 +18,8 @@ _DictAttributesAdapter: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, o
 
 
 class GetStageHistoryQuery:
+    """Resolve side-loaded `stageHistory` entries into named `StageChangeResponse`s."""
+
     def __init__(
         self,
         *,
@@ -29,9 +31,7 @@ class GetStageHistoryQuery:
         self,
         *,
         resource: BackstopApiResource[AttrT],
-        # Top level include in backstop
         api_include_resources: Sequence[dict[str, object]],
-        # Optional it can be obtained from backstop_resource_top_level_include
         preloaded_opportunity_id_to_name: Mapping[str, str] | None,
     ) -> tuple[StageChangeResponse, ...]:
         changes: list[StageChangeResponse] = []

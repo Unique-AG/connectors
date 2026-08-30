@@ -3,16 +3,15 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.opportunities import (
     GetOpportunitiesByIdsQuery,
     GetOpportunitiesQuery,
+    GetStageHistoryQuery,
+    MapOpportunityToResponseUtil,
     OpportunityStageResponse,
     OpportunityStagesService,
     SearchOpportunitiesQuery,
-)
-from backstop_mcp.features.opportunities.resource_utils import GetStageHistoryQuery
-from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
-    MapOpportunityToResponseUtil,
 )
 from tests.helpers import client_factory, credential, custom_fields_service
 
@@ -37,32 +36,46 @@ async def client() -> AsyncGenerator[BackstopClient]:
     await factory.aclose()
 
 
-def make_map_opportunity_to_response_util(client: BackstopClient) -> MapOpportunityToResponseUtil:
+def make_map_opportunity_to_response_util(
+    client: BackstopClient, *, custom_fields: CustomFieldsService
+) -> MapOpportunityToResponseUtil:
     stages = OpportunityStagesService.with_ttl_minutes(client=client, ttl_minutes=60)
     return MapOpportunityToResponseUtil(
         client=client,
         opportunity_stages_service=stages,
-        custom_fields_service=custom_fields_service(),
+        custom_fields_service=custom_fields,
         get_stage_history_query=GetStageHistoryQuery(opportunity_stages_service=stages),
     )
 
 
 def make_get_opportunities_query(client: BackstopClient) -> GetOpportunitiesQuery:
+    custom_fields = custom_fields_service()
     return GetOpportunitiesQuery(
         client=client,
-        map_opportunity_to_response_util=make_map_opportunity_to_response_util(client),
+        map_opportunity_to_response_util=make_map_opportunity_to_response_util(
+            client, custom_fields=custom_fields
+        ),
+        custom_fields_service=custom_fields,
     )
 
 
 def make_get_opportunities_by_ids_query(client: BackstopClient) -> GetOpportunitiesByIdsQuery:
+    custom_fields = custom_fields_service()
     return GetOpportunitiesByIdsQuery(
         client=client,
-        map_opportunity_to_response_util=make_map_opportunity_to_response_util(client),
+        map_opportunity_to_response_util=make_map_opportunity_to_response_util(
+            client, custom_fields=custom_fields
+        ),
+        custom_fields_service=custom_fields,
     )
 
 
 def make_search_opportunities_query(client: BackstopClient) -> SearchOpportunitiesQuery:
+    custom_fields = custom_fields_service()
     return SearchOpportunitiesQuery(
         client=client,
-        map_opportunity_to_response_util=make_map_opportunity_to_response_util(client),
+        map_opportunity_to_response_util=make_map_opportunity_to_response_util(
+            client, custom_fields=custom_fields
+        ),
+        custom_fields_service=custom_fields,
     )
