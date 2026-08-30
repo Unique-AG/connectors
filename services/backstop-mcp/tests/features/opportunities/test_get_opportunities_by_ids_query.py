@@ -8,7 +8,7 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
-from backstop_mcp.features.opportunities.responses import GetOpportunitiesByIdsResponse
+from backstop_mcp.features.opportunities import GetOpportunitiesByIdsResponse
 from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_by_ids_query
 from tests.helpers import BASE_URL, recorded_requests, resource
 

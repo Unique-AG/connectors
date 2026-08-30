@@ -8,14 +8,10 @@ from backstop_mcp.dependencies import get_backstop_client_for_current_caller, ge
 from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
 from backstop_mcp.features.custom_fields.dependencies import get_custom_fields_service
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
-from backstop_mcp.features.opportunities.oppportunity_stage_service_v2 import (
-    OpportunityStagesServiceV2,
-)
-from backstop_mcp.features.opportunities.queries.get_opportunities_by_ids_query import (
+from backstop_mcp.features.opportunities.queries import (
     GetOpportunitiesByIdsQuery,
-)
-from backstop_mcp.features.opportunities.queries.get_opportunities_query import (
     GetOpportunitiesQuery,
+    SearchOpportunitiesQuery,
 )
 from backstop_mcp.features.opportunities.resource_utils import GetStageHistoryQuery
 from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
@@ -26,42 +22,33 @@ from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_respo
 @lru_cache(maxsize=1)
 def get_opportunity_stages_service_factory(
     settings: BackstopConfig = Depends(get_backstop_config),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> OpportunityStagesService:
     return OpportunityStagesService.with_ttl_minutes(
-        ttl_minutes=settings.opportunity_stage_ttl_minutes,
-    )
-
-
-@lru_cache(maxsize=1)
-def get_opportunity_stages_service_v2_factory(
-    settings: BackstopConfig = Depends(get_backstop_config),
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
-) -> OpportunityStagesServiceV2:
-    return OpportunityStagesServiceV2.with_ttl_minutes(
         ttl_minutes=settings.opportunity_stage_ttl_minutes, client=client
     )
 
 
 @lru_cache(maxsize=1)
 def get_stage_history_query_factory(
-    opportunity_stages_service_v2: OpportunityStagesServiceV2 = Depends(
-        get_opportunity_stages_service_v2_factory
+    opportunity_stages_service: OpportunityStagesService = Depends(
+        get_opportunity_stages_service_factory
     ),
 ) -> GetStageHistoryQuery:
-    return GetStageHistoryQuery(opportunity_stages_service=opportunity_stages_service_v2)
+    return GetStageHistoryQuery(opportunity_stages_service=opportunity_stages_service)
 
 
 def get_map_opportunity_to_response_util_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
-    opportunity_stages_service_v2: OpportunityStagesServiceV2 = Depends(
-        get_opportunity_stages_service_v2_factory
+    opportunity_stages_service: OpportunityStagesService = Depends(
+        get_opportunity_stages_service_factory
     ),
     get_stage_history_query: GetStageHistoryQuery = Depends(get_stage_history_query_factory),
     custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> MapOpportunityToResponseUtil:
     return MapOpportunityToResponseUtil(
         client=client,
-        opportunity_stages_service=opportunity_stages_service_v2,
+        opportunity_stages_service=opportunity_stages_service,
         custom_fields_service=custom_fields_service,
         get_stage_history_query=get_stage_history_query,
     )
@@ -88,6 +75,19 @@ def get_opportunities_by_ids_query_factory(
     ),
 ) -> GetOpportunitiesByIdsQuery:
     return GetOpportunitiesByIdsQuery(
+        client=client,
+        map_opportunity_to_response_util=map_opportunity_to_response_util,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_search_opportunities_query_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    map_opportunity_to_response_util: MapOpportunityToResponseUtil = Depends(
+        get_map_opportunity_to_response_util_factory
+    ),
+) -> SearchOpportunitiesQuery:
+    return SearchOpportunitiesQuery(
         client=client,
         map_opportunity_to_response_util=map_opportunity_to_response_util,
     )

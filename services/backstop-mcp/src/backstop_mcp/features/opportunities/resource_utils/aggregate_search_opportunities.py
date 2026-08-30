@@ -4,7 +4,7 @@ from datetime import date
 from typing import Literal
 
 from backstop_mcp.features.collection_scan import AggregateBucketDto
-from backstop_mcp.features.opportunities.internal_dto import SearchOpportunityDto
+from backstop_mcp.features.opportunities.responses import SearchOpportunityRowResponse
 
 __all__ = ["OpportunityGroupBy", "aggregate_search_opportunities"]
 
@@ -22,7 +22,7 @@ def _month_key(value: date | None) -> tuple[str, str]:
     return (stamp, stamp)
 
 
-def _bucket(row: SearchOpportunityDto, group_by: OpportunityGroupBy) -> tuple[str, str]:
+def _bucket(row: SearchOpportunityRowResponse, group_by: OpportunityGroupBy) -> tuple[str, str]:
     match group_by:
         case "stage":
             if row.stage_id and row.stage:
@@ -41,7 +41,7 @@ def _bucket(row: SearchOpportunityDto, group_by: OpportunityGroupBy) -> tuple[st
 
 
 def aggregate_search_opportunities(
-    rows: Sequence[SearchOpportunityDto], *, group_by: OpportunityGroupBy
+    rows: Sequence[SearchOpportunityRowResponse], *, group_by: OpportunityGroupBy
 ) -> tuple[AggregateBucketDto, ...]:
     """Count matching deals per `group_by` key, largest buckets first."""
     counts: Counter[tuple[str, str]] = Counter()

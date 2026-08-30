@@ -1,12 +1,11 @@
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.lenient import LenientBool, LenientInt
+from backstop_mcp.models import StrippedStr
 
 __all__ = ["ActivityTagAttributes"]
-
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 
 class ActivityTagAttributes(BaseModel):
@@ -19,6 +18,6 @@ class ActivityTagAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    name: _StrippedStr | None = None
+    name: StrippedStr | None = None
     quantity_tagged: LenientInt = Field(default=None, alias="quantityTagged")
     viewable: LenientBool = None

@@ -185,7 +185,7 @@ class TestWiring:
         _ = app_client
         assert get_custom_fields_service() is not None
         assert get_backstop_client_factory() is not None
-        assert get_opportunity_stages_service_factory() is not None
+        assert get_opportunity_stages_service_factory is not None
 
     def test_lifespan_teardown_releases_the_services(
         self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch

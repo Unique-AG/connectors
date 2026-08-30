@@ -1,11 +1,12 @@
 import asyncio
 import logging
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import Self
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.opportunities.fetch_opportunity_stages import fetch_opportunity_stages
-from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
+from backstop_mcp.features.opportunities.responses import OpportunityStageResponse
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
@@ -36,18 +37,38 @@ class OpportunityStagesService:
     during a failure is an empty vocabulary, which reports every stage as unnameable.
     """
 
-    def __init__(self, *, ttl: timedelta) -> None:
-        self._stages: dict[str, OpportunityStageDto] | None = None
+    def __init__(self, *, client: BackstopClient, ttl: timedelta) -> None:
+        self._client: BackstopClient = client
+        self._stages: dict[str, OpportunityStageResponse] | None = None
         self._freshness: TimedGate = TimedGate(duration=ttl)
         self._cooldown: TimedGate = TimedGate(duration=_FAILURE_COOLDOWN)
         self._failure: Exception | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
 
     @classmethod
-    def with_ttl_minutes(cls, *, ttl_minutes: int) -> Self:
-        return cls(ttl=timedelta(minutes=ttl_minutes))
+    def with_ttl_minutes(cls, *, client: BackstopClient, ttl_minutes: int) -> Self:
+        return cls(client=client, ttl=timedelta(minutes=ttl_minutes))
 
-    async def get(self, client: BackstopClient) -> dict[str, OpportunityStageDto]:
+    async def get_stage(self, *, stage_id: str) -> OpportunityStageResponse | None:
+        catalog = await self.get_catalog()
+        return catalog.get(stage_id, None)
+
+    async def get_stage_name(
+        self, *, stage_id: str | None, preloaded_opportunity_id_to_name: Mapping[str, str] | None
+    ) -> str | None:
+        if stage_id is None:
+            return None
+
+        if (
+            preloaded_opportunity_id_to_name is not None
+            and preloaded_opportunity_id_to_name.get(stage_id, None) is not None
+        ):
+            return preloaded_opportunity_id_to_name.get(stage_id)
+
+        stage = await self.get_stage(stage_id=stage_id)
+        return stage.name if stage else None
+
+    async def get_catalog(self) -> dict[str, OpportunityStageResponse]:
         cached = self._stages
         if cached is not None and self._freshness.within():
             return dict(cached)
@@ -63,7 +84,17 @@ class OpportunityStagesService:
                 raise failure
 
             try:
-                stages = await fetch_opportunity_stages(client)
+                page = await self._client.paginate(
+                    "/opportunity-stages",
+                    schema=BackstopApiResource[OpportunityStageAttributes],
+                    max_records=None,
+                    page_size=100,
+                )
+                stages: dict[str, OpportunityStageResponse] = {}
+                for resource in page.items:
+                    stage = OpportunityStageResponse.from_resource(resource)
+                    if stage is not None:
+                        stages[stage.id] = stage
             except Exception as error:
                 self._failure = error
                 self._cooldown.mark()

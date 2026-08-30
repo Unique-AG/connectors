@@ -10,9 +10,7 @@ from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
 )
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.opportunities.queries.opportuntity_resource import (
-    OpportunityResource,
-)
+from backstop_mcp.features.opportunities.api_responses import OpportunityResource
 from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
     MapOpportunityToResponseUtil,
 )

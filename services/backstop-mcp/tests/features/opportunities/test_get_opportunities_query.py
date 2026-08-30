@@ -9,11 +9,11 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
-from backstop_mcp.features.opportunities.internal_dto import OpportunityStageDto
-from backstop_mcp.features.opportunities.queries.get_opportunities_query import (
+from backstop_mcp.features.opportunities import (
+    GetOpportunitiesResponse,
+    OpportunityStageResponse,
     OpportunityStatus,
 )
-from backstop_mcp.features.opportunities.responses import GetOpportunitiesResponse
 from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_query
 from tests.helpers import BASE_URL, resource
 
@@ -109,7 +109,7 @@ def _page(
 
 
 def _stages_response(
-    vocabulary: dict[str, OpportunityStageDto] | None = None,
+    vocabulary: dict[str, OpportunityStageResponse] | None = None,
 ) -> httpx.Response:
     stages = VOCABULARY if vocabulary is None else vocabulary
     return httpx.Response(
@@ -134,7 +134,7 @@ async def _run(
     client: BackstopClient,
     *,
     status: OpportunityStatus = "all",
-    vocabulary: dict[str, OpportunityStageDto] | None = None,
+    vocabulary: dict[str, OpportunityStageResponse] | None = None,
 ) -> GetOpportunitiesResponse:
     respx.get(_STAGES_URL).mock(return_value=_stages_response(vocabulary))
     return await make_get_opportunities_query(client).run(

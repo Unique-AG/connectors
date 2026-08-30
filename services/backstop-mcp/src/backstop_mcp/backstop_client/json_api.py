@@ -233,6 +233,25 @@ def follow_indexed[AttrT](
     return [index[key] for key in wanted if key in index]
 
 
+def first_included[AttrT, ResourceT: BaseModel](
+    index: IncludedIndex,
+    resource: BackstopApiResource[AttrT] | None,
+    relationship_name: str,
+    *,
+    schema: type[ResourceT],
+) -> ResourceT | None:
+    """The first `included` entry linked from `resource` via `relationship_name`, as `schema`.
+
+    `follow_indexed` then `included_resource` on the first match. None when the relationship
+    has no linkage, the side-load is missing, or the entry does not validate — one unreadable
+    chip costs its own field, not the record it hangs off.
+    """
+    matches = follow_indexed(index, resource, relationship_name)
+    if not matches:
+        return None
+    return included_resource(matches[0], schema=schema)
+
+
 def follow_included[AttrT](
     included: Sequence[dict[str, object]],
     resource: BackstopApiResource[AttrT] | None,

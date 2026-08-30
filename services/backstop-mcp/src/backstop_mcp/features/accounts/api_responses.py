@@ -1,12 +1,13 @@
 from collections.abc import Mapping
 from typing import Annotated, ClassVar, cast
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt
+from backstop_mcp.models import StrippedStr
 
 __all__ = [
     "ACCOUNT_LISTING_FIELDS",
@@ -28,8 +29,6 @@ __all__ = [
     "TableDataShareAttributes",
 ]
 
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
-
 
 def _blank_to_none(value: object) -> object:
     """A name Backstop sends as `""` means unset, and reads as a real empty name if kept."""
@@ -47,7 +46,7 @@ class ProductConfigurationAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    product_short_name: _StrippedStr | None = Field(default=None, alias="productShortName")
+    product_short_name: StrippedStr | None = Field(default=None, alias="productShortName")
 
 
 class ProductAttributes(BaseModel):
@@ -59,7 +58,7 @@ class ProductAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    name: _StrippedStr | None = None
+    name: StrippedStr | None = None
     configuration: ProductConfigurationAttributes | None = None
     regular_custom_field_values: RegularCustomFieldValues = Field(
         default_factory=list, alias="regularCustomFieldValues"
@@ -80,18 +79,18 @@ class AccountAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
-    name: _StrippedStr | None = None
-    currency: _StrippedStr | None = None
+    name: StrippedStr | None = None
+    currency: StrippedStr | None = None
     account_start_date: LenientDate = Field(default=None, alias="accountStartDate")
     closed_date: LenientDate = Field(default=None, alias="closedDate")
-    ownership_type: _StrippedStr | None = Field(default=None, alias="ownershipType")
+    ownership_type: StrippedStr | None = Field(default=None, alias="ownershipType")
     investor_qualification: InvestorQualificationAttributes | None = Field(
         default=None, alias="investorQualification"
     )
     is_employee_account: LenientBool = Field(default=None, alias="isEmployeeAccount")
     is_gp_account: LenientBool = Field(default=None, alias="isGpAccount")
     aml_check_complete: LenientBool = Field(default=None, alias="amlCheckComplete")
-    new_issue_eligible: _StrippedStr | None = Field(default=None, alias="newIssueEligible")
+    new_issue_eligible: StrippedStr | None = Field(default=None, alias="newIssueEligible")
     us_domiciled: LenientBool = Field(default=None, alias="usDomiciled")
 
 

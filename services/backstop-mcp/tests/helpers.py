@@ -29,7 +29,6 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentRulesDto,
     TypeVocabularyDto,
 )
-from backstop_mcp.features.opportunities import OpportunityStagesService
 from backstop_mcp.features.system_users import SystemUsersService
 
 BASE_URL = "https://example.backstopsolutions.com"
@@ -131,10 +130,6 @@ def custom_fields_service(
 
 def custom_field_groups_service(*, ttl_minutes: int = 60) -> CustomFieldGroupsService:
     return CustomFieldGroupsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
-
-
-def opportunity_stages_service(*, ttl_minutes: int = 60) -> OpportunityStagesService:
-    return OpportunityStagesService.with_ttl_minutes(ttl_minutes=ttl_minutes)
 
 
 class _RecordedCall(Protocol):

@@ -28,13 +28,11 @@ from backstop_mcp.features.custom_fields import (
 )
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities import (
-    OpportunityResponse,
-)
-from backstop_mcp.features.opportunities.dependencies import get_opportunities_query_factory
-from backstop_mcp.features.opportunities.queries.get_opportunities_query import (
     GetOpportunitiesQuery,
+    OpportunityResponse,
     OpportunityStatus,
 )
+from backstop_mcp.features.opportunities.dependencies import get_opportunities_query_factory
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyResponse,

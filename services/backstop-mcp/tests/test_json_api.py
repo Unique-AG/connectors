@@ -8,8 +8,10 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     IncludedResource,
     ResourceRef,
+    first_included,
     follow_included,
     included_resource,
+    index_included,
 )
 
 
@@ -190,6 +192,56 @@ class TestFollowIncluded:
         assert len(related) == 1
         assert related[0]["type"] == "entity-relationships"
         assert related[0]["attributes"] == {"endDate": "2020-01-01"}
+
+
+class TestFirstIncluded:
+    def test_parses_the_first_linked_side_load(self) -> None:
+        document = BackstopApiResourceDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "opportunities",
+                    "attributes": {"name": "Deal"},
+                    "relationships": {
+                        "product": {"data": {"type": "products", "id": "9"}},
+                    },
+                },
+                "included": [
+                    {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+                ],
+            }
+        )
+
+        chip = first_included(
+            index_included(document.included),
+            document.data,
+            "product",
+            schema=IncludedResource[_Attrs],
+        )
+
+        assert chip is not None
+        assert (chip.id, chip.attributes.name) == ("9", "Acme")
+
+    def test_missing_linkage_is_none(self) -> None:
+        document = BackstopApiResourceDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "opportunities",
+                    "attributes": {"name": "Deal"},
+                }
+            }
+        )
+
+        assert (
+            first_included(
+                index_included(document.included),
+                document.data,
+                "product",
+                schema=IncludedResource[_Attrs],
+            )
+            is None
+        )
 
 
 class TestBackstopApiResourceIdValidation:
