@@ -2,12 +2,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.tasks.tools.get_tasks_for_party import (
-    TasksResolvedResponse,
-    get_tasks_for_party,
-)
+from backstop_mcp.features.tasks import TasksResolvedResponse
+from backstop_mcp.features.tasks.tools.get_tasks_for_party import get_tasks_for_party
 from backstop_mcp.server.tools import TOOLS
 from tests.features.party_resolver.helpers import ctx_never_elicit
+from tests.features.tasks.conftest import make_get_tasks_for_party_query
 from tests.helpers import BASE_URL, recorded_requests, tool_client
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
@@ -63,6 +62,7 @@ class TestGetTasksForParty:
                     search_type="organizations",
                     party_id=_ORG_ID,
                     client=client,
+                    get_tasks_for_party_query=make_get_tasks_for_party_query(client),
                 ),
                 TasksResolvedResponse,
             )
@@ -98,6 +98,7 @@ class TestGetTasksForParty:
                     party_id=_ORG_ID,
                     status="open",
                     client=client,
+                    get_tasks_for_party_query=make_get_tasks_for_party_query(client),
                 ),
                 TasksResolvedResponse,
             )
