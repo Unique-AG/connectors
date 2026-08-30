@@ -1,5 +1,5 @@
 from datetime import date
-from typing import ClassVar, Literal, Self
+from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict
 
@@ -7,8 +7,6 @@ from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 
 __all__ = ["TaskDto", "TasksListingDto"]
-
-type TaskStatus = Literal["open", "completed"]
 
 
 class TaskDto(BaseModel):

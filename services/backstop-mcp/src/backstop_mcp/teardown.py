@@ -41,6 +41,7 @@ from backstop_mcp.features.opportunities import (
     get_stage_history_query_factory,
 )
 from backstop_mcp.features.system_users import get_system_users_service
+from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
 
 
 class CachedProvider(Protocol):
@@ -73,6 +74,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_opportunities_query_factory,
     get_opportunities_by_ids_query_factory,
     get_search_opportunities_query_factory,
+    get_tasks_for_party_query_factory,
 )
 
 
