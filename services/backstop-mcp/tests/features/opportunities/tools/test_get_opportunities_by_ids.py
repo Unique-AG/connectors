@@ -9,10 +9,10 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.opportunities.queries.get_opportunities_by_ids_query import (
+from backstop_mcp.features.opportunities import (
     MAX_OPPORTUNITY_IDS,
+    GetOpportunitiesByIdsResponse,
 )
-from backstop_mcp.features.opportunities.responses import GetOpportunitiesByIdsResponse
 from backstop_mcp.features.opportunities.tools.get_opportunities_by_ids import (
     get_opportunities_by_ids,
 )

@@ -7,11 +7,11 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
-    StringConstraints,
     ValidationError,
 )
 
 from backstop_mcp.lenient import LenientBool, LenientInt
+from backstop_mcp.models import StrippedStr
 
 __all__ = [
     "CustomFieldDefinitionAttributes",
@@ -23,8 +23,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-_StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 
 def _mapping_or_none(value: object) -> Mapping[str, object] | None:
@@ -61,18 +59,18 @@ class CustomFieldDefinitionAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    name: _StrippedStr | None = None
-    entity_type: _StrippedStr | None = Field(default=None, alias="entityType")
-    field_type: _StrippedStr | None = Field(default=None, alias="fieldType")
-    field_type_display: _StrippedStr | None = Field(default=None, alias="fieldTypeDisplay")
+    name: StrippedStr | None = None
+    entity_type: StrippedStr | None = Field(default=None, alias="entityType")
+    field_type: StrippedStr | None = Field(default=None, alias="fieldType")
+    field_type_display: StrippedStr | None = Field(default=None, alias="fieldTypeDisplay")
     is_time_series: LenientBool = Field(default=None, alias="isTimeSeries")
     select_options: object | None = Field(default=None, alias="selectOptions")
-    tab_name: _StrippedStr | None = Field(default=None, alias="tabName")
-    group_name: _StrippedStr | None = Field(default=None, alias="groupName")
+    tab_name: StrippedStr | None = Field(default=None, alias="tabName")
+    group_name: StrippedStr | None = Field(default=None, alias="groupName")
     group_id: LenientInt = Field(default=None, alias="groupId")
-    layout_name: _StrippedStr | None = Field(default=None, alias="layoutName")
-    resource_type: _StrippedStr | None = Field(default=None, alias="resourceType")
-    description: _StrippedStr | None = None
+    layout_name: StrippedStr | None = Field(default=None, alias="layoutName")
+    resource_type: StrippedStr | None = Field(default=None, alias="resourceType")
+    description: StrippedStr | None = None
     required: LenientBool = None
     client_required: LenientBool = Field(default=None, alias="clientRequired")
     system_defined: LenientBool = Field(default=None, alias="systemDefined")
@@ -88,7 +86,7 @@ class CustomFieldValueAttributes(BaseModel):
         alias="definitionId",
         description="Backstop id of the custom-field definition this value belongs to.",
     )
-    name: _StrippedStr | None = Field(
+    name: StrippedStr | None = Field(
         default=None,
         description="Field name as stored on the record.",
     )
@@ -144,7 +142,7 @@ class CustomFieldGroupParentAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     id: _IdStr = None
-    name: _StrippedStr | None = None
+    name: StrippedStr | None = None
     parent_id: _IdStr = Field(default=None, alias="parentId")
 
 
@@ -153,7 +151,7 @@ class CustomFieldGroupAttributes(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    name: _StrippedStr | None = None
+    name: StrippedStr | None = None
     full_path_name: Annotated[list[object] | None, BeforeValidator(_list_or_none)] = Field(
         default=None, alias="fullPathName"
     )

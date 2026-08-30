@@ -5,10 +5,10 @@ from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
     CustomFieldsService,
 )
-from backstop_mcp.features.opportunities.oppportunity_stage_service_v2 import (
-    OpportunityStagesServiceV2,
+from backstop_mcp.features.opportunities.api_responses import OpportunityResource
+from backstop_mcp.features.opportunities.opportunity_stages_service import (
+    OpportunityStagesService,
 )
-from backstop_mcp.features.opportunities.queries.opportuntity_resource import OpportunityResource
 from backstop_mcp.features.opportunities.resource_utils import GetStageHistoryQuery
 from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map import (
     get_stage_id_to_name_map,
@@ -22,12 +22,12 @@ class MapOpportunityToResponseUtil:
         self,
         *,
         client: BackstopClient,
-        opportunity_stages_service: OpportunityStagesServiceV2,
+        opportunity_stages_service: OpportunityStagesService,
         custom_fields_service: CustomFieldsService,
         get_stage_history_query: GetStageHistoryQuery,
     ) -> None:
         self._client: BackstopClient = client
-        self._opportunity_stages_service: OpportunityStagesServiceV2 = opportunity_stages_service
+        self._opportunity_stages_service: OpportunityStagesService = opportunity_stages_service
         self._custom_fields_service: CustomFieldsService = custom_fields_service
         self._get_stage_history_query: GetStageHistoryQuery = get_stage_history_query
 

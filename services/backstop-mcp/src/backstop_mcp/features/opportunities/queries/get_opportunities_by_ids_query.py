@@ -15,9 +15,7 @@ from backstop_mcp.backstop_client import (
     BackstopResponseSchemaError,
 )
 from backstop_mcp.features.custom_fields import CustomFieldFilters
-from backstop_mcp.features.opportunities.queries.opportuntity_resource import (
-    OpportunityResourceAttributes,
-)
+from backstop_mcp.features.opportunities.api_responses import OpportunityResourceAttributes
 from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
     MapOpportunityToResponseUtil,
 )

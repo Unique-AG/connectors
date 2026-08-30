@@ -32,6 +32,18 @@ def _parse_lenient_float(value: object) -> float | None:
     return _coerce(_float_adapter, value)
 
 
+def _parse_lenient_str(value: object) -> str | None:
+    """A stripped string, or None for a blank one and for anything that is not a string.
+
+    Deliberately does not stringify numbers or bools: these are display fields, and a `name` that
+    arrived as `42` is a defect worth reporting as absent rather than as the text "42".
+    """
+    if not isinstance(value, str):
+        return None
+    return value.strip() or None
+
+
 LenientBool = Annotated[bool | None, BeforeValidator(_parse_lenient_bool)]
 LenientInt = Annotated[int | None, BeforeValidator(_parse_lenient_int)]
 LenientFloat = Annotated[float | None, BeforeValidator(_parse_lenient_float)]
+LenientStr = Annotated[str | None, BeforeValidator(_parse_lenient_str)]

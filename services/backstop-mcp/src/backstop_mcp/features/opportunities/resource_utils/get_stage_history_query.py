@@ -4,8 +4,8 @@ from collections.abc import Mapping, Sequence
 from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef, follow_included
-from backstop_mcp.features.opportunities.oppportunity_stage_service_v2 import (
-    OpportunityStagesServiceV2,
+from backstop_mcp.features.opportunities.opportunity_stages_service import (
+    OpportunityStagesService,
 )
 from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map import (
     get_stage_id_to_name_map,
@@ -21,9 +21,9 @@ class GetStageHistoryQuery:
     def __init__(
         self,
         *,
-        opportunity_stages_service: OpportunityStagesServiceV2,
+        opportunity_stages_service: OpportunityStagesService,
     ) -> None:
-        self._opportunity_stages_service: OpportunityStagesServiceV2 = opportunity_stages_service
+        self._opportunity_stages_service: OpportunityStagesService = opportunity_stages_service
 
     async def run[AttrT](
         self,

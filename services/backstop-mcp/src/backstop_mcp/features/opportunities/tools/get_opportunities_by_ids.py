@@ -12,12 +12,12 @@ from pydantic import Field
 from backstop_mcp.features.custom_fields import (
     CustomFieldFilters,
 )
-from backstop_mcp.features.opportunities.dependencies import get_opportunities_by_ids_query_factory
-from backstop_mcp.features.opportunities.queries.get_opportunities_by_ids_query import (
+from backstop_mcp.features.opportunities import (
     MAX_OPPORTUNITY_IDS,
     GetOpportunitiesByIdsQuery,
+    GetOpportunitiesByIdsResponse,
 )
-from backstop_mcp.features.opportunities.responses import GetOpportunitiesByIdsResponse
+from backstop_mcp.features.opportunities.dependencies import get_opportunities_by_ids_query_factory
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
