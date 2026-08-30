@@ -1,15 +1,14 @@
 from collections.abc import Sequence
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.custom_fields import (
-    CustomFieldFilters,
-    CustomFieldsService,
-)
+from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.opportunities.api_responses import OpportunityResource
 from backstop_mcp.features.opportunities.opportunity_stages_service import (
     OpportunityStagesService,
 )
-from backstop_mcp.features.opportunities.resource_utils import GetStageHistoryQuery
+from backstop_mcp.features.opportunities.resource_utils.get_stage_history_query import (
+    GetStageHistoryQuery,
+)
 from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map import (
     get_stage_id_to_name_map,
 )
@@ -18,6 +17,8 @@ from backstop_mcp.utils import first_item
 
 
 class MapOpportunityToResponseUtil:
+    """Project one `opportunities` resource onto `OpportunityResponse`."""
+
     def __init__(
         self,
         *,

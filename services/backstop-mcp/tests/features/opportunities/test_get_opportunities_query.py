@@ -10,9 +10,9 @@ import respx
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.opportunities import (
-    GetOpportunitiesResponse,
     OpportunityStageResponse,
     OpportunityStatus,
+    PartyOpportunitiesResponse,
 )
 from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_query
 from tests.helpers import BASE_URL, resource
@@ -135,7 +135,7 @@ async def _run(
     *,
     status: OpportunityStatus = "all",
     vocabulary: dict[str, OpportunityStageResponse] | None = None,
-) -> GetOpportunitiesResponse:
+) -> PartyOpportunitiesResponse:
     respx.get(_STAGES_URL).mock(return_value=_stages_response(vocabulary))
     return await make_get_opportunities_query(client).run(
         segment="organizations",
@@ -690,6 +690,26 @@ class TestOrdering:
 
         assert [deal.id for deal in result.opportunities] == ["dated", "unreadable"]
         assert result.opportunities[1].date_entered_current_stage is None
+
+
+class TestCustomFieldsCatalog:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_catalog_failure_keeps_the_deals_and_flags_unavailable(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(_opportunity("5072909", stage_id="42482", isOpen=True))
+        )
+        respx.get(f"{BASE_URL}/custom-field-definitions").mock(
+            return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
+        )
+
+        result = await _run(client)
+
+        assert [deal.id for deal in result.opportunities] == ["5072909"]
+        assert result.opportunities[0].custom_field_values == ()
+        assert result.custom_fields_unavailable is True
 
     @pytest.mark.asyncio
     @respx.mock

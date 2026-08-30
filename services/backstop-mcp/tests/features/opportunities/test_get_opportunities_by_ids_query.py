@@ -398,6 +398,7 @@ class TestGetOpportunitiesByIdsQuery:
 
         assert result.opportunities[0].id == "5755031"
         assert result.opportunities[0].custom_field_values == ()
+        assert result.custom_fields_unavailable is True
 
     @pytest.mark.asyncio
     @respx.mock

@@ -325,6 +325,34 @@ class TestSearchOpportunities:
         assert [item["name"] for item in rows] == ["Koch - CATS Select", "Other"]
         assert set(rows[0]) == {"id", "name"}
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_catalog_failure_keeps_the_rows(self) -> None:
+        base_url = tenant("so-catalog-down")
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                included=_included(),
+                total=1,
+            )
+        )
+        respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
+        respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
+        )
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [item["id"] for item in rows] == ["1"]
+        assert result.custom_fields_unavailable is True
+
 
 class TestSearchOpportunitiesInput:
     def test_rejects_unknown_mode(self) -> None:

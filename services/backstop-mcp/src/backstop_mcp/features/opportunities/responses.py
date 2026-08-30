@@ -41,7 +41,27 @@ from backstop_mcp.features.opportunities.api_responses import (
     SearchContactAttributes,
     SearchProductAttributes,
 )
+from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 from backstop_mcp.models import OmitNoneModel, StrippedStr
+
+__all__ = [
+    "GetOpportunitiesByIdsResponse",
+    "InvestorFromOpportunityResponse",
+    "OpportunitiesResolvedResponse",
+    "OpportunityIdErrorResponse",
+    "OpportunityResponse",
+    "OpportunityStageResponse",
+    "PartyOpportunitiesResponse",
+    "ProductFromOpportunityResponse",
+    "SearchOpportunitiesResolvedResponse",
+    "SearchOpportunityRowResponse",
+    "StageChangeResponse",
+]
+
+_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION = (
+    "True when the custom-field catalog could not be loaded, so `custom_field_values` "
+    "is empty rather than 'none recorded'."
+)
 
 
 class OpportunityStageResponse(OmitNoneModel):
@@ -262,8 +282,8 @@ class OpportunityResponse(OmitNoneModel):
         )
 
 
-class GetOpportunitiesResponse(OmitNoneModel):
-    """One party's opportunities after filtering and ordering, plus what the whole set says.
+class PartyOpportunitiesResponse(OmitNoneModel):
+    """One party's deals after filtering and ordering, plus what the whole set says.
 
     `total` and the two counts are over everything fetched — the party's complete set, since the
     fetch walks their whole sub-collection — so `status="open"` still reports how many closed
@@ -294,6 +314,55 @@ class GetOpportunitiesResponse(OmitNoneModel):
     closed_count: int = Field(
         description="How many of those are closed, counted the same way as `open_count`."
     )
+    custom_fields_unavailable: bool = Field(
+        default=False,
+        description=_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION,
+    )
+
+
+class OpportunitiesResolvedResponse(OmitNoneModel):
+    """`get_opportunities` once the party was found and its pipeline fetched.
+
+    `total` / `open_count` / `closed_count` are over everything fetched — the party's complete
+    set — so `status="open"` still reports how many closed deals exist. `previous_stage` on each
+    deal names the stage it just left, and is omitted until it has moved at all.
+    """
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the party was found and its pipeline fetched.",
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
+    opportunities: tuple[OpportunityResponse, ...] = Field(
+        description=(
+            "The deals matching the requested status, newest first by the day each entered "
+            + "its current stage."
+        )
+    )
+    total: int = Field(
+        description=(
+            "Every opportunity fetched for this party, before filtering by status — so the "
+            + "number they have in total."
+        )
+    )
+    open_count: int = Field(
+        description=(
+            "How many of those are open, whatever status was asked for — so an answer about "
+            + "open deals still says how many exist."
+        )
+    )
+    closed_count: int = Field(
+        description="How many of those are closed, counted the same way as `open_count`."
+    )
+    custom_fields_unavailable: bool = Field(
+        default=False,
+        description=_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION,
+    )
 
 
 class OpportunityIdErrorResponse(OmitNoneModel):
@@ -322,6 +391,10 @@ class GetOpportunitiesByIdsResponse(OmitNoneModel):
     errors: tuple[OpportunityIdErrorResponse, ...] = Field(
         default=(),
         description="Requested ids that failed for a reason other than 404.",
+    )
+    custom_fields_unavailable: bool = Field(
+        default=False,
+        description=_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION,
     )
 
 
@@ -476,4 +549,8 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
         default=(),
         description="Count buckets in aggregate mode. Empty in rows mode.",
+    )
+    custom_fields_unavailable: bool = Field(
+        default=False,
+        description=_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION,
     )

@@ -84,7 +84,9 @@ async def get_opportunities_by_ids(
     Use after search_opportunities when the question needs a field that is not on the search
     row (Master Pipeline custom fields, amounts not in the sparse fieldset). Ids are trusted
     handles — never invent them. A missing id is named in `not_found`; a non-404 failure is
-    named in `errors`. The rest of the batch is still returned.
+    named in `errors`. The rest of the batch is still returned. When
+    `custom_fields_unavailable` is true, an empty `custom_field_values` list means the
+    catalog could not be loaded, not that the deal has none.
 
     Stage history is omitted unless `include_stage_history` is true. A full 50-id batch without
     history is ~37,000 tokens; further batching is the caller's job.

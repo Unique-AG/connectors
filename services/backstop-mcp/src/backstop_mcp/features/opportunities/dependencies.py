@@ -5,16 +5,15 @@ from fastmcp.dependencies import Depends
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller, get_backstop_config
-from backstop_mcp.features.custom_fields.custom_fields_service import CustomFieldsService
-from backstop_mcp.features.custom_fields.dependencies import get_custom_fields_service
+from backstop_mcp.features.custom_fields import CustomFieldsService, get_custom_fields_service
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.queries import (
     GetOpportunitiesByIdsQuery,
     GetOpportunitiesQuery,
     SearchOpportunitiesQuery,
 )
-from backstop_mcp.features.opportunities.resource_utils import GetStageHistoryQuery
-from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
+from backstop_mcp.features.opportunities.resource_utils import (
+    GetStageHistoryQuery,
     MapOpportunityToResponseUtil,
 )
 
@@ -60,10 +59,12 @@ def get_opportunities_query_factory(
     map_opportunity_to_response_util: MapOpportunityToResponseUtil = Depends(
         get_map_opportunity_to_response_util_factory
     ),
+    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> GetOpportunitiesQuery:
     return GetOpportunitiesQuery(
         client=client,
         map_opportunity_to_response_util=map_opportunity_to_response_util,
+        custom_fields_service=custom_fields_service,
     )
 
 
@@ -73,10 +74,12 @@ def get_opportunities_by_ids_query_factory(
     map_opportunity_to_response_util: MapOpportunityToResponseUtil = Depends(
         get_map_opportunity_to_response_util_factory
     ),
+    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> GetOpportunitiesByIdsQuery:
     return GetOpportunitiesByIdsQuery(
         client=client,
         map_opportunity_to_response_util=map_opportunity_to_response_util,
+        custom_fields_service=custom_fields_service,
     )
 
 
@@ -86,8 +89,10 @@ def get_search_opportunities_query_factory(
     map_opportunity_to_response_util: MapOpportunityToResponseUtil = Depends(
         get_map_opportunity_to_response_util_factory
     ),
+    custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> SearchOpportunitiesQuery:
     return SearchOpportunitiesQuery(
         client=client,
         map_opportunity_to_response_util=map_opportunity_to_response_util,
+        custom_fields_service=custom_fields_service,
     )

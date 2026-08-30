@@ -7,6 +7,7 @@ client-side after this walk. The investor include arrives as a `contacts` resour
 sparse key is `fields[contacts]`, not `fields[organizations]`.
 """
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Literal
@@ -23,18 +24,15 @@ from backstop_mcp.features.collection_scan import (
     AggregateBucketResponse,
     scan_coverage,
 )
-from backstop_mcp.features.custom_fields import CustomFieldFilters
-from backstop_mcp.features.opportunities.aggregate_search_opportunities import (
-    OpportunityGroupBy,
-    aggregate_search_opportunities,
-)
+from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.opportunities.api_responses import (
     OpportunityResource,
     SearchContactAttributes,
     SearchProductAttributes,
 )
-from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
+from backstop_mcp.features.opportunities.resource_utils import (
     MapOpportunityToResponseUtil,
+    aggregate_search_opportunities,
 )
 from backstop_mcp.features.opportunities.responses import (
     InvestorFromOpportunityResponse,
@@ -52,19 +50,24 @@ logger = logging.getLogger(__name__)
 MAX_OPPORTUNITY_SCAN_RECORDS = 20_000
 
 type SearchMode = Literal["rows", "aggregate"]
+type OpportunityGroupBy = Literal["stage", "product", "period", "party"]
 
 
 class SearchOpportunitiesQuery:
+    """Walk `GET /opportunities` and project onto sparse search rows or aggregates."""
+
     def __init__(
         self,
         *,
         client: BackstopClient,
         map_opportunity_to_response_util: MapOpportunityToResponseUtil,
+        custom_fields_service: CustomFieldsService,
     ) -> None:
         self._client: BackstopClient = client
         self.map_opportunity_to_response_util: MapOpportunityToResponseUtil = (
             map_opportunity_to_response_util
         )
+        self._custom_fields_service: CustomFieldsService = custom_fields_service
 
     async def run(
         self,
@@ -78,14 +81,23 @@ class SearchOpportunitiesQuery:
         max_rows: int,
         fields: frozenset[str],
     ) -> SearchOpportunitiesResolvedResponse:
-        """Walk the firm-wide opportunities collection, then filter and project."""
-        pages = await self._client.paginate(
-            "/opportunities",
-            schema=OpportunityResource,
-            params=self._query_params(representative=representative),
-            max_records=MAX_OPPORTUNITY_SCAN_RECORDS,
-            page_size=500,
-            parallel=True,
+        """Walk the firm-wide opportunities collection, then filter and project.
+
+        The catalog load runs in parallel with the walk: mapping each row through
+        `join_values` would otherwise wait for a cold catalog after the last page, and a
+        miss must be reported as `custom_fields_unavailable` rather than inferred from
+        empty values.
+        """
+        pages, catalog = await asyncio.gather(
+            self._client.paginate(
+                "/opportunities",
+                schema=OpportunityResource,
+                params=self._query_params(representative=representative),
+                max_records=MAX_OPPORTUNITY_SCAN_RECORDS,
+                page_size=500,
+                parallel=True,
+            ),
+            self._custom_fields_service.load_catalog(self._client),
         )
         # Indexed once for the whole walk. `follow_included` indexes on every call, and this loop
         # follows two relationships per opportunity against one array holding every side-loaded
@@ -148,6 +160,7 @@ class SearchOpportunitiesQuery:
             opportunities_dropped=dropped,
             total_count=pages.total_count,
             truncated=pages.truncated,
+            custom_fields_unavailable=catalog is None,
         )
 
     def _query_params(self, *, representative: str | None) -> dict[str, object]:
@@ -199,6 +212,7 @@ class SearchOpportunitiesQuery:
         opportunities_dropped: int,
         total_count: int | None,
         truncated: bool,
+        custom_fields_unavailable: bool,
     ) -> SearchOpportunitiesResolvedResponse:
         truncated_by_row_cap = mode == "rows" and len(selected) > max_rows
         coverage = scan_coverage(
@@ -229,4 +243,5 @@ class SearchOpportunitiesQuery:
             coverage=coverage,
             rows=opportunities,
             aggregates=aggregates,
+            custom_fields_unavailable=custom_fields_unavailable,
         )

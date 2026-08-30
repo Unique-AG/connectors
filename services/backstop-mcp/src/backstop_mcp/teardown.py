@@ -33,7 +33,7 @@ from backstop_mcp.features.custom_fields import (
     get_custom_fields_service,
 )
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
-from backstop_mcp.features.opportunities.dependencies import (
+from backstop_mcp.features.opportunities import (
     get_opportunities_by_ids_query_factory,
     get_opportunities_query_factory,
     get_opportunity_stages_service_factory,

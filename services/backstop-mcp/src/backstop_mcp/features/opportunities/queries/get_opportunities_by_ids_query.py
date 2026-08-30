@@ -14,11 +14,9 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
     BackstopResponseSchemaError,
 )
-from backstop_mcp.features.custom_fields import CustomFieldFilters
+from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.opportunities.api_responses import OpportunityResourceAttributes
-from backstop_mcp.features.opportunities.resource_utils.map_opportunity_to_response_util import (
-    MapOpportunityToResponseUtil,
-)
+from backstop_mcp.features.opportunities.resource_utils import MapOpportunityToResponseUtil
 from backstop_mcp.features.opportunities.responses import (
     GetOpportunitiesByIdsResponse,
     OpportunityIdErrorResponse,
@@ -40,16 +38,20 @@ class _FetchedOne:
 
 
 class GetOpportunitiesByIdsQuery:
+    """GET each trusted opportunity id; report not-found and per-id errors."""
+
     def __init__(
         self,
         *,
         client: BackstopClient,
         map_opportunity_to_response_util: MapOpportunityToResponseUtil,
+        custom_fields_service: CustomFieldsService,
     ) -> None:
         self._client: BackstopClient = client
         self._map_opportunity_to_response_util: MapOpportunityToResponseUtil = (
             map_opportunity_to_response_util
         )
+        self._custom_fields_service: CustomFieldsService = custom_fields_service
 
     async def run(
         self,
@@ -58,7 +60,13 @@ class GetOpportunitiesByIdsQuery:
         include_stage_history: bool,
         custom_fields_filters: CustomFieldFilters,
     ) -> GetOpportunitiesByIdsResponse:
-        """GET each id through the client gate; join custom fields from one catalog load."""
+        """GET each id through the client gate; join custom fields from one catalog load.
+
+        The catalog load runs in parallel with the per-id GETs: `join_values` on each
+        record would otherwise wait for a cold catalog after the first document arrives,
+        and a miss must be reported as `custom_fields_unavailable` rather than inferred
+        from empty values.
+        """
         assert len(opportunity_ids) <= MAX_OPPORTUNITY_IDS, (
             f"at most {MAX_OPPORTUNITY_IDS} opportunity ids per call, "
             f"which the tool's own `max_length` already rejects"
@@ -68,17 +76,20 @@ class GetOpportunitiesByIdsQuery:
             include_relations.append("stageHistory")
         include_query_param = ",".join(include_relations)
 
-        settled = await asyncio.gather(
-            *(
-                self._fetch_one_opportunity(
-                    opportunity_id=opportunity_id,
-                    include_query_param=include_query_param,
-                    custom_fields_filters=custom_fields_filters,
-                    include_stage_history=include_stage_history,
-                )
-                for opportunity_id in opportunity_ids
+        catalog, settled = await asyncio.gather(
+            self._custom_fields_service.load_catalog(self._client),
+            asyncio.gather(
+                *(
+                    self._fetch_one_opportunity(
+                        opportunity_id=opportunity_id,
+                        include_query_param=include_query_param,
+                        custom_fields_filters=custom_fields_filters,
+                        include_stage_history=include_stage_history,
+                    )
+                    for opportunity_id in opportunity_ids
+                ),
+                return_exceptions=True,
             ),
-            return_exceptions=True,
         )
         # `_get_one` reports a 404, a Backstop error status, an unreadable body and a transport
         # failure against its own id, so what reaches here is a revoked credential, cancellation, or
@@ -106,6 +117,7 @@ class GetOpportunitiesByIdsQuery:
             opportunities=tuple(opportunities),
             not_found=tuple(not_found),
             errors=tuple(errors),
+            custom_fields_unavailable=catalog is None,
         )
 
     async def _fetch_one_opportunity(
