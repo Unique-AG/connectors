@@ -8,10 +8,8 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.activity_tags.tools.list_activity_tags import (
-    ListActivityTagsResponse,
-    list_activity_tags,
-)
+from backstop_mcp.features.activity_tags import ListActivityTagsResponse
+from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_activity_tags
 from tests.helpers import (
     BASE_URL,
     activity_tags_service,
@@ -22,7 +20,7 @@ from tests.helpers import (
 from tests.server.tools.helpers import object_dict, tool_model, tool_payload
 
 _INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_activity_tags))
-_FETCH_LOGGER = "backstop_mcp.features.activity_tags.fetch_activity_tags"
+_FETCH_LOGGER = "backstop_mcp.features.activity_tags.activity_tags_service"
 
 _LIVE_TAG_ID = "474963"
 

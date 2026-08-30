@@ -9,6 +9,7 @@ Nothing here imports `config` either: the tuning knobs arrive as the frozen type
 """
 
 from backstop_mcp.backstop_client.client import (
+    SYSTEM_INFO_PATH,
     BackstopClient,
 )
 from backstop_mcp.backstop_client.credential import (
@@ -85,6 +86,7 @@ __all__ = [
     "ResourceRef",
     "RetryPolicy",
     "RetrySettings",
+    "SYSTEM_INFO_PATH",
     "SinglePage",
     "first_included",
     "follow_included",

@@ -17,7 +17,7 @@ from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.app import create_app
-from backstop_mcp.backstop_client.client import SYSTEM_INFO_PATH
+from backstop_mcp.backstop_client import SYSTEM_INFO_PATH
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import (
     get_backstop_client_factory,

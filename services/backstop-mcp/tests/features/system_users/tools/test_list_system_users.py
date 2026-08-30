@@ -7,10 +7,8 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.system_users.tools.list_system_users import (
-    ListSystemUsersResponse,
-    list_system_users,
-)
+from backstop_mcp.features.system_users import ListSystemUsersResponse
+from backstop_mcp.features.system_users.tools.list_system_users import list_system_users
 from backstop_mcp.server.tools import TOOLS
 from tests.helpers import BASE_URL, recorded_requests, resource, system_users_service, tool_client
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload

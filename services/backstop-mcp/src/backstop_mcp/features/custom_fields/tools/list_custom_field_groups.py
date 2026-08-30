@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
@@ -14,29 +14,10 @@ from backstop_mcp.features.custom_fields import (
     CustomFieldGroupResponse,
     CustomFieldGroupsService,
     CustomFieldsService,
+    ListCustomFieldGroupsResponse,
     get_custom_field_groups_service,
     get_custom_fields_service,
 )
-
-
-class ListCustomFieldGroupsResponse(BaseModel):
-    """Layout groups from the standard Backstop custom-field group catalog."""
-
-    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
-    cache: Literal["ok", "stale"] = Field(
-        description=(
-            "'ok' when both catalogs were fetched this call or are still fresh; 'stale' when a "
-            "previous catalog is served because refresh failed."
-        )
-    )
-    groups: list[CustomFieldGroupResponse] = Field(
-        description=(
-            "Layout groups in catalog order. Each group's full_path_name is the tab-to-section "
-            "path Backstop publishes, parent is the immediate parent group when nested, and "
-            "membership is the definitions whose group_id matches this group. Groups with no "
-            "matching definitions are still present with an empty membership list."
-        )
-    )
 
 
 def _join_id(resource_id: str) -> int | None:
