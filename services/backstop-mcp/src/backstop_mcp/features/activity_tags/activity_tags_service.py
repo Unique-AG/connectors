@@ -1,9 +1,37 @@
+import logging
 from datetime import timedelta
 from typing import Self
 
-from backstop_mcp.features.activity_tags.fetch_activity_tags import fetch_activity_tags
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.features.activity_tags.api_responses import ActivityTagAttributes
 from backstop_mcp.features.activity_tags.internal_dto import ActivityTagDto
 from backstop_mcp.features.cached_catalog import CachedCatalog
+
+logger = logging.getLogger(__name__)
+
+
+async def _fetch_activity_tags(client: BackstopClient) -> dict[str, ActivityTagDto]:
+    """Fetch Backstop's activity-tag catalog in one paginated walk, keyed by tag id."""
+    page = await client.paginate(
+        "/activity-tags",
+        schema=BackstopApiResource[ActivityTagAttributes],
+        max_records=None,
+        page_size=1000,
+    )
+
+    tags_by_id: dict[str, ActivityTagDto] = {}
+    for resource in page.items:
+        tag = ActivityTagDto.from_resource(resource)
+        if tag is None:
+            continue
+        existing = tags_by_id.get(tag.id)
+        if existing is None:
+            tags_by_id[tag.id] = tag
+        elif existing != tag:
+            logger.warning(
+                "Conflicting activity tags for duplicate id %r; retaining first tag", tag.id
+            )
+    return tags_by_id
 
 
 class ActivityTagsService(CachedCatalog[ActivityTagDto]):
@@ -19,7 +47,7 @@ class ActivityTagsService(CachedCatalog[ActivityTagDto]):
     def __init__(self, *, ttl: timedelta, caching_enabled: bool = True) -> None:
         super().__init__(
             ttl=ttl,
-            fetch=fetch_activity_tags,
+            fetch=_fetch_activity_tags,
             log_prefix="activity_tags",
             subject="activity-tag",
             caching_enabled=caching_enabled,

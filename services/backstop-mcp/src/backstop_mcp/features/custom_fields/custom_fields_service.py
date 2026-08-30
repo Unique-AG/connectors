@@ -6,11 +6,11 @@ from typing import Self, cast, override
 
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopClient, ResourceRef
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, ResourceRef
 from backstop_mcp.features.cached_catalog import CachedCatalog, CatalogSource
-from backstop_mcp.features.custom_fields.api_responses import CustomFieldValueAttributes
-from backstop_mcp.features.custom_fields.fetch_custom_field_definitions import (
-    fetch_custom_field_definitions,
+from backstop_mcp.features.custom_fields.api_responses import (
+    CustomFieldDefinitionAttributes,
+    CustomFieldValueAttributes,
 )
 from backstop_mcp.features.custom_fields.internal_dto import (
     CustomFieldDefinitionDto,
@@ -36,6 +36,34 @@ class CustomFieldFilters:
 _NO_FILTERS = CustomFieldFilters()
 
 
+async def _fetch_custom_field_definitions(
+    client: BackstopClient,
+) -> dict[str, CustomFieldDefinitionDto]:
+    """Fetch Backstop's full custom-field schema in one paginated walk, keyed by definition id."""
+    page = await client.paginate(
+        "/custom-field-definitions",
+        schema=BackstopApiResource[CustomFieldDefinitionAttributes],
+        max_records=None,
+        page_size=1000,
+    )
+
+    definitions_by_id: dict[str, CustomFieldDefinitionDto] = {}
+    for resource in page.items:
+        definition = CustomFieldDefinitionDto.from_resource(resource)
+        if definition is None:
+            continue
+        existing = definitions_by_id.get(definition.id)
+        if existing is None:
+            definitions_by_id[definition.id] = definition
+        elif existing != definition:
+            logger.warning(
+                "Conflicting custom-field definitions for duplicate id %r; "
+                + "retaining first definition",
+                definition.id,
+            )
+    return definitions_by_id
+
+
 class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
     """Process-wide custom-field schema catalog, and the join of record values onto it.
 
@@ -53,7 +81,7 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
     def __init__(self, *, ttl: timedelta, caching_enabled: bool = True) -> None:
         super().__init__(
             ttl=ttl,
-            fetch=fetch_custom_field_definitions,
+            fetch=_fetch_custom_field_definitions,
             log_prefix="custom_fields.schema",
             subject="custom-field",
             caching_enabled=caching_enabled,

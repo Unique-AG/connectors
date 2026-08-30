@@ -1,38 +1,20 @@
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.includes import InternalOwnerResponse
 from backstop_mcp.features.system_users import (
+    ListSystemUsersResponse,
     SystemUserDto,
     SystemUsersService,
     get_system_users_service,
 )
 from backstop_mcp.models import published_output_schema
-
-
-class ListSystemUsersResponse(BaseModel):
-    """Colleagues from the Backstop system-user catalog."""
-
-    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
-    cache: Literal["ok", "stale"] = Field(
-        description=(
-            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
-            "previous catalog is served because refresh failed."
-        )
-    )
-    users: list[InternalOwnerResponse] = Field(
-        description=(
-            "Our colleagues, in catalog order. Echo `user_name` into search_opportunities "
-            "`representative` — that filter takes a login, not a display name. `disabled` is "
-            "true for a departed colleague; do not treat their empty pipeline as 'no coverage'."
-        )
-    )
 
 
 def _to_owner(user: SystemUserDto) -> InternalOwnerResponse:

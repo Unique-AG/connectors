@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
@@ -13,29 +13,10 @@ from backstop_mcp.features.custom_fields import (
     CustomFieldDefinitionResponse,
     CustomFieldEntityType,
     CustomFieldsService,
+    ListCustomFieldsResponse,
     custom_field_entity_type_from_bean,
     get_custom_fields_service,
 )
-
-
-class ListCustomFieldsResponse(BaseModel):
-    """Custom-field definitions grouped by the requested entity types."""
-
-    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
-    cache: Literal["ok", "stale"] = Field(
-        description=(
-            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
-            "previous catalog is served because refresh failed."
-        )
-    )
-    definitions_by_entity: dict[CustomFieldEntityType, list[CustomFieldDefinitionResponse]] = Field(
-        description=(
-            "Custom-field definitions keyed by the requested standard Backstop entity type. "
-            "An entity with no definitions is still present with an empty list. Definitions may "
-            "be associated with a party or a concrete Backstop entity resource and include layout "
-            "group metadata such as group_id when available."
-        )
-    )
 
 
 def _definitions_for(

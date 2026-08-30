@@ -1,36 +1,18 @@
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_tags import (
     ActivityTagResponse,
     ActivityTagsService,
+    ListActivityTagsResponse,
     get_activity_tags_service,
 )
-
-
-class ListActivityTagsResponse(BaseModel):
-    """Activity tags from the standard Backstop activity-tag catalog."""
-
-    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
-    cache: Literal["ok", "stale"] = Field(
-        description=(
-            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
-            "previous catalog is served because refresh failed."
-        )
-    )
-    tags: list[ActivityTagResponse] = Field(
-        description=(
-            "Activity tags in catalog order. Each tag's id is the stable identifier for "
-            "filtering activities by tag. quantity_tagged is how many activities currently "
-            "carry the tag; viewable is whether the tag is shown in the Backstop UI."
-        )
-    )
 
 
 @tool(

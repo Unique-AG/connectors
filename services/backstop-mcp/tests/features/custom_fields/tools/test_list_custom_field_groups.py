@@ -7,8 +7,8 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
+from backstop_mcp.features.custom_fields import ListCustomFieldGroupsResponse
 from backstop_mcp.features.custom_fields.tools.list_custom_field_groups import (
-    ListCustomFieldGroupsResponse,
     list_custom_field_groups,
 )
 from tests.helpers import (

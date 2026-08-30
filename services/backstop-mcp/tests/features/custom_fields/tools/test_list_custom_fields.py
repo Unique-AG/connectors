@@ -8,11 +8,8 @@ from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.custom_fields import CustomFieldEntityType
-from backstop_mcp.features.custom_fields.tools.list_custom_fields import (
-    ListCustomFieldsResponse,
-    list_custom_fields,
-)
+from backstop_mcp.features.custom_fields import CustomFieldEntityType, ListCustomFieldsResponse
+from backstop_mcp.features.custom_fields.tools.list_custom_fields import list_custom_fields
 from tests.features.party_resolver.helpers import BASE_URL, resource
 from tests.helpers import custom_fields_service, recorded_requests, tool_client
 from tests.server.tools.helpers import tool_model, tool_payload
@@ -20,7 +17,7 @@ from tests.server.tools.helpers import tool_model, tool_payload
 # The published input schema: the tool's signature with the `Depends(...)` collaborators and
 # `Context` stripped, which is what FastMCP validates a call against.
 _INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_custom_fields))
-_FETCH_LOGGER = "backstop_mcp.features.custom_fields.fetch_custom_field_definitions"
+_FETCH_LOGGER = "backstop_mcp.features.custom_fields.custom_fields_service"
 
 
 def tenant(name: str) -> str:

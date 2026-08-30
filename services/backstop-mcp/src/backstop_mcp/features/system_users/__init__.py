@@ -8,9 +8,11 @@ colleague so a name lookup does not silently return an empty pipeline.
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
 from backstop_mcp.features.system_users.dependencies import get_system_users_service
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
+from backstop_mcp.features.system_users.responses import ListSystemUsersResponse
 from backstop_mcp.features.system_users.system_users_service import SystemUsersService
 
 __all__ = [
+    "ListSystemUsersResponse",
     "SystemUserAttributes",
     "SystemUserDto",
     "SystemUsersService",
