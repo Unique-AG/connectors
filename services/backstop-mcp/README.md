@@ -46,15 +46,37 @@ every tool file appears in `TOOLS`).
 
 ## Adding a feature or tool
 
-1. Create `features/<name>/` with the model layers `api_responses` → `internal_dto` → `responses`.
-2. Put the fetch in a module named after the function it defines.
-3. Add `dependencies.py` with an `@lru_cache(maxsize=1)` provider only if the feature owns a
-   long-lived service, exported through `__init__` and listed in `teardown.PROVIDERS`.
-4. Add `tools/<tool_name>.py` defining exactly one `FunctionTool` bound to a symbol matching the
-   filename.
-5. Declare collaborators as `Depends(...)` parameters, which stay out of the published schema.
-6. Write the test under `tests/features/<name>/tools/`, passing collaborators as kwargs rather
-   than standing up a database.
+**Current standard:** copy [`features/opportunities/`](src/backstop_mcp/features/opportunities/).
+The full agent guide is [AGENT_README.md](./AGENT_README.md) — read it before adding or
+refactoring a feature.
+
+1. Create `features/<name>/` with `api_responses` → `responses` (add `internal_dto` only when
+   you have real `*Dto` classes, not type aliases). Either file can become a package if it
+   grows too big.
+2. Put one logical read in `queries/<name>_query.py`, one logical write in
+   `commands/<name>_command.py`, and reusable helpers in `utils/`. File / class / factory
+   names use those suffixes and should read as the same symbol. Export each through that
+   package's `__init__`. The feature `__init__` is the public door. Keep data flow
+   simple unless a measured bottleneck justifies the complexity. Span and log inside the
+   feature; add a metric only when the series would change a decision.
+3. Put published `*Response` models in `responses`. A tool may keep only a small union
+   (resolved | not-found | ambiguous).
+4. Add `dependencies.py` providers. `@lru_cache(maxsize=1)` only for long-lived services;
+   export those through `__init__` and list them in `teardown.PROVIDERS`.
+5. Add `tools/<tool_name>.py` — the MCP endpoint. It structures elicitation and party
+   resolve, then ideally calls one query or command. Register it on `server/tools/registry.py`.
+6. Declare collaborators as `Depends(...)` parameters. Import them from the feature package,
+   not a file inside it.
+7. Write query/command tests under `tests/features/<name>/` and tool tests under
+   `tests/features/<name>/tools/`, passing collaborators as kwargs. Test only the public
+   interface: mock the Backstop API, call the tool/query/command, assert on the output.
+   Do not promote a private method just so a test can reach it.
+
+**Deprecated — do not copy.** Most other features (`org_people`, `accounts`,
+`activity_history`, …) still use the older layout: a `fetch_*.py` function at the feature
+root, large `*ResolvedResponse` models living in the tool file, and type aliases dumped in
+`internal_dto.py`. Leave those features as they are unless you are migrating one. Do not use
+them as a template for new work.
 
 Three rules an agent will otherwise break, each enforced by a test: a tool is registered by being
 added to `server/tools/registry.py` as well as written, and nothing under `features/` may import
@@ -93,8 +115,11 @@ uv run alembic downgrade -1                          # roll back one
 
 ## Tests
 
-Tool tests pass a fake or real client as kwargs and do not need Postgres. The suite still starts
-a container for app, auth, and db tests, so Docker must be running.
+Feature tests mock the Backstop API (the external boundary), call the public tool / query /
+command, and assert on the returned shape. They do not lock internals in place and they do
+not make a method public just to test it. Tool tests pass a client as kwargs and do not
+need Postgres. The suite still starts a container for app, auth, and db tests, so Docker
+must be running.
 
 ```bash
 uv run pytest
