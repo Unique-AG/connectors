@@ -5,8 +5,9 @@ from typing import ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field
 
+from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.features.party_resolver import ResolvedPartyResponse
-from backstop_mcp.features.tasks.internal_dto import TaskDto
+from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = ["PartyTasksResponse", "TaskRowResponse", "TasksResolvedResponse"]
@@ -26,8 +27,26 @@ class TaskRowResponse(OmitNoneModel):
     is_open: bool = Field(description="False when completed, complete, done, closed, or dated so.")
 
     @classmethod
-    def from_dto(cls, row: TaskDto) -> Self:
-        return cls.model_validate(row.model_dump())
+    def from_resource(cls, resource: BackstopApiResource[TaskAttributes]) -> Self:
+        attributes = resource.attributes
+        return cls(
+            id=resource.id,
+            title=attributes.title,
+            status=attributes.status,
+            description=attributes.description,
+            due_date=attributes.due_date,
+            completed_date=attributes.completed_date,
+            is_open=not _is_completed(attributes),
+        )
+
+
+def _is_completed(attributes: TaskAttributes) -> bool:
+    if attributes.completed is True:
+        return True
+    if attributes.completed_date is not None:
+        return True
+    status = (attributes.status or "").strip().casefold()
+    return status in {"completed", "complete", "done", "closed"}
 
 
 class PartyTasksResponse(OmitNoneModel):

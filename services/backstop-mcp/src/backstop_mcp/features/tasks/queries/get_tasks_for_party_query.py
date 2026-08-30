@@ -11,7 +11,6 @@ from typing import Literal
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
-from backstop_mcp.features.tasks.internal_dto import TaskDto, TasksListingDto
 from backstop_mcp.features.tasks.responses import PartyTasksResponse, TaskRowResponse
 
 logger = logging.getLogger(__name__)
@@ -63,11 +62,7 @@ class GetTasksForPartyQuery:
                     "total_count": page.total_count,
                 },
             )
-        listing = TasksListingDto(
-            rows=tuple(TaskDto.from_resource(resource) for resource in page.items),
-            scan_truncated=page.truncated,
-        )
-        rows = tuple(TaskRowResponse.from_dto(row) for row in listing.rows)
+        rows = tuple(TaskRowResponse.from_resource(resource) for resource in page.items)
         selected = tuple(
             row for row in rows if status == "all" or (row.is_open is (status == "open"))
         )
@@ -76,7 +71,7 @@ class GetTasksForPartyQuery:
             total=len(rows),
             open_count=sum(1 for row in rows if row.is_open),
             completed_count=sum(1 for row in rows if not row.is_open),
-            scan_truncated=listing.scan_truncated,
+            scan_truncated=page.truncated,
         )
         logger.info(
             "tasks.fetched",

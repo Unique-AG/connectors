@@ -420,8 +420,7 @@ payload (mapped `TaskRowResponse` rows + counts + `scan_truncated`). The tool at
 tasks/
   __init__.py
   api_responses.py            TaskAttributes (already typed — keep)
-  responses.py                TaskRowResponse, TasksResolvedResponse
-  internal_dto.py             TaskDto, TasksListingDto only
+  responses.py                TaskRowResponse, TasksResolvedResponse, PartyTasksResponse
   dependencies.py             get_tasks_for_party_query_factory  (@lru_cache)
   queries/
     __init__.py

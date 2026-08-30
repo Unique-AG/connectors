@@ -2,7 +2,6 @@
 
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.features.tasks.dependencies import get_tasks_for_party_query_factory
-from backstop_mcp.features.tasks.internal_dto import TaskDto, TasksListingDto
 from backstop_mcp.features.tasks.queries import (
     MAX_TASK_SCAN_RECORDS,
     GetTasksForPartyQuery,
@@ -20,11 +19,9 @@ __all__ = [
     "GetTasksForPartyQuery",
     "PartyTasksResponse",
     "TaskAttributes",
-    "TaskDto",
     "TaskFilter",
     "TaskRowResponse",
     "TaskStatus",
-    "TasksListingDto",
     "TasksResolvedResponse",
     "get_tasks_for_party_query_factory",
 ]
