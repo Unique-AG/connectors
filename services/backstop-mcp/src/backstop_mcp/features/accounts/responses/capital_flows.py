@@ -5,7 +5,7 @@ from typing import Literal, Self
 
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopApiResource, IncludedResource
+from backstop_mcp.backstop_client import IncludedResource
 from backstop_mcp.features.accounts.api_responses import AccountAttributes, OwnerAttributes
 from backstop_mcp.models import OmitNoneModel
 
@@ -25,7 +25,7 @@ class CapitalFlowPartyResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_account(cls, account: BackstopApiResource[AccountAttributes] | None) -> Self | None:
+    def from_account(cls, account: IncludedResource[AccountAttributes] | None) -> Self | None:
         if account is None:
             return None
         return cls(id=account.id, name=account.attributes.name, resource_type=account.type)

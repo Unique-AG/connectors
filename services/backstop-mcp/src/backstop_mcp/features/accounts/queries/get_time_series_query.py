@@ -14,12 +14,9 @@ from urllib.parse import quote
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.accounts.api_responses import SeriesPointAttributes
-from backstop_mcp.features.accounts.internal_dto import (
-    SeriesPointDto,
-    TimeSeriesEntityType,
-    TimeSeriesName,
-)
+from backstop_mcp.features.accounts.internal_dto import SeriesPointDto
 from backstop_mcp.features.accounts.responses import TimeSeriesResolvedResponse
+from backstop_mcp.features.accounts.time_series_name import TimeSeriesEntityType, TimeSeriesName
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 SeriesPointResource = BackstopApiResource[SeriesPointAttributes]

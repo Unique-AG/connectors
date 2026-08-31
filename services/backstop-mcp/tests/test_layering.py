@@ -506,6 +506,8 @@ def _top_level_defined_names(tree: ast.Module) -> set[str]:
             names.update(target.id for target in node.targets if isinstance(target, ast.Name))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             names.add(node.target.id)
+        elif isinstance(node, ast.TypeAlias) and isinstance(node.name, ast.Name):
+            names.add(node.name.id)
     return names
 
 
@@ -805,6 +807,12 @@ class TestTheDetectionItself:
         assert not _logic_module_name_violations(
             "class CustomFieldsService: ...\n",
             _FEATURES / "custom_fields" / "custom_fields_service.py",
+        )
+
+    def test_accepts_a_logic_module_named_after_its_type_alias(self) -> None:
+        assert not _logic_module_name_violations(
+            "type TimeSeriesName = str\n",
+            _FEATURES / "accounts" / "time_series_name.py",
         )
 
     def test_does_not_fire_on_a_vocabulary_module(self) -> None:

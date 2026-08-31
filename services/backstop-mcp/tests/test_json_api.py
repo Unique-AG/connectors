@@ -361,14 +361,36 @@ class TestIncludedResource:
             is None
         )
 
-    def test_a_non_object_attributes_is_unreadable_not_empty(self) -> None:
-        assert (
-            included_resource(
-                {"id": "42", "type": "products", "attributes": "not an object"},
-                schema=IncludedResource[_OptionalAttrs],
-            )
-            is None
+    def test_a_non_object_attributes_is_read_as_empty(self) -> None:
+        entry = included_resource(
+            {"id": "42", "type": "products", "attributes": "not an object"},
+            schema=IncludedResource[_OptionalAttrs],
         )
+
+        assert entry is not None
+        assert (entry.id, entry.attributes.name) == ("42", None)
+
+    def test_first_follows_owner_off_an_included_account_with_null_relationships(
+        self,
+    ) -> None:
+        """A side-load chip is `IncludedResource`, not a primary `BackstopApiResource`."""
+        account = included_resource(
+            {
+                "id": "7",
+                "type": "hedge-fund-accounts",
+                "attributes": {"name": "Acct"},
+                "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
+            },
+            schema=IncludedResource[_Attrs],
+        )
+        assert account is not None
+
+        owner = Included([{"id": "o1", "type": "contacts", "attributes": {"name": "Koch"}}]).first(
+            account, "owner", schema=IncludedResource[_Attrs]
+        )
+
+        assert owner is not None
+        assert (owner.id, owner.attributes.name) == ("o1", "Koch")
 
     def test_a_blank_id_is_dropped_like_a_missing_one(self) -> None:
         assert (
