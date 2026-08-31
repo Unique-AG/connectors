@@ -40,12 +40,12 @@ _RECENCY = "lastMessagePreview/createdDateTime desc"
 type _ChatsQuery = ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-List the signed-in user's Teams chats — one-to-one, group and meeting — ordered by last message \
-sent. Call it to see who is in a conversation, when it was last active, or for a meeting's \
-`meeting_uri`, the only route to its transcripts and recordings — no filter exists, so match it by \
-subject in `topic`. Channel activity is listed nowhere here: teams_browse_channel walks one, \
-teams_search_messages finds a message. Returns id, type, topic, last-message time and members for \
-unnamed chats.\
+List the signed-in user's Teams chats — one-to-one, group, and meeting — ordered by last message \
+sent. Call it to see who is in a conversation, and when it was last active. Call it also for a \
+meeting's `meeting_uri` — the only route to its transcripts and recordings. No filter exists for \
+`meeting_uri`, so match it by subject in `topic` instead. This tool does not list channel \
+activity: teams_browse_channel walks one channel, teams_search_messages finds a message. Returns \
+id, type, topic, last-message time, and members for unnamed chats.\
 """
 
 
@@ -56,8 +56,8 @@ class ChatMember(BaseModel):
     email: str | None = Field(
         default=None,
         description=(
-            "The member's email. Present only when `include_member_emails` is set. Null for rooms "
-            + "or phone dial-ins."
+            "The member's email. When `include_member_emails` is set, this field is present. Null "
+            + "for rooms or phone dial-ins."
         ),
     )
 
@@ -74,15 +74,15 @@ class ChatMember(BaseModel):
 class ChatSummary(BaseModel):
     chat_id: str = Field(
         description=(
-            "Graph id for this chat (e.g. `19:...@thread.v2`). Microsoft puts this on every "
+            "Graph id for this chat (for example `19:...@thread.v2`). Microsoft puts this on every "
             + "message in the chat. Not a `teams:///` handle and cannot be assembled into one. "
             + "teams_read_message takes only a handle a tool result carries."
         )
     )
     chat_type: str = Field(
         description=(
-            "`oneOnOne`, `group`, or `meeting`. Null becomes `unknown` if Graph reports a newer "
-            + "type."
+            "`oneOnOne`, `group`, or `meeting`. If Graph reports a newer type, null becomes "
+            + "`unknown`."
         )
     )
     topic: str | None = Field(
@@ -95,14 +95,14 @@ class ChatSummary(BaseModel):
             "For meeting chats: a handle for the Teams meeting. The only route from conversation "
             + "to meeting. Pass it verbatim to teams_list_meeting_transcripts to find out whether "
             + "the "
-            + "meeting was transcribed. Null when no join URL exists, in which case that meeting's "
-            + "transcripts are unreachable from this connector."
+            + "meeting was transcribed. Null when no join URL exists, in which case that "
+            + "meeting's transcripts are unreachable from this connector."
         )
     )
     last_message_at: datetime | None = Field(
         description=(
-            "When the last message was sent. Null if no one has posted. The sort order is by this "
-            + "field."
+            "When the last message was sent. Null if no one posted yet. The sort order is by "
+            + "this field."
         )
     )
     created_at: datetime | None = Field(
@@ -111,10 +111,10 @@ class ChatSummary(BaseModel):
     members: list[ChatMember] | None = Field(
         description=(
             "Who is in the chat. Returned only for unnamed chats (where members are the name). "
-            + "Null otherwise. A null field does not mean the chat has no members; it means "
+            + "Null otherwise. A null field does not mean the chat has no members. It means "
             + "members are not returned for named chats. Do not use this incomplete list to make "
             + "decisions about chat membership. Match a member by display name, or by email with "
-            + "`include_member_emails`; this list carries no user ids, so nothing in it can be "
+            + "`include_member_emails`. This list carries no user ids, so nothing in it can be "
             + "compared with get_me's `user_id`."
         )
     )
@@ -130,7 +130,7 @@ class ChatSummary(BaseModel):
     def from_chat(cls, chat: Chat, *, include_member_emails: bool) -> Self:
         assert chat.id is not None, "Graph returned a chat with no id"
         preview = chat.last_message_preview
-        # Graph documents `topic` as absent when unnamed; a blank one survives the SDK as `""`.
+        # Graph documents `topic` as absent when unnamed. A blank one survives the SDK as `""`.
         topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
         members = _members(chat, include_member_emails) if topic is None else None
         # Not `.value`: `ChatType` subclasses `str`, so the member is its wire value already, and
@@ -151,7 +151,7 @@ class ChatSummary(BaseModel):
 class ChatList(BaseModel):
     chats: list[ChatSummary] = Field(
         description=(
-            "The user's chats, most recent first. A full window may have more. A short one is "
+            "The user's chats, most recent first. A full window can have more. A short one is "
             + f"all. Raise `limit` (up to {MAX_CHATS}) to see further back. The notes-to-self "
             + "chat is usually the oneOnOne chat whose only member is the user — call get_me to "
             + "confirm."
@@ -166,7 +166,7 @@ async def list_recent_chats(
 
     configuration = RequestConfiguration[_ChatsQuery](
         query_parameters=ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters(
-            # Graph rejects `$select` on this collection; these expansions bring the fields back.
+            # Graph rejects `$select` on this collection. These expansions bring the fields back.
             expand=["members", "lastMessagePreview"],
             orderby=[_RECENCY],
             top=limit,
@@ -217,8 +217,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             bool,
             Field(
                 description=(
-                    "Include each member's email. Off by default. Needed when members share a "
-                    + "display name."
+                    "Include each member's email. Off by default. When members share a display "
+                    + "name, this is needed."
                 )
             ),
         ] = False,

@@ -2489,7 +2489,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         [
             (
                 "teams_list_meeting_transcripts",
-                "handle is teams_read_transcript's; this tool is what produces it",
+                "handle is teams_read_transcript's. This tool is what produces it",
             ),
             (
                 "teams_list_meeting_recordings",
@@ -2586,7 +2586,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
 
         assert result.is_error
         message = _error_text(result)
-        assert "could not be read" in message
+        assert "did not read the message" in message
         assert "not evidence that the message does not exist" in message
         assert "synthetic-request-id" in message, "the id Microsoft support asks for first"
         assert "verbatim" not in message, "the handle did come from a tool response"

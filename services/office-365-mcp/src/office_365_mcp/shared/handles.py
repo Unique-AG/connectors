@@ -1,37 +1,41 @@
 """The handle grammar: every shape this connector mints, the parser, and the speller.
 
-Two schemes, one per product. `teams:///` addresses Microsoft Teams and `outlook:///` addresses a
-mailbox. A mail shape under the Teams scheme would have to answer `MessageHandle.permission`
-below, and that answer would reach `teams_read_message`'s declared permissions and from there the
+Two schemes, one per product. `teams:///` addresses Microsoft Teams, and `outlook:///` addresses
+a mailbox. If a mail shape used the Teams scheme, it has to answer `MessageHandle.permission`
+below, and that answer reaches `teams_read_message`'s declared permissions and, from there, the
 consent screen of every `teams` deployment. The scheme is the cheapest place to keep the two
 products apart.
 
-The only module that spells or parses these URIs, which tests/test_layering.py enforces. A second
-speller would not look like a disagreement; it would look like a handle one tool produced and
-another answers 404 to.
+This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
+A second speller does not look like a disagreement. It looks like a handle that one tool produced
+and another answers 404 to.
 
 Three of the five shapes are Graph's three ways to address a Teams message
-(https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a search
-cannot mint: Graph addresses a reply *under* its parent post, and the search projection carries no
-`replyToId`, so a channel hit that is really a reply becomes the plain channel shape, which Graph
-answers 404 to. Only `teams_browse_channel` walks a channel post by post and knows each reply's
-parent.
+(https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a
+search cannot mint. Graph addresses a reply *under* its parent post, and the search projection
+carries no `replyToId`. So a channel hit that is really a reply becomes the plain channel shape
+instead, and Graph answers 404 to that. Only `teams_browse_channel` walks a channel post by post
+and knows each reply's parent.
 
-A meeting is addressed by join URL because that is the only route Graph gives a delegated caller
-from chat to meeting; no chat id, topic or date turns into one. A transcript is addressed by the two
-ids its content path is built from and not by that join URL, so reading one does not repeat the
-resolve, spend a second request and permission on it, and answer a 403 that could be about either.
-The family name is the first segment: `teams:///meetings/{x}/transcripts/{y}` would make `{x}` a
-join URL in one shape and a meeting id in another, which a parser cannot tell apart.
+A meeting is addressed by join URL, because that is the only route Graph gives a delegated
+caller from chat to meeting. No chat id, topic, or date turns into one. A transcript is addressed
+by the two ids that its content path is built from, and not by that join URL. So reading one does
+not repeat the resolve, spend a second request and permission on it, and answer a 403 that can be
+about either.
+
+The family name is the first segment for this reason. Nesting `{x}` under both `meetings` and
+`transcripts` in one URI, like `teams:///meetings/{x}/transcripts/{y}`, makes `{x}` ambiguous. It
+reads as a join URL in one shape and as a meeting id in another. A parser cannot tell them apart.
 
 Every segment is percent-encoded, because join URLs carry `:`, `/`, `?`, `&`, `%`, `#` and Teams ids
 carry `:` and `@` (`19:...@thread.v2`). The parser rejects half-encoded input, so a hand-spelled
 handle comes back as "not a handle" rather than as a truncated URL Graph ignores.
 
 Every `outlook:///` family is one segment, because Outlook addresses each of these by a single
-opaque id. They are four families rather than one because Graph gives them one id space and this
-connector must not: a draft is a message with `isDraft` set, so a single family would let a
-message a reader found be spelled as a draft and handed to the tool that sends.
+opaque id. There are four families rather than one. Graph gives them all one id space, but this
+connector keeps them apart: a draft is a message with `isDraft` set. Splitting them into four
+families keeps a message that a reader found from being spelled as a draft and handed to the tool
+that sends.
 """
 
 import re
@@ -82,8 +86,8 @@ class MeetingHandle:
 
 @dataclass(frozen=True, slots=True)
 class TranscriptHandle:
-    """Which transcript, by the two ids Graph's content path is built from. Graph's own
-    `transcriptContentUrl` is not used: the published samples are malformed
+    """This identifies a transcript by the two ids that Graph's content path is built from.
+    Graph's own `transcriptContentUrl` is not used, because the published samples are malformed
     (`…/transcripts/('…')/content`)."""
 
     meeting_id: str
@@ -105,10 +109,11 @@ class MailMessageHandle:
 
 @dataclass(frozen=True, slots=True)
 class MailFolderHandle:
-    """A mail folder by its Graph id, which is what reaches a folder no well-known name covers.
+    """This identifies a mail folder by its Graph id. That id is what reaches a folder that no
+    well-known name covers.
 
-    Its own family because Outlook's well-known names (`inbox`, `sentitems`, …) are a closed
-    vocabulary a tool spells as a `Literal`, and an id is the other half of that argument.
+    This is its own family, because Outlook's well-known names (`inbox`, `sentitems`, …) are a
+    closed vocabulary that a tool spells as a `Literal`. An id is the other half of that argument.
     """
 
     folder_id: str
@@ -120,11 +125,12 @@ class MailFolderHandle:
 
 @dataclass(frozen=True, slots=True)
 class MailDraftHandle:
-    """A draft this connector composed, and the only thing the sending tool accepts.
+    """This identifies a draft that this connector composed. It is the only thing the sending
+    tool accepts.
 
-    Graph gives a draft the same id space as any other message, so one family for both would let a
-    message a reader found be spelled as a draft. Keeping them apart is what makes "send the mail
-    you just wrote" expressible and "send that mail I found" unspellable.
+    Graph gives a draft the same id space as any other message. Keeping the families apart stops
+    a message that a reader found from being spelled as a draft. This is what makes "send the
+    mail you just wrote" expressible, and "send that mail I found" unspellable.
     """
 
     draft_id: str
@@ -248,7 +254,7 @@ def _single_id(pattern: re.Pattern[str], uri: str) -> str | None:
     """The one id a single-segment handle carries, or None when `uri` is not that shape.
 
     None for a segment that decoded to nothing too, because `%20` is not an id — the same rule
-    `_message_handle` applies to the Teams shapes.
+    that `_message_handle` applies to the Teams shapes.
     """
     match = pattern.match(uri)
     if match is None:

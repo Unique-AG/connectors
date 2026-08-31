@@ -1,24 +1,24 @@
 """Give every MCP message the trace context of the HTTP request that carried it.
 
-Trap: an MCP session's server task is started once, during `initialize`, and every message for the
+Trap: an MCP session's server task starts once, during `initialize`, and every message for the
 rest of that session's life runs inside it (mcp 1.28.1,
-`mcp/server/streamable_http_manager.py:331`; a later request on the same session starts nothing,
-`:261`). An asyncio task snapshots the contextvars of whoever created it, so every message handler
-carries the OpenTelemetry context that was ambient during `initialize` and no other. FastMCP
-prefers a valid ambient span over anything a message carries (fastmcp 3.4.5,
-`fastmcp/telemetry.py:95-98`) and that stale one is valid, so a session's traces come out as one
+`mcp/server/streamable_http_manager.py:331`). A later request on the same session starts nothing
+new (`:261`). An asyncio task snapshots the contextvars of whoever created it, so every message
+handler carries the OpenTelemetry context that was ambient during `initialize` and no other.
+FastMCP prefers a valid ambient span over anything a message carries (fastmcp 3.4.5,
+`fastmcp/telemetry.py:95-98`), and that stale one is valid. So a session's traces come out as one
 ever-growing `initialize` trace plus one orphan HTTP span per request.
 
-Bridging the incoming `traceparent` into `params._meta` was tried and measured doing nothing:
-`extract_trace_context` consults `_meta` only when there is no valid ambient span. The ambient
-context has to be replaced, not supplemented.
+The team tried bridging the incoming `traceparent` into `params._meta` and measured that it did
+nothing: `extract_trace_context` consults `_meta` only when there is no valid ambient span. The fix
+must replace the ambient context, not supplement it.
 
 Hence two halves. `TraceContextCaptureMiddleware` records the ambient context on the ASGI `scope`,
-which is per request and not a contextvar, so the session task's snapshot cannot make it stale; it
-must be mounted INSIDE `OpenTelemetryMiddleware`, which for an outside-in Starlette list means
-listed after it, or it captures the context from before the server span was made current and hands
-every message the request's *parent*. `TraceContextRestoreMiddleware` reads that value back off the
-request now being served and attaches it for the duration of the message.
+which is per request and not a contextvar, so the session task's snapshot cannot make it stale.
+It must be mounted INSIDE `OpenTelemetryMiddleware`, which for an outside-in Starlette list means
+listed after it. Otherwise it captures the context from before the server span became current and
+hands every message the request's *parent*. `TraceContextRestoreMiddleware` reads that value back
+off the request now being served and attaches it for the duration of the message.
 """
 
 from collections.abc import Mapping
@@ -37,7 +37,7 @@ _SCOPE_KEY = "office_365_mcp.otel_context"
 
 
 class TraceContextCaptureMiddleware:
-    """Records the ambient context on the ASGI scope. Half of a pair; see the module docstring."""
+    """Records the ambient context on the ASGI scope. Half of a pair. See the module docstring."""
 
     def __init__(self, app: ASGIApp) -> None:
         self._app: ASGIApp = app

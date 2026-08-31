@@ -21,16 +21,17 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
 Return the signed-in user's profile: user_id, display_name, email, user_principal_name, job_title. \
-Call it before anything that turns on who "I", "me" or "my" is, and reuse the answer — it is \
-stable for the session. Match sender and recipient addresses on `email`; `user_principal_name` is \
-a sign-in name on a possibly different domain and is correct only when `email` is null.\
+Call it before anything that depends on who "I", "me", or "my" is. Reuse the answer. It stays \
+stable for the whole session. Match sender and recipient addresses on `email`. \
+`user_principal_name` is a sign-in name on a possibly different domain, and it is correct only \
+when `email` is null.\
 """
 
 
 class SignedInUser(BaseModel):
     """The signed-in user's profile.
 
-    Field names are snake_case; see field descriptions for Graph names.
+    Field names are snake_case. See field descriptions for Graph names.
     """
 
     user_id: str = Field(
@@ -45,17 +46,17 @@ class SignedInUser(BaseModel):
     email: str | None = Field(
         description=(
             "The canonical primary SMTP address (Graph mail). Null for guest and unlicensed "
-            + "accounts. Use user_principal_name when null."
+            + "accounts. When null, use user_principal_name instead."
         )
     )
     user_principal_name: str | None = Field(
         description=(
-            "The sign-in name (Graph userPrincipalName). Usually looks like an email address "
-            + "but may be on a different domain. Use only when email is null."
+            "The sign-in name (Graph userPrincipalName). It usually looks like an email address, "
+            + "but it can be on a different domain. If email is null, use this field instead."
         )
     )
     job_title: str | None = Field(
-        description="The user's job title from the directory, when the directory records one."
+        description="The user's job title from the directory. Null if the directory has none."
     )
 
     @classmethod

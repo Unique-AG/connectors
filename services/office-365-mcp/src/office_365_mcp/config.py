@@ -18,7 +18,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PKG_VERSION = pkg_version("office-365-mcp")
 
-# libpq `sslmode` values asyncpg accepts; `verify` is rewritten because asyncpg rejects the short
+# libpq `sslmode` values asyncpg accepts. `verify` is rewritten because asyncpg rejects the short
 # spelling. Trap: `verify-ca` is a genuinely weaker mode. Never widen it to `verify-full` — the
 # wider mode silently changes what the connection checks.
 _ASYNCPG_SSLMODES = frozenset({"disable", "allow", "prefer", "require", "verify-ca", "verify-full"})
@@ -75,7 +75,7 @@ class LogLevel(StrEnum):
 
 
 class ToolsPreset(StrEnum):
-    """The named tool surfaces an operator may deploy; `tools/__init__.py` maps each to its tools.
+    """The named tool surfaces an operator can deploy. `tools/__init__.py` maps each to its tools.
 
     Trap: unlike `AppEnv` and `LogLevel`, an uppercase spelling is not accepted, because the Helm
     chart's schema carries these same values as a JSON Schema `enum`, which has no
@@ -109,8 +109,8 @@ class AppConfig(BaseSettings):
     # Worst case of one tool call: the request timeout times `graph_max_retries + 1` attempts,
     # before any Retry-After wait, per Graph call, and a paged walk makes several.
     #
-    # Zero timeouts are refused: httpx reads a timeout as a deadline and not as "unbounded", so `0`
-    # would time every Graph call out before it left the process.
+    # Zero timeouts are refused: httpx reads a timeout as a deadline, not as "unbounded", so a zero
+    # deadline times every Graph call out before it leaves the process.
     #
     # TRAP: the retry ceiling is the SDK's. `RetryHandlerOption.__init__` raises `ValueError:
     # MaxLimitExceeded. MaxRetries should not be more than $10` above `MAX_MAX_RETRIES = 10`
@@ -136,7 +136,7 @@ class AppConfig(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_local_base_url_in_production(self) -> Self:
-        """Trap: without this the server logs nothing and clients simply fail to connect."""
+        """Trap: without this check, the server logs nothing, and clients fail to connect."""
         if self.app_env != AppEnv.PRODUCTION:
             return self
         host = self.public_base_url.host
@@ -144,8 +144,8 @@ class AppConfig(BaseSettings):
         if host in _NON_PUBLIC_HOSTS:
             raise ValueError(
                 "PUBLIC_BASE_URL must be this service's externally-reachable URL in "
-                + f"{AppEnv.PRODUCTION} (got {self.public_base_url}); it is the OAuth issuer "
-                + "clients are redirected to"
+                + f"{AppEnv.PRODUCTION} (got {self.public_base_url}). It is the OAuth issuer "
+                + "clients are redirected to."
             )
         return self
 
@@ -158,8 +158,8 @@ class AppConfig(BaseSettings):
         if self.public_base_url.scheme != "https":
             raise ValueError(
                 "PUBLIC_BASE_URL must use https in "
-                + f"{AppEnv.PRODUCTION} (got {self.public_base_url}); the OAuth discovery, "
-                + "authorize and token endpoints are published under it"
+                + f"{AppEnv.PRODUCTION} (got {self.public_base_url}). The OAuth discovery, "
+                + "authorize and token endpoints are published under it."
             )
         return self
 
@@ -173,10 +173,10 @@ class AppConfig(BaseSettings):
 class SurfaceConfig(BaseSettings):
     """Which tools this deployment runs, and so what every user is asked to consent to at sign-in.
 
-    Exactly one of the two is a selection. Both set is an error naming which to remove rather than a
-    precedence rule nobody would remember; neither set is an error too, because **there is no
-    default**: a default of "every tool" would make the widest consent screen the thing an operator
-    gets by not choosing, which is the whole of what this knob exists to stop. `TOOLS_PRESET=teams`
+    Exactly one of the two is a selection. Both set is an error naming which to remove, rather than
+    a precedence rule nobody remembers. Neither set is an error too, because **there is no
+    default**: a default of "every tool" makes the widest consent screen the thing an operator gets
+    by not choosing, which is the whole of what this knob exists to stop. `TOOLS_PRESET=teams`
     keeps "everything" a one-word but chosen value.
 
     Narrowing a live deployment costs nothing. Widening one adds a permission to the authorize
@@ -193,7 +193,7 @@ class SurfaceConfig(BaseSettings):
     @classmethod
     def _split_the_list_an_operator_writes(cls, value: object) -> object:
         """Trap: pydantic-settings JSON-decodes an env var whose field is a collection, before any
-        validator here runs; `NoDecode` turns that off. The `| None` is load-bearing too: at the
+        validator here runs. `NoDecode` turns that off. The `| None` is load-bearing too: at the
         pinned version the decode failure is tolerated only because the field is a union.
         """
         if not isinstance(value, str):
@@ -281,7 +281,7 @@ class DatabaseConfig(BaseSettings):
 
         Any source that sets `url`, or any one of `host`/`name`/`user`/`password`, suppresses the
         fallback entirely — the env var is read only when nothing else names a database. Trap:
-        without that guard, an explicit `DatabaseConfig(host=...)` call would silently lose its
+        without that guard, an explicit `DatabaseConfig(host=...)` call silently loses its
         arguments to the ambient environment instead.
         """
         if not isinstance(data, dict):
@@ -313,7 +313,7 @@ class DatabaseConfig(BaseSettings):
             if val is None
         ]
         if missing:
-            raise ValueError(f"DB_URL not set; missing required fields: {', '.join(missing)}")
+            raise ValueError(f"DB_URL not set. Missing required fields: {', '.join(missing)}")
 
         assert self.user is not None and self.password is not None and self.name is not None, (
             "the missing-field check above must leave every discrete part set"

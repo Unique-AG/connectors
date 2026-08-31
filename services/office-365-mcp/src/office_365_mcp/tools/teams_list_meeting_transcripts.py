@@ -2,12 +2,12 @@
 transcribed.
 
 TRAP: transcript access is a tenant-wide Teams switch, OFF by default, and every call answers 403
-while it is off. It is not a permission; it needs admin action. Microsoft scopes the switch to
+while it is off. It is not a permission. It needs admin action. Microsoft scopes the switch to
 transcripts, so in an untouched tenant this fails and `teams_list_meeting_recordings` answers.
 
 TRAP: Graph can return an empty page that still carries a next link, so an empty page is not the
-end of the collection. `graph_client/pagination.py` follows the link; without that, a meeting Graph
-pages as `[3, nothing, 1]` would look like it held only 3 transcripts.
+end of the collection. `graph_client/pagination.py` follows the link. Without it, a meeting whose
+Graph pages as `[3, nothing, 1]` looks like it holds only 3 transcripts.
 
 Newest first: Graph has no `$orderby`. Read up to MAX_ARTIFACT_SCAN, sort, then cut to `limit` —
 cutting first returns an arbitrary subset sorted among itself, a wrong answer in the right shape.
@@ -56,12 +56,12 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
 }
 
-# Max transcripts per call. Graph documents `$top` but publishes no ceiling, so this limit is ours.
+# Graph documents `$top` but publishes no ceiling, so this limit is ours.
 MAX_TRANSCRIPTS = 50
 
 # This connector's own vocabulary, not Microsoft's, so it is closed and publishes as an enum
 # in the output schema rather than as a bare string a model has to mine out of the prose.
-# Graph-owned vocabularies (`meeting_type` here) stay `str`, because Microsoft may add a
+# Graph-owned vocabularies (`meeting_type` here) stay `str`, because Microsoft can add a
 # member at any time. Bare assignment, not `type X = ...`: PEP 695 aliases publish as a
 # `$ref` into `$defs`, which puts the values one hop away from the property a model reads.
 TranscriptStatus = Literal[
@@ -70,9 +70,9 @@ TranscriptStatus = Literal[
 
 _DESCRIPTION = """\
 List a Teams meeting's transcripts, from the `meeting_uri` teams_list_chats reports. Call it to \
-learn whether a meeting was transcribed; teams_read_transcript returns the words. Read `status` \
+learn whether a meeting was transcribed. teams_read_transcript returns the words. Read `status` \
 first: `not_ready` means wait, `not_transcribed` means none, `scan_incomplete` means unknowable — \
-stop, narrowing the window changes nothing. A tenant switch can block transcripts and never \
+stop. If you narrow the window, nothing changes. A tenant switch can block transcripts and never \
 recordings, so try teams_list_meeting_recordings on refusal. Returns `status` and each \
 transcript's `uri` and times. \
 """
@@ -81,7 +81,7 @@ _NOT_A_MEETING_HANDLE = (
     "teams_list_meeting_transcripts takes teams:///meetings/{join_web_url} from teams_list_chats, "
     + "not this. "
     + "Call teams_list_chats and use its `meeting_uri`. A `teams:///transcripts/...` handle is "
-    + "teams_read_transcript's; this tool is what produces it. Retrying this value will fail "
+    + "teams_read_transcript's. This tool is what produces it. Retrying this value will fail "
     + "identically."
 )
 
@@ -121,23 +121,23 @@ class MeetingTranscripts(BaseModel):
         description=(
             "What was found and what to do next. One of:\n"
             + "- `available` — transcripts are listed, newest first.\n"
-            + "- `not_ready` — nothing is there yet and something may still arrive. Wait and call "
-            + "again later. This is NOT 'there is no transcript'. A window that has demonstrably "
-            + "passed is never reported this way, however far in the future a recurring series "
-            + "runs. This is inferred; Microsoft publishes no availability SLA.\n"
+            + "- `not_ready` — nothing is there yet and something may still arrive. Wait and "
+            + "call again later. This is NOT 'there is no transcript'. A window that "
+            + "demonstrably passed is never reported this way, however far in the future a "
+            + "recurring series runs. This is inferred. Microsoft publishes no availability "
+            + "SLA.\n"
             + "- `scan_incomplete` — this meeting has more transcripts than one call reads "
             + f"({MAX_ARTIFACT_SCAN}) and none read fall in your window, so whether one exists "
             + "there "
             + "is NOT known. There is nothing to try. Stop here. This status is final and cannot "
-            + "be "
-            + "retried or worked around by narrowing the window. Never report this as 'there is no "
-            + "transcript'.\n"
-            + "- `not_transcribed` — the window is over; nothing is there; nothing expected. "
+            + "be retried or worked around by narrowing the window. Never report this as 'there "
+            + "is no transcript'.\n"
+            + "- `not_transcribed` — the window is over. Nothing is there. Nothing is expected. "
             + "Retrying will not change this.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Do not retry and do not rebuild the handle.\n"
-            + "A refusal is about this user, not about the meeting: a participant may be refused "
-            + "where the organiser succeeds."
+            + "A refusal is about this user, not about the meeting: a participant can be refused "
+            + "where the organizer succeeds."
         )
     )
     meeting_id: str | None = Field(
@@ -164,11 +164,11 @@ class MeetingTranscripts(BaseModel):
             + f"every transcript this call read (up to {MAX_ARTIFACT_SCAN}), not over one page of "
             + "Microsoft's answer. For meetings with fewer transcripts than that cap — all but "
             + "series recorded daily for most of a year — the first entry is the latest of the "
-            + "window. Past the cap the first entry is the latest of what was READ; Microsoft "
+            + "window. Past the cap the first entry is the latest of what was READ. Microsoft "
             + "returns this collection in its own order and offers no `$orderby`. Set "
             + "`include_scan_completeness` to learn if the read reached the end. As many as "
             + "`limit` "
-            + "means the window may hold older ones; fewer means the window holds no more than was "
+            + "means the window can hold older ones. Fewer means the window holds no more than was "
             + "read. Empty for every status other than `available`."
         )
     )

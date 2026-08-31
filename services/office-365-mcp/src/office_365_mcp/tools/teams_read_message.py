@@ -34,8 +34,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narro
 
 TOOL_NAME = "teams_read_message"
 
-# Three steps, not one: a single step would report a tenant that refuses channel messages as a tool
-# that is merely slow. The name comes from the handle's shape, never from the handle itself.
+# Three steps, not one. With a single step, a tenant that refuses channel messages looks like a
+# merely slow tool. The name comes from the handle's shape, never from the handle itself.
 STEP_CHAT_MESSAGE = "chat_message"
 STEP_CHANNEL_MESSAGE = "channel_message"
 STEP_CHANNEL_REPLY = "channel_reply"
@@ -48,7 +48,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 }
 
-# A chat handle's refusal names the chat permission alone: naming the channel one too would send an
+# A chat handle's refusal names only the chat permission. Naming the channel one too sends an
 # administrator after a permission that was never missing.
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
@@ -57,7 +57,7 @@ Read one Teams message in full: the whole text, sender, @-mentions, attachments,
 delete status. Call it on the `uri` of a teams_search_messages hit whenever the answer depends on \
 what somebody actually said — a hit carries a snippet and no message body. A message \
 teams_browse_channel returned is already complete and needs no read. `uri` must be a handle a tool \
-result carried; no name, chat topic or Teams link becomes one.\
+result carried. No name, chat topic, or Teams link becomes one.\
 """
 
 _BAD_HANDLE = (
@@ -67,7 +67,7 @@ _BAD_HANDLE = (
     + "  teams:///chats/{chat_id}/messages/{message_id}\n"
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}\n"
     + "  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}\n"
-    + "with the ids percent-encoded, e.g. "
+    + "with the ids percent-encoded, for example "
     + "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool "
     + "result rather than assembling one. This reader serves Teams messages only: no mail, files "
     + "or sites are addressable in this connector at all. Retrying this value will fail "
@@ -77,10 +77,11 @@ _BAD_HANDLE = (
 # The default 404 advice, to check the id came from a tool response verbatim, is wrong here because
 # the handle did.
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
+    "Microsoft 365 did not return this message. The handle is well formed, so this is not a bad "
     + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
-    + "'never existed' and 'the signed-in user may not see it' with the same 404, and does not say "
-    + "which of them it meant. Report that the message could not be read, never that it was never "
+    + "'never existed' and 'the signed-in user cannot see it' with the same 404, and does not say "
+    + "which of them it meant. Report that this tool did not read the message, never that it was "
+    + "never "
     + "written. Retrying will not help and this connector has no other route to the text. One "
     + "well-formed handle always fails this way: a reply in a channel thread is addressed under "
     + "the post it answers, and a search result does not identify that post — so a search hit that "
@@ -90,10 +91,10 @@ GRAPH_NOT_FOUND = (
     + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page and no "
     + "further: it follows neither Microsoft's cursor into an older part of a thread nor the one "
     + "into older posts, because a given channel allows this whole connector about one request a "
-    + "second across the tenant. So browse that channel once; if the reply is not in what comes "
-    + "back there is no route to its full text, and a second browse returns the same window. "
-    + "Report the search snippet with its sender and date, say the full text could not be "
-    + "retrieved, and stop looking."
+    + "second across the tenant. So browse that channel once. If the reply is not in what comes "
+    + "back, there is no route to its full text, and a second browse returns the same window. "
+    + "Report the search snippet with its sender and date, say this tool did not retrieve the "
+    + "full text, and stop looking."
 )
 
 # Without this header Graph answers `systemEventMessage` as `unknownFutureValue`. `chatEvent` and
@@ -108,7 +109,7 @@ type _ChannelReplyQuery = ChannelReplyRequestBuilder.ChatMessageItemRequestBuild
 
 
 async def teams_read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
-    """The message `handle` addresses. One request; the endpoint supports no `$select` or
+    """The message `handle` addresses. One request. The endpoint supports no `$select` or
     `$expand`, so mentions and attachments always arrive with it.
     """
     with graph_errors(TOOL_NAME):
@@ -137,7 +138,7 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
         client.teams.by_team_id(handle.team_id).channels.by_channel_id(handle.channel_id).messages
     )
     if handle.reply_to_id is not None:
-        # A reply is addressed under its parent post; the reply id alone is a 404.
+        # A reply is addressed under its parent post. The reply id alone is a 404.
         # `by_chat_message_id1` is the generated name for the second message id in that path.
         with graph_step(STEP_CHANNEL_REPLY):
             return await (
@@ -156,7 +157,7 @@ async def _get(client: GraphServiceClient, handle: MessageHandle) -> ChatMessage
 
 
 def _headers() -> HeadersCollection:
-    """Built per request: adding to the shared default collection would affect every Graph call."""
+    """Built per request. Adding to the shared default collection affects every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_UNKNOWN_ENUMS)
     return headers
@@ -198,6 +199,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         handle = message_handle(uri)
         if handle is None:
             raise ToolError(_BAD_HANDLE)
-        # The 403 table is built at startup and never sees the handle; this names the surface read.
+        # The 403 table is built at startup and never sees the handle. This names the surface read.
         await narrowed_to(ctx, handle.permission)
         return await teams_read_message(client, handle=handle)

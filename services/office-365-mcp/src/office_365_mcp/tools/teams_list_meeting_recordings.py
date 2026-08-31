@@ -1,18 +1,19 @@
-"""`teams_list_meeting_recordings` — did a call record, how long it ran, and who may get the file.
+"""`teams_list_meeting_recordings` — did a call record, how long it ran, and who can get the file.
 
-TRAP: no video is returned or reachable anywhere in this connector. A Teams meeting runs 30 hours
-max (https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams) and Graph serves
+TRAP: no video ever comes back, and none of it is reachable anywhere in this connector. A Teams
+meeting runs 30 hours max
+(https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams) and Graph serves
 a recording as one MP4 byte stream. `recordingContentUrl` is never returned either: that link opens
 only with this connector's own token, so passing it on leaks a credential or does nothing.
 `tests/test_layering.py` rule 7 blocks every module from addressing one recording, this file too.
 
 Separate from `teams_list_meeting_transcripts` because Graph gates them independently, under
 `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All`, and a default tenant has
-the transcript gate shut. One tool would have to either fail a reachable recording or hold two
-incompatible statuses. `content_correlation_id` links them.
+the transcript gate shut. Combining them into one tool forces a choice: fail a reachable
+recording, or hold two incompatible statuses. `content_correlation_id` links them.
 
 Newest first: Graph has no `$orderby` on this collection. Read up to MAX_ARTIFACT_SCAN, sort, then
-cut to `limit`; stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
+cut to `limit`. Stopping at `limit` before sorting returns an arbitrary subset sorted among itself.
 """
 
 from collections.abc import Mapping
@@ -46,7 +47,7 @@ TOOL_NAME = "teams_list_meeting_recordings"
 # `shared/identity.py`'s, so this names only the listing request and the walk that continues it.
 STEP_RECORDINGS = "recordings"
 
-# Meeting resolve, recordings read, and the identity check the organiser-only rule needs. Entra
+# Meeting resolve, recordings read, and the identity check the organizer-only rule needs. Entra
 # redeems all three under one token or none. The names live in `shared/meetings.py`.
 GRAPH_PERMISSIONS: tuple[str, ...] = (
     MEETING_PERMISSION,
@@ -59,12 +60,12 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     + "%2F19%253ameeting_TjAwMDAwMDAwMDAwMA%2540thread.v2%2F0"
 }
 
-# Max recordings per call. Graph sets no ceiling on `$top`, so this limit is ours.
+# Graph sets no ceiling on `$top`, so this limit is ours.
 MAX_RECORDINGS = 50
 
 # Both vocabularies are this connector's, not Microsoft's, so they are closed and publish as enums
 # in the output schema rather than as bare strings a model has to mine out of the prose. Graph-owned
-# vocabularies (`meeting_type` here) stay `str`, because Microsoft may add a member at any time.
+# vocabularies (`meeting_type` here) stay `str`, because Microsoft can add a member at any time.
 # Bare assignment, not `type X = ...`: PEP 695 aliases publish as a `$ref` into `$defs`, which puts
 # the values one hop away from the property a model reads.
 RecordingStatus = Literal[
@@ -74,11 +75,11 @@ ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 
 _DESCRIPTION = """\
 List a Teams meeting's recordings from the `meeting_uri` teams_list_chats reports. Call it to \
-learn whether a meeting was recorded, how long, and who may download it — no video is returned or \
-reachable here; for the words, call teams_list_meeting_transcripts. Read `status` first: \
-`not_ready` means wait, not "the call was not recorded". An `organizer_only` recording exists but \
-is out of reach: never report it as missing. Returns `status` and each recording's times, duration \
-and access.\
+learn whether a meeting was recorded, how long it ran, and who can download it — no video is \
+returned or reachable here; for the words, call teams_list_meeting_transcripts. Read `status` \
+first: `not_ready` means wait, not "the call was not recorded". An `organizer_only` recording \
+exists but is out of reach: never report it as missing. Returns `status` and each recording's \
+times, duration, and access.\
 """
 
 # Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids
@@ -96,8 +97,8 @@ _NOT_A_MEETING_HANDLE = (
 class RecordingSummary(BaseModel):
     recording_id: str = Field(
         description=(
-            "Recording's Graph id. Opaque; no tool here uses it. This connector has no recording "
-            + "handle."
+            "Recording's Graph id. This id is opaque. No tool here uses it. This connector has "
+            + "no recording handle."
         )
     )
     started_at: datetime | None = Field(
@@ -118,20 +119,21 @@ class RecordingSummary(BaseModel):
     )
     content_access: ContentAccess = Field(
         description=(
-            "Whether the SIGNED-IN user may download this recording. Not about this connector "
+            "Whether the SIGNED-IN user can download this recording. Not about this connector "
             + "(which has no video). One of:\n"
-            + "- `you_are_the_organizer` — user is the organiser; Microsoft permits download in "
+            + "- `you_are_the_organizer` — user is the organizer. Microsoft permits download in "
             + "Teams or SharePoint, not here. Admin can still block tenant-wide.\n"
-            + "- `organizer_only` — user is not the organiser. Microsoft: 'Meeting participants "
+            + "- `organizer_only` — user is not the organizer. Microsoft: 'Meeting participants "
             + "don't have permission to download meeting recordings' unless admin unblocks them. "
-            + "This is NOT a missing recording: it exists; the video is out of reach.\n"
-            + "- `unknown` — Microsoft named no organiser, so cannot tell which above applies."
+            + "This is NOT a missing recording: it exists, but the video is out of reach.\n"
+            + "- `unknown` — Microsoft named no organizer, so this tool cannot tell which above "
+            + "applies."
         )
     )
     organizer_user_id: str | None = Field(
         description=(
-            "Organiser's Entra object id, or null. The person to ask when `content_access` is "
-            + "`organizer_only`. Microsoft leaves the organiser's display name null on this "
+            "Organizer's Entra object id, or null. The person to ask when `content_access` is "
+            + "`organizer_only`. Microsoft leaves the organizer's display name null on this "
             + "resource, so this id is all there is. Comparable with get_me's `user_id` and "
             + "message "
             + "sender `user_id`."
@@ -166,36 +168,36 @@ class MeetingRecordings(BaseModel):
         description=(
             "What was found and what to do next. One of:\n"
             + "- `available` — recordings are listed with durations and access info.\n"
-            + "- `not_ready` — nothing arrived yet; window or meeting recently ended. Wait and "
-            + "retry. This is NOT 'the call was not recorded'. Microsoft publishes no availability "
-            + "SLA, so this tool infers timing and errs towards wait. A window that demonstrably "
-            + "passed is never reported this way.\n"
-            + "- `not_recorded` — the window is past; nothing there. The call was not recorded. "
-            + "Retrying will not help.\n"
+            + "- `not_ready` — nothing arrived yet. The window or meeting recently ended. Wait "
+            + "and retry. This is NOT 'the call was not recorded'. Microsoft publishes no "
+            + "availability SLA, so this tool infers timing and errs towards wait. A window that "
+            + "demonstrably passed is never reported this way.\n"
+            + "- `not_recorded` — the window is past. Nothing is there. The call was not "
+            + "recorded. Retrying will not help.\n"
             + "- `scan_incomplete` — this meeting has more recordings than one call reads "
             + f"({MAX_ARTIFACT_SCAN}) and none of the ones read fall in your window, so whether "
             + "one "
-            + "exists there is NOT known. There is nothing to try: the window is applied to the "
-            + "recordings after Microsoft has answered, not by Microsoft while answering, so "
+            + "exists there is NOT known. There is nothing to try: this tool applies the window "
+            + "to the recordings after Microsoft answers, not while Microsoft is still "
+            + "answering, so "
             + "changing `started_after`/`started_before` reads the same recordings and returns "
             + "this "
-            + "same status. Stop, and report that whether that occurrence was recorded could not "
-            + "be "
-            + "determined. Never report this as 'the call was not recorded'.\n"
+            + "same status. Stop, and report that whether that occurrence was recorded is not "
+            + "known. Never report this as 'the call was not recorded'.\n"
             + "- `meeting_not_found` — Microsoft matched the join URL to no meeting this user can "
             + "see. Do not retry or rebuild the handle."
         )
     )
     meeting_id: str | None = Field(
         description=(
-            "Resolved meeting's Graph id, or null if `status` is `meeting_not_found`. Opaque; no "
-            + "tool uses it."
+            "Resolved meeting's Graph id, or null if `status` is `meeting_not_found`. This id is "
+            + "opaque. No tool uses it."
         )
     )
     subject: str | None = Field(
         description=(
-            "Meeting subject as Microsoft holds it. Confirms this is the right meeting. May differ "
-            + "from chat topic."
+            "Meeting subject as Microsoft holds it. Confirms this is the right meeting. This can "
+            + "differ from chat topic."
         )
     )
     meeting_type: str | None = Field(
@@ -219,11 +221,11 @@ class MeetingRecordings(BaseModel):
             + "series "
             + "recorded daily for most of a year — the first entry is the latest of the window. "
             + "Past "
-            + "the cap the first entry is the latest of what was READ; Microsoft returns this "
+            + "the cap the first entry is the latest of what was READ. Microsoft returns this "
             + "collection in its own order and offers no `$orderby`. Set "
             + "`include_scan_completeness` "
-            + "to learn if the read reached the end. As many as `limit` means the window may hold "
-            + "older ones; fewer means the window holds no more than was read. Empty for every "
+            + "to learn if the read reached the end. As many as `limit` means the window can hold "
+            + "older ones. Fewer means the window holds no more than was read. Empty for every "
             + "status other than `available`."
         )
     )
@@ -251,7 +253,7 @@ async def teams_list_meeting_recordings(
     """Recordings of the meeting `handle` addresses.
 
     Two or three Graph requests: resolve, list, and — only when something was found — the caller id
-    the organiser-only rule needs. Graph documents no date filter, so the window applies after.
+    the organizer-only rule needs. Graph documents no date filter, so the window applies after.
     """
     assert 1 <= limit <= MAX_RECORDINGS, f"limit must be within 1..{MAX_RECORDINGS}, got {limit}"
     window = OccurrenceWindow.of(started_after, started_before)
@@ -276,7 +278,7 @@ async def teams_list_meeting_recordings(
             assert first_page is not None, "Graph answered a recording listing with no collection"
             collected = await newest_in_window(first_page, client, window=window, limit=limit)
         found = collected.items
-        # Only when it changes an answer: an empty listing has no organiser to compare anyone with.
+        # Only when it changes an answer: an empty listing has no organizer to compare anyone with.
         caller = (await identity.signed_in_user(client)).id if found else None
 
     return MeetingRecordings(
@@ -301,7 +303,7 @@ def _absence(*, scan_stopped_short: bool, settled: bool) -> RecordingStatus:
 
 
 def _organizer_user_id(recording: CallRecording) -> str | None:
-    """Organiser's Entra object id, or None if Graph named nobody.
+    """Organizer's Entra object id, or None if Graph named nobody.
 
     TRAP: the identitySet's @odata.type is not always a known SDK type — Microsoft's own sample
     sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity. An unknown discriminator deserializes to
@@ -314,7 +316,7 @@ def _organizer_user_id(recording: CallRecording) -> str | None:
 
 
 def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
-    """Which side of the organiser-only rule the signed-in user is on.
+    """Which side of the organizer-only rule the signed-in user is on.
 
     Guessing is wrong both ways, so a missing id is `unknown`. Ids compare case-insensitively: an
     Entra object id is a GUID and casing is not part of identity.
@@ -354,8 +356,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy "
-                    + "verbatim; Microsoft matches character for character."
+                    + "Copy it verbatim. Microsoft matches character for character."
                 ),
             ),
         ],

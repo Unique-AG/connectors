@@ -1,21 +1,23 @@
 """Keyword Query Language quoting: a caller's words as terms Graph reads as text, never as syntax.
 
-Every full-text search this connector makes is KQL, whatever endpoint carries it — `$search` on a
-mail collection and `POST /search/query` over Teams messages read the same operators. So the
-quoting is shared rather than copied, and the reason is the failure a copy would allow: KQL's
-boolean operators are ordinary words in uppercase, so a caller's own `OR` between two words turns
-a promised AND into an OR. A tool that quoted it and a tool that did not would answer the same
-question differently, and neither answer would look wrong.
+Every full-text search this connector makes is KQL, whatever endpoint carries it. `$search` on a
+mail collection and `POST /search/query` over Teams messages read the same operators.
+
+The quoting is shared here rather than copied into each tool, because a copy can drift out of
+sync with this one. KQL's boolean operators are ordinary words in uppercase, so a caller's own
+`OR` between two words turns a promised AND into an OR. If one tool quotes correctly and another
+does not, they answer the same question two different ways, and neither answer looks wrong.
 
 Nothing here builds a term. Which property a value is filtered on, and what that property is
-called, is each tool's own knowledge: Microsoft spells the scope terms differently per entity.
+called, is each tool's own knowledge. Microsoft spells the scope terms differently per entity.
 """
 
 import re
 
-# Characters KQL would read as syntax rather than text: whitespace separates terms, `:` `<` `>` `=`
-# introduce a property restriction, `(` `)` group, `"` closes the quoting applied here, `*` is the
-# wildcard. A leading `-` is NOT. `+` is AND, the default anyway, so it needs no handling.
+# Characters KQL reads as syntax instead of as text: whitespace separates terms, `:` `<` `>` `=`
+# introduce a property restriction, `(` `)` group, `"` closes the quoting applied here, and `*` is
+# the wildcard. A leading `-` is NOT an operator. `+` is AND, the default anyway, so it needs no
+# handling.
 _KQL_OPERATORS = re.compile(r'[\s:"<>=()*]')
 
 # KQL's boolean and proximity operators are themselves words, and "the operators are case-sensitive
@@ -23,11 +25,11 @@ _KQL_OPERATORS = re.compile(r'[\s:"<>=()*]')
 # the promised AND into an OR. `quoted` skips this — `from:OR` names a sender, not an operator.
 _KQL_KEYWORDS = frozenset({"AND", "OR", "NOT", "NEAR", "ONEAR"})
 
-# Quoting a caller's free text like a filter value costs them every match whose words are not
-# adjacent: KQL documents a quoted phrase as matching only words "located next to each other", and
-# unquoted free-text expressions as ANDed
+# Quoting a caller's free text like a filter value costs the caller every match whose words are
+# not adjacent. KQL documents a quoted phrase as matching only words "located next to each
+# other", and it documents unquoted free-text expressions as ANDed together
 # (https://learn.microsoft.com/en-us/sharepoint/dev/general-development/keyword-query-language-kql-syntax-reference).
-# So free text is guarded one word at a time, and this preserves a caller's own quotes.
+# So free text here is guarded one word at a time. This preserves a caller's own quotes.
 _PHRASE = re.compile(r'"([^"]*)"')
 
 
@@ -40,15 +42,15 @@ def as_search_value(clause: str) -> str:
     or backslash, escape it with a backslash"
     (https://learn.microsoft.com/en-us/graph/search-query-parameter).
 
-    TRAP: wrapping without escaping is what a naive f-string does, and it produces
-    `$search="from:"Bob Vance""` for any multi-word value — a string that ends at the third quote
-    and leaves the rest as syntax. Every single-word example Microsoft publishes for a mail
-    collection hides this, because a single word is never quoted by `phrase`.
+    TRAP: wrapping without escaping is what a naive f-string does. It produces
+    `$search="from:"Bob Vance""` for any multi-word value. The result is a string that ends at
+    the third quote and leaves the rest as syntax. Every single-word example Microsoft publishes
+    for a mail collection hides this, because a single word is never quoted by `phrase`.
 
-    Microsoft states that escaping rule in the directory-object section and publishes no
-    multi-word example for a mail collection, so the rule is applied here by the one document that
-    gives it rather than by a document about this endpoint. That is the weakest link in this
-    module and it is worth a live check.
+    Microsoft states this escaping rule only in the directory-object section. It publishes no
+    multi-word example for a mail collection. So this module applies the rule from that one
+    document, not from a document about this endpoint. That is the weakest link here, and it is
+    worth a live check.
     """
     escaped = clause.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
@@ -64,8 +66,9 @@ def phrase(text: str) -> str:
 
 
 # TRAP: a filter value needs the wildcard rule as much as a word does. KQL documents `<property>:*`
-# as matching every item with a value, so a sender of `*` asks for every message that has one —
-# which is every message, reached past a refusal of a criteria-free search.
+# as matching every item with a value, so a sender of `*` asks for every message that has one.
+# That request reaches past the refusal of a search with no criteria, because it still matches
+# every message.
 def quoted(value: str) -> str:
     """A filter value, safe to put after a scope term. One value, therefore at most one term."""
     if _needs_quoting(value):
@@ -76,7 +79,7 @@ def quoted(value: str) -> str:
 def free_text(query: str) -> str:
     """A caller's own words, as terms Graph will AND. Empty when they typed nothing to look for.
 
-    Double-quoted runs stay one phrase; an unbalanced quote is one character in a word.
+    Double-quoted runs stay one phrase. An unbalanced quote counts as one character in a word.
     """
     terms: list[str] = []
     words_from = 0

@@ -75,9 +75,9 @@ def create_app(
     configure_logging(config)
     configure_metrics(config)
     # Here rather than in `main.py`: everything below depends on a tracer provider, and tests call
-    # `create_app()` too. The version is passed rather than left to `TracingSettings`, which would
-    # read the bare `VERSION` env var. `configure_tracing` disables itself when no `OTEL_*` variable
-    # is set, so tests stay untraced.
+    # `create_app()` too. The version is passed rather than left to `TracingSettings`, which
+    # otherwise reads the bare `VERSION` env var. `configure_tracing` disables itself when no
+    # `OTEL_*` variable is set, so tests stay untraced.
     configure_tracing(service_name="office-365-mcp", service_version=config.version)
 
     # Resolved once: the scopes sign-in asks for and the modules that get registered come from the
@@ -91,7 +91,7 @@ def create_app(
         client_storage=oauth_storage,
         graph_scopes=selection.graph_scopes,
     )
-    # Built here, not inside `graph_client/`, which may be told its timeout budget but never
+    # Built here, not inside `graph_client/`, which can be told its timeout budget but is never
     # configured (rule 2 in `tests/test_layering.py`).
     graph_transport = create_graph_transport(
         GraphSettings(

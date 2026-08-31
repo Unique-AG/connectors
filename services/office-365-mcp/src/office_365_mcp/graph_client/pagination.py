@@ -14,10 +14,9 @@ and answer 200 with an empty collection and an `@odata.nextLink`
 end date of 2026-08-31 dates that incident, not this guard.
 
 TRAP: a channel's messages are deliberately not walked here, though they are what the scan cap was
-written against. Graph's throttling limit there is per *app* per tenant on a given channel, so even
-a capped walk spends a budget belonging to every other user of this connector;
-`teams_browse_channel`
-makes one request, uses `$top` as its window, and never comes here.
+written against. Graph's throttling limit there is per *app* per tenant on a given channel, so
+even a capped walk spends a budget belonging to every other user of this connector.
+`teams_browse_channel` makes one request, uses `$top` as its window, and never comes here.
 
 TRAP: headers do not travel with the cursor. `PageIterator` starts with an empty header collection,
 so a header the caller's first request needed — say `Prefer: include-unknown-enum-members` — reaches
@@ -55,8 +54,8 @@ class _WritableCollection[T](Protocol):
     value: list[T] | None
 
 
-# Items that may be looked at to satisfy one request, however few are kept. A safety valve, not a
-# tuning knob: a caller needing more than this from a filtered collection wants search instead.
+# Items a walk can look at to satisfy one request, however few it keeps. A safety valve, not a
+# tuning knob: a caller that needs more than this from a filtered collection wants search instead.
 MAX_SCANNED_ITEMS = 1000
 
 # Consecutive pages carrying nothing that a walk will follow before giving up: an endlessly empty
@@ -79,8 +78,8 @@ MAX_EMPTY_PAGES = 10
 class CollectedItems[T]:
     """Up to `limit` items, and whether a cap stopped the walk with more still on offer.
 
-    TRAP: `capped` means "may be incomplete", not "was incomplete" — Graph's paging gives no way to
-    know whether what was left holds anything the filter would have kept. It cannot mean anything
+    TRAP: `capped` means "can be incomplete", not "was incomplete" — Graph's paging gives no way to
+    know whether the unread remainder holds anything the filter accepts. It cannot mean anything
     other than a cap: a walk that gives up on a collection Graph will not end raises instead.
     """
 
@@ -97,7 +96,7 @@ async def collect_pages[T](
     max_scanned: int = MAX_SCANNED_ITEMS,
     headers: HeadersCollection | None = None,
 ) -> CollectedItems[T]:
-    """Walk `first_page` and its successors, keeping matching items up to `limit`.
+    """Walk `first_page` and its successors, and keep matching items up to `limit`.
 
     The SDK deserialises every page with `type(first_page)`, so the cast to `T` names a guarantee
     rather than creating one. `headers` must be the collection the caller set on its first request.
@@ -165,7 +164,7 @@ def _readable_first_page[T](page: GraphCollection[T]) -> GraphCollection[T]:
     *later* page with the same body is read as an empty page and walked through correctly, so page
     one is made to look like the rest.
 
-    The copy is shallow, leaving the caller's response as it was, and preserves the `type()`
+    The copy is shallow. It leaves the caller's response as it was, and it preserves the `type()`
     `PageIterator` deserialises every successor with.
     """
     if page.value is not None:
@@ -181,8 +180,8 @@ def _headers_for_one_page(headers: HeadersCollection | None) -> HeadersCollectio
     """A collection of the caller's headers for exactly one next-page request.
 
     TRAP: one per page, and re-assigned before every `next()`. `PageIterator.fetch_next_page` does
-    `request_info.headers = self.headers` — an assignment, so every page's request would otherwise
-    share the iterator's one long-lived collection. `BaseBearerTokenAuthenticationProvider` asks
+    `request_info.headers = self.headers` — an assignment, so every page's request otherwise shares
+    the iterator's one long-lived collection. `BaseBearerTokenAuthenticationProvider` asks
     `AccessTokenProvider` for a token only when the request carries no `Authorization` yet, so the
     header the first followed page deposits in a shared collection means no page after it consults
     the provider again — and that provider (`_CallerTokenProvider` in `client.py`) is where the

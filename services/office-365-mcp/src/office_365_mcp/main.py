@@ -12,13 +12,14 @@ app = create_app(config=_config)
 
 
 def main() -> None:
-    # Pass the app object, not a string target: a string target makes uvicorn re-import this module
-    # and build a second app — a second OAuth store nothing shuts down, and a second pool under it.
+    # Pass the app object, not a string target. A string target makes uvicorn re-import this
+    # module and build a second app: a second OAuth store that nothing shuts down, and a second
+    # pool under it.
     #
-    # `log_config=None`: uvicorn's default `dictConfig` runs after `create_app` configured logging
-    # and puts `uvicorn`, `uvicorn.error` and `uvicorn.access` on handlers of its own with
-    # `propagate = False`, writing plain text and sending access lines to **stdout**, while the
-    # chart advertises `logging.unique.app/format: pino-json` on stderr.
+    # `log_config=None`: uvicorn's default `dictConfig` runs after `create_app` configured
+    # logging. It puts `uvicorn`, `uvicorn.error` and `uvicorn.access` on handlers of its own
+    # with `propagate = False`. Those handlers write plain text and send access lines to
+    # **stdout**. The chart advertises `logging.unique.app/format: pino-json` on stderr instead.
     #
     # Trap: `None`, not an empty dict. uvicorn logs access lines only when
     # `access_logger.hasHandlers()` finds one, and it finds the root handler `create_app` installed.

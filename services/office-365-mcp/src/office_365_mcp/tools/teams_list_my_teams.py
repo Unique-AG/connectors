@@ -30,10 +30,10 @@ MAX_TEAMS = 200
 
 _DESCRIPTION = """\
 List the teams the signed-in user belongs to. Start here for any question about a team or a \
-channel: `team_id` is what teams_list_channels needs, and a channel id alone addresses nothing. \
-For chats, group chats and meeting chats — the other surface entirely — use teams_list_chats. \
-Returns each team's id, name, description and archived flag; fewer than `limit` means the end of \
-the list.\
+channel. `team_id` is what teams_list_channels needs, and a channel id alone addresses nothing. \
+For chats, group chats, and meeting chats — the other surface entirely — use teams_list_chats. \
+Returns each team's id, name, description, and archived flag. Fewer than `limit` means the end \
+of the list.\
 """
 
 
@@ -46,7 +46,7 @@ class TeamSummary(BaseModel):
         )
     )
     display_name: str | None = Field(
-        description="The team name. Multiple teams may share the same name."
+        description="The team name. Multiple teams can share the same name."
     )
     description: str | None = Field(
         description="The team purpose, written by owners. Null if not set."
@@ -72,9 +72,9 @@ class TeamSummary(BaseModel):
 class TeamList(BaseModel):
     teams: list[TeamSummary] = Field(
         description=(
-            "Your teams. Full window (`limit` teams) means more may exist; teams beyond a "
-            + "full window are arbitrary, not ranked by importance. Short window means end of "
-            + f"list. Raise `limit` (up to {MAX_TEAMS}) to see more."
+            "Your teams. A full window (`limit` teams) can mean more exist. Teams beyond a "
+            + "full window are arbitrary, not ranked by importance. A short window means the "
+            + f"end of the list. Raise `limit` (up to {MAX_TEAMS}) to see more."
         )
     )
 
@@ -107,8 +107,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_TEAMS,
                 description=(
                     f"Teams to return, 1–{MAX_TEAMS}. Default 50. Microsoft Graph applies no page "
-                    + "size to this collection; this is a window this connector applies while "
-                    + "paging. Shorter than `limit` means end of list."
+                    + "size to this collection. This is a window this connector applies while "
+                    + "paging. Shorter than `limit` means the end of the list."
                 ),
             ),
         ] = 50,

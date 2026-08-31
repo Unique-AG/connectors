@@ -4,9 +4,10 @@
 folders in a mailbox, only the child folders of the root folder. To return all mail folders in a
 mailbox, each child folder must be traversed separately"
 (https://learn.microsoft.com/en-us/graph/api/user-list-mailfolders). So the answer reports which
-folders have more underneath — `child_folder_count` — rather than posing as the tree, and the
-description says in as many words that one call is not an inventory of the mailbox. A model that
-answers "the mailbox has these folders" after one call has read a level and named a mailbox.
+folders have more underneath, through `child_folder_count`, rather than posing as the tree. The
+description also says, in as many words, that one call is not an inventory of the mailbox. A
+model that answers "the mailbox has these folders" after one call only read one level. It named
+that level as if it were the whole mailbox.
 
 **Hidden folders are Graph's own default omission**, and `includeHiddenFolders=true` is the only
 way past it. A folder Outlook does not display to the user still holds mail, so it is a real place
@@ -18,10 +19,10 @@ sit on the folder object, and Microsoft recommends them over counting a folder's
 (https://learn.microsoft.com/en-us/graph/api/resources/mailfolder). They count items of every type,
 so they bound the messages in a folder rather than counting them.
 
-**A folder id is not promised to be permanent, whichever Microsoft page you believe.** The
+**Microsoft does not promise a folder id is permanent, whichever page you believe.** The
 immutable-id page says container ids "were already constant"
-(https://learn.microsoft.com/en-us/graph/outlook-immutable-id); the Mail API overview says a
-`mailFolder` id might change after certain actions such as a copy or a move. Two pages, one
+(https://learn.microsoft.com/en-us/graph/outlook-immutable-id). The Mail API overview says a
+`mailFolder` id can change after certain actions, such as a copy or a move. Two pages, one
 contradiction, so nothing here promises a handle survives: `uri` names re-browsing as the recovery,
 which is what works under either reading.
 """
@@ -54,13 +55,13 @@ STEP = "mail_folders"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
 
-# No arguments is a call this tool accepts, and the one that reaches Graph without a handle from a
-# previous response: the top of the mailbox.
+# No arguments at all is a valid call for this tool. It is the one that reaches Graph without a
+# handle from a previous response: the top of the mailbox.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-# The default 404 advice, to check the id was copied from a tool response verbatim, is wrong here
-# because it was: a folder handle is this connector's own, and Microsoft does not promise the id
-# inside it outlives a copy or a move.
+# The default 404 advice says to check that the id came from a tool response, verbatim. That
+# check already passes here: a folder handle is this connector's own. The real reason is
+# different. Microsoft does not promise the id inside a folder handle outlives a copy or a move.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this folder. The handle is well formed, so most likely the "
     + "folder was deleted, or it was moved or copied and Outlook gave it a new id. Call "
@@ -70,9 +71,9 @@ GRAPH_NOT_FOUND = (
 
 MAX_FOLDERS = 200
 
-# Every property the answer reads. `childFolders` is deliberately absent: expanding it is the one
-# way to get a second level in a single request, and Graph expands only one level either way, so it
-# would move the boundary of this tool without removing it.
+# Every property the answer reads. `childFolders` is deliberately absent. Expanding it is the
+# one way to get a second level in a single request. But Graph expands only one level either
+# way. So including `childFolders` only moves this tool's boundary. It does not remove it.
 _FOLDER_FIELDS: tuple[str, ...] = (
     "id",
     "displayName",
@@ -82,25 +83,26 @@ _FOLDER_FIELDS: tuple[str, ...] = (
     "isHidden",
 )
 
-# TRAP: `includeHiddenFolders` is typed `str` by the SDK, not `bool` — the generated query
-# parameter is a plain string appended to the URL, so `True` would reach Graph as `True`.
+# TRAP: the SDK types `includeHiddenFolders` as `str`, not `bool`. The generated query
+# parameter is a plain string appended to the URL. So a Python `True` here reaches Graph as the
+# literal string `True`.
 _INCLUDE_HIDDEN = "true"
 
-# Bound rather than aliased with `type`: these are spelled as the query parameters' constructor as
-# well as `RequestConfiguration`'s argument, and a `TypeAliasType` is not callable.
+# Bound rather than aliased with `type`. These names serve as the query parameters' constructor,
+# and also as `RequestConfiguration`'s argument. A `TypeAliasType` is not callable.
 _FoldersQuery = MailFoldersRequestBuilder.MailFoldersRequestBuilderGetQueryParameters
 _ChildFoldersQuery = ChildFoldersRequestBuilder.ChildFoldersRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Browse ONE level of the signed-in user's mail folders and get the handle for each. Omit `parent` \
-for the folders at the top of the mailbox; pass a folder's `uri` back as `parent` to descend into \
-it. This is not the folder tree and one call is not an inventory of the mailbox: Microsoft returns \
-only the immediate children of the folder asked about, so any folder whose `child_folder_count` is \
-above zero has folders below that this call did not return, and reaching them means browsing that \
-folder too. Each folder comes with the number of items it holds and how many are unread, which is \
-the cheap way to size a folder. Folders Outlook hides from the user are left out unless \
-`include_hidden` is set, and a hidden folder can still hold mail. No message text comes back here \
-— use outlook_search_mail to find a message.\
+Browse ONE level of the signed-in user's mail folders and get the handle for each. Omit \
+`parent` for the folders at the top of the mailbox. Pass a folder's `uri` back as `parent` to \
+descend into it. This is not the folder tree, and one call is not an inventory of the mailbox. \
+Microsoft returns only the immediate children of the folder asked about. So any folder whose \
+`child_folder_count` is above zero has folders below that this call did not return. Reaching \
+them means browsing that folder too. Each folder comes with the number of items it holds and \
+how many are unread, which is the cheap way to size a folder. Unless `include_hidden` is set, \
+this tool leaves out folders Outlook hides from the user. A hidden folder can still hold mail. \
+No message text comes back here. Use outlook_search_mail to find a message.\
 """
 
 _NOT_A_FOLDER_HANDLE = (
@@ -115,37 +117,39 @@ class MailFolderSummary(BaseModel):
 
     uri: str = Field(
         description=(
-            "This folder's handle. Pass it back as `parent` to browse the level below it. Treat it "
-            + "as good for now rather than permanent: Microsoft's own pages disagree about whether "
+            "This folder's handle. Pass it back as `parent` to browse the level below it. Treat "
+            + "it as good for now, not as permanent: Microsoft's own pages disagree about whether "
             + "a mail folder's id survives a copy or a move. If it stops resolving, browse the "
             + "level above again and take the handle reported then — never repair or rebuild one."
         )
     )
     display_name: str | None = Field(
         description=(
-            "The folder's name as Outlook shows it, e.g. `Inbox`. Names are unique only among the "
-            + "folders sharing a parent, so two folders called `Archive` on different branches are "
-            + "different folders. Null when Graph recorded none."
+            "The folder's name as Outlook shows it, for example `Inbox`. Names are unique only "
+            + "among the folders sharing a parent, so two folders called `Archive` on different "
+            + "branches are different folders. Null when Graph recorded none."
         )
     )
     total_items: int | None = Field(
         description=(
-            "How many items the folder holds, as Graph reports it on the folder itself — the cheap "
-            + "count, and the one Microsoft recommends over counting messages, which it warns can "
-            + "incur significant latency. It counts items of every type, so it is an upper bound "
-            + "on the messages in this folder and not a message count. Excludes the folders below."
+            "How many items the folder holds, as Graph reports it on the folder itself. This is "
+            + "the cheap count, and the one Microsoft recommends over counting messages. "
+            + "Microsoft warns that counting messages directly can incur significant latency. It "
+            + "counts items of every type, so it is an upper bound on the messages in this folder "
+            + "and not a message count. Excludes the folders below."
         )
     )
     unread_items: int | None = Field(
         description=(
-            "How many of `total_items` are unread, on the same terms: items of every type, so an "
-            + "upper bound on unread messages rather than a count of them."
+            "How many of `total_items` are unread, on the same terms. These are items of every "
+            + "type too, so this is an upper bound on unread messages, rather than a count of "
+            + "them."
         )
     )
     child_folder_count: int | None = Field(
         description=(
             "How many folders sit directly under this one. Above zero means this call did NOT "
-            + "return them — pass this folder's `uri` back as `parent` to see them. Zero is the "
+            + "return them. Pass this folder's `uri` back as `parent` to see them. Zero is the "
             + "only value that means there is nothing below this folder."
         )
     )
@@ -174,18 +178,19 @@ class MailFolderLevel(BaseModel):
 
     folders: list[MailFolderSummary] = Field(
         description=(
-            "The folders immediately under the one asked about, in the order Graph returned them. "
-            + "This is one level, never the tree: a folder here with a `child_folder_count` above "
-            + "zero has folders of its own that are not in this list. Empty means this folder has "
-            + "no children, or none that are visible — hidden ones are excluded unless asked for."
+            "The folders immediately under the one asked about, in the order Graph returned "
+            + "them. This is one level, never the tree. A folder here with a "
+            + "`child_folder_count` above zero has folders of its own, not in this list. Empty "
+            + "means this folder has no children, or none that are visible. Unless asked for, "
+            + "this tool excludes hidden ones."
         )
     )
     capped: bool = Field(
         description=(
             "True when `limit` stopped the listing while Graph still had more of THIS level to "
-            + "give, so raising `limit` can return more. False whenever the level ran out on its "
+            + "give. A higher `limit` can return more. False whenever the level ran out on its "
             + "own, however few folders it held. It says nothing about the levels below, which "
-            + "this call never reaches — read `child_folder_count` for those."
+            + "this call never reaches. Read `child_folder_count` for those."
         )
     )
 
@@ -205,7 +210,7 @@ async def browse_folders(
             client, parent=handle, include_hidden=include_hidden, limit=limit
         )
         assert first_page is not None, "Graph answered a folder listing with no collection"
-        # No request header to re-supply per page: `includeHiddenFolders` is a query option, and
+        # No request header needs resupply per page: `includeHiddenFolders` is a query option.
         # Graph carries its own query options in the `@odata.nextLink` it mints.
         collected = await collect_pages(first_page, client, limit=limit)
 
@@ -234,8 +239,8 @@ async def _first_page(
 ) -> MailFolderCollectionResponse | None:
     """The mailbox root's children, or one folder's, from the two collections Graph publishes.
 
-    Two branches rather than one because they are two request builders with two query-parameter
-    types; the arguments spelled into each are the same.
+    Two branches rather than one, because they are two request builders with two
+    query-parameter types. The arguments spelled into each are the same.
     """
     hidden = _INCLUDE_HIDDEN if include_hidden else None
     if parent is None:
@@ -286,9 +291,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "Include folders Outlook hides from the user. Off by default, which is "
-                    + "Microsoft's own default. Turn it on when accounting for everything in the "
-                    + "mailbox, or when a message's folder matches nothing listed: a hidden folder "
-                    + "is invisible in Outlook and still holds mail."
+                    + "Microsoft's own default. Turn it on when the goal is a full account of "
+                    + "the mailbox. Also turn it on when a message's folder matches nothing "
+                    + "listed. A hidden folder is invisible in Outlook, and still holds mail."
                 )
             ),
         ] = False,
@@ -300,7 +305,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     f"How many folders to return from this one level, at most {MAX_FOLDERS}. "
                     + "Paging happens inside the call and `capped` says whether this stopped it. "
-                    + "It bounds one level only: raising it never reaches the folders below."
+                    + "It bounds one level only. A higher value never reaches the folders below."
                 ),
             ),
         ] = 50,

@@ -4,28 +4,28 @@ Two indexes, asked one after the other, and neither of them is a directory looku
 
 **A person search is fuzzy by default, and Microsoft does not publish how fuzzy.** `$search="tiler"`
 returns Tyler: a row Graph is pleased with rather than the person the user named. A model handed a
-list takes row one, and at that point the draft is addressed to the wrong human at an address that
-delivers. So every row carries a `match_kind` computed *here*, by comparing the row against the
-query as it was sent, and `ambiguous` is set whenever more than one row shares the best one. No row
-is ever chosen for the caller.
+list takes row one, and at that point it addresses the draft to the wrong human at an address that
+delivers. So every row carries a `match_kind`, computed *here* by comparing the row against the
+query as it was sent. This tool sets `ambiguous` whenever more than one row shares the best one.
+This tool never chooses a row for the caller.
 
 **`relevanceScore` is not in the answer, and that is the point.** Microsoft documents it as "a sort
 key, in relation to the other returned results" — a number whose whole meaning is the rest of this
 one page — and under `$search` Graph returns it negative. A model shown a score ranks on it, which
-is the ranking this tool exists to refuse. It is left out of the answer model entirely rather than
-returned with a warning attached.
+is the ranking this tool exists to refuse. This tool leaves it out of the answer model entirely,
+rather than returning it with a warning attached.
 
-**The second index is written by strangers.** `participants` is documented as "the from, to, cc, and
-bcc fields of an email message, specified as an SMTP address, display name, or alias", so it matches
-display names — and a sender chooses their own. Anyone who has mailed this mailbox once can put
+**Strangers write the second index.** Microsoft documents `participants` as "the from, to, cc, and
+bcc fields of an email message, specified as an SMTP address, display name, or alias". So it
+matches display names, and a sender chooses their own. Anyone who mailed this mailbox once can put
 another person's name beside their own address. Those rows say `source: "mailbox"`, and they are
 evidence that correspondence happened, never evidence of who somebody is.
 
-**An address is never `userPrincipalName`.** A guest's sign-in name carries `#EXT#` and bounces
-while their real address sits elsewhere, so the address comes off `scoredEmailAddresses[].address`
-on the people path and off `emailAddress.address` on the mailbox one. The sign-in name is still
-*asked* for, because a caller who typed one deserves an `exact` match — it is matched against and
-never answered with.
+**An address is never `userPrincipalName`.** A guest's sign-in name carries `#EXT#` and bounces,
+while their real address sits elsewhere. So the address comes off `scoredEmailAddresses[].address`
+on the people path, and off `emailAddress.address` on the mailbox one. This tool still *asks* for
+the sign-in name, because a caller who typed one deserves an `exact` match. This tool matches
+against it, and never answers with it.
 """
 
 import re
@@ -59,23 +59,25 @@ TOOL_NAME = "outlook_find_recipient"
 STEP_PEOPLE = "people_search"
 STEP_PARTICIPANTS = "mail_participants"
 
-# `People.Read` for the relevance list, `Mail.Read` for the fallback, `User.Read` for the signed-in
-# user every row's `external` is decided against. `User.Read` is named rather than assumed: the
-# token this tool is handed is exchanged for exactly the permissions declared here, so an undeclared
-# one is a 403 on a call nothing else in the tool touches.
+# `People.Read` covers the relevance list. `Mail.Read` covers the fallback. `User.Read` covers
+# the signed-in user this tool judges every row's `external` against. This file names
+# `User.Read` rather than assumes it is always on. This tool exchanges its token for exactly the
+# permissions declared here. An undeclared permission causes a 403 on a call nothing else in the
+# tool touches.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("People.Read", "Mail.Read", identity.GRAPH_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "Tyler"}
 
 MAX_RESULTS = 50
 
-# TRAP: written out in plain ASCII on purpose. Microsoft's documentation renders this header with
-# typographic hyphens, and a header pasted from the page is one Graph does not recognise — it
+# TRAP: written out in plain ASCII on purpose. Microsoft's documentation renders this header
+# with typographic hyphens. A header pasted from the page is one Graph does not recognize. Graph
 # answers 200 with the directory half of the index silently missing, never an error.
 _QUERY_SOURCES = ("X-PeopleQuery-QuerySources", "Mailbox,Directory")
 
-# Microsoft documents `$search` on this collection as matching `displayName` and `emailAddresses`.
-# `userPrincipalName` is projected to be compared against, never to be answered with.
+# Microsoft documents that `$search` on this collection matches `displayName` and
+# `emailAddresses`. This tool projects `userPrincipalName` only to compare against it, never to
+# answer with it.
 _PERSON_FIELDS = (
     "displayName",
     "scoredEmailAddresses",
@@ -87,8 +89,8 @@ _PERSON_FIELDS = (
 
 _PARTICIPANT_FIELDS = ("from", "toRecipients", "ccRecipients", "receivedDateTime")
 
-# The fallback reads messages to harvest people out of them, so the window is messages and not
-# people: one correspondent commonly owns twenty of these rows, and `limit` bounds the answer.
+# The fallback reads messages to harvest people out of them. So the window is messages, not
+# people. One correspondent commonly owns twenty of these rows, and `limit` bounds the answer.
 _PARTICIPANT_MESSAGES = 50
 
 type MatchKind = Literal["exact", "token", "fuzzy"]
@@ -99,8 +101,8 @@ type Outcome = Literal["match", "no_match"]
 type _PeopleQuery = PeopleRequestBuilder.PeopleRequestBuilderGetQueryParameters
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-# Best first. Ordering the answer by this is a ranking this file can explain; ordering it by what
-# Graph returned would be `relevanceScore` reaching the model through the door it was refused at.
+# Best first. Ordering the answer by this is a ranking this file can explain. Ordering it by
+# what Graph returned instead lets `relevanceScore` back in, through the door that refused it.
 _RANK: Mapping[MatchKind, int] = {"exact": 0, "token": 1, "fuzzy": 2}
 
 # Word characters minus the underscore, so `tyler_nguyen` and `tyler.nguyen` yield the same two
@@ -110,30 +112,31 @@ _WORD = re.compile(r"[^\W_]+")
 _NEVER = datetime.min.replace(tzinfo=UTC)
 
 _DESCRIPTION = """\
-Resolve a person's name to the email address they send from, before addressing a draft to a guess. \
-Answers candidates for a human to confirm — never an address to send to unprompted, and never a \
-row to pick because it came first. Microsoft's person index matches fuzzily, so `tiler` returns \
-Tyler: read `match_kind` on every row, and treat `ambiguous` as "ask the user which one". An empty \
-answer means this user's index holds nobody by that name, which is not the same as nobody \
-existing. Returns each candidate's address, display name, match kind, type, whether they are \
-outside the user's own domain, job title and department.\
+Before addressing a draft to a guess, resolve a person's name to the email address they send \
+from. This tool answers with candidates for a human to confirm. It never gives an address to \
+send to unprompted, and never a row to pick because it came first. Microsoft's person index \
+matches fuzzily, so `tiler` returns Tyler: read `match_kind` on every row, and treat `ambiguous` \
+as "ask the user which one". An empty answer means this user's index holds nobody by that name. \
+That is not the same as saying the person does not exist. It returns each candidate's address, \
+display name, match kind, type, whether they are outside the user's own domain, job title, and \
+department.\
 """
 
 _NO_QUERY = (
     "outlook_find_recipient needs a name, an alias or an address to look for, and this query "
     + "carries no word to match on. Graph answers an empty person search with an arbitrary slice "
-    + "of the user's relevance list, which is a sample of who they know and not an answer."
+    + "of the user's relevance list. That slice is a sample of who they know, not an answer."
 )
 
 
 class RecipientCandidate(BaseModel):
-    """One address a name could mean, with what is known about how well it means it."""
+    """One address a name can mean, with what is known about how well it means it."""
 
     address: str = Field(
         description=(
             "The SMTP address to put on a draft. Taken from the address list Microsoft returns "
-            + "for the person, never from their sign-in name: a guest's sign-in name carries "
-            + "`#EXT#` and bounces while this address delivers."
+            + "for the person, never from their sign-in name. A guest's sign-in name carries "
+            + "`#EXT#` and bounces, while this address delivers."
         )
     )
     display_name: str | None = Field(
@@ -156,7 +159,7 @@ class RecipientCandidate(BaseModel):
     kind: RecipientKind | None = Field(
         description=(
             "What the address belongs to: `person`, `group` for a distribution list or a "
-            + "Microsoft 365 group, `room` for a bookable resource such as a meeting room or "
+            + "Microsoft 365 group. `room` is for a bookable resource, such as a meeting room or "
             + "equipment. Null when Graph reported no type, which is every `mailbox` row: an "
             + "Exchange recipient carries none."
         )
@@ -183,51 +186,52 @@ class RecipientCandidate(BaseModel):
         description=(
             "Which index answered. `people` is Microsoft's relevance list for this user, drawn "
             + "from their mailbox and the directory. `mailbox` is a fallback over the messages "
-            + "this user has exchanged, and its display names are written by whoever sent the "
-            + "mail — a sender chooses their own name, so a `mailbox` row can carry one person's "
-            + "name beside another person's address. Confirm a `mailbox` row against a human."
+            + "this user exchanged, and whoever sent the mail wrote its display names. A sender "
+            + "chooses their own name, so a `mailbox` row can carry one person's name beside "
+            + "another person's address. Confirm a `mailbox` row against a human."
         )
     )
     ever_corresponded: bool = Field(
         description=(
-            "True when this address was found on a message in this user's own mailbox, so at "
-            + "least one message has passed between them. False means that was not established "
-            + "here — it is not evidence that they have never corresponded."
+            "True when this tool found this address on a message in this user's own mailbox. So "
+            + "at least one message passed between them. False means this tool did not establish "
+            + "that here. It is not evidence that they never corresponded."
         )
     )
 
 
 class RecipientCandidates(BaseModel):
-    """Who the query could mean, and how sure of it this connector is allowed to be."""
+    """Who the query can mean, and how sure of it this connector is allowed to be."""
 
     outcome: Outcome = Field(
         description=(
             "`match` when at least one candidate came back, `no_match` when neither index held "
             + "anybody. `no_match` is not proof the person does not exist. It means they are not "
-            + "in this user's index, and there are at least five ways for that to be true: the "
-            + "two have never corresponded; the person is not on this user's relevance list; an "
-            + "information barrier separates them; the person is hidden from the address list; "
-            + "or they joined too recently to be indexed. Say that rather than reporting that no "
-            + "such person exists, and ask the user for the address."
+            + "in this user's index. At least five reasons can explain that. First, the two "
+            + "never corresponded. Second, the person is not on this user's relevance list. "
+            + "Third, an information barrier separates them. Fourth, the person is hidden from "
+            + "the address list. Fifth, they joined too recently for the index to include them. "
+            + "Say that, rather than reporting that no such person exists, and ask the user for "
+            + "the address."
         )
     )
     query: str = Field(
         description=(
-            "The query exactly as it was sent, so a `no_match` can be quoted back to the user "
-            + "and a spelling can be corrected without guessing what was asked."
+            "The query exactly as it was sent. So a reader can quote a `no_match` back to the "
+            + "user, and correct a spelling, without guessing what was asked."
         )
     )
     candidates: list[RecipientCandidate] = Field(
         description=(
             "Candidates, strongest `match_kind` first and Microsoft's own order kept within each "
-            + "kind. First is not chosen: it is only the strongest kind this search found, and "
-            + "the strongest kind of a bad search is still a bad answer."
+            + "kind. First is not chosen: it is only the strongest kind this search found. The "
+            + "strongest kind of a bad search is still a bad answer."
         )
     )
     ambiguous: bool = Field(
         description=(
             "True when more than one candidate shares the best `match_kind`, so the answer names "
-            + "no single person. Put the choice to the user rather than resolving it — two people "
+            + "no single person. Put the choice to the user, rather than resolving it. Two people "
             + "of one name is the ordinary case, not the strange one."
         )
     )
@@ -235,7 +239,7 @@ class RecipientCandidates(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class _Caller:
-    """The signed-in user, as the two things every row is judged against."""
+    """The signed-in user, as the two things this tool judges every row against."""
 
     address: str | None
     domain: str | None
@@ -253,8 +257,8 @@ async def find_recipient(
 ) -> RecipientCandidates:
     """Resolve `query` against the people index, and against the mailbox only if that found nobody.
 
-    The mailbox call is skipped whenever the people index answered at all, including with rows this
-    file grades `fuzzy`: a second index cannot improve an answer, only lengthen it.
+    This tool skips the mailbox call whenever the people index answered at all, including with
+    rows this file grades `fuzzy`: a second index cannot improve an answer, only lengthen it.
     """
     assert 1 <= limit <= MAX_RESULTS, f"limit is bounded by the schema, got {limit}"
     if not _tokens(query):
@@ -303,8 +307,8 @@ async def _correspondents(
     """Everyone on a message this query matched, minus the user themselves and the bystanders.
 
     `participants` matches whole messages, so every recipient of a hit arrives with the person
-    asked for. The query has to be found again in the row, or a mail to a mailing list would answer
-    with the mailing list.
+    asked for. This tool must find the query again in the row. Otherwise, a mail to a mailing
+    list answers with the mailing list, not the person.
     """
     configuration = RequestConfiguration[_MessagesQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
@@ -344,7 +348,8 @@ def _from_messages(
 
 
 def _from_person(person: Person, *, query: str, caller: _Caller) -> RecipientCandidate | None:
-    """None for a person Graph returned no address for, which no draft can be addressed to."""
+    """None for a person Graph returned no address for. Nobody can address a draft to that
+    person."""
     address = _sendable(person.scored_email_addresses)
     if address is None:
         return None
@@ -371,8 +376,8 @@ def _from_recipient(
 ) -> RecipientCandidate | None:
     """None for the signed-in user, for a bystander on the same message, and for a missing address.
 
-    A row is kept only when the query is still findable in what it says. Graph matched the
-    *message*, and everyone copied on it arrived with the person actually asked for.
+    This function keeps a row only when the query is still findable in what it says. Graph
+    matched the *message*, and everyone copied on it arrived with the person actually asked for.
     """
     email = recipient.email_address
     if email is None or not email.address:
@@ -410,9 +415,9 @@ def _participants_of(message: Message) -> list[Recipient]:
 def _sendable(addresses: list[ScoredEmailAddress] | None) -> str | None:
     """The first address Microsoft listed for the person, and never their sign-in name.
 
-    The order is Microsoft's own relevance order and the score behind it is deliberately not read:
-    it is relative to the other rows of the same response, so it says nothing about one person's
-    two addresses that "the first one" does not already say.
+    The order is Microsoft's own relevance order. This function deliberately does not read the
+    score behind it. It is relative to the other rows of the same response. So it says nothing
+    about one person's two addresses that "the first one" does not already say.
     """
     for scored in addresses or []:
         if scored.address:
@@ -451,8 +456,8 @@ def _match_kind(
 ) -> MatchKind:
     """How well the row answers the query, decided here because Graph will not say.
 
-    The sign-in name counts towards `exact` and not towards `token`: its own tokens are the tenant's
-    domain and, for a guest, the word `EXT`, none of which is anybody's name.
+    The sign-in name counts towards `exact` and not towards `token`. Its own tokens are the
+    tenant's domain and, for a guest, the word `EXT`. None of those is anybody's name.
     """
     local = address.partition("@")[0]
     exact = {_folded(address), _folded(local)}
@@ -499,7 +504,7 @@ def _tokens(text: str) -> frozenset[str]:
 
 
 def _when(received_at: datetime | None) -> datetime:
-    """A naive datetime would not compare against an aware one, and Graph has answered with both."""
+    """A naive datetime cannot compare against an aware one, and Graph answers with both."""
     if received_at is None:
         return _NEVER
     if received_at.tzinfo is None:
@@ -508,7 +513,7 @@ def _when(received_at: datetime | None) -> datetime:
 
 
 def _headers() -> HeadersCollection:
-    """Built per request: adding to the shared default collection would affect every Graph call."""
+    """Built per request: adding to the shared default collection affects every Graph call."""
     headers = HeadersCollection()
     headers.add(*_QUERY_SOURCES)
     return headers
@@ -530,7 +535,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=2,
                 description=(
                     "The person to resolve: a name, a first name, an alias or a partial address. "
-                    + "Pass what the user actually wrote — the answer grades every row against "
+                    + "Pass what the user actually wrote. The answer grades every row against "
                     + "this exact text, so a query you tidied up first grades a row you invented."
                 ),
             ),
@@ -541,8 +546,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_RESULTS,
                 description=(
-                    f"How many candidates to return, at most {MAX_RESULTS}. Raising it does not "
-                    + "improve the top row; it lengthens the tail of fuzzy ones."
+                    f"How many candidates to return, at most {MAX_RESULTS}. A higher value does "
+                    + "not improve the top row. It lengthens the tail of fuzzy ones."
                 ),
             ),
         ] = 20,

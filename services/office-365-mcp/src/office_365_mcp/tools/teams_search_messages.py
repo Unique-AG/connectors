@@ -53,8 +53,9 @@ TOOL_NAME = "teams_search_messages"
 STEP = "search_query"
 
 # TRAP: `/search/query` accepts `Chat.Read` alone, and a search never returns more than the
-# equivalent GET would, so without `ChannelMessage.Read.All` it silently covers chats only. Both are
-# requested, so a tenant withholding the broad one is refused at consent time, not at query time.
+# equivalent GET returns, so without `ChannelMessage.Read.All` it silently covers chats only. Both
+# are requested, so a tenant withholding the broad one is refused at consent time, not at query
+# time.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
@@ -78,10 +79,10 @@ class MessageHit(BaseModel):
 
     uri: str | None = Field(
         description=(
-            "A handle for this exact message, e.g. "
+            "A handle for this exact message, for example "
             + "`teams:///chats/{chatId}/messages/{messageId}` or "
             + "`teams:///teams/{teamId}/channels/{channelId}/messages/{messageId}`, with each id "
-            + "percent-encoded. Pass it verbatim to teams_read_message; this search returns no "
+            + "percent-encoded. Pass it verbatim to teams_read_message. This search returns no "
             + "message "
             + "body, so it is the only route to the full text, the attachments and the mentions. "
             + "Null in the rare case where Graph returned a hit with neither a chat nor a channel "
@@ -89,27 +90,27 @@ class MessageHit(BaseModel):
             + "One handle here can fail to read: Microsoft "
             + "addresses a reply in a channel thread under its parent post and its search index "
             + "does not say which post that is, so a hit that is a reply gets the root-post form "
-            + "above and teams_read_message may answer that it could not be read. "
+            + "above, and teams_read_message can answer that it did not read the message. "
             + "teams_browse_channel "
             + "is the "
             + "only tool that emits a reply's own handle, and it reaches only the newest "
             + f"{MAX_REPLIES_PER_POST} replies of each post on the channel's first page, following "
             + "no cursor further back. If "
-            + "the reply is not in that window there is no route to its full text and browsing "
+            + "the reply is not in that window, there is no route to its full text, and browsing "
             + "again returns the same window: report this `summary` with the sender and date "
-            + "here, say the full text could not be retrieved, and stop looking."
+            + "here, say this tool did not retrieve the full text, and stop looking."
         )
     )
     message_id: str = Field(
         description=(
-            "Graph message `id`. Unique within its chat or channel only; use `uri` to identify "
+            "Graph message `id`. Unique within its chat or channel only. Use `uri` to identify "
             + "a message globally."
         )
     )
     chat_id: str | None = Field(
         description=(
-            "Chat this message is in, unencoded, e.g. `19:...@thread.v2`. Same as teams_list_chats "
-            + "reports. Null for channel messages."
+            "Chat this message is in, unencoded, for example `19:...@thread.v2`. Same as "
+            + "teams_list_chats reports. Null for channel messages."
         )
     )
     team_id: str | None = Field(
@@ -204,7 +205,7 @@ class MessageSearchResults(BaseModel):
         description=(
             "The offset that reaches the next page of results, or null when the page cannot "
             + "advance further. Null means either no more results exist, or the page held no hits "
-            + "to advance past even though Graph said more may exist — in both cases, do not use "
+            + "to advance past even though Graph said more can exist — in both cases, do not use "
             + "this offset again. It counts Graph's hits, not the messages this tool returned, "
             + "because offsets index Graph's unfiltered results."
         )
@@ -237,8 +238,8 @@ CRITERIA: tuple[str, ...] = tuple(field.name for field in fields(SearchCriteria)
 _NO_CRITERIA = (
     "teams_search_messages needs at least one of "
     + ", ".join(CRITERIA)
-    + ". Searching with none of them would return an arbitrary sample of every message the user "
-    + "can see, not an answer. Add the keywords, person or date range the question is about."
+    + ". Searching with none of them returns an arbitrary sample of every message the user "
+    + "can see, not an answer. Add the keywords, person, or date range the question is about."
 )
 
 
@@ -309,8 +310,9 @@ async def teams_search_messages(
         messages=[
             message for message in (MessageHit.from_hit(hit) for hit in hits) if message is not None
         ],
-        # `moreResultsAvailable` alone is not a next page: a hitless page would hand back the offset
-        # it was asked at, and a caller obeying `next_offset` would re-request it for ever.
+        # `moreResultsAvailable` alone is not a next page: without the `hits` check, a hitless page
+        # hands back the offset it was asked at, and a caller obeying `next_offset` re-requests it
+        # forever.
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
 
@@ -352,7 +354,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Keywords to find. Every word must appear anywhere in any order; they are not "
+                    "Keywords to find. Every word must appear anywhere in any order. They are not "
                     + 'matched as phrases unless quoted. Quote terms for adjacency: `"release '
                     + 'notes"` matches only side by side, `release notes` matches anywhere. '
                     + "Search operators are searched as text, not interpreted. Use the other "
@@ -375,8 +377,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Only messages addressed to this person. Works only for one-to-one chats; "
-                    + "hides group and channel matches."
+                    "Only messages addressed to this person. This works only for one-to-one "
+                    + "chats. It hides group and channel matches."
                 ),
             ),
         ] = None,
@@ -424,7 +426,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 ge=0,
                 description=(
-                    "How many results to skip. Start at 0; pass the previous response's "
+                    "How many results to skip. Start at 0. Pass the previous response's "
                     + "`next_offset` to advance."
                 ),
             ),

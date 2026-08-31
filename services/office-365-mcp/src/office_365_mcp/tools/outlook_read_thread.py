@@ -8,28 +8,29 @@ A Microsoft SDK maintainer confirmed it works, in
 https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/757, and that is the whole of the
 evidence.
 
-**So the filter is verified on every call rather than trusted once.** `conversationId` is a
-selectable property of the collection being filtered, so the tool can select the property it
-filtered on and check the answer: if Graph ignored the filter, the response is an arbitrary slice
-of the mailbox carrying many different conversations, and the anchor message is unlikely to be in
-it. Both are asserted, and a failure refuses rather than answers. That is the difference between
-this undocumented filter and a dangerous one — `$filter` on `/attachments` is documented as
-*ignored*, and nothing in that response reveals it.
+**So this tool verifies the filter on every call, rather than trusting it once.**
+`conversationId` is a selectable property of the filtered collection. So this tool can select the
+property it filtered on, and check the answer. If Graph ignored the filter, the response is an
+arbitrary slice of the mailbox carrying many different conversations. Then the anchor message is
+unlikely to be in it. This tool asserts both, and a failure refuses rather than answers. That is
+the difference between this undocumented filter and a dangerous one. Microsoft documents `$filter`
+on `/attachments` as *ignored*, and nothing in that response reveals it.
 
-**The anchor is a message handle, not a conversation id.** Three reasons, and the first is the one
-that matters: the check above needs a message that must be present, and only an anchor provides
-one. It also keeps this tool independent of how a message was found, and an 80-character opaque id
-is a hallucination surface with nothing to validate it against, where a handle is this connector's
-own grammar.
+**The anchor is a message handle, not a conversation id.** Three reasons exist, and the first is
+the one that matters: the check above needs a message that must be present, and only an anchor
+provides one. It also keeps this tool independent of how a caller found the message. An
+80-character opaque id is a hallucination surface with nothing to validate it against. A handle,
+by contrast, is this connector's own grammar.
 
 **No `$orderby`.** Rule one of Microsoft's three is that every property in `$orderby` must also
 appear in `$filter`, so `$orderby=receivedDateTime desc` beside `$filter=conversationId eq …`
-answers `InefficientFilter`. The messages are sorted here instead. A thread is small and this
+answers `InefficientFilter`. This tool sorts the messages here instead. A thread is small and this
 cannot fail.
 
 **A thread is this mailbox's copy of a conversation, never the conversation.** A message another
 participant sent to somebody else was never in this mailbox, and one this user permanently deleted
-is gone from it. The answer says which scope it searched so that absence is not read as proof.
+is gone from it. The answer says which scope it searched, so a reader does not take absence as
+proof.
 """
 
 from collections.abc import Mapping
@@ -66,8 +67,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_MESSAGES = 100
 
-# The id space every handle in this connector is minted in, sent so one id space runs through the
-# whole surface. Whether Graph also re-parses a path id in the space a header names is undocumented.
+# This header names the id space every handle in this connector uses. This tool sends it so one
+# id space runs through the whole surface. Whether Graph also re-parses a path id in the space a
+# header names is undocumented.
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
 _ANCHOR_FIELDS: tuple[str, ...] = ("id", "conversationId")
@@ -79,11 +81,11 @@ type _ThreadQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParamet
 
 _DESCRIPTION = """\
 Read every message of one conversation that this mailbox holds, oldest first, from any one message \
-of it. Use it for "what happened in this thread" and for "did I ever reply" — the answer spans \
-Sent Items as well as the folder the anchor is in, which is why a reply of the user's own shows up \
-here and not in a folder listing. Pass the `uri` of a hit from outlook_search_mail or a row from \
-outlook_list_mail. Read `searched_scope` before reporting that something is missing: this is the \
-mailbox's copy of a conversation, not the conversation.\
+of it. Use it for "what happened in this thread" and for "did I ever reply". The answer spans \
+Sent Items, as well as the folder the anchor is in. That is why a reply of the user's own shows \
+up here, and not in a folder listing. Pass the `uri` of a hit from outlook_search_mail or a row \
+from outlook_list_mail. Read `searched_scope` before reporting that something is missing: this is \
+the mailbox's copy of a conversation, not the conversation.\
 """
 
 _BAD_HANDLE = (
@@ -95,18 +97,18 @@ _BAD_HANDLE = (
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 has no message at that handle. Graph answers a deleted message, a handle that "
-    + "never named one and a message this user may not see with the same 404, so which of the "
-    + "three it is cannot be told apart here. Search for the message again rather than reusing a "
+    + "never named one, and a message this user cannot see with the same 404. So this tool "
+    + "cannot tell which of the three it is. Search for the message again rather than reusing a "
     + "handle from earlier in the conversation."
 )
 
 _FILTER_IGNORED = (
     "Microsoft 365 answered this thread read with messages from other conversations, which means "
     + "it did not apply the filter this tool asked for. `$filter=conversationId` is not in "
-    + "Microsoft's documentation and Graph is documented to ignore an unsupported filter rather "
-    + "than refuse it, so this connector checks the answer instead of trusting it. No thread is "
-    + "reported, because the alternative is an arbitrary slice of the mailbox presented as one. "
-    + "Read the messages individually with outlook_read_mail."
+    + "Microsoft's documentation. Microsoft documents that Graph ignores an unsupported filter, "
+    + "rather than refuses it, so this connector checks the answer instead of trusting it. This "
+    + "tool reports no thread, because the alternative is an arbitrary slice of the mailbox "
+    + "presented as one. Read the messages individually with outlook_read_mail."
 )
 
 
@@ -120,17 +122,17 @@ class MailThread(BaseModel):
         )
     )
     message_count: int = Field(
-        description="How many messages of the conversation were found in this mailbox."
+        description="How many messages of the conversation this tool found in this mailbox."
     )
     complete: bool = Field(
         description=(
             "False when Graph still had more to give when this tool stopped, so the oldest part "
-            + "of the thread may be missing. True means every message this mailbox holds for the "
+            + "of the thread can be missing. True means every message this mailbox holds for the "
             + "conversation is here — which is not the same as every message of the conversation."
         )
     )
     searched_scope: str = Field(
-        description="Where these messages were looked for, and where they were not."
+        description="Where this tool looked for these messages, and where it did not."
     )
 
 
@@ -149,8 +151,9 @@ async def read_thread(client: GraphServiceClient, *, handle: MailMessageHandle) 
             page = await client.me.messages.get(request_configuration=_thread_request(conversation))
 
     found = list((page.value if page is not None else None) or [])
-    # Graph's own "there is more" signal rather than a full window: a page can come back short of
-    # `$top` and still carry a next link, because `$skip` counts every item the service walked.
+    # Graph's own "there is more" signal, rather than a full window.
+    # A page can come back short of `$top` and still carry a next link, because `$skip` counts
+    # every item the service walked.
     truncated = page is not None and page.odata_next_link is not None
     _make_sure_the_filter_was_applied(
         found, conversation=conversation, anchor=handle.message_id, truncated=truncated
@@ -163,12 +166,12 @@ def _make_sure_the_filter_was_applied(
 ) -> None:
     """Refuse an answer Graph did not filter.
 
-    Two checks, and only one of them survives a truncated page. A foreign conversation proves the
-    filter was dropped whatever the page size. Anchor-absent is the subtler shape — it is what a
-    filter applied to the wrong value looks like, and answering it would report somebody else's
-    thread as this one — but a thread longer than one page can leave the anchor off it honestly,
-    with no `$orderby` to say which messages the page holds. Checking it there would refuse a
-    correct answer and blame Graph for a filter it applied.
+    Two checks, and only one of them survives a truncated page. A foreign conversation proves
+    Graph dropped the filter, whatever the page size. Anchor-absent is the subtler shape. It is
+    what a filter applied to the wrong value looks like. Answering with it reports somebody
+    else's thread as this one. But a thread longer than one page can leave the anchor off it
+    honestly, with no `$orderby` to say which messages the page holds. Checking it there refuses
+    a correct answer, and blames Graph for a filter it applied.
     """
     if not found:
         return
@@ -192,7 +195,7 @@ def _answer(found: list[Message], *, complete: bool) -> MailThread:
             + "Items and Junk Email. Not searched: any other participant's mailbox, a shared or "
             + "delegated mailbox, and an in-place archive, which Microsoft Graph does not support "
             + "at all. A message that was never delivered here, or that was permanently deleted, "
-            + "is absent and cannot be distinguished from one that never existed."
+            + "is absent. Nobody can tell it apart from one that never existed."
         ),
     )
 
@@ -213,8 +216,7 @@ def _anchor_request() -> RequestConfiguration[_AnchorQuery]:
 
 
 def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
-    """No `$orderby`: it would name a property `$filter` does not, which Graph answers
-    `InefficientFilter` to."""
+    """No `$orderby`. See the module docstring."""
     return RequestConfiguration[_ThreadQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             filter=f"conversationId eq '{_escaped(conversation)}'",
@@ -226,15 +228,17 @@ def _thread_request(conversation: str) -> RequestConfiguration[_ThreadQuery]:
 
 
 def _escaped(value: str) -> str:
-    """A single quote inside an OData string literal is doubled. Graph's ids do not carry one, so
-    this closes a hole rather than serving a case: an id that did would otherwise end the literal.
+    """Doubling escapes a single quote inside an OData string literal.
+
+    Graph's ids do not carry one, so this closes a hole rather than serving a case. If an id
+    ever carries one, it ends the literal.
     """
     return value.replace("'", "''")
 
 
 def _immutable_ids() -> HeadersCollection:
     """Built per call: kiota's `RequestConfiguration.headers` default is one collection shared by
-    every configuration in the process, so a preference added to it leaks onto every Graph call."""
+    every configuration in the process. So a preference added to it leaks onto every Graph call."""
     headers = HeadersCollection()
     headers.add(*_PREFER_IMMUTABLE_IDS)
     return headers

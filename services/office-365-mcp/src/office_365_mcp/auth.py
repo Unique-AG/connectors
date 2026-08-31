@@ -25,16 +25,16 @@ _REQUIRED_SCOPES = ("access_as_user",)
 _ENCRYPTION_SALT = "office-365-mcp-oauth-storage"
 
 # Passed to the provider rather than left to its default, because the Entra module's registry is
-# generated from this constant: a default read nowhere would be a path the app registration carries
-# and no Python names.
+# generated from this constant. A library default is a path the app registration carries, with no
+# Python name for the registry to read.
 _CALLBACK_PATH = "/auth/callback"
 
 
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
-    """Trap: FastMCP's default store encrypts, so handing it a bare table would silently disable
-    at-rest encryption while looking like configuration. The key material is the client secret via
-    PBKDF2, so rotating that secret makes every existing row unreadable; a decryption error is then
-    treated as a cache miss and the user signs in again.
+    """Trap: FastMCP's default store encrypts. Handing it a bare table silently disables at-rest
+    encryption while looking like valid configuration. The key material is the client secret via
+    PBKDF2, so rotating that secret makes every existing row unreadable. A decryption error is then
+    treated as a cache miss, and the user signs in again.
     """
     return FernetEncryptionWrapper(
         key_value=PostgreSQLStore(
@@ -58,8 +58,9 @@ def build_auth(
     redirect URI. `redirect_path` is passed rather than defaulted so that constant is what the
     registration is generated from.
 
-    `client_storage` is passed in so the readiness probe uses the same object: a separate readiness
-    connection would pass while the provider's own fails, masking a sign-in outage.
+    `client_storage` is passed in so the readiness probe uses the same object. A separate readiness
+    connection can report ready while the provider's own connection fails, and that gap hides a
+    sign-in outage from the probe.
 
     `graph_scopes` ride the authorize request only. Entra issues one token per resource
     (AADSTS28000), so the code exchange asks for this API's own scope and the Graph ones are

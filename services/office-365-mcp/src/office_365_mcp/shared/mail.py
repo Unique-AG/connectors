@@ -1,14 +1,16 @@
 """What an Outlook message is: the shape every reader answers in, and the fields they all ask for.
 
-Four tools find or list mail and one reads it. They agree here rather than each deciding, because
-the difference a caller would see is not cosmetic: a summary that carried a preview from one tool
-and none from another reads as "this message has no text", and an address normalised two ways
-compares unequal to itself.
+Four tools find or list mail, and one tool reads it. They agree here on one shape. No tool
+decides this on its own, because the difference a caller sees is not cosmetic: a summary that
+carries a preview from one tool and none from another reads as "this message has no text", and an
+address normalized two ways compares unequal to itself.
 
-`SUMMARY_FIELDS` is `$select` for all of them. Asking for the same set is what makes a hit from a
-search and a row from a folder listing the same thing — and `$select` is not an optimisation here:
-Microsoft warns that a large page without one risks a gateway timeout, and `body` on twenty-five
-messages is tens of thousands of tokens nobody asked for.
+`SUMMARY_FIELDS` is the `$select` list for all of them. The same set makes a hit from search and a
+row from a folder listing into the same shape.
+
+`$select` is not just an optimization here. Microsoft warns that a large page with no `$select`
+risks a gateway timeout. `body` alone on twenty-five messages is tens of thousands of tokens that
+nobody asked for.
 """
 
 from typing import Literal, Self
@@ -36,23 +38,24 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 )
 
 # Microsoft's own documented length for `bodyPreview`, named here because two tools quote it to a
-# model and a number that drifted in one of them would be a promise the other did not make.
+# model. If the number drifts in just one tool, that tool promises something the other does not.
 PREVIEW_CHARACTERS = 255
 
 
-# The well-known folder names Graph accepts in a URL path, and the seven of seventeen a person
-# says out loud. Locale-independent, so `inbox` reaches the Inbox of a mailbox in any language.
+# The well-known folder names Graph accepts in a URL path are the seven of seventeen that a
+# person says out loud. They are locale-independent, so `inbox` reaches the Inbox of a mailbox in
+# any language.
 #
-# The ten left out are left out on purpose. `conflicts`, `localfailures`, `serverfailures` and
-# `syncissues` are Outlook's own sync diagnostics rather than mail; `msgfolderroot` and
-# `searchfolders` are parents, not message folders; `recoverableitemsdeletions` is the purge bin
-# and Microsoft says it "isn't visible in any Outlook email client"; `outbox` holds a message for
-# the seconds before it leaves, so listing it is a race; `conversationhistory` is Skype and Teams
-# history; `scheduled` exists for Outlook on iOS alone.
+# The other ten are left out on purpose. `conflicts`, `localfailures`, `serverfailures` and
+# `syncissues` are Outlook's own sync diagnostics, not mail. `msgfolderroot` and `searchfolders`
+# are parents, not message folders. `recoverableitemsdeletions` is the purge bin, and Microsoft
+# says it "isn't visible in any Outlook email client". `outbox` holds a message for the seconds
+# before it leaves, so listing it is a race. `conversationhistory` is Skype and Teams history.
+# `scheduled` exists for Outlook on iOS alone.
 #
-# A folder outside this list is reached by its handle from outlook_browse_folders, never by name:
-# a custom folder's name is the user's, and matching one by string is how a tool files mail into
-# the wrong place.
+# A folder outside this list is reached by its handle from outlook_browse_folders, never by name.
+# A custom folder's name belongs to the user, and matching one by string is how a tool files mail
+# into the wrong place.
 type WellKnownFolder = Literal[
     "inbox",
     "sentitems",
@@ -69,15 +72,16 @@ class MailAddress(BaseModel):
 
     name: str | None = Field(
         description=(
-            "The display name on the message. Written by whoever sent it, so on inbound mail it "
-            + "is text a stranger chose and matches nobody's directory entry by necessity. "
+            "The display name on the message. Whoever sent the message wrote it, so on inbound "
+            + "mail it is text a stranger chose, and it never matches anybody's directory entry. "
             + "Null when Graph recorded none."
         )
     )
     address: str | None = Field(
         description=(
-            "The SMTP address. This is the value to compare, to quote back and to reuse. Null "
-            + "only for a message Graph recorded no address for, which happens on some drafts."
+            "The SMTP address. This address is the value to compare, to quote, and to reuse. "
+            + "Null only for a message that Graph recorded no address for, which happens on "
+            + "some drafts."
         )
     )
 
@@ -115,14 +119,14 @@ class MailSummary(BaseModel):
     preview: str | None = Field(
         description=(
             f"The first {PREVIEW_CHARACTERS} characters of the body, as plain text, from the very "
-            + "top. On a reply that is usually the quoted header block rather than what the "
-            + "sender wrote, so a preview that does not answer the question is not evidence the "
-            + "message does not: read the message before concluding. Null under a permission that "
-            + "withholds it."
+            + "top. On a reply, this is usually the quoted header block rather than what the "
+            + "sender wrote. If the preview does not answer the question, that is not evidence "
+            + "that the message does not either. Read the message first. Null under a permission "
+            + "that withholds it."
         )
     )
     sender: MailAddress | None = Field(
-        description="Who sent it. Null for a message Graph recorded no sender for."
+        description="Who sent it. Null for a message that Graph recorded no sender for."
     )
     to: list[MailAddress] = Field(
         description=(
@@ -133,7 +137,8 @@ class MailSummary(BaseModel):
     received_at: str | None = Field(
         description=(
             "When the mailbox received it, ISO-8601 in UTC. Null on a draft, which was never "
-            + "received. Compare and sort on this rather than on anything in the subject."
+            + "received. Compare and sort on this timestamp rather than on anything in the "
+            + "subject."
         )
     )
     is_read: bool | None = Field(
@@ -142,27 +147,28 @@ class MailSummary(BaseModel):
     has_attachments: bool | None = Field(
         description=(
             "Whether Graph reports attachments. No tool here returns attachment bytes or names. "
-            + "Note this is false for a message whose only attachment is an inline image."
+            + "This value is false for a message whose only attachment is an inline image."
         )
     )
     folder_id: str | None = Field(
         description=(
-            "The Graph id of the folder holding the message. Opaque, and no tool here turns it "
-            + "into a folder name — outlook_browse_folders reports id and name together."
+            "The Graph id of the folder holding the message. This id is opaque, and no tool here "
+            + "turns it into a folder name. outlook_browse_folders reports the id and the name "
+            + "together."
         )
     )
     web_link: str | None = Field(
         description=(
             "Graph's own link that opens the message in Outlook on the web, passed through "
-            + "exactly as Graph gave it. Never assembled here, and never repaired: Microsoft "
-            + "changed the format in 2025 and a hand-built link opens the wrong item or none."
+            + "exactly as Graph gave it. This connector never assembles or repairs it. Microsoft "
+            + "changed the format in 2025, so a hand-built link opens the wrong item or none."
         )
     )
 
     @classmethod
     def from_message(cls, message: Message, *, message_id: str) -> Self:
         """`message_id` is passed in rather than read off `message`, because a hit found by
-        `$search` carries a mutable id that the caller has already exchanged for a stable one."""
+        `$search` carries a mutable id, and the caller already exchanged it for a stable one."""
         return cls(
             uri=MailMessageHandle(message_id).uri,
             subject=message.subject,

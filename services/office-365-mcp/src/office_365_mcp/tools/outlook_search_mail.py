@@ -1,8 +1,8 @@
 """`outlook_search_mail` — find a message anywhere in the signed-in user's mailbox.
 
 `GET /me/messages?$search="…"` rather than `POST /search/query` with `entityTypes: ["message"]`,
-which is the endpoint `teams_search_messages` uses for Teams. Three documented facts decide it,
-and all three are about the mail entity specifically:
+which is the endpoint `teams_search_messages` uses for Teams. Three documented facts decide this
+choice. All three concern the mail entity:
 
 * **The Search API cannot reach a delegated mailbox at all** — "Users can search their own
   mailbox, but can't search delegated mailboxes"
@@ -10,32 +10,35 @@ and all three are about the mail entity specifically:
   has no such restriction, so the shape stays open to a shared-mailbox tool later.
 * **Its message hit carries no `id`.** The documented projection is `createdDateTime`,
   `lastModifiedDateTime`, `receivedDateTime`, `sentDateTime`, `hasAttachments`, `subject`,
-  `bodyPreview`, `importance`, `replyTo`, `sender` and `from`; `hitId` is a separate field and is
-  documented as a `RestId`. `fields` only narrows a message hit, so nothing can be added back.
+  `bodyPreview`, `importance`, `replyTo`, `sender` and `from`. Microsoft documents `hitId` as a
+  separate field, of type `RestId`. `fields` only narrows a message hit. It cannot add back a
+  field Graph left out.
 * **Its `total` is the page size, not the match count**, exactly as for `chatMessage`.
 
 **Two Graph calls, and the second is not optional.** `Prefer: IdType="ImmutableId"` is *not*
-honoured on a `$search` request and Graph answers `Preference-Applied` anyway, so the header lies
-rather than fails — Microsoft's own maintainer closed
+honoured on a `$search` request. Graph answers `Preference-Applied` anyway, so the header lies
+rather than fails. Microsoft's own maintainer confirmed this in
 https://github.com/microsoftgraph/msgraph-sdk-dotnet/issues/698 with "the immutableId is not
 supported with $search query parameters when targeting messages. You'd need to make a secondary
 call to translate those IDs … using the translateExchangeIds API." A handle minted from the raw
-hit id dies the moment Outlook files the message, which inbox rules and retention do unprompted,
-and the model then reports a message as deleted. So every id here is exchanged before it becomes
-a handle. The exchange costs no extra consent: `User.Read` is already always on.
+hit id dies the moment Outlook files the message. Inbox rules and retention can file a message
+with no warning, and when this happens, the model reports the message as deleted. So every id
+here is exchanged before it becomes a handle. The exchange costs no extra consent: `User.Read` is
+already always on.
 
-**One request, `$top` is the window.** Whether `$search` on this collection pages at all is
-undocumented — no Microsoft page shows an `@odata.nextLink` on a searched message collection — so
-this asks once for what the caller wanted rather than walking something whose stop condition is
-unverified. `$search` is also documented as returning at most 1000 results, and `limit` is far
-below that.
+**One request, `$top` is the window.** Whether `$search` paging works on this collection is
+undocumented. No Microsoft page shows an `@odata.nextLink` on a searched message collection. So
+this tool asks once for what the caller wants, instead of a walk with an unverified stop
+condition. Microsoft documents a `$search` limit of at most 1000 results, and `limit` here stays
+far below that.
 
 **No date arguments, and no `$orderby`.** Microsoft documents `received` as an exact-date KQL
-property on this collection and publishes no range syntax for it, and Graph fails unsupported
+property on this collection and publishes no range syntax for it. Graph fails unsupported
 query-parameter combinations *silently* rather than with an error
-(https://learn.microsoft.com/en-us/graph/query-parameters). An ignored `$orderby` would return
-Graph's own order under a label promising another. Date-bounded questions are `outlook_list_mail`,
-which filters and sorts on one property and cannot be silently ignored.
+(https://learn.microsoft.com/en-us/graph/query-parameters). If Graph silently ignores
+`$orderby`, it still returns results in its own order, under a label that promises a different
+order. Date-bounded questions are `outlook_list_mail`, which filters and sorts on one property
+and cannot be silently ignored.
 """
 
 from collections.abc import Mapping
@@ -67,9 +70,10 @@ TOOL_NAME = "outlook_search_mail"
 STEP_SEARCH = "mail_search"
 STEP_IDS = "mail_ids"
 
-# `Mail.Read` for the search, `User.Read` for the id exchange. `User.Read` is always on, so this
-# names it rather than relying on that: the token this tool is handed is exchanged for exactly the
-# permissions declared here, so an undeclared one is a 403 on the second call and nowhere else.
+# `Mail.Read` covers the search. `User.Read` covers the id exchange.
+# `User.Read` is always on by default, but this file names it anyway.
+# This tool exchanges its token for exactly the permissions declared here.
+# An undeclared permission causes a 403 on the second call, and nowhere else.
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
@@ -77,18 +81,19 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 MAX_RESULTS = 50
 
 _DESCRIPTION = """\
-Search the signed-in user's own mailbox by keyword, sender, recipient or subject. Use it for "find \
-the mail where…" and for anything about a person. At least one criterion is required and all are \
-combined with AND. Hits carry metadata and a short preview only — pass a hit's `uri` to \
-outlook_read_mail for what the message actually says. There is no date filter and no sort here: \
-Microsoft's index returns its own order, so for "the newest" or "this week" use outlook_list_mail, \
-which orders by receipt within one folder. Searches this user's mailbox only, never a shared one.\
+Search the signed-in user's own mailbox by keyword, sender, recipient or subject. Use it for \
+"find the mail where…" and for anything about a person. The tool needs at least one criterion, \
+and combines all given criteria with AND. Hits carry metadata and a short preview only. Pass a \
+hit's `uri` to outlook_read_mail for what the message actually says. There is no date filter and \
+no sort here. Microsoft's index returns its own order. For "the newest" or "this week", use \
+outlook_list_mail, which orders by receipt within one folder. This tool searches only this \
+user's mailbox, never a shared one.\
 """
 
 _NO_CRITERIA = (
     "outlook_search_mail needs at least one of query, sender, recipient or subject. Graph answers "
-    + "a criteria-free search with an arbitrary slice of the mailbox, which is a sample of what "
-    + "the user can read and not an answer. Add the words or the person the question is about."
+    + "a criteria-free search with an arbitrary slice of the mailbox. This slice is a sample of "
+    + "what the user can read, not an answer. Add the words or the person the question is about."
 )
 
 
@@ -97,16 +102,17 @@ class MailSearchResults(BaseModel):
 
     messages: list[MailSummary] = Field(
         description=(
-            "The matches, in the order Microsoft's index returned them, which is by the date the "
-            + "message was sent. Empty means the index matched nothing — it does not mean the "
-            + "mailbox holds nothing, because a search reaches indexed content only."
+            "The matches, ordered by send date, which is the order Microsoft's index returns. "
+            + "Empty means the index matched nothing. This does not mean the mailbox holds "
+            + "nothing, because a search reaches indexed content only."
         )
     )
     more_may_exist: bool = Field(
         description=(
-            "True when the answer filled `limit`, so raising `limit` can return more. There is no "
-            + "match count to report: Graph publishes none for a mail search, and any number here "
-            + "would be this page's size wearing a total's name."
+            "When the answer fills `limit`, this is true, and a higher `limit` can return more "
+            + "matches. There is no match count to report. Graph publishes none for a mail "
+            + "search, and any number reported here is only this page's size, mislabeled as a "
+            + "total."
         )
     )
 
@@ -157,11 +163,11 @@ async def search_mail(
 
 
 async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[str, str]:
-    """Each hit's mutable id mapped to one that survives the message being filed.
+    """Each hit's mutable id, mapped to one that survives after the mailbox files the message.
 
-    A hit Graph could not translate is dropped rather than answered with the mutable id: a handle
-    that works now and 404s in an hour is the failure this exchange exists to prevent, and the
-    model reads that 404 as "deleted".
+    This exchange drops a hit that Graph fails to translate, rather than answer with the mutable
+    id. A handle that works now, and then fails with a 404 within an hour, is the failure this
+    exchange exists to prevent. The model reads that 404 as "deleted".
     """
     raw = [message.id for message in found if message.id is not None]
     if not raw:
@@ -185,11 +191,12 @@ async def _stable_ids(client: GraphServiceClient, found: list[Message]) -> dict[
 
 
 def _query_string(criteria: SearchCriteria) -> str:
-    """The KQL these criteria become. Empty exactly when nothing was asked for.
+    """The KQL string these criteria become. This string is empty when the caller gives no
+    criteria.
 
-    The property names are Microsoft's own for a message collection. A query of nothing but
-    punctuation contributes no term, so this string, and not the arguments behind it, is the
-    honest test of whether a criterion was given.
+    The property names are Microsoft's own for a message collection. A query of only punctuation
+    contributes no term. So this string, not the arguments behind it, is the honest test of
+    whether the caller gave a criterion.
     """
     terms: list[str] = []
     if criteria.query:
@@ -223,7 +230,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Words to find in the subject, the body or an attachment's text. Every word "
                     + "must appear, in any order. Quote a run to require adjacency: "
                     + '`"purchase order"` matches only side by side, `purchase order` matches '
-                    + "both words anywhere. Search operators are searched as text, not obeyed."
+                    + "both words anywhere. This tool treats search operators as plain text. It "
+                    + "does not act on them as commands."
                 ),
             ),
         ] = None,
@@ -233,8 +241,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Only mail from this person, by address, alias or display name. Exchange "
-                    + "expands a name to the address it knows, so a first name usually works. "
-                    + "Prefer this over naming the person in `query`, which also matches mail "
+                    + "expands a name to the address it knows, so a first name usually works. Do "
+                    + "not put the person's name in `query` instead: `query` also matches mail "
                     + "that merely mentions them."
                 ),
             ),
@@ -246,7 +254,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Only mail this person was on, as sender or as any recipient including Bcc. "
                     + "Use the signed-in user's own address, from get_me, for \"mail addressed to "
-                    + 'me"; use `sender` for "mail from them".'
+                    + 'me". Use `sender` for "mail from them".'
                 ),
             ),
         ] = None,
@@ -284,9 +292,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
 
 def _require_a_criterion(tool: Tool) -> None:
-    """Say "at least one of these" in the schema, which a Python signature cannot.
+    """Say "at least one of these" in the schema, which a Python signature cannot express.
 
-    The runtime refusal stays: FastMCP validates arguments against the signature rather than
-    against this schema, so a client that ignores `anyOf` still has to be told.
+    The runtime refusal stays. FastMCP validates arguments against the signature, not against
+    this schema. So a client that ignores `anyOf` still receives the refusal at runtime.
     """
     tool.parameters["anyOf"] = [{"required": [name]} for name in CRITERIA]

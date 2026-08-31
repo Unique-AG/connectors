@@ -416,7 +416,7 @@ class TestHowItDeclaresItself:
         described = tool.description or ""
         assert "CHANGES THE MAILBOX" in described
         assert "everyone who emails this user gets `internal_message` back" in described
-        assert "outside the organisation get `external_message`" in described
+        assert "outside the organization get `external_message`" in described
 
     async def test_it_tells_a_caller_how_to_turn_an_automatic_reply_off(
         self, transport: httpx.AsyncClient
