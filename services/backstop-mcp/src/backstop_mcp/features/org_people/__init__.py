@@ -12,32 +12,52 @@ and `former_omitted` needs that walk. `include_former` only controls whether the
 returned.
 """
 
-from backstop_mcp.features.org_people.fetch_organization import fetch_organization
-from backstop_mcp.features.org_people.fetch_people_for_organization import (
-    MAX_ORG_PEOPLE,
-    fetch_people_for_organization,
+from backstop_mcp.features.org_people.api_responses import (
+    EmployeeAttributes,
+    OrganizationAttributes,
+    PersonAttributes,
 )
-from backstop_mcp.features.org_people.fetch_person import fetch_person
-from backstop_mcp.features.org_people.internal_dto import (
-    OrgPeopleListingDto,
-    PersonAtOrganizationDto,
+from backstop_mcp.features.org_people.dependencies import (
+    get_organization_query_factory,
+    get_people_for_organization_query_factory,
+    get_person_query_factory,
+)
+from backstop_mcp.features.org_people.queries import (
+    MAX_ORG_PEOPLE,
+    GetOrganizationQuery,
+    GetPeopleForOrganizationQuery,
+    GetPersonQuery,
 )
 from backstop_mcp.features.org_people.responses import (
     OrganizationRecordResponse,
+    OrganizationResolvedResponse,
     OrgPeopleResolvedResponse,
+    PartyOrganizationResponse,
+    PartyOrgPeopleResponse,
+    PartyPersonResponse,
     PersonAtOrganizationResponse,
     PersonRecordResponse,
+    PersonResolvedResponse,
 )
 
 __all__ = [
     "MAX_ORG_PEOPLE",
-    "OrganizationRecordResponse",
-    "OrgPeopleListingDto",
+    "EmployeeAttributes",
+    "GetOrganizationQuery",
+    "GetPeopleForOrganizationQuery",
+    "GetPersonQuery",
     "OrgPeopleResolvedResponse",
-    "PersonAtOrganizationDto",
+    "OrganizationAttributes",
+    "OrganizationRecordResponse",
+    "OrganizationResolvedResponse",
+    "PartyOrgPeopleResponse",
+    "PartyOrganizationResponse",
+    "PartyPersonResponse",
     "PersonAtOrganizationResponse",
+    "PersonAttributes",
     "PersonRecordResponse",
-    "fetch_organization",
-    "fetch_people_for_organization",
-    "fetch_person",
+    "PersonResolvedResponse",
+    "get_organization_query_factory",
+    "get_people_for_organization_query_factory",
+    "get_person_query_factory",
 ]

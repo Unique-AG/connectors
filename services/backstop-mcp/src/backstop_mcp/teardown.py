@@ -40,6 +40,11 @@ from backstop_mcp.features.opportunities import (
     get_search_opportunities_query_factory,
     get_stage_history_query_factory,
 )
+from backstop_mcp.features.org_people import (
+    get_organization_query_factory,
+    get_people_for_organization_query_factory,
+    get_person_query_factory,
+)
 from backstop_mcp.features.system_users import get_system_users_service
 from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
 
@@ -75,6 +80,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_opportunities_by_ids_query_factory,
     get_search_opportunities_query_factory,
     get_tasks_for_party_query_factory,
+    get_person_query_factory,
+    get_organization_query_factory,
+    get_people_for_organization_query_factory,
 )
 
 

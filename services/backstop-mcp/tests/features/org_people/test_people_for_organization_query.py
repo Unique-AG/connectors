@@ -5,10 +5,7 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
-from backstop_mcp.features.org_people import (
-    MAX_ORG_PEOPLE,
-    fetch_people_for_organization,
-)
+from backstop_mcp.features.org_people import MAX_ORG_PEOPLE
 from tests.features.data_hygiene.helpers import (
     EMPLOYEE_TYPE,
     FORMER_MIRROR_TYPE,
@@ -16,7 +13,8 @@ from tests.features.data_hygiene.helpers import (
     person_org,
     relationship_types,
 )
-from tests.helpers import BASE_URL, build_employment_index_factory, recorded_requests
+from tests.features.org_people.conftest import make_get_people_for_organization_query
+from tests.helpers import BASE_URL, recorded_requests
 
 _ORG = "o1"
 _ER_URL = f"{BASE_URL}/organizations/{_ORG}/entityRelationships"
@@ -65,7 +63,7 @@ def _org_link(er_id: str, *, person_id: str, type_id: str) -> dict[str, object]:
     )
 
 
-class TestFetchPeopleForOrganization:
+class TestPeopleForOrganizationQuery:
     @pytest.mark.asyncio
     @respx.mock
     async def test_returns_current_people_from_employee_includes(
@@ -92,19 +90,16 @@ class TestFetchPeopleForOrganization:
 
         respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
 
-        listing = await fetch_people_for_organization(
-            client,
-            build_employment_index_factory(),
+        listing = await make_get_people_for_organization_query(client).run(
             organization_id=_ORG,
             include_former=False,
         )
 
         assert [row.employment.person_id for row in listing.people] == ["p1"]
         assert listing.people[0].employment.status == "current"
-        assert listing.people[0].card is not None
-        assert listing.people[0].card.name == "Glenn, Phil"
-        assert listing.people[0].card.job_title == "Tax Director"
-        assert listing.people[0].card.categories == ("Investor", "Decision Maker")
+        assert listing.people[0].name == "Glenn, Phil"
+        assert listing.people[0].job_title == "Tax Director"
+        assert listing.people[0].categories == ("Investor", "Decision Maker")
         assert listing.former_omitted == 0
         assert listing.people_omitted == 0
         query = dict(route.calls.last.request.url.params)
@@ -136,9 +131,7 @@ class TestFetchPeopleForOrganization:
             )
         )
 
-        listing = await fetch_people_for_organization(
-            client,
-            build_employment_index_factory(),
+        listing = await make_get_people_for_organization_query(client).run(
             organization_id=_ORG,
             include_former=True,
         )
@@ -146,10 +139,9 @@ class TestFetchPeopleForOrganization:
         by_id = {row.employment.person_id: row for row in listing.people}
         assert set(by_id) == {"p1", "p2"}
         assert by_id["p1"].employment.status == "current"
-        assert by_id["p1"].card is not None
-        assert by_id["p1"].card.name == "Current"
+        assert by_id["p1"].name == "Current"
         assert by_id["p2"].employment.status == "former"
-        assert by_id["p2"].card is None
+        assert by_id["p2"].name is None
         assert listing.former_omitted == 0
 
     @pytest.mark.asyncio
@@ -163,9 +155,7 @@ class TestFetchPeopleForOrganization:
             )
         )
 
-        listing = await fetch_people_for_organization(
-            client,
-            build_employment_index_factory(),
+        listing = await make_get_people_for_organization_query(client).run(
             organization_id=_ORG,
             include_former=False,
         )
@@ -192,9 +182,7 @@ class TestFetchPeopleForOrganization:
             )
         )
 
-        listing = await fetch_people_for_organization(
-            client,
-            build_employment_index_factory(),
+        listing = await make_get_people_for_organization_query(client).run(
             organization_id=_ORG,
             include_former=False,
         )
@@ -208,9 +196,7 @@ class TestFetchPeopleForOrganization:
         respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(401))
 
         with pytest.raises(BackstopAuthError):
-            await fetch_people_for_organization(
-                client,
-                build_employment_index_factory(),
+            await make_get_people_for_organization_query(client).run(
                 organization_id=_ORG,
                 include_former=False,
             )
@@ -220,9 +206,11 @@ class TestFetchPeopleForOrganization:
     async def test_caps_the_fan_out(
         self, client: BackstopClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Package re-exports a same-named function; dotted setattr would bind it, not the module.
+        # Package re-exports a same-named constant; dotted setattr would bind it, not the module.
         monkeypatch.setattr(
-            import_module("backstop_mcp.features.org_people.fetch_people_for_organization"),
+            import_module(
+                "backstop_mcp.features.org_people.queries.get_people_for_organization_query"
+            ),
             "MAX_ORG_PEOPLE",
             1,
         )
@@ -239,9 +227,7 @@ class TestFetchPeopleForOrganization:
         )
         respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
 
-        listing = await fetch_people_for_organization(
-            client,
-            build_employment_index_factory(),
+        listing = await make_get_people_for_organization_query(client).run(
             organization_id=_ORG,
             include_former=False,
         )
