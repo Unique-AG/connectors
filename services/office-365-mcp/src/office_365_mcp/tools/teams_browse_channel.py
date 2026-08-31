@@ -38,7 +38,6 @@ STEP = "channel_messages"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)
 
-# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
     "channel_id": "19:general@thread.tacv2",
@@ -180,7 +179,6 @@ def _reply_id(reply: ChatMessage) -> str:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

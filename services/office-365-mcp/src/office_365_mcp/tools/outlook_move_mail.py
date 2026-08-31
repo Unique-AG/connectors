@@ -85,9 +85,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "destination": "archive",
 }
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id was
-# copied from a tool response verbatim, is wrong here because it was: both arguments that can 404
-# carry handles this connector minted.
+# The default 404 advice, to check the id was copied from a tool response verbatim, is wrong here
+# because it was: both arguments that can 404 carry handles this connector minted.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return something this move addressed, and nothing was moved. If "
     + "`folder_ref` was used, the destination is the likelier of the two: the handle is well "
@@ -420,7 +419,6 @@ def _answer(target: _Destination, attempts: Sequence[_Attempt]) -> MailMoved:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @tool_metadata(

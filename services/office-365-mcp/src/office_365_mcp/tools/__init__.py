@@ -67,6 +67,11 @@ class ToolModule(Protocol):
 
     TRAP: both read-only properties are read-only on purpose. A mutable protocol attribute would
     demand exactly `str` or `Mapping[str, object]`, and tool files write these unannotated.
+
+    `GRAPH_CALL_EXAMPLE` is arguments that reach Graph, so a startup probe exercises the real call.
+    Its ids are invented but its shape is one the tool accepts: an argument the tool rejects never
+    reaches Graph and would prove nothing. A tool with more than one reachable call says in its own
+    file which it picked.
     """
 
     @property

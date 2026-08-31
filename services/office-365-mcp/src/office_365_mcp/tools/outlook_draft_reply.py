@@ -105,9 +105,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "body_text": "Thanks — Friday works.",
 }
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id was
-# copied from a tool response verbatim, is wrong here because it was: `message_ref` carries a
-# handle this connector minted, and the interesting failure is that it went stale.
+# The default 404 advice, to check the id was copied from a tool response verbatim, is wrong here
+# because it was: `message_ref` carries a handle this connector minted, and the interesting failure
+# is that it went stale.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return the message this reply was to be drafted from, and no draft "
     + "was created. The handle is well formed, so the message has most likely been moved, filed "
@@ -392,7 +392,6 @@ def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyD
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

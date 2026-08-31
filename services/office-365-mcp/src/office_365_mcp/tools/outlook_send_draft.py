@@ -89,7 +89,6 @@ STEP_SEND_DRAFT = "send_draft"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Send", "Mail.ReadBasic")
 
-# An invented handle in the shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "draft_ref": "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
 }
@@ -288,7 +287,6 @@ def _answer(draft: Message, *, sent_at: datetime) -> MailSent:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

@@ -58,9 +58,9 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
 # previous response: the top of the mailbox.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id was
-# copied from a tool response verbatim, is wrong here because it was: a folder handle is this
-# connector's own, and Microsoft does not promise the id inside it outlives a copy or a move.
+# The default 404 advice, to check the id was copied from a tool response verbatim, is wrong here
+# because it was: a folder handle is this connector's own, and Microsoft does not promise the id
+# inside it outlives a copy or a move.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this folder. The handle is well formed, so most likely the "
     + "folder was deleted, or it was moved or copied and Outlook gave it a new id. Call "
@@ -260,7 +260,6 @@ async def _first_page(
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

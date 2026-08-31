@@ -71,7 +71,6 @@ STEP_MARK = "mark_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite",)
 
-# An invented id in the shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_refs": ["outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"],
     "is_read": True,
@@ -346,7 +345,6 @@ def _why(failure: GraphFailure) -> str:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @tool_metadata(

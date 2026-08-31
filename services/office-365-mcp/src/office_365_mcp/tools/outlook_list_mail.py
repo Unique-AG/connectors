@@ -82,9 +82,9 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
 # The default call, and the one that reaches Graph without a handle from a previous response.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"folder": "inbox"}
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id was
-# copied from a tool response verbatim, is wrong for both ways in here: a folder handle is this
-# connector's own, and a well-known name is a name rather than an id.
+# The default 404 advice, to check the id was copied from a tool response verbatim, is wrong for
+# both ways in here: a folder handle is this connector's own, and a well-known name is a name rather
+# than an id.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this folder, so no message in it could be listed. If "
     + "`folder_ref` was used, the handle is well formed and the folder was most likely deleted, "
@@ -302,7 +302,6 @@ def _headers() -> HeadersCollection:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @tool_metadata(

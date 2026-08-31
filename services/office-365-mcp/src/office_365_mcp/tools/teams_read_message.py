@@ -44,7 +44,6 @@ STEP_CHANNEL_REPLY = "channel_reply"
 # requests both, because the handle is parsed after the exchange.
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
-# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 }
@@ -75,8 +74,8 @@ _BAD_HANDLE = (
     + "identically."
 )
 
-# Read by `tools/__init__.py` into the 404 advice table: the default advice, to check the id came
-# from a tool response verbatim, is wrong here because the handle did.
+# The default 404 advice, to check the id came from a tool response verbatim, is wrong here because
+# the handle did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
     + "argument — and it is not evidence that the message does not exist: Graph answers 'deleted', "
@@ -164,7 +163,6 @@ def _headers() -> HeadersCollection:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

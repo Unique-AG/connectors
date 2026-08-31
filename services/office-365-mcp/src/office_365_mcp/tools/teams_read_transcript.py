@@ -38,7 +38,6 @@ STEP_UNATTRIBUTED = "transcript_unattributed"
 # teams_list_meeting_transcripts.
 GRAPH_PERMISSIONS: tuple[str, ...] = (TRANSCRIPT_PERMISSION,)
 
-# Invented ids, but a shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///transcripts/MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
     + "/MSMjMCMjSYNTHETIC0002"
@@ -74,8 +73,8 @@ _BLANK_SPEAKER = (
     + "pass any part of the display name (case-insensitive, matches anywhere)."
 )
 
-# Read by `tools/__init__.py` into the 404 advice table: the default advice, to check the id came
-# from a tool response verbatim, is wrong here because the handle did.
+# The default 404 advice, to check the id came from a tool response verbatim, is wrong here because
+# the handle did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not return this transcript. The handle is well formed. Most likely the "
     + "meeting expires after about 60 days for a one-off; transcripts age out with it. Call "
@@ -300,7 +299,6 @@ def _seconds(timestamp: str) -> float:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

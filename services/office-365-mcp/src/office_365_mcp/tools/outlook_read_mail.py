@@ -71,7 +71,6 @@ STEP_MESSAGE = "mail_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)
 
-# An invented id in the shape this tool accepts: an argument it rejects never reaches Graph.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 }
@@ -117,8 +116,8 @@ _BAD_HANDLE = (
     + "Retrying this value will fail identically."
 )
 
-# Read by `tools/__init__.py` into the 404 advice table: the default advice, to check the id came
-# from a tool response verbatim, is wrong here because the handle did.
+# The default 404 advice, to check the id came from a tool response verbatim, is wrong here because
+# the handle did.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 would not return this message. The handle is well formed, so this is not a bad "
     + "argument — and it is not evidence that the message does not exist: Graph answers 'it was "
@@ -292,7 +291,6 @@ def _content_of(body: ItemBody | None) -> str | None:
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(

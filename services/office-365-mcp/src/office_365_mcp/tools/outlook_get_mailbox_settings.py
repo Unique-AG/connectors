@@ -81,8 +81,8 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.Read",)
 # produces is the rules listing's rather than whichever of three ran first.
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"include": "rules"}
 
-# Read by `tools/__init__.py` into the 404 advice table. The default advice, to check the id was
-# copied from a tool response verbatim, cannot apply: this tool takes no id at all.
+# The default 404 advice, to check the id was copied from a tool response verbatim, cannot apply:
+# this tool takes no id at all.
 GRAPH_NOT_FOUND = (
     "Microsoft 365 has nothing to answer this with. outlook_get_mailbox_settings takes no id — it "
     + "reads the signed-in user's own mailbox — so nothing about the arguments caused this. Most "
@@ -545,7 +545,6 @@ def _external_audience(audience: ExternalAudienceScope | None) -> ExternalAudien
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
-    # Closes over `transport` here; the default below holds this name, not a call (ruff's B008).
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
