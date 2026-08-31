@@ -5,7 +5,7 @@ import secrets
 import pytest
 from pydantic import ValidationError
 
-from kb_mcp.settings import Settings, get_settings
+from kb_mcp.settings import KNOWN_MCP_TOOLS, Settings, get_settings
 
 pytestmark = pytest.mark.ai
 
@@ -80,3 +80,39 @@ def test_storage_rejects_ephemeral_flag_with_durable_pair(monkeypatch):
     monkeypatch.setenv("ENCRYPTION_KEY", "a" * 64)
     with pytest.raises(ValidationError, match="Refuse ALLOW_EPHEMERAL"):
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_enabled_tools_defaults_to_all_known(monkeypatch):
+    monkeypatch.delenv("KB_MCP_ENABLED_TOOLS", raising=False)
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert settings.enabled_tools == KNOWN_MCP_TOOLS
+    assert settings.disabled_tool_names() == frozenset()
+
+
+def test_enabled_tools_empty_string_defaults_to_all(monkeypatch):
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "")
+    get_settings.cache_clear()
+    assert get_settings().enabled_tools == KNOWN_MCP_TOOLS
+
+
+def test_enabled_tools_parses_comma_list(monkeypatch):
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "search, read_file")
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert settings.enabled_tools == frozenset({"search", "read_file"})
+    assert settings.disabled_tool_names() == frozenset({"content_tree"})
+
+
+def test_enabled_tools_rejects_unknown_name(monkeypatch):
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "search,nope")
+    get_settings.cache_clear()
+    with pytest.raises(ValidationError, match="Unknown tool"):
+        get_settings()
+
+
+def test_enabled_tools_rejects_empty_list(monkeypatch):
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "  ,  ")
+    get_settings.cache_clear()
+    with pytest.raises(ValidationError, match="empty"):
+        get_settings()

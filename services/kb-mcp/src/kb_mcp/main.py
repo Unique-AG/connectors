@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -9,7 +10,19 @@ from unique_toolkit.monitoring import configure_tracing
 
 from kb_mcp.auth import build_auth
 from kb_mcp.references import SERVER_INSTRUCTIONS_CITATION_GUIDANCE
-from kb_mcp.settings import ENV_FILE, get_settings
+from kb_mcp.settings import ENV_FILE, Settings, get_settings
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def apply_enabled_tools(mcp: FastMCP, settings: Settings) -> None:
+    hidden = settings.disabled_tool_names()
+    if hidden:
+        mcp.disable(names=set(hidden), components={"tool"})
+    _LOGGER.info(
+        "MCP tools enabled: %s",
+        ",".join(sorted(settings.enabled_tools)),
+    )
 
 
 def main() -> None:
@@ -31,6 +44,7 @@ def main() -> None:
         auth=oidc_proxy,
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
     )
+    apply_enabled_tools(mcp, settings)
 
     # No CORS: /mcp is server-side and OAuth redirects are top-level navigation.
     middleware = [

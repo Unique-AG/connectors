@@ -60,3 +60,17 @@ def test_no_env_file_resolved_skips_load_dotenv_entirely(monkeypatch):
         main()
 
     mock_load_dotenv.assert_not_called()
+
+
+def test_apply_enabled_tools_disables_hidden_names(monkeypatch):
+    from kb_mcp.main import apply_enabled_tools
+    from kb_mcp.settings import get_settings
+
+    monkeypatch.setenv("KB_MCP_ENABLED_TOOLS", "search,read_file")
+    get_settings.cache_clear()
+    mcp = MagicMock()
+    apply_enabled_tools(mcp, get_settings())
+    mcp.disable.assert_called_once_with(
+        names={"content_tree"},
+        components={"tool"},
+    )

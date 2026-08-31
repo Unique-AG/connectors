@@ -59,12 +59,9 @@ _META = merge_tool_meta(
 
 @tool(
     name="search",
-    # Not the docstring: this reuses TOOL_DESCRIPTION_CITATION_GUIDANCE, and a
-    # literal docstring can't reference a module constant.
-    description=(
-        "Search the knowledge base for the given query and return relevant "
-        "chunks. " + TOOL_DESCRIPTION_CITATION_GUIDANCE
-    ),
+    # Not the docstring: this reuses SEARCH_SYSTEM_PROMPT + citation
+    # guidance, and a literal docstring can't reference module constants.
+    description=SEARCH_SYSTEM_PROMPT + " " + TOOL_DESCRIPTION_CITATION_GUIDANCE,
     meta=_META,
     annotations=ToolAnnotations(
         readOnlyHint=True,
