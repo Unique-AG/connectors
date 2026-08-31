@@ -124,7 +124,7 @@ SEARCH_SYSTEM_PROMPT = (
     "question, or keyword — even if you don't know which file or folder it's "
     "in. Returns relevant text chunks with citations; you can fetch a chunk's "
     "full source file afterward via read_file using the content_id in the "
-    "result header. Do not call content_tree first \"to see what's there\" — "
+    'result header. Do not call content_tree first "to see what\'s there" — '
     "search directly."
 )
 
