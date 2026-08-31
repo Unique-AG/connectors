@@ -35,7 +35,7 @@ jobs:
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path')
           export FILES
-          if ! OUTPUT=$(printenv PR_TITLE | cz lint --paths "$(printenv FILES)" 2>&1); then
+          if ! OUTPUT=$(printenv PR_TITLE | cz --no-breaking-footer lint --paths "$(printenv FILES)" 2>&1); then
             echo "::error title=Invalid PR Title::$OUTPUT"
             exit 1
           fi
