@@ -29,6 +29,7 @@ See [Review after each change](#review-after-each-change).
 | Do | Do not |
 |---|---|
 | Turn `fetch_x.py` into `GetXQuery.run` | Invent empty `commands/` or `utils/` packages |
+| Keep one-query helpers as private methods; inline one-use strings | Module-level `_params` / `_SORT` next to the class |
 | Return the published `*Response` from `run` when the query *is* the tool answer | Contort a query so it can attach `resolved` / status the tool owns |
 | Type every Backstop GET as `*Attributes` / `BackstopApiResource[...]` | Paginate or `get` with `dict[str, object]` or a published `*Response` as `schema=` |
 | Move large `*ResolvedResponse` out of the tool | Change filters, page sizes, or undocumented paths |
@@ -86,7 +87,7 @@ flowchart LR
 | `opportunities` | Template. Do not rename `resource_utils/` here. |
 | `party_resolver` | Tools own resolve/elicitation. Queries must not. Keep `resolve_party` / `resolve_parties` / `fetch_party_name` as package-exported functions. |
 | `data_hygiene` | `EmploymentIndexFactory` is already a process-wide service. |
-| `includes` | Include-plan vocabulary, not a Backstop-entity feature. |
+| `includes` | Include-plan vocabulary, not a Backstop-entity feature. Call sites follow `Included` (requested shared include API). |
 | `collection_scan` | Shared scan/aggregate helpers. Opportunities already imports it. |
 | `auth`, `cached_catalog.py`, `resolution.py`, `entity_types.py` | Infrastructure / shared vocabulary. |
 
@@ -142,6 +143,10 @@ class GetXQuery:
 - Inject the real collaborator (`CustomFieldsService`, `EmploymentIndexFactory`, `BackstopClient`).
 - Names read as the same thing: `GetXQuery` / `get_x_query_factory` / `get_x_query` / `self._get_x_query`.
 - Small `Literal[...]` types live on the query that owns them, then get re-exported from `queries/__init__.py` and the feature `__init__`.
+- Helpers that only this query calls are **private methods**, not module-level `_params` / `_fields`.
+- Inline strings and fieldsets used once. Do not invent `_SORT = "sort"`.
+- Name the check (`raise_if_invalid_series`, `_has_completed_status`), not a longer restatement of the arguments.
+- Follow [AGENT_README — Local helpers](AGENT_README.md#local-helpers-do-this-on-the-first-draft) on the first draft.
 
 ### 2. What `run` returns
 
@@ -226,14 +231,16 @@ Known aliases to move:
 | Feature | Alias | Goes on |
 |---|---|---|
 | `tasks` | `TaskFilter` (today on the tool), `TaskStatus` in `internal_dto` | `GetTasksForPartyQuery` |
-| `accounts` | `TimeSeriesEntityType`, `AccountSeries`, `ProductSeries`, `HoldingsSource` | the query that owns them |
+| `accounts` | `TimeSeriesEntityType`, `AccountSeries`, `ProductSeries` | `time_series_name.py` (query + response + tool share them; query file would cycle with `responses`) |
+| `accounts` | `HoldingsSource` | `GetHoldingsQuery` |
 | `activity_history` | `BackstopActivityType` in `internal_dto`; `ActivityType` / `Segment` on the fetch | `GetActivityHistoryQuery` |
 | `activity_history` | `ActivityAggregateBy` | `SearchActivitiesQuery` or the aggregate util |
 
 ### 6. Utils
 
-Only when a **second caller** exists inside the feature. If only one query calls it, keep it
-on that query until a second caller appears.
+Only when a **second caller** exists inside the feature. If only one query (or one tool)
+calls it, keep it on that query / next to that tool until a second caller appears. Do not
+create `utils/<name>.py` as part of folding a `fetch_*`.
 
 ### 7. Tool
 
@@ -550,26 +557,23 @@ into `queries/` or people will confuse it with `GetProductQuery`.
 `fetch_party_name` stays on `party_resolver`. Tools that need a display name keep calling it
 after resolve.
 
-#### Today
+#### Today (Wave 4 landed)
 
 ```
 accounts/
-  dependencies.py               holdings + accounts-for-product factories
-  queries/get_holdings_query.py
-  queries/get_accounts_for_product_query.py
-  queries/get_capital_flows_query.py  this slice — stop here for review
-  fetch_product.py              fetch_product + fetch_product_catalog
-  fetch_time_series.py
-  fetch_series.py               stays at root this slice (only holdings calls it)
-  split_open.py                 stays at root until product-investors moves
-  resolve_product.py            stays
-  responses/                    already a package
-  tools/get_accounts_for_party.py
-  tools/get_product_investors.py
-  tools/get_capital_flows.py    returns query.run
-  tools/get_product.py          owns ProductRecordResponse, ProductResolvedResponse
-  tools/get_time_series.py
+  dependencies.py
+  time_series_name.py           TimeSeriesEntityType / series enums (shared; not internal_dto)
+  resolve_product.py            stays at feature root (elicitation)
+  queries/                      all five Get*Query
+  utils/fetch_series.py
+  utils/split_open.py
+  responses/                    + capital_flows.py, product.py
+  tools/                        same five files, thinner
 ```
+
+`Included` in `backstop_client` is the shared include API (requested). Leave-alone
+packages (`opportunities`, `org_people`, `includes`, `data_hygiene`) call that, not a
+per-feature copy.
 
 #### Target
 
@@ -597,8 +601,8 @@ accounts/
     get_time_series_query.py
   utils/
     __init__.py
-    fetch_series_util.py        used by the documented holdings fallback
-    split_open_util.py
+    fetch_series.py
+    split_open.py
   tools/                        same five files, thinner
 ```
 
@@ -614,8 +618,9 @@ accounts/
 | `fetch_series` | `utils/fetch_series_util.py` | Second caller: documented holdings fallback. |
 | `split_open` | `utils/split_open_util.py` | Used by party-accounts and product-investors. |
 
-Literal types (`TimeSeriesEntityType`, `HoldingsSource`, series name aliases) move off
-`internal_dto.py` onto the query that owns them.
+`HoldingsSource` lives on `GetHoldingsQuery`. Series name aliases live in
+`time_series_name.py` (named after `TimeSeriesName`) because the query, published response,
+and tool all need them — parking them on the query file cycles with `responses`.
 
 Cached factories → `teardown.PROVIDERS`:
 

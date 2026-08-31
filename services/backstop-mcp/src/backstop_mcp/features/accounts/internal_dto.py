@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import date
-from typing import ClassVar, Literal, Self, cast, get_args
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
@@ -26,85 +26,27 @@ from backstop_mcp.features.custom_fields import CustomFieldValueAttributes
 from backstop_mcp.features.resolution import Candidate, Resolution
 
 __all__ = [
-    "ACCOUNT_SERIES",
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
-    "AccountSeries",
     "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
-    "HoldingsSource",
     "InvestorTypeDto",
     "MoneyDto",
-    "PRODUCT_SERIES",
     "ProductCandidate",
     "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductResolution",
-    "ProductSeries",
     "ResolvedProductDto",
     "SeriesFigureDto",
     "SeriesPointDto",
     "ShareDto",
-    "TimeSeriesEntityType",
-    "TimeSeriesName",
 ]
 
 _OWNER = "owner"
 _INVESTOR_TYPE = "investorType"
 _PRODUCT = "product"
-
-# Swagger enums for `GET /{accounts|products}/{id}/{timeSeries}`. Keep Backstop's
-# `currentMonthNetAssests` spelling. Membership sets are derived from the Literals so a
-# typo cannot accept a path segment pydantic would reject, or the other way around.
-type TimeSeriesEntityType = Literal["accounts", "products"]
-type AccountSeries = Literal[
-    "currentMonthIrrs",
-    "currentMonthNetAssests",
-    "earnings",
-    "grossValues",
-    "highwaterMarks",
-    "incentiveFees",
-    "incentiveFeesCharged",
-    "irrs",
-    "managementFees",
-    "newIssueIncomes",
-    "percentageOfFundHistory",
-    "performanceFeeAccrued",
-    "returns",
-    "startingValues",
-    "totalInvested",
-    "totalRedemptions",
-    "values",
-]
-type ProductSeries = Literal[
-    "aums",
-    "benchmarkAReturns",
-    "benchmarkBReturns",
-    "benchmarkCReturns",
-    "benchmarkDReturns",
-    "benchmarkEReturns",
-    "benchmarkFReturns",
-    "benchmarkGReturns",
-    "benchmarkHReturns",
-    "expenseDataPoints",
-    "incomeDataPoints",
-]
-type TimeSeriesName = AccountSeries | ProductSeries
-
-
-def _literal_strings(alias: object) -> frozenset[str]:
-    """String members of a PEP 695 `Literal` alias."""
-    value: object = getattr(alias, "__value__", alias)
-    members = cast("tuple[object, ...]", get_args(value))
-    names = tuple(member for member in members if isinstance(member, str))
-    assert names and len(names) == len(members), f"{alias} is not a non-empty string Literal"
-    return frozenset(names)
-
-
-ACCOUNT_SERIES: frozenset[str] = _literal_strings(AccountSeries)
-PRODUCT_SERIES: frozenset[str] = _literal_strings(ProductSeries)
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _OwnerInclude = IncludedResource[OwnerAttributes]
@@ -347,12 +289,6 @@ class AccountListingDto(BaseModel):
     closed_omitted: int = 0
 
 
-# Which endpoint produced a holdings listing: the undocumented `bsg-account-table-data` or the
-# documented `/accounts` walk plus series. They answer the same question with different
-# completeness, and the name says which endpoint rather than passing judgement on it.
-type HoldingsSource = Literal["table-api", "accounts-api"]
-
-
 class MoneyDto(BaseModel):
     """A money figure carried with Backstop's own rendering.
 
@@ -487,7 +423,7 @@ class HoldingListingDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     rows: tuple[HoldingRowDto, ...]
-    source: HoldingsSource = "table-api"
+    source: Literal["table-api", "accounts-api"] = "table-api"
     omitted_fields: tuple[str, ...] = ()
     closed_omitted: int = 0
     rows_dropped: int = 0

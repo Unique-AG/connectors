@@ -107,6 +107,48 @@ Inside a class, names describe the data, not the step. `opportunities_mapped`, `
 `items_list` is not. Prefer the name the next line will use: if you filter by status, the
 input is `opportunities_mapped` and the output is `selected`, not `filtered_data`.
 
+Name the check that runs, not a leftover flag or a longer phrase the arguments already
+say. `_has_completed_status` not `_is_actual`. `raise_if_invalid_series` not
+`raise_if_invalid_series_for_entity`. `_series_or_figure_error` not `_accepted_series`.
+The file stem is that short name.
+
+---
+
+## Local helpers (do this on the first draft)
+
+These are the review nits that kept coming back while moving `accounts` onto queries.
+Later slices should not need the same pass.
+
+**Private methods on the query, not module-level `_` functions.** `_params`, `_fields`,
+`_project_row` belong on `GetXQuery`. A `_time_series_params` sitting next to the class is
+the old `fetch_*.py` with a class stapled on.
+
+**Inline a value used once.** Do not extract `_SORT = "sort"` or
+`_ACCOUNT_FIELDS = "date,value,valueStatus"` for a single call site. Write the string
+where it is sent. A named constant is for a second use, or a value tests and docs must
+share.
+
+**Keep `schema=` as a real assignment.** `SeriesPointResource = BackstopApiResource[SeriesPointAttributes]`
+stays — `schema=` needs a class object; a PEP 695 alias is not `type[T]`. That is not a
+one-use constant to inline.
+
+**Do not wrap a single call.** If `_series_figure` only calls `fetch_series(self._client, path)`,
+delete it and call `fetch_series` at the site.
+
+**One pass.** Filter and project in the same loop. Do not build "kept rows" and then map
+them. A projector that always succeeds returns the row (`assert account is not None` to
+narrow); the loop drops the unusable input *before* calling it, instead of
+`from_attributes` returning `None`.
+
+**A util needs two callers inside the feature**, unless the review asked for the util
+anyway (`raise_if_invalid_series` lives in `utils/` by request). Do not invent a second
+helpers package.
+
+**`Included` is the shared include API.** `backstop_client.Included` / `included_resource` /
+`IncludedResource` is what every feature uses to read `?include=` chips. Do not grow a
+second follow/index helper in a feature. Call-site updates in leave-alone packages are
+part of keeping that one API, not a drive-by rewrite.
+
 ---
 
 ## Data flow
@@ -162,7 +204,10 @@ from outside `queries/`. Same for `commands/` and `utils/`.
 - A file inside `queries/`, `commands/`, or `utils/` may import its own sibling file when a
   package import would cycle (`map_opportunity_to_response_util` → `get_stage_history_query`).
 - `api_responses` / `responses` import each other downward only
-  (`responses` → `internal_dto` → `api_responses`). Never upward.
+  (`responses` → `internal_dto` → `api_responses`). Never upward. A small shared
+  `Literal[...]` that the query, published response, and tool all need lives in a
+  feature-root file named after the alias (`time_series_name.py` → `TimeSeriesName`)
+  so the query file does not cycle with `responses`. Do not park it on `internal_dto`.
 - Tool tests may import `features.<pkg>.tools.get_*` (the tool is reached by being
   registered, not as a public surface). They still enter the rest of the feature through
   `__init__`.

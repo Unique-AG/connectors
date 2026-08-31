@@ -40,9 +40,9 @@ logger = logging.getLogger(__name__)
 
 type FlowKind = Literal["subscription", "redemption"]
 type FlowResource = BackstopApiResource[CapitalFlowAttributes]
-_AccountInclude = BackstopApiResource[AccountAttributes]
+_AccountInclude = IncludedResource[AccountAttributes]
 _OwnerInclude = IncludedResource[OwnerAttributes]
-_SubscriptionInclude = BackstopApiResource[CapitalFlowAttributes]
+_SubscriptionInclude = IncludedResource[CapitalFlowAttributes]
 
 
 class _CapitalFlowScan(NamedTuple):
@@ -200,9 +200,7 @@ class GetCapitalFlowsQuery:
     def _redemption_attribution(
         self, resource: FlowResource, included: Included
     ) -> tuple[CapitalFlowPartyResponse | None, CapitalFlowPartyResponse | None]:
-        original = included.first(
-            resource, "originalSubscription", schema=_SubscriptionInclude
-        )
+        original = included.first(resource, "originalSubscription", schema=_SubscriptionInclude)
         if original is None:
             return None, None
         return self._subscription_attribution(original, included)

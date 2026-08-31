@@ -1,4 +1,4 @@
-from backstop_mcp.features.accounts.internal_dto import (
+from backstop_mcp.features.accounts.time_series_name import (
     ACCOUNT_SERIES,
     PRODUCT_SERIES,
     TimeSeriesEntityType,
@@ -6,9 +6,7 @@ from backstop_mcp.features.accounts.internal_dto import (
 )
 
 
-def raise_if_invalid_series(
-    entity_type: TimeSeriesEntityType, series: TimeSeriesName
-) -> None:
+def raise_if_invalid_series(entity_type: TimeSeriesEntityType, series: TimeSeriesName) -> None:
     """Raise when `series` is not on this entity type's swagger enum.
 
     The tool parameter type is the union of both enums, so pairing is this check rather than

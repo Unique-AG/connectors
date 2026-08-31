@@ -16,15 +16,12 @@ from backstop_mcp.features.accounts.dependencies import (
     get_time_series_query_factory,
 )
 from backstop_mcp.features.accounts.internal_dto import (
-    ACCOUNT_SERIES,
-    PRODUCT_SERIES,
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
     HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
-    HoldingsSource,
     InvestorTypeDto,
     MoneyDto,
     ProductCandidate,
@@ -33,17 +30,20 @@ from backstop_mcp.features.accounts.internal_dto import (
     ProductResolution,
     ResolvedProductDto,
     ShareDto,
-    TimeSeriesEntityType,
-    TimeSeriesName,
 )
 from backstop_mcp.features.accounts.queries import (
+    ACCOUNT_SERIES,
     FALLBACK_OMITTED_FIELDS,
+    PRODUCT_SERIES,
     GetAccountsForProductQuery,
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
     GetProductQuery,
     GetTimeSeriesQuery,
+    HoldingsSource,
     HoldingsTableShapeError,
+    TimeSeriesEntityType,
+    TimeSeriesName,
 )
 from backstop_mcp.features.accounts.resolve_product import resolve_product, resolve_product_query
 from backstop_mcp.features.accounts.responses import (

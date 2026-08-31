@@ -4,6 +4,7 @@ from typing import Annotated, ClassVar, Self
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -74,10 +75,10 @@ class IncludedResource[AttrT](BaseModel):
 
     `Included.related` / `Included.first` / `Included.by_type` deserialize into this (or another
     `schema`) so callers do not parse raw JSON:API dicts. Deliberately *not*
-    `BackstopApiResource`, which models a **primary** resource: there `type` and `attributes`
-    are required and `relationships` is a declared field, and Backstop sends
-    `"relationships": null` on some side-loads, which a declared `dict` field rejects.
-    `extra="ignore"` drops it here, along with `links` and the rest of the envelope.
+    `BackstopApiResource`, which models a **primary** resource: there `type` is required and
+    `"relationships": null` on a side-load fails a declared `dict` field. Here `type` is
+    optional and a null `relationships` is an empty mapping, so a later `Included.first`
+    can still hop `owner` off an account chip. `extra="ignore"` drops `links` and the rest.
 
     `id` is kept. A side-load is usually a record the caller can go on to ask for by id, and a
     projection that drops it leaves the reader holding a name to search by instead.
@@ -88,6 +89,16 @@ class IncludedResource[AttrT](BaseModel):
     id: _NonEmptyStr
     type: _StrippedStr | None = None
     attributes: AttrT
+    # Side-loads often send `"relationships": null`. A declared `dict` would reject that; treat
+    # null as "no linkage" so `Included.first` can still hop owner off an account chip.
+    relationships: Annotated[
+        dict[str, BackstopRelationship],
+        BeforeValidator(lambda value: {} if value is None else value),
+    ] = Field(default_factory=dict)
+
+    def related_ids(self, name: str) -> tuple[str, ...]:
+        relationship = self.relationships.get(name)
+        return relationship.ids() if relationship is not None else ()
 
 
 def included_resource[ResourceT: BaseModel](
@@ -101,15 +112,12 @@ def included_resource[ResourceT: BaseModel](
     """
     if raw is None:
         return None
-    # JSON:API permits a resource object with no `attributes`. Reading that as an empty mapping
-    # keeps the identity of a side-load that carries nothing else, and costs nothing when the
-    # schema needs more than that: a required field is still missing, so the entry is still None.
-    # A present non-object is not that case — it is unreadable.
+    # JSON:API permits a resource object with no `attributes`. A present non-object is the same
+    # for our purposes — keep the identity and read `{}`. A required field is still missing, so
+    # a strict schema still drops the entry.
     attributes = raw.get("attributes")
-    if "attributes" not in raw:
+    if "attributes" not in raw or not isinstance(attributes, dict):
         payload: dict[str, object] = {**raw, "attributes": {}}
-    elif not isinstance(attributes, dict):
-        return None
     else:
         payload = raw
     try:
@@ -237,7 +245,7 @@ class Included:
 
     def _linked_raw[AttrT](
         self,
-        resource: BackstopApiResource[AttrT] | None,
+        resource: BackstopApiResource[AttrT] | IncludedResource[AttrT] | None,
         relationship_name: str,
     ) -> list[dict[str, object]]:
         if resource is None:
@@ -255,7 +263,7 @@ class Included:
 
     def related[AttrT, ResourceT: BaseModel](
         self,
-        resource: BackstopApiResource[AttrT] | None,
+        resource: BackstopApiResource[AttrT] | IncludedResource[AttrT] | None,
         relationship_name: str,
         *,
         schema: type[ResourceT],
@@ -271,7 +279,7 @@ class Included:
 
     def first[AttrT, ResourceT: BaseModel](
         self,
-        resource: BackstopApiResource[AttrT] | None,
+        resource: BackstopApiResource[AttrT] | IncludedResource[AttrT] | None,
         relationship_name: str,
         *,
         schema: type[ResourceT],

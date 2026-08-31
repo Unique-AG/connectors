@@ -963,7 +963,7 @@ _EXPECTED_FIELDS = {
 }
 
 
-class TestFetchAccountsForParty:
+class TestDocumentedWalk:
     @pytest.mark.asyncio
     @respx.mock
     async def test_walks_accounts_with_product_include_and_no_owner_filter(

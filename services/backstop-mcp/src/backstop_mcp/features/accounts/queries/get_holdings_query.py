@@ -39,6 +39,7 @@ party collection exposes an `accounts` subcollection. Open means the `closedDate
 import asyncio
 import logging
 from collections.abc import Sequence
+from typing import Literal
 
 from backstop_mcp.backstop_client import (
     BackstopAuthError,
@@ -69,6 +70,8 @@ from backstop_mcp.features.accounts.internal_dto import (
 from backstop_mcp.features.accounts.utils import fetch_series, split_open
 
 logger = logging.getLogger(__name__)
+
+type HoldingsSource = Literal["table-api", "accounts-api"]
 
 _OWNER = "owner"
 

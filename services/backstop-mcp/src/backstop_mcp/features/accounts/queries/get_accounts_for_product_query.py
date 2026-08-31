@@ -46,8 +46,7 @@ class GetAccountsForProductQuery:
         )
         included = Included(page.included)
         rows = tuple(
-            AccountRowResponse.from_resource(resource, included=included)
-            for resource in page.items
+            AccountRowResponse.from_resource(resource, included=included) for resource in page.items
         )
         kept = rows if include_closed else tuple(row for row in rows if row.is_open)
         closed_omitted = 0 if include_closed else len(rows) - len(kept)
