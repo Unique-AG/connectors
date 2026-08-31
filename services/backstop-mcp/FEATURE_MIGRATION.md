@@ -10,8 +10,11 @@ No new tools. No writes against `BACKSTOP_BASE_URL`. Do not rename opportunities
 
 Ship **one PR per wave**. Do not land a half-renamed feature.
 
-After each finished wave (or signed-off slice), **commit and push** the branch so the
-work is on the remote, not only the local checkout. Do not wait for the next wave.
+After each finished wave (or signed-off slice), **clean unused functions** the move left
+behind (old `fetch_*`, private parse/map helpers with no remaining callers, `__all__`
+names nothing imports). Then **commit and push** the branch so the work is on the remote,
+not only the local checkout. Do not wait for the next wave. Do not delete a collaborator
+another feature still calls.
 
 Implement with a medium/fast model (one wave or coherent slice at a time). After each
 reasonable change, **stop**: Opus (1M) reviews the slice against
@@ -34,6 +37,7 @@ See [Review after each change](#review-after-each-change).
 | Add `@lru_cache` factories to `teardown.PROVIDERS` | List uncached mapper/util factories there |
 | Match opportunities logs (dotted events + `extra`) | Add OpenTelemetry spans — opportunities has none today |
 | Keep `resolve_party` / `resolve_product` on the tool | Push party/product resolve into a query just to return the tool type |
+| After the wave, delete functions with no remaining callers | Leave `fetch_*` or a private helper "in case" |
 
 ---
 
@@ -176,7 +180,16 @@ A required field or a strict type fails the whole page on one bad record.
 
 This is a migration duty, not a follow-up. If today's fetch feeds a published `*Response`
 or a `dict[str, object]` into `schema=`, add `api_responses.py` in that wave and map
-Attributes → Dto / Response.
+Attributes → published `*Response`. Add a `*Dto` only when a second caller or a
+non-published shape needs it.
+
+### Wave 2 lesson — no DTO hop
+
+`GetTasksForPartyQuery` first copied the old fetch: wire → `TaskDto` → `TasksListingDto`
+→ `TaskRowResponse`. Nothing else read those DTOs. Map
+`BackstopApiResource[*Attributes]` straight onto the published row / listing payload.
+Skip `internal_dto.py` when that file would only exist to hold that hop. Later waves
+follow this, not the Wave 3 target tree's leftover `*Dto` names.
 
 Do **not**:
 
@@ -468,7 +481,6 @@ org_people/
   dependencies.py
   api_responses.py              PersonAttributes, OrganizationAttributes, EmployeeAttributes
   responses.py                  + PersonResolvedResponse, OrganizationResolvedResponse
-  internal_dto.py               OrgPeopleListingDto, PersonAtOrganizationDto
   queries/
     __init__.py
     get_person_query.py
@@ -490,11 +502,15 @@ Split it:
   passthrough must survive)
 - employees: `EmployeeAttributes` (or a people-card Attributes), not `ContactCardResponse`
 
-Queries return payloads (`_PersonFetch`-shaped fields, listing Dto). Tools wrap
-`PersonResolvedResponse` / `OrganizationResolvedResponse` / `OrgPeopleResolvedResponse`.
-Do not have `GetPersonQuery` call `resolve_party` so it can return the tool type.
+Queries return payloads (person/org record + includes / custom fields; people rows +
+omit counts). Map Attributes → published `PersonRecordResponse` /
+`PersonAtOrganizationResponse` — no `OrgPeopleListingDto` / `PersonAtOrganizationDto`.
+Tools wrap `PersonResolvedResponse` / `OrganizationResolvedResponse` /
+`OrgPeopleResolvedResponse`. Do not have `GetPersonQuery` call `resolve_party` so it
+can return the tool type.
 
-No `utils/` unless a second caller appears.
+No `utils/` unless a second caller appears. No `internal_dto.py` unless a real `*Dto`
+appears.
 
 | Old | New | Inject |
 |---|---|---|
@@ -831,6 +847,7 @@ The reviewer walks these. A send-back is any **must**; nits are **should**.
 
 - [ ] This slice is the wave (or named sub-slice) in this plan, not a drive-by refactor
 - [ ] No `fetch_*` remains in this feature's `__all__` once the wave claims to be done
+- [ ] Unused functions the wave replaced are gone (old fetch wrappers, private parse/map helpers, zero callers)
 - [ ] Tools still own resolve / elicitation; queries do not
 
 **AGENT_README**
@@ -860,6 +877,7 @@ Opus's verdict is an input, not a merge. You then read the slice yourself:
 - Skim the feature tree against this wave's target (queries / responses / tool wrap).
 - Read the tool and `run` — resolve stayed on the tool; `schema=` is `*Attributes`.
 - Glance at the test diff — same assertions, public surface only.
+- Confirm the wave did not leave unused functions (grep the old `fetch_*` / helper names).
 - Decide whether you agree with Opus (including nits you want fixed now vs later).
 
 Your sign-off is what unblocks the next slice. If you send it back, the implementer
@@ -882,6 +900,7 @@ substitute for either review: layering tests still *allow* the old shapes.
 ## Per-PR checklist
 
 - [ ] No `fetch_*` left in this feature's `__all__`
+- [ ] Unused functions cleaned up (no zero-caller leftovers from this wave)
 - [ ] `__all__` exports query classes, cached factories, published responses, owned types
 - [ ] Every `schema=` is `*Attributes` / `BackstopApiResource[*Attributes]` — no `*Response`, no `dict[str, object]`
 - [ ] `run` returns the published `*Response` when that is the whole answer; otherwise a query payload the tool wraps

@@ -1,18 +1,54 @@
-"""MCP-facing person and organization records, and the people-at-organization listing."""
+"""MCP-facing person and organization records, the people listing, and the tool wraps."""
 
 from typing import ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field
 from pydantic.json_schema import SkipJsonSchema
 
-from backstop_mcp.features.custom_fields import RegularCustomFieldValues
-from backstop_mcp.features.data_hygiene import EmploymentLinkResponse, ProvenanceAttributes
-from backstop_mcp.features.org_people.internal_dto import (
-    OrgPeopleListingDto,
-    PersonAtOrganizationDto,
+from backstop_mcp.features.custom_fields import (
+    RegularCustomFieldValues,
+    ResolvedCustomFieldValueResponse,
+)
+from backstop_mcp.features.data_hygiene import (
+    AsOfResponse,
+    EmploymentLinkResponse,
+    ProvenanceAttributes,
+)
+from backstop_mcp.features.includes import OrganizationIncludesResponse, PersonIncludesResponse
+from backstop_mcp.features.org_people.api_responses import (
+    EmployeeResource,
+    OrganizationAttributes,
+    PersonAttributes,
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 from backstop_mcp.models import OmitNoneModel
+
+__all__ = [
+    "OrgPeopleResolvedResponse",
+    "OrganizationRecordResponse",
+    "OrganizationResolvedResponse",
+    "PartyOrgPeopleResponse",
+    "PartyOrganizationResponse",
+    "PartyPersonResponse",
+    "PersonAtOrganizationResponse",
+    "PersonRecordResponse",
+    "PersonResolvedResponse",
+]
+
+
+def _record_fields(attributes: PersonAttributes | OrganizationAttributes) -> dict[str, object]:
+    """Known fields under their own names, with the instance's own keys passed through.
+
+    `passthrough()` comes first so a wire key that collides with a modelled one loses to the
+    modelled value rather than shadowing it.
+    """
+    return {
+        **attributes.passthrough(),
+        "name": attributes.name,
+        "regular_custom_field_values": attributes.regular_custom_field_values,
+        "modified_timestamp": attributes.modified_timestamp,
+        "modified_by": attributes.modified_by,
+    }
 
 
 class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
@@ -33,6 +69,10 @@ class PersonRecordResponse(OmitNoneModel, ProvenanceAttributes):
             "custom_field_values; omitted from the tool payload."
         ),
     )
+
+    @classmethod
+    def from_attributes(cls, attributes: PersonAttributes) -> Self:
+        return cls.model_validate(_record_fields(attributes))
 
 
 class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
@@ -58,6 +98,10 @@ class OrganizationRecordResponse(OmitNoneModel, ProvenanceAttributes):
             "custom_field_values; omitted from the tool payload."
         ),
     )
+
+    @classmethod
+    def from_attributes(cls, attributes: OrganizationAttributes) -> Self:
+        return cls.model_validate(_record_fields(attributes))
 
 
 class PersonAtOrganizationResponse(OmitNoneModel):
@@ -104,20 +148,193 @@ class PersonAtOrganizationResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_person(cls, row: PersonAtOrganizationDto) -> Self:
-        card = row.card
-        employment = row.employment
+    def from_employment(cls, employment: EmploymentLinkResponse) -> Self:
+        """A row with no `/employees` card — a former person, who is not on that walk."""
         return cls(
             id=employment.person_id,
             search_type=employment.person_type,
-            name=None if card is None else card.name,
-            job_title=None if card is None else card.job_title,
-            email=None if card is None else card.email,
-            phone=None if card is None else card.phone,
-            company_name=None if card is None else card.company_name,
-            categories=None if card is None else card.categories,
             employment=employment,
         )
+
+    @classmethod
+    def from_resource(cls, employment: EmploymentLinkResponse, resource: EmployeeResource) -> Self:
+        card = resource.attributes
+        return cls(
+            id=employment.person_id,
+            search_type=employment.person_type,
+            name=card.name,
+            job_title=card.job_title,
+            email=card.email,
+            phone=card.phone,
+            company_name=card.company_name,
+            categories=card.categories,
+            employment=employment,
+        )
+
+
+class PartyPersonResponse(OmitNoneModel):
+    """`GetPersonQuery`'s answer: the record, its employment links, includes, custom fields."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    person: PersonRecordResponse = Field(description="The person's own Backstop attributes.")
+    employments: list[EmploymentLinkResponse] = Field(
+        default_factory=list,
+        description="Every current and former organization link the CRM records.",
+    )
+    included: PersonIncludesResponse | None = Field(
+        default=None, description="Side-loads for the requested includes, when any were asked for."
+    )
+    custom_field_values: list[ResolvedCustomFieldValueResponse] = Field(
+        default_factory=list,
+        description="Custom-field values on this record, joined to the catalog and filtered.",
+    )
+
+
+class PartyOrganizationResponse(OmitNoneModel):
+    """`GetOrganizationQuery`'s answer: the record, its includes, and its custom fields."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    organization: OrganizationRecordResponse = Field(
+        description="The organization's own Backstop attributes."
+    )
+    included: OrganizationIncludesResponse | None = Field(
+        default=None, description="Side-loads for the requested includes, when any were asked for."
+    )
+    custom_field_values: list[ResolvedCustomFieldValueResponse] = Field(
+        default_factory=list,
+        description="Custom-field values on this record, joined to the catalog and filtered.",
+    )
+
+
+class PartyOrgPeopleResponse(OmitNoneModel):
+    """`GetPeopleForOrganizationQuery`'s answer: the rows kept, and what was dropped."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    people: tuple[PersonAtOrganizationResponse, ...] = Field(
+        description="People the employment index ties to this organization."
+    )
+    former_omitted: int = Field(
+        default=0,
+        description="Former-employment links dropped because `include_former` is false.",
+    )
+    people_omitted: int = Field(
+        default=0, description="Matching people dropped because the per-call cap was reached."
+    )
+
+
+class PersonResolvedResponse(OmitNoneModel):
+    """`get_person` once the person was found and fetched.
+
+    Always returns the person when resolved. `employments` lists every current and former
+    organization link the CRM records for this person — relay each entry, and do not present the
+    person as a current contact at any organization marked `status="former"` unless they asked
+    for historical contacts.
+    """
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the person was found and fetched.",
+    )
+    person: PersonRecordResponse = Field(
+        description=(
+            "The person's own Backstop attributes. Known keys (`name`, `modifiedTimestamp`, "
+            "`modifiedBy`) are documented; other keys are this instance's fields passed "
+            "through unchanged. Custom-field values are under `custom_field_values`, not on "
+            "this record."
+        )
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
+    as_of: AsOfResponse | None = Field(
+        default=None,
+        description=(
+            "When and by whom the person record was last saved. Omitted when unknown. "
+            "Relay this; do not treat age as a staleness verdict."
+        ),
+    )
+    employments: list[EmploymentLinkResponse] = Field(
+        default_factory=list,
+        description=(
+            "Every current and former organization link. Do not present the person as a "
+            "current contact at any organization whose `status` is 'former' unless they "
+            "asked for historical contacts."
+        ),
+    )
+    included: PersonIncludesResponse | None = Field(
+        default=None,
+        description=(
+            "The related records asked for through `include`, side-loaded on the same request. "
+            "Absent when no include was asked for."
+        ),
+    )
+    custom_field_values: list[ResolvedCustomFieldValueResponse] = Field(
+        default_factory=list,
+        description=(
+            "Custom-field values on this record, joined to the catalog (definition id, name, "
+            "layout, group, type, and value). Fields may belong to the person or to the shared "
+            "party catalog. Empty when the record has none or the catalog could not be loaded. "
+            "Slice with the custom_field_* filters rather than fetching again."
+        ),
+    )
+
+
+class OrganizationResolvedResponse(OmitNoneModel):
+    """`get_organization`'s response once the organization was found and fetched.
+
+    `organization` holds the record's own fields (the JSON:API resource's `attributes`) — not
+    the enclosing document, whose `type`/`id` are already echoed under `resolved`.
+    `as_of` is plain provenance (`modifiedTimestamp` / `modifiedBy`); relay it, do not treat
+    age as a staleness verdict.
+    """
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': the organization was found and fetched.",
+    )
+    organization: OrganizationRecordResponse = Field(
+        description=(
+            "The organization's own Backstop attributes. Known keys (`name`, "
+            "`modifiedTimestamp`, `modifiedBy`) are documented; other keys are this "
+            "instance's fields passed through unchanged. Custom-field values are under "
+            "`custom_field_values`, not on this record."
+        )
+    )
+    resolved: ResolvedPartyResponse = Field(
+        description=(
+            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
+            "`party_id` later — never invent them."
+        )
+    )
+    as_of: AsOfResponse | None = Field(
+        default=None,
+        description=(
+            "When and by whom the organization record was last saved. Omitted when "
+            "unknown. Relay this; do not treat age as a staleness verdict."
+        ),
+    )
+    included: OrganizationIncludesResponse | None = Field(
+        default=None,
+        description=(
+            "The related records asked for through `include`, side-loaded on the same request. "
+            "Absent when no include was asked for."
+        ),
+    )
+    custom_field_values: list[ResolvedCustomFieldValueResponse] = Field(
+        default_factory=list,
+        description=(
+            "Custom-field values on this record, joined to the catalog (definition id, name, "
+            "layout, group, type, and value). Fields may belong to the organization or to the "
+            "shared party catalog. Empty when the record has none or the catalog could not be "
+            "loaded. Slice with the custom_field_* filters rather than fetching again."
+        ),
+    )
 
 
 class OrgPeopleResolvedResponse(OmitNoneModel):
@@ -163,25 +380,31 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_listing(cls, listing: OrgPeopleListingDto, *, resolved: ResolvedPartyResponse) -> Self:
-        returned = len(listing.people)
+    def from_people(
+        cls,
+        *,
+        resolved: ResolvedPartyResponse,
+        people: tuple[PersonAtOrganizationResponse, ...],
+        former_omitted: int,
+        people_omitted: int,
+    ) -> Self:
         hint = None
-        if listing.former_omitted:
-            if returned == 0:
+        if former_omitted:
+            if not people:
                 hint = (
                     "No current employees were returned; "
-                    f"{listing.former_omitted} former-employment link(s) were omitted. "
+                    f"{former_omitted} former-employment link(s) were omitted. "
                     "Pass include_former=true rather than treating this as no people on file."
                 )
             else:
                 hint = (
-                    f"{listing.former_omitted} former-employment link(s) were omitted. "
+                    f"{former_omitted} former-employment link(s) were omitted. "
                     "Pass include_former=true to include them."
                 )
         return cls(
             resolved=resolved,
-            people=tuple(PersonAtOrganizationResponse.from_person(row) for row in listing.people),
-            former_omitted=listing.former_omitted,
-            people_omitted=listing.people_omitted,
+            people=people,
+            former_omitted=former_omitted,
+            people_omitted=people_omitted,
             include_former_hint=hint,
         )

@@ -8,6 +8,7 @@ from backstop_mcp.backstop_client import (
     BackstopApiResourceDocument,
     IncludedResource,
     ResourceRef,
+    filter_included,
     first_included,
     follow_included,
     included_resource,
@@ -242,6 +243,39 @@ class TestFirstIncluded:
             )
             is None
         )
+
+
+class TestFilterIncluded:
+    def test_parses_every_entry_of_the_requested_type(self) -> None:
+        included = [
+            {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+            {"type": "people", "id": "1", "attributes": {"name": "noise"}},
+            {"type": "products", "id": "8", "attributes": {"name": "Beta"}},
+        ]
+
+        chips = filter_included(included, resource_type="products", schema=IncludedResource[_Attrs])
+
+        assert [(chip.id, chip.attributes.name) for chip in chips] == [("9", "Acme"), ("8", "Beta")]
+
+    def test_omitted_type_keeps_every_usable_entry(self) -> None:
+        included = [
+            {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+            {"id": "  ", "type": "products", "attributes": {"name": "blank"}},
+        ]
+
+        chips = filter_included(included, schema=IncludedResource[_Attrs])
+
+        assert [chip.id for chip in chips] == ["9"]
+
+    def test_an_unreadable_entry_is_dropped_on_its_own(self) -> None:
+        included = [
+            {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+            {"type": "products", "id": "8"},
+        ]
+
+        chips = filter_included(included, resource_type="products", schema=IncludedResource[_Attrs])
+
+        assert [chip.id for chip in chips] == ["9"]
 
 
 class TestBackstopApiResourceIdValidation:

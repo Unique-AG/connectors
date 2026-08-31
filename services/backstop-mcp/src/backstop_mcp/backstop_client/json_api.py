@@ -279,3 +279,29 @@ def included_by_type(
     `included` array with nothing on the primary resource pointing at them.
     """
     return [item for item in included if _clean_str(item.get("type")) == resource_type]
+
+
+def filter_included[ResourceT: BaseModel](
+    included: Sequence[dict[str, object]],
+    *,
+    schema: type[ResourceT],
+    resource_type: str | None = None,
+) -> list[ResourceT]:
+    """`included` entries as `schema` — `included_by_type` then `included_resource` on each.
+
+    `first_included` follows one relationship and returns one parsed chip. This is the other
+    selection: take the array (or already-followed entries), optionally keep one JSON:API
+    `type`, and deserialize each. `resource_type` is the nested-include case
+    `included_by_type` exists for; omit it when the caller already selected (e.g.
+    `follow_included`).
+
+    Unreadable entries are dropped, same as `included_resource`: one bad side-load costs its
+    own field, not the rest of the array.
+    """
+    raw_items = included_by_type(included, resource_type) if resource_type is not None else included
+    parsed: list[ResourceT] = []
+    for raw in raw_items:
+        item = included_resource(raw, schema=schema)
+        if item is not None:
+            parsed.append(item)
+    return parsed
