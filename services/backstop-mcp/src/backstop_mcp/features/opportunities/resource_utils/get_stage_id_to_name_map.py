@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 
-from backstop_mcp.backstop_client import IncludedResource, filter_included
+from backstop_mcp.backstop_client import Included, IncludedResource
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 
 
@@ -16,9 +16,8 @@ def get_stage_id_to_name_map(
     """
     return {
         stage.id: stage.attributes.name
-        for stage in filter_included(
-            included,
-            resource_type="opportunity-stages",
+        for stage in Included(included).by_type(
+            "opportunity-stages",
             schema=IncludedResource[OpportunityStageAttributes],
         )
         if stage.attributes.name

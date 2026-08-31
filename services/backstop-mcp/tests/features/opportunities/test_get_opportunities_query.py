@@ -239,7 +239,7 @@ class TestProjection:
     async def test_the_current_stage_is_named_from_the_vocabulary_when_not_side_loaded(
         self, client: BackstopClient
     ) -> None:
-        """The current stage takes the same ladder as history, not `follow_included` alone."""
+        """The current stage takes the same ladder as history, not `Included.related` alone."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(_opportunity("5072909", stage_id="42478", isOpen=True))
         )

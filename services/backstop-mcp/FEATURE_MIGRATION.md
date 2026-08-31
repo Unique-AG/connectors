@@ -554,20 +554,19 @@ after resolve.
 
 ```
 accounts/
-  fetch_holdings.py             orchestrates table vs documented path
-  fetch_holdings_table.py
-  fetch_accounts_for_party.py   documented path
-  fetch_accounts_for_product.py
-  fetch_capital_flows.py
+  dependencies.py               holdings + accounts-for-product factories
+  queries/get_holdings_query.py
+  queries/get_accounts_for_product_query.py
+  queries/get_capital_flows_query.py  this slice — stop here for review
   fetch_product.py              fetch_product + fetch_product_catalog
   fetch_time_series.py
-  fetch_series.py               latest point on a dated series
-  split_open.py
+  fetch_series.py               stays at root this slice (only holdings calls it)
+  split_open.py                 stays at root until product-investors moves
   resolve_product.py            stays
   responses/                    already a package
   tools/get_accounts_for_party.py
   tools/get_product_investors.py
-  tools/get_capital_flows.py    owns CapitalFlowsResolvedResponse
+  tools/get_capital_flows.py    returns query.run
   tools/get_product.py          owns ProductRecordResponse, ProductResolvedResponse
   tools/get_time_series.py
 ```

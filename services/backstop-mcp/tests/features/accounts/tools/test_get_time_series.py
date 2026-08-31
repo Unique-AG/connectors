@@ -16,6 +16,7 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.tools.get_time_series import get_time_series
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
+from tests.features.accounts.conftest import make_get_time_series_query
 from tests.features.party_resolver.helpers import ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_params
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
@@ -80,6 +81,7 @@ class TestGetTimeSeries:
                 entity_id=_ACCOUNT_ID,
                 series="values",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             ),
             TimeSeriesResolvedResponse,
         )
@@ -110,6 +112,7 @@ class TestGetTimeSeries:
             start_date=date(2025, 1, 1),
             end_date=date(2025, 12, 31),
             client=client,
+            get_time_series_query=make_get_time_series_query(client),
         )
 
         params = recorded_params(route)[0]
@@ -137,6 +140,7 @@ class TestGetTimeSeries:
                 entity_id="CGUP",
                 series="aums",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             ),
             TimeSeriesResolvedResponse,
         )
@@ -166,6 +170,7 @@ class TestGetTimeSeries:
                 entity_id=_PRODUCT_ID,
                 series="aums",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             ),
             TimeSeriesResolvedResponse,
         )
@@ -188,6 +193,7 @@ class TestGetTimeSeries:
                 entity_id=_ACCOUNT_ID,
                 series="values",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             ),
             NotFoundResponse,
         )
@@ -211,6 +217,7 @@ class TestGetTimeSeries:
                 entity_id=_ACCOUNT_ID,
                 series="values",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             )
 
         assert caught.value.status_code == 500
@@ -232,6 +239,7 @@ class TestGetTimeSeries:
                 entity_id=_PRODUCT_ID,
                 series="aums",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             )
 
         assert caught.value.status_code == 404
@@ -263,6 +271,7 @@ class TestGetTimeSeries:
                 entity_id="9001",
                 series="aums",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             ),
             TimeSeriesResolvedResponse,
         )
@@ -303,6 +312,7 @@ class TestGetTimeSeries:
                 entity_id="BLUC",
                 series="aums",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             ),
             ProductAmbiguousResponse,
         )
@@ -320,6 +330,7 @@ class TestGetTimeSeries:
                 start_date=date(2026, 12, 31),
                 end_date=date(2026, 1, 1),
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             )
 
     async def test_series_on_the_wrong_entity_fails_before_any_request(
@@ -332,6 +343,7 @@ class TestGetTimeSeries:
                 entity_id=_ACCOUNT_ID,
                 series="aums",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             )
 
     async def test_slash_in_entity_id_fails_before_any_request(
@@ -344,6 +356,7 @@ class TestGetTimeSeries:
                 entity_id="29431089/values",
                 series="values",
                 client=client,
+                get_time_series_query=make_get_time_series_query(client),
             )
 
     def test_is_registered_and_names_the_zero_trap(self) -> None:

@@ -8,7 +8,7 @@ Classification, former-first ranking, and IRRELEVANT drop are covered through `i
 from collections.abc import Sequence
 from datetime import date, timedelta
 
-from backstop_mcp.backstop_client import BackstopApiResource, filter_included
+from backstop_mcp.backstop_client import BackstopApiResource, Included
 from backstop_mcp.features.data_hygiene import (
     DepartureSignal,
     EmploymentIndexFactory,
@@ -26,13 +26,15 @@ from tests.features.data_hygiene.helpers import (
 def _typed_relationships(
     relationships: list[dict[str, object]],
 ) -> list[BackstopApiResource[EntityRelationshipAttributes]]:
-    return filter_included(relationships, schema=BackstopApiResource[EntityRelationshipAttributes])
+    return Included(relationships).parse(
+        schema=BackstopApiResource[EntityRelationshipAttributes]
+    )
 
 
 def _typed_types(
     types: list[dict[str, object]],
 ) -> list[BackstopApiResource[RelationshipTypeAttributes]]:
-    return filter_included(types, schema=BackstopApiResource[RelationshipTypeAttributes])
+    return Included(types).parse(schema=BackstopApiResource[RelationshipTypeAttributes])
 
 
 def _factory(

@@ -20,7 +20,7 @@ questions the documented route cannot answer at all:
   so without this endpoint "what did the firm do last quarter", "what did this colleague log",
   and any question spanning more than one client are simply unanswerable.
 - Those are the questions clients want Backstop to answer. This endpoint, and the account table
-  in `accounts/fetch_holdings_table.py`, are the two undocumented calls the product leans on
+  in `accounts/queries/get_holdings_query.py`, are the two undocumented calls the product leans on
   hardest; treat both as load-bearing rather than as shortcuts to clean up later.
 
 **What we owe for that.** An undocumented endpoint can change or be absent without notice, so

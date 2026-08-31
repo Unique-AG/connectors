@@ -7,29 +7,13 @@ Figures are `sort=-date` (first 10 rows) then `max(date)` — not a `filter[date
 except `get_time_series`, which paginates the dated series.
 """
 
-from backstop_mcp.features.accounts.api_responses import AccountApiResponse
-from backstop_mcp.features.accounts.fetch_accounts_for_party import fetch_accounts_for_party
-from backstop_mcp.features.accounts.fetch_accounts_for_product import fetch_accounts_for_product
-from backstop_mcp.features.accounts.fetch_capital_flows import (
-    MAX_CAPITAL_FLOW_SCAN_RECORDS,
-    fetch_capital_flows,
-)
-from backstop_mcp.features.accounts.fetch_holdings import (
-    FALLBACK_OMITTED_FIELDS,
-    fetch_holdings,
-)
-from backstop_mcp.features.accounts.fetch_holdings_table import (
-    HoldingsTableShapeError,
-    fetch_holdings_table,
-)
-from backstop_mcp.features.accounts.fetch_product import (
-    MAX_PRODUCT_SCAN_RECORDS,
-    fetch_product,
-    fetch_product_catalog,
-)
-from backstop_mcp.features.accounts.fetch_time_series import (
-    fetch_time_series,
-    require_series_for_entity,
+from backstop_mcp.features.accounts.api_responses import AccountApiResource
+from backstop_mcp.features.accounts.dependencies import (
+    get_accounts_for_product_query_factory,
+    get_capital_flows_query_factory,
+    get_holdings_query_factory,
+    get_product_query_factory,
+    get_time_series_query_factory,
 )
 from backstop_mcp.features.accounts.internal_dto import (
     ACCOUNT_SERIES,
@@ -37,8 +21,6 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
-    CapitalFlowDto,
-    CapitalFlowsFetchDto,
     HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
@@ -54,30 +36,52 @@ from backstop_mcp.features.accounts.internal_dto import (
     TimeSeriesEntityType,
     TimeSeriesName,
 )
+from backstop_mcp.features.accounts.queries import (
+    FALLBACK_OMITTED_FIELDS,
+    GetAccountsForProductQuery,
+    GetCapitalFlowsQuery,
+    GetHoldingsQuery,
+    GetProductQuery,
+    GetTimeSeriesQuery,
+    HoldingsTableShapeError,
+)
 from backstop_mcp.features.accounts.resolve_product import resolve_product, resolve_product_query
 from backstop_mcp.features.accounts.responses import (
+    MAX_CAPITAL_FLOW_SCAN_RECORDS,
+    MAX_PRODUCT_SCAN_RECORDS,
     AccountRowResponse,
+    CapitalFlowPartyResponse,
+    CapitalFlowRowResponse,
+    CapitalFlowsResolvedResponse,
     HoldingFigureErrorResponse,
     HoldingRowResponse,
     MoneyResponse,
     PartyAccountsResolvedResponse,
     ProductAmbiguousResponse,
     ProductInvestorsResolvedResponse,
+    ProductRecordResponse,
+    ProductResolvedResponse,
     ShareResponse,
     TimeSeriesResolvedResponse,
 )
-from backstop_mcp.features.accounts.split_open import split_open
+from backstop_mcp.features.accounts.utils import raise_if_invalid_series, split_open
 
 __all__ = [
     "ACCOUNT_SERIES",
-    "AccountApiResponse",
+    "AccountApiResource",
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
     "AccountRowResponse",
-    "CapitalFlowDto",
-    "CapitalFlowsFetchDto",
+    "CapitalFlowPartyResponse",
+    "CapitalFlowRowResponse",
+    "CapitalFlowsResolvedResponse",
     "FALLBACK_OMITTED_FIELDS",
+    "GetAccountsForProductQuery",
+    "GetCapitalFlowsQuery",
+    "GetHoldingsQuery",
+    "GetProductQuery",
+    "GetTimeSeriesQuery",
     "HoldingFigureErrorDto",
     "HoldingFigureErrorResponse",
     "HoldingListingDto",
@@ -97,22 +101,21 @@ __all__ = [
     "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductInvestorsResolvedResponse",
+    "ProductRecordResponse",
     "ProductResolution",
+    "ProductResolvedResponse",
     "ResolvedProductDto",
     "ShareDto",
     "ShareResponse",
     "TimeSeriesEntityType",
     "TimeSeriesName",
     "TimeSeriesResolvedResponse",
-    "fetch_accounts_for_party",
-    "fetch_accounts_for_product",
-    "fetch_capital_flows",
-    "fetch_holdings",
-    "fetch_holdings_table",
-    "fetch_product",
-    "fetch_product_catalog",
-    "fetch_time_series",
-    "require_series_for_entity",
+    "get_accounts_for_product_query_factory",
+    "get_capital_flows_query_factory",
+    "get_holdings_query_factory",
+    "get_product_query_factory",
+    "get_time_series_query_factory",
+    "raise_if_invalid_series",
     "resolve_product",
     "resolve_product_query",
     "split_open",

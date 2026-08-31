@@ -10,9 +10,9 @@ from backstop_mcp.features.accounts import (
     ACCOUNT_SERIES,
     PRODUCT_SERIES,
     TimeSeriesName,
-    fetch_time_series,
-    require_series_for_entity,
+    raise_if_invalid_series,
 )
+from tests.features.accounts.conftest import make_get_time_series_query
 from tests.helpers import BASE_URL, recorded_params, recorded_requests
 
 _ACCOUNT_ID = "29431089"
@@ -37,7 +37,7 @@ def _page(*points: dict[str, object], next_url: str | None = None) -> httpx.Resp
     return httpx.Response(200, json=payload)
 
 
-class TestRequireSeriesForEntity:
+class TestRaiseIfInvalidSeriesForEntity:
     def test_membership_sets_match_the_swagger_enums(self) -> None:
         assert len(ACCOUNT_SERIES) == 17
         assert len(PRODUCT_SERIES) == 11
@@ -46,18 +46,18 @@ class TestRequireSeriesForEntity:
 
     def test_accepts_every_swagger_account_and_product_enum(self) -> None:
         for series in ACCOUNT_SERIES:
-            require_series_for_entity("accounts", cast(TimeSeriesName, series))
+            raise_if_invalid_series("accounts", cast(TimeSeriesName, series))
         for series in PRODUCT_SERIES:
-            require_series_for_entity("products", cast(TimeSeriesName, series))
+            raise_if_invalid_series("products", cast(TimeSeriesName, series))
 
     def test_rejects_a_series_that_belongs_to_the_other_entity(self) -> None:
         with pytest.raises(ValueError, match="not valid for accounts"):
-            require_series_for_entity("accounts", "aums")
+            raise_if_invalid_series("accounts", "aums")
         with pytest.raises(ValueError, match="not valid for products"):
-            require_series_for_entity("products", "values")
+            raise_if_invalid_series("products", "values")
 
 
-class TestFetchTimeSeries:
+class TestGetTimeSeriesQuery:
     @pytest.mark.asyncio
     @respx.mock
     async def test_pins_account_fields_sort_and_date_filters(self, client: BackstopClient) -> None:
@@ -68,14 +68,14 @@ class TestFetchTimeSeries:
             )
         )
 
-        points = await fetch_time_series(
-            client,
+        result = await make_get_time_series_query(client).run(
             entity_type="accounts",
             entity_id=_ACCOUNT_ID,
             series="values",
             start_date=date(2026, 1, 1),
             end_date=date(2026, 12, 31),
         )
+        points = result.points
 
         assert route.call_count == 1
         params = recorded_params(route)[0]
@@ -93,8 +93,8 @@ class TestFetchTimeSeries:
     async def test_omits_date_filters_when_no_window_is_given(self, client: BackstopClient) -> None:
         route = respx.get(_VALUES_URL).mock(return_value=_page())
 
-        await fetch_time_series(
-            client, entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
+        await make_get_time_series_query(client).run(
+            entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
         )
 
         params = recorded_params(route)[0]
@@ -110,9 +110,11 @@ class TestFetchTimeSeries:
             )
         )
 
-        points = await fetch_time_series(
-            client, entity_type="products", entity_id=_PRODUCT_ID, series="aums"
-        )
+        points = (
+            await make_get_time_series_query(client).run(
+                entity_type="products", entity_id=_PRODUCT_ID, series="aums"
+            )
+        ).points
 
         assert recorded_params(route)[0]["fields"] == "date,value,source"
         assert points[0].source == "AUM from Accounts"
@@ -125,8 +127,7 @@ class TestFetchTimeSeries:
             return_value=_page(_point("1", date="2026-08-31", value=12.0))
         )
 
-        await fetch_time_series(
-            client,
+        await make_get_time_series_query(client).run(
             entity_type="products",
             entity_id=_PRODUCT_ID,
             series="expenseDataPoints",
@@ -152,9 +153,11 @@ class TestFetchTimeSeries:
             )
         )
 
-        points = await fetch_time_series(
-            client, entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
-        )
+        points = (
+            await make_get_time_series_query(client).run(
+                entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
+            )
+        ).points
 
         assert [(point.date.isoformat(), point.value) for point in points] == [
             ("2026-09-30", None),
@@ -166,8 +169,8 @@ class TestFetchTimeSeries:
     async def test_one_request_for_a_single_page(self, client: BackstopClient) -> None:
         route = respx.get(_VALUES_URL).mock(return_value=_page(_point("1", date="2026-01-31")))
 
-        await fetch_time_series(
-            client, entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
+        await make_get_time_series_query(client).run(
+            entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
         )
 
         assert route.call_count == 1
@@ -183,9 +186,11 @@ class TestFetchTimeSeries:
             ]
         )
 
-        points = await fetch_time_series(
-            client, entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
-        )
+        points = (
+            await make_get_time_series_query(client).run(
+                entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
+            )
+        ).points
 
         requests = recorded_requests(route.calls)
         assert route.call_count == 2
@@ -205,8 +210,8 @@ class TestFetchTimeSeries:
         )
 
         with pytest.raises(BackstopApiError) as caught:
-            await fetch_time_series(
-                client, entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
+            await make_get_time_series_query(client).run(
+                entity_type="accounts", entity_id=_ACCOUNT_ID, series="values"
             )
 
         assert caught.value.status_code == 500

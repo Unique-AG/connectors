@@ -380,7 +380,7 @@ async def search_activities(
         # would answer with more load.
         raise
     except Exception as exc:
-        # Broad on purpose, matching `fetch_holdings`: HTTP status, transport timeout,
+        # Broad on purpose, matching `GetHoldingsQuery`: HTTP status, transport timeout,
         # schema-validation failure, and a 401 that re-verified (`BackstopTransientAuthError`)
         # all mean the same thing here — the undocumented endpoint did not answer usably. A
         # `httpx.TimeoutException` reaches this frame raw (the client lets transport errors

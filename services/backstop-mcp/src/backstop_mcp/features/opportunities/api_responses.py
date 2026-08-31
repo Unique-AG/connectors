@@ -39,6 +39,7 @@ __all__ = [
     "OpportunityResource",
     "OpportunityResourceAttributes",
     "OpportunityStageAttributes",
+    "OpportunityStageHistoryAttributes",
     "SearchContactAttributes",
     "SearchProductAttributes",
 ]
@@ -128,3 +129,16 @@ class SearchProductAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     name: str | None = None
+
+
+class OpportunityStageHistoryAttributes(BaseModel):
+    """Wire attributes on a side-loaded `opportunity-stage-history` entry.
+
+    `stage` is Backstop's inline `{resourceType, resourceId}` object; it is resolved to a name
+    after this model is read, not here.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    stage: object | None = None
+    effective_date: LenientDate = Field(default=None, alias="effectiveDate")
