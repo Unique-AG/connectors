@@ -310,7 +310,7 @@ def test_the_id_is_optional_so_a_bare_attributes_payload_still_validates(
 ) -> None:
     """`id` is a resource member, not an attribute — a payload without one is still readable.
 
-    Through `project` a record always has one, because `follow_included` found it by that id.
+    Through `project` a record always has one, because `Included.related` found it by that id.
     `ContactEmailResponse` is excluded: it requires `retired` for its own reasons.
     """
     projected = model.model_validate({})

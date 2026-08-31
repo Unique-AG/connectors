@@ -4,12 +4,11 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.accounts.tools.get_product import (
-    ProductResolvedResponse,
-    get_product,
-)
+from backstop_mcp.features.accounts import ProductResolvedResponse
+from backstop_mcp.features.accounts.tools.get_product import get_product
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
+from tests.features.accounts.conftest import make_get_product_query
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import (
     BASE_URL,
@@ -104,6 +103,7 @@ class TestGetProduct:
                     custom_field_names=["Strategy"],
                     client=client,
                     custom_fields=custom_fields_service(),
+                    get_product_query=make_get_product_query(client),
                 ),
                 ProductResolvedResponse,
             )
@@ -163,6 +163,7 @@ class TestGetProduct:
                     custom_field_names=["Strategy"],
                     client=client,
                     custom_fields=custom_fields_service(),
+                    get_product_query=make_get_product_query(client),
                     **kwargs,
                 ),
                 ProductResolvedResponse,
@@ -207,6 +208,7 @@ class TestGetProduct:
                     product_id=_PRODUCT_ID,
                     client=client,
                     custom_fields=custom_fields_service(),
+                    get_product_query=make_get_product_query(client),
                 ),
                 ProductResolvedResponse,
             )
@@ -231,6 +233,7 @@ class TestGetProduct:
                     product_id=_PRODUCT_ID,
                     client=client,
                     custom_fields=custom_fields_service(),
+                    get_product_query=make_get_product_query(client),
                 ),
                 NotFoundResponse,
             )
@@ -251,5 +254,6 @@ class TestGetProduct:
                     search="Keystone",
                     client=client,
                     custom_fields=custom_fields_service(),
+                    get_product_query=make_get_product_query(client),
                 )
         assert products.call_count == 0

@@ -14,12 +14,7 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import (
-    BackstopClient,
-    IncludedResource,
-    first_included,
-    index_included,
-)
+from backstop_mcp.backstop_client import BackstopClient, Included, IncludedResource
 from backstop_mcp.features.collection_scan import (
     AggregateBucketResponse,
     scan_coverage,
@@ -99,11 +94,9 @@ class SearchOpportunitiesQuery:
             ),
             self._custom_fields_service.load_catalog(self._client),
         )
-        # Indexed once for the whole walk. `follow_included` indexes on every call, and this loop
-        # follows two relationships per opportunity against one array holding every side-loaded
-        # investor, product and stage from every page — 1,206 rows would rebuild that map 2,412
-        # times.
-        included_index = index_included(pages.included)
+        # Indexed once for the whole walk. This loop follows two relationships per opportunity
+        # against one array holding every side-loaded investor, product and stage from every page.
+        included = Included(pages.included)
         opportunities_mapped: list[SearchOpportunityRowResponse] = []
         dropped = 0
         for opportunity in pages.items:
@@ -115,16 +108,14 @@ class SearchOpportunitiesQuery:
                     include_stage_history=False,
                 )
                 investor = InvestorFromOpportunityResponse.from_included(
-                    first_included(
-                        included_index,
+                    included.first(
                         opportunity,
                         "investor",
                         schema=IncludedResource[SearchContactAttributes],
                     )
                 )
                 product_response = ProductFromOpportunityResponse.from_included(
-                    first_included(
-                        included_index,
+                    included.first(
                         opportunity,
                         "product",
                         schema=IncludedResource[SearchProductAttributes],

@@ -18,9 +18,6 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.accounts.api_responses import SeriesPointAttributes
 from backstop_mcp.features.accounts.internal_dto import SeriesFigureDto, SeriesPointDto
 
-_PAGE_SIZE = 10
-_SORT = "sort"
-
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 SeriesPointResource = BackstopApiResource[SeriesPointAttributes]
 
@@ -46,8 +43,8 @@ async def fetch_series(client: BackstopClient, path: str) -> SeriesFigureDto | N
     page = await client.fetch_page(
         path,
         schema=SeriesPointResource,
-        params={_SORT: "-date"},
-        page_size=_PAGE_SIZE,
+        params={"sort": "-date"},
+        page_size=10,
     )
     return _latest_figure(page.items)
 

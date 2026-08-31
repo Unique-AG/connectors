@@ -9,7 +9,7 @@ aliases are what the tools type the parameter as.
 
 Deliberately not a generic recursive hydrator over `included`: walking `relationships` would
 faithfully reproduce Backstop's duplicate fields and leave nested pointers unresolved. The value
-is in the projection layer — `backstop_client.follow_included` already covers the depth every
+is in the projection layer — `Included.related` already covers the depth every
 include here needs.
 """
 

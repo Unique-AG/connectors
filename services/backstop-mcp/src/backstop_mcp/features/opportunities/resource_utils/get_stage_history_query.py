@@ -1,9 +1,12 @@
-import logging
 from collections.abc import Mapping, Sequence
 
-from pydantic import TypeAdapter, ValidationError
-
-from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef, follow_included
+from backstop_mcp.backstop_client import (
+    BackstopApiResource,
+    Included,
+    IncludedResource,
+    ResourceRef,
+)
+from backstop_mcp.features.opportunities.api_responses import OpportunityStageHistoryAttributes
 from backstop_mcp.features.opportunities.opportunity_stages_service import (
     OpportunityStagesService,
 )
@@ -12,9 +15,7 @@ from backstop_mcp.features.opportunities.resource_utils.get_stage_id_to_name_map
 )
 from backstop_mcp.features.opportunities.responses import StageChangeResponse
 
-logger = logging.getLogger(__name__)
-
-_DictAttributesAdapter: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
+_StageHistoryInclude = IncludedResource[OpportunityStageHistoryAttributes]
 
 
 class GetStageHistoryQuery:
@@ -39,30 +40,20 @@ class GetStageHistoryQuery:
         if preloaded_opportunity_id_to_name is None:
             preloaded_opportunity_id_to_name = get_stage_id_to_name_map(api_include_resources)
 
-        for raw in follow_included(api_include_resources, resource, "stageHistory"):
-            try:
-                attributes = _DictAttributesAdapter.validate_python(raw.get("attributes"))
-            except ValidationError as exc:
-                logger.warning(
-                    "opportunities.stage_history.unreadable",
-                    extra={"opportunity_id": resource.id, "entry_id": raw.get("id")},
-                    exc_info=exc,
-                )
-                continue
-
-            stage_ref = ResourceRef.safe_model_validate(attributes.get("stage", None))
+        for entry in Included(api_include_resources).related(
+            resource, "stageHistory", schema=_StageHistoryInclude
+        ):
+            stage_ref = ResourceRef.safe_model_validate(entry.attributes.stage)
             stage_id = stage_ref.resource_id if stage_ref is not None else None
             stage_name = await self._opportunity_stages_service.get_stage_name(
                 stage_id=stage_id,
                 preloaded_opportunity_id_to_name=preloaded_opportunity_id_to_name,
             )
             changes.append(
-                StageChangeResponse.model_validate(
-                    {
-                        **attributes,
-                        "stage": stage_name,
-                        "stage_id": stage_id,
-                    }
+                StageChangeResponse(
+                    stage=stage_name,
+                    stage_id=stage_id,
+                    effective_date=entry.attributes.effective_date,
                 )
             )
         return tuple(changes)

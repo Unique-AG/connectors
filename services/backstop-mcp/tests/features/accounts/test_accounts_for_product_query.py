@@ -5,13 +5,15 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
-from backstop_mcp.features.accounts import fetch_accounts_for_product
+from backstop_mcp.features.accounts import ResolvedProductDto
+from tests.features.accounts.conftest import make_get_accounts_for_product_query
 from tests.helpers import BASE_URL, resource
 
 _ACCOUNTS_URL = f"{BASE_URL}/accounts"
 _NEXT_PAGE = "/accounts?page[offset]=100"
 _OWNER_ID = "341688185"
 _PRODUCT_ID = "1292283"
+_PRODUCT = ResolvedProductDto(id=_PRODUCT_ID, name="Capstone", short_name="CGUP")
 
 
 def _account(
@@ -80,7 +82,7 @@ _EXPECTED_FIELDS = {
 }
 
 
-class TestFetchAccountsForProduct:
+class TestGetAccountsForProductQuery:
     @pytest.mark.asyncio
     @respx.mock
     async def test_filters_by_product_id_and_includes_owner_and_investor_type(
@@ -101,7 +103,7 @@ class TestFetchAccountsForProduct:
             )
         )
 
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+        listing = await make_get_accounts_for_product_query(client).run(product=_PRODUCT)
 
         params = route.calls.last.request.url.params
         assert params["filter[product.id][eq]"] == _PRODUCT_ID
@@ -114,7 +116,7 @@ class TestFetchAccountsForProduct:
         assert listing.accounts[0].owner.id == _OWNER_ID
         assert listing.accounts[0].investor_type is not None
         assert listing.accounts[0].investor_type.name == "Fund of Funds"
-        assert listing.accounts[0].product is None
+        assert listing.product.id == _PRODUCT_ID
 
     @pytest.mark.asyncio
     @respx.mock
@@ -126,7 +128,7 @@ class TestFetchAccountsForProduct:
             ]
         )
 
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+        listing = await make_get_accounts_for_product_query(client).run(product=_PRODUCT)
 
         assert route.call_count == 2
         assert [account.id for account in listing.accounts] == ["1", "2"]
@@ -141,7 +143,7 @@ class TestFetchAccountsForProduct:
             )
         )
 
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+        listing = await make_get_accounts_for_product_query(client).run(product=_PRODUCT)
 
         assert [account.id for account in listing.accounts] == ["open"]
         assert listing.closed_omitted == 1
@@ -156,8 +158,8 @@ class TestFetchAccountsForProduct:
             )
         )
 
-        listing = await fetch_accounts_for_product(
-            client, product_id=_PRODUCT_ID, include_closed=True
+        listing = await make_get_accounts_for_product_query(client).run(
+            product=_PRODUCT, include_closed=True
         )
 
         assert [account.id for account in listing.accounts] == ["open", "closed"]
@@ -174,7 +176,7 @@ class TestFetchAccountsForProduct:
         )
 
         with pytest.raises(BackstopResponseSchemaError):
-            await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+            await make_get_accounts_for_product_query(client).run(product=_PRODUCT)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -185,7 +187,7 @@ class TestFetchAccountsForProduct:
             return_value=_page(_account("ok", name="Keep", isEmployeeAccount="not-a-bool"))
         )
 
-        listing = await fetch_accounts_for_product(client, product_id=_PRODUCT_ID)
+        listing = await make_get_accounts_for_product_query(client).run(product=_PRODUCT)
 
         assert [account.id for account in listing.accounts] == ["ok"]
         assert listing.accounts[0].is_employee_account is None

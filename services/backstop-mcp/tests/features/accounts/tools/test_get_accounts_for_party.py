@@ -17,6 +17,7 @@ from backstop_mcp.features.accounts import PartyAccountsResolvedResponse
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
+from tests.features.accounts.conftest import make_get_holdings_query
 from tests.features.party_resolver.helpers import ctx_never_elicit
 from tests.helpers import BASE_URL, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
@@ -169,6 +170,7 @@ async def _call(client: BackstopClient, *, include_closed: bool = False) -> obje
         party_id=_ORG_ID,
         include_closed=include_closed,
         client=client,
+        get_holdings_query=make_get_holdings_query(client),
     )
 
 
@@ -264,6 +266,7 @@ class TestOwnsNothingIsVerified:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
+                get_holdings_query=make_get_holdings_query(client),
             ),
             PartyAccountsResolvedResponse,
         )
@@ -286,6 +289,7 @@ class TestOwnsNothingIsVerified:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
+                get_holdings_query=make_get_holdings_query(client),
             ),
             NotFoundResponse,
         )
@@ -309,6 +313,7 @@ class TestOwnsNothingIsVerified:
                 search_type="organizations",
                 search="PSP Investments",
                 client=client,
+                get_holdings_query=make_get_holdings_query(client),
             ),
             PartyAccountsResolvedResponse,
         )
@@ -330,6 +335,7 @@ class TestOwnsNothingIsVerified:
             search_type="organizations",
             party_id=_ORG_ID,
             client=client,
+            get_holdings_query=make_get_holdings_query(client),
         )
 
         assert not confirm.called
@@ -349,6 +355,7 @@ class TestOwnsNothingIsVerified:
                 search_type="organizations",
                 party_id=_ORG_ID,
                 client=client,
+                get_holdings_query=make_get_holdings_query(client),
             ),
             PartyAccountsResolvedResponse,
         )
@@ -391,6 +398,7 @@ class TestResolution:
                 search_type="organizations",
                 search="No Such Org",
                 client=client,
+                get_holdings_query=make_get_holdings_query(client),
             ),
             NotFoundResponse,
         )

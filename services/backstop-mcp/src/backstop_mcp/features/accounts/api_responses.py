@@ -11,7 +11,7 @@ from backstop_mcp.models import StrippedStr
 
 __all__ = [
     "ACCOUNT_LISTING_FIELDS",
-    "AccountApiResponse",
+    "AccountApiResource",
     "AccountAttributes",
     "AccountTableDataAttributes",
     "AccountTableDataDocument",
@@ -336,7 +336,7 @@ class AccountTableDataDocument(BaseModel):
 
 
 # Plain assignment — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
-AccountApiResponse = BackstopApiResource[AccountAttributes]
+AccountApiResource = BackstopApiResource[AccountAttributes]
 
 
 class CapitalFlowAttributes(BaseModel):

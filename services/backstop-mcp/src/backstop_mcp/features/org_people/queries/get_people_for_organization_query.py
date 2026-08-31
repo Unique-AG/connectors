@@ -2,11 +2,7 @@
 
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import (
-    BackstopApiResource,
-    BackstopClient,
-    filter_included,
-)
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, Included
 from backstop_mcp.features.data_hygiene import (
     EmploymentIndexFactory,
     EmploymentLinkResponse,
@@ -64,23 +60,22 @@ class GetPeopleForOrganizationQuery:
             max_records=None,
             page_size=100,
         )
+        employee_includes = Included(employees_page.included)
+        organization_includes = Included(organization_relationships_page.included)
         relationships = [
-            *filter_included(
-                employees_page.included,
-                resource_type=EntityRelationshipRef.RELATIONSHIPS_RESOURCE,
+            *employee_includes.by_type(
+                EntityRelationshipRef.RELATIONSHIPS_RESOURCE,
                 schema=BackstopApiResource[EntityRelationshipAttributes],
             ),
             *organization_relationships_page.items,
         ]
         relationship_types = [
-            *filter_included(
-                employees_page.included,
-                resource_type=EntityRelationshipRef.TYPES_RESOURCE,
+            *employee_includes.by_type(
+                EntityRelationshipRef.TYPES_RESOURCE,
                 schema=BackstopApiResource[RelationshipTypeAttributes],
             ),
-            *filter_included(
-                organization_relationships_page.included,
-                resource_type=EntityRelationshipRef.TYPES_RESOURCE,
+            *organization_includes.by_type(
+                EntityRelationshipRef.TYPES_RESOURCE,
                 schema=BackstopApiResource[RelationshipTypeAttributes],
             ),
         ]

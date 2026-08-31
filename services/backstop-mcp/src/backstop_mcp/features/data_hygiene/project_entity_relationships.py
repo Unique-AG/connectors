@@ -8,8 +8,7 @@ result into `EmploymentIndexFactory.index`.
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
     BackstopApiResourceDocument,
-    filter_included,
-    follow_included,
+    Included,
 )
 from backstop_mcp.features.data_hygiene.api_responses import (
     EntityRelationshipAttributes,
@@ -23,14 +22,15 @@ def project_entity_relationships[AttrT](
     document: BackstopApiResourceDocument[AttrT],
 ) -> EntityRelationshipsDto:
     """`relationships` and `relationship_types` for an employment index, from one document."""
+    included = Included(document.included)
     return EntityRelationshipsDto(
-        relationships=filter_included(
-            follow_included(document.included, document.data, EntityRelationshipRef.RELATIONSHIPS),
+        relationships=included.related(
+            document.data,
+            EntityRelationshipRef.RELATIONSHIPS,
             schema=BackstopApiResource[EntityRelationshipAttributes],
         ),
-        relationship_types=filter_included(
-            document.included,
-            resource_type=EntityRelationshipRef.TYPES_RESOURCE,
+        relationship_types=included.by_type(
+            EntityRelationshipRef.TYPES_RESOURCE,
             schema=BackstopApiResource[RelationshipTypeAttributes],
         ),
     )
