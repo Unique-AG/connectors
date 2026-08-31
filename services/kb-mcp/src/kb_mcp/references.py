@@ -119,10 +119,13 @@ UNIQUE_AI_TOOL_FORMAT_INFORMATION = (
 )
 
 SEARCH_SYSTEM_PROMPT = (
-    "Use this tool to search the Unique knowledge base for passages that answer "
-    "the user's question. Prefer it when the answer may live in company "
-    "documents, policies, or uploaded files. Pass a focused search_string; "
-    "split distinct facts into separate calls when needed."
+    "Default tool for finding information in the knowledge base. Use this "
+    "whenever you're looking for content about something — a topic, entity, "
+    "question, or keyword — even if you don't know which file or folder it's "
+    "in. Returns relevant text chunks with citations; you can fetch a chunk's "
+    "full source file afterward via read_file using the content_id in the "
+    'result header. Do not call content_tree first "to see what\'s there" — '
+    "search directly."
 )
 
 # Trailing content block, generic clients (Claude Desktop/Code, Inspector —

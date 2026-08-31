@@ -5,14 +5,24 @@ If it reads the environment, it is declared in this file. No exceptions.
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from fastmcp.server.server import Transport
-from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import (
+    Field,
+    HttpUrl,
+    PostgresDsn,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from unique_mcp.util.find_env_file import find_env_file
 
 # main.py also loads this into the process env for libraries that bypass Settings.
 ENV_FILE: Path | None = find_env_file(filenames=["kb_mcp.env", ".env"], required=False)
+
+KNOWN_MCP_TOOLS = frozenset({"search", "content_tree", "read_file"})
 
 
 class Settings(BaseSettings):
@@ -67,6 +77,44 @@ class Settings(BaseSettings):
 
     # ── Search scope lookups ──
     scope_lookup_concurrency: int = Field(default=8, ge=1)
+
+    # ── MCP tool allowlist ──
+    enabled_tools: Annotated[frozenset[str], NoDecode] = Field(
+        default=KNOWN_MCP_TOOLS,
+        description=(
+            "Comma-separated tool names advertised on /mcp. Unset = all. "
+            "Search-only ship: search,read_file (keep read_file so hits "
+            "can still be opened). Restart required."
+        ),
+        validation_alias="KB_MCP_ENABLED_TOOLS",
+    )
+
+    @field_validator("enabled_tools", mode="before")
+    @classmethod
+    def _parse_enabled_tools(cls, value: object) -> frozenset[str]:
+        if value is None or value == "":
+            return KNOWN_MCP_TOOLS
+        if isinstance(value, (frozenset, set, list, tuple)):
+            names = {str(item).strip() for item in value if str(item).strip()}
+        else:
+            names = {part.strip() for part in str(value).split(",") if part.strip()}
+        if not names:
+            raise ValueError(
+                "KB_MCP_ENABLED_TOOLS is empty. Known tools: "
+                + ", ".join(sorted(KNOWN_MCP_TOOLS))
+            )
+        unknown = names - KNOWN_MCP_TOOLS
+        if unknown:
+            raise ValueError(
+                "Unknown tool(s) in KB_MCP_ENABLED_TOOLS: "
+                + ", ".join(sorted(unknown))
+                + ". Known: "
+                + ", ".join(sorted(KNOWN_MCP_TOOLS))
+            )
+        return frozenset(names)
+
+    def disabled_tool_names(self) -> frozenset[str]:
+        return KNOWN_MCP_TOOLS - self.enabled_tools
 
     @property
     def base_url(self) -> HttpUrl:

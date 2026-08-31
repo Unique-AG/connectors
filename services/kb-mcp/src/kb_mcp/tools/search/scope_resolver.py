@@ -81,8 +81,10 @@ async def resolve_scope_ids(
         scope = scope_id_from_metadata(content.metadata)
         return content_id, scope
 
-    results = await asyncio.gather(*(_lookup(cid) for cid in missing))
-    for content_id, scope in results:
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(_lookup(cid)) for cid in missing]
+    for task in tasks:
+        content_id, scope = task.result()
         if scope:
             resolved[content_id] = scope
         else:

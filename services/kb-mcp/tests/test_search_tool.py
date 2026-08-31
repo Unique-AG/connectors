@@ -58,6 +58,7 @@ def test_default_config_round_trips():
 def test_tool_description_includes_citation_rules():
     description = search.__fastmcp__.description
     assert description is not None
+    assert description.startswith(SEARCH_SYSTEM_PROMPT)
     assert "Do NOT invent placeholders like [source1]" in description
     assert TOOL_DESCRIPTION_CITATION_GUIDANCE in description
 
