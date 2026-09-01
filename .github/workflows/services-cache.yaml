@@ -33,7 +33,14 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_SERVICES: ${{ github.event.inputs.services }}
         run: |
-          available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+          available=$(printf '%s\n' \
+            backstop-mcp \
+            confluence-connector \
+            kb-mcp \
+            office-365-mcp \
+            outlook-semantic-mcp \
+            sharepoint-connector \
+            teams-mcp)
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_SERVICES" != "all" ]; then
             IFS=',' read -ra requested <<< "$INPUT_SERVICES"
