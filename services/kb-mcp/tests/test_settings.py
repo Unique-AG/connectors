@@ -116,3 +116,9 @@ def test_enabled_tools_rejects_empty_list(monkeypatch):
     get_settings.cache_clear()
     with pytest.raises(ValidationError, match="empty"):
         get_settings()
+
+
+def test_scope_lookup_concurrency_env_override(monkeypatch):
+    monkeypatch.setenv("KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY", "3")
+    get_settings.cache_clear()
+    assert get_settings().scope_lookup_concurrency == 3

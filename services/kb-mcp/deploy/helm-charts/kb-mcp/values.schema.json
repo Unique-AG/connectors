@@ -2042,6 +2042,59 @@
             }
           },
           "additionalProperties": false
+        },
+        "enabledTools": {
+          "type": "array",
+          "description": "MCP tool names to advertise on /mcp — joined into KB_MCP_ENABLED_TOOLS (see kb_mcp.settings.KNOWN_MCP_TOOLS for the allowlist). Server-wide. Empty/unset means all tools. Restart required for changes to take effect.",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [
+            [
+              "search",
+              "read_file"
+            ]
+          ]
+        },
+        "search": {
+          "type": "object",
+          "description": "The search tool's own tuning knobs.",
+          "properties": {
+            "scopeLookupConcurrency": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Max concurrent scope-id lookups per search call. null uses the app default (8).",
+              "minimum": 1,
+              "default": null
+            }
+          },
+          "additionalProperties": false
+        },
+        "contentTree": {
+          "type": "object",
+          "description": "The content_tree tool's own cache tuning. Only reachable while content_tree is enabled (see enabledTools).",
+          "properties": {
+            "cacheTtlSeconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Seconds a cached ContentTree stays valid. null uses the app default (1800).",
+              "default": null
+            },
+            "cacheMaxEntries": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Max cached ContentTree entries. null uses the app default (128).",
+              "default": null
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

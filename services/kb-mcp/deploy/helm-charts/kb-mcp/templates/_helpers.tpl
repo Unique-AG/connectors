@@ -20,4 +20,20 @@ deliver those via envVars/secretKeyRef or the overlay's external-secrets.
 - name: ZITADEL_BASE_URL
   value: {{ tpl .Values.mcpConfig.zitadel.baseUrl . | quote }}
 {{- end }}
+{{- if .Values.mcpConfig.enabledTools }}
+- name: KB_MCP_ENABLED_TOOLS
+  value: {{ join "," .Values.mcpConfig.enabledTools | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.search.scopeLookupConcurrency }}
+- name: KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY
+  value: {{ .Values.mcpConfig.search.scopeLookupConcurrency | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.contentTree.cacheTtlSeconds }}
+- name: KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS
+  value: {{ .Values.mcpConfig.contentTree.cacheTtlSeconds | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.contentTree.cacheMaxEntries }}
+- name: KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES
+  value: {{ .Values.mcpConfig.contentTree.cacheMaxEntries | quote }}
+{{- end }}
 {{- end -}}

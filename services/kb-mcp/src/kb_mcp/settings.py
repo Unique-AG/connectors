@@ -69,14 +69,16 @@ class Settings(BaseSettings):
 
     # ── Content-tree cache ──
     content_tree_cache_ttl_seconds: int = Field(
-        default=1800, validation_alias="KB_SEARCH_CONTENT_TREE_CACHE_TTL_SECONDS"
+        default=1800, validation_alias="KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS"
     )
     content_tree_cache_max_entries: int = Field(
-        default=128, validation_alias="KB_SEARCH_CONTENT_TREE_CACHE_MAX_ENTRIES"
+        default=128, validation_alias="KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES"
     )
 
     # ── Search scope lookups ──
-    scope_lookup_concurrency: int = Field(default=8, ge=1)
+    scope_lookup_concurrency: int = Field(
+        default=8, ge=1, validation_alias="KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY"
+    )
 
     # ── MCP tool allowlist ──
     enabled_tools: Annotated[frozenset[str], NoDecode] = Field(

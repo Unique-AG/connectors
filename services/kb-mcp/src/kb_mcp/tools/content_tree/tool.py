@@ -1,7 +1,7 @@
 """Knowledge Base content-tree tool — browse, list, and fuzzy-search visible files.
 
 - CONFIG (admin, per company): ContentTreeToolConfig
-- ENV (process-wide): KB_SEARCH_CONTENT_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES
+- ENV (process-wide): KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES
 - STATE (LLM, per call): mode required, rest optional per mode
 """
 

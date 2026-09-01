@@ -265,11 +265,11 @@ def test_cache_settings_default_and_env_override(monkeypatch):
     assert get_settings().content_tree_cache_max_entries == 128
     assert get_settings().content_tree_cache_ttl_seconds == 1800
 
-    monkeypatch.setenv("KB_SEARCH_CONTENT_TREE_CACHE_MAX_ENTRIES", "999")
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES", "999")
     get_settings.cache_clear()
     assert get_settings().content_tree_cache_max_entries == 999
 
-    monkeypatch.setenv("KB_SEARCH_CONTENT_TREE_CACHE_TTL_SECONDS", "60")
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS", "60")
     get_settings.cache_clear()
     assert get_settings().content_tree_cache_ttl_seconds == 60
 
