@@ -580,13 +580,20 @@ class _MainModule(Protocol):
 
 
 @pytest.fixture
-def main_module() -> Iterator[_MainModule]:
+def main_module(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_MainModule]:
     """Importing runs `load_dotenv()`, which would otherwise push this service's local `.env` into
     `os.environ` for the rest of the test session. The module is exec'd once per process, so the
     whole environment is snapshotted around that one import.
+
+    The import also runs from an empty directory. `main.py` anchors its search at the working
+    directory, and setting the variables below is not enough on its own: a developer's `.env` names
+    TOOLS_ENABLED, which nothing here sets, so `load_dotenv` would add it beside the TOOLS_PRESET
+    below and `SurfaceConfig` would refuse both.
     """
     environment_before = os.environ.copy()
+    working_before = pathlib.Path.cwd()
     try:
+        os.chdir(tmp_path_factory.mktemp("main-import"))
         # The import runs `create_app()`, so it needs a complete environment or it raises.
         # `load_dotenv()` does not override what is already set, so these win in CI and locally.
         os.environ["PUBLIC_BASE_URL"] = _PUBLIC_BASE_URL
@@ -601,6 +608,7 @@ def main_module() -> Iterator[_MainModule]:
         # `reportInvalidCast` refuses to convert to `_MainModule`, even through `object`.
         yield cast("_MainModule", cast("object", importlib.import_module("office_365_mcp.main")))
     finally:
+        os.chdir(working_before)
         os.environ.clear()
         os.environ.update(environment_before)
 

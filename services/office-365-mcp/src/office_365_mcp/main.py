@@ -1,6 +1,10 @@
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
-load_dotenv()
+# `usecwd=True` or the search starts at this file and walks up, which finds the checkout's own
+# `.env` whatever directory the process was started in. The tests boot this module from an
+# empty directory to keep a developer's `.env` out of their configuration, and that only works
+# if the working directory is what is searched.
+load_dotenv(find_dotenv(usecwd=True))
 
 import uvicorn  # noqa: E402
 
