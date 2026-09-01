@@ -98,6 +98,9 @@ describe('GraphApiService', () => {
     );
   });
 
+  // biome-ignore lint/suspicious/noExplicitAny: Access private logger
+  const getLogger = () => (service as any).logger;
+
   describe('getListColumns', () => {
     it('successfully fetches list columns', async () => {
       const mockColumns: ListColumn[] = [
@@ -167,6 +170,8 @@ describe('GraphApiService', () => {
       (service as any).recursivelyFetchDriveItems = vi.fn();
       // biome-ignore lint/suspicious/noExplicitAny: Check private method call
       const recursiveSpy = (service as any).recursivelyFetchDriveItems;
+      const logSpy = vi.spyOn(getLogger(), 'log');
+      const warnSpy = vi.spyOn(getLogger(), 'warn');
 
       const result = await service.getAllFilesForSite(
         new Smeared('site-1', false),
@@ -176,6 +181,12 @@ describe('GraphApiService', () => {
       expect(result.items).toHaveLength(0);
       expect(result.directories).toHaveLength(0);
       expect(recursiveSpy).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('does not have sync column "FinanceGPTKnowledge", skipping'),
+      );
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('does not have sync column'),
+      );
     });
 
     it('scans drive when sync column matches by internal name', async () => {
@@ -200,7 +211,7 @@ describe('GraphApiService', () => {
         new Smeared('site-1', false),
         'Documents',
         'FinanceGPTKnowledge',
-        { filesScanned: 0, maxFiles: undefined },
+        { filesScanned: 0, itemsVisited: 0, maxFiles: undefined },
       );
     });
 
@@ -226,7 +237,7 @@ describe('GraphApiService', () => {
         new Smeared('site-1', false),
         'Documents',
         'InternalSyncName',
-        { filesScanned: 0, maxFiles: undefined },
+        { filesScanned: 0, itemsVisited: 0, maxFiles: undefined },
       );
     });
 
@@ -263,8 +274,79 @@ describe('GraphApiService', () => {
         new Smeared('site-1', false),
         'Documents',
         'SyncFlag',
-        { filesScanned: 0, maxFiles: undefined },
+        { filesScanned: 0, itemsVisited: 0, maxFiles: undefined },
       );
+    });
+  });
+
+  describe('scan progress logging', () => {
+    const createDriveFile = (index: number): DriveItem =>
+      ({
+        id: `file-${index}`,
+        name: `file-${index}.pdf`,
+        size: 100,
+        webUrl: `https://example.com/file-${index}.pdf`,
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+        createdDateTime: '2024-01-01T00:00:00Z',
+        file: { mimeType: 'application/pdf' },
+        listItem: { fields: {} },
+        parentReference: { path: '/drives/drive-1/root:' },
+      }) as DriveItem;
+
+    const runScan = async (items: DriveItem[]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).fetchAllDriveItemsInDrive = vi.fn().mockResolvedValue(items);
+      const logSpy = vi.spyOn(getLogger(), 'log');
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test private scan method
+      await (service as any).recursivelyFetchDriveItems(
+        'drive-1',
+        'root',
+        new Smeared('site-1', false),
+        'Documents',
+        'FinanceGPTKnowledge',
+        { filesScanned: 0, itemsVisited: 0, maxFiles: undefined },
+      );
+
+      return logSpy.mock.calls
+        .map((call) => call[0])
+        .filter((message): message is string => typeof message === 'string')
+        .filter((message) => message.includes('items visited'));
+    };
+
+    it('logs progress every 100 visited items including skipped files', async () => {
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
+
+      const progressLogs = await runScan(Array.from({ length: 250 }, (_, i) => createDriveFile(i)));
+
+      expect(progressLogs).toHaveLength(2);
+      expect(progressLogs[0]).toContain('100 items visited, 0 files found so far for site');
+      expect(progressLogs[1]).toContain('200 items visited, 0 files found so far for site');
+    });
+
+    it('does not log progress when visited items are below the interval', async () => {
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
+
+      const progressLogs = await runScan(Array.from({ length: 50 }, (_, i) => createDriveFile(i)));
+
+      expect(progressLogs).toHaveLength(0);
+    });
+
+    it('includes found files in the progress log', async () => {
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockImplementation(
+          (item: DriveItem) => item.name === 'file-0.pdf',
+        ) as unknown as FileFilterService['isFileValidForIngestion'];
+
+      const progressLogs = await runScan(Array.from({ length: 101 }, (_, i) => createDriveFile(i)));
+
+      expect(progressLogs).toHaveLength(1);
+      expect(progressLogs[0]).toContain('100 items visited, 1 files found so far for site');
     });
   });
 
@@ -277,6 +359,8 @@ describe('GraphApiService', () => {
         { id: '1', name: 'Title', displayName: 'Title' },
       ]);
       const getAspxListItemsSpy = vi.spyOn(service, 'getAspxListItems');
+      const logSpy = vi.spyOn(getLogger(), 'log');
+      const warnSpy = vi.spyOn(getLogger(), 'warn');
 
       const result = await service.getAspxPagesForSite(
         new Smeared('site-1', false),
@@ -285,6 +369,12 @@ describe('GraphApiService', () => {
 
       expect(result).toHaveLength(0);
       expect(getAspxListItemsSpy).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('does not have sync column "FinanceGPTKnowledge", skipping'),
+      );
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('does not have sync column'),
+      );
     });
 
     it('scans SitePages when sync column is present', async () => {
