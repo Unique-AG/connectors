@@ -88,7 +88,7 @@ async def fetch_holdings(
     """
     try:
         return await fetch_holdings_table(client, entity_id=owner_id, include_closed=include_closed)
-    except (BackstopAuthError, BackstopRateLimitError):
+    except BackstopAuthError, BackstopRateLimitError:
         # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
         # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
         # account, so falling back would answer a "slow down" with an order of magnitude more

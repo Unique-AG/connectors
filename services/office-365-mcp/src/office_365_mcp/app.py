@@ -102,7 +102,7 @@ def create_app(
     )
 
     @asynccontextmanager
-    async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
+    async def lifespan(server: FastMCP) -> AsyncGenerator[None]:
         # In the lifespan, not above: the manifest reads the registered tools' own prose, readable
         # only once they are registered and awaitable only here.
         logger.info(await surface_manifest(server, selection, version=config.version))

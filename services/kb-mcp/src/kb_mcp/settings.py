@@ -143,7 +143,7 @@ class Settings(BaseSettings):
         return str(self.frontend_base_url).rstrip("/")
 
     @model_validator(mode="after")
-    def _storage_must_be_durable(self) -> "Settings":
+    def _storage_must_be_durable(self) -> Settings:
         durable = bool(self.database_url and self.encryption_key)
         half = bool(self.database_url) ^ bool(self.encryption_key)
         if half:

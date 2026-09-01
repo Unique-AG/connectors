@@ -9,11 +9,10 @@ import functools
 import logging
 import re
 from types import GenericAlias
-from typing import cast
+from typing import TypeVar, cast
 
 import httpx
 from pydantic import TypeAdapter, ValidationError
-from typing_extensions import TypeVar
 
 from backstop_mcp.backstop_client.errors import (
     BackstopResponseSchemaError,

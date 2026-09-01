@@ -139,9 +139,7 @@ class ResolvedProductDto(BaseModel):
     short_name: str | None = None
 
     @classmethod
-    def from_attributes(
-        cls, product_id: str, attributes: ProductAttributes
-    ) -> "ResolvedProductDto":
+    def from_attributes(cls, product_id: str, attributes: ProductAttributes) -> ResolvedProductDto:
         """Flatten the nested `configuration.productShortName` onto the identity.
 
         Takes an id and attributes rather than a resource, because the two sources are shaped
@@ -156,7 +154,7 @@ class ResolvedProductDto(BaseModel):
         )
 
     @classmethod
-    def from_included(cls, raw: dict[str, object] | None) -> "ResolvedProductDto | None":
+    def from_included(cls, raw: dict[str, object] | None) -> ResolvedProductDto | None:
         product = included_resource(raw, schema=_ProductInclude)
         if product is None:
             return None
