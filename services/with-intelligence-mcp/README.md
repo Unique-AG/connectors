@@ -12,11 +12,8 @@ The vendor session that comes back — a 1-hour access token over a 30-day refre
 encrypted (Fernet) and stored in Postgres per user, so every tool call acts as that user rather
 than as a shared service account.
 
-> **Status: one vertical slice.** The transport, a vendor session and `get_investor` work
-> against the live API. Authentication is **interim**: one shared account from
-> `WITH_INTELLIGENCE_USERNAME`/`_PASSWORD` serves every caller, and there is no MCP-side login
-> at all, so anyone who can reach `/mcp` gets that account's data. Do not deploy it outside a
-> trusted network until the per-user login lands.
+> **Status: authenticated, two tools.** Every MCP client logs in through the hosted form and
+> is served as itself. `get_investor` and `get_people_for_investor` answer against the live API.
 
 ## Layout
 
@@ -60,26 +57,36 @@ added to `server/tools/registry.py` as well as written, and nothing under `featu
 
 ```bash
 cd services/with-intelligence-mcp
-cp .env.example .env   # fill DB_* and WITH_INTELLIGENCE_USERNAME/_PASSWORD
+cp .env.example .env   # fill DB_* and WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY
 uv sync
 uv run alembic upgrade head
 uv run with-intelligence-mcp
 ```
 
-- MCP endpoint: `http://localhost:9011/mcp` (HTTP transport, no auth yet)
+- MCP endpoint: `http://localhost:9011/mcp` (HTTP transport, OAuth required)
+- Login form: `GET /login?request_id=...` — reached by redirect, not by hand
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
 - Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
-Point MCP Inspector (`npx @modelcontextprotocol/inspector`) at that endpoint with transport
-"Streamable HTTP" to call `get_investor` by hand. Postgres is not needed for it — nothing on the
-MCP path reads the database yet, so only `/ready` cares.
+Generate the encryption key with:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Point MCP Inspector (`npx @modelcontextprotocol/inspector`) at the endpoint with transport
+"Streamable HTTP" and press Connect: an anonymous call is refused with 401 plus the OAuth
+metadata, so the client registers itself, runs PKCE and opens the login form in a browser. Submit
+the username and password the With Intelligence platform accepts — not the one-time passcode from
+their onboarding mail, which sets a password on their site and is never seen by this service. The
+credential is verified by signing in, encrypted, and stored against your user id; tool calls then
+query With Intelligence as you.
+
+Postgres is required: OAuth token validation reads it on every request.
 
 ## Migrations
-
-`versions/` is empty: the first migration arrives with the auth tables, which are the first
-tables this service owns. `alembic upgrade head` is a no-op until then.
 
 ```bash
 uv run alembic upgrade head                          # apply
@@ -89,11 +96,16 @@ uv run alembic downgrade -1                          # roll back one
 
 ## Tests
 
-The suite starts a Postgres container for the app and teardown tests, so Docker must be running.
-
 ```bash
 uv run pytest
-uv run pytest tests/test_layering.py   # a subset
+uv run pytest tests/features/auth -q   # a subset
+```
+
+The suite needs a Postgres. It starts a container by default, so Docker must be running; set
+`TEST_DB_URL` to use one that is already running instead:
+
+```bash
+TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:5432/wi_test uv run pytest
 ```
 
 ## Lint & type-check

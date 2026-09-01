@@ -6,7 +6,9 @@
 4. A package is entered through its `__init__`, never through its modules.
 5. Feature model layers flow downward: `responses` -> `internal_dto` -> `api_responses`, with
    `*Response` / `*Dto` / `*Attributes` classes in the matching module. `tools/` is exempt.
-6. A logic module is named after the symbol it defines.
+6. A logic module is named after the symbol it defines. `features/auth/` is out of scope:
+   its filenames mirror the OAuth concepts they implement (`provider`, `throttle`, `crypto`),
+   which is what makes the package readable against the spec.
 7. Every tool module defines one `@tool` named after the file, and appears in `TOOLS`.
 
 Most are vacuous while `features/` is empty, which is why `TestTheDetectionItself` proves each
@@ -44,6 +46,9 @@ _CLASS_SUFFIX_LAYER = {
     "Dto": "internal_dto",
     "Response": "responses",
 }
+
+# Out of rule 6's scope entirely: see the module docstring.
+_LOGIC_NAME_EXEMPT_FEATURES = frozenset({"auth"})
 
 # Named for a vocabulary rather than a symbol they define (rule 6).
 _VOCABULARY_FILES = frozenset(
@@ -152,6 +157,15 @@ def _feature_tool_modules() -> list[pathlib.Path]:
     ]
 
 
+def _feature_of(source: pathlib.Path) -> str | None:
+    """Which feature package a source file belongs to, if any."""
+    try:
+        relative = source.relative_to(_FEATURES)
+    except ValueError:
+        return None
+    return relative.parts[0] if len(relative.parts) > 1 else None
+
+
 def _is_under_feature_tools(source: pathlib.Path) -> bool:
     return source.parent.name == "tools" and _FEATURES in source.parents
 
@@ -253,6 +267,8 @@ class TestRule6ModuleNamedAfterItsSymbol:
         for source in _python_sources(_FEATURES):
             if source.name in _VOCABULARY_FILES or source.name.startswith("_"):
                 continue
+            if _feature_of(source) in _LOGIC_NAME_EXEMPT_FEATURES:
+                continue
             if _layer_of(source.stem) is not None:
                 continue
             tree = ast.parse(source.read_text(), filename=str(source))
@@ -347,6 +363,12 @@ class TestTheDetectionItself:
             )
         )
         assert names == {"fetch_investor", "VocabularyService", "PAGE_SIZE", "ToolFunction"}
+
+    def test_the_rule_6_exemption_is_scoped_to_one_package(self) -> None:
+        assert _feature_of(_FEATURES / "auth" / "provider.py") == "auth"
+        assert _feature_of(_FEATURES / "investors" / "fetch_investor.py") == "investors"
+        assert _feature_of(_SRC / "config.py") is None
+        assert "investors" not in _LOGIC_NAME_EXEMPT_FEATURES
 
     def test_recognises_a_tool_decorated_function(self) -> None:
         names = _tool_decorated_names(

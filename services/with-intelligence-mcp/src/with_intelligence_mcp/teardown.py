@@ -1,20 +1,25 @@
 """Releasing what the cached providers hold, and dropping every one of them.
 
 `PROVIDERS` is the whole of what a teardown clears; `tests/test_teardown.py` fails when it and
-`dependencies` disagree.
+the provider modules disagree.
 """
 
 from typing import Protocol
 
 from with_intelligence_mcp.dependencies import (
     get_app_config,
+    get_auth_config,
+    get_auth_context,
+    get_auth_provider,
     get_database_config,
+    get_encryption_config,
+    get_encryption_key,
     get_engine,
     get_session_factory,
     get_with_intelligence_client_factory,
     get_with_intelligence_config,
 )
-from with_intelligence_mcp.features.vendor_session import get_service_account_session
+from with_intelligence_mcp.features.vendor_session import get_vendor_session_registry
 
 
 class CachedProvider(Protocol):
@@ -25,10 +30,15 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_app_config,
     get_with_intelligence_config,
     get_database_config,
+    get_auth_config,
+    get_encryption_config,
     get_engine,
     get_session_factory,
+    get_encryption_key,
     get_with_intelligence_client_factory,
-    get_service_account_session,
+    get_auth_context,
+    get_auth_provider,
+    get_vendor_session_registry,
 )
 
 

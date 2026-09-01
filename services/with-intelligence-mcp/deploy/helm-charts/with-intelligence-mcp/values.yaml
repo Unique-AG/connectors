@@ -11,7 +11,13 @@ env:
   PORT: "8000"
   WITH_INTELLIGENCE_ASSET_CLASS_GROUPS: '["hfm"]'
 
-# PUBLIC_BASE_URL and DB_URL come from the overlay.
+# Required from the overlay, as secrets:
+# - WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY: Fernet key encrypting stored vendor credentials.
+#   Generate with:
+#     python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+#   Rotating it makes every stored credential undecryptable — users must log in again.
+# - PUBLIC_BASE_URL: the externally-reachable OAuth issuer URL.
+# - DB_URL, unless postgresql.enabled injects DATABASE_URL.
 envVars: []
 
 image:

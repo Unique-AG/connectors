@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unique With Intelligence Mcp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --background: #02161d;
+      --surface: #03212b;
+      --control: #05313f;
+      --primary: #1fb7ea;
+      --primary-variant: #139ac7;
+      --on-background: #ffffff;
+      --on-background-dimmed: #92aab1;
+      --on-primary: #ffffff;
+      --error: #e05454;
+      --link: #1fb7ea;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      font-family: Inter, system-ui, sans-serif;
+      background: var(--background);
+      color: var(--on-background);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 28rem;
+      background: var(--surface);
+      border-radius: 1rem;
+      padding: 2rem 1.75rem 1.75rem;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.85rem;
+      margin-bottom: 1.75rem;
+      text-align: center;
+    }
+
+    .logo {
+      height: 22px;
+      width: auto;
+      color: var(--on-background);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle {
+      margin: 0.35rem 0 0;
+      color: var(--on-background-dimmed);
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
+
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      margin-top: 0.4rem;
+      padding: 0.7rem 0.8rem;
+      border: 1px solid var(--control);
+      border-radius: 0.5rem;
+      background: var(--background);
+      color: var(--on-background);
+      font: inherit;
+      font-size: 0.9375rem;
+    }
+
+    input:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 1px;
+      border-color: var(--primary);
+    }
+
+    button {
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.75rem 1.2rem;
+      border: 0;
+      border-radius: 0.5rem;
+      background: var(--primary);
+      color: var(--on-primary);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--primary-variant); }
+
+    .error {
+      margin: 0 0 1rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 0.5rem;
+      background: rgba(224, 84, 84, 0.15);
+      color: var(--error);
+      font-size: 0.875rem;
+    }
+
+    .hint {
+      margin: 1.5rem 0 0;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--control);
+      color: var(--on-background-dimmed);
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+
+    .hint h2 {
+      margin: 0 0 0.65rem;
+      color: var(--on-background);
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    .hint ul {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+
+    .hint li + li { margin-top: 0.4rem; }
+
+    .hint a {
+      color: var(--link);
+      text-underline-offset: 2px;
+    }
+
+    .docs {
+      margin: 0.85rem 0 0;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 147 24" xmlns="http://www.w3.org/2000/svg" aria-label="Unique" role="img">
+        <path
+          d="M81.523 0c10.932 0 13.191 5.876 13.191 10.103v.825c0 1.882-.457 4.141-1.96 6.058l3.648 1.76L93.676 24l-6.815-3.458c-1.495.38-3.259.6-5.338.6h-1.239c-10.905 0-13.19-6.041-13.19-10.214v-.825C67.093 5.85 69.405 0 80.283 0zM7.337.56v9.3c0 2.32.794 4.995 5.42 4.995h.11c4.571 0 5.31-2.675 5.31-4.995V.56h7.337v9.356c0 4.012-1.095 10.917-12.264 10.917H12.4c-11.477 0-12.382-6.75-12.4-10.781L0 .56h7.337zM146.65.357V5.3h-13.053v2.608h12.64v5.079h-12.64v2.8h13.245v4.997H126.19V.357h20.461zM63.844 0v20.75h-7.98V0h7.98zm40.862 0v9.702c0 2.336.795 5.03 5.426 5.03h.109c4.481 0 5.284-2.583 5.315-4.884L115.557 0h7.343v9.756c0 4.04-1.095 10.993-12.275 10.993h-.85c-11.617 0-12.412-6.952-12.412-10.993V0h7.343zM40.26 0C51.746 0 52.652 6.798 52.67 10.856v9.893h-7.344v-9.7c0-2.337-.794-5.03-5.425-5.03h-.11c-4.575 0-5.314 2.693-5.314 5.03v9.7h-7.344v-9.755C27.134 6.954 28.23 0 39.409 0h.85zM80.89 5.547c-5.177 0-6.03 2.8-6.03 4.776v.303c0 1.976.908 4.887 6.057 4.887 5.15 0 6.032-2.91 6.032-4.887v-.303c0-1.976-.882-4.776-6.059-4.776z"
+          fill="currentColor"
+          fill-rule="evenodd"
+        />
+      </svg>
+      <div>
+        <h1>Unique With Intelligence</h1>
+        <p class="subtitle">
+          {% if client_name %}{{ client_name }} wants to connect to your With Intelligence account.{% else %}Connect your With Intelligence account.{% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+    <form method="post">
+      <input type="hidden" name="request_id" value="{{ request_id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="username">With Intelligence username</label>
+      <input type="text" id="username" name="username" value="{{ username }}"
+             autocomplete="username" required>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <button type="submit">Connect</button>
+    </form>
+
+    <div class="hint">
+      <h2>Which credentials</h2>
+      <ul>
+        <li>The same username and password you use on the With Intelligence platform.</li>
+        <li>If you have only ever received the one-time passcode from their onboarding email, set
+            a permanent password on the With Intelligence site first — this form does not accept
+            the passcode.</li>
+        <li>Your credentials are encrypted before they are stored, and are used only to query
+            With Intelligence as you.</li>
+      </ul>
+      <p class="docs">
+        <a href="{{ docs_url }}" target="_blank" rel="noopener noreferrer">With Intelligence API documentation</a>
+      </p>
+    </div>
+  </main>
+</body>
+</html>

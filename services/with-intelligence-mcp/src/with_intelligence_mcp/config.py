@@ -1,5 +1,6 @@
 import os
 import ssl
+from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import ClassVar, Self, TypedDict, cast
@@ -122,21 +123,15 @@ class AssetClassGroup(StrEnum):
 
 
 class WithIntelligenceConfig(BaseSettings):
-    """Where to reach the v3 REST API, with what credential, and how hard to lean on it.
+    """Where to reach the v3 REST API and how hard to lean on it.
 
-    The credential here is interim: one configured account serves every caller, until a hosted
-    login form per user replaces it with a session encrypted per user in Postgres. Spec:
-    /v3/docs/json (public).
+    No credentials: each MCP client completes this service's own login form, and the username
+    and password it submits are encrypted per user in Postgres. Spec: /v3/docs/json (public).
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="WITH_INTELLIGENCE_")
 
     base_url: str = "https://api.withintelligence.com"
-
-    # Interim, until the per-user login form lands: one shared account for every caller. See
-    # features/vendor_session/service_account_session.py.
-    username: str | None = None
-    password: SecretStr | None = None
 
     # Responses are auto-filtered to the licensed packages regardless; asking narrowly keeps a
     # hedge-fund question from paging through wealth records.
@@ -217,3 +212,59 @@ class DatabaseConfig(BaseSettings):
     @property
     def connect_args(self) -> AsyncpgConnectArgs:
         return self._connect_args
+
+
+class AuthConfig(BaseSettings):
+    """Retention and sweep cadence for the OAuth rows this service issues.
+
+    Without a periodic sweep four tables grow without bound, `oauth_tokens` fastest: every
+    refresh rotation adds a row to the table `load_access_token` queries on every request.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")
+
+    token_retention_days: int = Field(default=30, ge=1)
+
+    # Client registration is open (RFC 7591), so every caller that ever registered leaves a row.
+    # Comfortably longer than the pending-authorization TTL, so a client waiting on its user to
+    # fill in the form cannot be swept mid-handshake.
+    unused_client_retention_hours: float = Field(default=24.0, gt=0)
+
+    cleanup_interval_hours: float = Field(default=6.0, gt=0)
+
+    # Without this, the login form forwards any username/password pair to the vendor, which
+    # makes it a credential-testing oracle for anyone who can start an OAuth flow.
+    login_max_attempts: int = Field(default=10, ge=1)
+    login_attempt_window_minutes: int = Field(default=15, ge=1)
+
+    @property
+    def token_retention(self) -> timedelta:
+        return timedelta(days=self.token_retention_days)
+
+    @property
+    def unused_client_retention(self) -> timedelta:
+        return timedelta(hours=self.unused_client_retention_hours)
+
+    @property
+    def cleanup_interval(self) -> timedelta:
+        return timedelta(hours=self.cleanup_interval_hours)
+
+    @property
+    def login_attempt_window(self) -> timedelta:
+        return timedelta(minutes=self.login_attempt_window_minutes)
+
+
+class EncryptionConfig(BaseSettings):
+    """Key used to encrypt stored With Intelligence credentials at rest."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_prefix="WITH_INTELLIGENCE_MCP_"
+    )
+
+    encryption_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_encryption_key(self) -> Self:
+        if self.encryption_key is None:
+            raise ValueError("WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY not set")
+        return self

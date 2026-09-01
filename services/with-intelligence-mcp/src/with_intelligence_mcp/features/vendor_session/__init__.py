@@ -1,17 +1,21 @@
-"""Obtaining and holding a With Intelligence session, and handing its token to the transport."""
+"""Holding a With Intelligence session per authenticated user, and handing out its token."""
 
+from with_intelligence_mcp.features.vendor_session.caller_vendor_session import (
+    CallerVendorSession,
+)
 from with_intelligence_mcp.features.vendor_session.dependencies import (
-    get_service_account_session,
+    get_vendor_session_registry,
     get_with_intelligence_client,
 )
-from with_intelligence_mcp.features.vendor_session.service_account_session import (
-    SERVICE_ACCOUNT_SUBJECT,
-    ServiceAccountSession,
+from with_intelligence_mcp.features.vendor_session.vendor_session_registry import (
+    MAX_TRACKED_SUBJECTS,
+    VendorSessionRegistry,
 )
 
 __all__ = [
-    "SERVICE_ACCOUNT_SUBJECT",
-    "ServiceAccountSession",
-    "get_service_account_session",
+    "MAX_TRACKED_SUBJECTS",
+    "CallerVendorSession",
+    "VendorSessionRegistry",
+    "get_vendor_session_registry",
     "get_with_intelligence_client",
 ]

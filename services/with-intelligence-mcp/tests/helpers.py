@@ -9,8 +9,10 @@ import respx
 
 from with_intelligence_mcp.with_intelligence_client import (
     RetryPolicy,
+    RetrySettings,
     TransportSettings,
     WithIntelligenceClient,
+    WithIntelligenceClientFactory,
 )
 
 BASE_URL = "https://api.withintelligence.test"
@@ -95,3 +97,15 @@ def sent_query(route: respx.Route, index: int = 0) -> str:
 def sent_header(route: respx.Route, name: str, index: int = 0) -> str:
     value = cast("object", sent_request(route, index).headers.get(name))
     return value if isinstance(value, str) else ""
+
+
+def vendor_factory(base_url: str = BASE_URL) -> WithIntelligenceClientFactory:
+    """A real factory pointed at a respx-mocked host, for code that signs in."""
+    return WithIntelligenceClientFactory(
+        transport_settings(base_url=base_url),
+        RetrySettings(max_attempts=1, max_wait_ms=0),
+    )
+
+
+def sign_in_ok(access: str = "access-1", refresh: str = "refresh-1") -> httpx.Response:
+    return httpx.Response(200, json={"accessToken": access, "refreshToken": refresh})

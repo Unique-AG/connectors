@@ -32,34 +32,49 @@ async def _close_singletons() -> AsyncGenerator[None]:
     await close_singletons()
 
 
-@pytest.fixture(scope="session")
-def postgres_container() -> Generator[PostgresContainer]:
-    """Start Postgres once per session and migrate it.
+def _migrate(url: str) -> None:
+    """Apply migrations against `url`.
 
     `env.py` reads `DB_URL` from the environment and would overwrite anything set via
     `Config.set_main_option`. It also calls `load_dotenv()`, which would otherwise leak the
     developer's `.env` into every later test in the session — hence the snapshot/restore.
     """
+    environment_before = os.environ.copy()
+    os.environ["DB_URL"] = url
+    try:
+        command.upgrade(Config(str(_SERVICE_ROOT / "alembic.ini")), "head")
+    finally:
+        os.environ.clear()
+        os.environ.update(environment_before)
+
+
+@pytest.fixture(scope="session")
+def database_url() -> Generator[str]:
+    """A migrated Postgres for the session.
+
+    `TEST_DB_URL` points the suite at a Postgres that is already running, which is what a
+    machine without Docker needs; otherwise a container is started, which is what CI does.
+    """
+    provided = os.environ.get("TEST_DB_URL")
+    if provided:
+        url = provided.replace("postgresql://", "postgresql+asyncpg://")
+        _migrate(url)
+        yield url
+        return
+
     with PostgresContainer("postgres:17-alpine") as postgres:
         url = postgres.get_connection_url().replace("+psycopg2", "+asyncpg")
-        environment_before_migrations = os.environ.copy()
-        os.environ["DB_URL"] = url
-        try:
-            command.upgrade(Config(str(_SERVICE_ROOT / "alembic.ini")), "head")
-        finally:
-            os.environ.clear()
-            os.environ.update(environment_before_migrations)
-        yield postgres
+        _migrate(url)
+        yield url
 
 
 @pytest.fixture
-async def db(postgres_container: PostgresContainer) -> AsyncGenerator[DatabaseFixture]:
-    """The container is shared across the session and rows persist — use suite-unique ids."""
+async def db(database_url: str) -> AsyncGenerator[DatabaseFixture]:
+    """The database is shared across the session and rows persist — use suite-unique ids."""
     from with_intelligence_mcp.config import DatabaseConfig
     from with_intelligence_mcp.db import create_engine, create_session_factory
 
-    url = postgres_container.get_connection_url().replace("+psycopg2", "")
-    config = DatabaseConfig.model_validate({"url": url})
+    config = DatabaseConfig.model_validate({"url": database_url})
     engine = create_engine(config)
     factory = create_session_factory(engine)
     yield engine, factory

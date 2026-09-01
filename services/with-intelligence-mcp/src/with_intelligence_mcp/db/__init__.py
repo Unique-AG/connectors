@@ -6,10 +6,24 @@ from with_intelligence_mcp.db.engine import (
     read_session,
     transaction,
 )
-from with_intelligence_mcp.db.models import Base
+from with_intelligence_mcp.db.models import (
+    AuthorizationCode,
+    Base,
+    LoginAttempt,
+    OAuthClient,
+    OAuthToken,
+    PendingAuthorization,
+    WithIntelligenceCredential,
+)
 
 __all__ = [
+    "AuthorizationCode",
     "Base",
+    "LoginAttempt",
+    "OAuthClient",
+    "OAuthToken",
+    "PendingAuthorization",
+    "WithIntelligenceCredential",
     "create_engine",
     "create_session_factory",
     "read_session",
