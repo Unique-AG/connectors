@@ -1,9 +1,4 @@
-"""The composition root, exercised as a real ASGI app.
-
-`create_app` is where the wiring lives that is easiest to get wrong — the lifespan, middleware
-registration, the route table — so it is driven here through Starlette's `TestClient`, which
-actually runs the lifespan.
-"""
+"""`create_app` driven as a real ASGI app, so the lifespan and middleware actually run."""
 
 from collections.abc import Iterator
 from typing import Protocol, cast
@@ -16,8 +11,7 @@ from with_intelligence_mcp.app import create_app
 from with_intelligence_mcp.server.tools import TOOLS
 
 
-# `starlette.testclient` returns httpx responses that this repo's strict type-checking sees as
-# partially unknown. Narrowed once here so every assertion below is checked rather than `Any`.
+# TestClient's httpx responses are partially unknown to this repo's type-checking mode.
 class _HttpResponse(Protocol):
     @property
     def status_code(self) -> int: ...
@@ -40,7 +34,6 @@ def _checks(body: dict[str, object]) -> dict[str, object]:
 def client(
     postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[TestClient]:
-    """A running app pointed at the test container, with a development-safe issuer."""
     monkeypatch.setenv("APP_ENV", "development")
     monkeypatch.setenv(
         "DB_URL", postgres_container.get_connection_url().replace("+psycopg2", "+asyncpg")
@@ -68,7 +61,7 @@ class TestReadinessWithoutADatabase:
     def test_ready_is_503_when_postgres_is_unreachable(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Readiness is the only thing that must fail here — liveness must not restart the pod."""
+        """Readiness must fail here and liveness must not — a restart would not help."""
         monkeypatch.setenv("APP_ENV", "development")
         monkeypatch.setenv("DB_URL", "postgresql+asyncpg://u:p@127.0.0.1:1/nothing")
         with TestClient(create_app()) as client:
@@ -86,5 +79,4 @@ class TestMcpEndpoint:
         assert _get(client, "/mcp").status_code != 404
 
     def test_no_tools_are_registered_yet(self) -> None:
-        """The registry is empty on purpose; rule 7 in `test_layering.py` keeps it honest."""
         assert TOOLS == ()

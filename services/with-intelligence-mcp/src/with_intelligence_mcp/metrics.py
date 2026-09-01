@@ -1,14 +1,3 @@
-"""OTel instruments for this service, and the reader that exposes them on `/metrics`.
-
-Instruments are created at import time against the OTel *API*, not the SDK: before
-`configure_metrics` runs, `get_meter` hands back a proxy that buffers instrument creation and
-rebinds once a provider is set — so import order doesn't matter and nothing needs a lazy
-accessor.
-
-Only the upstream-request instruments exist so far. Catalog instruments arrive with the
-vocabulary feature, which is what will need them to size its TTLs.
-"""
-
 from opentelemetry import metrics
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
 from opentelemetry.sdk.metrics import MeterProvider
@@ -20,11 +9,7 @@ _provider: MeterProvider | None = None
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
-    """Install the OTel→Prometheus reader so domain instruments land on the default REGISTRY.
-
-    HTTP `/metrics` itself is served by `unique_mcp.monitoring.setup_ops`, which reads that
-    same registry.
-    """
+    """Install the OTel→Prometheus reader. HTTP `/metrics` itself is served by `setup_ops`."""
     global _provider
     if _provider is not None:
         return _provider
@@ -37,6 +22,8 @@ def configure_metrics(config: AppConfig) -> MeterProvider:
     return provider
 
 
+# Created against the OTel API, not the SDK: before `configure_metrics` runs, `get_meter`
+# returns a proxy that rebinds once a provider is set, so import order does not matter.
 _meter = metrics.get_meter("with_intelligence_mcp")
 
 UPSTREAM_REQUESTS = _meter.create_counter(

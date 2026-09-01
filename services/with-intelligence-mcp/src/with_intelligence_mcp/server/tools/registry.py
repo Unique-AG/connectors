@@ -1,8 +1,7 @@
-"""The single declaration of which tools this server exposes.
+"""The one declaration of which tools this server exposes.
 
-Each entry is a `@tool`-decorated function (annotations live on the function). `create_app`
-registers from this list via `mcp.add_tool`. A tool module that exists but is not listed here
-fails `tests/test_layering.py` rather than shipping unreachable.
+`create_app` registers from this list. A tool module that exists but is not listed here fails
+`tests/test_layering.py` rather than shipping unreachable.
 """
 
 from collections.abc import Awaitable, Callable

@@ -1,7 +1,7 @@
 """The cached providers tools and `create_app` resolve their collaborators from.
 
-Releasing them is `teardown.close_singletons()`, which lives in its own module so it can import
-the feature-owned providers without this one importing `features/` back.
+Releasing them is `teardown.close_singletons()`, in its own module so it can import
+feature-owned providers without this one importing `features/` back.
 """
 
 from functools import lru_cache

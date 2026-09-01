@@ -1,1 +1,1 @@
-"""How this connector is exposed over MCP: the instructions, and the tool registry."""
+"""How the features are exposed over MCP: instructions, and the tool registry."""

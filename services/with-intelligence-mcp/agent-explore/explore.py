@@ -1,23 +1,12 @@
-#!/usr/bin/env python3
 """GET-only CLI for the live With Intelligence v3 API. Loads .env from this directory.
 
     uv run agent-explore/explore.py /v3/investors -p 'name=Virginia Retirement System'
     uv run agent-explore/explore.py /v3/investors/2504
     uv run agent-explore/explore.py /v3/mandates -p investor_id=2504 -p asset_class_group=hfm
 
-Run it through `uv run` from the service root, for the same reason as `spec.py`.
-
-Signs in once with the username and password from `.env`, caches the access token next to the
-probe cache, and refreshes it when it expires (1 hour). Responses are cached under
-`.probe-cache/` keyed by path and query, so re-running a probe costs nothing and a recorded body
-can become a test fixture.
-
-GET only, deliberately: the only POSTs this file will ever make are to `/v3/auth/sign-in` and
-`/v3/auth/refresh`. Everything else about the account — its password, its permissions — is
-changed by a human on the vendor's site, not from here.
-
-Read `.claude/skills/with-intelligence-api/SKILL.md` first, and `./spec.py` for shapes; this is
-for the behaviour a spec cannot tell you.
+Signs in once, caches the access token for its hour, and caches responses under `.probe-cache/`
+so a recorded body can become a test fixture. The only POSTs it will ever make are the two auth
+calls. Read `.claude/skills/with-intelligence-api/SKILL.md` first.
 """
 
 from __future__ import annotations
@@ -38,8 +27,7 @@ _HERE = Path(__file__).resolve().parent
 _CACHE = _HERE / ".probe-cache"
 _TOKEN_FILE = _CACHE / "token.json"
 
-# The vendor's access token lives an hour. Re-signing in a minute early costs one request and
-# avoids a 401 on a long probing session.
+# The token lives an hour; renewing a minute early avoids a 401 mid-session.
 _TOKEN_TTL_SECONDS = 3600 - 60
 
 
@@ -56,12 +44,7 @@ class _Args(argparse.Namespace):
 
 
 def _sign_in(base_url: str, username: str, password: str) -> str:
-    """`POST /v3/auth/sign-in` → access token.
-
-    Username and password only: no one-time passcode is part of this exchange. The passcode in
-    the vendor's onboarding mail is the initial password for `POST /v3/auth/set-password`, done
-    once by a human before any of this works.
-    """
+    """Username and password only — no passcode takes part in this exchange."""
     with httpx.Client(base_url=base_url, timeout=120.0) as client:
         response = client.post(
             "/v3/auth/sign-in", json={"username": username, "password": password}
@@ -79,7 +62,6 @@ def _sign_in(base_url: str, username: str, password: str) -> str:
 
 
 def _access_token(base_url: str, username: str, password: str, refresh: bool) -> str:
-    """A usable access token, from the cache when it is still fresh."""
     if _TOKEN_FILE.exists() and not refresh:
         cached = cast(dict[str, object], json.loads(_TOKEN_FILE.read_text()))
         issued_at = cached.get("issued_at")
@@ -137,7 +119,6 @@ def main() -> None:
                 "With Intelligence did not respond within 2 minutes; treat the API as down."
             ) from None
         if response.status_code == 401:
-            # The cached token outlived its hour, or the account's session was invalidated.
             token = _access_token(base_url, username, password, refresh=True)
             client.headers["authorization"] = f"Bearer {token}"
             response = client.get(args.path, params=params)

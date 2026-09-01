@@ -1,20 +1,13 @@
-#!/usr/bin/env python3
 """Query the public With Intelligence OpenAPI spec. No credentials needed.
 
-    uv run agent-explore/spec.py paths                  # every path, or those matching a filter
-    uv run agent-explore/spec.py paths investor
-    uv run agent-explore/spec.py params /v3/investors   # query parameters, with descriptions
+    uv run agent-explore/spec.py paths [filter]
+    uv run agent-explore/spec.py params /v3/investors
     uv run agent-explore/spec.py schema InvestorExtended
     uv run agent-explore/spec.py response '/v3/investors/{id}'
 
-Run it through `uv run` from the service root: it imports httpx from the service's venv, which
-the system interpreter does not have.
+Through `uv run`: it imports httpx from the service venv. Output is tab-separated.
 
-The spec is ~456 KB across 143 paths and 267 schemas — far too big to read whole, and dumping it
-into a conversation wastes the context it was meant to save. So this caches it once and answers
-one question at a time, in tab-separated lines.
-
-Behaviour comes from a live GET (`explore.py`), not from here: the spec says an endpoint takes
+Shapes only. Behaviour comes from a live GET (`explore.py`) — the spec says an endpoint takes
 `primary_strategy_id`, never which ids exist or what a 403 means for your subscription.
 """
 
@@ -32,11 +25,9 @@ from pydantic import TypeAdapter
 SPEC_URL = "https://api.withintelligence.com/v3/docs/json"
 _CACHE = Path(__file__).resolve().parent / ".spec-cache" / "openapi.json"
 
-# `object` rather than a recursive JSON alias: this walks a handful of known keys and narrows at
-# each step, which reads better than threading a union through every access.
 Json = dict[str, object]
 
-# `json.loads` is typed as returning `Any`, which this service's type-checking mode forbids.
+# `json.loads` returns `Any`, which this service's type-checking mode forbids.
 _JSON = TypeAdapter(object)
 
 
@@ -65,7 +56,6 @@ def _as_str(value: object) -> str:
 
 
 def _at(mapping: Json, *keys: str) -> Json:
-    """Walk a chain of dict keys, yielding `{}` at the first one that isn't there."""
     current = mapping
     for key in keys:
         current = _as_dict(current.get(key))
@@ -83,7 +73,6 @@ def load_spec(refresh: bool) -> Json:
 
 
 def _ref_name(ref: str) -> str:
-    """The schema name a `#/components/schemas/X` reference points at."""
     return ref.rsplit("/", 1)[-1]
 
 
@@ -172,6 +161,5 @@ if __name__ == "__main__":
     try:
         main()
     except BrokenPipeError:
-        # Piping into `head` closes the pipe mid-print, which is the normal way to read this
-        # output — a traceback there says nothing and buries the lines you asked for.
+        # Piping into `head` is the normal way to read this; a traceback there says nothing.
         sys.stderr.close()
