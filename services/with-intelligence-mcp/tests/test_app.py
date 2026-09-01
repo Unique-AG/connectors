@@ -78,5 +78,5 @@ class TestMcpEndpoint:
         """A GET without the streaming headers is rejected by the transport, not missing."""
         assert _get(client, "/mcp").status_code != 404
 
-    def test_no_tools_are_registered_yet(self) -> None:
-        assert TOOLS == ()
+    def test_the_registered_tools_are_reachable(self) -> None:
+        assert [getattr(fn, "__name__", "") for fn in TOOLS] == ["get_investor"]

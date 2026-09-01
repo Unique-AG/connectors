@@ -13,9 +13,11 @@ The vendor session that comes back — a 1-hour access token over a 30-day refre
 encrypted (Fernet) and stored in Postgres per user, so every tool call acts as that user rather
 than as a shared service account.
 
-> **Status: skeleton.** The service boots, reports readiness and exposes no tools yet. The auth
-> feature, the HTTP transport, the filter vocabularies and the investor tools land in that order
-> — see the build plan on UN-24101.
+> **Status: one vertical slice.** The transport, a vendor session and `get_investor` work
+> against the live API. Authentication is **interim**: one shared account from
+> `WITH_INTELLIGENCE_USERNAME`/`_PASSWORD` serves every caller, and there is no MCP-side login
+> at all, so anyone who can reach `/mcp` gets that account's data. Do not deploy it outside a
+> trusted network until the per-user login lands. See the build plan on UN-24101.
 
 ## Layout
 
@@ -59,17 +61,21 @@ added to `server/tools/registry.py` as well as written, and nothing under `featu
 
 ```bash
 cd services/with-intelligence-mcp
-cp .env.example .env   # fill DB_*
+cp .env.example .env   # fill DB_* and WITH_INTELLIGENCE_USERNAME/_PASSWORD
 uv sync
 uv run alembic upgrade head
 uv run with-intelligence-mcp
 ```
 
-- MCP endpoint: `http://localhost:9011/mcp` (HTTP transport)
+- MCP endpoint: `http://localhost:9011/mcp` (HTTP transport, no auth yet)
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
 - Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
+
+Point MCP Inspector (`npx @modelcontextprotocol/inspector`) at that endpoint with transport
+"Streamable HTTP" to call `get_investor` by hand. Postgres is not needed for it — nothing on the
+MCP path reads the database yet, so only `/ready` cares.
 
 ## Migrations
 

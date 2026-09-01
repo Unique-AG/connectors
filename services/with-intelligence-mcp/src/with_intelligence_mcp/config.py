@@ -4,7 +4,7 @@ from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import ClassVar, Self, TypedDict, cast
 
-from pydantic import Field, HttpUrl, PostgresDsn, PrivateAttr, model_validator
+from pydantic import Field, HttpUrl, PostgresDsn, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
 
@@ -122,15 +122,21 @@ class AssetClassGroup(StrEnum):
 
 
 class WithIntelligenceConfig(BaseSettings):
-    """Where to reach the v3 REST API, and how hard to lean on it.
+    """Where to reach the v3 REST API, with what credential, and how hard to lean on it.
 
-    No credentials: each MCP client completes this service's own login form, and the vendor
-    session it returns is stored encrypted per user. Spec: /v3/docs/json (public).
+    The credential here is interim. The plan is a hosted login form per user with the session
+    encrypted per user in Postgres; until that lands, one configured account serves every
+    caller. Spec: /v3/docs/json (public).
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="WITH_INTELLIGENCE_")
 
     base_url: str = "https://api.withintelligence.com"
+
+    # Interim, until the per-user login form lands: one shared account for every caller. See
+    # features/vendor_session/service_account_session.py.
+    username: str | None = None
+    password: SecretStr | None = None
 
     # Responses are auto-filtered to the licensed packages regardless; asking narrowly keeps a
     # hedge-fund question from paging through wealth records.

@@ -6,6 +6,8 @@
 
 from collections.abc import Awaitable, Callable
 
+from with_intelligence_mcp.features.investors.tools.get_investor import get_investor
+
 type ToolFunction = Callable[..., Awaitable[object]]
 
-TOOLS: tuple[ToolFunction, ...] = ()
+TOOLS: tuple[ToolFunction, ...] = (get_investor,)
