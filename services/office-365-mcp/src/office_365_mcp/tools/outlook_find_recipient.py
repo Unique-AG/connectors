@@ -245,7 +245,7 @@ class _Caller:
     domain: str | None
 
     @classmethod
-    def of(cls, user: User) -> "_Caller":
+    def of(cls, user: User) -> _Caller:
         # `mail` first: `userPrincipalName` is a sign-in name on a possibly different domain, and
         # get_me says the same thing to the model.
         address = user.mail or user.user_principal_name
