@@ -28,12 +28,12 @@ deliver those via envVars/secretKeyRef or the overlay's external-secrets.
 - name: KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY
   value: {{ .Values.mcpConfig.search.scopeLookupConcurrency | quote }}
 {{- end }}
-{{- if .Values.mcpConfig.contentTree.cacheTtlSeconds }}
+{{- if .Values.mcpConfig.contentTree.cache.ttlSeconds }}
 - name: KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS
-  value: {{ .Values.mcpConfig.contentTree.cacheTtlSeconds | quote }}
+  value: {{ .Values.mcpConfig.contentTree.cache.ttlSeconds | quote }}
 {{- end }}
-{{- if .Values.mcpConfig.contentTree.cacheMaxEntries }}
+{{- if .Values.mcpConfig.contentTree.cache.maxEntries }}
 - name: KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES
-  value: {{ .Values.mcpConfig.contentTree.cacheMaxEntries | quote }}
+  value: {{ .Values.mcpConfig.contentTree.cache.maxEntries | quote }}
 {{- end }}
 {{- end -}}
