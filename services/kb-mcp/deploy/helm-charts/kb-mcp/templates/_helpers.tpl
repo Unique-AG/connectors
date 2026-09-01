@@ -3,9 +3,8 @@ Chart-specific helpers. Generic identity/label helpers are provided by the base 
 */}}
 
 {{/*
-mcpConfig environment variables — only the non-secret fields with tenant-specific
-values. Secrets (ZITADEL_CLIENT_ID/SECRET, UNIQUE_APP_*) stay out of values.yaml;
-deliver those via envVars/secretKeyRef or the overlay's external-secrets.
+mcpConfig environment variables — non-secret fields with tenant-specific values.
+Secrets and the Zitadel client ID stay in envVars/secret refs; PKCE needs no client secret.
 */}}
 {{- define "chart.config.mcpEnv" -}}
 {{- if .Values.mcpConfig.app.publicBaseUrl }}
@@ -35,5 +34,26 @@ deliver those via envVars/secretKeyRef or the overlay's external-secrets.
 {{- if .Values.mcpConfig.contentTree.cache.maxEntries }}
 - name: KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES
   value: {{ .Values.mcpConfig.contentTree.cache.maxEntries | quote }}
+{{- end }}
+{{/* hasKey preserves explicit zero values, which Helm treats as false. */}}
+{{- if hasKey .Values.mcpConfig.contentTree "timeoutSeconds" }}
+- name: KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS
+  value: {{ .Values.mcpConfig.contentTree.timeoutSeconds | quote }}
+{{- end }}
+{{- if hasKey .Values.mcpConfig.contentTree "maxTimeoutSeconds" }}
+- name: KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS
+  value: {{ .Values.mcpConfig.contentTree.maxTimeoutSeconds | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.http.maxConnections }}
+- name: KB_MCP_HTTP_MAX_CONNECTIONS
+  value: {{ .Values.mcpConfig.http.maxConnections | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.http.maxKeepaliveConnections }}
+- name: KB_MCP_HTTP_MAX_KEEPALIVE_CONNECTIONS
+  value: {{ .Values.mcpConfig.http.maxKeepaliveConnections | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.http.poolTimeoutSeconds }}
+- name: KB_MCP_HTTP_POOL_TIMEOUT_SECONDS
+  value: {{ .Values.mcpConfig.http.poolTimeoutSeconds | quote }}
 {{- end }}
 {{- end -}}

@@ -2,6 +2,7 @@
 
 - CONFIG (admin, per company): ContentTreeToolConfig
 - ENV (process-wide): KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS / _MAX_ENTRIES
+  and KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS / _MAX_TIMEOUT_SECONDS
 - STATE (LLM, per call): mode required, rest optional per mode
 """
 
@@ -21,39 +22,46 @@ from unique_mcp import (
     merge_tool_meta,
 )
 from unique_toolkit.content.schemas import ContentInfo
-from unique_toolkit.experimental.components.content_tree import ContentTree
-from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
-    AsyncTTLCache,
-)
+from unique_toolkit.experimental.components.content_tree import ContentTree, FuzzyMatch
 
 from kb_mcp.correlation import correlation_id
 from kb_mcp.references import file_reference_url, markdown_citation_link
 from kb_mcp.settings import Settings, get_settings
+from kb_mcp.tools.content_tree.cache import get_tree_cache
 from kb_mcp.tools.content_tree.config import (
     DEFAULT_METADATA_FILTER_STATEMENT,
     ContentTreeToolConfig,
     MatchTarget,
 )
 from kb_mcp.tools.content_tree.path_utils import (
+    PathLike,
     display_path,
     display_path_segments,
     normalize_path_segment,
+    path_parts,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-# Keeps ContentTree instances alive across calls, keyed by (company_id,
-# user_id). Single-process only.
-_tree_cache: AsyncTTLCache | None = None
+_INCOMPLETE_NOTICE = (
+    "This listing is incomplete. The folder walk is still running in the "
+    "background; call content_tree again (same arguments) to get the "
+    "complete tree — that follow-up is usually instant from cache.\n\n"
+)
+
+
+def clamped_content_tree_timeout(requested: float | None, settings: Settings) -> float:
+    raw = settings.content_tree_timeout_seconds if requested is None else requested
+    return min(max(0.0, raw), settings.content_tree_max_timeout_seconds)
 
 
 def _file_link(
     content_info: ContentInfo,
-    segments: list[str],
+    path: PathLike,
     frontend_base_url: str | None,
 ) -> str:
     """Render a file row as a markdown citation (sentinel/brackets stripped)."""
-    display = display_path(segments)
+    display = display_path(path)
     url = file_reference_url(
         content_info.id,
         metadata=content_info.metadata,
@@ -63,26 +71,17 @@ def _file_link(
     return markdown_citation_link(display, url)
 
 
-def _get_tree_cache(settings: Settings) -> AsyncTTLCache:
-    global _tree_cache
-    if _tree_cache is None:
-        _tree_cache = AsyncTTLCache(
-            maxsize=settings.content_tree_cache_max_entries,
-            ttl_ms=settings.content_tree_cache_ttl_seconds * 1000,
-        )
-    return _tree_cache
-
-
 _META = merge_tool_meta(
     {
         "unique.app/icon": "folder-tree",
         "unique.app/system-prompt": (
-            "Choose this tool to browse the knowledge base's folder "
-            "structure, list files, or find a file by its name/path before "
-            "reading it with read_file. Its own mode='search' only "
-            "fuzzy-matches file names/paths — for questions about what a "
-            "document says (a topic, a fact, 'search about X'), use the "
-            "search tool instead, not this one."
+            "Browse the knowledge base's folder/file structure — use this "
+            "only when you need to know what files or folders exist, not to "
+            "find information inside them (use search for that). Do not "
+            'call this first "to see what\'s there" — search directly. '
+            "mode='search' is fuzzy filename/path lookup, not content search. "
+            "If a listing says it is incomplete, call this tool again; do "
+            "not tell the user missing files do not exist."
         ),
     },
     ContextRequirements(
@@ -165,22 +164,42 @@ async def content_tree(
             )
         ),
     ] = False,
+    timeout: Annotated[
+        float | None,
+        Field(
+            ge=0,
+            description=(
+                "Seconds to wait before returning a partial tree; the walk "
+                "continues, so a follow-up call usually returns the complete "
+                "tree. The server clamps this below the calling client's own "
+                "budget."
+            ),
+        ),
+    ] = None,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> ToolResult:
-    """Browse the knowledge base's visible file/folder structure. Pick a
-    `mode`; only that mode's args below apply, rest ignored. '*' = required.
-    - mode='tree': max_depth — first orientation view of folders/files.
-    - mode='list': folder_path, limit — flat listing; each result's
+    """Browse the knowledge base's folder/file structure — use this only when
+    you need to know what files or folders exist, not to find information
+    inside them (use search for that). Reach for this when: the user names a
+    specific folder/file and you need to resolve its path or content_id; you
+    need to enumerate everything in a known location; or you're about to call
+    read_file and need the content_id first. Pick a mode; only that mode's
+    args below apply, rest ignored. '*' = required.
+    - mode='tree': max_depth, timeout — first orientation view of folders/files.
+    - mode='list': folder_path, limit, timeout — flat listing; each result's
     content_id is needed for a later read_file call.
-    - mode='search': query*, limit, min_score, match_on, case_sensitive —
-    fuzzy filename/path lookup when you know roughly what it's called but
-    not where.
+    - mode='search': query*, limit, min_score, match_on, case_sensitive,
+    timeout — fuzzy filename/path lookup when you know roughly what a file
+    is called but not where it is — not for finding files by their content,
+    use search for that.
     'list' and 'search' rows start with a markdown link that opens the file
     in the Unique knowledge base — paste it as-is when referring the user to
     a file; use the content_id for read_file calls.
-    Listings are cached per user (~30 min); repeat calls are fast. When the
+    Listings are cached per user (~10 min); repeat calls are fast. When the
     user says they added, deleted, or changed files and needs a fresh tree,
     call with refresh=true (expect a slower ~20s refetch).
+    timeout is seconds to wait before returning a partial tree; the walk
+    continues, so a follow-up call usually returns the complete tree.
     """
     kb_settings = get_settings()
     cid: str | None = None
@@ -203,7 +222,7 @@ async def content_tree(
         cid = correlation_id(user_id, company_id)
         _LOGGER.info("content_tree start correlation_id=%s mode=%s", cid, mode)
 
-        cache = _get_tree_cache(kb_settings)
+        cache = get_tree_cache(kb_settings)
 
         async def _construct() -> ContentTree:
             return ContentTree(company_id=company_id, user_id=user_id)
@@ -220,21 +239,25 @@ async def content_tree(
             if config.metadata_filter is not None
             else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
         )
+        wait = clamped_content_tree_timeout(timeout, kb_settings)
+        walk_depth = max_depth if mode == "tree" else None
+
+        snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
+            metadata_filter=metadata_filter,
+            max_depth=walk_depth,
+            timeout=wait,
+            max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
+        )
 
         if mode == "tree":
-            text = await tree_svc.render_visible_tree_async(
-                max_depth=max_depth,
-                metadata_filter=metadata_filter,
-                max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
+            text = ("" if snapshot.complete else _INCOMPLETE_NOTICE) + snapshot.render(
+                max_depth=max_depth
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])
 
         if mode == "list":
-            rows = await tree_svc.resolve_visible_file_paths_async(
-                metadata_filter=metadata_filter,
-                max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
-            )
+            rows = list(snapshot.files)
             if folder_path:
                 # Match against display paths (brackets stripped, sentinel dropped)
                 # so filters like "SM/AlpenSys" work when segments are ["[SM]", ...].
@@ -242,19 +265,20 @@ async def content_tree(
                     normalize_path_segment(p) for p in folder_path.strip("/").split("/")
                 )
                 rows = [
-                    (content_info, segments)
-                    for content_info, segments in rows
-                    if tuple(display_path_segments(segments)[: len(prefix)]) == prefix
+                    (content_info, path)
+                    for content_info, path in rows
+                    if tuple(display_path_segments(path)[: len(prefix)]) == prefix
                 ]
             effective_limit = limit if limit is not None else config.default_limit
             rows = rows[:effective_limit]
             frontend_base_url = kb_settings.frontend_base_url_str()
             lines = [
-                f"{_file_link(content_info, segments, frontend_base_url)} "
+                f"{_file_link(content_info, path, frontend_base_url)} "
                 f"(content_id={content_info.id})"
-                for content_info, segments in rows
+                for content_info, path in rows
             ]
-            text = "\n".join(lines) if lines else "No visible files match."
+            body = "\n".join(lines) if lines else "No visible files match."
+            text = ("" if snapshot.complete else _INCOMPLETE_NOTICE) + body
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
                 cid,
@@ -264,26 +288,71 @@ async def content_tree(
             return ToolResult(content=[TextContent(type="text", text=text)])
 
         assert query is not None and mode == "search"
-        matches = await tree_svc.search_visible_files_fuzzy_async(
-            query,
-            limit=limit if limit is not None else config.default_limit,
-            min_score=min_score if min_score is not None else config.default_min_score,
-            match_on=match_on if match_on is not None else config.default_match_on,
-            case_sensitive=(
-                case_sensitive
-                if case_sensitive is not None
-                else config.default_case_sensitive
-            ),
-            metadata_filter=metadata_filter,
-            max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
+        effective_limit = limit if limit is not None else config.default_limit
+        effective_min_score = (
+            min_score if min_score is not None else config.default_min_score
         )
+        effective_match_on = (
+            match_on if match_on is not None else config.default_match_on
+        )
+        effective_case_sensitive = (
+            case_sensitive
+            if case_sensitive is not None
+            else config.default_case_sensitive
+        )
+        if snapshot.complete:
+            matches = await tree_svc.search_visible_files_fuzzy_async(
+                query,
+                limit=effective_limit,
+                min_score=effective_min_score,
+                match_on=effective_match_on,
+                case_sensitive=effective_case_sensitive,
+                metadata_filter=metadata_filter,
+                max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
+            )
+        else:
+            needle = query if effective_case_sensitive else query.lower()
+            matches = []
+            for content_info, path in snapshot.files:
+                key = content_info.key or ""
+                display = display_path(path)
+                key_matches = (
+                    needle in key
+                    if effective_case_sensitive
+                    else needle in key.lower()
+                )
+                path_matches = (
+                    needle in display
+                    if effective_case_sensitive
+                    else needle in display.lower()
+                )
+                if effective_match_on == "key":
+                    matched = key_matches
+                    matched_on = "key"
+                elif effective_match_on == "path":
+                    matched = path_matches
+                    matched_on = "path"
+                else:
+                    matched = key_matches or path_matches
+                    matched_on = "key" if key_matches else "path"
+                if matched and 1.0 >= effective_min_score:
+                    matches.append(
+                        FuzzyMatch(
+                            content_info=content_info,
+                            path_segments=list(path_parts(path)),
+                            score=1.0,
+                            matched_on=matched_on,
+                        )
+                    )
+            matches = matches[:effective_limit]
         frontend_base_url = kb_settings.frontend_base_url_str()
         lines = [
             f"{_file_link(m.content_info, m.path_segments, frontend_base_url)} "
             f"(score={m.score:.2f}, content_id={m.content_info.id})"
             for m in matches
         ]
-        text = "\n".join(lines) if lines else "No matching files found."
+        body = "\n".join(lines) if lines else "No matching files found."
+        text = ("" if snapshot.complete else _INCOMPLETE_NOTICE) + body
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
             cid,

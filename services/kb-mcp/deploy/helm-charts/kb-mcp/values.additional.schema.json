@@ -6,7 +6,7 @@
   "properties": {
     "mcpConfig": {
       "type": "object",
-      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Secrets (ZITADEL_CLIENT_ID/SECRET, UNIQUE_APP_*) stay out of values.yaml — deliver them via envVars/secretKeyRef or the overlay's external-secrets.",
+      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Unique API credentials stay out of values.yaml — deliver them via envVars/secretKeyRef or the overlay's external-secrets. Zitadel uses a public PKCE client, so no client secret is required.",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -30,7 +30,7 @@
         },
         "zitadel": {
           "type": "object",
-          "description": "Zitadel OIDC issuer (non-secret). clientId/clientSecret are secrets — set via envVars/secretKeyRef or overlay external-secrets, not here.",
+          "description": "Zitadel OIDC issuer (non-secret). Set the public client ID via envVars/secretKeyRef or overlay external-secrets; PKCE means no client secret is required.",
           "properties": {
             "baseUrl": {
               "type": "string",
@@ -75,16 +75,53 @@
                   "type": "integer",
                   "description": "Seconds a cached ContentTree stays valid.",
                   "minimum": 1,
-                  "default": 1800
+                  "default": 600
                 },
                 "maxEntries": {
                   "type": "integer",
                   "description": "Max cached ContentTree entries.",
                   "minimum": 1,
-                  "default": 128
+                  "default": 24
                 }
               },
               "additionalProperties": false
+            },
+            "timeoutSeconds": {
+              "type": "number",
+              "description": "Default seconds content_tree waits before returning a partial tree.",
+              "minimum": 0,
+              "default": 30
+            },
+            "maxTimeoutSeconds": {
+              "type": "number",
+              "description": "Maximum content_tree wait in seconds. Keep below the MCP client's request budget.",
+              "minimum": 0,
+              "default": 45
+            }
+          },
+          "additionalProperties": false
+        },
+        "http": {
+          "type": "object",
+          "description": "Outbound Unique API HTTP connection-pool tuning.",
+          "properties": {
+            "maxConnections": {
+              "type": "integer",
+              "description": "Maximum number of outbound HTTP connections.",
+              "minimum": 1,
+              "default": 100
+            },
+            "maxKeepaliveConnections": {
+              "type": "integer",
+              "description": "Maximum number of idle outbound HTTP connections.",
+              "minimum": 1,
+              "default": 20
+            },
+            "poolTimeoutSeconds": {
+              "type": "number",
+              "description": "Seconds to wait for an available outbound HTTP connection.",
+              "exclusiveMinimum": 0,
+              "default": 60
             }
           },
           "additionalProperties": false

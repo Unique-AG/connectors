@@ -16,7 +16,6 @@ _TEST_ENV_FILE = Path(__file__).parent.parent / "test.env"
 _DEFAULT_TEST_ENV = {
     "ZITADEL_BASE_URL": "https://id.test.unique.app",
     "ZITADEL_CLIENT_ID": "test-client-id",
-    "ZITADEL_CLIENT_SECRET": "test-client-secret",
     "ALLOW_EPHEMERAL_OAUTH_STORAGE": "true",
 }
 

@@ -29,7 +29,7 @@ def build_auth(settings: Settings) -> OIDCProxy:
         zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(
             base_url=settings.zitadel_base_url,
             client_id=settings.zitadel_client_id,
-            client_secret=settings.zitadel_client_secret.get_secret_value(),
+            client_secret=None,
         ),
         client_storage=build_storage(settings),
         # Zitadel issues opaque access tokens even when configured for JWT.
