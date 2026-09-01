@@ -49,6 +49,7 @@ unique-api = packages/unique-api/**
 
 # Docs
 recordings-and-transcripts = docs/recordings-and-transcripts/**
+supply-chain = docs/supply-chain/**
 
 # Special scopes
 ci = .github/**, .gitcommitizen, biome.json, turbo.json, tsconfig.json, vitest.config.ts, pnpm-workspace.yaml, Makefile, docker-compose.yaml, flake.nix, flake.lock, .dockerignore, .nvmrc, release-please-config.json, .release-please-manifest.json, .syncpackrc.json

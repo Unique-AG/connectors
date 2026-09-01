@@ -1,0 +1,161 @@
+name: "Dependency Updates"
+
+on:
+  schedule:
+    - cron: "3,23,43 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "report = decide and print, change nothing. apply = converge."
+        type: choice
+        options: [report, apply]
+        default: report
+
+permissions: {}
+
+concurrency:
+  group: dependency-updates
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Hold and release dependency updates
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: write
+      checks: read
+      statuses: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      HOLD_STATE: ${{ vars.DEPENDENCY_UPDATES }}
+      REQUESTED_MODE: ${{ inputs.mode || 'apply' }}
+      AGE_HOURS: "72"
+      GROUP_NAME: minor-and-patch
+      FREEZE_FALLBACK_HOURS: "1"
+      STALE_READY_DAYS: "2"
+      ISSUE_TITLE: "Dependency updates: attention required"
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Reconcile
+        run: |
+          set -euo pipefail
+
+          MODE=report
+          if [ "${HOLD_STATE:-}" = "on" ] && [ "$REQUESTED_MODE" = "apply" ]; then MODE=apply; fi
+
+          WORK="${RUNNER_TEMP}/dependency-updates"; mkdir -p "$WORK"
+          : > "$WORK/anomalies.txt"
+
+          now=$(date -u +%s)
+          dow=$(date -u +%u)
+          hour=$((10#$(date -u +%H)))
+          window=no
+          if [ "$dow" -le 4 ] && [ "$hour" -ge 6 ] && [ "$hour" -lt 8 ]; then window=yes; fi
+
+          gh api graphql --paginate \
+            -f owner="${GH_REPO%/*}" -f name="${GH_REPO#*/}" \
+            -f query='
+              query($owner:String!,$name:String!,$endCursor:String){
+                repository(owner:$owner,name:$name){
+                  pullRequests(states:OPEN, first:50, after:$endCursor){
+                    pageInfo{ hasNextPage endCursor }
+                    nodes{
+                      number isDraft headRefName
+                      author{ login __typename }
+                      commits(last:1){ nodes{ commit{ oid committedDate statusCheckRollup{ state } } } }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.repository.pullRequests.nodes[]' > "$WORK/prs.jsonl"
+
+          jq -c '
+            select(.author.__typename == "Bot" and .author.login == "dependabot")
+            | select(.headRefName | contains($ENV.GROUP_NAME))
+            | { number:   .number,
+                draft:    .isDraft,
+                oid:      .commits.nodes[0].commit.oid,
+                frozenAt: .commits.nodes[0].commit.committedDate,
+                rollup:   (.commits.nodes[0].commit.statusCheckRollup.state // "NONE") }
+          ' "$WORK/prs.jsonl" > "$WORK/held.jsonl"
+
+          open_total=$(wc -l < "$WORK/prs.jsonl" | tr -d ' ')
+          held_total=$(wc -l < "$WORK/held.jsonl" | tr -d ' ')
+
+          {
+            echo "## Dependency updates"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| mode | \`$MODE\` (\`vars.DEPENDENCY_UPDATES\` = \`${HOLD_STATE:-<unset>}\`) |"
+            echo "| now (UTC) | day $dow, hour $hour — promotion window: **$window** |"
+            echo "| hold window | ${AGE_HOURS}h measured on the head commit |"
+            echo "| open PRs / in scope | $open_total / $held_total |"
+            echo
+            echo "| PR | pin frozen at | age | draft | checks | action |"
+            echo "|---|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          while IFS= read -r row; do
+            num=$(jq -r '.number'     <<<"$row")
+            draft=$(jq -r '.draft'    <<<"$row")
+            frozen=$(jq -r '.frozenAt' <<<"$row")
+            rollup=$(jq -r '.rollup'  <<<"$row")
+
+            frozen_epoch=$(date -u -d "$frozen" +%s)
+            age_h=$(( (now - frozen_epoch) / 3600 ))
+            aged=no
+            if [ "$age_h" -ge "$AGE_HOURS" ]; then aged=yes; fi
+
+            action=none
+            if [ "$draft" = "false" ] && [ "$aged" = "no" ]; then
+              if [ "$rollup" != "PENDING" ] || [ "$age_h" -ge "$FREEZE_FALLBACK_HOURS" ]; then
+                action=freeze
+              else
+                action=wait-for-checks
+              fi
+            elif [ "$draft" = "true" ] && [ "$aged" = "yes" ] && [ "$window" = "yes" ]; then
+              action=promote
+            elif [ "$draft" = "false" ] && [ "$age_h" -ge $(( AGE_HOURS + STALE_READY_DAYS * 24 )) ]; then
+              echo "PR #${num} has been ready for review for over ${STALE_READY_DAYS} days. Dependabot supersedes an unmerged group pull request on the next Friday run, and its review threads go with it." >> "$WORK/anomalies.txt"
+            fi
+
+            if [ "$MODE" = "apply" ]; then
+              case "$action" in
+                freeze)
+                  gh pr ready --undo "$num" </dev/null
+                  ;;
+                promote)
+                  gh pr ready "$num" </dev/null
+                  gh pr comment "$num" --body \
+                    "Held since \`${frozen}\` and unchanged for ${age_h}h. Ready for review." </dev/null
+                  ;;
+              esac
+            fi
+
+            printf '| #%s | `%s` | %sh | %s | %s | **%s** |\n' \
+              "$num" "$frozen" "$age_h" "$draft" "$rollup" "$action" >> "$GITHUB_STEP_SUMMARY"
+          done < "$WORK/held.jsonl"
+
+          if [ "$MODE" != "apply" ]; then
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo "_Report mode. Nothing was changed._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -s "$WORK/anomalies.txt" ] && [ "$MODE" = "apply" ]; then
+            gh label create dependency-updates --color 0366D6 \
+              --description "Raised by the dependency update hold" 2>/dev/null || true
+            { cat "$WORK/anomalies.txt"; echo; echo "Run: ${RUN_URL}"; } > "$WORK/issue.md"
+            existing=$(gh issue list --state open --label dependency-updates --json number,title \
+                       --jq '[.[] | select(.title == $ENV.ISSUE_TITLE)][0].number // empty')
+            if [ -n "$existing" ]; then
+              gh issue edit "$existing" --body-file "$WORK/issue.md" </dev/null
+            else
+              gh issue create --title "$ISSUE_TITLE" --label dependency-updates \
+                --body-file "$WORK/issue.md" </dev/null
+            fi
+          fi
