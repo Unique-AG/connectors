@@ -61,13 +61,14 @@ means nothing in particular.
 declares no `bcc` argument at all, so a draft that reaches here has none to report.
 """
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.elicitation import AcceptedElicitation
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -107,9 +108,11 @@ _DESCRIPTION = """\
 Send a draft that outlook_draft_mail or outlook_draft_reply created in the signed-in user's own \
 Drafts folder. THIS PUTS MAIL ON THE WIRE: it is delivered from the user's own address, in their \
 name, and IT CANNOT BE UNDONE. This connector has no recall and no unsend, and nothing here \
-reaches a message once it is in somebody else's mailbox. Show the draft to the user and get \
-their agreement first. Read them the recipients, the subject and the body that the drafting \
-tool answered with, and call this only once they say to send it. It takes one argument, the \
+reaches a message once it is in somebody else's mailbox. This tool asks the person at the other \
+end to confirm the send before it happens, and sends nothing unless they agree, so calling it is \
+a request rather than an instruction. Read them the recipients, the subject and the body that the \
+drafting tool answered with first, so the question they are asked is not the first they hear of \
+it. It takes one argument, the \
 draft's own handle, and NOTHING it is given can change the message. There is no recipient, \
 subject, body or attachment argument here, so what goes out is exactly what the user can already \
 open in Outlook. Only a handle of the drafts family is accepted: a message handle from \
@@ -208,8 +211,66 @@ class MailSent(BaseModel):
     )
 
 
-async def send_draft(client: GraphServiceClient, *, draft_ref: str) -> MailSent:
-    """Read the draft `draft_ref` addresses, then send it: two requests, in that order."""
+SEND = "send"
+_DO_NOT_SEND = "do not send"
+
+_DECLINED = (
+    "Nothing was sent. The person at the other end of this conversation was asked to confirm "
+    "the send and did not agree to it. The draft is untouched and still in Drafts, so this is "
+    "not a failure to report as one: say the send was not confirmed. Do not call this tool again "
+    "for the same draft unless the user asks for it in a new message."
+)
+
+_NO_WAY_TO_ASK = (
+    "Nothing was sent. This connector asks a person to confirm every send, and the MCP client on "
+    "the other end does not support elicitation, so there was nobody to ask. This is a property "
+    "of the client, not of the draft or of the mailbox: retrying will fail the same way. The "
+    "draft is untouched and still in Drafts, where the user can send it from Outlook. Tell the "
+    "user that, and tell them their client cannot confirm a send."
+)
+
+type _Confirm = Callable[[Message], Awaitable[None]]
+
+
+def a_person_agrees(ctx: Context) -> _Confirm:
+    """Ask the caller's own client to put the send to a person, and refuse unless they agree.
+
+    The permission this tool holds is `Mail.ReadBasic`, which Microsoft excludes the body from,
+    so the question names the recipients and the subject and cannot name the body. That is the
+    whole of what this tool can show, and it is what makes "send to these people" answerable.
+    """
+
+    async def confirm(draft: Message) -> None:
+        everyone = [
+            one.address or one.name or "an address Microsoft did not record"
+            for one in MailAddress.each_of(draft.to_recipients)
+            + MailAddress.each_of(draft.cc_recipients)
+        ]
+        question = (
+            f"Send the draft {draft.subject or '(no subject)'!r} to "
+            f"{', '.join(everyone) or 'nobody'}? Sending cannot be undone."
+        )
+        try:
+            answer = await ctx.elicit(question, response_type=[SEND, _DO_NOT_SEND])
+        except ToolError:
+            raise
+        except Exception as unreachable:
+            # Every exception: a client with no elicitation capability is reported differently by
+            # different transports, and none of those is a reason to send anyway.
+            raise ToolError(_NO_WAY_TO_ASK) from unreachable
+        if not isinstance(answer, AcceptedElicitation) or answer.data != SEND:
+            raise ToolError(_DECLINED)
+
+    return confirm
+
+
+async def send_draft(client: GraphServiceClient, *, draft_ref: str, confirm: _Confirm) -> MailSent:
+    """Read the draft `draft_ref` addresses, put it to a person, then send it.
+
+    `confirm` has no default. The read is what makes the question answerable, so the confirmation
+    belongs between the two requests, and a caller that could omit it would be back to a promise
+    in a docstring.
+    """
     handle = _handle_for(draft_ref)
 
     with graph_errors(TOOL_NAME):
@@ -218,6 +279,9 @@ async def send_draft(client: GraphServiceClient, *, draft_ref: str) -> MailSent:
                 request_configuration=_read_request()
             )
         sendable = draft is not None and draft.is_draft is True
+        if sendable:
+            assert draft is not None
+            await confirm(draft)
         sent_at = await _send(client, handle) if sendable else None
 
     # This function decides inside the block above, and raises outside it. `graph_errors` treats
@@ -308,12 +372,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "can change the recipients, the subject, the body or anything else about "
                     + "the message, so what is sent is the draft the user can already read in "
                     + "Outlook. A message handle from a search, a listing or a thread is refused: "
-                    + "mail somebody else wrote is not this user's to send. Show the draft to the "
-                    + "user and wait for them to agree before passing it here. The send cannot be "
-                    + "undone."
+                    + "mail somebody else wrote is not this user's to send. Passing a handle "
+                    + "here asks the person for confirmation. It does not send on its own, and a "
+                    + "refusal leaves the draft where it is. The send cannot be undone."
                 ),
             ),
         ],
+        ctx: Context,
         client: GraphServiceClient = graph,
     ) -> MailSent:
-        return await send_draft(client, draft_ref=draft_ref)
+        return await send_draft(client, draft_ref=draft_ref, confirm=a_person_agrees(ctx))

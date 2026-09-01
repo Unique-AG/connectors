@@ -8,16 +8,22 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    CancelledElicitation,
+    DeclinedElicitation,
+)
 from fastmcp.tools import Tool
+from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE
 from office_365_mcp.tools import outlook_send_draft as sender
-from office_365_mcp.tools.outlook_send_draft import MailSent, send_draft
+from office_365_mcp.tools.outlook_send_draft import MailSent, a_person_agrees, send_draft
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
@@ -61,6 +67,18 @@ def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
     return graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=payload))
 
 
+async def _agrees(draft: Message) -> None:
+    """A person who said yes. Named rather than a lambda, because every call below states which
+    side of the gate it is testing."""
+    assert draft is not None
+
+
+async def _refuses(draft: Message) -> None:
+    """A person who said no, in the shape the tool's own refusal takes."""
+    assert draft is not None
+    raise ToolError("Nothing was sent.")
+
+
 def _sends(graph: respx.MockRouter) -> respx.Route:
     """Microsoft answers this route 202 with an empty body, which is why nothing is echoed."""
     return graph.post(_SEND_PATH).mock(return_value=httpx.Response(202))
@@ -81,6 +99,109 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
     return cast("Mapping[str, object]", tool.parameters), tool
 
 
+class TestThePersonBetweenTheDraftAndTheSend:
+    """The tool description used to ask the model to show the draft to somebody. This is the
+    mechanism that replaced that request."""
+
+    async def test_a_refusal_sends_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        send = _ready(graph)
+
+        with pytest.raises(ToolError, match="Nothing was sent"):
+            _ = await send_draft(client, confirm=_refuses, draft_ref=_DRAFT_REF)
+
+        assert send.call_count == 0, "a declined send still reached the mailbox"
+
+    async def test_the_question_comes_after_the_read_and_before_the_send(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The read is what makes the question answerable, and the send is what it gates, so the
+        confirmation has to sit between them rather than beside them."""
+        send = _ready(graph)
+        calls_when_asked: list[int] = []
+
+        async def watching(draft: Message) -> None:
+            assert draft is not None
+            calls_when_asked.append(len(graph.calls))
+
+        _ = await send_draft(client, confirm=watching, draft_ref=_DRAFT_REF)
+
+        assert calls_when_asked == [1], "asked before the read, or after the send"
+        assert send.call_count == 1
+
+    async def test_the_question_names_every_recipient_and_the_subject(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`Mail.ReadBasic` excludes the body, so recipients and subject are the whole of what
+        this tool can put to a person. All of it has to be in the question."""
+        _ = _ready(graph)
+        asked: list[Message] = []
+
+        async def capturing(draft: Message) -> None:
+            asked.append(draft)
+
+        _ = await send_draft(client, confirm=capturing, draft_ref=_DRAFT_REF)
+
+        assert len(asked) == 1
+        addresses = {
+            one.email_address.address
+            for one in (asked[0].to_recipients or []) + (asked[0].cc_recipients or [])
+            if one.email_address is not None
+        }
+        assert addresses, "the question was asked about a draft with nobody on it"
+        assert asked[0].subject is not None
+
+
+class TestHowTheQuestionReachesAPerson:
+    """`a_person_agrees` is the adapter from this tool to the caller's own client. Everything a
+    client can answer, and everything it can fail to answer, decides whether mail goes out."""
+
+    @staticmethod
+    def _context(answer: object) -> Context:
+        class _Client:
+            async def elicit(self, message: str, response_type: object = None) -> object:
+                assert message
+                assert response_type is not None, "the caller must say what it expects back"
+                if isinstance(answer, Exception):
+                    raise answer
+                return answer
+
+        return cast("Context", cast("object", _Client()))
+
+    async def test_agreeing_lets_the_send_through(self) -> None:
+        confirm = a_person_agrees(self._context(AcceptedElicitation(data=sender.SEND)))
+
+        await confirm(Message(subject="Invoice 4471"))
+
+    async def test_declining_refuses_and_says_the_draft_survives(self) -> None:
+        confirm = a_person_agrees(self._context(DeclinedElicitation()))
+
+        with pytest.raises(ToolError, match="still in Drafts"):
+            await confirm(Message(subject="Invoice 4471"))
+
+    async def test_cancelling_refuses_too(self) -> None:
+        confirm = a_person_agrees(self._context(CancelledElicitation()))
+
+        with pytest.raises(ToolError, match="did not agree"):
+            await confirm(Message(subject="Invoice 4471"))
+
+    async def test_answering_anything_but_send_refuses(self) -> None:
+        confirm = a_person_agrees(self._context(AcceptedElicitation(data="do not send")))
+
+        with pytest.raises(ToolError, match="did not agree"):
+            await confirm(Message(subject="Invoice 4471"))
+
+    async def test_a_client_that_cannot_ask_sends_nothing(self) -> None:
+        """The risk this whole gate carries: a client with no elicitation support can no longer
+        send. It has to fail closed, and it has to say why, because the operator cannot tell a
+        broken mailbox from a client limitation otherwise."""
+        confirm = a_person_agrees(self._context(RuntimeError("elicitation not supported")))
+
+        with pytest.raises(ToolError, match="does not support elicitation"):
+            await confirm(Message(subject="Invoice 4471"))
+
+
 class TestWhatItAsksGraphFor:
     async def test_it_reads_the_draft_and_then_sends_it_and_makes_no_other_call(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -90,7 +211,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         send = _sends(graph)
 
-        _ = await send_draft(client, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert read.call_count == 1
         assert send.call_count == 1
@@ -107,7 +228,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         _ = _sends(graph)
 
-        _ = await send_draft(client, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         selected = read.calls.last.request.url.params["$select"]
         assert "toRecipients" in selected
@@ -123,7 +244,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         _ = _sends(graph)
 
-        _ = await send_draft(client, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         selected = read.calls.last.request.url.params["$select"]
         assert "body" not in selected.casefold()
@@ -136,7 +257,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         send = _sends(graph)
 
-        _ = await send_draft(client, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert read.calls.last.request.headers["prefer"] == 'IdType="ImmutableId"'
         assert send.calls.last.request.headers["prefer"] == 'IdType="ImmutableId"'
@@ -148,7 +269,7 @@ class TestWhatItAsksGraphFor:
         is no body to put one in."""
         send = _ready(graph)
 
-        _ = await send_draft(client, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.calls.last.request.content == b""
 
@@ -162,7 +283,7 @@ class TestTheSendThatIsNeverMade:
         _ = _ready(graph)
         one_shot = graph.post(_SEND_MAIL_PATH).mock(return_value=httpx.Response(202))
 
-        _ = await send_draft(client, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert one_shot.call_count == 0
 
@@ -188,7 +309,7 @@ class TestTheRetryItRefuses:
         send = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.call_count == 1
 
@@ -204,7 +325,7 @@ class TestTheRetryItRefuses:
         )
 
         with pytest.raises(Exception):  # noqa: B017, PT011
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.call_count == 1
 
@@ -219,7 +340,7 @@ class TestTheMessagesItRefusesToSend:
         send = _sends(graph)
 
         with pytest.raises(ToolError):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.call_count == 0, "the pre-read is what stops the send, so nothing went out"
 
@@ -230,7 +351,7 @@ class TestTheMessagesItRefusesToSend:
         send = _sends(graph)
 
         with pytest.raises(ToolError):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
@@ -242,7 +363,7 @@ class TestTheMessagesItRefusesToSend:
         _ = _ready(graph, _draft(is_draft=False))
 
         with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL"):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
     async def test_a_message_handle_is_refused_and_told_why(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -253,7 +374,9 @@ class TestTheMessagesItRefusesToSend:
 
         with pytest.raises(ToolError, match="COMPOSED"):
             _ = await send_draft(
-                client, draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+                client,
+                confirm=_agrees,
+                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
             )
 
         assert len(graph.calls) == 0, "a refused argument never reaches the mailbox"
@@ -263,7 +386,9 @@ class TestTheMessagesItRefusesToSend:
     ) -> None:
         with pytest.raises(ToolError, match="outlook_draft_reply"):
             _ = await send_draft(
-                client, draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+                client,
+                confirm=_agrees,
+                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
             )
 
     @pytest.mark.parametrize(
@@ -286,7 +411,7 @@ class TestTheMessagesItRefusesToSend:
         _ = _ready(graph)
 
         with pytest.raises(ToolError):
-            _ = await send_draft(client, draft_ref=draft_ref)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=draft_ref)
 
         assert len(graph.calls) == 0
 
@@ -305,7 +430,7 @@ class TestWhatItAnswers:
             ),
         )
 
-        answer = await send_draft(client, draft_ref=_DRAFT_REF)
+        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert [address.address for address in answer.to] == [_ADA, _GRACE]
         assert [address.address for address in answer.cc] == [_PAM]
@@ -315,7 +440,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(subject="Invoice 4471 (final)"))
 
-        answer = await send_draft(client, draft_ref=_DRAFT_REF)
+        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert answer.subject == "Invoice 4471 (final)"
 
@@ -324,7 +449,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(subject=None))
 
-        answer = await send_draft(client, draft_ref=_DRAFT_REF)
+        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert answer.subject is None
 
@@ -333,7 +458,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(cc=[]))
 
-        answer = await send_draft(client, draft_ref=_DRAFT_REF)
+        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert answer.cc == []
 
@@ -346,7 +471,7 @@ class TestWhatItAnswers:
         _ = _ready(graph)
         before = datetime.now(UTC)
 
-        answer = await send_draft(client, draft_ref=_DRAFT_REF)
+        answer = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         sent_at = datetime.fromisoformat(answer.sent_at)
         assert sent_at.utcoffset() == UTC.utcoffset(None)
@@ -376,7 +501,7 @@ class TestTheFailuresItPassesOn:
         send = _sends(graph)
 
         with pytest.raises(GraphForbidden):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
@@ -391,7 +516,7 @@ class TestTheFailuresItPassesOn:
         send = _sends(graph)
 
         with pytest.raises(GraphNotFound):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
@@ -406,7 +531,7 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await send_draft(client, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
     def test_its_not_found_advice_never_reports_the_mail_as_sent(self) -> None:
         """The default 404 advice tells a caller to check the id came from a tool response, which
@@ -478,11 +603,15 @@ class TestHowItDeclaresItself:
         assert "user's own address" in lowered
         assert "cannot be undone" in lowered
 
-    async def test_the_description_says_to_show_the_draft_to_the_user_first(
+    async def test_the_description_says_a_person_is_asked_before_anything_is_sent(
         self, transport: httpx.AsyncClient
     ) -> None:
+        """The description used to ask the model to arrange a review. The tool arranges it now, so
+        the description has to say that instead: a model told to get agreement itself would read a
+        refusal as its own failure to ask."""
         _parameters, tool = await _registered(transport)
 
         lowered = (tool.description or "").casefold()
-        assert "show the draft to the user" in lowered
+        assert "confirm the send" in lowered
+        assert "sends nothing unless they agree" in lowered
         assert "outlook_draft_mail" in lowered
