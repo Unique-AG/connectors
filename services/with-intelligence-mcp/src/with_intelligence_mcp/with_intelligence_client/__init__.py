@@ -5,7 +5,12 @@ Infrastructure the features consume: it must not import `features/` or `config`
 implementation — see `CallerSession`.
 """
 
-from with_intelligence_mcp.with_intelligence_client.as_sequence import SEQUENCE, as_sequence
+from with_intelligence_mcp.with_intelligence_client.as_sequence import (
+    SEQUENCE,
+    SINGLE,
+    as_sequence,
+    as_single,
+)
 from with_intelligence_mcp.with_intelligence_client.client import (
     QueryValue,
     WithIntelligenceClient,
@@ -45,6 +50,7 @@ __all__ = [
     "NotEntitled",
     "NotFound",
     "SEQUENCE",
+    "SINGLE",
     "Page",
     "PageInfo",
     "QueryValue",
@@ -61,6 +67,7 @@ __all__ = [
     "WithIntelligenceError",
     "as_query",
     "as_sequence",
+    "as_single",
     "narrow_dict",
     "parse_page",
 ]

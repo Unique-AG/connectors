@@ -137,7 +137,10 @@ class TestContactDetails:
                             2504,
                             job_title="Director of Hedge Funds",
                             seniority={"id": 3, "name": "Director"},
-                            specialisms={"id": 1, "name": "Hedge Funds"},
+                            specialisms=[
+                                {"id": 1, "name": "Hedge Funds"},
+                                {"id": 4, "name": "Real Assets"},
+                            ],
                             primary_email="f.allocator@example.invalid",
                             office_phone="+1 555 0100",
                             main_for_organisation=True,
@@ -152,7 +155,7 @@ class TestContactDetails:
         assert isinstance(result, PeopleForInvestorResponse)
         person = result.people[0]
         assert person.seniority == "Director"
-        assert person.specialism == "Hedge Funds"
+        assert person.specialisms == ["Hedge Funds", "Real Assets"]
         assert person.email == "f.allocator@example.invalid"
         assert person.phone == "+1 555 0100"
         assert person.is_main_contact is True
@@ -202,3 +205,60 @@ class TestCountsAndScoping:
         assert isinstance(result, InvestorAmbiguousResponse)
         assert result.total_matches == 20
         assert persons.call_count == 0
+
+
+class TestVendorEncodings:
+    """Fields the spec declares as one object and the API sends as a list, and vice versa."""
+
+    @respx.mock
+    async def test_a_single_specialism_sent_as_a_list_parses(self) -> None:
+        """The shape that failed in MCP Inspector: `specialisms` is declared one
+        Classification and arrives as `[{'id': 4, 'name': 'Real Assets'}]`."""
+        _mock_roster(
+            [
+                _person(
+                    1,
+                    "H. Allocator",
+                    [
+                        _role(
+                            2504,
+                            job_title="Head of Real Assets",
+                            specialisms=[{"id": 4, "name": "Real Assets"}],
+                        )
+                    ],
+                )
+            ],
+            total=1,
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        assert result.people[0].specialisms == ["Real Assets"]
+
+    @respx.mock
+    async def test_a_specialism_sent_as_a_bare_object_also_parses(self) -> None:
+        """What the spec actually promises. Both encodings have to work."""
+        _mock_roster(
+            [
+                _person(
+                    1, "I. Allocator", [_role(2504, specialisms={"id": 4, "name": "Real Assets"})]
+                )
+            ],
+            total=1,
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        assert result.people[0].specialisms == ["Real Assets"]
+
+    @respx.mock
+    async def test_a_seniority_sent_as_a_list_collapses_to_one(self) -> None:
+        """The reverse coercion: a list where the model declares a single object."""
+        _mock_roster(
+            [_person(1, "J. Allocator", [_role(2504, seniority=[{"id": 3, "name": "Director"}])])],
+            total=1,
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        assert result.people[0].seniority == "Director"

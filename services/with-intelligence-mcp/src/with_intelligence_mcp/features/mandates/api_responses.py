@@ -10,14 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from with_intelligence_mcp.features.investments import CurrencyAmountAttributes
 from with_intelligence_mcp.features.investors import ClassificationAttributes
-from with_intelligence_mcp.with_intelligence_client import SEQUENCE
+from with_intelligence_mcp.with_intelligence_client import SEQUENCE, SINGLE
 
 
 class MandateAmountAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     amount: float | None = None
-    currency: CurrencyAmountAttributes | None = None
+    currency: Annotated[CurrencyAmountAttributes | None, SINGLE] = None
 
 
 class MandateStatusAttributes(BaseModel):
@@ -25,7 +25,7 @@ class MandateStatusAttributes(BaseModel):
 
     id: int | None = None
     name: str | None = None
-    sub_status: ClassificationAttributes | None = None
+    sub_status: Annotated[ClassificationAttributes | None, SINGLE] = None
 
 
 class MandateServiceAttributes(BaseModel):
@@ -48,7 +48,7 @@ class MandateInvestorAttributes(BaseModel):
 
     id: int | None = None
     aum: float | None = None
-    type: ClassificationAttributes | None = None
+    type: Annotated[ClassificationAttributes | None, SINGLE] = None
 
 
 class MandateNoteAttributes(BaseModel):
@@ -70,13 +70,13 @@ class MandateExtendedAttributes(BaseModel):
 
     id: int
     updated_at: str | None = None
-    amount: MandateAmountAttributes | None = None
-    status: MandateStatusAttributes | None = None
-    service: MandateServiceAttributes | None = None
-    last_reviewed: MandateReviewedAttributes | None = None
-    institutional_investor: MandateInvestorAttributes | None = None
-    fund: ClassificationAttributes | None = None
-    primary_consultant_firm: ClassificationAttributes | None = None
+    amount: Annotated[MandateAmountAttributes | None, SINGLE] = None
+    status: Annotated[MandateStatusAttributes | None, SINGLE] = None
+    service: Annotated[MandateServiceAttributes | None, SINGLE] = None
+    last_reviewed: Annotated[MandateReviewedAttributes | None, SINGLE] = None
+    institutional_investor: Annotated[MandateInvestorAttributes | None, SINGLE] = None
+    fund: Annotated[ClassificationAttributes | None, SINGLE] = None
+    primary_consultant_firm: Annotated[ClassificationAttributes | None, SINGLE] = None
     consultant: str | None = None
     rfp_link: str | None = None
     note: str | None = None

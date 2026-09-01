@@ -116,6 +116,10 @@ DELIBERATE: dict[tuple[type[BaseModel], str], str] = {
         StrategyGroupAttributes,
         "secondary_strategies",
     ): "declared a single Classification, delivered as a list of them",
+    (
+        PersonRoleAttributes,
+        "specialisms",
+    ): "declared a single Classification, delivered as a list of them",
 }
 
 

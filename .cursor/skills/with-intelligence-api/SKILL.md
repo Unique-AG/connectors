@@ -176,9 +176,14 @@ investor record:
 | `InvestorExtended.asset_allocation_breakdown` | object keyed by asset-class id | a list |
 | `InvestorInvestmentStrategies.secondary_strategies` | one `Classification` | a list of them |
 | `InvestorLatestAum.ranges_usd` | one object | a list of them |
+| `PersonPersonRole.specialisms` | one `Classification` | a list of them |
 
-So treat every list-ish field as either shape. `with_intelligence_client.SEQUENCE` is the
-`BeforeValidator` that does it.
+Five wrong so far, in both directions, so do not model a nested field on the spec's word alone.
+`with_intelligence_client.SEQUENCE` accepts either encoding for a field modelled as a list and
+`SINGLE` accepts a list for a field modelled as one object; apply them to every nested field
+rather than only to the ones already caught. Note an index-keyed object (`{"0": …}`) and a single
+record are told apart by whether every key is a digit — reading `.values()` off a single record
+turns `{"id": 4, "name": "Real Assets"}` into `[4, "Real Assets"]`.
 
 **AUM is in millions.** An investor reporting `aum: 135900` with
 `latest_aum.ranges_usd[0].label == "> $50bn"` is a $135.9bn fund. Publishing the raw number as

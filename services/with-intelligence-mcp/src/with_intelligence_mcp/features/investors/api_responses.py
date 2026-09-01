@@ -10,7 +10,7 @@ from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from with_intelligence_mcp.with_intelligence_client import SEQUENCE
+from with_intelligence_mcp.with_intelligence_client import SEQUENCE, SINGLE
 
 
 class ClassificationAttributes(BaseModel):
@@ -71,9 +71,9 @@ class AddressAttributes(BaseModel):
 
     city: str | None = None
     postcode: str | None = None
-    state: StateAttributes | None = None
-    country: ClassificationAttributes | None = None
-    continent: ClassificationAttributes | None = None
+    state: Annotated[StateAttributes | None, SINGLE] = None
+    country: Annotated[ClassificationAttributes | None, SINGLE] = None
+    continent: Annotated[ClassificationAttributes | None, SINGLE] = None
 
 
 class ConsultantAttributes(BaseModel):
@@ -121,10 +121,10 @@ class InvestorExtendedAttributes(BaseModel):
     website: str | None = None
     year_of_incorporation: int | None = None
     aum: float | None = None
-    latest_aum: LatestAumAttributes | None = None
-    currency: CurrencyAttributes | None = None
-    type: ClassificationAttributes | None = None
-    address: AddressAttributes | None = None
+    latest_aum: Annotated[LatestAumAttributes | None, SINGLE] = None
+    currency: Annotated[CurrencyAttributes | None, SINGLE] = None
+    type: Annotated[ClassificationAttributes | None, SINGLE] = None
+    address: Annotated[AddressAttributes | None, SINGLE] = None
     contacts_total: int | None = None
 
     # `Entity` — ids only. Names and titles come from `/v3/persons`.

@@ -17,7 +17,7 @@ def project_person(record: PersonExtendedAttributes, organisation_id: int) -> Pe
         name=record.full_name or record.name,
         job_title=role.job_title if role else None,
         seniority=role.seniority.name if role and role.seniority else None,
-        specialism=role.specialisms.name if role and role.specialisms else None,
+        specialisms=[entry.name for entry in role.specialisms if entry.name] if role else [],
         email=role.primary_email if role else None,
         phone=(role.primary_phone or role.office_phone) if role else None,
         linkedin=record.linked_in_url,

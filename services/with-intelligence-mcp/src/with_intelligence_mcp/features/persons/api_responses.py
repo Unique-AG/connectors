@@ -9,7 +9,7 @@ from typing import Annotated, ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from with_intelligence_mcp.features.investors import ClassificationAttributes
-from with_intelligence_mcp.with_intelligence_client import SEQUENCE
+from with_intelligence_mcp.with_intelligence_client import SEQUENCE, SINGLE
 
 
 class RoleOrganisationAttributes(BaseModel):
@@ -24,9 +24,11 @@ class RoleOrganisationAttributes(BaseModel):
 class PersonRoleAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
-    organisation: RoleOrganisationAttributes | None = None
-    seniority: ClassificationAttributes | None = None
-    specialisms: ClassificationAttributes | None = None
+    organisation: Annotated[RoleOrganisationAttributes | None, SINGLE] = None
+    seniority: Annotated[ClassificationAttributes | None, SINGLE] = None
+
+    # Declared a single Classification, delivered as a list of them.
+    specialisms: Annotated[list[ClassificationAttributes], SEQUENCE] = Field(default_factory=list)
     job_title: str | None = None
     role_name: str | None = None
     main_for_organisation: bool | None = None

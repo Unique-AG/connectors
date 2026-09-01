@@ -9,7 +9,7 @@ from typing import Annotated, ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from with_intelligence_mcp.features.investors import ClassificationAttributes
-from with_intelligence_mcp.with_intelligence_client import SEQUENCE
+from with_intelligence_mcp.with_intelligence_client import SEQUENCE, SINGLE
 
 
 class CurrencyAmountAttributes(BaseModel):
@@ -24,7 +24,7 @@ class InvestmentAmountAttributes(BaseModel):
 
     amount: float | None = None
     date: str | None = None
-    currency: CurrencyAmountAttributes | None = None
+    currency: Annotated[CurrencyAmountAttributes | None, SINGLE] = None
 
 
 class InvestmentFundAttributes(BaseModel):
@@ -51,10 +51,10 @@ class InvestmentExtendedAttributes(BaseModel):
     updated_at: str | None = None
     deleted_at: str | None = None
     latest_as_of: str | None = None
-    amount: InvestmentAmountAttributes | None = None
-    fund: InvestmentFundAttributes | None = None
-    manager_firm: ClassificationAttributes | None = None
-    institutional_investor: ClassificationAttributes | None = None
+    amount: Annotated[InvestmentAmountAttributes | None, SINGLE] = None
+    fund: Annotated[InvestmentFundAttributes | None, SINGLE] = None
+    manager_firm: Annotated[ClassificationAttributes | None, SINGLE] = None
+    institutional_investor: Annotated[ClassificationAttributes | None, SINGLE] = None
     asset_classes: Annotated[list[ClassificationAttributes], SEQUENCE] = Field(default_factory=list)
     fund_primary_strategies: Annotated[list[ClassificationAttributes], SEQUENCE] = Field(
         default_factory=list

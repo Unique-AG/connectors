@@ -17,7 +17,9 @@ class PersonResponse(OmitNoneModel):
         default=None,
         description="The vendor's seniority band. The closest thing to a decision-maker signal.",
     )
-    specialism: str | None = None
+    specialisms: list[str] = Field(
+        default_factory=list, description="What they cover — often several."
+    )
     email: str | None = None
     phone: str | None = None
     linkedin: str | None = None
