@@ -25,7 +25,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly userProfileId: string;
   private readonly clientId: string;
   private readonly clientSecret: string;
-  private readonly signInTenant: string;
+  private readonly signInTenantId: string;
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
@@ -35,13 +35,13 @@ export class TokenProvider implements AuthenticationProvider {
       userProfileId,
       clientId,
       clientSecret,
-      signInTenant,
+      signInTenantId,
       scopes,
     }: {
       userProfileId: string;
       clientId: string;
       clientSecret: string;
-      signInTenant: string;
+      signInTenantId: string;
       scopes: string[];
     },
     {
@@ -55,7 +55,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.userProfileId = userProfileId;
     this.clientId = clientId;
     this.clientSecret = clientSecret;
-    this.signInTenant = signInTenant;
+    this.signInTenantId = signInTenantId;
     this.scopes = scopes;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
@@ -90,7 +90,7 @@ export class TokenProvider implements AuthenticationProvider {
 
     try {
       // Microsoft OAuth2 token refresh endpoint
-      const response = await fetch(microsoftOAuthTokenUrl(this.signInTenant), {
+      const response = await fetch(microsoftOAuthTokenUrl(this.signInTenantId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
