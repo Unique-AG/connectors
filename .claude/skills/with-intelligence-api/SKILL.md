@@ -1,6 +1,6 @@
 ---
 name: with-intelligence-api
-description: Explains how the With Intelligence v3 REST API works — the sign-in/refresh token flow, the uniform `{pagination, results}` envelope, the thin-listing/`*Extended`-detail split, resolving an investor or person by name to an id, the ~70 vocabulary endpoints every id-based filter is drawn from, `updated_at[from|to]` change-log queries, and what an empty result or a 403 means when entitlements are per-package. Use this EVERY TIME you need to understand how some With Intelligence entity works or where its data comes from — before reading their OpenAPI spec or readme.io docs, adding a with-intelligence-mcp tool/feature, or exploring the live API.
+description: Explains how the With Intelligence v3 REST API works — the sign-in/refresh token flow, the uniform `{pagination, results}` envelope, the thin-listing/`*Extended`-detail split, resolving an investor or person by name to an id, the ~70 vocabulary endpoints every id-based filter is drawn from, `updated_at[from|to]` change-log queries, what an empty result or a 403 means when entitlements are per-package, and the places the spec is wrong about what the API actually sends. Use this EVERY TIME you need to understand how some With Intelligence entity works or where its data comes from — before reading their OpenAPI spec or readme.io docs, adding a with-intelligence-mcp tool/feature, or exploring the live API.
 ---
 
 # The With Intelligence v3 REST API
@@ -161,6 +161,53 @@ a record you can also open in the UI before trusting a field's meaning.
 Worth establishing by live GET, because the spec cannot say: how big each vocabulary actually is
 (it sets cache sizing), what `hfm` filtering does to a result count, which `InvestorExtended`
 fields are densely populated versus mostly null, and what a 429 costs.
+
+## 8. What live calls have established
+
+Facts from real responses that the spec does not give, or gets wrong. Add to this list rather
+than rediscovering them.
+
+**The spec's array/object distinction is unreliable in both directions.** Confirmed on one
+investor record:
+
+| Field | Spec says | API sends |
+| --- | --- | --- |
+| `InvestorExtended.consultants` | `array<InvestorConsultant>` | object keyed `"0"`, `"1"`, … |
+| `InvestorExtended.asset_allocation_breakdown` | object keyed by asset-class id | a list |
+| `InvestorInvestmentStrategies.secondary_strategies` | one `Classification` | a list of them |
+| `InvestorLatestAum.ranges_usd` | one object | a list of them |
+
+So treat every list-ish field as either shape. `with_intelligence_client.SEQUENCE` is the
+`BeforeValidator` that does it.
+
+**AUM is in millions.** An investor reporting `aum: 135900` with
+`latest_aum.ranges_usd[0].label == "> $50bn"` is a $135.9bn fund. Publishing the raw number as
+a plain figure is wrong by six orders of magnitude.
+
+**Prose fields are HTML.** `summary` arrives as `<p>…<em><strong>…</strong></em></p>` with
+`&nbsp;`, so it needs converting before a model reads it.
+
+**Name matching is partial, not exact.** `?name=Virginia` returns 20 investors. So resolving a
+short name is normally ambiguous, and a zero-result answer means no name contains the text —
+not that the caller should try a longer form. Note also that the registered name may carry a
+suffix ("Virginia Retirement System (VRS)").
+
+**`?organisation_id=` on `/v3/persons` takes the investor's id**, and unlike the investor
+record's `contacts`, the person listing carries names. Titles, seniority, email and
+`end_date` live on `person_roles` in the *detail* record, so a roster with titles costs one
+listing call plus one call per person. A person's roles span every employer they have had —
+pick the role whose `organisation.id` or `org_entity_id` matches the investor, or you will
+attribute a previous employer's job title to this one.
+
+**The two contact counts disagree.** For investor 2504, the investor record embedded 64
+`contacts` ids while `/v3/persons?organisation_id=2504` reported `total: 12`. Which is
+authoritative is undocumented — report both rather than picking one.
+
+**`organisation_type_id`** on `/v3/persons` maps `1 = Investor`, `2 = Manager`,
+`3 = Consultant`.
+
+**Entitlements observed:** the trial account returns no `preferences` on an investor record,
+which is what an account without the Intentions & Preferences add-on sees.
 
 ## 7. Entities, and which belong to v1
 

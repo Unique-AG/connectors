@@ -83,7 +83,9 @@ class TestResolvingByName:
         assert result.total_matches == 2
 
     @respx.mock
-    async def test_no_match_explains_how_the_name_filter_behaves(self) -> None:
+    async def test_no_match_says_matching_is_partial(self) -> None:
+        """Probed against the live API: `?name=Virginia` returns 20, so matching is partial and
+        a miss means no name contains the text at all."""
         respx.get(f"{BASE_URL}/v3/investors").mock(
             return_value=httpx.Response(200, json=page_body([], total=0))
         )
@@ -91,7 +93,7 @@ class TestResolvingByName:
         result = await get_investor(name="Nonexistent Pension", client=client)
         assert isinstance(result, InvestorNotFoundResponse)
         assert result.hint is not None
-        assert "registered name" in result.hint
+        assert "partial" in result.hint
 
     @respx.mock
     async def test_the_search_asks_for_the_licensed_packages(self) -> None:

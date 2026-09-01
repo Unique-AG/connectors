@@ -33,6 +33,12 @@ from with_intelligence_mcp.features.investors.api_responses import (
     StateAttributes,
     StrategyGroupAttributes,
 )
+from with_intelligence_mcp.features.persons.api_responses import (
+    PersonExtendedAttributes,
+    PersonListItemAttributes,
+    PersonRoleAttributes,
+    RoleOrganisationAttributes,
+)
 from with_intelligence_mcp.with_intelligence_client import PageInfo
 
 _SNAPSHOT = pathlib.Path(__file__).parent / "spec" / "vendor_schemas.json"
@@ -50,6 +56,10 @@ MODELS: dict[type[BaseModel], str] = {
     ConsultantAttributes: "InvestorConsultant",
     StrategyGroupAttributes: "InvestorInvestmentStrategies",
     AumRangeAttributes: "InvestorLatestAumRangesUsd",
+    PersonListItemAttributes: "Person",
+    PersonExtendedAttributes: "PersonExtended",
+    PersonRoleAttributes: "PersonPersonRole",
+    RoleOrganisationAttributes: "PersonPersonRolesOrganisation",
     PageInfo: "PaginatedResponsePagination",
 }
 

@@ -6,8 +6,13 @@ contacts, fund rosters, mandates, allocation intentions, funds and managers, and
 coverage.
 
 get_investor profiles one institutional investor by name: type, AUM, location, the strategies \
-and structures they allocate to, who they currently invest with, their consultants and key \
-contacts. Several name matches come back as candidates to choose between.
+and structures they allocate to, who they currently invest with, and their consultants. \
+get_people_for_investor lists the contacts there, with each one's title, seniority and contact \
+details at that investor.
+
+Name matching is partial, so a short name matches many investors and comes back as candidates \
+to choose between. AUM is reported in millions. A contact whose role has ended has left — do \
+not present them as reachable.
 
 Two things no field can tell you. An absent value is unknown to With Intelligence, never zero. \
 And responses are filtered to what this subscription licenses — so an empty result, or \

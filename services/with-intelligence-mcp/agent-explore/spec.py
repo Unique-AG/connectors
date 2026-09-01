@@ -142,7 +142,15 @@ def cmd_response(spec: Json, target: str) -> None:
 
 # The schemas `tests/test_spec_conformance.py` checks our models against, plus everything they
 # reference. Add a name here when a feature starts modelling it.
-SNAPSHOT_ROOTS = ("Investor", "InvestorExtended", "PaginatedInvestor", "Auth")
+SNAPSHOT_ROOTS = (
+    "Investor",
+    "InvestorExtended",
+    "PaginatedInvestor",
+    "Person",
+    "PersonExtended",
+    "PaginatedPerson",
+    "Auth",
+)
 _SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "vendor_schemas.json"
 
 

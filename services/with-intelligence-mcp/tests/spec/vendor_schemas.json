@@ -5,6 +5,9 @@
     "Investor",
     "InvestorExtended",
     "PaginatedInvestor",
+    "Person",
+    "PersonExtended",
+    "PaginatedPerson",
     "Auth"
   ],
   "schemas": {
@@ -1082,6 +1085,25 @@
       ],
       "additionalProperties": false
     },
+    "PaginatedPerson": {
+      "type": "object",
+      "properties": {
+        "pagination": {
+          "$ref": "#/components/schemas/PaginatedResponsePagination"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Person"
+          }
+        }
+      },
+      "required": [
+        "pagination",
+        "results"
+      ],
+      "additionalProperties": false
+    },
     "PaginatedResponsePagination": {
       "type": "object",
       "properties": {
@@ -1103,6 +1125,224 @@
         "page_size",
         "count",
         "total"
+      ],
+      "additionalProperties": false
+    },
+    "Person": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "PersonExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "person_roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/PersonPersonRole"
+          }
+        },
+        "biography": {
+          "type": "string"
+        },
+        "first_name": {
+          "type": "string"
+        },
+        "full_name": {
+          "type": "string"
+        },
+        "last_name": {
+          "type": "string"
+        },
+        "linked_in_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at",
+        "person_roles",
+        "biography",
+        "first_name",
+        "full_name",
+        "last_name",
+        "linked_in_url"
+      ],
+      "additionalProperties": false
+    },
+    "PersonPersonRole": {
+      "type": "object",
+      "properties": {
+        "function": {
+          "$ref": "#/components/schemas/Entity"
+        },
+        "organisation": {
+          "$ref": "#/components/schemas/PersonPersonRolesOrganisation"
+        },
+        "seniority": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "specialisms": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "job_title": {
+          "type": "string"
+        },
+        "main_for_organisation": {
+          "type": "boolean"
+        },
+        "main_for_person": {
+          "type": "boolean"
+        },
+        "office_phone": {
+          "type": "string"
+        },
+        "primary_email": {
+          "type": "string"
+        },
+        "primary_phone": {
+          "type": "string"
+        },
+        "role_name": {
+          "type": "string"
+        },
+        "start_date": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "function",
+        "organisation",
+        "seniority",
+        "specialisms",
+        "job_title",
+        "main_for_organisation",
+        "main_for_person",
+        "office_phone",
+        "primary_email",
+        "primary_phone",
+        "role_name",
+        "start_date",
+        "end_date"
+      ],
+      "additionalProperties": false
+    },
+    "PersonPersonRolesOrganisation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "org_entity_id": {
+          "type": "number"
+        },
+        "org_type": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/PersonPersonRolesOrganisationLocation"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "org_entity_id",
+        "org_type",
+        "type",
+        "phone",
+        "locations"
+      ],
+      "additionalProperties": false
+    },
+    "PersonPersonRolesOrganisationLocation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "address1": {
+          "type": "string"
+        },
+        "address2": {
+          "type": "string"
+        },
+        "address3": {
+          "type": "string"
+        },
+        "city": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "continent": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "country": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "id",
+        "address1",
+        "address2",
+        "address3",
+        "city",
+        "continent",
+        "country",
+        "main",
+        "phone",
+        "postcode",
+        "state"
       ],
       "additionalProperties": false
     }

@@ -79,4 +79,7 @@ class TestMcpEndpoint:
         assert _get(client, "/mcp").status_code != 404
 
     def test_the_registered_tools_are_reachable(self) -> None:
-        assert [getattr(fn, "__name__", "") for fn in TOOLS] == ["get_investor"]
+        assert [getattr(fn, "__name__", "") for fn in TOOLS] == [
+            "get_investor",
+            "get_people_for_investor",
+        ]
