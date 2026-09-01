@@ -675,12 +675,13 @@ async def test_incomplete_search_does_not_wait_on_fuzzy_and_still_matches():
 
 
 @pytest.mark.parametrize(
-    ("match_on", "case_sensitive", "query", "expected_content_id"),
+    ("match_on", "case_sensitive", "query", "min_score", "expected_content_id"),
     [
-        ("key", False, "Finance", None),
-        ("path", False, "annual", "c1"),
-        ("key", True, "Annual", None),
-        ("path", False, "finance", "c1"),
+        ("key", False, "Finance", 0.6, None),
+        ("path", False, "annual", 0.6, "c1"),
+        ("key", True, "Annual", 0.6, None),
+        ("path", False, "finance", 0.6, "c1"),
+        ("both", False, "annual", 1.1, None),
     ],
 )
 @pytest.mark.asyncio
@@ -688,6 +689,7 @@ async def test_incomplete_search_respects_match_options(
     match_on: MatchTarget,
     case_sensitive: bool,
     query: str,
+    min_score: float,
     expected_content_id: str | None,
 ):
     info = _make_content_info("c1", key="annual_report.pdf")
@@ -701,6 +703,7 @@ async def test_incomplete_search_respects_match_options(
         result = await content_tree(
             mode="search",
             query=query,
+            min_score=min_score,
             match_on=match_on,
             case_sensitive=case_sensitive,
             config=ContentTreeToolConfig(),
