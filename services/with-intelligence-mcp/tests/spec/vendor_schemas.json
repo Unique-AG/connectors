@@ -8,6 +8,12 @@
     "Person",
     "PersonExtended",
     "PaginatedPerson",
+    "Investment",
+    "InvestmentExtended",
+    "PaginatedInvestment",
+    "Mandate",
+    "MandateExtended",
+    "PaginatedMandate",
     "Auth"
   ],
   "schemas": {
@@ -230,6 +236,230 @@
       },
       "required": [
         "id"
+      ],
+      "additionalProperties": false
+    },
+    "Investment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "InvestmentAmount": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "date": {
+          "type": "string"
+        },
+        "currency": {
+          "$ref": "#/components/schemas/InvestmentAmountCurrency"
+        }
+      },
+      "required": [
+        "amount",
+        "date",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "InvestmentAmountCurrency": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "short_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "short_name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestmentExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "deleted_at": {
+          "type": "string"
+        },
+        "latest_as_of": {
+          "type": "string"
+        },
+        "amount": {
+          "$ref": "#/components/schemas/InvestmentAmount"
+        },
+        "fund": {
+          "$ref": "#/components/schemas/InvestmentFund"
+        },
+        "manager_firm": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "institutional_investor": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "asset_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_approaches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_company_size_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_continents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_countries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_sub_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_market_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_sub_markets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_instruments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_primary_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_secondary_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_primary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "updated_at",
+        "deleted_at",
+        "latest_as_of",
+        "amount",
+        "fund",
+        "manager_firm",
+        "institutional_investor",
+        "asset_classes",
+        "fund_attributes",
+        "fund_approaches",
+        "fund_company_size_focuses",
+        "fund_continents",
+        "fund_countries",
+        "fund_regions",
+        "fund_sub_regions",
+        "fund_market_focuses",
+        "fund_sub_markets",
+        "fund_structures",
+        "fund_instruments",
+        "fund_primary_industries",
+        "fund_secondary_industries",
+        "fund_primary_strategies",
+        "fund_secondary_strategies"
+      ],
+      "additionalProperties": false
+    },
+    "InvestmentFund": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unknown": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "unknown"
       ],
       "additionalProperties": false
     },
@@ -1066,6 +1296,390 @@
       ],
       "additionalProperties": false
     },
+    "Mandate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "MandateAmount": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "$ref": "#/components/schemas/MandateAmountCurrency"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "MandateAmountCurrency": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "short_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "short_name"
+      ],
+      "additionalProperties": false
+    },
+    "MandateExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "amount": {
+          "$ref": "#/components/schemas/MandateAmount"
+        },
+        "approaches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "asset_class": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "capital_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "consultant": {
+          "type": "string"
+        },
+        "fund": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "fund_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/MandateFundIndustryGroup"
+          }
+        },
+        "fund_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "institutional_investor": {
+          "$ref": "#/components/schemas/MandateInstitutionalInvestor"
+        },
+        "last_reviewed": {
+          "$ref": "#/components/schemas/MandateLastReviewed"
+        },
+        "managers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/MandateManager"
+          }
+        },
+        "market_caps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "market_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "note": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/MandateNote"
+          }
+        },
+        "primary_consultant_firm": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "primary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "rfp_link": {
+          "type": "string"
+        },
+        "search_consultant": {
+          "$ref": "#/components/schemas/MandateSearchConsultant"
+        },
+        "secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "service": {
+          "$ref": "#/components/schemas/MandateServiceExtended"
+        },
+        "service_providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "status": {
+          "$ref": "#/components/schemas/MandateStatusExtended"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at",
+        "amount",
+        "approaches",
+        "asset_class",
+        "attributes",
+        "capital_structures",
+        "consultant",
+        "fund",
+        "fund_industries",
+        "fund_structures",
+        "institutional_investor",
+        "last_reviewed",
+        "managers",
+        "market_caps",
+        "market_focuses",
+        "note",
+        "notes",
+        "primary_consultant_firm",
+        "primary_strategies",
+        "rfp_link",
+        "search_consultant",
+        "secondary_strategies",
+        "service",
+        "service_providers",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "MandateFundIndustryGroup": {
+      "type": "object",
+      "properties": {
+        "primaryIndustry": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "secondaryIndustries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": [
+        "primaryIndustry",
+        "secondaryIndustries"
+      ],
+      "additionalProperties": false
+    },
+    "MandateInstitutionalInvestor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "aum": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "id",
+        "aum",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "MandateLastReviewed": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "additionalProperties": false
+    },
+    "MandateManager": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "status": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "MandateNote": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/components/schemas/MandateNoteStatus"
+        }
+      },
+      "required": [
+        "date",
+        "note",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "MandateNoteStatus": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sub_status": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sub_status"
+      ],
+      "additionalProperties": false
+    },
+    "MandateSearchConsultant": {
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "firm": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "contacts",
+        "firm"
+      ],
+      "additionalProperties": false
+    },
+    "MandateServiceExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "MandateStatusExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sub_status": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sub_status"
+      ],
+      "additionalProperties": false
+    },
+    "PaginatedInvestment": {
+      "type": "object",
+      "properties": {
+        "pagination": {
+          "$ref": "#/components/schemas/PaginatedResponsePagination"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Investment"
+          }
+        }
+      },
+      "required": [
+        "pagination",
+        "results"
+      ],
+      "additionalProperties": false
+    },
     "PaginatedInvestor": {
       "type": "object",
       "properties": {
@@ -1076,6 +1690,25 @@
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/Investor"
+          }
+        }
+      },
+      "required": [
+        "pagination",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "PaginatedMandate": {
+      "type": "object",
+      "properties": {
+        "pagination": {
+          "$ref": "#/components/schemas/PaginatedResponsePagination"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Mandate"
           }
         }
       },

@@ -86,6 +86,8 @@ class TestMcpEndpoint:
         assert [getattr(fn, "__name__", "") for fn in TOOLS] == [
             "get_investor",
             "get_people_for_investor",
+            "get_investments",
+            "get_mandates",
         ]
 
 

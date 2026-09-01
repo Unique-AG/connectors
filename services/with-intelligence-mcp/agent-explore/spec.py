@@ -149,6 +149,12 @@ SNAPSHOT_ROOTS = (
     "Person",
     "PersonExtended",
     "PaginatedPerson",
+    "Investment",
+    "InvestmentExtended",
+    "PaginatedInvestment",
+    "Mandate",
+    "MandateExtended",
+    "PaginatedMandate",
     "Auth",
 )
 _SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "vendor_schemas.json"

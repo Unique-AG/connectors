@@ -20,6 +20,13 @@ from typing import get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
+from with_intelligence_mcp.features.investments.api_responses import (
+    CurrencyAmountAttributes,
+    InvestmentAmountAttributes,
+    InvestmentExtendedAttributes,
+    InvestmentFundAttributes,
+    InvestmentListItemAttributes,
+)
 from with_intelligence_mcp.features.investors.api_responses import (
     AddressAttributes,
     AumRangeAttributes,
@@ -33,6 +40,16 @@ from with_intelligence_mcp.features.investors.api_responses import (
     StateAttributes,
     StrategyGroupAttributes,
 )
+from with_intelligence_mcp.features.mandates.api_responses import (
+    MandateAmountAttributes,
+    MandateExtendedAttributes,
+    MandateInvestorAttributes,
+    MandateListItemAttributes,
+    MandateNoteAttributes,
+    MandateReviewedAttributes,
+    MandateServiceAttributes,
+    MandateStatusAttributes,
+)
 from with_intelligence_mcp.features.persons.api_responses import (
     PersonExtendedAttributes,
     PersonListItemAttributes,
@@ -43,8 +60,9 @@ from with_intelligence_mcp.with_intelligence_client import PageInfo
 
 _SNAPSHOT = pathlib.Path(__file__).parent / "spec" / "vendor_schemas.json"
 
-# Our model -> the vendor schema it transcribes.
-MODELS: dict[type[BaseModel], str] = {
+# Our model -> the vendor schema it transcribes, or the several it transcribes where the vendor
+# declares the same shape under more than one name (`{id, short_name}` appears three times).
+MODELS: dict[type[BaseModel], str | tuple[str, ...]] = {
     InvestorListItemAttributes: "Investor",
     InvestorExtendedAttributes: "InvestorExtended",
     ClassificationAttributes: "Classification",
@@ -60,6 +78,19 @@ MODELS: dict[type[BaseModel], str] = {
     PersonExtendedAttributes: "PersonExtended",
     PersonRoleAttributes: "PersonPersonRole",
     RoleOrganisationAttributes: "PersonPersonRolesOrganisation",
+    InvestmentListItemAttributes: "Investment",
+    InvestmentExtendedAttributes: "InvestmentExtended",
+    InvestmentAmountAttributes: "InvestmentAmount",
+    InvestmentFundAttributes: "InvestmentFund",
+    CurrencyAmountAttributes: ("InvestmentAmountCurrency", "MandateAmountCurrency"),
+    MandateListItemAttributes: "Mandate",
+    MandateExtendedAttributes: "MandateExtended",
+    MandateAmountAttributes: "MandateAmount",
+    MandateStatusAttributes: "MandateStatusExtended",
+    MandateServiceAttributes: "MandateServiceExtended",
+    MandateReviewedAttributes: "MandateLastReviewed",
+    MandateInvestorAttributes: "MandateInstitutionalInvestor",
+    MandateNoteAttributes: "MandateNote",
     PageInfo: "PaginatedResponsePagination",
 }
 
@@ -160,6 +191,13 @@ def _spec_kind(prop: dict[str, object]) -> tuple[str, object]:
     return ("unknown", declared)
 
 
+def _transcribed_by(model: type[BaseModel]) -> tuple[str, ...]:
+    declared = MODELS.get(model)
+    if declared is None:
+        return ()
+    return (declared,) if isinstance(declared, str) else declared
+
+
 def _matches(ours: tuple[str, object], theirs: tuple[str, object]) -> bool:
     our_kind, our_detail = ours
     their_kind, their_detail = theirs
@@ -174,11 +212,11 @@ def _matches(ours: tuple[str, object], theirs: tuple[str, object]) -> bool:
     if our_kind == "model":
         # The nested class has to transcribe the schema the vendor actually references.
         assert isinstance(our_detail, type)
-        return MODELS.get(typing.cast("type[BaseModel]", our_detail)) == their_detail
+        return their_detail in _transcribed_by(typing.cast("type[BaseModel]", our_detail))
     return True
 
 
-_PAIRS = list(MODELS.items())
+_PAIRS = [(model, schema) for model in MODELS for schema in _transcribed_by(model)]
 
 
 class TestEveryDeclaredFieldExists:
@@ -224,6 +262,16 @@ class TestTheDetectionItself:
 
     def test_the_real_nested_declaration_passes(self) -> None:
         assert _matches(_our_kind(ClassificationAttributes | None), ("model", "Classification"))
+
+    def test_one_class_may_transcribe_several_identically_shaped_schemas(self) -> None:
+        """The vendor declares `{id, short_name}` under three names; one class covers them."""
+        assert _matches(
+            _our_kind(CurrencyAmountAttributes | None), ("model", "MandateAmountCurrency")
+        )
+        assert _matches(
+            _our_kind(CurrencyAmountAttributes | None), ("model", "InvestmentAmountCurrency")
+        )
+        assert not _matches(_our_kind(CurrencyAmountAttributes | None), ("model", "Classification"))
 
     def test_a_wrong_nested_model_is_caught(self) -> None:
         """Right kind, wrong schema — `country: CurrencyAttributes` must not pass."""
