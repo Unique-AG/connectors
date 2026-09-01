@@ -33,6 +33,7 @@ const SCAN_PROGRESS_LOG_INTERVAL = 100;
 
 interface ScanProgress {
   filesScanned: number;
+  itemsVisited: number;
   maxFiles?: number;
 }
 
@@ -96,7 +97,7 @@ export class GraphApiService {
     const logPrefix = `[Site: ${siteId}]`;
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
-    const progress: ScanProgress = { filesScanned: 0, maxFiles: maxFilesToScan };
+    const progress: ScanProgress = { filesScanned: 0, itemsVisited: 0, maxFiles: maxFilesToScan };
 
     if (progress.maxFiles) {
       this.logger.warn(
@@ -116,7 +117,7 @@ export class GraphApiService {
 
       const resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
       if (!resolvedColumnName) {
-        this.logger.warn(
+        this.logger.log(
           `[Site: ${siteId}] Drive "${smearedDriveName}" does not have sync column "${syncColumnName}", skipping`,
         );
         continue;
@@ -194,7 +195,7 @@ export class GraphApiService {
     const sitePagesColumns = await this.getListColumns(siteId, sitePagesList.id);
     const resolvedColumnName = this.resolveSyncColumnName(sitePagesColumns, syncColumnName);
     if (!resolvedColumnName) {
-      this.logger.warn(
+      this.logger.log(
         `${logPrefix} SitePages list does not have sync column "${syncColumnName}", skipping`,
       );
       return [];
@@ -550,6 +551,14 @@ export class GraphApiService {
           break;
         }
 
+        if (progress.itemsVisited > 0 && progress.itemsVisited % SCAN_PROGRESS_LOG_INTERVAL === 0) {
+          this.logger.log(
+            `${logPrefix} Scanning drive "${smearedDriveName}", ${progress.itemsVisited} items visited, ${progress.filesScanned} files found so far for site`,
+          );
+        }
+
+        progress.itemsVisited++;
+
         if (this.isFolder(driveItem)) {
           const { items, directories } = await this.recursivelyFetchDriveItems(
             driveId,
@@ -589,11 +598,6 @@ export class GraphApiService {
           });
 
           progress.filesScanned++;
-          if (progress.filesScanned % SCAN_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log(
-              `${logPrefix} Scanning drive "${smearedDriveName}", ${progress.filesScanned} files found so far for site`,
-            );
-          }
         }
       }
 
