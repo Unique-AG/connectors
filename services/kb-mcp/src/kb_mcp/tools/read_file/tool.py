@@ -309,7 +309,7 @@ async def read_file(
             suffix = Path(content.key).suffix
             _LOGGER.info(
                 "read_file complete correlation_id=%s content_id=%s is_error=True "
-                "reason=unsupported_extension mime_type=%s",
+                "reason=unsupported_file_type mime_type=%s",
                 cid,
                 content_id,
                 content.mime_type,
