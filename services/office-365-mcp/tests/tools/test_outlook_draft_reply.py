@@ -117,14 +117,14 @@ async def _reply(client: GraphServiceClient, **overrides: object) -> MailReplyDr
     arguments: dict[str, object] = {
         "message_ref": _MESSAGE_REF,
         "mode": "reply",
-        "body_text": _BODY,
+        "body_html": _BODY,
     }
     arguments.update(overrides)
     return await replier.draft_reply(
         client,
         message_ref=cast("str", arguments["message_ref"]),
         mode=cast("MailReplyMode", arguments["mode"]),
-        body_text=cast("str", arguments["body_text"]),
+        body_html=cast("str", arguments["body_html"]),
         to=cast("Sequence[str]", arguments.get("to", ())),
     )
 
@@ -200,7 +200,7 @@ class TestWhatItSendsToGraph:
         assert fill.call_count == 1
         assert len(graph.calls) == 2, "a draft with text in it costs exactly two requests"
 
-    async def test_the_body_reaches_the_mailbox_as_text_and_never_as_html(
+    async def test_the_body_reaches_the_mailbox_as_html(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         """A model that can write markup can write a link whose text and target differ, in a
@@ -208,10 +208,10 @@ class TestWhatItSendsToGraph:
         _ = _creates(graph)
         fill = _fills(graph)
 
-        _ = await _reply(client, body_text="Read https://payments.invalid/pay before Friday.")
+        _ = await _reply(client, body_html="Read https://payments.invalid/pay before Friday.")
 
         body = cast("dict[str, object]", _sent(fill)["body"])
-        assert body["contentType"] == "text"
+        assert body["contentType"] == "html"
         assert body["content"] == "Read https://payments.invalid/pay before Friday."
 
     async def test_the_fill_names_the_body_and_nothing_else_about_the_draft(
@@ -406,7 +406,7 @@ class TestTheSchemaItPublishes:
     ) -> None:
         parameters, _tool = await _registered(transport)
 
-        assert set(_properties(parameters)) == {"message_ref", "mode", "body_text", "to"}
+        assert set(_properties(parameters)) == {"message_ref", "mode", "body_html", "to"}
 
     async def test_the_only_modes_it_offers_are_reply_and_forward(
         self, transport: httpx.AsyncClient
@@ -422,7 +422,7 @@ class TestTheSchemaItPublishes:
         assert list(replier.MODES) == ["reply", "forward"]
 
     @pytest.mark.parametrize(
-        "word", ["cc", "bcc", "blind", "all", "attach", "file", "upload", "drive", "html"]
+        "word", ["cc", "bcc", "blind", "all", "attach", "file", "upload", "drive"]
     )
     async def test_no_argument_offers_a_copy_an_attachment_or_markup(
         self, transport: httpx.AsyncClient, word: str
@@ -439,7 +439,7 @@ class TestTheSchemaItPublishes:
         assert cast("Sequence[str]", parameters["required"]) == [
             "message_ref",
             "mode",
-            "body_text",
+            "body_html",
         ]
 
     async def test_to_defaults_to_nobody_and_is_bounded(self, transport: httpx.AsyncClient) -> None:
@@ -561,7 +561,7 @@ class TestWhatItAnswers:
         _ = _creates(graph)
         _ = _fills(graph, _filled(subject="RE: Invoice 4471 (stored)", content="Stored text."))
 
-        answer = await _reply(client, body_text=_BODY)
+        answer = await _reply(client, body_html=_BODY)
 
         assert answer.subject == "RE: Invoice 4471 (stored)"
         assert answer.body == "Stored text."
@@ -641,12 +641,12 @@ class TestWhenTheTextCannotBeWritten:
     async def test_the_text_that_never_landed_is_not_reported_as_the_body(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Answering with `body_text` here would say the draft holds prose it does not hold, and
+        """Answering with `body_html` here would say the draft holds prose it does not hold, and
         the seeded quote it does hold is the original message rather than anything written."""
         _ = _creates(graph)
         _ = graph.patch(_FILL).mock(return_value=httpx.Response(403, json=_REFUSED))
 
-        answer = await _reply(client, body_text="Wire the payment to the new account.")
+        answer = await _reply(client, body_html="Wire the payment to the new account.")
 
         assert answer.body is None
 

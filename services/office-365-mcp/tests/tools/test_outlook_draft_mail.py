@@ -52,7 +52,7 @@ def _created(
         "bodyPreview": _BODY,
         "toRecipients": [dict(one) for one in (to or [_recipient("Ada Lovelace", _ADA)])],
         "ccRecipients": [dict(one) for one in cc],
-        "body": dict(body) if body is not None else {"contentType": "text", "content": _BODY},
+        "body": dict(body) if body is not None else {"contentType": "html", "content": _BODY},
         "webLink": web_link,
         "parentFolderId": "AQMkADAwSYNTHETIC-drafts",
         "hasAttachments": False,
@@ -65,13 +65,13 @@ def _creates(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route
 
 async def _draft(client: GraphServiceClient, **overrides: object) -> MailDraft:
     """One valid call, so a test that is about something else says only that thing."""
-    arguments: dict[str, object] = {"to": [_ADA], "subject": _SUBJECT, "body_text": _BODY}
+    arguments: dict[str, object] = {"to": [_ADA], "subject": _SUBJECT, "body_html": _BODY}
     arguments.update(overrides)
     return await drafter.draft_mail(
         client,
         to=cast("Sequence[str]", arguments["to"]),
         subject=cast("str", arguments["subject"]),
-        body_text=cast("str", arguments["body_text"]),
+        body_html=cast("str", arguments["body_html"]),
         cc=cast("Sequence[str]", arguments.get("cc", ())),
     )
 
@@ -119,18 +119,30 @@ class TestWhatItSendsToGraph:
 
         assert route.call_count == 1, "one draft, one request"
 
-    async def test_the_body_is_sent_as_text_and_never_as_html(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+    @pytest.mark.parametrize(
+        "written",
+        [
+            "Read https://payments.invalid/pay before Friday.",
+            "<p>Hello</p><p>Thanks</p>",
+            "<a href='https://evil.invalid'>https://bank.invalid</a>",
+            "<img src='https://tracker.invalid/p.gif'>",
+            "<script>alert(1)</script>",
+            "<div onclick='x'>x</div>",
+            "a &lt; b &amp; c",
+        ],
+    )
+    async def test_the_body_is_sent_as_html_exactly_as_written(
+        self, client: GraphServiceClient, graph: respx.MockRouter, written: str
     ) -> None:
-        """A model that can write markup can write a link whose text and target differ, in a
-        message a human sends under their own name."""
+        """Microsoft owns what is safe in a body. This connector filters nothing, so whatever the
+        caller wrote reaches Graph byte for byte, and one example would not say that."""
         route = _creates(graph, _created())
 
-        _ = await _draft(client, body_text="Read https://payments.invalid/pay before Friday.")
+        _ = await _draft(client, body_html=written)
 
         body = cast("dict[str, object]", _sent(route)["body"])
-        assert body["contentType"] == "text"
-        assert body["content"] == "Read https://payments.invalid/pay before Friday."
+        assert body["contentType"] == "html"
+        assert body["content"] == written
 
     async def test_it_sends_the_recipients_and_the_subject_it_was_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -256,11 +268,9 @@ class TestTheSchemaItPublishes:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"to", "subject", "body_text", "cc"}
+        assert set(properties) == {"to", "subject", "body_html", "cc"}
 
-    @pytest.mark.parametrize(
-        "word", ["attach", "bcc", "blind", "file", "upload", "drive", "html", "url"]
-    )
+    @pytest.mark.parametrize("word", ["attach", "bcc", "blind", "file", "upload", "drive", "url"])
     async def test_no_argument_offers_an_attachment_a_blind_copy_or_markup(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
@@ -280,7 +290,7 @@ class TestTheSchemaItPublishes:
         to = cast("Mapping[str, object]", properties["to"])
         assert to["minItems"] == 1
         assert to["maxItems"] == drafter.MAX_RECIPIENTS
-        assert cast("Sequence[str]", parameters["required"]) == ["to", "subject", "body_text"]
+        assert cast("Sequence[str]", parameters["required"]) == ["to", "subject", "body_html"]
 
     async def test_cc_is_optional_and_bounded_the_same_way(
         self, transport: httpx.AsyncClient
@@ -367,7 +377,7 @@ class TestWhatItAnswers:
             ),
         )
 
-        answer = await _draft(client, subject=_SUBJECT, body_text=_BODY)
+        answer = await _draft(client, subject=_SUBJECT, body_html=_BODY)
 
         assert answer.subject == "Invoice 4471 (stored)"
         assert answer.body == "Stored by Microsoft."

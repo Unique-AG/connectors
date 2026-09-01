@@ -51,8 +51,13 @@ anything. The description states this, so a caller is not surprised by a file th
 the SDK retries `POST` as readily as `GET`. So a 503 that arrives after Graph created the draft
 leaves a second one. A retried fill then writes into whichever of them the response named.
 
-**The body is sent as text and never as HTML.** The model writes this prose. Markup it wrote
-carries a link whose visible text and target differ into a message a human sends as themselves.
+**The body is sent as HTML.** Microsoft owns what is safe in a message body, and
+this connector adds no filtering of its own. A second filter here drifts from what the API allows
+and refuses markup Outlook accepts. `contentType: "html"` is the only content type these tools
+write, so no argument names a format. A body with no tags in it is valid HTML, so plain prose
+still works, but a newline is not a line break and `&`, `<` and `>` are markup. Write `<p>` and
+`<br>` for structure, and escape those three characters where they are meant to read as
+themselves.
 
 **`Prefer: IdType="ImmutableId"` on both requests.** The handle coming in carries the immutable
 id the reading tools mint, and Graph reads a path id in whichever id space the request declares.
@@ -103,7 +108,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
     "mode": "reply",
-    "body_text": "Thanks — Friday works.",
+    "body_html": "Thanks — Friday works.",
 }
 
 # The default 404 advice, to check the id was copied from a tool response verbatim, is wrong here
@@ -147,8 +152,8 @@ what Microsoft actually stored on the draft, and on a reply they can be an addre
 original's reply-to, not its sender. A forward carries the original message's own attachments. \
 This is Microsoft copying the message, not this tool attaching anything. There is NO attachment \
 argument here, and no tool in this connector can attach a file, link, image or document to \
-anything. `body_text` is stored as plain text, never HTML, and it REPLACES the quoted original \
-that Microsoft seeds the draft with. Write any quoting the message needs into `body_text` \
+anything. `body_html` is stored as HTML, and it REPLACES the quoted original \
+that Microsoft seeds the draft with. Write any quoting the message needs into `body_html` \
 yourself.\
 """
 
@@ -247,10 +252,11 @@ class MailReplyDraft(BaseModel):
     )
     body: str | None = Field(
         description=(
-            "The message text as Microsoft stored it once the body was written, read off that "
-            + "response. Stored as plain text, so this is the characters the recipient will see "
-            + "and not markup. Null when `body_written` is false, in which case the draft in the "
-            + "mailbox holds none of the intended text."
+            "The body as Microsoft stored it once it was written, read off that response. It "
+            + "is HTML, and Microsoft can wrap what was sent in a whole HTML document, so this "
+            + "is not always the string that was sent. The recipient sees it rendered. Read the "
+            + "words to the user, not the tags. Null when `body_written` is false, in which case "
+            + "the draft in the mailbox holds none of the intended text."
         )
     )
     body_written: bool = Field(
@@ -284,7 +290,7 @@ async def draft_reply(
     *,
     message_ref: str,
     mode: MailReplyMode,
-    body_text: str,
+    body_html: str,
     to: Sequence[str] = (),
 ) -> MailReplyDraft:
     """Create one draft and write its text, in two non-retriable requests, reporting both."""
@@ -299,7 +305,7 @@ async def draft_reply(
     with graph_errors(TOOL_NAME):
         created = await _create(client, handle=handle, mode=mode, recipients=recipients)
         assert created.id is not None, "Graph created a draft it gave no id, which cannot be filled"
-        fill = await _fill(client, draft_id=created.id, body_text=body_text)
+        fill = await _fill(client, draft_id=created.id, body_html=body_html)
 
     return _answer(mode, created=created, fill=fill)
 
@@ -344,7 +350,7 @@ async def _create(
     return draft
 
 
-async def _fill(client: GraphServiceClient, *, draft_id: str, body_text: str) -> _Fill:
+async def _fill(client: GraphServiceClient, *, draft_id: str, body_html: str) -> _Fill:
     """The text, into the draft the create just made.
 
     The refusal is caught rather than raised: the draft is already in the mailbox by now, and an
@@ -353,7 +359,7 @@ async def _fill(client: GraphServiceClient, *, draft_id: str, body_text: str) ->
     try:
         with graph_step(STEP_FILL_REPLY):
             filled = await client.me.messages.by_message_id(draft_id).patch(
-                Message(body=ItemBody(content_type=BodyType.Text, content=body_text)),
+                Message(body=ItemBody(content_type=BodyType.Html, content=body_html)),
                 request_configuration=_request(),
             )
     except GraphFailure as failure:
@@ -428,17 +434,18 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ],
-        body_text: Annotated[
+        body_html: Annotated[
             str,
             Field(
                 min_length=1,
                 description=(
-                    "What to say, as plain text. It is stored as text and never as HTML, so "
-                    + "markup written here is stored as the characters it is made of rather than "
-                    + "rendered — write prose, and write a URL out in full rather than hiding it "
-                    + "behind words. It replaces the quoted original Microsoft seeds the draft "
-                    + "with, so quote what the message needs to quote here. There is no way to "
-                    + "attach anything, so do not promise an attached file."
+                    "What to say, as HTML. Microsoft stores and renders it as HTML, so a "
+                    + "newline is not a line break: use `<p>` and `<br>`. Escape `&`, `<` and "
+                    + "`>` where they must read as themselves. A body with no tags is valid "
+                    + "HTML. Write a URL out in full rather than hiding it behind other words. "
+                    + "It replaces the quoted original Microsoft seeds the draft with, so quote "
+                    + "what the message needs to quote here. There is no way to attach "
+                    + "anything, so do not promise an attached file."
                 ),
             ),
         ],
@@ -464,5 +471,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         client: GraphServiceClient = graph,
     ) -> MailReplyDraft:
         return await draft_reply(
-            client, message_ref=message_ref, mode=mode, body_text=body_text, to=to
+            client, message_ref=message_ref, mode=mode, body_html=body_html, to=to
         )
