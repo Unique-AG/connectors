@@ -38,6 +38,56 @@
             }
           },
           "additionalProperties": false
+        },
+        "enabledTools": {
+          "type": "array",
+          "description": "MCP tool names to advertise on /mcp — joined into KB_MCP_ENABLED_TOOLS (see kb_mcp.settings.KNOWN_MCP_TOOLS for the allowlist). Server-wide. Empty/unset means all tools. Restart required for changes to take effect.",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [
+            ["search", "read_file"]
+          ]
+        },
+        "search": {
+          "type": "object",
+          "description": "The search tool's own tuning knobs.",
+          "properties": {
+            "scopeLookupConcurrency": {
+              "type": "integer",
+              "description": "Max concurrent scope-id lookups per search call. Mirrors the app's own default (kb_mcp.settings.Settings.scope_lookup_concurrency) so it stays visible here and stable across app releases.",
+              "minimum": 1,
+              "default": 8
+            }
+          },
+          "additionalProperties": false
+        },
+        "contentTree": {
+          "type": "object",
+          "description": "The content_tree tool's own cache tuning. Only reachable while content_tree is enabled (see enabledTools).",
+          "properties": {
+            "cache": {
+              "type": "object",
+              "description": "Mirrors the app's own defaults (kb_mcp.settings.Settings.content_tree_cache_*) so they stay visible here and stable across app releases.",
+              "properties": {
+                "ttlSeconds": {
+                  "type": "integer",
+                  "description": "Seconds a cached ContentTree stays valid.",
+                  "minimum": 1,
+                  "default": 1800
+                },
+                "maxEntries": {
+                  "type": "integer",
+                  "description": "Max cached ContentTree entries.",
+                  "minimum": 1,
+                  "default": 128
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

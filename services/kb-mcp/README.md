@@ -31,6 +31,10 @@ Ops access lines for `/probe`, `/health`, and `/metrics` are silenced.
 | `content_tree` | Browse / list / fuzzy-search visible folders & files |
 | `read_file` | Download and return file content by `content_id` |
 
+Which tools are advertised on `/mcp` is configurable via `KB_MCP_ENABLED_TOOLS`
+(unset = all three) — see `.env.example` / `mcpConfig.enabledTools` in the Helm
+chart.
+
 ## Tests
 
 ```bash

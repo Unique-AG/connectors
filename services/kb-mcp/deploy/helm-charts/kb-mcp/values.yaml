@@ -25,6 +25,18 @@ mcpConfig:
     frontendBaseUrl: "" # optional, e.g. https://<tenant>.unique.app
   zitadel:
     baseUrl: "" # e.g. https://id.<tenant>.unique.app
+  # -- MCP tool names to advertise, e.g. [search, read_file] to hide
+  # content_tree. Server-wide — empty (default) means all tools.
+  enabledTools: []
+  # -- The search tool's own tuning knobs.
+  search:
+    scopeLookupConcurrency: 8
+  # -- The content_tree tool's own cache tuning. Only reachable while
+  # content_tree is enabled (see enabledTools above).
+  contentTree:
+    cache:
+      ttlSeconds: 1800
+      maxEntries: 128
 
 # -- Secrets. The Unique QA overlay uses extraEnvSecrets + external-secrets
 # instead; the envVars + secretKeyRef pattern below is a portable fallback
