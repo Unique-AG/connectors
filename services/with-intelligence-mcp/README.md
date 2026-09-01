@@ -102,11 +102,16 @@ uv run basedpyright .        # type check
 ## The vendor API
 
 Read `.claude/skills/with-intelligence-api/` before adding a feature that touches a new entity.
-The spec is public and needs no credentials:
+Two CLIs under `agent-explore/` answer the two kinds of question:
 
 ```bash
-curl https://api.withintelligence.com/v3/docs/json    # OpenAPI 3.0, 143 paths
+uv run agent-explore/spec.py paths investor          # shapes, from the public OpenAPI spec
+uv run agent-explore/spec.py schema InvestorExtended
+uv run agent-explore/explore.py /v3/investors/2504   # behaviour, from a live GET (needs .env)
 ```
+
+`spec.py` needs no credentials — the spec is public. `explore.py` signs in with the username and
+password from `agent-explore/.env`, caches the token and every response, and only ever GETs.
 
 Three things about it shape most of the code here: listings return `{id, name, updated_at}` and
 the rich record lives at `GET /{id}`; filters take vocabulary **ids** (`primary_strategy_id`,
