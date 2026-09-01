@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { pick, prop } from 'remeda';
+import { chunk, pick, prop } from 'remeda';
 import { Smeared } from '../../utils/smeared';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -132,17 +132,19 @@ export class UniqueGroupsService {
   }
 
   public async addGroupMembers(groupId: string, memberIds: string[]): Promise<void> {
-    await this.scopeManagementClient.request<
-      AddGroupMembersMutationResult,
-      AddGroupMembersMutationInput
-    >(
-      ADD_GROUP_MEMBERS_MUTATION,
-      {
-        groupId,
-        userIds: memberIds,
-      },
-      { logSafeKeys: ADD_GROUP_MEMBERS_LOG_SAFE_KEYS },
-    );
+    for (const memberIdsBatch of chunk(memberIds, BATCH_SIZE)) {
+      await this.scopeManagementClient.request<
+        AddGroupMembersMutationResult,
+        AddGroupMembersMutationInput
+      >(
+        ADD_GROUP_MEMBERS_MUTATION,
+        {
+          groupId,
+          userIds: memberIdsBatch,
+        },
+        { logSafeKeys: ADD_GROUP_MEMBERS_LOG_SAFE_KEYS },
+      );
+    }
   }
 
   public async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
