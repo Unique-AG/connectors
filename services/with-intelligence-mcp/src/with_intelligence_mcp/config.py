@@ -124,9 +124,9 @@ class AssetClassGroup(StrEnum):
 class WithIntelligenceConfig(BaseSettings):
     """Where to reach the v3 REST API, with what credential, and how hard to lean on it.
 
-    The credential here is interim. The plan is a hosted login form per user with the session
-    encrypted per user in Postgres; until that lands, one configured account serves every
-    caller. Spec: /v3/docs/json (public).
+    The credential here is interim: one configured account serves every caller, until a hosted
+    login form per user replaces it with a session encrypted per user in Postgres. Spec:
+    /v3/docs/json (public).
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="WITH_INTELLIGENCE_")

@@ -1,4 +1,4 @@
-"""The structural rules this package's layout depends on, ported from backstop-mcp.
+"""The structural rules this package's layout depends on.
 
 1. `features/` must not import `server/`.
 2. `with_intelligence_client/` must not import `features/`.

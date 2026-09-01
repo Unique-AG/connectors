@@ -1,13 +1,13 @@
 """A `CallerSession` backed by one credential from configuration.
 
 **Interim.** It authenticates every MCP caller as a single shared account, which is not what
-this connector is meant to do — the plan is a hosted login form per user, with the session
-encrypted per user in Postgres. It exists so tools can be built and run against real data
-before that lands, and because it holds the token exactly the way the per-user store will have
-to: one holder, one lock, renewed under it.
+this connector is meant to do — a hosted login form per user, with the session encrypted per
+user in Postgres, replaces it. It exists so tools can be built and run against real data before
+that lands, and because it holds the token exactly the way the per-user store will have to: one
+holder, one lock, renewed under it.
 
-Phase 2 replaces this class and nothing else. Tools depend on the `CallerSession` Protocol, not
-on this.
+That replacement is this class and nothing else — tools depend on the `CallerSession` Protocol,
+not on this.
 """
 
 import asyncio

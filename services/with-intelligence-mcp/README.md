@@ -5,10 +5,9 @@ investor data for alternative markets, built for the investor-relations use case
 investors and their contacts, fund rosters, mandates, allocation intentions, funds and managers,
 and editorial coverage.
 
-Modelled on `services/backstop-mcp`, which it shares its layout, layering rules and OAuth
-approach with. With Intelligence has no OAuth of its own, so this service *is* the OAuth 2.1
-authorization server for its MCP clients: a client registers dynamically, gets redirected to a
-login form hosted here, and submits the username and password `POST /v3/auth/sign-in` accepts.
+With Intelligence has no OAuth of its own, so this service *is* the OAuth 2.1 authorization
+server for its MCP clients: a client registers dynamically, gets redirected to a login form
+hosted here, and submits the username and password `POST /v3/auth/sign-in` accepts.
 The vendor session that comes back — a 1-hour access token over a 30-day refresh token — is
 encrypted (Fernet) and stored in Postgres per user, so every tool call acts as that user rather
 than as a shared service account.
@@ -17,7 +16,7 @@ than as a shared service account.
 > against the live API. Authentication is **interim**: one shared account from
 > `WITH_INTELLIGENCE_USERNAME`/`_PASSWORD` serves every caller, and there is no MCP-side login
 > at all, so anyone who can reach `/mcp` gets that account's data. Do not deploy it outside a
-> trusted network until the per-user login lands. See the build plan on UN-24101.
+> trusted network until the per-user login lands.
 
 ## Layout
 
@@ -37,8 +36,8 @@ src/with_intelligence_mcp/
 
 The layering rule is that **nothing under `features/` may import from `server/`** — the server
 wires features together, never the reverse. `tests/test_layering.py` enforces it, along with six
-more rules ported from backstop-mcp; each rule's detector is itself tested, so the guards mean
-something before there are features to guard.
+more rules; each rule's detector is itself tested, so the guards mean something before there are
+features to guard.
 
 ## Adding a feature or tool
 
