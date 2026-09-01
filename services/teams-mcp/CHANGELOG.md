@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.5...teams-mcp@0.4.6) (2026-09-01)
+
+
+### Features
+
+* **teams-mcp,recordings-and-transcripts:** allow pinning the Microsoft OAuth tenant ([#879](https://github.com/Unique-AG/connectors/issues/879)) ([8db60ee](https://github.com/Unique-AG/connectors/commit/8db60eee77846871a8e6fd9b41a88567a0632c84))
+
 ## [0.4.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.4...teams-mcp@0.4.5) (2026-08-25)
 
 
