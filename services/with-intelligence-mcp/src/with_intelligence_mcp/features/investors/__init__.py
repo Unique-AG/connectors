@@ -7,6 +7,7 @@ from with_intelligence_mcp.features.investors.api_responses import (
 from with_intelligence_mcp.features.investors.fetch_investor import INVESTORS_PATH, fetch_investor
 from with_intelligence_mcp.features.investors.project_investor import project_investor
 from with_intelligence_mcp.features.investors.responses import (
+    ConsultantResponse,
     InvestorAmbiguousResponse,
     InvestorCandidateResponse,
     InvestorNotFoundResponse,
@@ -18,6 +19,7 @@ from with_intelligence_mcp.features.investors.search_investors_by_name import (
 
 __all__ = [
     "INVESTORS_PATH",
+    "ConsultantResponse",
     "InvestorAmbiguousResponse",
     "InvestorCandidateResponse",
     "InvestorExtendedAttributes",

@@ -11,6 +11,9 @@ from with_intelligence_mcp.features.investors import (
 )
 from with_intelligence_mcp.features.investors.tools.get_investor import get_investor
 
+# Shaped from the v3 OpenAPI schemas, not invented: `country`/`state` are objects,
+# `latest_aum` dates itself with `as_of` and carries no currency, `currency` is `short_name`,
+# and a contact `Entity` is an id alone.
 VIRGINIA: dict[str, object] = {
     "id": 2504,
     "name": "Virginia Retirement System",
@@ -19,13 +22,27 @@ VIRGINIA: dict[str, object] = {
     "website": "https://www.varetire.org",
     "year_of_incorporation": 1942,
     "aum": 112_000_000_000.0,
-    "latest_aum": {"value": 115_000_000_000.0, "date": "2026-06-30", "currency": "USD"},
+    "latest_aum": {
+        "value": 115_000_000_000.0,
+        "value_usd": 115_000_000_000.0,
+        "as_of": "2026-06-30",
+    },
+    "currency": {"id": 1, "short_name": "USD"},
     "type": {"id": 7, "name": "Public Pension"},
-    "address": {"city": "Richmond", "state": "Virginia", "country": "United States"},
+    "address": {
+        "city": "Richmond",
+        "postcode": "23219",
+        "state": {"id": 51, "name": "Virginia", "abbreviation": "VA"},
+        "country": {"id": 1, "name": "United States"},
+        "continent": {"id": 2, "name": "North America"},
+    },
     "contacts_total": 41,
-    "contacts": [{"id": 88, "name": "A. Allocator"}],
+    "contacts": [{"id": 88}, {"id": 89}],
+    "investment_capital_structures": [{"id": 4}],
     "managers": [{"id": 12, "name": "Bridgewater Associates"}],
-    "consultants": [{"id": 99, "name": "Mercer"}],
+    "consultants": [
+        {"id": 99, "name": "Mercer", "is_lead": True, "role_extended": "General consultant"}
+    ],
     "primary_strategies": [{"id": 3, "name": "Equity Long/Short"}],
     "investment_countries": [{"id": 1, "name": "United States"}],
 }
@@ -149,6 +166,42 @@ class TestEntitlements:
 
 class TestProjection:
     @respx.mock
+    async def test_parses_the_nested_address_and_currency_objects(self) -> None:
+        """`country` and `state` arrive as objects; declaring them as strings raised here."""
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=VIRGINIA)
+        )
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorProfileResponse)
+        assert result.location == "Richmond, Virginia, United States"
+        assert result.aum is not None
+        assert result.aum.currency == "USD"
+
+    @respx.mock
+    async def test_reports_consultant_lead_and_role(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=VIRGINIA)
+        )
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorProfileResponse)
+        assert result.consultants[0].name == "Mercer"
+        assert result.consultants[0].is_lead is True
+        assert result.consultants[0].role == "General consultant"
+
+    @respx.mock
+    async def test_exposes_contacts_as_ids_because_the_api_sends_no_names(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=VIRGINIA)
+        )
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorProfileResponse)
+        assert result.contact_ids == [88, 89]
+        assert result.contacts_total == 41
+
+    @respx.mock
     async def test_prefers_the_dated_aum_over_the_bare_number(self) -> None:
         respx.get(f"{BASE_URL}/v3/investors/2504").mock(
             return_value=httpx.Response(200, json=VIRGINIA)
@@ -159,6 +212,7 @@ class TestProjection:
         assert result.aum is not None
         assert result.aum.value == 115_000_000_000.0
         assert result.aum.as_of == "2026-06-30"
+        assert result.aum.value_usd == 115_000_000_000.0
 
     @respx.mock
     async def test_falls_back_to_the_bare_aum_when_undated(self) -> None:
@@ -174,14 +228,15 @@ class TestProjection:
         assert result.aum.as_of is None
 
     @respx.mock
-    async def test_joins_the_address_into_one_location(self) -> None:
+    async def test_a_partial_address_omits_the_missing_parts(self) -> None:
+        record = {**VIRGINIA, "address": {"city": "Richmond", "country": None, "state": None}}
         respx.get(f"{BASE_URL}/v3/investors/2504").mock(
-            return_value=httpx.Response(200, json=VIRGINIA)
+            return_value=httpx.Response(200, json=record)
         )
         client, _ = build_client()
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
-        assert result.location == "Richmond, Virginia, United States"
+        assert result.location == "Richmond"
 
     @respx.mock
     async def test_keeps_vocabulary_ids_for_follow_up_filters(self) -> None:
@@ -195,17 +250,6 @@ class TestProjection:
         assert result.primary_strategies[0].name == "Equity Long/Short"
 
     @respx.mock
-    async def test_reports_the_contact_total_alongside_the_embedded_subset(self) -> None:
-        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
-            return_value=httpx.Response(200, json=VIRGINIA)
-        )
-        client, _ = build_client()
-        result = await get_investor(investor_id=2504, client=client)
-        assert isinstance(result, InvestorProfileResponse)
-        assert len(result.contacts) == 1
-        assert result.contacts_total == 41
-
-    @respx.mock
     async def test_a_sparse_record_does_not_break_parsing(self) -> None:
         """Unmodelled and missing fields are both normal — the vendor has 40 of them."""
         respx.get(f"{BASE_URL}/v3/investors/7").mock(
@@ -217,3 +261,4 @@ class TestProjection:
         assert result.id == 7
         assert result.aum is None
         assert result.managers == []
+        assert result.contact_ids == []

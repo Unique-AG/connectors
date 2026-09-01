@@ -1,10 +1,12 @@
 from with_intelligence_mcp.features.investors.api_responses import (
     ClassificationAttributes,
+    ConsultantAttributes,
     EntityAttributes,
     InvestorExtendedAttributes,
 )
 from with_intelligence_mcp.features.investors.responses import (
     AumResponse,
+    ConsultantResponse,
     InvestorProfileResponse,
     NamedValueResponse,
 )
@@ -30,11 +32,11 @@ def project_investor(record: InvestorExtendedAttributes) -> InvestorProfileRespo
         investment_countries=_named(record.investment_countries),
         fund_structures=_named(record.investment_fund_structures),
         instruments=_named(record.investment_instruments),
-        capital_structures=_named(record.investment_capital_structures),
+        capital_structure_ids=_ids(record.investment_capital_structures),
         managers=_named(record.managers),
-        consultants=_named(record.consultants),
-        contacts=[NamedValueResponse(id=c.id, name=c.name) for c in record.contacts],
+        consultants=[_consultant(entry) for entry in record.consultants],
         contacts_total=record.contacts_total,
+        contact_ids=_ids(record.contacts),
         preferences_available=bool(record.preferences),
         preferences=record.preferences or None,
     )
@@ -44,25 +46,40 @@ def _named(values: list[ClassificationAttributes]) -> list[NamedValueResponse]:
     return [NamedValueResponse(id=value.id, name=value.name) for value in values]
 
 
+def _ids(values: list[EntityAttributes]) -> list[int]:
+    return [value.id for value in values if value.id is not None]
+
+
+def _consultant(entry: ConsultantAttributes) -> ConsultantResponse:
+    return ConsultantResponse(
+        id=entry.id, name=entry.name, is_lead=entry.is_lead, role=entry.role_extended
+    )
+
+
 def _location(record: InvestorExtendedAttributes) -> str | None:
-    if record.address is None:
+    """City, state, country — the last two arrive as objects, not strings."""
+    address = record.address
+    if address is None:
         return None
-    parts = [record.address.city, record.address.state, record.address.country]
-    populated = [part for part in parts if part]
-    return ", ".join(populated) or None
+    parts = [
+        address.city,
+        address.state.name if address.state else None,
+        address.country.name if address.country else None,
+    ]
+    return ", ".join(part for part in parts if part) or None
 
 
 def _aum(record: InvestorExtendedAttributes) -> AumResponse | None:
+    """Prefer the dated figure. `latest_aum` carries no currency, so that comes off the record."""
+    currency = record.currency.short_name if record.currency else None
     latest = record.latest_aum
-    if latest is not None and latest.value is not None:
-        currency = latest.currency or (record.currency.name if record.currency else None)
-        return AumResponse(value=latest.value, as_of=latest.date, currency=currency)
-    if record.aum is not None:
+    if latest is not None and (latest.value is not None or latest.value_usd is not None):
         return AumResponse(
-            value=record.aum, currency=record.currency.name if record.currency else None
+            value=latest.value,
+            value_usd=latest.value_usd,
+            as_of=latest.as_of,
+            currency=currency,
         )
+    if record.aum is not None:
+        return AumResponse(value=record.aum, currency=currency)
     return None
-
-
-def _entity_names(values: list[EntityAttributes]) -> list[str]:
-    return [value.name for value in values if value.name]

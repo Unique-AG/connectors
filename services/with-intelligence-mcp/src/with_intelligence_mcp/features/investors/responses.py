@@ -22,16 +22,27 @@ class NamedValueResponse(OmitNoneModel):
 
 class AumResponse(OmitNoneModel):
     value: float | None = Field(default=None, description="Total assets under management.")
+    value_usd: float | None = Field(default=None, description="The same figure normalised to USD.")
     as_of: str | None = Field(default=None, description="Date the figure was reported.")
-    currency: str | None = None
+    currency: str | None = Field(
+        default=None, description="Currency of `value`; `value_usd` is always USD."
+    )
+
+
+class ConsultantResponse(OmitNoneModel):
+    id: int | None = None
+    name: str | None = None
+    is_lead: bool | None = Field(
+        default=None, description="Whether this consultant leads the relationship."
+    )
+    role: str | None = None
 
 
 class InvestorProfileResponse(OmitNoneModel):
     """One institutional investor, as a meeting-prep sheet.
 
-    `managers` is who they currently allocate to. `contacts` is the key-contact subset the
-    record embeds — `contacts_total` says how many exist in total. A field that is absent is
-    unknown to With Intelligence, not zero.
+    `managers` is who they currently allocate to. A field that is absent is unknown to With
+    Intelligence, not zero.
     """
 
     id: int
@@ -52,12 +63,24 @@ class InvestorProfileResponse(OmitNoneModel):
     investment_countries: list[NamedValueResponse] = Field(default_factory=list)
     fund_structures: list[NamedValueResponse] = Field(default_factory=list)
     instruments: list[NamedValueResponse] = Field(default_factory=list)
-    capital_structures: list[NamedValueResponse] = Field(default_factory=list)
+    capital_structure_ids: list[int] = Field(
+        default_factory=list,
+        description="Ids only — the API returns no names for capital structures here.",
+    )
 
     managers: list[NamedValueResponse] = Field(default_factory=list)
-    consultants: list[NamedValueResponse] = Field(default_factory=list)
-    contacts: list[NamedValueResponse] = Field(default_factory=list)
-    contacts_total: int | None = None
+    consultants: list[ConsultantResponse] = Field(default_factory=list)
+
+    contacts_total: int | None = Field(
+        default=None, description="How many contacts With Intelligence holds for this investor."
+    )
+    contact_ids: list[int] = Field(
+        default_factory=list,
+        description=(
+            "Ids of the contacts embedded on the investor record. The API returns ids only "
+            "here — names, titles and seniority require a separate person lookup."
+        ),
+    )
 
     preferences_available: bool = Field(
         default=False,
