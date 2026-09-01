@@ -69,21 +69,21 @@ describe(createMicrosoftOAuthProvider.name, () => {
     const provider = createMicrosoftOAuthProvider({
       chat: 'enabled',
       ingestion: 'disabled',
-      tenantId: 'common',
+      signInTenant: 'common',
     });
 
     expect(provider.strategyOptions(strategyArgs).tenant).toBe('common');
   });
 
-  it('passes a pinned tenant id in strategy options', () => {
-    const tenantId = 'f66cc3e7-9a7f-42ae-a0fa-adb72979b371';
+  it('passes a pinned sign-in tenant in strategy options', () => {
+    const signInTenant = 'f66cc3e7-9a7f-42ae-a0fa-adb72979b371';
     const provider = createMicrosoftOAuthProvider({
       chat: 'disabled',
       ingestion: 'enabled',
-      tenantId,
+      signInTenant,
     });
 
-    expect(provider.strategyOptions(strategyArgs).tenant).toBe(tenantId);
+    expect(provider.strategyOptions(strategyArgs).tenant).toBe(signInTenant);
   });
 });
 

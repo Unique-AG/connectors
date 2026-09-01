@@ -395,9 +395,9 @@ Each tenant authentication creates an independent user profile in Teams MCP, and
 
 **Answer:** The Entra app registration is single-tenant (`AzureADMyOrg`) but Teams MCP is using the `/common` authority, which Microsoft only allows for multi-tenant apps.
 
-Set `MICROSOFT_TENANT_ID` (Helm `mcpConfig.microsoft.tenantId`) to the app's **Directory (tenant) ID**. Unique SaaS multi-tenant apps should keep the default `common`.
+Set `MICROSOFT_SIGN_IN_TENANT` (Helm `mcpConfig.microsoft.signInTenant`) to the directory users sign into (for a single-tenant app, that is the app's own directory). Unique SaaS multi-tenant apps should keep the default `common`.
 
-**See also:** [OAuth authority](./operator/authentication.md#oauth-authority-microsoft_tenant_id)
+**See also:** [OAuth authority](./operator/authentication.md#oauth-authority-microsoft_sign_in_tenant)
 
 ## Related Documentation
 

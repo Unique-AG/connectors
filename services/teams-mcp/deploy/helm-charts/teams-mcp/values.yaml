@@ -283,10 +283,11 @@ mcpConfig:
     # -- The client ID of the Microsoft App Registration
     # example: 12345678-1234-1234-1234-123456789012
     clientId: '{{ fail "mcpConfig.microsoft.clientId is mandatory. Override in your deployment values." }}'
-    # -- Entra directory for OAuth authorize and token endpoints.
-    # Use a tenant GUID to pin a single-tenant app or a specific customer directory.
-    # Defaults to "common" (multi-tenant). Aliases "organizations" and "consumers" are also valid.
-    tenantId: common
+    # -- Directory users sign into for OAuth (authorize and token).
+    # This is the customer directory that receives the Enterprise Application, not the tenant that owns the app registration.
+    # Use a GUID to pin a single-tenant app or a dedicated customer directory.
+    # Defaults to "common". Aliases "organizations" and "consumers" are also valid.
+    signInTenant: common
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://teams.mcp.unique.app

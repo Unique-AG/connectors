@@ -2157,9 +2157,9 @@
               "type": "string",
               "description": "The client ID of the Microsoft App Registration"
             },
-            "tenantId": {
+            "signInTenant": {
               "type": "string",
-              "description": "Entra directory for OAuth authorize and token endpoints. Use a tenant GUID to pin a single-tenant app or a specific customer directory. Defaults to common (multi-tenant).",
+              "description": "Directory users sign into for OAuth authorize and token. This is the tenant that receives the Enterprise Application, not the tenant that owns the app registration. Use a GUID to pin a single-tenant app or a specific customer directory. Defaults to common.",
               "default": "common"
             },
             "publicWebhookUrl": {

@@ -127,7 +127,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         provider: createMicrosoftOAuthProvider({
           chat: configService.get('chat.integration', { infer: true }),
           ingestion: configService.get('unique.integration', { infer: true }),
-          tenantId: configService.get('microsoft.tenantId', { infer: true }),
+          signInTenant: configService.get('microsoft.signInTenant', { infer: true }),
         }),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),

@@ -12,7 +12,7 @@ describe('TokenProvider', () => {
     userProfileId: 'user-profile-123',
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
-    tenantId: 'common',
+    signInTenant: 'common',
     scopes: ['https://graph.microsoft.com/.default'],
   };
 
@@ -131,7 +131,7 @@ describe('TokenProvider', () => {
 
       const pinnedTenantId = 'f66cc3e7-9a7f-42ae-a0fa-adb72979b371';
       const unit = new TokenProvider(
-        { ...mockConfig, tenantId: pinnedTenantId },
+        { ...mockConfig, signInTenant: pinnedTenantId },
         mockDependencies as any,
       );
 

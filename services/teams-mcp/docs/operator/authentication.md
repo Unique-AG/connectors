@@ -150,7 +150,7 @@ For SaaS deployments serving users from multiple Microsoft 365 organizations:
 
 See [Authentication Architecture - Single App Registration Architecture](../technical/architecture.md#single-app-registration-architecture) for details.
 
-#### OAuth authority (`MICROSOFT_TENANT_ID`)
+#### OAuth authority (`MICROSOFT_SIGN_IN_TENANT`)
 
 Teams MCP talks to Microsoft identity on:
 
@@ -159,12 +159,12 @@ https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize
 https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
 ```
 
-`<tenant>` comes from `MICROSOFT_TENANT_ID` (Helm `mcpConfig.microsoft.tenantId`) and defaults to `common`.
+`<tenant>` comes from `MICROSOFT_SIGN_IN_TENANT` (Helm `mcpConfig.microsoft.signInTenant`) and defaults to `common`. This is the directory **users sign into** — the tenant that receives the Enterprise Application — not the tenant that owns the app registration.
 
 | App registration / deployment | Authority to use |
 |-------------------------------|------------------|
 | Unique SaaS multi-tenant app (`AzureADMultipleOrgs`) | `common` (default) — users from any consented directory can sign in |
-| Single-tenant app (`AzureADMyOrg`) | The app's **Directory (tenant) ID**. `/common` returns **AADSTS50194** ("Application is not configured as a multi-tenant application") |
+| Single-tenant app (`AzureADMyOrg`) | The directory users belong to (the same tenant the app is registered in). `/common` returns **AADSTS50194** ("Application is not configured as a multi-tenant application") |
 | Unique-hosted dedicated instance that must open one customer directory (for example UAT vs production) | That directory's tenant GUID — otherwise `/common` can send the SSO window to the signed-in admin's home tenant |
 
 `organizations` and `consumers` are also valid Microsoft tenant aliases.
