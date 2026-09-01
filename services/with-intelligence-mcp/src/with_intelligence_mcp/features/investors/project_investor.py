@@ -3,12 +3,15 @@ from with_intelligence_mcp.features.investors.api_responses import (
     ConsultantAttributes,
     EntityAttributes,
     InvestorExtendedAttributes,
+    StrategyGroupAttributes,
 )
+from with_intelligence_mcp.features.investors.html_to_markdown import html_to_markdown
 from with_intelligence_mcp.features.investors.responses import (
     AumResponse,
     ConsultantResponse,
     InvestorProfileResponse,
     NamedValueResponse,
+    StrategyGroupResponse,
 )
 
 
@@ -18,14 +21,15 @@ def project_investor(record: InvestorExtendedAttributes) -> InvestorProfileRespo
         id=record.id,
         name=record.name,
         investor_type=record.type.name if record.type else None,
-        summary=record.summary,
-        profile=record.family_profile,
+        summary=html_to_markdown(record.summary),
+        profile=html_to_markdown(record.family_profile),
         website=record.website,
         founded=record.year_of_incorporation,
         location=_location(record),
         aum=_aum(record),
         updated_at=record.updated_at,
         asset_classes=_named(record.asset_classes),
+        strategies=[_strategy_group(group) for group in record.investment_strategies],
         primary_strategies=_named(record.primary_strategies),
         secondary_strategies=_named(record.secondary_strategies),
         investment_regions=_named(record.investment_regions),
@@ -39,6 +43,13 @@ def project_investor(record: InvestorExtendedAttributes) -> InvestorProfileRespo
         contact_ids=_ids(record.contacts),
         preferences_available=bool(record.preferences),
         preferences=record.preferences or None,
+    )
+
+
+def _strategy_group(group: StrategyGroupAttributes) -> StrategyGroupResponse:
+    return StrategyGroupResponse(
+        primary=group.primary_strategy.name if group.primary_strategy else None,
+        secondary=[entry.name for entry in group.secondary_strategies if entry.name],
     )
 
 
@@ -70,16 +81,18 @@ def _location(record: InvestorExtendedAttributes) -> str | None:
 
 
 def _aum(record: InvestorExtendedAttributes) -> AumResponse | None:
-    """Prefer the dated figure. `latest_aum` carries no currency, so that comes off the record."""
+    """Prefer the dated figure. Both are in millions; `latest_aum` carries no currency."""
     currency = record.currency.short_name if record.currency else None
     latest = record.latest_aum
     if latest is not None and (latest.value is not None or latest.value_usd is not None):
+        bands = [entry.label for entry in latest.ranges_usd if entry.label]
         return AumResponse(
-            value=latest.value,
-            value_usd=latest.value_usd,
+            value_millions=latest.value,
+            value_usd_millions=latest.value_usd,
+            band=bands[0] if bands else None,
             as_of=latest.as_of,
             currency=currency,
         )
     if record.aum is not None:
-        return AumResponse(value=record.aum, currency=currency)
+        return AumResponse(value_millions=record.aum, currency=currency)
     return None

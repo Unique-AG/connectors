@@ -6,9 +6,29 @@ not a detail: `address.country` is an object rather than a string, `latest_aum` 
 in `as_of`, `currency` names itself `short_name`, and an `Entity` carries an id and nothing else.
 """
 
-from typing import ClassVar
+from typing import Annotated, ClassVar, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+
+
+def _as_sequence(value: object) -> object:
+    """Accept a list, or an object keyed by index, for the same field.
+
+    The spec's array/object distinction does not hold in either direction: `consultants` is
+    declared an array and arrives as `{"0": {...}, "1": {...}}`, while
+    `asset_allocation_breakdown` is declared an object and arrives as a list. So every list
+    field tolerates both rather than raising on whichever one the vendor sends.
+    """
+    if not isinstance(value, dict):
+        return value
+    entries = cast(dict[str, object], value)
+    try:
+        return [entries[key] for key in sorted(entries, key=int)]
+    except ValueError:
+        return list(entries.values())
+
+
+_SEQUENCE = BeforeValidator(_as_sequence)
 
 
 class ClassificationAttributes(BaseModel):
@@ -43,14 +63,25 @@ class StateAttributes(BaseModel):
     abbreviation: str | None = None
 
 
+class AumRangeAttributes(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    label: str | None = None
+
+
 class LatestAumAttributes(BaseModel):
-    """Carries no currency of its own — `value_usd` is the normalised figure."""
+    """Carries no currency of its own — `value_usd` is the normalised figure.
+
+    Both figures are in **millions**: a fund reporting 135,900 here is a $135.9bn fund, which
+    `ranges_usd[].label` states in words ("> $50bn").
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     value: float | None = None
     value_usd: float | None = None
     as_of: str | None = None
+    ranges_usd: Annotated[list[AumRangeAttributes], _SEQUENCE] = Field(default_factory=list)
 
 
 class AddressAttributes(BaseModel):
@@ -72,6 +103,17 @@ class ConsultantAttributes(BaseModel):
     name: str | None = None
     is_lead: bool | None = None
     role_extended: str | None = None
+
+
+class StrategyGroupAttributes(BaseModel):
+    """One primary strategy with the secondaries recorded under it."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    primary_strategy: ClassificationAttributes | None = None
+    secondary_strategies: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
 
 
 class InvestorListItemAttributes(BaseModel):
@@ -104,18 +146,42 @@ class InvestorExtendedAttributes(BaseModel):
     contacts_total: int | None = None
 
     # `Entity` — ids only. Names and titles come from `/v3/persons`.
-    contacts: list[EntityAttributes] = Field(default_factory=list)
-    investment_capital_structures: list[EntityAttributes] = Field(default_factory=list)
+    contacts: Annotated[list[EntityAttributes], _SEQUENCE] = Field(default_factory=list)
+    investment_capital_structures: Annotated[list[EntityAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
 
-    managers: list[ClassificationAttributes] = Field(default_factory=list)
-    asset_classes: list[ClassificationAttributes] = Field(default_factory=list)
-    primary_strategies: list[ClassificationAttributes] = Field(default_factory=list)
-    secondary_strategies: list[ClassificationAttributes] = Field(default_factory=list)
-    investment_regions: list[ClassificationAttributes] = Field(default_factory=list)
-    investment_countries: list[ClassificationAttributes] = Field(default_factory=list)
-    investment_fund_structures: list[ClassificationAttributes] = Field(default_factory=list)
-    investment_instruments: list[ClassificationAttributes] = Field(default_factory=list)
-    consultants: list[ConsultantAttributes] = Field(default_factory=list)
+    managers: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(default_factory=list)
+    asset_classes: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+    primary_strategies: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+    secondary_strategies: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+    investment_regions: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+    investment_countries: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+    investment_fund_structures: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+    investment_instruments: Annotated[list[ClassificationAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
+
+    # Declared an array, delivered as an index-keyed object.
+    consultants: Annotated[list[ConsultantAttributes], _SEQUENCE] = Field(default_factory=list)
+
+    # The structured view of what they allocate to, and the one worth reading: the flat
+    # `primary_strategies` mixes every asset class's strategies into one list.
+    investment_strategies: Annotated[list[StrategyGroupAttributes], _SEQUENCE] = Field(
+        default_factory=list
+    )
 
     # Present only for accounts licensed for the Intentions & Preferences add-on, so its absence
     # is not the same as an investor having stated none.

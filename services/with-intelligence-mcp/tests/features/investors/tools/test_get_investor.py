@@ -21,11 +21,12 @@ VIRGINIA: dict[str, object] = {
     "summary": "Statewide public pension plan.",
     "website": "https://www.varetire.org",
     "year_of_incorporation": 1942,
-    "aum": 112_000_000_000.0,
+    "aum": 112_000.0,
     "latest_aum": {
-        "value": 115_000_000_000.0,
-        "value_usd": 115_000_000_000.0,
+        "value": 115_000.0,
+        "value_usd": 115_000.0,
         "as_of": "2026-06-30",
+        "ranges_usd": [{"label": "> $50bn"}],
     },
     "currency": {"id": 1, "short_name": "USD"},
     "type": {"id": 7, "name": "Public Pension"},
@@ -210,9 +211,9 @@ class TestProjection:
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
         assert result.aum is not None
-        assert result.aum.value == 115_000_000_000.0
+        assert result.aum.value_millions == 115_000.0
         assert result.aum.as_of == "2026-06-30"
-        assert result.aum.value_usd == 115_000_000_000.0
+        assert result.aum.value_usd_millions == 115_000.0
 
     @respx.mock
     async def test_falls_back_to_the_bare_aum_when_undated(self) -> None:
@@ -224,7 +225,7 @@ class TestProjection:
         result = await get_investor(investor_id=2504, client=client)
         assert isinstance(result, InvestorProfileResponse)
         assert result.aum is not None
-        assert result.aum.value == 112_000_000_000.0
+        assert result.aum.value_millions == 112_000.0
         assert result.aum.as_of is None
 
     @respx.mock

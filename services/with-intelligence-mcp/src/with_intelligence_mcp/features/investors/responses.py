@@ -21,12 +21,28 @@ class NamedValueResponse(OmitNoneModel):
 
 
 class AumResponse(OmitNoneModel):
-    value: float | None = Field(default=None, description="Total assets under management.")
-    value_usd: float | None = Field(default=None, description="The same figure normalised to USD.")
-    as_of: str | None = Field(default=None, description="Date the figure was reported.")
-    currency: str | None = Field(
-        default=None, description="Currency of `value`; `value_usd` is always USD."
+    value_millions: float | None = Field(
+        default=None,
+        description=(
+            "Total assets under management, in MILLIONS of `currency`. 135900 means 135.9 "
+            "billion. Do not report it as a plain figure."
+        ),
     )
+    value_usd_millions: float | None = Field(
+        default=None, description="The same figure in millions of USD."
+    )
+    band: str | None = Field(
+        default=None, description="The vendor's own words for the size, e.g. '> $50bn'."
+    )
+    as_of: str | None = Field(default=None, description="Date the figure was reported.")
+    currency: str | None = None
+
+
+class StrategyGroupResponse(OmitNoneModel):
+    """A primary strategy with the secondaries recorded under it."""
+
+    primary: str | None = None
+    secondary: list[str] = Field(default_factory=list)
 
 
 class ConsultantResponse(OmitNoneModel):
@@ -57,6 +73,14 @@ class InvestorProfileResponse(OmitNoneModel):
     updated_at: str | None = None
 
     asset_classes: list[NamedValueResponse] = Field(default_factory=list)
+    strategies: list[StrategyGroupResponse] = Field(
+        default_factory=list,
+        description=(
+            "What they allocate to, grouped: each primary strategy with the secondaries "
+            "recorded under it. Prefer this over the flat lists below, which mix every asset "
+            "class's strategies together."
+        ),
+    )
     primary_strategies: list[NamedValueResponse] = Field(default_factory=list)
     secondary_strategies: list[NamedValueResponse] = Field(default_factory=list)
     investment_regions: list[NamedValueResponse] = Field(default_factory=list)
@@ -77,8 +101,8 @@ class InvestorProfileResponse(OmitNoneModel):
     contact_ids: list[int] = Field(
         default_factory=list,
         description=(
-            "Ids of the contacts embedded on the investor record. The API returns ids only "
-            "here — names, titles and seniority require a separate person lookup."
+            "Every contact the investor record lists, as ids — the API returns no names here, "
+            "so names, titles and seniority require a separate person lookup."
         ),
     )
 

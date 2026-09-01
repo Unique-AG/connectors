@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from with_intelligence_mcp.features.investors.api_responses import (
     AddressAttributes,
+    AumRangeAttributes,
     ClassificationAttributes,
     ConsultantAttributes,
     CurrencyAttributes,
@@ -30,6 +31,7 @@ from with_intelligence_mcp.features.investors.api_responses import (
     InvestorListItemAttributes,
     LatestAumAttributes,
     StateAttributes,
+    StrategyGroupAttributes,
 )
 from with_intelligence_mcp.with_intelligence_client import PageInfo
 
@@ -46,15 +48,33 @@ MODELS: dict[type[BaseModel], str] = {
     LatestAumAttributes: "InvestorLatestAum",
     AddressAttributes: "InvestorAddress",
     ConsultantAttributes: "InvestorConsultant",
+    StrategyGroupAttributes: "InvestorInvestmentStrategies",
+    AumRangeAttributes: "InvestorLatestAumRangesUsd",
     PageInfo: "PaginatedResponsePagination",
 }
 
 # Places we knowingly differ, with the reason. A deviation that is not listed is a bug.
+#
+# Three of these are the spec being wrong rather than us: it declares single objects and arrays
+# in place of each other, which a recorded response settles and this file cannot. Each one was
+# found by a real call, so add to `tests/features/investors/recordings` before adding here.
 DELIBERATE: dict[tuple[type[BaseModel], str], str] = {
     (
         InvestorExtendedAttributes,
         "preferences",
     ): "passed through untouched rather than modelled: it is an add-on payload we only relay",
+    (
+        InvestorExtendedAttributes,
+        "investment_strategies",
+    ): "declared an object, delivered as a list — see tests/features/investors/recordings",
+    (
+        LatestAumAttributes,
+        "ranges_usd",
+    ): "declared a single object, delivered as a list of them",
+    (
+        StrategyGroupAttributes,
+        "secondary_strategies",
+    ): "declared a single Classification, delivered as a list of them",
 }
 
 
