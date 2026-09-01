@@ -159,17 +159,16 @@ https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize
 https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
 ```
 
-`<tenant>` comes from `MICROSOFT_SIGN_IN_TENANT` (Helm `mcpConfig.microsoft.signInTenant`) and defaults to `common`. This is the directory **users sign into** — the tenant that receives the Enterprise Application — not the tenant that owns the app registration.
+`<tenant>` comes from `MICROSOFT_SIGN_IN_TENANT` (Helm `mcpConfig.microsoft.signInTenant`). This is the directory the **login window should open** — the foreign tenant that holds the Enterprise Application (service principal). It is independent of `clientId`/`clientSecret` and is **not** the tenant that owns Unique's app registration.
 
-| App registration / deployment | Authority to use |
-|-------------------------------|------------------|
-| Unique SaaS multi-tenant app (`AzureADMultipleOrgs`) | `common` (default) — users from any consented directory can sign in |
-| Single-tenant app (`AzureADMyOrg`) | The directory users belong to (the same tenant the app is registered in). `/common` returns **AADSTS50194** ("Application is not configured as a multi-tenant application") |
-| Unique-hosted dedicated instance that must open one customer directory (for example UAT vs production) | That directory's tenant GUID — otherwise `/common` can send the SSO window to the signed-in admin's home tenant |
+| When | Value |
+|------|-------|
+| Users should choose their directory at login | `common` (default) |
+| Login must open a specific tenant's service principal (for example a customer's UAT directory instead of the admin's home tenant) | That directory's GUID |
 
 `organizations` and `consumers` are also valid Microsoft tenant aliases.
 
-Do not mix a single-tenant app registration with `common`. Pinning Unique's shared SaaS app to one customer GUID is only correct when that deployment should serve that directory alone.
+If Microsoft returns **AADSTS50194**, `/common` is not accepted for that Enterprise Application — set `signInTenant` to the directory that holds it.
 
 ### Secret Management
 

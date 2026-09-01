@@ -19,7 +19,7 @@ const ConfigSchema = z.object({
     .min(1)
     .prefault('common')
     .describe(
-      'Directory users sign into for OAuth authorize and token. This is the tenant that receives the Enterprise Application, not the tenant that owns the app registration. Use a GUID to pin a single-tenant app or a specific customer directory. Defaults to "common".',
+      'Tenant the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as "common" when users choose their directory at login. Independent of clientId/clientSecret; not the tenant that owns the app registration.',
     ),
   webhookSecret: redacted(z.string().length(128)).describe(
     'The webhook secret for validating subscriptions hooks (spoof protection). Must be a 128 random characters.',

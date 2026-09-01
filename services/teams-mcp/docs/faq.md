@@ -393,9 +393,9 @@ Each tenant authentication creates an independent user profile in Teams MCP, and
 
 ### Why do I get AADSTS50194 when signing in?
 
-**Answer:** The Entra app registration is single-tenant (`AzureADMyOrg`) but Teams MCP is using the `/common` authority, which Microsoft only allows for multi-tenant apps.
+**Answer:** Login used `/common`, but the Enterprise Application (service principal) only exists in one directory, so Microsoft rejected the authority.
 
-Set `MICROSOFT_SIGN_IN_TENANT` (Helm `mcpConfig.microsoft.signInTenant`) to the directory users sign into (for a single-tenant app, that is the app's own directory). Unique SaaS multi-tenant apps should keep the default `common`.
+Set `MICROSOFT_SIGN_IN_TENANT` (Helm `mcpConfig.microsoft.signInTenant`) to that directory's GUID so the login window opens the foreign tenant's service principal. Leave it as `common` when users should choose their directory at login.
 
 **See also:** [OAuth authority](./operator/authentication.md#oauth-authority-microsoft_sign_in_tenant)
 

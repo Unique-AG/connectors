@@ -33,7 +33,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
-| `MICROSOFT_SIGN_IN_TENANT` | `mcpConfig.microsoft.signInTenant` | `common` | Directory users sign into for OAuth. This is the tenant that receives the Enterprise Application, not the tenant that owns the app registration. Use a tenant GUID for a single-tenant app (`AzureADMyOrg`, avoids AADSTS50194) or to pin Unique SaaS SSO to one customer directory. Aliases `organizations` and `consumers` are also valid |
+| `MICROSOFT_SIGN_IN_TENANT` | `mcpConfig.microsoft.signInTenant` | `common` | Tenant the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as `common` when users choose their directory at login. Independent of `clientId`/`clientSecret`; not the tenant that owns the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL. Only used by transcript capture |
 
 ### Chat Integration
@@ -119,7 +119,7 @@ mcpConfig:
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
-    # signInTenant: common  # optional; set a customer Directory (tenant) ID to pin OAuth
+    # signInTenant: common  # optional; set a foreign-tenant GUID to pin login to that service principal
     # publicWebhookUrl: https://teams.mcp.example.com  # optional
 
   chat:
