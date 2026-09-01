@@ -1,0 +1,64 @@
+name: "Scheduled Failure Alarm"
+
+on:
+  workflow_run:
+    workflows:
+      - "Services Cache Warming"
+      - "Dependency Updates"
+      - "Release, Please 🤖"
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: scheduled-failure-alarm-${{ github.event.workflow_run.name }}
+  cancel-in-progress: false
+
+jobs:
+  alarm:
+    name: Open or update the failure issue
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      WF_NAME: ${{ github.event.workflow_run.name }}
+      WF_URL: ${{ github.event.workflow_run.html_url }}
+      WF_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      WF_EVENT: ${{ github.event.workflow_run.event }}
+    steps:
+      - name: Open or update the issue
+        run: |
+          set -euo pipefail
+
+          gh label create ci-failure --color B60205 \
+            --description "A scheduled workflow is failing" 2>/dev/null || true
+
+          TITLE="Scheduled workflow failing: $(printenv WF_NAME)"
+          export TITLE
+
+          {
+            echo "\`$(printenv WF_NAME)\` failed."
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| branch | \`$(printenv WF_BRANCH)\` |"
+            echo "| trigger | \`$(printenv WF_EVENT)\` |"
+            echo "| run | $(printenv WF_URL) |"
+            echo
+            echo "_Rewritten in place on every failure. Close it once the workflow is green._"
+          } > "${RUNNER_TEMP}/issue.md"
+
+          existing=$(gh issue list --state open --label ci-failure --json number,title \
+                     --jq '[.[] | select(.title == $ENV.TITLE)][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "${RUNNER_TEMP}/issue.md" </dev/null
+            echo "Updated issue #${existing}."
+          else
+            gh issue create --title "$TITLE" --label ci-failure \
+              --body-file "${RUNNER_TEMP}/issue.md" </dev/null
+          fi
