@@ -53,10 +53,7 @@ _CHUNKED_MIME_TYPES = {
 def _is_chunked(content: Content) -> bool | None:
     """True (chunked), False (flat text), or None (unsupported).
 
-    Prefers mime_type over the key's extension — a transcript's key is an
-    opaque recording id, not a filename. Any text/* mime type counts as
-    flat text (the decode already degrades on bad bytes, so an unlisted
-    subtype is still safe); application/json is the one exception.
+    Prefers mime_type over the key's extension, since a key isn't always a filename.
     """
     mime = content.mime_type
     if mime in _CHUNKED_MIME_TYPES:
@@ -340,9 +337,7 @@ async def read_file(
                 )
                 full_text = raw_bytes.decode("utf-8", errors="replace")
             except httpx.HTTPStatusError as exc:
-                # Scraped/crawled content (e.g. a Confluence page) has no
-                # downloadable file at all — only chunks from ingestion —
-                # so a 404 here falls back to them instead of failing.
+                # Scraped content has no downloadable file, only ingested chunks.
                 if exc.response.status_code != 404 or not content.chunks:
                     raise
                 chunks = sort_content_chunks(list(content.chunks))
