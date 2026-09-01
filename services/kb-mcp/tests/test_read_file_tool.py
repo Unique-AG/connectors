@@ -82,7 +82,6 @@ async def test_unsupported_extension_returns_error_without_downstream_calls():
 
 @pytest.mark.asyncio
 async def test_unsupported_mime_type_is_named_in_the_error():
-    """The extension alone doesn't explain a mismatch — surface mime_type too."""
     content = _make_content("report.xlsx", mime_type="application/vnd.ms-excel")
     with _patch_search_contents(content):
         result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
@@ -143,8 +142,7 @@ async def test_unrecognized_text_mime_subtype_is_treated_as_text():
 
 @pytest.mark.asyncio
 async def test_mime_type_takes_precedence_over_a_mismatched_extension():
-    """mime_type wins even when key's extension would say otherwise —
-    covers the real case where an upload's key still carries a stale
+    """Covers the real case where an upload's key still carries a stale
     or wrong extension."""
     content = _make_content("upload.bin", mime_type="text/plain")
     with (
@@ -172,8 +170,6 @@ async def test_json_mime_type_is_supported_despite_not_being_under_text():
 
 @pytest.mark.asyncio
 async def test_chunked_mime_type_dispatches_to_page_aware_rendering():
-    """mime_type alone (no .pdf extension in key) still routes to the
-    chunked/page-aware path, not the flat-text download path."""
     chunks = [_make_chunk("hello", 0, 1, 1)]
     content = _make_content("cont_opaque_key", chunks, mime_type="application/pdf")
     with (
