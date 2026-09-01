@@ -1,0 +1,131 @@
+# with-intelligence-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: with-intelligence-mcp
+fullnameOverride: with-intelligence-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json
+# (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  APP_ENV: production
+  LOG_LEVEL: info
+  PORT: "8000"
+  # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
+  # WITH_INTELLIGENCE_BASE_URL defaults to https://api.withintelligence.com inside the app.
+
+  # Which asset-class packages ("data solutions") tool calls ask for. Responses are
+  # auto-filtered to what the account is licensed for regardless; asking narrowly keeps a
+  # hedge-fund question from paging through wealth records. Unique's agreement covers With HFM
+  # and With SFO; v1 scope is hedge fund content, so the app defaults to hfm alone. Set here
+  # rather than left to the app so an overlay can widen it without knowing the env var name.
+  WITH_INTELLIGENCE_ASSET_CLASS_GROUPS: '["hfm"]'
+
+envVars: []
+# Required secrets (provide via envVars in overlay):
+# - DB_URL (or rely on base-chart DATABASE_URL when postgresql.enabled — app accepts both)
+# The credential-encryption key arrives with the auth feature.
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/with-intelligence-mcp
+  tag: 0.0.1 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 25m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  # /health is process-up (setup_ops); /ready checks Postgres. Liveness must not restart the pod
+  # when the database is briefly unreachable — readiness alone keeps it out of service.
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # Overlay supplies host/url (CloudNativePG or external). Base chart injects
+    # DATABASE_URL / POSTGRESQL_* — with-intelligence-mcp also accepts DB_URL.
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: true
+    command: |
+      alembic upgrade head
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    ephemeralPorts:
+      enabled: false

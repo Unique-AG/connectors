@@ -1,0 +1,10 @@
+apiVersion: v2
+name: with-intelligence-mcp
+description: With Intelligence FastMCP server with OAuth credential bridging.
+type: application
+version: 0.0.1
+appVersion: 0.0.1
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-4c70c3

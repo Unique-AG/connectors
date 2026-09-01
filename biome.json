@@ -23,6 +23,7 @@
       "!**/scripts",
       "!**/local-scripts",
       "!**/services/backstop-mcp",
+      "!**/services/with-intelligence-mcp",
       "!**/.venv"
     ]
   },

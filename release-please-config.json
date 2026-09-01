@@ -203,6 +203,31 @@
           "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
+    },
+    "services/with-intelligence-mcp": {
+      "release-type": "python",
+      "component": "with-intelligence-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/with-intelligence-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/with-intelligence-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/with-intelligence-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
+        }
+      ]
     }
   }
 }

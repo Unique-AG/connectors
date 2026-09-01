@@ -35,6 +35,7 @@ hello-mcp = services/hello-mcp/**
 kb-mcp = services/kb-mcp/**
 backstop-mcp = services/backstop-mcp/**
 office-365-mcp = services/office-365-mcp/**
+with-intelligence-mcp = services/with-intelligence-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**
