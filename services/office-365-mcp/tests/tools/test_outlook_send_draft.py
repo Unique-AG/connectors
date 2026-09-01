@@ -67,16 +67,17 @@ def _reads(graph: respx.MockRouter, payload: dict[str, object]) -> respx.Route:
     return graph.get(_DRAFT_PATH).mock(return_value=httpx.Response(200, json=payload))
 
 
-async def _agrees(draft: Message) -> None:
+async def _agrees(draft: Message) -> str | None:
     """A person who said yes. Named rather than a lambda, because every call below states which
     side of the gate it is testing."""
     assert draft is not None
+    return None
 
 
-async def _refuses(draft: Message) -> None:
-    """A person who said no, in the shape the tool's own refusal takes."""
+async def _refuses(draft: Message) -> str | None:
+    """A person who said no, in the shape the tool's own refusal takes: answered, never raised."""
     assert draft is not None
-    raise ToolError("Nothing was sent.")
+    return "Nothing was sent."
 
 
 def _sends(graph: respx.MockRouter) -> respx.Route:
@@ -169,28 +170,25 @@ class TestHowTheQuestionReachesAPerson:
 
         return cast("Context", cast("object", _Client()))
 
-    async def test_agreeing_lets_the_send_through(self) -> None:
+    async def test_agreeing_answers_with_no_refusal(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data=sender.SEND)))
 
-        await confirm(Message(subject="Invoice 4471"))
+        assert await confirm(Message(subject="Invoice 4471")) is None
 
     async def test_declining_refuses_and_says_the_draft_survives(self) -> None:
         confirm = a_person_agrees(self._context(DeclinedElicitation()))
 
-        with pytest.raises(ToolError, match="still in Drafts"):
-            await confirm(Message(subject="Invoice 4471"))
+        assert "still in Drafts" in (await confirm(Message(subject="Invoice 4471")) or "")
 
     async def test_cancelling_refuses_too(self) -> None:
         confirm = a_person_agrees(self._context(CancelledElicitation()))
 
-        with pytest.raises(ToolError, match="did not agree"):
-            await confirm(Message(subject="Invoice 4471"))
+        assert "did not agree" in (await confirm(Message(subject="Invoice 4471")) or "")
 
     async def test_answering_anything_but_send_refuses(self) -> None:
         confirm = a_person_agrees(self._context(AcceptedElicitation(data="do not send")))
 
-        with pytest.raises(ToolError, match="did not agree"):
-            await confirm(Message(subject="Invoice 4471"))
+        assert "did not agree" in (await confirm(Message(subject="Invoice 4471")) or "")
 
     async def test_a_client_that_cannot_ask_sends_nothing(self) -> None:
         """The risk this whole gate carries: a client with no elicitation support can no longer
@@ -198,8 +196,28 @@ class TestHowTheQuestionReachesAPerson:
         broken mailbox from a client limitation otherwise."""
         confirm = a_person_agrees(self._context(RuntimeError("elicitation not supported")))
 
-        with pytest.raises(ToolError, match="does not support elicitation"):
-            await confirm(Message(subject="Invoice 4471"))
+        answer = await confirm(Message(subject="Invoice 4471"))
+        assert "does not support elicitation" in (answer or "")
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            DeclinedElicitation(),
+            CancelledElicitation(),
+            AcceptedElicitation(data="do not send"),
+            RuntimeError("elicitation not supported"),
+            ToolError("the client refused the request"),
+        ],
+        ids=["declined", "cancelled", "another-answer", "cannot-ask", "client-error"],
+    )
+    async def test_no_refusal_is_ever_raised(self, answer: object) -> None:
+        """Every refusal answers with a string. A raise here crosses `graph_errors`, and the seam
+        then records a person saying no as a Graph failure with the whole wait as its latency."""
+        confirm = a_person_agrees(self._context(answer))
+
+        refusal = await confirm(Message(subject="Invoice 4471"))
+
+        assert isinstance(refusal, str) and refusal
 
 
 class TestWhatItAsksGraphFor:

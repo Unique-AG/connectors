@@ -79,7 +79,7 @@ from msgraph.generated.users.item.messages.item.message_item_request_builder imp
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, graph_client_for_caller
@@ -229,7 +229,10 @@ _NO_WAY_TO_ASK = (
     "user that, and tell them their client cannot confirm a send."
 )
 
-type _Confirm = Callable[[Message], Awaitable[None]]
+# The refusal to report, or None when the person agreed. Answered rather than raised: a
+# `ToolError` leaving this crosses the block that measures the Graph operation, which then
+# records a person saying no as a Graph failure. See `send_draft`.
+type _Confirm = Callable[[Message], Awaitable[str | None]]
 
 
 def a_person_agrees(ctx: Context) -> _Confirm:
@@ -240,7 +243,7 @@ def a_person_agrees(ctx: Context) -> _Confirm:
     whole of what this tool can show, and it is what makes "send to these people" answerable.
     """
 
-    async def confirm(draft: Message) -> None:
+    async def confirm(draft: Message) -> str | None:
         everyone = [
             one.address or one.name or "an address Microsoft did not record"
             for one in MailAddress.each_of(draft.to_recipients)
@@ -252,14 +255,15 @@ def a_person_agrees(ctx: Context) -> _Confirm:
         )
         try:
             answer = await ctx.elicit(question, response_type=[SEND, _DO_NOT_SEND])
-        except ToolError:
-            raise
-        except Exception as unreachable:
+        except ToolError as already_a_refusal:
+            return str(already_a_refusal)
+        except Exception:
             # Every exception: a client with no elicitation capability is reported differently by
             # different transports, and none of those is a reason to send anyway.
-            raise ToolError(_NO_WAY_TO_ASK) from unreachable
+            return _NO_WAY_TO_ASK
         if not isinstance(answer, AcceptedElicitation) or answer.data != SEND:
-            raise ToolError(_DECLINED)
+            return _DECLINED
+        return None
 
     return confirm
 
@@ -278,18 +282,20 @@ async def send_draft(client: GraphServiceClient, *, draft_ref: str, confirm: _Co
             draft = await client.me.messages.by_message_id(handle.draft_id).get(
                 request_configuration=_read_request()
             )
-        sendable = draft is not None and draft.is_draft is True
-        if sendable:
-            assert draft is not None
-            await confirm(draft)
-        sent_at = await _send(client, handle) if sendable else None
+        refused: str | None = _ALREADY_SENT
+        if draft is not None and draft.is_draft is True:
+            with not_graph():
+                refused = await confirm(draft)
+        sent_at = await _send(client, handle) if refused is None else None
 
-    # This function decides inside the block above, and raises outside it. `graph_errors` treats
-    # a `ToolError` that escapes it as a Graph operation that failed for a reason the seam cannot
-    # describe. A message this tool refuses to send is not a Graph failure at all.
+    # This function decides inside the block above, and raises every refusal outside it.
+    # `graph_errors` treats a `ToolError` that escapes it as a Graph operation that failed for a
+    # reason the seam cannot describe. A message this tool refuses to send is not a Graph failure
+    # at all, whether the refusal is the person's, their client's, or "that draft already went".
     assert draft is not None, "Graph answered a draft read with no message"
-    if sent_at is None:
-        raise ToolError(_ALREADY_SENT)
+    if refused is not None:
+        raise ToolError(refused)
+    assert sent_at is not None, "a send that nothing refused recorded no time"
     return _answer(draft, sent_at=sent_at)
 
 

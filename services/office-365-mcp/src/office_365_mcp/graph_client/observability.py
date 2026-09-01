@@ -67,8 +67,9 @@ _operation_duration = _meter.create_histogram(
     unit="s",
     description=(
         "Wall-clock time one Graph operation took. This includes the SDK's Retry-After waits and "
-        "every page a paged walk read. This is what an MCP client waited for, not what one HTTP "
-        "request took."
+        "every page a paged walk read. It leaves out any wait a tool marked as not Microsoft's, "
+        "such as `outlook_send_draft` asking a person to confirm. For the whole wait an MCP "
+        "client saw, person included, read `mcp_call_duration_seconds`."
     ),
 )
 _steps = _meter.create_counter(

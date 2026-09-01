@@ -9,6 +9,7 @@ drives the same operation names.
 """
 
 import ast
+import asyncio
 import json
 import pathlib
 import re
@@ -18,7 +19,10 @@ from typing import TypeGuard, cast
 import httpx
 import pytest
 import respx
+from fastmcp import Context
+from fastmcp.exceptions import ToolError
 from kiota_http.middleware import retry_handler
+from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
@@ -42,6 +46,7 @@ from office_365_mcp.graph_client import (
     graph_step,
 )
 from office_365_mcp.metrics import configure_metrics
+from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -201,6 +206,106 @@ class TestAGraphCallIsCountedAndTimed:
             _ = await client.me.get()
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden") == before + 1
+
+    async def test_a_person_declining_a_send_is_not_counted_as_a_graph_error(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`outlook_send_draft` asks a person before it sends, and a refusal is an answer rather
+        than a failure. Counted as `error` it reads on a dashboard as this connector breaking, and
+        the wait for the person lands in the Graph latency histogram as if Microsoft were slow.
+        """
+        draft_id = "AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        _ = graph.get(f"/me/messages/{draft_id}").mock(
+            return_value=httpx.Response(
+                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
+            )
+        )
+        sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
+
+        answered = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="ok")
+
+        async def declines(draft: Message) -> str | None:
+            assert draft is not None
+            return "Nothing was sent."
+
+        with pytest.raises(ToolError):
+            _ = await send_draft(
+                client, confirm=declines, draft_ref=f"outlook:///drafts/{draft_id}"
+            )
+
+        assert sent.call_count == 0, "a declined send reached the mailbox"
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error") == before
+        ), "a person saying no was counted as a Graph failure"
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="ok")
+            == answered + 1
+        ), "the read that did happen stopped being counted at all"
+
+    async def test_a_client_that_cannot_ask_is_not_counted_as_a_graph_error(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Driven through the real adapter rather than a stub, because this path is deterministic
+        for a client with no elicitation: every send it attempts would raise the failure rate.
+        """
+
+        class _CannotAsk:
+            async def elicit(self, message: str, response_type: object = None) -> object:
+                assert message and response_type is not None
+                raise RuntimeError("elicitation not supported")
+
+        draft_id = "AAMkAGI2SYNTHETIC-immutable-0002%3D"
+        _ = graph.get(f"/me/messages/{draft_id}").mock(
+            return_value=httpx.Response(
+                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
+            )
+        )
+        sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
+
+        with pytest.raises(ToolError, match="does not support elicitation"):
+            _ = await send_draft(
+                client,
+                confirm=a_person_agrees(cast("Context", cast("object", _CannotAsk()))),
+                draft_ref=f"outlook:///drafts/{draft_id}",
+            )
+
+        assert sent.call_count == 0
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error") == before
+        ), "a client that cannot ask was counted as a Graph failure"
+
+    async def test_the_wait_for_a_person_is_not_timed_as_graph_latency(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The half that lands on every send, the accepted ones included. The operation histogram
+        carries no status label, so a wait recorded here cannot be filtered out downstream.
+        """
+        draft_id = "AAMkAGI2SYNTHETIC-immutable-0003%3D"
+        _ = graph.get(f"/me/messages/{draft_id}").mock(
+            return_value=httpx.Response(
+                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
+            )
+        )
+        _ = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
+        waited = 0.5
+        before = _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_sum", operation="outlook_send_draft")
+
+        async def thinks_about_it(draft: Message) -> str | None:
+            assert draft is not None
+            await asyncio.sleep(waited)
+            return None
+
+        _ = await send_draft(
+            client, confirm=thinks_about_it, draft_ref=f"outlook:///drafts/{draft_id}"
+        )
+
+        timed = (
+            _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_sum", operation="outlook_send_draft")
+            - before
+        )
+        assert timed < waited / 2, f"the wait for a person was timed as Graph latency: {timed}s"
 
     async def test_a_step_with_no_operation_above_it_is_not_counted_under_a_made_up_name(
         self, client: GraphServiceClient, graph: respx.MockRouter

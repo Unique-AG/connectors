@@ -11,6 +11,7 @@ to "branch on the `innerError.code` value, not the message text"
 from asyncio import CancelledError
 from collections.abc import Generator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from time import perf_counter
 from typing import cast
 
@@ -143,6 +144,34 @@ def graph_step(step: str) -> Generator[None]:
         yield
 
 
+# The waits inside the innermost measured block that its clock leaves out. A list that is mutated
+# in place rather than re-`set`, because a task copies the context: a `set` inside one is lost to
+# the block that opened it, and an append to the list it already holds is not.
+_UNMEASURED: ContextVar[list[float] | None] = ContextVar("office_365_mcp_unmeasured", default=None)
+
+
+@contextmanager
+def not_graph() -> Generator[None]:
+    """Stop the clock of the measured block in scope, for a wait that is not Microsoft's.
+
+    `outlook_send_draft` puts a question to a person between its read and its send, so the wait
+    for an answer happens inside the block that times the operation. Timed as Graph it lands in a
+    histogram whose every bucket is sized for Microsoft, and no dashboard can take it out again:
+    `graph_operation_duration_seconds` carries no status label to filter on.
+
+    Outside any measured block this records nothing, because there is no clock to stop.
+    """
+    spent = _UNMEASURED.get()
+    if spent is None:
+        yield
+        return
+    started = perf_counter()
+    try:
+        yield
+    finally:
+        spent.append(perf_counter() - started)
+
+
 @contextmanager
 def _measured(
     operation: str | None, *, step: str | None, operation_level: bool = True
@@ -151,6 +180,8 @@ def _measured(
     whole thing, and counting twice turns `graph_operations_total` into a count of blocks entered.
     """
     started = perf_counter()
+    unmeasured: list[float] = []
+    outer = _UNMEASURED.set(unmeasured)
     # Pessimistic on purpose: every path below replaces it, so this surviving means an exception
     # escaped that this seam cannot describe.
     status = _UNCLASSIFIED
@@ -206,10 +237,15 @@ def _measured(
             request_id=None,
         ) from error
     finally:
+        _UNMEASURED.reset(outer)
+        enclosing = _UNMEASURED.get()
+        if enclosing is not None:
+            # A wait a step left out is one the operation around it leaves out too.
+            enclosing.extend(unmeasured)
         # One reading of the clock serves both instruments. Two readings land two different
         # durations in the low end of the histograms, exactly where a call answered from a warm
         # pool sits.
-        elapsed = perf_counter() - started
+        elapsed = perf_counter() - started - sum(unmeasured)
         if operation_level:
             record_graph_call(operation, status=status, seconds=elapsed)
         record_graph_step(operation, step=step, status=status, seconds=elapsed)
