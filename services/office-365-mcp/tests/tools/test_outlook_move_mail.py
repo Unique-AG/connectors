@@ -93,11 +93,23 @@ def _folder_payload(
     display_name: str | None = "Archive",
     is_hidden: bool | None = False,
     odata_type: str | None = None,
+    extra: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {"displayName": display_name, "isHidden": is_hidden}
     if odata_type is not None:
         payload["@odata.type"] = odata_type
+    payload.update(extra or {})
     return payload
+
+
+# What Graph answers for a search folder, minus the annotation. Microsoft can leave `@odata.type`
+# out, and then the SDK has no discriminator and builds a plain `MailFolder`.
+_SEARCH_FOLDER_PROPERTIES: Mapping[str, object] = {
+    "filterQuery": "flagStatus eq 'flagged'",
+    "sourceFolderIds": ["AQMkADAwSYNTHETIC-inbox"],
+    "includeNestedFolders": True,
+    "isSupported": True,
+}
 
 
 def _sent_body(route: respx.Route) -> Mapping[str, object]:
@@ -435,6 +447,40 @@ class TestTheDestinationItRefuses:
         assert first_move.call_count == 0
 
     @pytest.mark.usefixtures("first_move")
+    async def test_a_search_folder_is_refused_even_with_no_odata_type(
+        self, client: GraphServiceClient, graph: respx.MockRouter, first_move: respx.Route
+    ) -> None:
+        """The annotation is the clean signal, not the only one. Graph can answer without it, and
+        the SDK then builds a plain `MailFolder`, so the type check alone lets the folder through.
+        A search folder still names itself through the properties only it declares.
+        """
+        _ = graph.get(_ARCHIVE).mock(
+            return_value=httpx.Response(
+                200,
+                json=_folder_payload(display_name="Unread mail", extra=_SEARCH_FOLDER_PROPERTIES),
+            )
+        )
+
+        with pytest.raises(ToolError, match="search folder"):
+            _ = await mover.move_mail(
+                client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
+            )
+
+        assert first_move.call_count == 0
+
+    @pytest.mark.usefixtures("first_move")
+    async def test_the_destination_read_narrows_nothing(
+        self, client: GraphServiceClient, archive: respx.Route
+    ) -> None:
+        """`$select` is what hides a search folder: a narrowed answer can carry neither the
+        annotation nor the properties the check falls back on."""
+        _ = await mover.move_mail(
+            client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
+        )
+
+        assert "select" not in str(archive.calls.last.request.url).casefold()
+
+    @pytest.mark.usefixtures("first_move")
     async def test_the_folder_is_read_again_on_every_call(
         self, client: GraphServiceClient, archive: respx.Route
     ) -> None:
@@ -446,21 +492,6 @@ class TestTheDestinationItRefuses:
         _ = await mover.move_mail(client, message_refs=refs, folder_ref=_ARCHIVE_REF)
 
         assert archive.call_count == 2
-
-    @pytest.mark.usefixtures("first_move")
-    async def test_the_folder_read_asks_for_the_flag_it_checks(
-        self, client: GraphServiceClient, archive: respx.Route
-    ) -> None:
-        """Graph leaves `isHidden` out of a projection that does not name it, and an absent flag
-        would read as "not hidden"."""
-        _ = await mover.move_mail(
-            client, message_refs=[MailMessageHandle(_FIRST_ID).uri], folder_ref=_ARCHIVE_REF
-        )
-
-        assert archive.calls.last.request.url.params["$select"].split(",") == [
-            "displayName",
-            "isHidden",
-        ]
 
     @pytest.mark.usefixtures("archive")
     async def test_a_folder_graph_named_is_reported_by_its_name(

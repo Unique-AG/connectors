@@ -37,8 +37,11 @@ it.
 a search folder. Mail filed into either one disappears from the user's view, even though it was
 not deleted. This call reads the folder now, instead of trusting an earlier answer, because a
 flag in an earlier answer is a snapshot that the model holds, not a fact about the current
-mailbox. `mailSearchFolder` is a distinct `@odata.type`, not a flag, so this check reads the type
-that Graph's own discriminator produced.
+mailbox. `mailSearchFolder` is a distinct `@odata.type`, not a flag. This read narrows nothing,
+because Graph can leave that annotation out of a narrowed answer: the SDK then has no
+discriminator, builds a plain `MailFolder`, and a type check alone lets the folder through. The
+check also falls back to the properties only a search folder declares, which the SDK keeps in
+`additional_data` when it did not recognise them.
 """
 
 from collections.abc import Mapping, Sequence
@@ -53,10 +56,8 @@ from fastmcp.tools import tool as tool_metadata
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
+from msgraph.generated.models.mail_folder import MailFolder
 from msgraph.generated.models.mail_search_folder import MailSearchFolder
-from msgraph.generated.users.item.mail_folders.item.mail_folder_item_request_builder import (
-    MailFolderItemRequestBuilder,
-)
 from msgraph.generated.users.item.messages.item.move.move_post_request_body import (
     MovePostRequestBody,
 )
@@ -108,14 +109,19 @@ MAX_MESSAGES = 20
 # rule the schema does not publish.
 DESTINATION_ARGUMENTS: tuple[str, str] = ("destination", "folder_ref")
 
-# Everything the destination check reads. `@odata.type` is deliberately absent, and no query can
-# ask for it. Graph puts this annotation on an instance of a derived type. The SDK's
-# discriminator reads it to hand back a `MailSearchFolder` instead of a `MailFolder`.
-_DESTINATION_FIELDS: tuple[str, ...] = ("displayName", "isHidden")
+# The properties only a search folder declares, taken from the SDK rather than written out, so a
+# property Microsoft adds later is covered without an edit here.
+_SEARCH_FOLDER_ONLY: frozenset[str] = frozenset(
+    MailSearchFolder().get_field_deserializers()
+) - frozenset(MailFolder().get_field_deserializers())
+
+assert _SEARCH_FOLDER_ONLY, (
+    "MailSearchFolder declares no property of its own, so the destination check below would "
+    "accept every search folder silently"
+)
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
-_FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = f"""\
 Move messages in the signed-in user's mailbox into another folder, up to {MAX_MESSAGES} at a \
@@ -349,18 +355,31 @@ async def _destination(
     """
     if not isinstance(wanted, MailFolderHandle):
         return _Destination(folder_id=wanted, name=wanted)
+    # No `$select`. Narrowing this read is what hides a search folder: Graph can leave the
+    # `@odata.type` annotation out of a narrowed answer, the SDK then has no discriminator to read
+    # and hands back a plain `MailFolder`, and the check below never fires. A whole folder is a
+    # small answer, and this is one folder once per call.
     with graph_step(STEP_DESTINATION):
-        folder = await client.me.mail_folders.by_mail_folder_id(wanted.folder_id).get(
-            request_configuration=RequestConfiguration[_FolderQuery](
-                query_parameters=_FolderQuery(select=list(_DESTINATION_FIELDS))
-            )
-        )
+        folder = await client.me.mail_folders.by_mail_folder_id(wanted.folder_id).get()
     assert folder is not None, "Graph answered a mail folder read with no folder"
-    if isinstance(folder, MailSearchFolder):
+    if _is_search_folder(folder):
         return _Unusable(_SEARCH_FOLDER_DESTINATION)
     if folder.is_hidden:
         return _Unusable(_HIDDEN_DESTINATION)
     return _Destination(folder_id=wanted.folder_id, name=folder.display_name or wanted.uri)
+
+
+def _is_search_folder(folder: MailFolder) -> bool:
+    """Whether Graph answered with a search folder, by either of the two signals it can carry.
+
+    The typed answer is the clean one: `@odata.type` names the derived type and the SDK's
+    discriminator hands back a `MailSearchFolder`. Without that annotation the SDK builds a plain
+    `MailFolder` and puts the properties it did not recognise in `additional_data`, so a search
+    folder still names itself there.
+    """
+    if isinstance(folder, MailSearchFolder):
+        return True
+    return bool(_SEARCH_FOLDER_ONLY & frozenset(folder.additional_data or {}))
 
 
 async def _move_one(
