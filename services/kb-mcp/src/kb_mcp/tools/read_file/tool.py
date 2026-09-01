@@ -9,11 +9,13 @@ import math
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import tiktoken
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
 from pydantic import Field
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -51,15 +53,10 @@ _CHUNKED_MIME_TYPES = {
 def _is_chunked(content: Content) -> bool | None:
     """True (chunked), False (flat text), or None (unsupported).
 
-    Prefers mime_type — content.key is sometimes not a filename at all (a
-    call/video transcript's key is an opaque recording id, a scraped page's
-    key is its source URL), so there's no extension to check. `text/*` is
-    treated as flat text broadly rather than as an enumerated set: every
-    registered text/* subtype is still ASCII/UTF-8-representable, and the
-    decode below already degrades on bad bytes instead of raising, so an
-    unusual subtype just renders noisier text, never binary passed off as
-    something else. application/json is the one text-bucket exception,
-    since its mime type isn't under text/.
+    Prefers mime_type over the key's extension — a transcript's key is an
+    opaque recording id, not a filename. Any text/* mime type counts as
+    flat text (the decode already degrades on bad bytes, so an unlisted
+    subtype is still safe); application/json is the one exception.
     """
     mime = content.mime_type
     if mime in _CHUNKED_MIME_TYPES:
@@ -210,6 +207,26 @@ def _virtual_page_token_bounds(
     return token_start, token_end
 
 
+def _is_transient_download_error(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return isinstance(exc, httpx.TransportError)
+
+
+@retry(
+    retry=retry_if_exception(_is_transient_download_error),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.5, max=4),
+    reraise=True,
+)
+async def _download_with_retry(
+    *, user_id: str, company_id: str, content_id: str, chat_id: str | None
+) -> bytes:
+    return await download_content_to_bytes_async(
+        user_id=user_id, company_id=company_id, content_id=content_id, chat_id=chat_id
+    )
+
+
 @tool(
     name="read_file",
     meta=_META,
@@ -314,13 +331,22 @@ async def read_file(
                 chunks, start_page, end_page, config.max_tokens_per_call
             )
         else:
-            raw_bytes = await download_content_to_bytes_async(
-                user_id=user_id,
-                company_id=company_id,
-                content_id=content_id,
-                chat_id=None,
-            )
-            full_text = raw_bytes.decode("utf-8", errors="replace")
+            try:
+                raw_bytes = await _download_with_retry(
+                    user_id=user_id,
+                    company_id=company_id,
+                    content_id=content_id,
+                    chat_id=None,
+                )
+                full_text = raw_bytes.decode("utf-8", errors="replace")
+            except httpx.HTTPStatusError as exc:
+                # Scraped/crawled content (e.g. a Confluence page) has no
+                # downloadable file at all — only chunks from ingestion —
+                # so a 404 here falls back to them instead of failing.
+                if exc.response.status_code != 404 or not content.chunks:
+                    raise
+                chunks = sort_content_chunks(list(content.chunks))
+                full_text = "\n".join(c.text for c in chunks)
             is_error, text = _render_text(
                 full_text, start_page, end_page, config.max_tokens_per_call
             )
