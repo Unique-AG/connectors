@@ -1,0 +1,81 @@
+name: "Verify Image Pins"
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify image pins
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assert that pins which must move together do
+        run: |
+          set -euo pipefail
+          fail=0
+          note() { echo "::error file=$1::$2"; fail=1; }
+
+          while IFS= read -r df; do
+            svc_dir=${df%/deploy/Dockerfile}
+
+            while IFS= read -r image; do
+              case "$image" in
+                *@sha256:*) ;;
+                *) note "$df" "base image '${image}' is not digest-pinned. Every external FROM must carry @sha256:." ;;
+              esac
+            done < <(awk '/^[[:space:]]*FROM /{print $2}' "$df" \
+                     | grep -vxFf <(awk '/^[[:space:]]*FROM /{ for(i=1;i<=NF;i++) if(tolower($i)=="as") print $(i+1) }' "$df") \
+                     || true)
+
+            uv_py=$(grep -oE 'ghcr\.io/astral-sh/uv:[^[:space:]]*-python[0-9]+\.[0-9]+' "$df" \
+                    | grep -oE '[0-9]+\.[0-9]+$' | head -1 || true)
+            rt_py=$(grep -oE '^[[:space:]]*FROM[[:space:]]+python:[0-9]+\.[0-9]+' "$df" \
+                    | grep -oE '[0-9]+\.[0-9]+$' | head -1 || true)
+            pv_py=""
+            if [ -f "$svc_dir/.python-version" ]; then
+              pv_py=$(sed -e 's/[[:space:]]//g' "$svc_dir/.python-version" \
+                      | grep -oE '^[0-9]+\.[0-9]+' | head -1 || true)
+            fi
+
+            if [ -n "$uv_py" ] && [ -n "$rt_py" ] && [ "$uv_py" != "$rt_py" ]; then
+              note "$df" "python minor split: the uv builder ships python${uv_py} and the runtime is python:${rt_py}. The venv copied from the builder lives in lib/python${uv_py} and cannot be imported under python${rt_py}. The image still builds and 'python -V' still exits 0; the real entrypoint fails with ModuleNotFoundError."
+            fi
+            if [ -n "$pv_py" ] && [ -n "$rt_py" ] && [ "$pv_py" != "$rt_py" ]; then
+              note "$df" "the runtime is python:${rt_py} but ${svc_dir}/.python-version says ${pv_py}. CI resolves the lockfile on ${pv_py} and the image runs ${rt_py}."
+            fi
+
+            mapfile -t node_vers < <(grep -oE '^[[:space:]]*FROM[[:space:]]+node:[0-9]+\.[0-9]+\.[0-9]+' "$df" \
+                                     | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$' | sort -u)
+            if [ "${#node_vers[@]}" -gt 1 ]; then
+              note "$df" "node version split across stages: ${node_vers[*]}. The build and runtime stages must run the same Node version."
+            fi
+          done < <(find services -type f -path '*/deploy/Dockerfile' | sort)
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Coupled image pins disagree."
+            exit 1
+          fi
+          echo "All coupled image pins agree."
+
+      - name: Reject a breaking-change footer quoted from upstream release notes
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          printenv PR_BODY > "${RUNNER_TEMP}/pr-body.txt"
+          if grep -qE 'BREAKING[ -]CHANGE(:| #)' "${RUNNER_TEMP}/pr-body.txt"; then
+            echo "::error::This pull request body contains a breaking-change footer, almost certainly quoted from an upstream changelog. This repository squashes with the pull request body as the commit message, so merging it would cut a major release for every service in the group. Remove the footer from the body."
+            exit 1
+          fi
+          echo "No breaking-change footer in the pull request body."
