@@ -1,0 +1,11 @@
+mcpConfig:
+  app:
+    apiKey:
+      fromSecret:
+        name: kyckr-mcp-ci-dummy
+        key: mcp-api-key
+  kyckr:
+    apiKey:
+      fromSecret:
+        name: kyckr-mcp-ci-dummy
+        key: kyckr-api-key

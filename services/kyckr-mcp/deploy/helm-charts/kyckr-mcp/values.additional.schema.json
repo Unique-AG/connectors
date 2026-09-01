@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Kyckr MCP Values",
+  "description": "Values for the Kyckr MCP Helm chart. NestJS MCP server for the Kyckr company-registry API. Exposure uses base chart Gateway API routes (no custom Ingress).",
+  "type": "object",
+  "properties": {
+    "mcpConfig": {
+      "type": "object",
+      "description": "Configuration for the Kyckr MCP Server, mapped to environment variables (MCP_API_KEY, KYCKR_API_BASE_URL, KYCKR_API_KEY, KYCKR_DEFAULT_CUSTOMER_REFERENCE, KYCKR_DEFAULT_CONTACT_EMAIL).",
+      "properties": {
+        "app": {
+          "type": "object",
+          "description": "Application configuration",
+          "properties": {
+            "apiKey": {
+              "$ref": "#/$defs/valueSourceSensitive",
+              "description": "Shared secret protecting the MCP endpoint. The server mounts itself at /<MCP_API_KEY>/mcp and 404s every other path, so this value is the credential and the URL prefix at once: it is required, and there is no unauthenticated surface to fall back on. Generate with `openssl rand -hex 32`. Rotating it moves the endpoint, so every configured client has to be updated in the same window. fromSecretProvider is auto-collected into the chart's SecretProviderClass — no separate secretProvider.vaults entry needed."
+            }
+          },
+          "required": ["apiKey"],
+          "additionalProperties": false
+        },
+        "kyckr": {
+          "type": "object",
+          "description": "Kyckr REST API configuration",
+          "properties": {
+            "apiBaseUrl": {
+              "type": "string",
+              "description": "Base URL of the Kyckr REST API. The default is Kyckr's test environment, matching the application's own default; point it at https://api.kyckr.com/v2 for real registry data. Must be https — the API key travels as a Bearer token on every request, which templates/_helpers.tpl enforces."
+            },
+            "apiKey": {
+              "$ref": "#/$defs/valueSourceSensitive",
+              "description": "Kyckr API key, sent as a Bearer token on every Kyckr call. Production keys draw on a paid credit balance, so a key belonging to the other environment than apiBaseUrl is a billing incident rather than a 401. fromSecretProvider is auto-collected into the chart's SecretProviderClass — no separate secretProvider.vaults entry needed."
+            },
+            "defaultCustomerReference": {
+              "type": "string",
+              "description": "Customer reference forwarded to Kyckr on paid calls so the credit spend can be reconciled per deployment. Omit to send none."
+            },
+            "defaultContactEmail": {
+              "type": "string",
+              "description": "Contact email forwarded to Kyckr on document orders that need manual follow-up. Omit to send none, which leaves those orders without a reachable owner."
+            }
+          },
+          "required": ["apiKey"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["app", "kyckr"],
+      "additionalProperties": false
+    }
+  }
+}

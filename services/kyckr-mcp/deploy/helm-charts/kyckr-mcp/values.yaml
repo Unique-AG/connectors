@@ -1,0 +1,132 @@
+nameOverride: kyckr-mcp
+fullnameOverride: kyckr-mcp
+selectorComponentLabel: server
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  LOG_LEVEL: info
+  MAX_HEAP_MB: 400
+  NODE_ENV: production
+  OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+  OTEL_METRICS_EXPORTER: "prometheus"
+  OTEL_EXPORTER_OTLP_ENDPOINT:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}'
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}/v1/traces'
+
+envVars: []
+
+mcpConfig:
+  app: {}
+  kyckr:
+    apiBaseUrl: https://test-api.kyckr.com/v2
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/kyckr-mcp
+  tag: 0.1.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 9542
+  metrics: 51346
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 25m
+    memory: 256Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+serviceAccount:
+  enabled: true
+
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: false
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+internalServices:
+  dependencies:
+    otelTraces:
+      enabled: false
+      name: otel-traces
+      servicePort: 4318
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+routes:
+  hostname: ""
+  pathPrefix: /
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: false
+
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    ephemeralPorts:
+      enabled: false
+    egress:
+      kyckr:
+        toFQDNs:
+          - matchName: api.kyckr.com
+          - matchName: test-api.kyckr.com
+          - matchPattern: "*.kyckr.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

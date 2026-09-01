@@ -1,0 +1,6 @@
+dependencies:
+- name: base
+  repository: oci://ghcr.io/unique-ag/helm
+  version: 0.1.0-4c70c3
+digest: sha256:d8d5eccd847d9304be3d18392ba57798175fcca81d0abc00fd071eaed038658e
+generated: "2026-09-01T15:00:00.000000+02:00"

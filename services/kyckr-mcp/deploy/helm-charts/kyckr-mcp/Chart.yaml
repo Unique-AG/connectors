@@ -1,0 +1,10 @@
+apiVersion: v2
+name: kyckr-mcp
+description: Kyckr company registry MCP server.
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-4c70c3

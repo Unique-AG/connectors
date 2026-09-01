@@ -1,0 +1,2 @@
+{{ include "kyckr-mcp.validateValues" . }}
+{{ include "base.all" . }}
