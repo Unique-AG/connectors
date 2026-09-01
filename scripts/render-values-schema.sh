@@ -29,6 +29,7 @@ CHART_DIRS=(
   "services/kb-mcp/deploy/helm-charts/kb-mcp"
   "services/backstop-mcp/deploy/helm-charts/backstop-mcp"
   "services/office-365-mcp/deploy/helm-charts/office-365-mcp"
+  "services/temenos-mcp/deploy/helm-charts/temenos-mcp"
 )
 
 had_drift=false

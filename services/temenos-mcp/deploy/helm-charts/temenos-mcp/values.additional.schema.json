@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Temenos MCP Values",
+  "description": "Values for the Temenos MCP Helm chart. NestJS MCP server wrapping the Temenos DataHub REST API. Exposure uses base chart Gateway API routes (no custom Ingress).",
+  "type": "object",
+  "properties": {
+    "mcpConfig": {
+      "type": "object",
+      "description": "Configuration for the Temenos MCP Server, mapped to environment variables (MCP_API_KEY, TEMENOS_API_BASE_URL, TEMENOS_API_KEY).",
+      "properties": {
+        "app": {
+          "type": "object",
+          "description": "Application configuration",
+          "properties": {
+            "apiKey": {
+              "$ref": "#/$defs/valueSourceSensitive",
+              "description": "Shared secret protecting the MCP endpoint. The server mounts itself at /<MCP_API_KEY>/mcp and 404s every other path, so this value is the credential and the URL prefix at once: it is required, and there is no unauthenticated surface to fall back on. Generate with `openssl rand -hex 32`. Rotating it moves the endpoint, so every configured client has to be updated in the same window. fromSecretProvider is auto-collected into the chart's SecretProviderClass \u2014 no separate secretProvider.vaults entry needed."
+            }
+          },
+          "required": ["apiKey"],
+          "additionalProperties": false
+        },
+        "temenos": {
+          "type": "object",
+          "description": "Temenos DataHub REST API configuration",
+          "properties": {
+            "apiBaseUrl": {
+              "type": "string",
+              "description": "Base URL of the Temenos DataHub REST API. Must be https \u2014 the API key travels as the apikey header on every request, which templates/_helpers.tpl enforces."
+            },
+            "apiKey": {
+              "$ref": "#/$defs/valueSourceSensitive",
+              "description": "Temenos API key, sent as the apikey header on every DataHub call. fromSecretProvider is auto-collected into the chart's SecretProviderClass \u2014 no separate secretProvider.vaults entry needed."
+            }
+          },
+          "required": ["apiKey"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["app", "temenos"],
+      "additionalProperties": false
+    }
+  }
+}

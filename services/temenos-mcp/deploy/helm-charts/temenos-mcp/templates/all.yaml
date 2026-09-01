@@ -1,0 +1,2 @@
+{{ include "temenos-mcp.validateValues" . }}
+{{ include "base.all" . }}

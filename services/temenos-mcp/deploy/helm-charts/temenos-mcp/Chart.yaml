@@ -1,0 +1,10 @@
+apiVersion: v2
+name: temenos-mcp
+description: Temenos DataHub MCP server.
+type: application
+version: 0.0.0
+appVersion: 0.0.0
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-4c70c3

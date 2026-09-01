@@ -179,6 +179,24 @@
         }
       ]
     },
+    "services/temenos-mcp": {
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/temenos-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/temenos-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/temenos-mcp/values.yaml"
+        }
+      ]
+    },
     "services/office-365-mcp": {
       "release-type": "python",
       "component": "office-365-mcp",

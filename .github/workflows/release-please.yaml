@@ -38,6 +38,8 @@ jobs:
       "services/backstop-mcp--version": ${{ steps.release.outputs['services/backstop-mcp--version'] }}
       "services/office-365-mcp--release_created": ${{ steps.release.outputs['services/office-365-mcp--release_created'] }}
       "services/office-365-mcp--version": ${{ steps.release.outputs['services/office-365-mcp--version'] }}
+      "services/temenos-mcp--release_created": ${{ steps.release.outputs['services/temenos-mcp--release_created'] }}
+      "services/temenos-mcp--version": ${{ steps.release.outputs['services/temenos-mcp--version'] }}
 
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -134,3 +136,13 @@ jobs:
       service-name: office-365-mcp
       service-version: ${{ needs.release-please.outputs['services/office-365-mcp--version'] }}
       dockerfile: services/office-365-mcp/deploy/Dockerfile
+
+  release-temenos-mcp:
+    needs: release-please
+    if: ${{ needs.release-please.outputs['services/temenos-mcp--release_created'] == 'true' }}
+    uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
+    with:
+      service-name: temenos-mcp
+      service-version: ${{ needs.release-please.outputs['services/temenos-mcp--version'] }}
+      dockerfile: services/temenos-mcp/deploy/Dockerfile

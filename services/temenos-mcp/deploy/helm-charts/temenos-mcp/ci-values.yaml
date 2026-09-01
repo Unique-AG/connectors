@@ -1,0 +1,11 @@
+mcpConfig:
+  app:
+    apiKey:
+      fromSecret:
+        name: temenos-mcp-ci-dummy
+        key: mcp-api-key
+  temenos:
+    apiKey:
+      fromSecret:
+        name: temenos-mcp-ci-dummy
+        key: temenos-api-key

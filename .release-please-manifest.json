@@ -4,6 +4,7 @@
   "services/confluence-connector": "3.0.1",
   "services/outlook-semantic-mcp": "3.4.1",
   "services/kyckr-mcp": "0.1.0",
+  "services/temenos-mcp": "0.0.0",
   "services/hello-mcp": "0.1.0",
   "services/kb-mcp": "0.1.2",
   "services/backstop-mcp": "0.0.4",
