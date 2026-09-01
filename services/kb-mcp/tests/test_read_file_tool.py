@@ -27,8 +27,14 @@ def _identity(monkeypatch):
     )
 
 
-def _make_content(key: str, chunks: list[ContentChunk] | None = None) -> Content:
-    return Content(id="cont_abc", key=key, chunks=chunks or [], metadata=None)
+def _make_content(
+    key: str,
+    chunks: list[ContentChunk] | None = None,
+    mime_type: str | None = None,
+) -> Content:
+    return Content(
+        id="cont_abc", key=key, chunks=chunks or [], metadata=None, mime_type=mime_type
+    )
 
 
 def _make_chunk(text: str, order: int, start_page: int, end_page: int) -> ContentChunk:
@@ -71,6 +77,115 @@ async def test_unsupported_extension_returns_error_without_downstream_calls():
 
     assert result.is_error is True
     assert "unsupported file type for read_file: .xlsx" in result.content[0].text  # type: ignore[union-attr]
+    mock_download.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_unsupported_mime_type_is_named_in_the_error():
+    """The extension alone doesn't explain a mismatch — surface mime_type too."""
+    content = _make_content("report.xlsx", mime_type="application/vnd.ms-excel")
+    with _patch_search_contents(content):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "unsupported file type for read_file: .xlsx" in text
+    assert "mime_type=application/vnd.ms-excel" in text
+
+
+@pytest.mark.asyncio
+async def test_mime_type_resolves_text_when_key_has_no_extension():
+    """A call/video transcript's key is an opaque recording id, not a
+    filename — mime_type is the only signal available."""
+    content = _make_content("a6ughlz4rlbz3jszsqzhbatb", mime_type="text/vtt")
+    with (
+        _patch_search_contents(content),
+        _patch_download(b"WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nHello.\n"),
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is not True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "WEBVTT" in text
+    assert "Hello." in text
+
+
+@pytest.mark.asyncio
+async def test_mime_type_resolves_html_when_key_is_a_source_url():
+    """A scraped page's key is its source URL, not a filename."""
+    content = _make_content(
+        "https://unique-ch.atlassian.net/731283492", mime_type="text/html"
+    )
+    with (
+        _patch_search_contents(content),
+        _patch_download(b"<html><body>hi</body></html>"),
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is not True
+    assert "<html><body>hi</body></html>" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_unrecognized_text_mime_subtype_is_treated_as_text():
+    """text/* is matched broadly, not from an enumerated set of subtypes —
+    covers legitimate but unlisted subtypes like text/calendar."""
+    content = _make_content("invite.ics", mime_type="text/calendar")
+    with (
+        _patch_search_contents(content),
+        _patch_download(b"BEGIN:VCALENDAR\nEND:VCALENDAR"),
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is not True
+    assert "BEGIN:VCALENDAR" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_mime_type_takes_precedence_over_a_mismatched_extension():
+    """mime_type wins even when key's extension would say otherwise —
+    covers the real case where an upload's key still carries a stale
+    or wrong extension."""
+    content = _make_content("upload.bin", mime_type="text/plain")
+    with (
+        _patch_search_contents(content),
+        _patch_download(b"just plain text"),
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is not True
+    assert "just plain text" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_json_mime_type_is_supported_despite_not_being_under_text():
+    content = _make_content("cont_opaque_key", mime_type="application/json")
+    with (
+        _patch_search_contents(content),
+        _patch_download(b'{"a": 1}'),
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is not True
+    assert '{"a": 1}' in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_chunked_mime_type_dispatches_to_page_aware_rendering():
+    """mime_type alone (no .pdf extension in key) still routes to the
+    chunked/page-aware path, not the flat-text download path."""
+    chunks = [_make_chunk("hello", 0, 1, 1)]
+    content = _make_content("cont_opaque_key", chunks, mime_type="application/pdf")
+    with (
+        _patch_search_contents(content),
+        patch(
+            "kb_mcp.tools.read_file.tool.download_content_to_bytes_async"
+        ) as mock_download,
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert result.is_error is not True
+    assert "--- page 1 ---" in result.content[0].text  # type: ignore[union-attr]
     mock_download.assert_not_called()
 
 

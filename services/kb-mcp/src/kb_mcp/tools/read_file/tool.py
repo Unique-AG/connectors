@@ -13,7 +13,7 @@ import tiktoken
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
-from pydantic import Field, RootModel, field_validator
+from pydantic import Field
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -27,7 +27,7 @@ from unique_toolkit.content.functions import (
     download_content_to_bytes_async,
     search_contents_async,
 )
-from unique_toolkit.content.schemas import ContentChunk
+from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.correlation import correlation_id
@@ -37,24 +37,42 @@ from kb_mcp.tools.read_file.config import ReadFileToolConfig
 
 _LOGGER = logging.getLogger(__name__)
 
-_TEXT_EXTENSIONS = {".txt", ".md", ".html", ".json", ".csv"}
+_TEXT_EXTENSIONS = {".txt", ".md", ".html", ".json", ".csv", ".vtt"}
 _CHUNKED_EXTENSIONS = {".pdf", ".docx"}
 
+# The only two formats with a page-aware extraction pipeline; everything
+# else that decodes cleanly enough gets the flat-text path instead.
+_CHUNKED_MIME_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
-class SupportedFileExtension(RootModel[str]):
-    """Extension allow-list and chunked vs text dispatch."""
 
-    @field_validator("root")
-    @classmethod
-    def _check_supported(cls, v: str) -> str:
-        v = v.lower()
-        if v not in _TEXT_EXTENSIONS | _CHUNKED_EXTENSIONS:
-            raise ValueError(f"unsupported file extension: {v}")
-        return v
+def _is_chunked(content: Content) -> bool | None:
+    """True (chunked), False (flat text), or None (unsupported).
 
-    @property
-    def is_chunked(self) -> bool:
-        return self.root in _CHUNKED_EXTENSIONS
+    Prefers mime_type — content.key is sometimes not a filename at all (a
+    call/video transcript's key is an opaque recording id, a scraped page's
+    key is its source URL), so there's no extension to check. `text/*` is
+    treated as flat text broadly rather than as an enumerated set: every
+    registered text/* subtype is still ASCII/UTF-8-representable, and the
+    decode below already degrades on bad bytes instead of raising, so an
+    unusual subtype just renders noisier text, never binary passed off as
+    something else. application/json is the one text-bucket exception,
+    since its mime type isn't under text/.
+    """
+    mime = content.mime_type
+    if mime in _CHUNKED_MIME_TYPES:
+        return True
+    if mime == "application/json" or (mime is not None and mime.startswith("text/")):
+        return False
+
+    suffix = Path(content.key).suffix.lower()
+    if suffix in _CHUNKED_EXTENSIONS:
+        return True
+    if suffix in _TEXT_EXTENSIONS:
+        return False
+    return None
 
 
 _META = merge_tool_meta(
@@ -226,7 +244,7 @@ async def read_file(
     `content_id` (from a prior content_tree 'list'/'search' call).
     For large files, pass `start_page`/`end_page` to read a portion — for
     PDFs/DOCX these are real document pages; for plain-text formats
-    (.txt/.md/.html/.json/.csv) they're fixed-size virtual pages, same
+    (.txt/.md/.html/.json/.csv/.vtt) they're fixed-size virtual pages, same
     semantics either way. If the file is too large and no range is given,
     the call returns an informative error (with the file's total token/page
     count) instead of silently truncating — use that to pick a range. Ranges
@@ -269,27 +287,28 @@ async def read_file(
             )
         content = contents[0]
 
-        try:
-            ext = SupportedFileExtension(Path(content.key).suffix)
-        except ValueError:
+        is_chunked = _is_chunked(content)
+        if is_chunked is None:
             suffix = Path(content.key).suffix
             _LOGGER.info(
                 "read_file complete correlation_id=%s content_id=%s is_error=True "
-                "reason=unsupported_extension",
+                "reason=unsupported_extension mime_type=%s",
                 cid,
                 content_id,
+                content.mime_type,
             )
+            detail = f" (mime_type={content.mime_type})" if content.mime_type else ""
             return ToolResult(
                 content=[
                     TextContent(
                         type="text",
-                        text=f"unsupported file type for read_file: {suffix}",
+                        text=f"unsupported file type for read_file: {suffix}{detail}",
                     )
                 ],
                 is_error=True,
             )
 
-        if ext.is_chunked:
+        if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))
             is_error, text = _render_chunked(
                 chunks, start_page, end_page, config.max_tokens_per_call
