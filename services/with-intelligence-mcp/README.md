@@ -118,6 +118,20 @@ uv run agent-explore/explore.py /v3/investors/2504   # behaviour, from a live GE
 `spec.py` needs no credentials — the spec is public. `explore.py` signs in with the username and
 password from `agent-explore/.env`, caches the token and every response, and only ever GETs.
 
+The wire models under `features/*/api_responses.py` are hand-written, and
+`tests/test_spec_conformance.py` checks every field they declare against the vendor's own
+schemas — a field that no longer exists, or one whose type is an object where we wrote a string,
+fails the suite. The schemas it compares against are pruned into
+`tests/spec/vendor_schemas.json`; refresh them, as a deliberate and readable diff, with:
+
+```bash
+uv run agent-explore/spec.py snapshot
+```
+
+Add a schema name to `SNAPSHOT_ROOTS` in `agent-explore/spec.py` when a feature starts modelling
+a new entity. What conformance cannot tell you is whether a field is ever populated — for that,
+record a real response with `explore.py`.
+
 Three things about it shape most of the code here: listings return `{id, name, updated_at}` and
 the rich record lives at `GET /{id}`; filters take vocabulary **ids** (`primary_strategy_id`,
 `country_id`, …) resolved from ~70 small listing endpoints; and an empty result can mean "not

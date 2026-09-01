@@ -4,6 +4,7 @@
     uv run agent-explore/spec.py params /v3/investors
     uv run agent-explore/spec.py schema InvestorExtended
     uv run agent-explore/spec.py response '/v3/investors/{id}'
+    uv run agent-explore/spec.py snapshot            # refresh tests/spec/vendor_schemas.json
 
 Through `uv run`: it imports httpx from the service venv. Output is tab-separated.
 
@@ -14,8 +15,10 @@ Shapes only. Behaviour comes from a live GET (`explore.py`) — the spec says an
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -137,11 +140,68 @@ def cmd_response(spec: Json, target: str) -> None:
         print(f"{status}\t{shape}\t{_as_str(response.get('description'))}")
 
 
+# The schemas `tests/test_spec_conformance.py` checks our models against, plus everything they
+# reference. Add a name here when a feature starts modelling it.
+SNAPSHOT_ROOTS = ("Investor", "InvestorExtended", "PaginatedInvestor", "Auth")
+_SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "tests" / "spec" / "vendor_schemas.json"
+
+
+def _referenced_schemas(spec: Json, roots: tuple[str, ...]) -> dict[str, Json]:
+    """The named schemas reachable from `roots`, following `$ref` transitively."""
+    all_schemas = _at(spec, "components", "schemas")
+    collected: dict[str, Json] = {}
+    queue = list(roots)
+    while queue:
+        name = queue.pop()
+        if name in collected:
+            continue
+        schema = _as_dict(all_schemas.get(name))
+        if not schema:
+            continue
+        collected[name] = schema
+        queue.extend(_refs_in(schema))
+    return collected
+
+
+def _refs_in(node: object) -> list[str]:
+    if isinstance(node, dict):
+        entries = cast("Json", node)
+        found: list[str] = []
+        for key, value in entries.items():
+            if key == "$ref" and isinstance(value, str):
+                found.append(_ref_name(value))
+            else:
+                found.extend(_refs_in(value))
+        return found
+    if isinstance(node, list):
+        return [ref for item in cast("list[object]", node) for ref in _refs_in(item)]
+    return []
+
+
+def cmd_snapshot(spec: Json, _target: str) -> None:
+    """Write the pruned snapshot the conformance test reads.
+
+    Only the schemas we model are kept, so the committed file stays small enough to read in a
+    diff — refreshing it is then a visible change to the vendor contract we depend on.
+    """
+    schemas = _referenced_schemas(spec, SNAPSHOT_ROOTS)
+    payload = {
+        "_source": SPEC_URL,
+        "_fetched": datetime.now(UTC).date().isoformat(),
+        "_roots": list(SNAPSHOT_ROOTS),
+        "schemas": dict(sorted(schemas.items())),
+    }
+    _SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _ = _SNAPSHOT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
+    print(f"wrote {_SNAPSHOT_PATH.relative_to(Path.cwd())} with {len(schemas)} schemas")
+
+
 _COMMANDS: dict[str, Callable[[Json, str], None]] = {
     "paths": cmd_paths,
     "params": cmd_params,
     "schema": cmd_schema,
     "response": cmd_response,
+    "snapshot": cmd_snapshot,
 }
 
 
@@ -152,7 +212,7 @@ def main() -> None:
     _ = parser.add_argument("--refresh", action="store_true", help="re-fetch the cached spec")
     args = parser.parse_args(namespace=_Args())
 
-    if args.command != "paths" and not args.target:
+    if args.command not in ("paths", "snapshot") and not args.target:
         raise SystemExit(f"{args.command} needs a target")
     _COMMANDS[args.command](load_spec(args.refresh), args.target)
 

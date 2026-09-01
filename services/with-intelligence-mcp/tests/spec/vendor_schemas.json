@@ -1,0 +1,1110 @@
+{
+  "_source": "https://api.withintelligence.com/v3/docs/json",
+  "_fetched": "2026-09-01",
+  "_roots": [
+    "Investor",
+    "InvestorExtended",
+    "PaginatedInvestor",
+    "Auth"
+  ],
+  "schemas": {
+    "AssetAllocation": {
+      "type": "object",
+      "properties": {
+        "actual_percentage": {
+          "type": "number"
+        },
+        "actual_to_target_diff": {
+          "$ref": "#/components/schemas/AssetAllocationRangeValue"
+        },
+        "as_of": {
+          "type": "string"
+        },
+        "asset_allocations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/AssetAllocationAssetAllocation"
+          }
+        },
+        "asset_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "has_asset_allocations": {
+          "type": "boolean"
+        },
+        "is_approximate": {
+          "type": "boolean"
+        },
+        "number_of_asset_allocations": {
+          "type": "number"
+        },
+        "target_percentage": {
+          "$ref": "#/components/schemas/AssetAllocationRangeValue"
+        }
+      },
+      "required": [
+        "actual_percentage",
+        "actual_to_target_diff",
+        "as_of",
+        "asset_allocations",
+        "asset_classes",
+        "has_asset_allocations",
+        "is_approximate",
+        "number_of_asset_allocations",
+        "target_percentage"
+      ],
+      "additionalProperties": false
+    },
+    "AssetAllocationAssetAllocation": {
+      "type": "object",
+      "properties": {
+        "actual_percentage": {
+          "type": "number"
+        },
+        "actual_to_target_diff": {
+          "$ref": "#/components/schemas/AssetAllocationRangeValue"
+        },
+        "approaches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "continents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "countries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_durations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "fund_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "instruments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "is_approximate": {
+          "type": "boolean"
+        },
+        "primary_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "secondary_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "sub_markets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "sub_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "target_percentage": {
+          "$ref": "#/components/schemas/AssetAllocationRangeValue"
+        }
+      },
+      "required": [
+        "actual_percentage",
+        "actual_to_target_diff",
+        "approaches",
+        "attributes",
+        "continents",
+        "countries",
+        "fund_durations",
+        "fund_structures",
+        "instruments",
+        "is_approximate",
+        "primary_industries",
+        "regions",
+        "secondary_industries",
+        "sub_markets",
+        "sub_regions",
+        "target_percentage"
+      ],
+      "additionalProperties": false
+    },
+    "AssetAllocationRangeValue": {
+      "type": "object",
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "mid": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "lower",
+        "mid",
+        "upper"
+      ],
+      "additionalProperties": false
+    },
+    "Auth": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string"
+        },
+        "refreshToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accessToken",
+        "refreshToken"
+      ],
+      "additionalProperties": false
+    },
+    "Classification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "Entity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Investor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorAddress": {
+      "type": "object",
+      "properties": {
+        "address1": {
+          "type": "string"
+        },
+        "address2": {
+          "type": "string"
+        },
+        "address3": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_id": {
+          "type": "number"
+        },
+        "continent": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "country": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/components/schemas/InvestorAddressState"
+        }
+      },
+      "required": [
+        "address1",
+        "address2",
+        "address3",
+        "city",
+        "city_id",
+        "continent",
+        "country",
+        "email",
+        "phone",
+        "postcode",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorAddressState": {
+      "type": "object",
+      "properties": {
+        "abbreviation": {
+          "type": "string"
+        },
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "abbreviation",
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorAllocationCalculations": {
+      "type": "object",
+      "properties": {
+        "allocation_trend": {
+          "type": "string"
+        },
+        "current_allocation": {
+          "type": "string"
+        },
+        "current_allocation_as_of": {
+          "type": "string"
+        },
+        "funding_ratio": {
+          "type": "number"
+        },
+        "funding_ratio_as_of": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "allocation_trend",
+        "current_allocation",
+        "current_allocation_as_of",
+        "funding_ratio",
+        "funding_ratio_as_of"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorConsultant": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "asset_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "is_lead": {
+          "type": "boolean"
+        },
+        "role_extended": {
+          "type": "string"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "asset_classes",
+        "contacts",
+        "is_lead",
+        "role_extended",
+        "services"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorCurrency": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "short_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "short_name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorExtended": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "address": {
+          "$ref": "#/components/schemas/InvestorAddress"
+        },
+        "allocation_calculations": {
+          "$ref": "#/components/schemas/InvestorAllocationCalculations"
+        },
+        "asset_allocation_breakdown": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/components/schemas/AssetAllocation"
+          },
+          "description": "A dictionary keyed by asset class IDs. These IDs represent distinct asset classes rather than array positions or ordering."
+        },
+        "asset_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "aum": {
+          "type": "number"
+        },
+        "classification_investment_regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "consultants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/InvestorConsultant"
+          }
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Entity"
+          }
+        },
+        "contacts_total": {
+          "type": "number"
+        },
+        "currency": {
+          "$ref": "#/components/schemas/InvestorCurrency"
+        },
+        "family_names": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "family_profile": {
+          "type": "string",
+          "description": "Investor profile description"
+        },
+        "investment_capital_structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Entity"
+          }
+        },
+        "investment_company_size_focuses": {
+          "description": "Typical size of companies focussed within the investment allocation",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_continents": {
+          "description": "Geographic continent",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_countries": {
+          "description": "Geographic country",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_fund_approaches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_fund_structures": {
+          "description": "Structure used within the fund to manage tax and legal issues  of allocated proportion",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_industries": {
+          "$ref": "#/components/schemas/InvestorInvestmentIndustry"
+        },
+        "investment_instruments": {
+          "description": "Type of monetary contract used to create, trade, modify and settle financial asset and liability  of allocated proportion",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_market_caps": {
+          "description": "Measure of company worth - the price per share multiplied by the number of shares outstanding within the Asset Allocation",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_market_focuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_regions": {
+          "description": "With.Intelligence defined Geographic Region",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_sectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/InvestorInvestmentSector"
+          }
+        },
+        "investment_strategies": {
+          "description": "Allocation logical composite of a primary industry and a set of zero or more secondary industries",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/InvestorInvestmentStrategies"
+            }
+          ]
+        },
+        "investment_sub_markets": {
+          "description": "Sub-market for allocation",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_sub_regions": {
+          "description": "With.Intelligence defined Sub Region",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "investment_attributes": {
+          "description": "Investment attributes associated with the investor",
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "latest_aum": {
+          "$ref": "#/components/schemas/InvestorLatestAum"
+        },
+        "managers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "primary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "preferences": {
+          "description": "Investor preference data available to clients with the Intentions & Preferences subscription add-on.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/InvestorPreferences"
+            }
+          ]
+        },
+        "secondary_strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "summary": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "website": {
+          "type": "string"
+        },
+        "year_of_incorporation": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updated_at",
+        "address",
+        "allocation_calculations",
+        "asset_allocation_breakdown",
+        "asset_classes",
+        "aum",
+        "classification_investment_regions",
+        "consultants",
+        "contacts",
+        "contacts_total",
+        "currency",
+        "family_names",
+        "family_profile",
+        "investment_capital_structures",
+        "investment_company_size_focuses",
+        "investment_continents",
+        "investment_countries",
+        "investment_fund_approaches",
+        "investment_fund_structures",
+        "investment_industries",
+        "investment_instruments",
+        "investment_market_caps",
+        "investment_market_focuses",
+        "investment_regions",
+        "investment_sectors",
+        "investment_strategies",
+        "investment_sub_markets",
+        "investment_sub_regions",
+        "investment_attributes",
+        "latest_aum",
+        "managers",
+        "primary_strategies",
+        "secondary_strategies",
+        "summary",
+        "type",
+        "website",
+        "year_of_incorporation"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorInvestmentIndustry": {
+      "type": "object",
+      "properties": {
+        "primary_industry": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "secondary_industries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        }
+      },
+      "required": [
+        "primary_industry",
+        "secondary_industries"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorInvestmentSector": {
+      "type": "object",
+      "properties": {
+        "primary_sector": {
+          "$ref": "#/components/schemas/Entity"
+        },
+        "secondary_sectors": {
+          "$ref": "#/components/schemas/Entity"
+        }
+      },
+      "required": [
+        "primary_sector",
+        "secondary_sectors"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorInvestmentStrategies": {
+      "type": "object",
+      "properties": {
+        "primary_strategy": {
+          "$ref": "#/components/schemas/Classification"
+        },
+        "secondary_strategies": {
+          "$ref": "#/components/schemas/Classification"
+        }
+      },
+      "required": [
+        "primary_strategy",
+        "secondary_strategies"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorLatestAum": {
+      "type": "object",
+      "properties": {
+        "as_of": {
+          "type": "string"
+        },
+        "ranges_usd": {
+          "$ref": "#/components/schemas/InvestorLatestAumRangesUsd"
+        },
+        "value": {
+          "type": "number"
+        },
+        "value_max": {
+          "type": "number"
+        },
+        "value_max_usd": {
+          "type": "number"
+        },
+        "value_min": {
+          "type": "number"
+        },
+        "value_min_usd": {
+          "type": "number"
+        },
+        "value_usd": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "as_of",
+        "ranges_usd",
+        "value",
+        "value_max",
+        "value_max_usd",
+        "value_min",
+        "value_min_usd",
+        "value_usd"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorLatestAumRangesUsd": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "middle": {
+          "type": "number"
+        },
+        "range": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "middle",
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceAllocationAmount": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "$ref": "#/components/schemas/InvestorPreferenceCurrency"
+        },
+        "intention_id": {
+          "type": "number"
+        },
+        "value_lower": {
+          "type": "number"
+        },
+        "value_lower_usd": {
+          "type": "number"
+        },
+        "value_upper": {
+          "type": "number"
+        },
+        "value_upper_usd": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "currency",
+        "intention_id",
+        "value_lower",
+        "value_lower_usd",
+        "value_upper",
+        "value_upper_usd"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceAllocations": {
+      "type": "object",
+      "properties": {
+        "allocation_amount": {
+          "$ref": "#/components/schemas/InvestorPreferenceAllocationAmount"
+        },
+        "fund_count": {
+          "$ref": "#/components/schemas/InvestorPreferenceFundCount"
+        },
+        "fund_size": {
+          "$ref": "#/components/schemas/InvestorPreferenceFundSize"
+        },
+        "intention_id": {
+          "type": "number"
+        },
+        "ticket_size": {
+          "$ref": "#/components/schemas/InvestorPreferenceTicketSize"
+        }
+      },
+      "required": [
+        "allocation_amount",
+        "fund_count",
+        "fund_size",
+        "intention_id",
+        "ticket_size"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceAssetClass": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceAttribute": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceAttributes": {
+      "type": "object",
+      "properties": {
+        "attribute": {
+          "$ref": "#/components/schemas/InvestorPreferenceAttribute"
+        },
+        "intention_id": {
+          "type": "number"
+        },
+        "sentiment": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "attribute",
+        "intention_id",
+        "sentiment"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceCurrency": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "short_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "short_name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceFundCount": {
+      "type": "object",
+      "properties": {
+        "intention_id": {
+          "type": "number"
+        },
+        "value_lower": {
+          "type": "number"
+        },
+        "value_upper": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "intention_id",
+        "value_lower",
+        "value_upper"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceFundSize": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "$ref": "#/components/schemas/InvestorPreferenceCurrency"
+        },
+        "intention_id": {
+          "type": "number"
+        },
+        "value_lower": {
+          "type": "number"
+        },
+        "value_lower_usd": {
+          "type": "number"
+        },
+        "value_upper": {
+          "type": "number"
+        },
+        "value_upper_usd": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "currency",
+        "intention_id",
+        "value_lower",
+        "value_lower_usd",
+        "value_upper",
+        "value_upper_usd"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceStructure": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceStructures": {
+      "type": "object",
+      "properties": {
+        "intention_id": {
+          "type": "number"
+        },
+        "sentiment": {
+          "type": "string"
+        },
+        "structure": {
+          "$ref": "#/components/schemas/InvestorPreferenceStructure"
+        }
+      },
+      "required": [
+        "intention_id",
+        "sentiment",
+        "structure"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferenceTicketSize": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "$ref": "#/components/schemas/InvestorPreferenceCurrency"
+        },
+        "intention_id": {
+          "type": "number"
+        },
+        "value_lower": {
+          "type": "number"
+        },
+        "value_lower_usd": {
+          "type": "number"
+        },
+        "value_upper": {
+          "type": "number"
+        },
+        "value_upper_usd": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "currency",
+        "intention_id",
+        "value_lower",
+        "value_lower_usd",
+        "value_upper",
+        "value_upper_usd"
+      ],
+      "additionalProperties": false
+    },
+    "InvestorPreferences": {
+      "type": "object",
+      "properties": {
+        "allocations": {
+          "$ref": "#/components/schemas/InvestorPreferenceAllocations"
+        },
+        "asset_class": {
+          "$ref": "#/components/schemas/InvestorPreferenceAssetClass"
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/InvestorPreferenceAttributes"
+          }
+        },
+        "preferences_count": {
+          "type": "number"
+        },
+        "structures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/InvestorPreferenceStructures"
+          }
+        }
+      },
+      "required": [
+        "allocations",
+        "asset_class",
+        "attributes",
+        "preferences_count",
+        "structures"
+      ],
+      "additionalProperties": false
+    },
+    "PaginatedInvestor": {
+      "type": "object",
+      "properties": {
+        "pagination": {
+          "$ref": "#/components/schemas/PaginatedResponsePagination"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Investor"
+          }
+        }
+      },
+      "required": [
+        "pagination",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "PaginatedResponsePagination": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number"
+        },
+        "page_size": {
+          "type": "number"
+        },
+        "count": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "page",
+        "page_size",
+        "count",
+        "total"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
