@@ -391,6 +391,14 @@ Each tenant authentication creates an independent user profile in Teams MCP, and
 
 **See also:** [Multi-Tenant App Registration](./operator/authentication.md#multi-tenant)
 
+### Why do I get AADSTS50194 when signing in?
+
+**Answer:** Login used `/common`, but the Enterprise Application (service principal) only exists in one directory, so Microsoft rejected the authority.
+
+Set `MICROSOFT_SIGN_IN_TENANT_ID` (Helm `mcpConfig.microsoft.signInTenantId`) to that directory's GUID so the login window opens the foreign tenant's service principal. Leave it as `common` when users should choose their directory at login.
+
+**See also:** [OAuth authority](./operator/authentication.md#oauth-authority-microsoft_sign_in_tenant_id)
+
 ## Related Documentation
 
 - [Architecture](./technical/architecture.md) - System components and infrastructure

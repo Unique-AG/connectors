@@ -33,6 +33,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
+| `MICROSOFT_SIGN_IN_TENANT_ID` | `mcpConfig.microsoft.signInTenantId` | `common` | Sign-in tenant ID the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as `common` when users choose their directory at login. Independent of `clientId`/`clientSecret`; not the tenant that owns the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL. Only used by transcript capture |
 
 ### Chat Integration
@@ -118,6 +119,7 @@ mcpConfig:
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
+    # signInTenantId: common  # optional; set a foreign-tenant GUID to pin login to that service principal
     # publicWebhookUrl: https://teams.mcp.example.com  # optional
 
   chat:
