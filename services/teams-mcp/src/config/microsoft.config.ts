@@ -14,6 +14,13 @@ const ConfigSchema = z.object({
   clientSecret: redacted(z.string().min(1)).describe(
     'The client secret of the Microsoft App Registration that the MCP Server will use.',
   ),
+  tenantId: z
+    .string()
+    .min(1)
+    .prefault('common')
+    .describe(
+      'Entra directory for OAuth authorize and token endpoints. Use a tenant GUID to pin a single-tenant app or a specific customer directory. Defaults to "common" (multi-tenant).',
+    ),
   webhookSecret: redacted(z.string().length(128)).describe(
     'The webhook secret for validating subscriptions hooks (spoof protection). Must be a 128 random characters.',
   ),

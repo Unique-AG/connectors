@@ -59,11 +59,17 @@ export function resolveMicrosoftScopes({
   ];
 }
 
+export function microsoftOAuthTokenUrl(tenantId: string): string {
+  return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+}
+
 export function createMicrosoftOAuthProvider(toggles: {
   chat: 'enabled' | 'disabled';
   ingestion: 'enabled' | 'disabled';
+  tenantId: string;
 }): OAuthProviderConfig {
   const scopes = resolveMicrosoftScopes(toggles);
+  const { tenantId } = toggles;
 
   return {
     name: 'microsoft',
@@ -73,6 +79,7 @@ export function createMicrosoftOAuthProvider(toggles: {
       clientSecret,
       callbackURL: serverUrl + callbackPath,
       scope: scopes,
+      tenant: tenantId,
     }),
     profileMapper: (profile) => ({
       id: profile.id,

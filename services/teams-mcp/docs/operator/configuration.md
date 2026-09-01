@@ -33,6 +33,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
+| `MICROSOFT_TENANT_ID` | `mcpConfig.microsoft.tenantId` | `common` | Entra directory for OAuth authorize and token endpoints. Use a tenant GUID for a single-tenant app (`AzureADMyOrg`, avoids AADSTS50194) or to pin Unique SaaS SSO to one customer directory. Aliases `organizations` and `consumers` are also valid |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL. Only used by transcript capture |
 
 ### Chat Integration
@@ -118,6 +119,7 @@ mcpConfig:
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
+    # tenantId: common  # optional; set a Directory (tenant) ID to pin OAuth
     # publicWebhookUrl: https://teams.mcp.example.com  # optional
 
   chat:

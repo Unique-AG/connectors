@@ -2157,6 +2157,11 @@
               "type": "string",
               "description": "The client ID of the Microsoft App Registration"
             },
+            "tenantId": {
+              "type": "string",
+              "description": "Entra directory for OAuth authorize and token endpoints. Use a tenant GUID to pin a single-tenant app or a specific customer directory. Defaults to common (multi-tenant).",
+              "default": "common"
+            },
             "publicWebhookUrl": {
               "type": "string",
               "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://teams.mcp.unique.app/webhooks"

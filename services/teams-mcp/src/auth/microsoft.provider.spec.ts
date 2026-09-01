@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHAT_SCOPES,
+  createMicrosoftOAuthProvider,
   IDENTITY_SCOPES,
   KB_SCOPES,
   MESSAGING_SCOPES,
+  microsoftOAuthTokenUrl,
   resolveMicrosoftScopes,
   SCOPES,
 } from './microsoft.provider';
@@ -52,5 +54,46 @@ describe(resolveMicrosoftScopes.name, () => {
     for (const kbScope of KB_SCOPES) {
       expect(scopes).not.toContain(kbScope);
     }
+  });
+});
+
+describe(createMicrosoftOAuthProvider.name, () => {
+  const strategyArgs = {
+    serverUrl: 'https://teams.mcp.example.com',
+    clientId: 'client-id',
+    clientSecret: 'client-secret',
+    callbackPath: '/auth/callback',
+  };
+
+  it('passes tenant common in strategy options', () => {
+    const provider = createMicrosoftOAuthProvider({
+      chat: 'enabled',
+      ingestion: 'disabled',
+      tenantId: 'common',
+    });
+
+    expect(provider.strategyOptions(strategyArgs).tenant).toBe('common');
+  });
+
+  it('passes a pinned tenant id in strategy options', () => {
+    const tenantId = 'f66cc3e7-9a7f-42ae-a0fa-adb72979b371';
+    const provider = createMicrosoftOAuthProvider({
+      chat: 'disabled',
+      ingestion: 'enabled',
+      tenantId,
+    });
+
+    expect(provider.strategyOptions(strategyArgs).tenant).toBe(tenantId);
+  });
+});
+
+describe(microsoftOAuthTokenUrl.name, () => {
+  it('builds the v2 token URL for the given tenant', () => {
+    expect(microsoftOAuthTokenUrl('common')).toBe(
+      'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    );
+    expect(microsoftOAuthTokenUrl('f66cc3e7-9a7f-42ae-a0fa-adb72979b371')).toBe(
+      'https://login.microsoftonline.com/f66cc3e7-9a7f-42ae-a0fa-adb72979b371/oauth2/v2.0/token',
+    );
   });
 });

@@ -30,6 +30,7 @@ import { TokenRefreshMiddleware } from './token-refresh.middleware';
 export class GraphClientFactory {
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly tenantId: string;
   private readonly scopes: string[];
 
   public constructor(
@@ -46,6 +47,7 @@ export class GraphClientFactory {
   ) {
     this.clientId = this.configService.get('microsoft.clientId', { infer: true });
     this.clientSecret = this.configService.get('microsoft.clientSecret', { infer: true }).value;
+    this.tenantId = this.configService.get('microsoft.tenantId', { infer: true });
     this.scopes = resolveMicrosoftScopes({
       chat: this.configService.get('chat.integration', { infer: true }),
       ingestion: this.configService.get('unique.integration', { infer: true }),
@@ -58,6 +60,7 @@ export class GraphClientFactory {
         userProfileId,
         clientId: this.clientId,
         clientSecret: this.clientSecret,
+        tenantId: this.tenantId,
         scopes: this.scopes,
       },
       {

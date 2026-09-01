@@ -12,6 +12,7 @@ describe('TokenProvider', () => {
     userProfileId: 'user-profile-123',
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
+    tenantId: 'common',
     scopes: ['https://graph.microsoft.com/.default'],
   };
 
@@ -110,6 +111,36 @@ describe('TokenProvider', () => {
       );
 
       expect(mockDependencies.drizzle.update).toHaveBeenCalled();
+    });
+
+    it('refreshes tokens against a pinned tenant endpoint', async () => {
+      const mockUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+        }),
+      });
+
+      const pinnedTenantId = 'f66cc3e7-9a7f-42ae-a0fa-adb72979b371';
+      const unit = new TokenProvider(
+        { ...mockConfig, tenantId: pinnedTenantId },
+        mockDependencies as any,
+      );
+
+      await unit.refreshAccessToken('user-profile-123');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `https://login.microsoftonline.com/${pinnedTenantId}/oauth2/v2.0/token`,
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
 
     it('uses existing refresh token when new one not provided', async () => {

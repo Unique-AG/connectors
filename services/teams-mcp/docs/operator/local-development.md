@@ -88,6 +88,7 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teams_mcp
 # Microsoft (from Entra app registration)
 MICROSOFT_CLIENT_ID=<your-client-id>
 MICROSOFT_CLIENT_SECRET=<your-client-secret>
+# MICROSOFT_TENANT_ID=common  # optional; set a Directory (tenant) ID for single-tenant apps
 
 # Security (generate with: openssl rand -hex 32)
 AUTH_HMAC_SECRET=<64-char-hex>

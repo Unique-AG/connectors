@@ -40,6 +40,7 @@ Copy `.env.example` to `.env` and configure the following:
 | `AMQP_URL` | RabbitMQ connection string |
 | `MICROSOFT_CLIENT_ID` | Azure AD application client ID |
 | `MICROSOFT_CLIENT_SECRET` | Azure AD application client secret |
+| `MICROSOFT_TENANT_ID` | Optional. Entra directory for OAuth (`common` by default; set a tenant GUID for single-tenant apps) |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-char hex secret used as `clientState` for webhook validation |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Publicly reachable URL for Microsoft webhooks |
 | `AUTH_HMAC_SECRET` | 64-char hex secret for JWT signing |

@@ -34,7 +34,7 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 
 const PORT = 9542;
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
-const TENANT = 'common';
+const TENANT = process.env.MICROSOFT_TENANT_ID || 'common';
 // Standalone dev helper: scopes are inlined here (no ../src imports). Keep these
 // in sync with resolveMicrosoftScopes in src/auth/microsoft.provider.ts.
 const CHAT_INTEGRATION = process.env.CHAT_INTEGRATION === 'disabled' ? 'disabled' : 'enabled';
