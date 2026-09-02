@@ -28,6 +28,7 @@ import { TokenRefreshMiddleware } from './token-refresh.middleware';
 export class GraphClientFactory {
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly signInTenantId: string;
   private readonly scopes: string[];
 
   public constructor(
@@ -46,6 +47,7 @@ export class GraphClientFactory {
     this.clientSecret = this.configService.get('microsoft.clientSecret', {
       infer: true,
     }).value;
+    this.signInTenantId = this.configService.get('microsoft.signInTenantId', { infer: true });
     this.scopes = getScopes();
   }
 
@@ -81,6 +83,7 @@ export class GraphClientFactory {
         userProfileId,
         clientId: this.clientId,
         clientSecret: this.clientSecret,
+        signInTenantId: this.signInTenantId,
         scopes: this.scopes,
       },
       {

@@ -22,11 +22,18 @@ export function getScopes(): string[] {
   return isCalendarEnabled() ? [...MAIL_SCOPES, ...CALENDAR_SCOPES] : [...MAIL_SCOPES];
 }
 
+export function microsoftOAuthTokenUrl(signInTenantId: string): string {
+  return `https://login.microsoftonline.com/${signInTenantId}/oauth2/v2.0/token`;
+}
+
 interface OAuth2WithSetAgent {
   setAgent: (agent: http.Agent) => void;
 }
 
-export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderConfig {
+export function createMicrosoftOAuthProvider(
+  agent?: http.Agent,
+  signInTenantId = 'common',
+): OAuthProviderConfig {
   class MicrosoftStrategyWithProxy extends MicrosoftStrategy {
     public constructor(...args: ConstructorParameters<typeof MicrosoftStrategy>) {
       super(...args);
@@ -45,6 +52,7 @@ export function createMicrosoftOAuthProvider(agent?: http.Agent): OAuthProviderC
       clientSecret,
       callbackURL: serverUrl + callbackPath,
       scope: getScopes(),
+      tenant: signInTenantId,
     }),
     profileMapper: (profile) => ({
       id: profile.id,

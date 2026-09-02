@@ -77,6 +77,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm key | Default | Description |
 |----------|----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `clientId` | (required) | Entra app client ID |
+| `MICROSOFT_SIGN_IN_TENANT_ID` | `signInTenantId` | `common` | Sign-in tenant ID the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as `common` when users choose their directory at login. Independent of `clientId`/`clientSecret`; not the tenant that owns the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
 
@@ -308,6 +309,7 @@ mcpConfig:
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
+    # signInTenantId: common  # optional; set a foreign-tenant GUID to pin login to that service principal
     # publicWebhookUrl: https://outlook.semantic.mcp.example.com  # optional, defaults to selfUrl
 
   unique:
@@ -401,6 +403,7 @@ mcpConfig:
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
+    # signInTenantId: common  # optional; set a foreign-tenant GUID to pin login to that service principal
 
   unique:
     serviceAuthMode: cluster_local
