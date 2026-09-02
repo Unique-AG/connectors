@@ -27,25 +27,24 @@ class PoolHealthMiddleware:
         is_probe = (
             scope["type"] == "http" and self._normalize(scope["path"]) in _PROBE_PATHS
         )
-        if is_probe and self._unhealthy():
-            response = JSONResponse(
-                {"status": "unhealthy", "reason": "connection pool exhausted"},
-                status_code=503,
-            )
-            await response(scope, receive, send)
-            return
+        if is_probe:
+            try:
+                unhealthy = self._is_unhealthy()
+            except Exception:
+                _LOGGER.warning(
+                    "Health check raised; treating pod as healthy", exc_info=True
+                )
+                unhealthy = False
+            if unhealthy:
+                response = JSONResponse(
+                    {"status": "unhealthy", "reason": "connection pool exhausted"},
+                    status_code=503,
+                )
+                await response(scope, receive, send)
+                return
 
         await self.app(scope, receive, send)
 
     @staticmethod
     def _normalize(path: str) -> str:
         return path.rstrip("/") or "/"
-
-    def _unhealthy(self) -> bool:
-        try:
-            return self._is_unhealthy()
-        except Exception:
-            _LOGGER.warning(
-                "Health check raised; treating pod as healthy", exc_info=True
-            )
-            return False

@@ -75,19 +75,12 @@ class Settings(BaseSettings):
     content_tree_cache_ttl_seconds: int = Field(
         default=600,
         ge=1,
-        description=(
-            "Seconds a per-user ContentTree stays pinned. 10 min covers a "
-            "chat and the incomplete-walk retry; 30 min held RSS after the "
-            "user left. Overlay 300 for 5 min."
-        ),
+        description="Seconds a cached ContentTree stays valid.",
         validation_alias="KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS",
     )
     content_tree_cache_max_entries: int = Field(
         default=24,
-        description=(
-            "Cached ContentTree instances (one per company+user). 24 covers "
-            "a small tenant without pinning RSS for 128 idle graphs."
-        ),
+        description="Max cached ContentTree entries (one per company+user).",
         validation_alias="KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES",
     )
 
@@ -121,21 +114,15 @@ class Settings(BaseSettings):
     http_max_connections: int = Field(
         default=100,
         ge=1,
-        description=(
-            "httpx's own default. Peak demand is ~25 connections per call, so "
-            "raising this mainly delays PoolTimeout — and with it the "
-            "unhealthy signal that gets a leaking pod replaced."
-        ),
+        description="Maximum number of outbound HTTP connections.",
         validation_alias="KB_MCP_HTTP_MAX_CONNECTIONS",
     )
     http_max_keepalive_connections: int = Field(
         default=20,
         ge=1,
         description=(
-            "Idle sockets kept in the pool (httpx DEFAULT_LIMITS). Must be "
-            "set on Limits: omitting it makes httpcore keep max_connections "
-            "idle, which is how CLOSE_WAIT stacked under overlapping walks. "
-            "Does not bound in-flight connections."
+            "Idle sockets kept in the pool. Must be set on Limits; omitting "
+            "it keeps max_connections idle. Does not bound in-flight connections."
         ),
         validation_alias="KB_MCP_HTTP_MAX_KEEPALIVE_CONNECTIONS",
     )
