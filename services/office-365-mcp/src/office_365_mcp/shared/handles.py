@@ -31,11 +31,23 @@ Every segment is percent-encoded, because join URLs carry `:`, `/`, `?`, `&`, `%
 carry `:` and `@` (`19:...@thread.v2`). The parser rejects half-encoded input, so a hand-spelled
 handle comes back as "not a handle" rather than as a truncated URL Graph ignores.
 
-Every `outlook:///` family is one segment, because Outlook addresses each of these by a single
-opaque id. There are four families rather than one. Graph gives them all one id space, but this
-connector keeps them apart: a draft is a message with `isDraft` set. Splitting them into four
+Each mail `outlook:///` family is one segment, because Outlook addresses each of these by a single
+opaque id. There are four mail families rather than one. Graph gives them all one id space, but
+this connector keeps them apart: a draft is a message with `isDraft` set. Splitting them into four
 families keeps a message that a reader found from being spelled as a draft and handed to the tool
 that sends.
+
+A calendar is one segment too. Graph says that container types such as `calendar` support no
+immutable id, "but their regular IDs were already constant"
+(https://learn.microsoft.com/en-us/graph/outlook-immutable-id), so one id addresses one
+calendar for as long as it exists.
+
+An event is TWO segments, and it is the calendar id that comes first. An event id is only
+meaningful beside the calendar it was read from: the reader addresses
+`/me/calendars/{calendar_id}/events/{event_id}` and needs both. Microsoft states that an id from
+another mailbox "would return an error"
+(https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars), so the pair is the
+whole address. This is the shape of `teams:///transcripts/{a}/{b}`, and for the same reason.
 """
 
 import re
@@ -149,6 +161,32 @@ class MailRuleHandle:
         return f"outlook:///rules/{_segment(self.rule_id)}"
 
 
+@dataclass(frozen=True, slots=True)
+class CalendarHandle:
+    """This identifies one calendar of the signed-in user's mailbox, including a calendar that
+    another person shared with them: Graph lists a delegated calendar in `GET /me/calendars` as a
+    row of its own (https://learn.microsoft.com/en-us/graph/api/user-list-calendars)."""
+
+    calendar_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///calendars/{_segment(self.calendar_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class EventHandle:
+    """This identifies an event by the calendar it was read from and its own id, because the read
+    route needs both."""
+
+    calendar_id: str
+    event_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///events/{_segment(self.calendar_id)}/{_segment(self.event_id)}"
+
+
 # Ids are matched as "anything but a separator", because the spellers above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
@@ -161,6 +199,8 @@ _MAIL_MESSAGE_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)\Z")
 _MAIL_FOLDER_HANDLE = re.compile(r"\Aoutlook:///folders/([^/]+)\Z")
 _MAIL_DRAFT_HANDLE = re.compile(r"\Aoutlook:///drafts/([^/]+)\Z")
 _MAIL_RULE_HANDLE = re.compile(r"\Aoutlook:///rules/([^/]+)\Z")
+_CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
+_EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -227,6 +267,21 @@ def mail_draft_handle(uri: str) -> MailDraftHandle | None:
 def mail_rule_handle(uri: str) -> MailRuleHandle | None:
     rule_id = _single_id(_MAIL_RULE_HANDLE, uri)
     return None if rule_id is None else MailRuleHandle(rule_id)
+
+
+def calendar_handle(uri: str) -> CalendarHandle | None:
+    calendar_id = _single_id(_CALENDAR_HANDLE, uri)
+    return None if calendar_id is None else CalendarHandle(calendar_id)
+
+
+def event_handle(uri: str) -> EventHandle | None:
+    match = _EVENT_HANDLE.match(uri)
+    if match is None:
+        return None
+    calendar_id, event_id = (unquote(part) for part in match.groups())
+    if not calendar_id.strip() or not event_id.strip():
+        return None
+    return EventHandle(calendar_id, event_id)
 
 
 def meeting_uri_for(join_web_url: str | None) -> str | None:

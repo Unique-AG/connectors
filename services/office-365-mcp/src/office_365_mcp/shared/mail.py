@@ -15,6 +15,7 @@ nobody asked for.
 
 from typing import Literal, Self
 
+from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
 from pydantic import BaseModel, Field
@@ -92,6 +93,18 @@ class MailAddress(BaseModel):
         if recipient is None or recipient.email_address is None:
             return None
         return cls(name=recipient.email_address.name, address=recipient.email_address.address)
+
+    @classmethod
+    def from_email_address(cls, address: EmailAddress | None) -> Self | None:
+        """The same shape from a bare `emailAddress`, or None when Graph named nobody.
+
+        Graph wraps a mail recipient in a `recipient` and does not wrap a calendar's `owner`
+        (https://learn.microsoft.com/en-us/graph/api/resources/calendar): that property is an
+        `emailAddress` on its own.
+        """
+        if address is None:
+            return None
+        return cls(name=address.name, address=address.address)
 
     @classmethod
     def each_of(cls, recipients: list[Recipient] | None) -> list[Self]:

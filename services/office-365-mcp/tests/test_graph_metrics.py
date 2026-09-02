@@ -768,6 +768,7 @@ GRAPH_STEPS = frozenset(
         "disable_mail_rule",
         "transcript_attributed",
         "transcript_unattributed",
+        "calendar",
     }
 )
 

@@ -190,6 +190,8 @@ _MAIL_ID = "AAMkAGI2THVSYNTHETIC-0001_abc="
 _FOLDER_ID = "AQMkADAwATNiZmYAZS1kSYNTHETIC0002"
 _DRAFT_ID = "AAMkAGI2THVSYNTHETIC-0003_def="
 _RULE_ID = "AQAAAJSYNTHETIC0004="
+_CALENDAR_ID = "AAMkSYNTHETIC-cal-0005="
+_EVENT_ID = "AAMkAGI2SYNTHETIC-immutable-0006="
 
 
 class TestTheMailHandleGrammar:
@@ -228,10 +230,12 @@ class TestTheMailHandleGrammar:
     @pytest.mark.parametrize(
         "uri",
         [
-            # The other three families, so one parser cannot answer for another.
+            # The other five families, so one parser cannot answer for another.
             f"outlook:///folders/{_FOLDER_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",
             f"outlook:///rules/{_RULE_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
             # The Teams scheme, and the schemes a polymorphic reader would advertise.
             _CHAT_URI,
             "mail:///messages/AAMkAGI2",
@@ -251,6 +255,8 @@ class TestTheMailHandleGrammar:
             f"outlook:///messages/{_MAIL_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",
             f"outlook:///rules/{_RULE_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
             "outlook:///folders/%20",
             "",
         ],
@@ -265,6 +271,8 @@ class TestTheMailHandleGrammar:
             f"outlook:///messages/{_DRAFT_ID}",
             f"outlook:///folders/{_FOLDER_ID}",
             f"outlook:///rules/{_RULE_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
             "outlook:///drafts/%20",
             "",
         ],
@@ -278,6 +286,8 @@ class TestTheMailHandleGrammar:
             f"outlook:///messages/{_RULE_ID}",
             f"outlook:///folders/{_FOLDER_ID}",
             f"outlook:///drafts/{_DRAFT_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
             "outlook:///rules/%20",
             "",
         ],
@@ -292,4 +302,96 @@ class TestTheMailHandleGrammar:
 
         assert handles.message_handle(uri) is None
         assert handles.meeting_handle(uri) is None
+        assert handles.transcript_handle(uri) is None
+
+
+class TestTheCalendarHandleGrammar:
+    """Two more families under the mail scheme. A calendar is one segment because a calendar id is
+    constant, and an event is two because an event id is only meaningful beside the calendar it was
+    read from."""
+
+    def test_a_calendar_handle_round_trips_its_id(self) -> None:
+        handle = handles.CalendarHandle(_CALENDAR_ID)
+
+        assert handles.calendar_handle(handle.uri) == handle
+
+    def test_an_event_handle_round_trips_both_ids(self) -> None:
+        handle = handles.EventHandle(_CALENDAR_ID, _EVENT_ID)
+
+        parsed = handles.event_handle(handle.uri)
+
+        assert parsed is not None
+        assert (parsed.calendar_id, parsed.event_id) == (_CALENDAR_ID, _EVENT_ID)
+
+    def test_the_calendar_id_comes_first_in_an_event_handle(self) -> None:
+        """The reader addresses `/me/calendars/{calendar}/events/{event}`, so the two halves are
+        not interchangeable and a handle read back the other way round reaches another calendar."""
+        handle = handles.EventHandle(_CALENDAR_ID, _EVENT_ID)
+
+        assert handles.event_handle(handle.uri) != handles.EventHandle(_EVENT_ID, _CALENDAR_ID)
+
+    def test_either_id_is_percent_encoded_so_a_separator_inside_it_cannot_end_a_segment(
+        self,
+    ) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.EventHandle(awkward, awkward).uri
+
+        assert uri.count("/") == 5, (
+            "the three of the scheme, the one after the family, and the one between the two ids"
+        )
+        assert handles.event_handle(uri) == handles.EventHandle(awkward, awkward)
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The other five families, so one parser cannot answer for another.
+            f"outlook:///messages/{_MAIL_ID}",
+            f"outlook:///folders/{_FOLDER_ID}",
+            f"outlook:///drafts/{_DRAFT_ID}",
+            f"outlook:///rules/{_RULE_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            _CHAT_URI,
+            "calendar:///calendars/AAMkSYNTHETIC",
+            "outlook:///calendars/",
+            "outlook:///calendars/%20",
+            "outlook:///calendars/a/b",
+            "outlook:///calendars",
+            "",
+        ],
+    )
+    def test_what_is_not_a_calendar_handle(self, uri: str) -> None:
+        assert handles.calendar_handle(uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The family an event is reached *from*: a lister takes one and mints the other.
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///messages/{_MAIL_ID}",
+            f"outlook:///drafts/{_DRAFT_ID}",
+            "outlook:///events/only-one-id",
+            "outlook:///events//an-event",
+            "outlook:///events/a-calendar/%20",
+            "outlook:///events/a/b/c",
+            _CHAT_URI,
+            "calendar:///events/AAMkAGI2",
+            "",
+        ],
+    )
+    def test_what_is_not_an_event_handle(self, uri: str) -> None:
+        assert handles.event_handle(uri) is None
+
+    def test_a_calendar_handle_is_not_a_teams_handle_of_any_family(self) -> None:
+        uri = handles.CalendarHandle(_CALENDAR_ID).uri
+
+        assert handles.message_handle(uri) is None
+        assert handles.meeting_handle(uri) is None
+        assert handles.transcript_handle(uri) is None
+
+    def test_an_event_handle_is_not_a_transcript_handle(self) -> None:
+        """The two shapes are the same two-segment grammar under different schemes, and the scheme
+        is what keeps a mailbox id out of a Teams request."""
+        uri = handles.EventHandle(_CALENDAR_ID, _EVENT_ID).uri
+
         assert handles.transcript_handle(uri) is None

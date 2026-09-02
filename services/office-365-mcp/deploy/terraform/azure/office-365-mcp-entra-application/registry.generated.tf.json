@@ -280,7 +280,11 @@
         "Mail.ReadWrite",
         "Mail.Send",
         "Mail.ReadBasic",
-        "MailboxSettings.ReadWrite"
+        "MailboxSettings.ReadWrite",
+        "Calendars.Read",
+        "Calendars.Read.Shared",
+        "Calendars.ReadWrite",
+        "Calendars.ReadWrite.Shared"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -297,7 +301,11 @@
         "Mail.ReadWrite": false,
         "Mail.Send": false,
         "Mail.ReadBasic": false,
-        "MailboxSettings.ReadWrite": false
+        "MailboxSettings.ReadWrite": false,
+        "Calendars.Read": false,
+        "Calendars.Read.Shared": false,
+        "Calendars.ReadWrite": false,
+        "Calendars.ReadWrite.Shared": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",
