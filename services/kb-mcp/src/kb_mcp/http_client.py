@@ -46,9 +46,8 @@ class PooledHTTPXClient(HTTPClient):
             write=_REQUEST_TIMEOUT_SECONDS,
             pool=pool_timeout_seconds,
         )
-        # max_keepalive_connections must be explicit. Limits(max_connections=N)
-        # leaves it None, and httpcore then keeps N idle sockets — not httpx's
-        # DEFAULT_LIMITS of 20.
+        # Must be explicit: Limits(max_connections=N) alone leaves it None,
+        # and httpcore then keeps N idle sockets instead of httpx's default 20.
         self._limits = httpx.Limits(
             max_connections=max_connections,
             max_keepalive_connections=max_keepalive_connections,
