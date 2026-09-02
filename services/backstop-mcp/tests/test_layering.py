@@ -71,8 +71,8 @@
    per-feature and keeps its filename.
 
 6. **A logic module is named after the symbol it defines.** The filename stem, or the PascalCase
-   of it, must be a top-level function, class, or assignment in that file — `fetch_series.py`
-   holds `fetch_series`, `custom_fields_service.py` holds `CustomFieldsService`. That is how the
+   of it, must be a top-level function, class, or assignment in that file — `split_open.py`
+   holds `split_open`, `custom_fields_service.py` holds `CustomFieldsService`. That is how the
    tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
    `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
    modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
@@ -799,8 +799,8 @@ class TestTheDetectionItself:
 
     def test_accepts_a_logic_module_named_after_its_function(self) -> None:
         assert not _logic_module_name_violations(
-            "async def fetch_series(): ...\n",
-            _FEATURES / "accounts" / "fetch_series.py",
+            "def split_open(): ...\n",
+            _FEATURES / "accounts" / "utils" / "split_open.py",
         )
 
     def test_accepts_a_logic_module_named_after_its_class(self) -> None:
