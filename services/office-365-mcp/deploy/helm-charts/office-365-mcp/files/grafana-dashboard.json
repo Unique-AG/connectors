@@ -936,7 +936,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "End to end, retries and every page of a paged walk included \u2014 what an MCP client waited for, not what one HTTP request took. The top finite bucket is 30s \u2014 one Graph request timeout (GraphSettings.request_timeout_seconds), set as a view in office_365_mcp/metrics.py. A quantile pinned on 30 means the call spent Retry-After waits or timed out and was retried; the throttling and status panels say which.",
+      "description": "End to end, retries and every page of a paged walk included \u2014 the Graph work one tool call did, not what one HTTP request took, and not any wait a tool marked as not Microsoft's \u2014 a confirmation from a person lands in mcp_call_duration_seconds instead. The top finite bucket is 30s \u2014 one Graph request timeout (GraphSettings.request_timeout_seconds), set as a view in office_365_mcp/metrics.py. A quantile pinned on 30 means the call spent Retry-After waits or timed out and was retried; the throttling and status panels say which.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1522,7 +1522,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Which Graph call inside a tool is failing, and how. A step counted `forbidden` while its operation is counted `ok` is a tool recovering \u2014 read_transcript falling back to an unattributed transcript is the one that does this by design.",
+      "description": "Which Graph call inside a tool is failing, and how. A step counted `forbidden` while its operation is counted `ok` is a tool recovering \u2014 teams_read_transcript falling back to an unattributed transcript is the one that does this by design.",
       "fieldConfig": {
         "defaults": {
           "color": {

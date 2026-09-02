@@ -46,7 +46,8 @@ _REPLY_HANDLE = handles.MessageHandle(
 
 
 class TestTheMessageHandleGrammar:
-    """`search_messages` mints two of these, `browse_channel` the third, and `read_message` reads
+    """`teams_search_messages` mints two of these, `teams_browse_channel` the third, and
+    `teams_read_message` reads
     all three back. The grammar is neither tool's: a handle one mints and another 404s on does not
     look like a disagreement."""
 
@@ -60,7 +61,7 @@ class TestTheMessageHandleGrammar:
     def test_it_reads_the_reply_shape_that_only_browsing_a_channel_can_mint(self) -> None:
         """Graph addresses a channel reply under the post it answers, and the search projection
         carries no `replyToId`, so a search hit on a reply degrades to the unreadable root-post
-        shape; only `browse_channel`, walking post by post, knows each reply's parent."""
+        shape; only `teams_browse_channel`, walking post by post, knows each reply's parent."""
         reply = handles.message_handle(_REPLY_URI)
 
         assert reply == _REPLY_HANDLE
@@ -182,3 +183,113 @@ class TestTheHandleGrammar:
     ) -> None:
         """Graph gives some meeting chats no join URL, so there is no route to the meeting."""
         assert handles.meeting_uri_for(join_web_url) is None
+
+
+# Shaped like Graph's own: base64url with `-` and `_`, and an `=` pad that percent-encodes.
+_MAIL_ID = "AAMkAGI2THVSYNTHETIC-0001_abc="
+_FOLDER_ID = "AQMkADAwATNiZmYAZS1kSYNTHETIC0002"
+_DRAFT_ID = "AAMkAGI2THVSYNTHETIC-0003_def="
+_RULE_ID = "AQAAAJSYNTHETIC0004="
+
+
+class TestTheMailHandleGrammar:
+    """Four families under their own scheme. The negative cases are the load-bearing ones: a draft
+    is a message with `isDraft` set, so only the grammar keeps a message a reader found from being
+    handed to the tool that sends."""
+
+    def test_a_message_handle_round_trips_its_id(self) -> None:
+        handle = handles.MailMessageHandle(_MAIL_ID)
+
+        assert handles.mail_message_handle(handle.uri) == handle
+
+    def test_a_folder_handle_round_trips_its_id(self) -> None:
+        handle = handles.MailFolderHandle(_FOLDER_ID)
+
+        assert handles.mail_folder_handle(handle.uri) == handle
+
+    def test_a_draft_handle_round_trips_its_id(self) -> None:
+        handle = handles.MailDraftHandle(_DRAFT_ID)
+
+        assert handles.mail_draft_handle(handle.uri) == handle
+
+    def test_a_rule_handle_round_trips_its_id(self) -> None:
+        handle = handles.MailRuleHandle(_RULE_ID)
+
+        assert handles.mail_rule_handle(handle.uri) == handle
+
+    def test_an_id_is_percent_encoded_so_a_separator_inside_it_cannot_end_the_segment(self) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.MailMessageHandle(awkward).uri
+
+        assert "/" not in uri.removeprefix("outlook:///messages/")
+        assert handles.mail_message_handle(uri) == handles.MailMessageHandle(awkward)
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The other three families, so one parser cannot answer for another.
+            f"outlook:///folders/{_FOLDER_ID}",
+            f"outlook:///drafts/{_DRAFT_ID}",
+            f"outlook:///rules/{_RULE_ID}",
+            # The Teams scheme, and the schemes a polymorphic reader would advertise.
+            _CHAT_URI,
+            "mail:///messages/AAMkAGI2",
+            "outlook:///messages/",
+            "outlook:///messages/%20",
+            "outlook:///messages/a/b",
+            "outlook:///messages",
+            "",
+        ],
+    )
+    def test_what_is_not_a_mail_message_handle(self, uri: str) -> None:
+        assert handles.mail_message_handle(uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///messages/{_MAIL_ID}",
+            f"outlook:///drafts/{_DRAFT_ID}",
+            f"outlook:///rules/{_RULE_ID}",
+            "outlook:///folders/%20",
+            "",
+        ],
+    )
+    def test_what_is_not_a_mail_folder_handle(self, uri: str) -> None:
+        assert handles.mail_folder_handle(uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            # The one that matters: a message a reader minted is not sendable.
+            f"outlook:///messages/{_DRAFT_ID}",
+            f"outlook:///folders/{_FOLDER_ID}",
+            f"outlook:///rules/{_RULE_ID}",
+            "outlook:///drafts/%20",
+            "",
+        ],
+    )
+    def test_what_is_not_a_mail_draft_handle(self, uri: str) -> None:
+        assert handles.mail_draft_handle(uri) is None
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///messages/{_RULE_ID}",
+            f"outlook:///folders/{_FOLDER_ID}",
+            f"outlook:///drafts/{_DRAFT_ID}",
+            "outlook:///rules/%20",
+            "",
+        ],
+    )
+    def test_what_is_not_a_mail_rule_handle(self, uri: str) -> None:
+        assert handles.mail_rule_handle(uri) is None
+
+    def test_a_mail_handle_is_not_a_teams_handle_of_any_family(self) -> None:
+        """The scheme is the boundary between the two products, so every Teams parser refuses
+        one."""
+        uri = handles.MailMessageHandle(_MAIL_ID).uri
+
+        assert handles.message_handle(uri) is None
+        assert handles.meeting_handle(uri) is None
+        assert handles.transcript_handle(uri) is None

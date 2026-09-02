@@ -37,7 +37,8 @@ disagree with it about. `graph_client/` is the transport they borrow.
    tool ends up configured differently from the app it runs in. Only *calling* a config type is the
    violation, and `main.py` is exempt as the entrypoint that hands `create_app` its `AppConfig`.
 
-6. **One speller per handle family: `shared/handles.py` alone spells or parses a `teams:///` URI.**
+6. **One speller per handle family: `shared/handles.py` alone spells or parses a `teams:///` or
+   an `outlook:///` URI.**
    Two modules that each knew how to write `teams:///chats/…` would be free to disagree, and the
    disagreement would look like a handle one tool produced and another answers 404 to. A literal
    carrying the scheme is an implementation when something is *done* to it and prose when it merely
@@ -50,7 +51,8 @@ disagree with it about. `graph_client/` is the transport they borrow.
    that a model cannot watch, and its `recordingContentUrl` is a Graph URL only this connector's
    bearer token opens, so handing it to a caller is either useless or a token leak. "Return
    metadata and availability, never the bytes" is the whole shape of
-   `tools/list_meeting_recordings.py`, and it is a failing test rather than a paragraph because the
+   `tools/teams_list_meeting_recordings.py`, and it is a failing test rather than a paragraph
+   because the
    change that breaks it is a small-looking convenience someone adds later.
 
 8. **A package is entered through its `__init__`, never through its modules.** Applies to the
@@ -74,6 +76,7 @@ import ast
 import pathlib
 import re
 import sys
+from collections.abc import Mapping
 
 import pytest
 
@@ -100,10 +103,24 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
 
 _SEAM = _SHARED / "seam.py"
 
-_HANDLE_SCHEME = "teams:///"
 _HANDLE_OWNER = _SHARED / "handles.py"
-_HANDLE_FAMILIES = frozenset({"chats", "teams", "meetings", "transcripts"})
-_HANDLE_FAMILY = re.compile(re.escape(_HANDLE_SCHEME) + r"([A-Za-z_]*)")
+# One scheme per product, and the families each one addresses. Both halves are written out: a
+# scheme nothing lists is a grammar no rule guards, and a family nothing lists is a surface that
+# became addressable without anybody deciding it should be.
+_HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
+    "teams:///": frozenset({"chats", "teams", "meetings", "transcripts"}),
+    "outlook:///": frozenset({"messages", "folders", "drafts", "rules"}),
+}
+_HANDLE_SCHEMES: tuple[str, ...] = tuple(_HANDLE_FAMILIES)
+_HANDLE_FAMILY: Mapping[str, re.Pattern[str]] = {
+    scheme: re.compile(re.escape(scheme) + r"([A-Za-z_]*)") for scheme in _HANDLE_SCHEMES
+}
+
+
+def _scheme_of(text: str) -> str | None:
+    """Which handle scheme `text` carries, or None if it carries none."""
+    return next((scheme for scheme in _HANDLE_SCHEMES if scheme in text), None)
+
 
 # Regex syntax never appears in prose a model reads, so it tells a matcher from a mention.
 _PATTERN_SYNTAX: tuple[str, ...] = (r"\A", r"\Z", "[^", "(?")
@@ -337,16 +354,17 @@ def _handle_spellings(source: str) -> list[str]:
         if isinstance(node, ast.JoinedStr):
             found.extend(f"line {node.lineno} builds a handle" for _ in _built_handles(node))
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if _HANDLE_SCHEME not in node.value or isinstance(parents.get(id(node)), ast.JoinedStr):
+            scheme = _scheme_of(node.value)
+            if scheme is None or isinstance(parents.get(id(node)), ast.JoinedStr):
                 continue
             if any(syntax in node.value for syntax in _PATTERN_SYNTAX):
                 found.append(f"line {node.lineno} matches a handle")
                 continue
-            use = _use_made_of(node, parents, adjacency=node.value)
+            use = _use_made_of(node, parents, adjacency=node.value, scheme=scheme)
             if use is not None:
                 found.append(f"line {node.lineno} {use} a handle")
         elif isinstance(node, ast.Name) and node.id in bound and isinstance(node.ctx, ast.Load):
-            use = _use_made_of(node, parents, adjacency=None)
+            use = _use_made_of(node, parents, adjacency=None, scheme=None)
             if use is not None:
                 found.append(
                     f"line {node.lineno} {use} a handle through {node.id} "
@@ -375,7 +393,7 @@ def _scheme_bindings(tree: ast.AST) -> dict[str, int]:
         value = node.value
         if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
             continue
-        if _HANDLE_SCHEME not in value.value:
+        if _scheme_of(value.value) is None:
             continue
         for target in targets:
             if isinstance(target, ast.Name):
@@ -384,7 +402,7 @@ def _scheme_bindings(tree: ast.AST) -> dict[str, int]:
 
 
 def _use_made_of(
-    node: ast.expr, parents: dict[int, ast.AST], *, adjacency: str | None
+    node: ast.expr, parents: dict[int, ast.AST], *, adjacency: str | None, scheme: str | None
 ) -> str | None:
     """`adjacency` is the literal's own text, or None for a name. A name has no run to judge, so `+`
     on one is left alone, which is how a refusal's hint constant goes on being concatenated with
@@ -395,10 +413,10 @@ def _use_made_of(
     if isinstance(parent, ast.BinOp):
         if isinstance(parent.op, ast.Mod):
             return "spells"
-        if isinstance(parent.op, ast.Add) and adjacency is not None:
+        if isinstance(parent.op, ast.Add) and adjacency is not None and scheme is not None:
             other = parent.right if parent.left is node else parent.left
             hands_over = not _is_literal_text(other)
-            reaches_it = not _WHITESPACE.search(adjacency.rsplit(_HANDLE_SCHEME, 1)[1])
+            reaches_it = not _WHITESPACE.search(adjacency.rsplit(scheme, 1)[1])
             return "spells" if hands_over and reaches_it else None
         return None
     if isinstance(parent, ast.Attribute):
@@ -441,10 +459,10 @@ def _built_handles(node: ast.JoinedStr) -> list[ast.Constant]:
         for index, part in enumerate(parts)
         if isinstance(part, ast.Constant)
         and isinstance(part.value, str)
-        and _HANDLE_SCHEME in part.value
+        and _scheme_of(part.value) is not None
         and index + 1 < len(parts)
         and isinstance(parts[index + 1], ast.FormattedValue)
-        and not _WHITESPACE.search(part.value.rsplit(_HANDLE_SCHEME, 1)[1])
+        and not _WHITESPACE.search(part.value.rsplit(_scheme_of(part.value) or "", 1)[1])
     ]
 
 
@@ -457,7 +475,7 @@ def _handle_violations(source: pathlib.Path) -> list[str]:
 
 def _registry_imports() -> set[str]:
     """Both spellings, because either is how a module gets into `_TOOL_MODULES`: the names of
-    `from office_365_mcp.tools import get_me, list_chats`, and the tail of
+    `from office_365_mcp.tools import get_me, teams_list_chats`, and the tail of
     `import office_365_mcp.tools.get_me`."""
     tree = ast.parse((_TOOLS / "__init__.py").read_text())
     found: set[str] = set()
@@ -497,10 +515,11 @@ def _a_tool_file_containing(
     source: str, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> pathlib.Path:
     """On disk rather than as a string because a relative import resolves only against a real
-    package: `from .. import tools` is `office_365_mcp` seen from `office_365_mcp.tools.list_chats`,
+    package: `from .. import tools` is `office_365_mcp` seen from
+    `office_365_mcp.tools.teams_list_chats`,
     and nothing but the file's own path says which. `_SRC` is repointed at the copy, so the
     violation comes back named the way the real rules name one."""
-    module = tmp_path / "office_365_mcp" / "tools" / "list_chats.py"
+    module = tmp_path / "office_365_mcp" / "tools" / "teams_list_chats.py"
     module.parent.mkdir(parents=True)
     module.write_text(source)
     monkeypatch.setattr(sys.modules[__name__], "_SRC", tmp_path / "office_365_mcp")
@@ -537,7 +556,7 @@ class TestTheDetectionItself:
         module = _a_tool_file_containing("from .. import tools\n", tmp_path, monkeypatch)
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:1 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:1 imports office_365_mcp.tools"
         ]
 
     def test_catches_the_same_reach_spelled_absolutely(
@@ -548,7 +567,7 @@ class TestTheDetectionItself:
         )
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:1 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:1 imports office_365_mcp.tools"
         ]
 
     def test_catches_it_under_an_alias(
@@ -562,7 +581,7 @@ class TestTheDetectionItself:
         )
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:1 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:1 imports office_365_mcp.tools"
         ]
 
     def test_catches_it_inside_a_function_body(
@@ -577,7 +596,7 @@ class TestTheDetectionItself:
         )
 
         assert _violations(module, _TOOLS_PREFIX) == [
-            "tools/list_chats.py:2 imports office_365_mcp.tools"
+            "tools/teams_list_chats.py:2 imports office_365_mcp.tools"
         ]
 
     def test_does_not_fire_on_a_member_that_is_not_the_package(self) -> None:
@@ -923,15 +942,16 @@ class TestNoToolKnowsAboutAnotherTool:
 
 
 class TestEachHandleFamilyHasOneHome:
-    def test_the_owner_actually_writes_every_family(self) -> None:
+    @pytest.mark.parametrize("scheme", _HANDLE_SCHEMES)
+    def test_the_owner_actually_writes_every_family(self, scheme: str) -> None:
         assert _HANDLE_OWNER.is_file(), f"no such file: {_HANDLE_OWNER}"
-        # A bare `teams:///` with no family after it is the docstring naming the scheme itself.
-        families: list[str] = _HANDLE_FAMILY.findall(_HANDLE_OWNER.read_text())
+        # A bare scheme with no family after it is the docstring naming the scheme itself.
+        families: list[str] = _HANDLE_FAMILY[scheme].findall(_HANDLE_OWNER.read_text())
         written = {family for family in families if family}
 
-        assert written == _HANDLE_FAMILIES, (
-            f"{_HANDLE_OWNER.name} spells the handle families {sorted(written)}, and rule 6 gives "
-            + f"it {sorted(_HANDLE_FAMILIES)}"
+        assert written == _HANDLE_FAMILIES[scheme], (
+            f"{_HANDLE_OWNER.name} spells the {scheme} families {sorted(written)}, and rule 6 "
+            + f"gives it {sorted(_HANDLE_FAMILIES[scheme])}"
         )
 
     def test_the_owner_both_builds_and_matches_them(self) -> None:

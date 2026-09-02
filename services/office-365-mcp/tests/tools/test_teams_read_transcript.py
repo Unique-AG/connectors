@@ -1,4 +1,4 @@
-"""`read_transcript`: the words that come back, and what narrows them."""
+"""`teams_read_transcript`: the words that come back, and what narrows them."""
 
 import httpx
 import pytest
@@ -8,7 +8,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import TranscriptHandle
-from office_365_mcp.tools import read_transcript as reader
+from office_365_mcp.tools import teams_read_transcript as reader
 
 from .conftest import ME
 
@@ -105,7 +105,7 @@ class TestReadingTheWords:
             )
         )
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client,
             handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
             offset=0,
@@ -131,8 +131,8 @@ class TestReadingTheWords:
         graph.get(_CONTENT).mock(return_value=httpx.Response(200, content=TRANSCRIPT_VTT.encode()))
         handle = TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID)
 
-        first = await reader.read_transcript(client, handle=handle, offset=0, limit=2)
-        second = await reader.read_transcript(
+        first = await reader.teams_read_transcript(client, handle=handle, offset=0, limit=2)
+        second = await reader.teams_read_transcript(
             client, handle=handle, offset=first.next_offset or 0, limit=2
         )
 
@@ -157,7 +157,7 @@ class TestReadingTheWords:
 
         graph.get(_CONTENT).mock(side_effect=respond)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client,
             handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
             offset=0,
@@ -178,7 +178,7 @@ class TestReadingTheWords:
         route = graph.get(_CONTENT).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
 
         with pytest.raises(GraphForbidden) as raised:
-            _ = await reader.read_transcript(
+            _ = await reader.teams_read_transcript(
                 client,
                 handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
                 offset=0,
@@ -201,7 +201,7 @@ class TestReadingTheWords:
         _spoken(graph)
         profile = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
-        _ = await reader.read_transcript(client, handle=_transcript(), offset=0, limit=200)
+        _ = await reader.teams_read_transcript(client, handle=_transcript(), offset=0, limit=200)
         _ = await identity.signed_in_user(client)
 
         assert "text/vtt" not in profile.calls.last.request.headers["accept"]
@@ -211,7 +211,7 @@ class TestReadingTheWords:
     ) -> None:
         graph.get(_CONTENT).mock(return_value=httpx.Response(200, content=b"WEBVTT\n\n"))
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client,
             handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
             offset=0,
@@ -225,7 +225,7 @@ class TestReadingTheWords:
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await reader.read_transcript(
+            _ = await reader.teams_read_transcript(
                 client,
                 handle=TranscriptHandle(MEETING_ID, _TRANSCRIPT_ID),
                 offset=0,
@@ -239,7 +239,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, from_seconds=1.0
         )
 
@@ -256,7 +256,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, from_seconds=16.0
         )
 
@@ -268,7 +268,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, to_seconds=62.0
         )
 
@@ -279,7 +279,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, from_seconds=20.0, to_seconds=64.0
         )
 
@@ -290,7 +290,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, speaker="Ada Lovelace"
         )
 
@@ -320,7 +320,7 @@ class TestNarrowingWhatComesBack:
         parse time, so the filter is stripped too."""
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, speaker=speaker
         )
 
@@ -341,7 +341,7 @@ class TestNarrowingWhatComesBack:
             )
         )
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, speaker="ada & charles"
         )
 
@@ -354,7 +354,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client,
             handle=_transcript(),
             offset=0,
@@ -372,7 +372,7 @@ class TestNarrowingWhatComesBack:
         """A `next_offset` over the whole transcript would page for turns that cannot come."""
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=2, speaker="ada"
         )
 
@@ -390,10 +390,10 @@ class TestNarrowingWhatComesBack:
         _spoken(graph)
         handle = _transcript()
 
-        first = await reader.read_transcript(
+        first = await reader.teams_read_transcript(
             client, handle=handle, offset=0, limit=2, from_seconds=2.0
         )
-        second = await reader.read_transcript(
+        second = await reader.teams_read_transcript(
             client, handle=handle, offset=first.next_offset or 0, limit=2, from_seconds=2.0
         )
 
@@ -407,7 +407,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, from_seconds=7200.0
         )
 
@@ -421,7 +421,7 @@ class TestNarrowingWhatComesBack:
         nothing legitimately and only `speaker_attribution` says why."""
         _spoken_by_nobody(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, speaker="ada"
         )
 
@@ -434,7 +434,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken_by_nobody(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client, handle=_transcript(), offset=0, limit=200, from_seconds=30.0
         )
 
@@ -445,7 +445,7 @@ class TestNarrowingWhatComesBack:
     ) -> None:
         _spoken(graph)
 
-        read = await reader.read_transcript(
+        read = await reader.teams_read_transcript(
             client,
             handle=_transcript(),
             offset=0,
@@ -469,7 +469,7 @@ class TestNarrowingWhatComesBack:
         content = _spoken(graph)
 
         with pytest.raises(AssertionError):
-            _ = await reader.read_transcript(
+            _ = await reader.teams_read_transcript(
                 client,
                 handle=_transcript(),
                 offset=0,

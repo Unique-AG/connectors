@@ -3,7 +3,7 @@
 `unique_mcp.monitoring._McpMetrics` labels `mcp_calls_total` and `mcp_call_duration_seconds` with
 `getattr(context.message, "name", "unknown")` — the name the *client* sent, read before FastMCP has
 resolved it — so one authenticated caller sending `tools/call {"name": "aaa1"}` mints a Prometheus
-series that dies only with the process. `resources/read` and `prompts/get` are labelled the same
+series that dies only with the process. `resources/read` and `prompts/get` are labeled the same
 way, off `str(uri)` and off the prompt name.
 
 This has to sit outside the middleware that reads the label: the `FastMCP(...)` constructor list is
@@ -17,7 +17,7 @@ first and renames only a call that was going to be refused. What the caller read
 chain.
 
 The real fix belongs upstream in `unique_mcp`: label the component the call resolved to, or take a
-name-normaliser hook. Delete this module when either lands.
+name-normalizer hook. Delete this module when either lands.
 """
 
 from collections.abc import Awaitable, Callable, MutableMapping
@@ -117,12 +117,12 @@ class BoundedRequestMiddleware:
     `GET /wp-login.php` from a scanner mints a counter series and a whole histogram.
 
     `route.matches(scope)` is the same question Starlette's own router asks, so this cannot disagree
-    with it about which paths exist; and it rewrites rather than refuses, so a route somebody forgot
-    to register still 404s instead of becoming an outage. A hand-written set of known paths in front
-    of the router is what both failures look like.
+    with it about which paths exist. This class rewrites rather than refuses, so a route somebody
+    forgot to register still 404s instead of becoming an outage. A hand-written set of known paths
+    in front of the router is what both failures look like.
 
     Mounted second: inside the request-id middleware, because the log line and uvicorn's access line
-    are where the real path has to survive; outside everything else, because
+    are where the real path must survive. Also outside everything else, because
     `OpenTelemetryMiddleware` names its span and sets `url.full` from that same `scope["path"]`.
 
     The real fix belongs upstream, in `unique_toolkit`: label with `scope["path"]` only when routing

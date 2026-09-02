@@ -1,4 +1,4 @@
-"""`search_messages`: the query Graph is sent, and the traps in what comes back."""
+"""`teams_search_messages`: the query Graph is sent, and the traps in what comes back."""
 
 import json
 from datetime import date
@@ -12,8 +12,8 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.messages import MAX_REPLIES_PER_POST
-from office_365_mcp.tools import search_messages
-from office_365_mcp.tools.search_messages import SearchCriteria
+from office_365_mcp.tools import teams_search_messages
+from office_365_mcp.tools.teams_search_messages import SearchCriteria
 
 from .conftest import channel_hit, chat_hit, search_response
 
@@ -55,7 +55,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([chat_hit()]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=25, size=10
         )
 
@@ -97,7 +97,9 @@ class TestTheQueryItSends:
             )
         )
 
-        _ = await search_messages.search_messages(client, criteria=criteria, offset=0, size=25)
+        _ = await teams_search_messages.teams_search_messages(
+            client, criteria=criteria, offset=0, size=25
+        )
 
         assert route.call_count == 1
         assert len(graph.calls) == 1, "and no request to any other Graph endpoint either"
@@ -111,7 +113,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client,
             criteria=SearchCriteria(
                 query="release",
@@ -141,7 +143,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(mentions=_MENTIONED), offset=0, size=25
         )
 
@@ -155,7 +157,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client,
             criteria=SearchCriteria(sent_after=date(2026, 1, 1), sent_before=date(2026, 1, 31)),
             offset=0,
@@ -174,7 +176,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="cut the release"), offset=0, size=25
         )
 
@@ -187,7 +189,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query='friday "release notes"'), offset=0, size=25
         )
 
@@ -219,7 +221,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query=injection), offset=0, size=25
         )
 
@@ -239,7 +241,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release OR from:ceo"), offset=0, size=25
         )
 
@@ -252,7 +254,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client,
             criteria=SearchCriteria(sender="ada OR IsRead:false"),
             offset=0,
@@ -286,7 +288,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(sender=sender), offset=0, size=25
         )
 
@@ -302,7 +304,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json=search_response([]))
         )
 
-        _ = await search_messages.search_messages(
+        _ = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release", sender="ada"), offset=0, size=25
         )
 
@@ -339,7 +341,7 @@ class TestCriteriaThatAskForNothing:
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await search_messages.search_messages(
+            _ = await teams_search_messages.teams_search_messages(
                 client, criteria=SearchCriteria(), offset=0, size=25
             )
 
@@ -347,11 +349,11 @@ class TestCriteriaThatAskForNothing:
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await search_messages.search_messages(
+            _ = await teams_search_messages.teams_search_messages(
                 client,
                 criteria=SearchCriteria(query="release"),
                 offset=0,
-                size=search_messages.MAX_RESULTS + 1,
+                size=teams_search_messages.MAX_RESULTS + 1,
             )
 
 
@@ -359,29 +361,32 @@ class TestTheHandleItMints:
     def test_the_handle_names_the_reader_that_now_takes_it(self) -> None:
         """The absences matter as much as the mention: a model told the snippet is all there is
         stops looking, and every other assertion about this tool passes either way."""
-        described = search_messages.MessageHit.model_fields["uri"].description
+        described = teams_search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
-        assert "read_message" in described
+        assert "teams_read_message" in described
         assert "only route to the full text, the attachments and the mentions" in described
         assert "no tool on this server takes it as an argument" not in described
         assert "no route from here to the message body" not in described
 
     def test_the_summary_warns_against_inference_from_truncation(self) -> None:
-        described = search_messages.MessageHit.model_fields["summary"].description
+        described = teams_search_messages.MessageHit.model_fields["summary"].description
         assert described is not None
 
         assert "or infer from its absence" in described
 
     def test_the_advice_for_a_reply_hit_stops_rather_than_pointing_back_at_browsing(self) -> None:
-        """A hit on a channel reply carries the root-post shape, which Graph 404s. `browse_channel`
+        """A hit on a channel reply carries the root-post shape, which Graph 404s.
+        `teams_browse_channel`
         mints a reply's own handle but reaches only the newest replies of each post and follows no
         cursor past them, so "browse instead" is a route for a recent reply and a loop for an older
         one."""
-        described = search_messages.MessageHit.model_fields["uri"].description
+        described = teams_search_messages.MessageHit.model_fields["uri"].description
         assert described is not None
 
-        assert "browse_channel" in described, "the one tool that can, when the reply is recent"
+        assert "teams_browse_channel" in described, (
+            "the one tool that can, when the reply is recent"
+        )
         assert f"only the newest {MAX_REPLIES_PER_POST} replies" in described, (
             "and where it stops, in the number the browser actually applies rather than in prose "
             + "of its own"
@@ -414,7 +419,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -424,7 +429,7 @@ class TestWhatTheCallerIsTold:
             + "/channels/19%3Ageneral%40thread.tacv2/messages/1770000000002",
         ]
         # The raw ids are returned alongside, unencoded, so a hit can be lined up with the
-        # `chat_id` list_chats reports without anyone unpicking the handle to get one back.
+        # `chat_id` teams_list_chats reports without anyone unpicking the handle to get one back.
         assert found.messages[0].chat_id == "19:release@thread.v2"
         assert (found.messages[1].team_id, found.messages[1].channel_id) == (
             "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
@@ -440,7 +445,7 @@ class TestWhatTheCallerIsTold:
             return_value=httpx.Response(200, json=search_response([hit]))
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -460,7 +465,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -493,7 +498,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -524,7 +529,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -553,7 +558,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -584,7 +589,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -618,7 +623,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -641,7 +646,7 @@ class TestWhatTheCallerIsTold:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -665,7 +670,7 @@ class TestPagingAndItsHonesty:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=50, size=25
         )
 
@@ -673,8 +678,8 @@ class TestPagingAndItsHonesty:
             "the offset is both the cursor and the whole 'there is more' signal: Graph said more "
             "results were available, so it is set"
         )
-        assert "total" not in search_messages.MessageSearchResults.model_fields
-        assert "truncated" not in search_messages.MessageSearchResults.model_fields, (
+        assert "total" not in teams_search_messages.MessageSearchResults.model_fields
+        assert "truncated" not in teams_search_messages.MessageSearchResults.model_fields, (
             "a flag saying what a non-null `next_offset` already says is a second thing to learn"
         )
 
@@ -697,7 +702,7 @@ class TestPagingAndItsHonesty:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -713,7 +718,7 @@ class TestPagingAndItsHonesty:
             )
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=0, size=25
         )
 
@@ -727,7 +732,7 @@ class TestPagingAndItsHonesty:
             return_value=httpx.Response(200, json=search_response(None))
         )
 
-        found = await search_messages.search_messages(
+        found = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="nothing-matches-this"), offset=0, size=25
         )
 
@@ -744,7 +749,7 @@ class TestPagingAndItsHonesty:
             return_value=httpx.Response(200, json=search_response([], more_results_available=True))
         )
 
-        stalled = await search_messages.search_messages(
+        stalled = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=25, size=25
         )
 
@@ -759,7 +764,7 @@ class TestPagingAndItsHonesty:
                 200, json=search_response([chat_hit()], more_results_available=True)
             )
         )
-        advanced = await search_messages.search_messages(
+        advanced = await teams_search_messages.teams_search_messages(
             client, criteria=SearchCriteria(query="release"), offset=25, size=25
         )
 
@@ -777,7 +782,7 @@ class TestGraphFailures:
         )
 
         with pytest.raises(GraphForbidden) as raised:
-            _ = await search_messages.search_messages(
+            _ = await teams_search_messages.teams_search_messages(
                 client, criteria=SearchCriteria(query="release"), offset=0, size=25
             )
 

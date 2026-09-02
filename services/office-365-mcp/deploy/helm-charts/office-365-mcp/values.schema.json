@@ -2076,9 +2076,14 @@
                 "teams-channels",
                 "teams-transcripts",
                 "teams-recordings",
-                "teams-meetings"
+                "teams-meetings",
+                "outlook-read",
+                "outlook-mailbox",
+                "outlook-write",
+                "outlook-send",
+                "outlook-automate"
               ],
-              "description": "Which tools this deployment runs, as a named surface. 'teams' is every tool there is; the rest are one use case each, and README's preset table says what each costs a tenant in permissions and admin consents. Set this or enabled, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
+              "description": "Which tools this deployment runs, as a named surface. 'teams' is every Teams tool; each other name is one use case, and README's preset table says what each costs a tenant in permissions and admin consents. Set this or enabled, never both. Narrowing a live deployment is free; widening it makes every signed-in user sign in again."
             },
             "enabled": {
               "type": "string",

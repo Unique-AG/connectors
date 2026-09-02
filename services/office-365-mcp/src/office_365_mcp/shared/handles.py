@@ -1,25 +1,41 @@
-"""The `teams:///` handle grammar: every shape this connector mints, the parser, and the speller.
+"""The handle grammar: every shape this connector mints, the parser, and the speller.
 
-The only module that spells or parses these URIs, which tests/test_layering.py enforces. A second
-speller would not look like a disagreement; it would look like a handle one tool produced and
-another answers 404 to.
+Two schemes, one per product. `teams:///` addresses Microsoft Teams, and `outlook:///` addresses
+a mailbox. If a mail shape used the Teams scheme, it has to answer `MessageHandle.permission`
+below, and that answer reaches `teams_read_message`'s declared permissions and, from there, the
+consent screen of every `teams` deployment. The scheme is the cheapest place to keep the two
+products apart.
+
+This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
+A second speller does not look like a disagreement. It looks like a handle that one tool produced
+and another answers 404 to.
 
 Three of the five shapes are Graph's three ways to address a Teams message
-(https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a search
-cannot mint: Graph addresses a reply *under* its parent post, and the search projection carries no
-`replyToId`, so a channel hit that is really a reply becomes the plain channel shape, which Graph
-answers 404 to. Only `browse_channel` walks a channel post by post and knows each reply's parent.
+(https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a
+search cannot mint. Graph addresses a reply *under* its parent post, and the search projection
+carries no `replyToId`. So a channel hit that is really a reply becomes the plain channel shape
+instead, and Graph answers 404 to that. Only `teams_browse_channel` walks a channel post by post
+and knows each reply's parent.
 
-A meeting is addressed by join URL because that is the only route Graph gives a delegated caller
-from chat to meeting; no chat id, topic or date turns into one. A transcript is addressed by the two
-ids its content path is built from and not by that join URL, so reading one does not repeat the
-resolve, spend a second request and permission on it, and answer a 403 that could be about either.
-The family name is the first segment: `teams:///meetings/{x}/transcripts/{y}` would make `{x}` a
-join URL in one shape and a meeting id in another, which a parser cannot tell apart.
+A meeting is addressed by join URL, because that is the only route Graph gives a delegated
+caller from chat to meeting. No chat id, topic, or date turns into one. A transcript is addressed
+by the two ids that its content path is built from, and not by that join URL. So reading one does
+not repeat the resolve, spend a second request and permission on it, and answer a 403 that can be
+about either.
+
+The family name is the first segment for this reason. Nesting `{x}` under both `meetings` and
+`transcripts` in one URI, like `teams:///meetings/{x}/transcripts/{y}`, makes `{x}` ambiguous. It
+reads as a join URL in one shape and as a meeting id in another. A parser cannot tell them apart.
 
 Every segment is percent-encoded, because join URLs carry `:`, `/`, `?`, `&`, `%`, `#` and Teams ids
 carry `:` and `@` (`19:...@thread.v2`). The parser rejects half-encoded input, so a hand-spelled
 handle comes back as "not a handle" rather than as a truncated URL Graph ignores.
+
+Every `outlook:///` family is one segment, because Outlook addresses each of these by a single
+opaque id. There are four families rather than one. Graph gives them all one id space, but this
+connector keeps them apart: a draft is a message with `isDraft` set. Splitting them into four
+families keeps a message that a reader found from being spelled as a draft and handed to the tool
+that sends.
 """
 
 import re
@@ -70,8 +86,8 @@ class MeetingHandle:
 
 @dataclass(frozen=True, slots=True)
 class TranscriptHandle:
-    """Which transcript, by the two ids Graph's content path is built from. Graph's own
-    `transcriptContentUrl` is not used: the published samples are malformed
+    """This identifies a transcript by the two ids that Graph's content path is built from.
+    Graph's own `transcriptContentUrl` is not used, because the published samples are malformed
     (`…/transcripts/('…')/content`)."""
 
     meeting_id: str
@@ -82,6 +98,57 @@ class TranscriptHandle:
         return f"teams:///transcripts/{_segment(self.meeting_id)}/{_segment(self.transcript_id)}"
 
 
+@dataclass(frozen=True, slots=True)
+class MailMessageHandle:
+    message_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///messages/{_segment(self.message_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class MailFolderHandle:
+    """This identifies a mail folder by its Graph id. That id is what reaches a folder that no
+    well-known name covers.
+
+    This is its own family, because Outlook's well-known names (`inbox`, `sentitems`, …) are a
+    closed vocabulary that a tool spells as a `Literal`. An id is the other half of that argument.
+    """
+
+    folder_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///folders/{_segment(self.folder_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class MailDraftHandle:
+    """This identifies a draft that this connector composed. It is the only thing the sending
+    tool accepts.
+
+    Graph gives a draft the same id space as any other message. Keeping the families apart stops
+    a message that a reader found from being spelled as a draft. This is what makes "send the
+    mail you just wrote" expressible, and "send that mail I found" unspellable.
+    """
+
+    draft_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///drafts/{_segment(self.draft_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class MailRuleHandle:
+    rule_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///rules/{_segment(self.rule_id)}"
+
+
 # Ids are matched as "anything but a separator", because the spellers above percent-encode each one.
 _CHAT_HANDLE = re.compile(r"\Ateams:///chats/([^/]+)/messages/([^/]+)\Z")
 _CHANNEL_HANDLE = re.compile(r"\Ateams:///teams/([^/]+)/channels/([^/]+)/messages/([^/]+)\Z")
@@ -90,6 +157,10 @@ _REPLY_HANDLE = re.compile(
 )
 _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
 _TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///transcripts/([^/]+)/([^/]+)\Z")
+_MAIL_MESSAGE_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)\Z")
+_MAIL_FOLDER_HANDLE = re.compile(r"\Aoutlook:///folders/([^/]+)\Z")
+_MAIL_DRAFT_HANDLE = re.compile(r"\Aoutlook:///drafts/([^/]+)\Z")
+_MAIL_RULE_HANDLE = re.compile(r"\Aoutlook:///rules/([^/]+)\Z")
 
 
 def message_handle(uri: str) -> MessageHandle | None:
@@ -138,6 +209,26 @@ def transcript_handle(uri: str) -> TranscriptHandle | None:
     return TranscriptHandle(meeting_id, transcript_id)
 
 
+def mail_message_handle(uri: str) -> MailMessageHandle | None:
+    message_id = _single_id(_MAIL_MESSAGE_HANDLE, uri)
+    return None if message_id is None else MailMessageHandle(message_id)
+
+
+def mail_folder_handle(uri: str) -> MailFolderHandle | None:
+    folder_id = _single_id(_MAIL_FOLDER_HANDLE, uri)
+    return None if folder_id is None else MailFolderHandle(folder_id)
+
+
+def mail_draft_handle(uri: str) -> MailDraftHandle | None:
+    draft_id = _single_id(_MAIL_DRAFT_HANDLE, uri)
+    return None if draft_id is None else MailDraftHandle(draft_id)
+
+
+def mail_rule_handle(uri: str) -> MailRuleHandle | None:
+    rule_id = _single_id(_MAIL_RULE_HANDLE, uri)
+    return None if rule_id is None else MailRuleHandle(rule_id)
+
+
 def meeting_uri_for(join_web_url: str | None) -> str | None:
     """Meeting handle for `join_web_url`, or None when Graph gave none."""
     if join_web_url is None or not join_web_url.strip():
@@ -157,6 +248,19 @@ def _message_handle(handle: MessageHandle) -> MessageHandle | None:
     if any(value is not None and not value.strip() for value in ids):
         return None
     return handle
+
+
+def _single_id(pattern: re.Pattern[str], uri: str) -> str | None:
+    """The one id a single-segment handle carries, or None when `uri` is not that shape.
+
+    None for a segment that decoded to nothing too, because `%20` is not an id — the same rule
+    that `_message_handle` applies to the Teams shapes.
+    """
+    match = pattern.match(uri)
+    if match is None:
+        return None
+    value = unquote(match.group(1))
+    return value if value.strip() else None
 
 
 def _segment(value: str) -> str:

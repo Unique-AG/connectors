@@ -9,118 +9,260 @@
           ]
         },
         {
-          "name": "list_chats",
+          "name": "teams_list_chats",
           "permissions": [
             "Chat.Read"
           ]
         },
         {
-          "name": "list_teams",
+          "name": "teams_list_my_teams",
           "permissions": [
             "Team.ReadBasic.All"
           ]
         },
         {
-          "name": "list_channels",
+          "name": "teams_list_channels",
           "permissions": [
             "Channel.ReadBasic.All"
           ]
         },
         {
-          "name": "browse_channel",
+          "name": "teams_browse_channel",
           "permissions": [
             "ChannelMessage.Read.All"
           ]
         },
         {
-          "name": "search_messages",
-          "permissions": [
-            "Chat.Read",
-            "ChannelMessage.Read.All"
-          ]
-        },
-        {
-          "name": "read_message",
+          "name": "teams_search_messages",
           "permissions": [
             "Chat.Read",
             "ChannelMessage.Read.All"
           ]
         },
         {
-          "name": "list_meeting_transcripts",
+          "name": "teams_read_message",
+          "permissions": [
+            "Chat.Read",
+            "ChannelMessage.Read.All"
+          ]
+        },
+        {
+          "name": "teams_list_meeting_transcripts",
           "permissions": [
             "OnlineMeetings.Read",
             "OnlineMeetingTranscript.Read.All"
           ]
         },
         {
-          "name": "read_transcript",
+          "name": "teams_read_transcript",
           "permissions": [
             "OnlineMeetingTranscript.Read.All"
           ]
         },
         {
-          "name": "list_meeting_recordings",
+          "name": "teams_list_meeting_recordings",
           "permissions": [
             "OnlineMeetings.Read",
             "OnlineMeetingRecording.Read.All",
             "User.Read"
           ]
+        },
+        {
+          "name": "outlook_search_mail",
+          "permissions": [
+            "Mail.Read",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "outlook_read_mail",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
+          "name": "outlook_browse_folders",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
+          "name": "outlook_find_recipient",
+          "permissions": [
+            "People.Read",
+            "Mail.Read",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "outlook_read_thread",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
+          "name": "outlook_list_mail",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
+          "name": "outlook_get_mailbox_settings",
+          "permissions": [
+            "MailboxSettings.Read"
+          ]
+        },
+        {
+          "name": "outlook_mark_mail",
+          "permissions": [
+            "Mail.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_move_mail",
+          "permissions": [
+            "Mail.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_draft_mail",
+          "permissions": [
+            "Mail.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_draft_reply",
+          "permissions": [
+            "Mail.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_send_draft",
+          "permissions": [
+            "Mail.Send",
+            "Mail.ReadBasic"
+          ]
+        },
+        {
+          "name": "outlook_set_automatic_reply",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_disable_mail_rule",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
         "get_me",
-        "list_chats",
-        "list_teams",
-        "list_channels",
-        "browse_channel",
-        "search_messages",
-        "read_message",
-        "list_meeting_transcripts",
-        "read_transcript",
-        "list_meeting_recordings"
+        "teams_list_chats",
+        "teams_list_my_teams",
+        "teams_list_channels",
+        "teams_browse_channel",
+        "teams_search_messages",
+        "teams_read_message",
+        "teams_list_meeting_transcripts",
+        "teams_read_transcript",
+        "teams_list_meeting_recordings",
+        "outlook_search_mail",
+        "outlook_read_mail",
+        "outlook_browse_folders",
+        "outlook_find_recipient",
+        "outlook_read_thread",
+        "outlook_list_mail",
+        "outlook_get_mailbox_settings",
+        "outlook_mark_mail",
+        "outlook_move_mail",
+        "outlook_draft_mail",
+        "outlook_draft_reply",
+        "outlook_send_draft",
+        "outlook_set_automatic_reply",
+        "outlook_disable_mail_rule"
       ],
       "always_on": "get_me",
       "presets": {
         "teams": [
-          "get_me",
-          "list_chats",
-          "list_teams",
-          "list_channels",
-          "browse_channel",
-          "search_messages",
-          "read_message",
-          "list_meeting_transcripts",
-          "read_transcript",
-          "list_meeting_recordings"
+          "teams_list_chats",
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_browse_channel",
+          "teams_search_messages",
+          "teams_read_message",
+          "teams_list_meeting_transcripts",
+          "teams_read_transcript",
+          "teams_list_meeting_recordings"
         ],
         "teams-chat": [
-          "list_chats"
+          "teams_list_chats"
         ],
         "teams-messages": [
-          "list_chats",
-          "search_messages",
-          "read_message"
+          "teams_list_chats",
+          "teams_search_messages",
+          "teams_read_message"
         ],
         "teams-channels": [
-          "list_teams",
-          "list_channels",
-          "browse_channel"
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_browse_channel"
         ],
         "teams-transcripts": [
-          "list_chats",
-          "list_meeting_transcripts",
-          "read_transcript"
+          "teams_list_chats",
+          "teams_list_meeting_transcripts",
+          "teams_read_transcript"
         ],
         "teams-recordings": [
-          "list_chats",
-          "list_meeting_recordings"
+          "teams_list_chats",
+          "teams_list_meeting_recordings"
         ],
         "teams-meetings": [
-          "list_chats",
-          "list_meeting_transcripts",
-          "read_transcript",
-          "list_meeting_recordings"
+          "teams_list_chats",
+          "teams_list_meeting_transcripts",
+          "teams_read_transcript",
+          "teams_list_meeting_recordings"
+        ],
+        "outlook-read": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail"
+        ],
+        "outlook-write": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail",
+          "outlook_mark_mail",
+          "outlook_move_mail",
+          "outlook_draft_mail",
+          "outlook_draft_reply"
+        ],
+        "outlook-send": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail",
+          "outlook_mark_mail",
+          "outlook_move_mail",
+          "outlook_draft_mail",
+          "outlook_draft_reply",
+          "outlook_send_draft"
+        ],
+        "outlook-mailbox": [
+          "outlook_get_mailbox_settings"
+        ],
+        "outlook-automate": [
+          "outlook_get_mailbox_settings",
+          "outlook_set_automatic_reply",
+          "outlook_disable_mail_rule"
         ]
       },
       "requestable_permissions": [
@@ -131,7 +273,14 @@
         "ChannelMessage.Read.All",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
-        "OnlineMeetingRecording.Read.All"
+        "OnlineMeetingRecording.Read.All",
+        "Mail.Read",
+        "People.Read",
+        "MailboxSettings.Read",
+        "Mail.ReadWrite",
+        "Mail.Send",
+        "Mail.ReadBasic",
+        "MailboxSettings.ReadWrite"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -141,7 +290,14 @@
         "ChannelMessage.Read.All": true,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
-        "OnlineMeetingRecording.Read.All": true
+        "OnlineMeetingRecording.Read.All": true,
+        "Mail.Read": false,
+        "People.Read": false,
+        "MailboxSettings.Read": false,
+        "Mail.ReadWrite": false,
+        "Mail.Send": false,
+        "Mail.ReadBasic": false,
+        "MailboxSettings.ReadWrite": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",

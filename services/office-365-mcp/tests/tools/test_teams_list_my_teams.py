@@ -1,4 +1,4 @@
-"""`list_teams`: the query Graph accepts here, and what a full window promises."""
+"""`teams_list_my_teams`: the query Graph accepts here, and what a full window promises."""
 
 import httpx
 import pytest
@@ -6,7 +6,7 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.tools import list_teams as lister
+from office_365_mcp.tools import teams_list_my_teams as lister
 
 from .conftest import GRAPH_V1
 
@@ -37,7 +37,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json={"value": [_team_payload("team-a")]})
         )
 
-        _ = await lister.list_teams(client, limit=10)
+        _ = await lister.teams_list_my_teams(client, limit=10)
 
         assert not route.calls.last.request.url.params, (
             "no OData parameter is supported on this collection"
@@ -48,7 +48,7 @@ class TestTheQueryItSends:
         self, client: GraphServiceClient, limit: int
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await lister.list_teams(client, limit=limit)
+            _ = await lister.teams_list_my_teams(client, limit=limit)
 
 
 class TestTheInventoryItReports:
@@ -67,7 +67,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_teams(client, limit=25)
+        listed = await lister.teams_list_my_teams(client, limit=25)
 
         assert [team.team_id for team in listed.teams] == ["team-live", "team-old"]
         assert [team.is_archived for team in listed.teams] == [False, True], (
@@ -83,7 +83,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_teams(client, limit=25)
+        listed = await lister.teams_list_my_teams(client, limit=25)
 
         assert listed.teams[0].is_archived is None
 
@@ -114,7 +114,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_teams(client, limit=25)
+        listed = await lister.teams_list_my_teams(client, limit=25)
 
         assert [team.team_id for team in listed.teams] == ["team-a", "team-c"]
         assert len(listed.teams) < 25, (
@@ -135,7 +135,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_teams(client, limit=2)
+        listed = await lister.teams_list_my_teams(client, limit=2)
 
         assert len(listed.teams) == 2, (
             "a window filled to `limit` is the whole of what a caller is told; Graph had a next "
@@ -154,7 +154,7 @@ class TestGraphFailures:
         graph.get("/me/joinedTeams").mock(return_value=denied)
 
         with pytest.raises(GraphForbidden):
-            _ = await lister.list_teams(client, limit=25)
+            _ = await lister.teams_list_my_teams(client, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("Team.ReadBasic.All",)

@@ -9,6 +9,7 @@ drives the same operation names.
 """
 
 import ast
+import asyncio
 import json
 import pathlib
 import re
@@ -18,7 +19,10 @@ from typing import TypeGuard, cast
 import httpx
 import pytest
 import respx
+from fastmcp import Context
+from fastmcp.exceptions import ToolError
 from kiota_http.middleware import retry_handler
+from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
@@ -42,6 +46,7 @@ from office_365_mcp.graph_client import (
     graph_step,
 )
 from office_365_mcp.metrics import configure_metrics
+from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -202,6 +207,106 @@ class TestAGraphCallIsCountedAndTimed:
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden") == before + 1
 
+    async def test_a_person_declining_a_send_is_not_counted_as_a_graph_error(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`outlook_send_draft` asks a person before it sends, and a refusal is an answer rather
+        than a failure. Counted as `error` it reads on a dashboard as this connector breaking, and
+        the wait for the person lands in the Graph latency histogram as if Microsoft were slow.
+        """
+        draft_id = "AAMkAGI2SYNTHETIC-immutable-0001%3D"
+        _ = graph.get(f"/me/messages/{draft_id}").mock(
+            return_value=httpx.Response(
+                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
+            )
+        )
+        sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
+
+        answered = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="ok")
+
+        async def declines(draft: Message) -> str | None:
+            assert draft is not None
+            return "Nothing was sent."
+
+        with pytest.raises(ToolError):
+            _ = await send_draft(
+                client, confirm=declines, draft_ref=f"outlook:///drafts/{draft_id}"
+            )
+
+        assert sent.call_count == 0, "a declined send reached the mailbox"
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error") == before
+        ), "a person saying no was counted as a Graph failure"
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="ok")
+            == answered + 1
+        ), "the read that did happen stopped being counted at all"
+
+    async def test_a_client_that_cannot_ask_is_not_counted_as_a_graph_error(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Driven through the real adapter rather than a stub, because this path is deterministic
+        for a client with no elicitation: every send it attempts would raise the failure rate.
+        """
+
+        class _CannotAsk:
+            async def elicit(self, message: str, response_type: object = None) -> object:
+                assert message and response_type is not None
+                raise RuntimeError("elicitation not supported")
+
+        draft_id = "AAMkAGI2SYNTHETIC-immutable-0002%3D"
+        _ = graph.get(f"/me/messages/{draft_id}").mock(
+            return_value=httpx.Response(
+                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
+            )
+        )
+        sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
+
+        with pytest.raises(ToolError, match="does not support elicitation"):
+            _ = await send_draft(
+                client,
+                confirm=a_person_agrees(cast("Context", cast("object", _CannotAsk()))),
+                draft_ref=f"outlook:///drafts/{draft_id}",
+            )
+
+        assert sent.call_count == 0
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error") == before
+        ), "a client that cannot ask was counted as a Graph failure"
+
+    async def test_the_wait_for_a_person_is_not_timed_as_graph_latency(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The half that lands on every send, the accepted ones included. The operation histogram
+        carries no status label, so a wait recorded here cannot be filtered out downstream.
+        """
+        draft_id = "AAMkAGI2SYNTHETIC-immutable-0003%3D"
+        _ = graph.get(f"/me/messages/{draft_id}").mock(
+            return_value=httpx.Response(
+                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
+            )
+        )
+        _ = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
+        waited = 0.5
+        before = _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_sum", operation="outlook_send_draft")
+
+        async def thinks_about_it(draft: Message) -> str | None:
+            assert draft is not None
+            await asyncio.sleep(waited)
+            return None
+
+        _ = await send_draft(
+            client, confirm=thinks_about_it, draft_ref=f"outlook:///drafts/{draft_id}"
+        )
+
+        timed = (
+            _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_sum", operation="outlook_send_draft")
+            - before
+        )
+        assert timed < waited / 2, f"the wait for a person was timed as Graph latency: {timed}s"
+
     async def test_a_step_with_no_operation_above_it_is_not_counted_under_a_made_up_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -250,23 +355,24 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
     async def test_a_refused_step_a_tool_recovers_from_leaves_the_operation_counted_as_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`read_transcript`'s shape. Under two `graph_errors` blocks the first refusal counted as
+        """`teams_read_transcript`'s shape. Under two `graph_errors` blocks the first refusal
+        counted as
         a failed *operation*, so any alert on refusals fired on a tenant behaving as designed."""
         _ = graph.get("/me").mock(
             side_effect=[httpx.Response(403, json={}), httpx.Response(200, json=_ME)]
         )
-        answered = _value(GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="ok")
+        answered = _value(GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="ok")
         refused_operations = _value(
-            GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="forbidden"
+            GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="forbidden"
         )
         refused_steps = _value(
             GRAPH_STEPS_TOTAL,
-            operation="read_transcript",
+            operation="teams_read_transcript",
             step="transcript_attributed",
             status="forbidden",
         )
 
-        with graph_errors("read_transcript"):
+        with graph_errors("teams_read_transcript"):
             try:
                 with graph_step("transcript_attributed"):
                     _ = await client.me.get()
@@ -275,16 +381,17 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
                     _ = await client.me.get()
 
         assert (
-            _value(GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="ok") == answered + 1
+            _value(GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="ok")
+            == answered + 1
         )
         assert (
-            _value(GRAPH_OPERATIONS_TOTAL, operation="read_transcript", status="forbidden")
+            _value(GRAPH_OPERATIONS_TOTAL, operation="teams_read_transcript", status="forbidden")
             == refused_operations
         ), "the tool answered, so the operation is not a refusal"
         assert (
             _value(
                 GRAPH_STEPS_TOTAL,
-                operation="read_transcript",
+                operation="teams_read_transcript",
                 step="transcript_attributed",
                 status="forbidden",
             )
@@ -302,7 +409,7 @@ class TestTheOperationLabelIsANameThisCodeChose:
         chat_id = "19%3Aunbounded-cardinality%40thread.v2"
         _ = graph.get(f"/chats/{chat_id}").mock(return_value=httpx.Response(200, json={"id": "c"}))
 
-        with graph_errors("list_chats"):
+        with graph_errors("teams_list_chats"):
             _ = await client.chats.by_chat_id("19:unbounded-cardinality@thread.v2").get()
 
         families = (
@@ -386,12 +493,12 @@ class TestAPagedWalkReportsWhatItRead:
                 httpx.Response(200, json=_page(["c-3"])),
             ]
         )
-        before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats")
+        before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats")
 
-        with graph_errors("list_chats"):
+        with graph_errors("teams_list_chats"):
             await _walk_chats(client, limit=50)
 
-        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == before + 3
+        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == before + 3
 
     async def test_a_nested_unnamed_block_does_not_erase_the_name_in_scope(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -405,22 +512,24 @@ class TestAPagedWalkReportsWhatItRead:
                 httpx.Response(200, json=_page(["c-2"])),
             ]
         )
-        pages = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats")
-        counted = _value(GRAPH_OPERATIONS_TOTAL, operation="list_chats", status="ok")
+        pages = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats")
+        counted = _value(GRAPH_OPERATIONS_TOTAL, operation="teams_list_chats", status="ok")
 
-        steps = _value(GRAPH_STEPS_TOTAL, operation="list_chats", step="chats", status="ok")
+        steps = _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
 
-        with graph_errors("list_chats"), graph_step("chats"):
+        with graph_errors("teams_list_chats"), graph_step("chats"):
             await _walk_chats(client, limit=50)
 
-        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="list_chats") == pages + 2
-        assert _value(GRAPH_OPERATIONS_TOTAL, operation="list_chats", status="ok") == counted + 1, (
+        assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == pages + 2
+        assert (
+            _value(GRAPH_OPERATIONS_TOTAL, operation="teams_list_chats", status="ok") == counted + 1
+        ), (
             "the inner block is a step, so it counts against the step instruments and leaves the "
             + "operation counted once — otherwise a tool that names its calls would look like a "
             + "tool called several times"
         )
         assert (
-            _value(GRAPH_STEPS_TOTAL, operation="list_chats", step="chats", status="ok")
+            _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
             == steps + 1
         )
 
@@ -475,7 +584,8 @@ def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
 
 class TestEveryToolNamesItselfWhenItCallsGraph:
     """What `graph_errors`' signature cannot say is that the name has to be *this tool's own*:
-    `graph_errors("get_me")` inside `list_chats.py` type-checks, compiles, and files one tool's
+    `graph_errors("get_me")` inside `teams_list_chats.py` type-checks, compiles, and files one
+    tool's
     latency under another's name. Asserted through the AST, so a call written across two lines
     counts and a `graph_errors` inside a docstring does not.
     """
@@ -628,6 +738,31 @@ GRAPH_STEPS = frozenset(
         "resolve_meeting",
         "transcripts",
         "recordings",
+        "mail_search",
+        "mail_ids",
+        "mail_message",
+        "mail_folders",
+        "people_search",
+        "mail_participants",
+        "thread_anchor",
+        "thread_messages",
+        "mail_folder",
+        "folder_messages",
+        "mailbox_settings",
+        "mail_rules",
+        "mail_categories",
+        "mark_message",
+        "move_message",
+        "destination_folder",
+        "create_draft",
+        "create_reply",
+        "fill_reply",
+        "read_draft",
+        "send_draft",
+        "read_mailbox_settings",
+        "write_automatic_reply",
+        "read_mail_rule",
+        "disable_mail_rule",
         "transcript_attributed",
         "transcript_unattributed",
     }
@@ -872,7 +1007,8 @@ def _panel_graph_metrics(panel: Mapping[str, object]) -> set[str]:
 
 class TestNoPanelPromisesGraphCallsAndPlotsOperations:
     """A wrong title is worse than an empty panel: it renders a real number a reader takes for a
-    different measurement. `list_meeting_recordings` makes three Graph calls per invocation, so an
+    different measurement. `teams_list_meeting_recordings` makes three Graph calls per invocation,
+    so an
     operation rate read as a Graph call rate understates Graph traffic by the fan-out.
     """
 

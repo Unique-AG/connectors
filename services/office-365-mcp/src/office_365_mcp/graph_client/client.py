@@ -60,8 +60,8 @@ class _CallerTokenProvider(AccessTokenProvider):
     credential the SDK calls `await credentials.close()` after every token acquisition
     (kiota_authentication_azure/azure_identity_access_token_provider.py:113-115), so a sync
     credential never reaches it but FastMCP's cached `OnBehalfOfCredential` is async and does. That
-    closes the credential's transport, breaking the user permanently at the next cache miss about an
-    hour later, recoverable only by a fresh sign-in.
+    closes the credential's transport and breaks the user permanently at the next cache miss about
+    an hour later. Only a fresh sign-in recovers them.
     """
 
     def __init__(self, access_token: str) -> None:
@@ -86,7 +86,7 @@ class _CallerTokenProvider(AccessTokenProvider):
         hostname alone (kiota_abstractions/authentication/allowed_hosts_validator.py) — without it,
         `http://graph.microsoft.com/...` matches and the delegated token goes out in cleartext. The
         SDK raises `HTTPError("Only https is supported")` here
-        (kiota_authentication_azure/azure_identity_access_token_provider.py:80-84); `""` is this
+        (kiota_authentication_azure/azure_identity_access_token_provider.py:80-84). `""` is this
         contract's existing way of saying "no token", and
         `BaseBearerTokenAuthenticationProvider` omits the header entirely for it rather than
         sending a bare `Authorization: Bearer `. Neither check looks at the port.
@@ -168,7 +168,7 @@ class _QuietUrlReplaceHandler(UrlReplaceHandler):
 
     `_NO_EUII_SPAN_ATTRIBUTES` cannot reach this one. `URL_FULL` is written in exactly two places in
     the SDK, and only the request adapter's (kiota_http/httpx_request_adapter.py:673-674) honours
-    `ObservabilityOptions.include_euii_attributes`; kiota_http/middleware/url_replace_handler.py:44
+    `ObservabilityOptions.include_euii_attributes`. kiota_http/middleware/url_replace_handler.py:44
     writes it unconditionally. Dropping the handler is not an option: it carries the
     `/users/me-token-to-replace` → `/me` rewrite every `client.me` call depends on.
 
@@ -210,8 +210,23 @@ def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]
     return [*quietened, GraphTelemetryHandler(options=telemetry_option)]
 
 
+def no_retry() -> list[RequestOption]:
+    """Options that make one Graph call non-retriable, for a request that must not happen twice.
+
+    The SDK's retry middleware retries `POST` as readily as `GET` — its allowed methods include
+    every verb and its retry statuses are 429, 503 and 504 — and Microsoft Graph publishes no
+    idempotency key for the mail operations that send or move. A 503 that arrives after Graph has
+    already accepted a request therefore performs it again, once per configured retry, and
+    `GRAPH_MAX_RETRIES` defaults to 3.
+
+    A fresh list per call: `RequestConfiguration.options` is a caller-owned collection and this
+    package does not hand out one that two requests share.
+    """
+    return [RetryHandlerOption(max_retries=0, should_retry=False)]
+
+
 def create_graph_transport(settings: GraphSettings) -> httpx.AsyncClient:
-    """Shared HTTP transport for all Graph calls. No base_url here on purpose; `graph_client_for`
+    """Shared HTTP transport for all Graph calls. No base_url here on purpose. `graph_client_for`
     sets the one that is used, and says why.
 
     TRAP: `await client.aclose()` does not close the underlying connection pool. The SDK wraps it in
@@ -244,7 +259,7 @@ def graph_client_for(transport: httpx.AsyncClient, access_token: str) -> GraphSe
     )
     # TRAP: this is the only place the Graph base URL is set, and it has to stay that way.
     # `HttpxRequestAdapter.__init__` copies the transport's base_url verbatim
-    # (kiota_http/httpx_request_adapter.py:90), and httpx normalises a base_url to end with a slash,
+    # (kiota_http/httpx_request_adapter.py:90), and httpx normalizes a base_url to end with a slash,
     # so giving the transport one puts `https://graph.microsoft.com/v1.0//chats/...` on the wire —
     # an empty path segment Graph tolerates and nothing else on the way there promises to.
     # `create_with_custom_middleware` sets a base_url only when it builds the client itself, which

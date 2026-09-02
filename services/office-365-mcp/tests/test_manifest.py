@@ -152,8 +152,9 @@ class TestWhatTheManifestSays:
 
 class TestTheDescriptionScanWarnsAboutStalePromises:
     """It warns and never aborts: the references are dense and mutual, so requiring every mention
-    would drag `search_messages` — and an administrator's signature on `ChannelMessage.Read.All` —
-    into a deployment that asked for nothing but `list_chats`."""
+    would drag `teams_search_messages` — and an administrator's signature on
+    `ChannelMessage.Read.All` —
+    into a deployment that asked for nothing but `teams_list_chats`."""
 
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_pointing_at_a_tool_this_deployment_lacks_is_reported(self) -> None:
@@ -228,8 +229,8 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 class TestTheManifestRefusesToGuess:
     async def test_a_permission_with_no_verdict_is_an_assertion_and_not_a_shrug(self) -> None:
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON,), permissions=("Mail.Read",), graph_scopes=()
+            preset=None, tools=(ALWAYS_ON,), permissions=("Files.Read.All",), graph_scopes=()
         )
 
-        with pytest.raises(AssertionError, match="no admin-consent verdict for Mail.Read"):
+        with pytest.raises(AssertionError, match="no admin-consent verdict for Files.Read.All"):
             await _manifest_of(selection)

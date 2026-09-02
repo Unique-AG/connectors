@@ -1,4 +1,4 @@
-"""`list_meeting_transcripts`: the window, the order, and the five answers."""
+"""`teams_list_meeting_transcripts`: the window, the order, and the five answers."""
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta, timezone
@@ -11,7 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared import handles, meetings
-from office_365_mcp.tools import list_meeting_transcripts as lister
+from office_365_mcp.tools import teams_list_meeting_transcripts as lister
 
 from .conftest import (
     GRAPH_V1,
@@ -136,7 +136,7 @@ class TestNoMatchIsNotAnError:
             return_value=httpx.Response(200, json={"value": [transcript_payload()]})
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -162,7 +162,7 @@ class TestNoMatchIsNotAnError:
         )
 
         with pytest.raises(GraphNotFound):
-            _ = await lister.list_meeting_transcripts(
+            _ = await lister.teams_list_meeting_transcripts(
                 client,
                 handle=_handle(),
                 started_after=None,
@@ -184,7 +184,7 @@ class TestTheKindsOfAbsence:
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(403, json=_TENANT_SWITCH_OFF))
 
         with pytest.raises(GraphForbidden) as raised:
-            _ = await lister.list_meeting_transcripts(
+            _ = await lister.teams_list_meeting_transcripts(
                 client,
                 handle=_handle(),
                 started_after=None,
@@ -202,7 +202,7 @@ class TestTheKindsOfAbsence:
         _resolved(graph, end=ended.isoformat())
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -231,7 +231,7 @@ class TestTheKindsOfAbsence:
         _resolved(graph, end=ended.isoformat() if ended is not None else None)
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -270,7 +270,7 @@ class TestScopingToOneOccurrence:
     ) -> None:
         _weekly_series(graph)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=datetime(2026, 2, 10, tzinfo=UTC),
@@ -292,7 +292,7 @@ class TestScopingToOneOccurrence:
             )
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=datetime(2026, 3, 1, tzinfo=UTC),
@@ -325,7 +325,7 @@ class TestScopingToOneOccurrence:
             )
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -349,7 +349,7 @@ class TestScopingToOneOccurrence:
             [transcript_payload(transcript_id="week-2", created_at="2026-02-10T14:00:00Z")],
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -388,7 +388,7 @@ class TestScopingToOneOccurrence:
             )
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -410,7 +410,7 @@ class TestScopingToOneOccurrence:
             [transcript_payload(transcript_id="newest", created_at="2026-02-17T14:00:00Z")],
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -443,7 +443,7 @@ class TestScopingToOneOccurrence:
             )
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=datetime(2026, 3, 1, tzinfo=UTC),
@@ -472,7 +472,7 @@ class TestScopingToOneOccurrence:
         _resolved(graph, meeting_type="recurring")
         listing = _daily_series(graph)
 
-        wide = await lister.list_meeting_transcripts(
+        wide = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=_day(meetings.MAX_ARTIFACT_SCAN).date(),
@@ -481,7 +481,7 @@ class TestScopingToOneOccurrence:
             include_scan_completeness=False,
         )
         wide_request = listing.calls.last.request.url
-        narrow = await lister.list_meeting_transcripts(
+        narrow = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=_day(250).date(),
@@ -516,7 +516,7 @@ class TestScopingToOneOccurrence:
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -539,7 +539,7 @@ class TestScopingToOneOccurrence:
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -598,7 +598,7 @@ class TestScopingToOneOccurrence:
             ]
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -629,7 +629,7 @@ class TestScopingToOneOccurrence:
         _resolved(graph, meeting_type="recurring")
         _daily_series(graph)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=_day(10).date(),
@@ -662,7 +662,7 @@ class TestScopingToOneOccurrence:
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await lister.list_meeting_transcripts(
+            _ = await lister.teams_list_meeting_transcripts(
                 client,
                 handle=_handle(),
                 started_after=None,
@@ -679,7 +679,7 @@ class TestScopingToOneOccurrence:
             return_value=httpx.Response(200, json={"value": [transcript_payload()]})
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=None,
@@ -736,7 +736,7 @@ class TestTheWindowShapesAModelActuallySends:
         silently given the host's."""
         _weekly_series(graph)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=started_after,
@@ -768,7 +768,7 @@ class TestTheWindowShapesAModelActuallySends:
             )
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=date(2026, 2, 10),
@@ -796,7 +796,7 @@ class TestTheWindowShapesAModelActuallySends:
             )
         )
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=date(2026, 2, 10),
@@ -823,7 +823,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         past = (datetime.now(UTC) - timedelta(days=30)).date()
         _weekly_series(graph, end=end)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=past,
@@ -844,7 +844,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         never coming."""
         _weekly_series(graph, end=None)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=datetime.now(UTC) - timedelta(hours=1),
@@ -862,7 +862,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         a processing status nor an SLA, so the cheap wrong answer wins."""
         _weekly_series(graph, end=None)
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=datetime.now(UTC) - timedelta(days=30),
@@ -881,7 +881,7 @@ class TestTheVerdictIsAboutTheWindowThatWasAskedFor:
         _resolved(graph, end=(datetime.now(UTC) - timedelta(days=9)).isoformat())
         graph.get(_TRANSCRIPTS).mock(return_value=httpx.Response(200, json={"value": []}))
 
-        found = await lister.list_meeting_transcripts(
+        found = await lister.teams_list_meeting_transcripts(
             client,
             handle=_handle(),
             started_after=(datetime.now(UTC) + timedelta(days=7)).date(),

@@ -1,16 +1,22 @@
 import httpx
+import pytest
 import respx
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.request_option import RequestOption
+from msgraph.generated.users.item.send_mail.send_mail_post_request_body import (
+    SendMailPostRequestBody,
+)
 from msgraph.graph_request_adapter import options as sdk_middleware_options
 from msgraph.graph_service_client import GraphServiceClient
 from msgraph_core import GraphClientFactory
 
-from office_365_mcp.graph_client import GraphSettings, create_graph_transport
+from office_365_mcp.graph_client import GraphSettings, create_graph_transport, no_retry
 from office_365_mcp.graph_client.client import (
     _CallerTokenProvider,  # pyright: ignore[reportPrivateUsage]
 )
+from tests.conftest import RecordedSleeps
 
-from .conftest import CALLER_TOKEN, GRAPH_V1, RecordedSleeps
+from .conftest import CALLER_TOKEN, GRAPH_V1
 
 
 def _handler_chain(transport: httpx.AsyncClient) -> list[str]:
@@ -125,3 +131,35 @@ class TestTheTransportRunsTheSdksOwnPipeline:
         finally:
             await sdk.aclose()
             await ours.aclose()
+
+
+class TestANonIdempotentCallIsNotRetried:
+    """`no_retry` exists because the SDK retries POST exactly as readily as GET, and Graph has no
+    idempotency key for sending mail. The middleware default and the per-request override are
+    asserted together: a test of the override alone would still pass if the default had changed to
+    match it, and the whole point is that they differ."""
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_by_default_a_post_that_answers_503_is_sent_once_per_retry(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post("/me/sendMail").mock(return_value=httpx.Response(503))
+
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await client.me.send_mail.post(SendMailPostRequestBody())
+
+        assert route.call_count == GraphSettings().max_retries + 1
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_the_override_sends_it_exactly_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post("/me/sendMail").mock(return_value=httpx.Response(503))
+
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await client.me.send_mail.post(
+                SendMailPostRequestBody(),
+                request_configuration=RequestConfiguration(options=no_retry()),
+            )
+
+        assert route.call_count == 1

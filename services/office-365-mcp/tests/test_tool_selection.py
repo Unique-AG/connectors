@@ -78,21 +78,21 @@ class TestTheTwoVariablesAreOneChoice:
         assert config.tools_enabled is None
 
     def test_a_list_alone_is_a_selection(self) -> None:
-        config = SurfaceConfig.model_validate({"tools_enabled": "get_me,list_chats"})
+        config = SurfaceConfig.model_validate({"tools_enabled": "get_me,teams_list_chats"})
 
         assert config.tools_preset is None
-        assert config.tools_enabled == ("get_me", "list_chats")
+        assert config.tools_enabled == ("get_me", "teams_list_chats")
 
     def test_the_spelling_an_operator_writes_is_the_one_that_works(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Read out of the environment rather than handed in: a collection-typed setting is
         JSON-decoded before any validator of ours."""
-        monkeypatch.setenv("TOOLS_ENABLED", "get_me, list_chats ,read_message,")
+        monkeypatch.setenv("TOOLS_ENABLED", "get_me, teams_list_chats ,teams_read_message,")
 
         config = SurfaceConfig()
 
-        assert config.tools_enabled == ("get_me", "list_chats", "read_message")
+        assert config.tools_enabled == ("get_me", "teams_list_chats", "teams_read_message")
 
     def test_neither_set_is_refused_and_says_what_to_set(self) -> None:
         """There is no default anywhere: a default of "every tool" would make the widest consent
@@ -293,40 +293,73 @@ class TestRegisteringWhatWasSelected:
 # `src/` guards it (F4 of the design): a selection that enables a consumer without its producer
 # starts, and the tool's own refusal names the missing tool on first use.
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
-    "list_channels": {"team_id": ("list_teams",)},
-    "browse_channel": {
-        "team_id": ("list_teams",),
-        "channel_id": ("list_channels", "search_messages"),
+    "teams_list_channels": {"team_id": ("teams_list_my_teams",)},
+    "teams_browse_channel": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
     },
-    "read_message": {"uri": ("search_messages", "browse_channel")},
+    "teams_read_message": {"uri": ("teams_search_messages", "teams_browse_channel")},
     # Always satisfied, `get_me` being the floor; recorded so the guard below sees it as minted.
-    "search_messages": {"mentions": ("get_me",)},
-    "list_meeting_transcripts": {"meeting_uri": ("list_chats",)},
-    "read_transcript": {"uri": ("list_meeting_transcripts",)},
-    "list_meeting_recordings": {"meeting_uri": ("list_chats",)},
+    "teams_search_messages": {"mentions": ("get_me",)},
+    "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
+    "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
+    "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
+    "outlook_read_mail": {"uri": ("outlook_search_mail",)},
+    "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
+    "outlook_read_thread": {"uri": ("outlook_search_mail",)},
+    "outlook_list_mail": {"folder_ref": ("outlook_browse_folders",)},
+    "outlook_search_mail": {"recipient": ("get_me",)},
+    "outlook_mark_mail": {
+        "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_move_mail": {
+        "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread"),
+        "folder_ref": ("outlook_browse_folders",),
+    },
+    "outlook_draft_mail": {"to": ("outlook_find_recipient",)},
+    "outlook_draft_reply": {
+        "message_ref": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_send_draft": {"draft_ref": ("outlook_draft_mail", "outlook_draft_reply")},
+    "outlook_disable_mail_rule": {"rule_ref": ("outlook_get_mailbox_settings",)},
 }
 
 
-# `search_messages` requires at least one search criterion, which its schema says with one-name
-# `anyOf` branches. None of them is a handle, so none needs a producer.
-_COMPOSED_BY_THE_CALLER: frozenset[str] = frozenset(
-    {
-        "query",
-        "sender",
-        "recipient",
-        "sent_after",
-        "sent_before",
-        "has_attachment",
-        "is_read",
-        "mentions_me",
-    }
-)
+# Arguments a caller writes rather than copies from another tool's answer, per tool.
+#
+# TRAP: keyed by tool, not a flat set of names, because one name can be both. `recipient` is free
+# text on `teams_search_messages` and is the signed-in user's own address on `outlook_search_mail`,
+# whose description says to take it from `get_me` — under a flat set the second would inherit the
+# first's classification and the reachability check below would never ask about it.
+_COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
+    "teams_search_messages": frozenset(
+        {
+            "query",
+            "sender",
+            "recipient",
+            "sent_after",
+            "sent_before",
+            "has_attachment",
+            "is_read",
+            "mentions_me",
+        }
+    ),
+    "outlook_search_mail": frozenset({"query", "sender", "subject"}),
+    "outlook_list_mail": frozenset({"folder"}),
+    "outlook_find_recipient": frozenset({"query"}),
+    "outlook_mark_mail": frozenset({"is_read", "flagged", "importance"}),
+    "outlook_move_mail": frozenset({"destination"}),
+    "outlook_draft_mail": frozenset({"subject", "body_html"}),
+    "outlook_draft_reply": frozenset({"mode", "body_html"}),
+    "outlook_set_automatic_reply": frozenset({"status"}),
+    "outlook_disable_mail_rule": frozenset({"enabled"}),
+}
 
 
 def _required_arguments(schema: Mapping[str, object]) -> set[str]:
     """Not just the top-level `required`: a tool that requires "at least one of these" says it with
     a `required` inside each branch of an `anyOf`, and reading only the top level would report
-    `search_messages` as requiring nothing at all."""
+    `teams_search_messages` as requiring nothing at all."""
     found: set[str] = set()
     pending: list[object] = [schema]
     while pending:
@@ -352,8 +385,10 @@ def _tools_named_by(schema: Mapping[str, object], argument: str, *, besides: str
 
 class TestEveryCuratedPresetIsUsableOnItsOwn:
     """The failure this catches can have **no permission signature at all**. `teams-messages`
-    without `search_messages` asks for the identical three permissions, because `read_message`
-    declares `Chat.Read` and `ChannelMessage.Read.All` itself — while exposing a `read_message`
+    without `teams_search_messages` asks for the identical three permissions, because
+    `teams_read_message`
+    declares `Chat.Read` and `ChannelMessage.Read.All` itself — while exposing a
+    `teams_read_message`
     nothing in the preset can address. A table rather than a mechanism in the registry is the trade
     the design records (F4).
     """
@@ -373,9 +408,9 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 
     async def test_the_table_answers_for_every_argument_a_tool_requires(self) -> None:
         """Read off the live schemas, which is the side that goes stale: that is how the table came
-        to record only one of `browse_channel`'s two required ids.
+        to record only one of `teams_browse_channel`'s two required ids.
         """
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(preset=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("argument-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -384,9 +419,15 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
             }
 
         unclassified = {
-            name: sorted(arguments - set(_ARGUMENT_SOURCES.get(name, {})) - _COMPOSED_BY_THE_CALLER)
+            name: sorted(
+                arguments
+                - set(_ARGUMENT_SOURCES.get(name, {}))
+                - _COMPOSED_BY_THE_CALLER.get(name, frozenset())
+            )
             for name, arguments in required.items()
-            if arguments - set(_ARGUMENT_SOURCES.get(name, {})) - _COMPOSED_BY_THE_CALLER
+            if arguments
+            - set(_ARGUMENT_SOURCES.get(name, {}))
+            - _COMPOSED_BY_THE_CALLER.get(name, frozenset())
         }
 
         assert not unclassified, (
@@ -400,7 +441,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         satisfy the completeness check above and quietly stop the reachability check below from
         asking about that tool at all.
         """
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(preset=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("prose-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -421,18 +462,23 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         )
 
     def test_nothing_is_both_minted_and_composed(self) -> None:
-        """An argument in both places is checked under whichever the code consults first."""
-        minted = {argument for arguments in _ARGUMENT_SOURCES.values() for argument in arguments}
+        """An argument in both places is checked under whichever the code consults first. Compared
+        per tool, because the same name is legitimately minted for one tool and composed for
+        another."""
+        twice = {
+            f"{tool}.{argument}"
+            for tool, minted in _ARGUMENT_SOURCES.items()
+            for argument in set(minted) & _COMPOSED_BY_THE_CALLER.get(tool, frozenset())
+        }
 
-        assert not minted & _COMPOSED_BY_THE_CALLER, (
-            f"classified twice: {sorted(minted & _COMPOSED_BY_THE_CALLER)}"
-        )
+        assert not twice, f"classified twice: {sorted(twice)}"
 
     @pytest.mark.parametrize("preset", list(ToolsPreset))
     def test_every_tool_in_it_can_obtain_its_arguments_from_another_member(
         self, preset: ToolsPreset
     ) -> None:
-        """Every argument, not every tool: `browse_channel` takes its `team_id` and `channel_id`
+        """Every argument, not every tool: `teams_browse_channel` takes its `team_id` and
+        `channel_id`
         from two different tools, so a preset can hold one producer and not the other."""
         selection = resolve(preset=preset, enabled=None)
         exposed = set(selection.tools)
@@ -455,9 +501,24 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         selection = resolve(preset=preset, enabled=None)
 
         if preset is ToolsPreset.TEAMS:
-            assert set(selection.tools) == set(TOOL_NAMES)
+            assert set(selection.tools) <= set(TOOL_NAMES)
         else:
             assert set(selection.tools) < set(TOOL_NAMES), f"{preset} is the whole surface"
+
+    def test_no_preset_is_derived_from_the_registry(self) -> None:
+        """`teams` naming a tuple rather than `TOOL_NAMES` is the whole point: a derived preset
+        takes in the first tool of another product and puts its permission on every `teams`
+        tenant's consent screen."""
+        derived = [name for name, tools in PRESETS.items() if tools is TOOL_NAMES]
+
+        assert not derived, f"{derived} would grow with the registry rather than with a review"
+
+    def test_every_registered_tool_is_reachable_through_some_preset(self) -> None:
+        """The cost of writing `teams` out by hand: a tool can now land in the registry and be
+        named by no preset at all, reachable only by `TOOLS_ENABLED`."""
+        named = {tool for tools in PRESETS.values() for tool in tools} | {ALWAYS_ON}
+
+        assert set(TOOL_NAMES) == named, f"no preset names {sorted(set(TOOL_NAMES) - named)}"
 
 
 # Transcribed from the design document's own table: permissions consented to, how many need an
@@ -514,6 +575,33 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         3,
         10,
+    ),
+    (ToolsPreset.OUTLOOK_READ, ("User.Read", "Mail.Read", "People.Read"), 0, 7),
+    (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 2),
+    (
+        ToolsPreset.OUTLOOK_WRITE,
+        ("User.Read", "Mail.Read", "People.Read", "Mail.ReadWrite"),
+        0,
+        11,
+    ),
+    (
+        ToolsPreset.OUTLOOK_SEND,
+        (
+            "User.Read",
+            "Mail.Read",
+            "People.Read",
+            "Mail.ReadWrite",
+            "Mail.Send",
+            "Mail.ReadBasic",
+        ),
+        0,
+        12,
+    ),
+    (
+        ToolsPreset.OUTLOOK_AUTOMATE,
+        ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite"),
+        0,
+        4,
     ),
 )
 

@@ -1,4 +1,4 @@
-"""`list_chats`: the query Graph is sent, and the traps in what comes back."""
+"""`teams_list_chats`: the query Graph is sent, and the traps in what comes back."""
 
 from collections.abc import Mapping, Sequence
 
@@ -9,7 +9,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphThrottled
 from office_365_mcp.shared import handles
-from office_365_mcp.tools import list_chats as chats
+from office_365_mcp.tools import teams_list_chats as chats
 
 from .conftest import GRAPH_V1
 
@@ -344,7 +344,7 @@ class TestWhatTheCallerIsTold:
             "naming what a handle is missing is a recipe for assembling one, and this tool has no "
             + "message id to hand a model that follows it"
         )
-        assert "read_message" in description, (
+        assert "teams_read_message" in description, (
             "a model told not to build a handle still needs to know where a real one comes from"
         )
 

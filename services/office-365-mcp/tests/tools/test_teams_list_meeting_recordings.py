@@ -1,4 +1,4 @@
-"""`list_meeting_recordings`: what exists, how long it ran, and who may download it."""
+"""`teams_list_meeting_recordings`: what exists, how long it ran, and who may download it."""
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -11,7 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared import handles, meetings
-from office_365_mcp.tools import list_meeting_recordings as lister
+from office_365_mcp.tools import teams_list_meeting_recordings as lister
 
 from .conftest import (
     GRAPH_V1,
@@ -124,7 +124,7 @@ async def _listing(
     limit: int = 20,
     include_scan_completeness: bool = False,
 ) -> lister.MeetingRecordings:
-    return await lister.list_meeting_recordings(
+    return await lister.teams_list_meeting_recordings(
         client,
         handle=_handle(),
         started_after=started_after,

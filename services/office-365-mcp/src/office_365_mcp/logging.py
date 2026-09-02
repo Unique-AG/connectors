@@ -3,9 +3,9 @@
 That formatter renders the format the chart's `logging.unique.app/format: pino-json` pod label
 promises the log pipeline. It copies every non-reserved `LogRecord` attribute into the payload and
 serialises the whole `exc_info` chain into `err.stack`, so secrets leak from `extra=` and from
-exceptions. The correction has to sit on the *handler*: `Handler.handle` filters before it formats,
-and a handler's filters see every record it emits whatever logger produced it. A filter on a logger
-would see only that logger's own records.
+exceptions. The correction must sit on the *handler*: `Handler.handle` filters before it formats,
+and a handler's filters see every record it emits, whatever logger produced it. A filter on a
+logger sees only that logger's own records.
 
 These filters mutate the record they are given, against the house rule on arguments: a
 `logging.Filter` has no other return path, and the record is a per-emit object the caller does not
@@ -70,7 +70,7 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
     # A bare JWT: `eyJ` is base64url of `{"`, so every Entra and Graph token starts with it.
     (re.compile(r"\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*"), CENSORED),
     # `scheme://user:password@host`: `server/readiness.py` logs a store failure with
-    # `exc_info=True`, and asyncpg quotes the DSN it could not reach.
+    # `exc_info=True`, and asyncpg quotes the DSN it failed to reach.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@]+:[^\s/@]+@"), r"\1" + CENSORED + "@"),
     # A credential in a query string, which is the vector the reference calls
     # `req.query["api-key"]`. uvicorn's access line quotes the path *with* its query string, so
@@ -93,8 +93,8 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 # Trap: at the cap the container must be replaced, not passed through. An ASGI scope can contain
-# itself, and a cycle in the payload makes `json.dumps` raise — which `logging` swallows, losing the
-# line entirely.
+# itself, and a cycle in the payload makes `json.dumps` raise. `logging` swallows that exception and
+# drops the line entirely.
 _MAX_DEPTH = 5
 TRUNCATED = "[Truncated]"
 
@@ -128,10 +128,10 @@ def _rendered_text(value: object) -> str | None:
     and a `logging.Filter` that raises raises out of the `logger.info(...)` call that built the
     record: `Handler.handle` runs its filters *outside* the `handleError` guard that covers `emit`.
     So a `__str__` this service does not own must not turn one log line into the caller's exception,
-    and the `except` is broad because there is no exception a log filter may propagate.
+    and the `except` clause is broad because a log filter must not propagate any exception.
 
-    Nothing is lost by giving up here: the upstream formatter serialises with
-    `json.dumps(..., default=str)`, so it would fail on the same object.
+    Nothing is lost by giving up here: the upstream formatter also fails on the same object, since
+    it serialises with `json.dumps(..., default=str)`.
     """
     try:
         return _as_text(value)
@@ -205,7 +205,7 @@ def _key_text(key: object) -> str:
 
 
 def _redact_member(member: object, depth: int) -> object:
-    """`scope["headers"]` is a list of `(name, value)` byte pairs, not a dict; without pairing them
+    """`scope["headers"]` is a list of `(name, value)` byte pairs, not a dict. Without pairing them,
     the name half is seen and the value half is logged."""
     pair = _sensitive_pair(member)
     if pair is not None:
@@ -245,7 +245,8 @@ def _redacted_stack(
     service does not own, not because it is likelier to fail: `traceback` wraps each `str` it needs
     itself and renders a raising one as `<exception str() failed>`, where `str(exc)` above
     propagates. What is left is everything else formatting a chain touches — the tracebacks, the
-    notes, each frame's source line — and none of it may raise out of a filter.
+    notes, each frame's source line — and this guard makes sure that none of it raises out of a
+    filter.
     """
     try:
         formatted = "".join(traceback.format_exception(exc_type, exc, tb))
@@ -258,7 +259,7 @@ class RedactionFilter(logging.Filter):
     """Take the secrets out of a record before the formatter can serialise them.
 
     Two independent nets, name and value shape, because neither alone holds. What gets through both
-    is a secret with an innocent name and no recognisable shape.
+    is a secret with an innocent name and no recognizable shape.
     """
 
     @override
@@ -271,15 +272,17 @@ class RedactionFilter(logging.Filter):
 
         rendered = _rendered_message(record)
         if rendered is None:
-            # Nothing censored this pair, so nothing may carry it out of the process. The formatter
-            # cannot interpolate it either, and its failure lands in `Handler.handleError`, which
-            # writes `record.msg` and `record.args` to stderr verbatim — un-redacted, and outside
-            # the pino stream. So the template is kept as censored text and the args dropped.
+            # Nothing has censored this pair, so this filter must not let it leave the process. The
+            # formatter cannot interpolate it either, and its failure lands in
+            # `Handler.handleError`, which writes `record.msg` and `record.args` to stderr
+            # verbatim — un-redacted, and outside the pino stream. So the template is kept as
+            # censored text and the args dropped.
             record.msg = _redacted_object_text(record.msg)
             record.args = None
         elif (censored := _censor_text(rendered)) != rendered:
             # The args are dropped with the template they filled: the censored text is already
-            # interpolated, and `%`-formatting it a second time would fail on its own literals.
+            # interpolated, and `%`-formatting the same text a second time fails on its own
+            # literals.
             record.msg = censored
             record.args = None
         # A clean message keeps its template and args, which the formatter then interpolates a
@@ -291,8 +294,8 @@ class RedactionFilter(logging.Filter):
         already_given = attributes.get(_ERR_FIELD)
         if exc_type is not None and exc is not None and not isinstance(already_given, dict):
             # The same three keys the upstream formatter writes, so nothing reading `err.stack`
-            # notices which of us built it — and writing them at all is what stops it building
-            # them itself, from the exception these two renderings may have failed on.
+            # notices which of us built it. Writing them here also stops the formatter from
+            # building them itself, from an exception that either rendering above can fail on.
             setattr(
                 record,
                 _ERR_FIELD,
@@ -326,13 +329,14 @@ def _mcp_request_id() -> str | None:
     try:
         return get_context().request_id
     except Exception:
-        # Broad on purpose: no exception may propagate out of a log filter.
+        # Broad on purpose: this function must not let an exception propagate out of a log filter.
         return None
 
 
 def _mcp_session_id() -> str | None:
-    """Read from the header, not `Context.session_id`: that mints and memoises a uuid of its own
-    when a session has none, as `initialize` has none, reporting an id the transport never knew."""
+    """Read from the header, not `Context.session_id`. That property mints and memoises a uuid of
+    its own when a session has none, as `initialize` has none, and reports an id the transport
+    never knew."""
     try:
         return get_http_request().headers.get("mcp-session-id")
     except Exception:
@@ -366,7 +370,8 @@ class CorrelationFilter(logging.Filter):
         session_id = _mcp_session_id()
         if session_id is not None and _SESSION_FIELD not in record.__dict__:
             setattr(record, _SESSION_FIELD, session_id)
-        # Also its own field: a trace id outranks it, so with tracing on it would never show.
+        # Also its own field: a trace id outranks it in `_correlation_id`, so this field is the
+        # only place it shows when tracing is on.
         http_request_id = _http_request_id.get()
         if http_request_id is not None and _HTTP_REQUEST_FIELD not in record.__dict__:
             setattr(record, _HTTP_REQUEST_FIELD, http_request_id)
@@ -417,7 +422,7 @@ def _forwarded_request_id(scope: ASGIScope) -> str | None:
 
 # `mcp/server/lowlevel/server.py`, in `_handle_request`, immediately before the request handler —
 # which is where FastMCP's whole middleware chain lives. Matched on the template, a literal in that
-# file; a drift guard in `tests/test_logging.py` reads it back out of the SDK and fails if it moved.
+# file. A drift guard in `tests/test_logging.py` reads it back out of the SDK and fails if it moved.
 _SDK_MESSAGE_LOGGER = "mcp.server.lowlevel.server"
 _SDK_PER_MESSAGE_LINE = "Processing request of type %s"
 
@@ -426,7 +431,7 @@ class StaleMessageLineFilter(logging.Filter):
     """Drop the SDK's per-message line, the one line that cannot carry the right trace id.
 
     It is emitted inside the session task before any middleware of ours, so it is formatted under
-    the OpenTelemetry context that task snapshotted at `initialize`, for the session's whole life;
+    the OpenTelemetry context that task snapshotted at `initialize`, for the session's whole life.
     `tracing.py` says why that cannot be corrected from inside the task. `MessageLogMiddleware`
     emits the replacement.
     """
@@ -439,7 +444,7 @@ class StaleMessageLineFilter(logging.Filter):
 class MessageLogMiddleware(Middleware):
     """One line per MCP message, in the trace of the request that carried it.
 
-    Mount inside `TraceContextRestoreMiddleware`; outside it, this line is the defect it replaces.
+    Mount inside `TraceContextRestoreMiddleware`. Outside it, this line is the defect it replaces.
     """
 
     @override
@@ -458,8 +463,8 @@ class MessageLogMiddleware(Middleware):
         return await call_next(context)
 
 
-# uvicorn puts an ANSI copy of the line in `extra` for its own formatter; the pino formatter copies
-# every extra, so each uvicorn lifecycle line would carry its message twice.
+# uvicorn puts an ANSI copy of the line in `extra` for its own formatter. The pino formatter copies
+# every extra, so uncorrected, each uvicorn lifecycle line carries its message twice.
 _COLOR_MESSAGE_FIELD = "color_message"
 
 

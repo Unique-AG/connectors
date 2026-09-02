@@ -1,4 +1,4 @@
-"""`list_channels`: what the query asks for, what it declines, and the pages it follows."""
+"""`teams_list_channels`: what the query asks for, what it declines, and the pages it follows."""
 
 from collections.abc import Callable
 
@@ -8,7 +8,7 @@ import respx
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
-from office_365_mcp.tools import list_channels as lister
+from office_365_mcp.tools import teams_list_channels as lister
 
 from .conftest import GRAPH_V1
 
@@ -70,7 +70,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json={"value": [_channel_payload(_CHANNEL_ID)]})
         )
 
-        _ = await lister.list_channels(client, team_id=_TEAM_ID, limit=10)
+        _ = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=10)
 
         params = route.calls.last.request.url.params
         assert params["$select"] == "id,displayName,description,createdDateTime,membershipType"
@@ -84,7 +84,7 @@ class TestTheQueryItSends:
             return_value=httpx.Response(200, json={"value": [_channel_payload(_CHANNEL_ID)]})
         )
 
-        _ = await lister.list_channels(client, team_id=_TEAM_ID, limit=10)
+        _ = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=10)
 
         assert route.calls.last.request.headers["prefer"] == _PREFER_UNKNOWN_MEMBERS
 
@@ -93,7 +93,7 @@ class TestTheQueryItSends:
         self, client: GraphServiceClient, limit: int
     ) -> None:
         with pytest.raises(AssertionError):
-            _ = await lister.list_channels(client, team_id=_TEAM_ID, limit=limit)
+            _ = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=limit)
 
 
 class TestTheInventoryItReports:
@@ -117,7 +117,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
+        listed = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=25)
 
         assert [channel.channel_id for channel in listed.channels] == [
             _CHANNEL_ID,
@@ -154,7 +154,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
+        listed = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=25)
 
         assert [channel.channel_id for channel in listed.channels] == [
             _CHANNEL_ID,
@@ -177,7 +177,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
+        listed = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=25)
 
         assert [channel.membership_type for channel in listed.channels] == ["private", None]
         created = listed.channels[0].created_at
@@ -197,7 +197,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
+        listed = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=25)
 
         assert [channel.membership_type for channel in listed.channels] == ["shared"]
 
@@ -221,7 +221,7 @@ class TestTheInventoryItReports:
             )
         )
 
-        listed = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
+        listed = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=25)
 
         assert [channel.membership_type for channel in listed.channels] == ["standard", "shared"]
 
@@ -236,7 +236,7 @@ class TestGraphFailures:
         graph.get(_CHANNELS_PATH).mock(return_value=denied)
 
         with pytest.raises(GraphForbidden):
-            _ = await lister.list_channels(client, team_id=_TEAM_ID, limit=25)
+            _ = await lister.teams_list_channels(client, team_id=_TEAM_ID, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("Channel.ReadBasic.All",)
