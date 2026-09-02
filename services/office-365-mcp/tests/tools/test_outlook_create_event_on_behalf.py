@@ -14,13 +14,23 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    CancelledElicitation,
+    DeclinedElicitation,
+)
 from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphNotFound,
+    GraphThrottled,
+    GraphUnavailable,
+)
 from office_365_mcp.shared.calendar import CALENDAR_FIELDS, MAX_ATTENDEES
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle, event_handle
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
@@ -64,9 +74,14 @@ def _calendar_payload(
     owner_name: str | None = _OWNER_NAME,
     owner: str | None = _OWNER,
     can_edit: bool | None = True,
+    providers: Sequence[str] | None = ("teamsForBusiness",),
 ) -> dict[str, object]:
-    """A delegated calendar as Microsoft lists it: named after its owner, `canShare` false."""
-    return {
+    """A delegated calendar as Microsoft lists it: named after its owner, `canShare` false.
+
+    `providers` is None for a calendar whose payload carries no `allowedOnlineMeetingProviders`
+    key at all, which is a different answer from a key holding an empty list.
+    """
+    payload: dict[str, object] = {
         "id": calendar_id,
         "name": name,
         "owner": None if owner is None else {"name": owner_name, "address": owner},
@@ -75,9 +90,11 @@ def _calendar_payload(
         "canViewPrivateItems": False,
         "isDefaultCalendar": False,
         "isTallyingResponses": True,
-        "allowedOnlineMeetingProviders": ["teamsForBusiness"],
         "defaultOnlineMeetingProvider": "teamsForBusiness",
     }
+    if providers is not None:
+        payload["allowedOnlineMeetingProviders"] = list(providers)
+    return payload
 
 
 def _attendee(address: str, *, kind: str = "required", response: str = "none") -> dict[str, object]:
@@ -126,6 +143,21 @@ def _created_payload(
     }
 
 
+def _message_envelope() -> dict[str, object]:
+    """The shape Microsoft's delegated-create walkthrough shows for step 2: an `eventMessage`
+    carrying the event under an `event` key, and its own id rather than the event's.
+
+    The SDK deserializes it into `Event` like any other body and records what arrived in
+    `@odata.type`, so nothing but that discriminator tells the two apart.
+    """
+    return {
+        "@odata.type": "#microsoft.graph.eventMessage",
+        "id": "AAMkADADSYNTHETIC-message-0001=",
+        "subject": _SUBJECT,
+        "event": _created_payload(),
+    }
+
+
 def _reads(graph: respx.MockRouter, payload: dict[str, object] | None = None) -> respx.Route:
     return graph.get(_CALENDAR_PATH).mock(
         return_value=httpx.Response(
@@ -170,6 +202,20 @@ async def _cannot_ask(question: str) -> str | None:
     """A client with no elicitation support, which `person_confirms` reports as a refusal too."""
     assert question, "the person was asked nothing at all"
     return "No event was created. The MCP client does not support elicitation."
+
+
+def _context(answer: object) -> Context:
+    """A FastMCP context whose client answers the elicitation with `answer`, or raises it."""
+
+    class _Client:
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            assert message
+            assert response_type is not None, "the caller must say what it expects back"
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+    return cast("Context", cast("object", _Client()))
 
 
 async def _create(client: GraphServiceClient, **overrides: object) -> CreatedEventOnBehalf:
@@ -326,8 +372,8 @@ class TestWhatItSendsToGraph:
     async def test_it_sends_the_subject_the_bounds_and_the_zone_it_was_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """The zone reaches Graph as written. Microsoft accepts an IANA or a Windows name here, and
-        translating one changes which instant the event is at."""
+        """The zone reaches Graph as written. Microsoft accepts every Windows name and a fixed
+        list of IANA names here, and translating one changes which instant the event is at."""
         create = _ready(graph)
 
         _ = await _create(client, time_zone="W. Europe Standard Time")
@@ -503,14 +549,14 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
             asked.append(question)
             return None
 
-        _ = await _create(client, time_zone="Europe/Zurich", confirm=capturing)
+        _ = await _create(client, time_zone="Europe/Berlin", confirm=capturing)
 
         assert len(asked) == 1
         assert f"on {_OWNER_NAME}'s calendar" in asked[0]
         assert f"as {_OWNER_NAME}" in asked[0]
         assert _SUBJECT in asked[0]
         assert _STARTS_AT in asked[0]
-        assert "Europe/Zurich" in asked[0]
+        assert "Europe/Berlin" in asked[0]
 
     async def test_the_question_names_every_address_and_marks_the_optional_ones(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -543,6 +589,47 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
         _ = await _create(client, confirm=capturing)
 
         assert _OWNER in asked[0]
+
+
+class TestTheConfirmationTheRegisteredToolBuilds:
+    """`register` hands `a_person_agrees(ctx)` to the tool, so these drive the confirmation the
+    registered path builds rather than one that only resembles it."""
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            DeclinedElicitation(),
+            CancelledElicitation(),
+            AcceptedElicitation(data="do not create"),
+            RuntimeError("elicitation not supported"),
+        ],
+        ids=["declined", "cancelled", "another-answer", "cannot-ask"],
+    )
+    async def test_a_refusal_opens_by_saying_no_event_was_created(self, answer: object) -> None:
+        """What a model needs first is that nothing was written into the other person's day. These
+        are the three words this tool hands the shared confirmation."""
+        confirm = creator.a_person_agrees(_context(answer))
+
+        refusal = await confirm(f"Create {_SUBJECT!r} on {_OWNER_NAME}'s calendar?")
+
+        assert (refusal or "").startswith("No event was created.")
+
+    async def test_agreeing_answers_with_no_refusal(self) -> None:
+        confirm = creator.a_person_agrees(_context(AcceptedElicitation(data="create")))
+
+        assert await confirm(f"Create {_SUBJECT!r} on {_OWNER_NAME}'s calendar?") is None
+
+    async def test_a_declined_confirmation_reaches_the_calendar_with_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The gate driven end to end through the confirmation `register` builds."""
+        create = _ready(graph)
+        confirm = creator.a_person_agrees(_context(DeclinedElicitation()))
+
+        with pytest.raises(ToolError, match="No event was created"):
+            _ = await _create(client, confirm=confirm)
+
+        assert create.call_count == 0
 
 
 class TestTheCalendarsItRefusesToWriteTo:
@@ -594,6 +681,64 @@ class TestTheCalendarsItRefusesToWriteTo:
 
         assert create.call_count == 1
 
+    async def test_a_teams_meeting_a_calendar_lists_no_provider_for_is_refused_before_the_create(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The pre-read already carries `allowedOnlineMeetingProviders`, and a Teams meeting is the
+        only kind this connector asks Microsoft for. A calendar that lists other providers answers
+        the create with an Exchange error the model reads as nothing in particular."""
+        create = _ready(graph, calendar=_calendar_payload(providers=["skypeForBusiness"]))
+
+        with pytest.raises(ToolError, match="skypeForBusiness"):
+            _ = await _create(client, online_meeting=True)
+
+        assert create.call_count == 0
+
+    async def test_a_teams_meeting_a_calendar_lists_no_provider_for_is_never_put_to_a_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The pre-read decides this refusal, so it lands before anybody is asked. Asking somebody
+        to confirm a create that cannot happen spends their attention on nothing, and teaches them
+        to agree without reading."""
+        create = _ready(graph, calendar=_calendar_payload(providers=["skypeForBusiness"]))
+        asked: list[str] = []
+
+        async def capturing(question: str) -> str | None:
+            asked.append(question)
+            return None
+
+        with pytest.raises(ToolError, match="skypeForBusiness"):
+            _ = await _create(client, online_meeting=True, confirm=capturing)
+
+        assert asked == [], "a person was asked about a Teams meeting that calendar refuses"
+        assert create.call_count == 0, "a calendar that takes no Teams meeting was written to"
+
+    @pytest.mark.parametrize("providers", [(), None], ids=["empty-list", "no-key"])
+    async def test_a_calendar_that_names_no_provider_is_attempted_rather_than_refused(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        providers: Sequence[str] | None,
+    ) -> None:
+        """Graph naming no provider is not Graph refusing Teams, so an absent list is no evidence
+        and the create goes ahead."""
+        create = _ready(graph, calendar=_calendar_payload(providers=providers))
+
+        _ = await _create(client, online_meeting=True)
+
+        assert create.call_count == 1
+
+    async def test_a_calendar_that_takes_no_teams_meeting_takes_an_event_without_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The refusal is about the online meeting alone. The same calendar still holds an event
+        with no joining link."""
+        create = _ready(graph, calendar=_calendar_payload(providers=["skypeForBusiness"]))
+
+        _ = await _create(client)
+
+        assert create.call_count == 1
+
 
 class TestWhatItRefuses:
     @pytest.mark.parametrize(
@@ -635,6 +780,9 @@ class TestWhatItRefuses:
             "2026-03-02",
             "14:00",
             "2026-03-02 14:00",
+            "2026-W10-1",
+            "2026-03-02T14",
+            "20260302T140000",
             "tomorrow at 2",
             "2026-02-30T14:00",
             "2026-03-02T25:00",
@@ -644,7 +792,10 @@ class TestWhatItRefuses:
         self, client: GraphServiceClient, graph: respx.MockRouter, moment: str
     ) -> None:
         """An offset and a `Z` are refused rather than honored: the zone belongs in `time_zone`,
-        and a value carrying both is two answers to one question."""
+        and a value carrying both is two answers to one question. The week date, the space, the
+        bare hour and the basic format are the shapes `datetime.fromisoformat` reads on its own
+        since Python 3.11, and a create sends the caller's own string, so each one Exchange is
+        left to judge reaches it exactly as written."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError):
@@ -701,6 +852,38 @@ class TestWhatItRefuses:
             )
 
         assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize(
+        ("starts_at", "ends_at"),
+        [
+            ("2026-03-02T14:00", "2026-03-03T00:00"),
+            ("2026-03-02T00:00", "2026-03-03T15:00"),
+            ("2026-03-02T00:00:30", "2026-03-03T00:00"),
+        ],
+        ids=["start-at-two", "end-at-three", "start-half-a-minute-late"],
+    )
+    async def test_an_all_day_event_that_does_not_run_midnight_to_midnight_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, starts_at: str, ends_at: str
+    ) -> None:
+        """Microsoft requires both bounds of an all-day event at midnight, and Exchange answers
+        anything else with a 400 that carries no advice about which bound was wrong."""
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError, match="midnight to midnight"):
+            _ = await _create(client, starts_at=starts_at, ends_at=ends_at, all_day=True)
+
+        assert len(graph.calls) == 0
+
+    async def test_the_all_day_refusal_names_both_values_it_was_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Naming one of the two leaves a model changing the bound that was already right."""
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError, match="2026-03-02T14:00.+2026-03-03T15:00"):
+            _ = await _create(
+                client, starts_at="2026-03-02T14:00", ends_at="2026-03-03T15:00", all_day=True
+            )
 
     async def test_a_span_a_timed_event_refuses_is_allowed_for_an_all_day_one(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -768,12 +951,26 @@ class TestWhatItRefuses:
     async def test_one_person_in_both_lists_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """Microsoft holds one attendee per person, so the second entry overwrites the first and
-        which of the two Exchange keeps is not knowable from here."""
+        """This tool takes each person once, and a person named in both lists is two answers to
+        one question: whether the meeting works without them."""
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="one list only"):
             _ = await _create(client, attendees=[_ADA], optional_attendees=[_ADA.upper()])
+
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize("argument", ["attendees", "optional_attendees"])
+    async def test_the_same_person_twice_in_one_list_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, argument: str
+    ) -> None:
+        """One list is held to the rule the two lists are held to together: this tool takes each
+        person once, whatever the case of the address."""
+        _ = _ready(graph)
+        listed: dict[str, object] = {argument: [_ADA, _ADA.upper()]}
+
+        with pytest.raises(ToolError, match="more than once"):
+            _ = await _create(client, **listed)
 
         assert len(graph.calls) == 0
 
@@ -829,7 +1026,7 @@ class TestTheRetryItRefuses:
             return_value=httpx.Response(429, headers={"Retry-After": "12"})
         )
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphThrottled):
             _ = await _create(client, attendees=[_ADA])
 
         assert create.call_count == 1
@@ -959,7 +1156,7 @@ class TestWhatItAnswers:
             ),
         )
 
-        answer = await _create(client, time_zone="Europe/Zurich")
+        answer = await _create(client, time_zone="Europe/Berlin")
 
         assert answer.start is not None and answer.start.iso == "2026-03-02T14:00:00+01:00"
         assert answer.end is not None and answer.end.iso == "2026-03-02T15:00:00+01:00"
@@ -1046,6 +1243,24 @@ class TestWhatItAnswers:
         answer = await _create(client, location="Room 3")
 
         assert answer.location == "Room 3 (Zurich)"
+
+    async def test_a_response_that_is_not_an_event_is_refused_rather_than_answered(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """Microsoft's delegated-create walkthrough answers step 2 with an `eventMessage`
+        envelope. Read as the event, it mints a handle around the MESSAGE id and reports an empty
+        attendee list as nobody invited, for a create that already mailed two people."""
+        _ = _ready(graph, created=_message_envelope())
+
+        with pytest.raises(AssertionError) as raised:
+            _ = await _create(client, attendees=[_ADA])
+
+        assert "#microsoft.graph.eventMessage" in str(raised.value), (
+            "the failure does not say what arrived instead"
+        )
+        assert "was created" in str(raised.value), (
+            "the failure reads as though nothing had happened"
+        )
 
     async def test_every_field_of_the_answer_says_what_it_is(self) -> None:
         """A model is handed these values with nothing but their descriptions to read them by, and
@@ -1174,11 +1389,17 @@ class TestHowItDeclaresItself:
     def test_the_permissions_are_the_least_privileged_ones_for_its_two_calls_in_order(
         self,
     ) -> None:
-        """Microsoft names `Calendars.Read.Shared` as least privileged for reading the delegated
-        calendar and `Calendars.ReadWrite.Shared` for creating the event in it. The token is minted
-        for exactly these, so declaring the write alone answers a 403 to this tool's own pre-read.
+        """The pre-read is `GET /me/calendars/{id}`, and two Microsoft pages name two permissions
+        for it: `calendar-get` names `Calendars.Read` and no `.Shared` scope, and the
+        delegated-create walkthrough names `Calendars.Read.Shared`. Both are declared, because the
+        token is minted for exactly this tuple and a missing scope answers a 403 to this tool's own
+        pre-read. `Calendars.ReadWrite.Shared` is the one Microsoft names for the create.
         """
-        assert creator.GRAPH_PERMISSIONS == ("Calendars.Read.Shared", "Calendars.ReadWrite.Shared")
+        assert creator.GRAPH_PERMISSIONS == (
+            "Calendars.Read",
+            "Calendars.Read.Shared",
+            "Calendars.ReadWrite.Shared",
+        )
 
     def test_its_create_step_is_the_one_the_own_calendar_create_uses(self) -> None:
         """One Graph request creates an event whichever calendar it lands on. Two step names for it

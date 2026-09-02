@@ -521,7 +521,7 @@ class TestWhatItAnswers:
         assert answer.join_url == "https://teams.microsoft.invalid/l/meetup-join/SYNTHETIC"
         assert answer.organizer is not None
         assert answer.organizer.address == "bob@vance.invalid"
-        assert answer.is_organizer is False
+        assert answer.owner_is_organizer is False
         assert answer.attendee_count == 1
         assert answer.web_link == "https://outlook.office365.invalid/owa/?itemid=synthetic"
 
@@ -602,6 +602,19 @@ class TestWhatItRefuses:
         assert "Retrying this value will fail identically." in text
         assert route.call_count == 0, "the refusal has to land before the request"
 
+    async def test_the_zone_refusal_warns_that_an_etc_gmt_key_reverses_its_sign(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """`Etc/GMT+2` is a key the database holds, at two hours behind UTC. The refusal turns
+        down `+02:00`, so it names that key as well and says which way the sign runs."""
+        route = _reads(graph, _payload(body=_body("Agenda.")))
+
+        with pytest.raises(ToolError, match="Etc/GMT") as refused:
+            _ = await _read(client, time_zone="+02:00")
+
+        assert "BEHIND UTC" in str(refused.value)
+        assert route.call_count == 0, "the refusal has to land before the request"
+
 
 class TestTheSchemaItPublishes:
     async def test_the_handle_is_the_only_required_argument(
@@ -619,6 +632,20 @@ class TestTheSchemaItPublishes:
         properties = cast("Mapping[str, object]", parameters["properties"])
         time_zone = cast("Mapping[str, object]", properties["time_zone"])
         assert time_zone["default"] == "UTC"
+
+    async def test_the_zone_argument_says_which_way_an_etc_gmt_key_runs(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """`Etc/GMT+2` resolves, at two hours behind UTC, so this argument accepts it and reads
+        the event at the wrong hours. Nothing fails, so the argument says so."""
+        parameters = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        time_zone = cast("Mapping[str, object]", properties["time_zone"])
+        described = str(time_zone["description"])
+        assert "`Etc/GMT+2`" in described
+        assert "BEHIND UTC" in described
+        assert "`Europe/Berlin`" in described
 
     async def test_it_takes_two_arguments_and_no_others(self, transport: httpx.AsyncClient) -> None:
         """Neither `client` nor a context reaches the wire."""

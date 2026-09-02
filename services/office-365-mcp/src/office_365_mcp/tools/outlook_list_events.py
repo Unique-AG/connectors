@@ -128,7 +128,10 @@ and `ends_on` are dates, and both of those days are covered whole. Each row stat
 ways: Graph's own wall-clock text, Graph's own zone name, and `iso`, the same instant in \
 `time_zone`. `time_zone` defaults to UTC and takes an IANA name such as `Europe/Zurich`. A wrong \
 zone does not fail here. It answers the right meetings at the wrong hours. So pass the user's own \
-zone for any question about a time of day, and quote `iso` rather than the wall-clock text. \
+zone for any question about a time of day, and quote `iso` rather than `local`, the wall-clock \
+text, except on a row whose `all_day` is true, where `iso` is a UTC midnight moved into \
+`time_zone`, so in a zone west of UTC it names the day before. Take the date of an all-day row \
+from `local`. \
 Without `calendar_ref` this lists the signed-in user's own primary calendar. Pass `calendar_ref`, \
 the `uri` of an outlook_list_calendars row, for a calendar somebody shared. For "my next meeting \
 with Dana", pass `with_person` and set `starts_on` to today: the rows are in start order, so the \
@@ -165,7 +168,8 @@ _NOT_A_ZONE = (
     + "argument takes an IANA zone name, such as `Europe/Zurich`, `America/New_York` or `UTC`. A "
     + "Windows zone name such as `W. Europe Standard Time` is not accepted here, and neither is a "
     + "city, a country, a numeric offset such as `+02:00` or a daylight abbreviation such as "
-    + "`CEST` or `PST`. `UTC` is the default, so omit "
+    + "`CEST` or `PST`. `Etc/GMT+2` does resolve, and the sign of an `Etc/GMT` key runs the other "
+    + "way, so that name is two hours BEHIND UTC rather than ahead. `UTC` is the default, so omit "
     + "the argument entirely when the question is not about a time of day. Retrying with the same "
     + "name will fail identically."
 )
@@ -397,7 +401,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "such as `Europe/Zurich`, `America/New_York` or `UTC`. Pass the user's own "
                     + "zone whenever the question is about a time of day: the default answers in "
                     + "UTC, which is the right meetings at the wrong hours for most of the world. "
-                    + "A Windows zone name such as `W. Europe Standard Time` is refused here."
+                    + "A Windows zone name such as `W. Europe Standard Time` is refused here. "
+                    + "`Etc/GMT+2` is a real key that means two hours BEHIND UTC, so name a place "
+                    + "such as `Europe/Berlin` instead."
                 ),
             ),
         ] = DEFAULT_TIME_ZONE,
