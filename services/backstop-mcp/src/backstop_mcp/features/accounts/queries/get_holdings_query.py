@@ -108,7 +108,7 @@ class GetHoldingsQuery:
         """`owner_id` should be a resolved party id; an unresolved one returns "owns nothing"."""
         try:
             return await self._holdings_table(owner_id=owner_id, include_closed=include_closed)
-        except (BackstopAuthError, BackstopRateLimitError):
+        except BackstopAuthError, BackstopRateLimitError:
             # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
             # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
             # account, so falling back would answer a "slow down" with an order of magnitude more
