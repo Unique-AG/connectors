@@ -72,11 +72,10 @@ refactoring a feature.
    interface: mock the Backstop API, call the tool/query/command, assert on the output.
    Do not promote a private method just so a test can reach it.
 
-**Deprecated — do not copy.** Most other features (`org_people`, `accounts`,
-`activity_history`, …) still use the older layout: a `fetch_*.py` function at the feature
-root, large `*ResolvedResponse` models living in the tool file, and type aliases dumped in
-`internal_dto.py`. Leave those features as they are unless you are migrating one. Do not use
-them as a template for new work.
+**Deprecated — do not copy.** Do not add a new `fetch_*.py` at a feature root. Domain reads
+go through `GetXQuery.run`. Catalog walks go through a `*Service`. Leave
+`party_resolver/fetch_party_name.py` and `accounts/utils/fetch_series.py` as they are —
+those are leftover names, not a template.
 
 Three rules an agent will otherwise break, each enforced by a test: a tool is registered by being
 added to `server/tools/registry.py` as well as written, and nothing under `features/` may import

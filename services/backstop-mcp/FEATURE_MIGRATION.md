@@ -754,14 +754,16 @@ Cached factories → `teardown.PROVIDERS`:
 
 ---
 
-### Wave 6 — Layering docs (after the last `fetch_*` is gone)
+### Wave 6 — Layering docs (after the last domain `fetch_*` is gone)
 
-[`tests/test_layering.py`](tests/test_layering.py) rule 6 still cites `fetch_series.py` holds
-`fetch_series` as the naming example. Update that docstring (and the synthetic test fixture
-around line 800) so new work cannot treat `fetch_*` as the standard.
+#### Today (Wave 6 landed)
 
-Do **not** forbid the old filename in the linter until nothing uses it. After wave 5, nothing
-should.
+[`tests/test_layering.py`](tests/test_layering.py) rule 6 names `split_open.py` / `split_open`
+and `custom_fields_service.py` / `CustomFieldsService`. The synthetic fixture that used
+`fetch_series.py` now uses `split_open.py`. New work cannot treat `fetch_*` as the standard.
+
+The linter still does **not** forbid a `fetch_*` filename: `accounts/utils/fetch_series.py`
+and `party_resolver/fetch_party_name.py` remain. Do not add that ban while those files exist.
 
 ---
 
