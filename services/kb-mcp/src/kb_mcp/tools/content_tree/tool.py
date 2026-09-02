@@ -317,9 +317,7 @@ async def content_tree(
                 key = content_info.key or ""
                 display = display_path(path)
                 key_matches = (
-                    needle in key
-                    if effective_case_sensitive
-                    else needle in key.lower()
+                    needle in key if effective_case_sensitive else needle in key.lower()
                 )
                 path_matches = (
                     needle in display
