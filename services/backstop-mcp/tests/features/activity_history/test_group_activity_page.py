@@ -1,10 +1,7 @@
-"""`group_activity_page`: per-stream date_range and next continuation, over a plain in-memory
-page.
+"""`GetActivityHistoryQuery._group_page`: per-stream date_range and next continuation.
 
-`group_activity_page` is a pure, synchronous function — no HTTP, no `respx`, no async fixtures.
-Each test builds a list of `ActivityItemDto`/`EmailItemDto` plus fetch params, which is the
-whole point of decoupling fetching from grouping: the helper cannot tell a synthetic fixture
-from a page a real `BackstopClient`-backed layer fetched.
+Grouping is a private method on the query — no HTTP, no `respx`, no async fixtures.
+Each test builds a list of `ActivityRecordResponse`/`EmailRecordResponse` plus fetch params.
 
 Each test targets one behaviour: this page's min/max `occurred_at` (including that start is the
 oldest date even when Backstop returns newest-first), `date_range` of `None` when nothing dated
@@ -15,53 +12,41 @@ returned in input order.
 
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta, timezone
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
 
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityGroupResponse,
-    ActivityItemDto,
+    ActivityRecordResponse,
     ActivityType,
     BackstopActivityType,
     DateRangeResponse,
-    EmailItemDto,
-    group_activity_page,
+    EmailRecordResponse,
+    GetActivityHistoryQuery,
+    TimelineRecord,
 )
 
 
 def _activity(
     item_id: str, stream: BackstopActivityType, effective_date: date | None
-) -> ActivityItemDto:
-    return ActivityItemDto(
-        id=item_id,
-        stream=stream,
-        title=None,
-        description=None,
-        effective_date=effective_date,
-        resource_type=None,
-        resource_id=None,
-        created_timestamp=None,
-        modified_timestamp=None,
+) -> ActivityRecordResponse:
+    return ActivityRecordResponse(
+        type=stream,
+        activity_id=item_id,
+        occurred_at=effective_date,
     )
 
 
-def _email(item_id: str, sent_timestamp: datetime | None) -> EmailItemDto:
-    return EmailItemDto(
-        id=item_id,
-        subject=None,
-        sent_timestamp=sent_timestamp,
-        from_email=None,
-        to_emails=(),
-        cc_emails=(),
-        has_attachments=None,
-        content_url=None,
-    )
+def _email(item_id: str, sent_timestamp: datetime | None) -> EmailRecordResponse:
+    return EmailRecordResponse(activity_id=item_id, occurred_at=sent_timestamp)
 
 
 def _group(
-    items: Sequence[ActivityItemDto | EmailItemDto],
+    items: Sequence[TimelineRecord],
     *,
     activity_type: ActivityType = "meeting",
     end_of_stream: bool,
@@ -69,8 +54,9 @@ def _group(
     offset: int,
     since: date | None = None,
     until: date | None = None,
-) -> ActivityGroupResponse[ActivityItemDto | EmailItemDto]:
-    return group_activity_page(
+) -> ActivityGroupResponse[TimelineRecord]:
+    query = GetActivityHistoryQuery(client=cast(BackstopClient, object()))
+    return query._group_page(  # pyright: ignore[reportPrivateUsage]
         items,
         activity_type=activity_type,
         end_of_stream=end_of_stream,
@@ -186,7 +172,7 @@ class TestItems:
         ]
         result = _group(items, end_of_stream=True, limit=10, offset=0)
 
-        assert [item.id for item in result.items] == ["newest", "oldest", "middle"]
+        assert [item.activity_id for item in result.items] == ["newest", "oldest", "middle"]
 
     def test_carries_the_requested_activity_type(self) -> None:
         result = _group((), activity_type="email", end_of_stream=True, limit=10, offset=0)

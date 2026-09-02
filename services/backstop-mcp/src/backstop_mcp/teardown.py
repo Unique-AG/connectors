@@ -33,7 +33,12 @@ from backstop_mcp.features.accounts import (
     get_product_query_factory,
     get_time_series_query_factory,
 )
-from backstop_mcp.features.activity_history import get_activity_history_settings
+from backstop_mcp.features.activity_history import (
+    get_activity_detail_query_factory,
+    get_activity_history_query_factory,
+    get_activity_history_settings,
+    get_search_activities_query_factory,
+)
 from backstop_mcp.features.activity_tags import get_activity_tags_service
 from backstop_mcp.features.custom_fields import (
     get_custom_field_groups_service,
@@ -76,6 +81,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_backstop_client_factory,
     get_auth_provider,
     get_activity_history_settings,
+    get_activity_detail_query_factory,
+    get_activity_history_query_factory,
+    get_search_activities_query_factory,
     get_activity_tags_service,
     get_system_users_service,
     get_custom_fields_service,

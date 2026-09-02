@@ -233,7 +233,7 @@ Known aliases to move:
 | `tasks` | `TaskFilter` (today on the tool), `TaskStatus` in `internal_dto` | `GetTasksForPartyQuery` |
 | `accounts` | `TimeSeriesEntityType`, `AccountSeries`, `ProductSeries` | `time_series_name.py` (query + response + tool share them; query file would cycle with `responses`) |
 | `accounts` | `HoldingsSource` | `GetHoldingsQuery` |
-| `activity_history` | `BackstopActivityType` in `internal_dto`; `ActivityType` / `Segment` on the fetch | `GetActivityHistoryQuery` |
+| `activity_history` | `BackstopActivityType` / `ActivityType` / `Segment` | `activity_type.py` (query + responses + `_page_input`; query file would cycle with `responses`) |
 | `activity_history` | `ActivityAggregateBy` | `SearchActivitiesQuery` or the aggregate util |
 
 ### 6. Utils
@@ -651,24 +651,47 @@ table path while moving files.
 
 ### Wave 5 — `activity_history`
 
-#### Today
+#### Today (Wave 5 landed)
 
 ```
 activity_history/
-  fetch_activities_page.py      fetch_activity_page / fetch_email_page / fetch_activities_page
-  fetch_activity_detail.py      + fetch_attendees, fetch_meeting_specifics
-  fetch_entity_activities.py    POST /entity-activities pageNum loop
+  activity_type.py              ActivityType / BackstopActivityType / Segment
+  entity_activity_type.py       EntityActivityType
   aggregate_entity_activities.py
-  group_activity_page.py
   extract_gist_from_html.py
   settings.py
-  dependencies.py               get_activity_history_settings  (already cached)
-  responses.py                  already owns the large published models
+  dependencies.py               three query factories
+  queries/                      GetActivityHistoryQuery, GetActivityDetailQuery, SearchActivitiesQuery
+  responses.py                  + PartyRecordResponse (party GET schema)
   tools/_page_input.py          elicitation / continuation
   tools/get_activity_history.py
-  tools/get_activity_detail.py  gathers three fetches
+  tools/get_activity_detail.py
   tools/search_activities.py
 ```
+
+`ActivityType` / `Segment` live in `activity_type.py` for the same reason series names do:
+the history query imports published group models. `EntityActivityType` lives in
+`entity_activity_type.py` — the search tool publishes that vocabulary; the query file is
+the POST walker, not the type list.
+
+Landed decisions (do not revert on review):
+
+- One-caller helpers are **private methods on the query**, not module-level `_` functions and
+  not a new `utils/` file. History grouping is `_group_page` / `_occurred_date` / `_date_range`.
+  Search body build / row projection / `PartyBean_{id}` are `_request_body` / `_project_rows` /
+  `_party_bean`. Single-use `_` constants (`_timestamp`, include-field names, path) are inlined.
+- History pages map **Attributes → published Response** in one pass
+  (`ActivityRecordResponse.from_attributes` / `EmailRecordResponse.from_attributes`).
+  Regarding parses on `ActivityRegardingResponse.from_stored`. Do not reintroduce a DTO hop
+  or `to_timeline_record` / `from_item` on this path.
+- `party_bean` is **not** a public helper. The tool passes a raw `party_id`; the query encodes
+  `associatedWiths`. The standalone `TestPartyBean` was removed on purpose; the tool test that
+  pins `PartyBean_{id}` on the wire stays.
+- Unreadable search rows use `EntityActivityAttributes.safe_model_validate` (None, same as
+  `ResourceRef`). Do not put a `try`/`ValidationError` back in `_project_rows`.
+- `_page_input.py` stays on the tool. Do not push paging/elicitation into a query.
+- Gist and aggregate stay at the feature root — each still has one production home
+  (`responses` / the search tool).
 
 #### Target
 
@@ -721,6 +744,7 @@ Cached factories → `teardown.PROVIDERS`:
 | Today | After |
 |---|---|
 | `test_fetch_activities_page.py` | `test_activity_history_query.py` — enter through `run` |
+| (no fetch_activity_detail test) | `test_activity_detail_query.py` — enter through `run` |
 | `test_fetch_entity_activities.py` | `test_search_activities_query.py` |
 | `test_aggregate_entity_activities.py` | keep; import util from the package |
 | `test_group_activity_page.py` | keep |

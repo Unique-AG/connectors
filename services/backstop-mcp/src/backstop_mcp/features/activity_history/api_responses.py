@@ -1,6 +1,6 @@
-from typing import Annotated, ClassVar, cast
+from typing import Annotated, ClassVar, Self, cast
 
-from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
 from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.lenient import LenientBool, LenientInt
@@ -204,6 +204,13 @@ class EntityActivityAttributes(BaseModel):
     to_addresses: tuple[EntityActivityAddressAttributes, ...] = Field(
         default=(), alias="toAddresses"
     )
+
+    @classmethod
+    def safe_model_validate(cls, value: object) -> Self | None:
+        try:
+            return cls.model_validate(value)
+        except ValidationError:
+            return None
 
 
 class EntityActivitiesPageAttributes(BaseModel):

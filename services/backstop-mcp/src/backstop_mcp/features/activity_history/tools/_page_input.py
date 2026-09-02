@@ -7,7 +7,6 @@ from typing import Annotated, ClassVar, Literal, Self
 
 from fastmcp import Context
 from pydantic import (
-    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -22,7 +21,6 @@ from backstop_mcp.features.activity_history import (
     ActivityType,
     Segment,
 )
-from backstop_mcp.features.data_hygiene import ProvenanceAttributes
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -214,26 +212,6 @@ type ActivityHistoryPageInput = Annotated[
     ActivityHistoryFirstPageInput | ActivityHistoryNextPageInput,
     Field(discriminator="type"),
 ]
-
-
-class PartyRecordResponse(ProvenanceAttributes):
-    """Minimal attributes this tool needs from the party fetch: a display name plus provenance.
-
-    `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
-    surfaces the raw attribute dump, only `name` (for the resolve echo) and provenance (for
-    `as_of`). People records often omit `name` and send `firstName`/`lastName` instead; keep
-    those so a `type="next"` page (where `ResolvedPartyDto.name` is None) can still rebuild it.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    name: str | None = None
-    first_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("firstName", "first_name")
-    )
-    last_name: str | None = Field(
-        default=None, validation_alias=AliasChoices("lastName", "last_name")
-    )
 
 
 class FetchArgs(BaseModel):
