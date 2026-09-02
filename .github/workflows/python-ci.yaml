@@ -134,6 +134,15 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check .
 
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Check formatting of the files ruff does not own
+        run: |
+          version=$(jq -r '.devDependencies["@biomejs/biome"]' "${GITHUB_WORKSPACE}/package.json")
+          npx --yes "@biomejs/biome@${version}" check .
+
       - name: Lint
         run: uv run ruff check .
 

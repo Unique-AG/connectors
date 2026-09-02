@@ -41,9 +41,13 @@ workspace and are driven by [uv](https://docs.astral.sh/uv/). `Python CI` runs e
 cd services/<service>
 uv sync --locked
 uv run ruff format --check . && uv run ruff check .
+npx --yes "@biomejs/biome@$(jq -r '.devDependencies["@biomejs/biome"]' ../../package.json)" check .
 uv run basedpyright
 uv run pytest
 ```
+
+`ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
+chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.
 
 ### Trap: basedpyright in a git worktree
 
