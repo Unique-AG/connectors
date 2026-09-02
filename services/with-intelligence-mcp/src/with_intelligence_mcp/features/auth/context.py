@@ -58,9 +58,8 @@ class WithIntelligenceAuthContext(BaseModel):
     ) -> VendorSession:
         """Renew under a row lock, so one caller renews and the rest read the result.
 
-        The lock is held across the vendor call on purpose. The refresh token may rotate, and
-        this service runs several replicas — two of them refreshing the same token would leave
-        one holding a dead one. The call is bounded by the transport timeout.
+        The lock is held across the vendor call on purpose (see `lock_session`), which the
+        transport timeout bounds.
 
         A refused refresh revokes the caller's MCP tokens: without a stored password there is
         nothing to fall back on, so the client has to come back through the login form.

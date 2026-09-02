@@ -47,7 +47,6 @@ _CLASS_SUFFIX_LAYER = {
     "Response": "responses",
 }
 
-# Out of rule 6's scope entirely: see the module docstring.
 _LOGIC_NAME_EXEMPT_FEATURES = frozenset({"auth"})
 
 # Named for a vocabulary rather than a symbol they define (rule 6).

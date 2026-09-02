@@ -69,11 +69,9 @@ def _source_ip(request: Request) -> str | None:
     return request.client.host if request.client is not None else None
 
 
-# --- Refresh rotation outcomes ---------------------------------------------------------------
-#
 # `_rotate_refresh_token` returns one of these instead of raising, because `TokenError` cannot be
-# raised while the transaction is still open (see `exchange_refresh_token`). Modelling the two
-# results as types rather than a set of booleans keeps every database branch a single `return`.
+# raised while the transaction is still open. Modelling the two results as types rather than a
+# set of booleans keeps every database branch a single `return`.
 
 
 class _RefreshRotated(BaseModel):
@@ -160,8 +158,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         )
         self._session_factory = session_factory
         self._encryption_key = encryption_key
-        # Credential verification goes through the shared factory so the login form reuses the
-        # same connection pool, base URL and timeout profile as every tool call.
         self._vendor_clients = vendor_clients
         self._throttle = throttle
         self.login_path = login_path
@@ -174,8 +170,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         # still gets a working form; every real deploy (https, enforced for production by
         # `AppConfig`) gets the flag.
         self._secure_cookies: bool = secure_cookies
-
-    # -- Dynamic client registration -----------------------------------------------------
 
     @override
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
@@ -195,8 +189,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                     client_metadata=client_info.model_dump(mode="json"),
                 )
             )
-
-    # -- Authorization: redirect to our own login form, not a third party -------------------
 
     @override
     async def authorize(
@@ -222,8 +214,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             )
 
         return f"{self._issuer}{self.login_path}?request_id={request_id}"
-
-    # -- Login form: our replacement for the third-party OAuth redirect ---------------------
 
     def _expired_link_response(self) -> Response:
         return PlainTextResponse(
@@ -368,8 +358,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         code = secrets.token_urlsafe(32)
         code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()
 
-        # Same frozen-decision pattern as `exchange_authorization_code`: decide inside the
-        # transaction, return only after it closes.
         already_claimed = False
 
         async with transaction(self._session_factory) as session:
@@ -423,8 +411,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             return None
         return pending
 
-    # -- Authorization code exchange ---------------------------------------------------------
-
     @override
     async def load_authorization_code(
         self, client: OAuthClientInformationFull, authorization_code: str
@@ -456,8 +442,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         refresh_token = secrets.token_urlsafe(32)
         now = datetime.now(UTC)
 
-        # Same frozen-dataclass-exception caveat as `exchange_refresh_token` below: decide,
-        # then raise/return only after the session block has closed.
         already_consumed = False
 
         async with transaction(self._session_factory) as session:
@@ -500,8 +484,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             scope=" ".join(authorization_code.scopes) if authorization_code.scopes else None,
             refresh_token=refresh_token,
         )
-
-    # -- Refresh token exchange ---------------------------------------------------------------
 
     @override
     async def load_refresh_token(
@@ -648,8 +630,6 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             )
             .values(revoked_at=now)
         )
-
-    # -- Access token verification / revocation ------------------------------------------------
 
     @override
     async def load_access_token(self, token: str) -> AccessToken | None:

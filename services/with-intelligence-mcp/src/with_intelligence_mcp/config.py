@@ -139,7 +139,6 @@ class WithIntelligenceConfig(BaseSettings):
 
     default_timeout_seconds: float = Field(default=30.0, gt=0)
 
-    # Every listing pages identically, so one size serves all of them.
     default_page_size: int = Field(default=50, ge=1, le=500)
 
     # Our own politeness bound: the vendor publishes no concurrency limit, only 429 on every path.

@@ -121,12 +121,11 @@ class WithIntelligenceSession(Base):
     to the user's whole With Intelligence account.
 
     The cost is that the refresh token is the only way back. It lives 30 days, so a user idle
-    longer than that logs in again, and there is nothing to fall back on if a refresh is
-    refused — `features/vendor_session` revokes their MCP tokens and the login form is the way
-    back. It also rotates, so this row is rewritten on every renewal rather than written once.
+    longer logs in again, and a refused refresh leaves nothing to fall back on — `features/auth`
+    revokes their MCP tokens and the login form is the way back. It also rotates, so this row is
+    rewritten on every renewal rather than written once.
 
-    `wi_username` is kept so a returning user maps to their existing `user_id`, and so the
-    login throttle has something to key on. The password is used at login and discarded.
+    `wi_username` maps a returning user to their existing `user_id`.
     """
 
     __tablename__: str = "with_intelligence_sessions"
