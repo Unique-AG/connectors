@@ -162,6 +162,13 @@
             "Calendars.Read.Shared",
             "User.Read"
           ]
+        },
+        {
+          "name": "outlook_list_events",
+          "permissions": [
+            "Calendars.Read",
+            "Calendars.Read.Shared"
+          ]
         }
       ],
       "tool_names": [
@@ -189,7 +196,8 @@
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
-        "outlook_list_calendars"
+        "outlook_list_calendars",
+        "outlook_list_events"
       ],
       "always_on": "get_me",
       "presets": {
@@ -274,7 +282,8 @@
           "outlook_disable_mail_rule"
         ],
         "outlook-calendar": [
-          "outlook_list_calendars"
+          "outlook_list_calendars",
+          "outlook_list_events"
         ]
       },
       "requestable_permissions": [

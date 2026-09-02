@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-five
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-six
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -24,7 +24,8 @@ which drafts a reply or a forward from a message this connector found; and `outl
 the only tool here that puts mail on the wire; and `outlook_set_automatic_reply`,
 which turns the out-of-office on for a bounded window or off; and `outlook_disable_mail_rule`,
 which switches one inbox rule off and cannot switch one on; and `outlook_list_calendars`,
-every calendar this mailbox reaches, the user's own and every one another person delegated,
+every calendar this mailbox reaches, the user's own and every one another person delegated;
+and `outlook_list_events`, what sits on one of those calendars between two dates,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -154,8 +155,8 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.Send` | Delegated | No | `outlook_send_draft` |
 | `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
 | `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
-| `Calendars.Read` | Delegated | No | `outlook_list_calendars` |
-| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars` |
+| `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events` |
+| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -298,7 +299,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
 | `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
-| `outlook-calendar` | name every calendar this mailbox reaches, own and delegated | `outlook_list_calendars` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
+| `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, and read what sits on one between two dates | `outlook_list_calendars`, `outlook_list_events` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
