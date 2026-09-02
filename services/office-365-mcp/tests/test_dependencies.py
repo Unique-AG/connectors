@@ -1,14 +1,16 @@
-"""The declarations that keep two directly-imported packages from being dropped as redundant.
+"""The declarations that keep three directly-needed packages from being dropped as redundant.
 
-`starlette` also reaches this service through `fastmcp`, and `unique_toolkit` through `unique-mcp`,
-so the declaration reads like duplication until an upstream package drops its own edge and the
-import breaks at runtime instead of at resolve time.
+`starlette` also reaches this service through `fastmcp`, `unique_toolkit` through `unique-mcp`, and
+`tzdata` through another package's own dependencies, so each declaration reads like duplication
+until an upstream package drops its own edge and the import breaks at runtime instead of at resolve
+time.
 """
 
 import ast
 import pathlib
 import re
 import tomllib
+import zoneinfo
 from typing import cast
 
 _SERVICE_ROOT = pathlib.Path(__file__).parent.parent
@@ -75,4 +77,24 @@ class TestUniqueToolkit:
         assert "monitoring" in declared["unique-toolkit"], (
             "the monitoring extra is what installs prometheus-client, which is the package "
             + "unique_toolkit.monitoring.REGISTRY is a registry of."
+        )
+
+
+class TestTzdata:
+    def test_the_calendar_vocabulary_converts_through_zoneinfo(self) -> None:
+        """Guards the guard: without this import the declaration below has no justification."""
+        assert "zoneinfo" in _imported_modules(_SRC / "shared" / "calendar.py")
+
+    def test_an_iana_zone_name_resolves(self) -> None:
+        """The whole of what the package is for. `zoneinfo` reads the system tz database first and
+        this package second, and a runtime with neither refuses every IANA name."""
+        zone = zoneinfo.ZoneInfo("Europe/Zurich")
+
+        assert str(zone) == "Europe/Zurich"
+
+    def test_tzdata_is_a_declared_dependency(self) -> None:
+        assert "tzdata" in _declared_dependencies(), (
+            "shared/calendar.py converts every calendar time through zoneinfo, so the tz database "
+            + "has to be declared — the runtime image ships a system copy today, and a base-image "
+            + "bump that drops it resolves cleanly and fails at runtime instead."
         )

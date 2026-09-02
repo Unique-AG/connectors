@@ -1,12 +1,16 @@
-"""What a model is told when Graph says no.
+"""What a model is told when Graph says no, and what it is told when a person says no.
 
 Both routes to a message are driven here: `graph_tool_errors`, the mapping asked directly, and
 `GraphAdviceMiddleware`, which covers every registered tool and the dependency resolution no block
 could reach. Whether the two agree end to end is `tests/test_error_mapping.py`'s subject.
 """
 
+from typing import cast
+
 import pytest
+from fastmcp import Context
 from fastmcp.exceptions import ToolError
+from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.types import CallToolRequestParams
@@ -20,10 +24,12 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
 )
 from office_365_mcp.shared.seam import (
+    Confirm,
     GraphAdviceMiddleware,
     TokenExchangeFailed,
     ToolAdvice,
     graph_tool_errors,
+    person_confirms,
 )
 
 _PERMISSION = "Chat.Read"
@@ -291,6 +297,100 @@ class TestTheRefusalThatHappensBeforeGraph:
         assert _CHANNELS in message
         assert "grant the delegated permissions" in message, "plural, or it reads as one of them"
         assert "administrator" in message
+
+
+_AGREE = "create the event"
+_DECLINE = "do not create it"
+_NOTHING_HAPPENED = "No event was created."
+_QUESTION = "Create 'Pricing review' on 2 March at 14:00 UTC and invite nobody?"
+
+
+def _asked(answer: object) -> object:
+    """A stand-in for the caller's own client. `person_confirms` reaches nothing on a `Context`
+    but `elicit`, so this is the whole of the surface it depends on."""
+
+    class _Client:
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            assert message
+            assert response_type == [_AGREE, _DECLINE], (
+                "the person picks between the two answers the caller named"
+            )
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+    return _Client()
+
+
+def _confirm_with(answer: object) -> Confirm:
+    return person_confirms(
+        cast("Context", _asked(answer)),
+        agree=_AGREE,
+        decline=_DECLINE,
+        nothing_happened=_NOTHING_HAPPENED,
+    )
+
+
+class TestHowAWriteIsPutToAPerson:
+    """`person_confirms` is the adapter from a tool to the caller's own client. What a client
+    answers, and what it fails to answer, decides whether the write happens at all."""
+
+    async def test_agreeing_answers_with_no_refusal(self) -> None:
+        confirm = _confirm_with(AcceptedElicitation(data=_AGREE))
+
+        assert await confirm(_QUESTION) is None
+
+    async def test_declining_refuses_and_says_nothing_happened(self) -> None:
+        refusal = await _confirm_with(DeclinedElicitation())(_QUESTION)
+
+        assert refusal is not None
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "did not agree" in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_answering_anything_but_the_agreement_refuses(self) -> None:
+        """A client is free to send back its own text, and only the exact agreement is one."""
+        refusal = await _confirm_with(AcceptedElicitation(data=_DECLINE))(_QUESTION)
+
+        assert refusal is not None and "did not agree" in refusal
+
+    async def test_a_client_that_cannot_ask_writes_nothing(self) -> None:
+        """The risk every confirmation carries: a client with no elicitation support can no longer
+        write. It has to fail closed and say why, because an operator cannot tell a broken mailbox
+        from a client limitation otherwise."""
+        refusal = await _confirm_with(RuntimeError("elicitation not supported"))(_QUESTION)
+
+        assert refusal is not None
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "does not support elicitation" in refusal
+        assert "Do not call this tool again" in refusal
+
+    async def test_a_tool_error_from_the_client_is_passed_through_as_it_arrived(self) -> None:
+        """A `ToolError` is already a refusal worded for a caller, so re-wording it would replace
+        what the client said with a guess."""
+        already = ToolError("the client refused the request")
+
+        refusal = await _confirm_with(already)(_QUESTION)
+
+        assert refusal == str(already)
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            DeclinedElicitation(),
+            AcceptedElicitation(data=_DECLINE),
+            RuntimeError("elicitation not supported"),
+            ToolError("the client refused the request"),
+        ],
+        ids=["declined", "another-answer", "cannot-ask", "client-error"],
+    )
+    async def test_no_refusal_is_ever_raised(self, answer: object) -> None:
+        """Every refusal answers with a string. A raise here crosses the block that measures the
+        Graph operation, which then records a person saying no as a Graph failure with the whole
+        wait as its latency."""
+        refusal = await _confirm_with(answer)(_QUESTION)
+
+        assert isinstance(refusal, str) and refusal
 
 
 class TestWhatTheMiddlewareLeavesAlone:

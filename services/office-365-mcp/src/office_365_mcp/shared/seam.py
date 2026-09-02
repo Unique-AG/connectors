@@ -33,6 +33,13 @@ refusal never says which one was missing. The message therefore names all of the
 transport out of ambient state can be registered against nothing at all, and nothing says so
 until its first call.
 
+## Putting a write to a person
+
+`person_confirms` is the one way a tool asks a person before it writes. The question is the tool's,
+because only the tool knows what it is about to do, and the two refusals are here, because a person
+saying no and a client that cannot ask are the same answer to every tool: nothing happened, and
+calling again changes nothing.
+
 ## One mapping, not one per tool
 
 `GraphAdviceMiddleware` is where a failure becomes advice. It wraps every `tools/call`, so it
@@ -62,7 +69,7 @@ wording change breaks it, and nobody here reviews FastMCP's commits for that kin
 """
 
 import re
-from collections.abc import Generator, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
@@ -73,6 +80,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Dependency, Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
+from fastmcp.server.elicitation import AcceptedElicitation
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.types import CallToolRequestParams
@@ -142,6 +150,10 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Mail.Send",
         "Mail.ReadBasic",
         "MailboxSettings.ReadWrite",
+        "Calendars.Read",
+        "Calendars.Read.Shared",
+        "Calendars.ReadWrite",
+        "Calendars.ReadWrite.Shared",
     }
 )
 
@@ -225,6 +237,57 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
         return graph_client_for(transport, access_token)
 
     return Depends(client_for_this_call)
+
+
+# What a refusal says last, so a model does not read "no" as "ask again". Every confirmation this
+# connector asks for is about one request, and MCP gives a server no way to remember that a person
+# already said no.
+_ASK_AGAIN = (
+    "Do not call this tool again for the same request unless the user asks for it in a new message."
+)
+
+# The refusal to report, or None when the person agreed. Answered rather than raised: a `ToolError`
+# leaving a confirmation crosses the block that measures the Graph operation, which then records a
+# person saying no as a Graph failure.
+type Confirm = Callable[[str], Awaitable[str | None]]
+
+
+def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
+    """Ask the caller's own client to put a question to a person, and refuse unless they agree.
+
+    `agree` and `decline` are the two answers the person picks between, and `agree` is the only one
+    that lets the call continue. `nothing_happened` opens both refusals, because what a model needs
+    first is the fact that the write did not happen.
+
+    Elicitation is a capability of the client and not of this server
+    (https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation), so a client that
+    does not support it leaves nobody to ask. That is a refusal too.
+    """
+
+    async def confirm(question: str) -> str | None:
+        try:
+            answer = await ctx.elicit(question, response_type=[agree, decline])
+        except ToolError as already_a_refusal:
+            return str(already_a_refusal)
+        except Exception:
+            # Every exception: a client with no elicitation capability is reported differently by
+            # different transports, and none of those is a reason to write anyway.
+            return (
+                f"{nothing_happened} This connector asks a person to confirm this, and the MCP "
+                + "client on the other end does not support elicitation, so there was nobody to "
+                + "ask. This is a property of the client and not of the request: retrying will "
+                + "fail the same way. Tell the user that their client cannot confirm this, and "
+                + f"that they can do it in Outlook instead. {_ASK_AGAIN}"
+            )
+        if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
+            return (
+                f"{nothing_happened} The person at the other end of this conversation was asked to "
+                + "confirm it and did not agree. Nothing was changed, so this is not a failure to "
+                + f"report as one: say that the request was not confirmed. {_ASK_AGAIN}"
+            )
+        return None
+
+    return confirm
 
 
 class Advised(ToolError):
