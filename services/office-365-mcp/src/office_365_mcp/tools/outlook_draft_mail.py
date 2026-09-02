@@ -41,7 +41,6 @@ draft the same id space as any other message, so a single family lets a message 
 be spelled as a draft, and handed to whatever tool later sends one. See `shared/handles.py`.
 """
 
-import re
 from collections.abc import Mapping, Sequence
 from typing import Annotated
 
@@ -61,7 +60,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry
 from office_365_mcp.shared.handles import MailDraftHandle
-from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_draft_mail"
@@ -80,11 +79,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 MAX_RECIPIENTS = 10
 
 MAX_SUBJECT_CHARACTERS = 255
-
-# One address and nothing else: no display name, no angle brackets, no second address. A model
-# that packs `Ada <ada@x.invalid>` or `a@x.invalid, b@y.invalid` into one string writes a
-# recipient Exchange either rejects or silently reads as a name, and both are quietly wrong.
-_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 _DESCRIPTION = f"""\
 Compose a new message into the signed-in user's own Drafts folder in Outlook. It CANNOT send: \
@@ -200,7 +194,7 @@ def _recipients(addresses: Sequence[str], *, argument: str) -> list[Recipient]:
     """Each address as Graph's recipient shape, once every one of them is a single address."""
     trimmed = [address.strip() for address in addresses]
     for address in trimmed:
-        if _ADDRESS.match(address) is None:
+        if ONE_ADDRESS.match(address) is None:
             raise ToolError(_bad_address(argument, address))
     return [Recipient(email_address=EmailAddress(address=address)) for address in trimmed]
 

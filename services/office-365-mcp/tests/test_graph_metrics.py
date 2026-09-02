@@ -772,6 +772,7 @@ GRAPH_STEPS = frozenset(
         "calendars",
         "calendar_events",
         "calendar_event",
+        "create_event",
     }
 )
 

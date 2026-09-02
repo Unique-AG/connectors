@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-seven
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-eight
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -26,7 +26,9 @@ which turns the out-of-office on for a bounded window or off; and `outlook_disab
 which switches one inbox rule off and cannot switch one on; and `outlook_list_calendars`,
 every calendar this mailbox reaches, the user's own and every one another person delegated;
 and `outlook_list_events`, what sits on one of those calendars between two dates; and
-`outlook_read_event`, one of those events in full with every attendee and their answer,
+`outlook_read_event`, one of those events in full with every attendee and their answer; and
+`outlook_create_event`, which puts one event on the user's own calendar and sends the
+invitations as it does,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -158,6 +160,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
 | `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` |
 | `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` |
+| `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -301,6 +304,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
 | `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, read what sits on one between two dates, and read one event in full | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
+| `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -335,6 +339,30 @@ Microsoft names `Calendars.Read.Shared` as the least privileged permission for r
 a deployment that reads the signed-in user's own calendars pays the same two permissions as one
 that reads a colleague's, and cutting the read tier in two buys a tenant nothing at all. Writing is
 where the tiers earn their names.
+
+**A create sends, and there is no draft to inspect first.** Microsoft states that a create with
+attendees mails invitations to all of them, that this keeps the organizer's and the attendees'
+views consistent, and that it *"can't be configured"*. `isDraft` on an event is an unsent-*updates*
+flag and not a state a client asks for. So `outlook_create_event` is the one calendar tool that
+reaches a person outside the mailbox, and this connector cannot recall what it sent. The tool puts
+the subject, the time and every address to the user through MCP elicitation before the first Graph
+call, and a decline creates nothing. With an empty attendee list the event is a private
+appointment nobody is told about, which is why the tool answers `invitations_sent` off the
+attendees Graph stored rather than off the arguments.
+
+**Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
+as the way a client app stops the server from acting twice on one retried POST, and publishes no
+rule for what a duplicate does. So both halves are used: the id is a uuid5 over the target
+calendar and the event a caller asked for, so the same call composes the same id, and the request
+also opts out of the SDK's retry middleware. One 503 that Graph acted on is one invitation, not
+four.
+
+**Times go on the wire as wall-clock text plus a zone name, and come back in UTC.** Graph's
+`start` and `end` are a naive string beside a zone name, and Microsoft states that without the
+`Prefer: outlook.timezone` header those values are returned in UTC. This connector sends that
+header nowhere. Every answer reports Graph's own two values verbatim and converts them with
+`zoneinfo` into the zone the caller named, so nothing is lost and no conversion happens inside
+Exchange, where a zone name it rejects fails the whole call.
 
 **`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
 answers "is something forwarding my mail?", and a tenant that wants that answer should not have to

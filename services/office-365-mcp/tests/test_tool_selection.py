@@ -359,6 +359,9 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
         {"starts_on", "ends_on", "time_zone", "with_person", "subject_contains"}
     ),
     "outlook_read_event": frozenset({"time_zone"}),
+    "outlook_create_event": frozenset(
+        {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
+    ),
 }
 
 
@@ -614,6 +617,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ("User.Read", "Calendars.Read", "Calendars.Read.Shared"),
         0,
         4,
+    ),
+    (
+        ToolsPreset.OUTLOOK_CALENDAR_WRITE,
+        ("User.Read", "Calendars.Read", "Calendars.Read.Shared", "Calendars.ReadWrite"),
+        0,
+        5,
     ),
 )
 
