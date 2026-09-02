@@ -1,118 +1,147 @@
-"""`GetActivityHistoryQuery._group_page`: per-stream date_range and next continuation.
+"""`GetActivityHistoryQuery.run` grouping: per-stream date_range and next continuation.
 
-Grouping is a private method on the query — no HTTP, no `respx`, no async fixtures.
-Each test builds a list of `ActivityRecordResponse`/`EmailRecordResponse` plus fetch params.
-
-Each test targets one behaviour: this page's min/max `occurred_at` (including that start is the
-oldest date even when Backstop returns newest-first), `date_range` of `None` when nothing dated
-is present, UTC-normalized email timestamps, `next` present with an advanced offset when the
-page was full and `None` when short/exhausted, echoed `limit`/`since`/`until`, and items
-returned in input order.
+Each test drives a mocked page through `run` and reads the published group. Date-range and
+continuation bounds on the response models are checked without HTTP.
 """
 
-from collections.abc import Sequence
-from datetime import date, datetime, timedelta, timezone
-from typing import cast
+from datetime import date
 
+import httpx
 import pytest
+import respx
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityGroupResponse,
-    ActivityRecordResponse,
     ActivityType,
-    BackstopActivityType,
     DateRangeResponse,
-    EmailRecordResponse,
-    GetActivityHistoryQuery,
+    Segment,
     TimelineRecord,
 )
+from backstop_mcp.features.party_resolver import ResolvedPartyDto
+from tests.features.activity_history.conftest import make_get_activity_history_query
+from tests.helpers import BASE_URL, collection, resource
 
 
-def _activity(
-    item_id: str, stream: BackstopActivityType, effective_date: date | None
-) -> ActivityRecordResponse:
-    return ActivityRecordResponse(
-        type=stream,
-        activity_id=item_id,
-        occurred_at=effective_date,
+def _activity(item_id: str, effective_date: str | None = None) -> dict[str, object]:
+    if effective_date is None:
+        return resource(item_id, "activities", title=item_id)
+    return resource(item_id, "activities", title=item_id, effectiveDate=effective_date)
+
+
+def _email(item_id: str, sent_timestamp: str | None = None) -> dict[str, object]:
+    if sent_timestamp is None:
+        return resource(item_id, "emails", subject=item_id)
+    return resource(item_id, "emails", subject=item_id, sentTimestamp=sent_timestamp)
+
+
+def _mock_party(segment: str, entity_id: str) -> None:
+    respx.get(f"{BASE_URL}/{segment}/{entity_id}").mock(
+        return_value=httpx.Response(
+            200,
+            json={"data": {"type": segment, "id": entity_id, "attributes": {"name": "Party"}}},
+        )
     )
 
 
-def _email(item_id: str, sent_timestamp: datetime | None) -> EmailRecordResponse:
-    return EmailRecordResponse(activity_id=item_id, occurred_at=sent_timestamp)
-
-
-def _group(
-    items: Sequence[TimelineRecord],
-    *,
+async def _run_group(
+    client: BackstopClient,
+    *rows: dict[str, object],
     activity_type: ActivityType = "meeting",
-    end_of_stream: bool,
-    limit: int,
-    offset: int,
+    segment: Segment = "organizations",
+    entity_id: str = "42",
+    limit: int = 10,
+    offset: int = 0,
     since: date | None = None,
     until: date | None = None,
 ) -> ActivityGroupResponse[TimelineRecord]:
-    query = GetActivityHistoryQuery(client=cast(BackstopClient, object()))
-    return query._group_page(  # pyright: ignore[reportPrivateUsage]
-        items,
-        activity_type=activity_type,
-        end_of_stream=end_of_stream,
-        limit=limit,
-        offset=offset,
-        since=since,
-        until=until,
+    _mock_party(segment, entity_id)
+    collection_name = "emails" if activity_type == "email" else "activities"
+    respx.get(f"{BASE_URL}/{segment}/{entity_id}/{collection_name}").mock(
+        return_value=httpx.Response(200, json=collection(*rows))
     )
+    result = await make_get_activity_history_query(client).run(
+        segment=segment,
+        entity_id=entity_id,
+        party=ResolvedPartyDto(id=entity_id, search_type=segment, name="Party"),
+        continuations={
+            activity_type: ActivityContinuationResponse(
+                limit=limit,
+                offset=offset,
+                since=since,
+                until=until,
+            )
+        },
+        gist_max_chars=300,
+    )
+    return result.groups[activity_type]
 
 
 class TestDateRange:
-    def test_start_is_oldest_and_end_is_newest_on_the_page(self) -> None:
-        items = [
-            _activity("newest", "meeting", date(2026, 3, 1)),
-            _activity("middle", "meeting", date(2026, 2, 1)),
-            _activity("oldest", "meeting", date(2026, 1, 1)),
-        ]
-        result = _group(items, end_of_stream=True, limit=10, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_start_is_oldest_and_end_is_newest_on_the_page(
+        self, client: BackstopClient
+    ) -> None:
+        result = await _run_group(
+            client,
+            _activity("newest", "2026-03-01"),
+            _activity("middle", "2026-02-01"),
+            _activity("oldest", "2026-01-01"),
+        )
 
         assert result.date_range == DateRangeResponse(start=date(2026, 1, 1), end=date(2026, 3, 1))
 
-    def test_returns_none_when_page_is_empty(self) -> None:
-        result = _group((), end_of_stream=True, limit=10, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_none_when_page_is_empty(self, client: BackstopClient) -> None:
+        result = await _run_group(client)
 
         assert result.date_range is None
 
-    def test_returns_none_when_every_item_lacks_a_date(self) -> None:
-        items = [_activity("a", "meeting", None), _email("e", None)]
-        result = _group(items, end_of_stream=True, limit=10, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_none_when_every_item_lacks_a_date(self, client: BackstopClient) -> None:
+        result = await _run_group(client, _activity("a"), _activity("b"))
 
         assert result.date_range is None
 
-    def test_omits_items_that_lack_a_date_from_the_range(self) -> None:
-        items = [
-            _activity("dated", "meeting", date(2026, 2, 1)),
-            _activity("undated", "meeting", None),
-        ]
-        result = _group(items, end_of_stream=True, limit=10, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_omits_items_that_lack_a_date_from_the_range(
+        self, client: BackstopClient
+    ) -> None:
+        result = await _run_group(
+            client,
+            _activity("dated", "2026-02-01"),
+            _activity("undated"),
+        )
 
         assert result.date_range == DateRangeResponse(start=date(2026, 2, 1), end=date(2026, 2, 1))
 
-    def test_email_timestamp_contributes_its_utc_date(self) -> None:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_email_timestamp_contributes_its_utc_date(self, client: BackstopClient) -> None:
         # 23:00 US Eastern is the next calendar day in UTC.
-        sent = datetime(2026, 1, 15, 23, 0, tzinfo=timezone(timedelta(hours=-5)))
-        result = _group(
-            [_email("e1", sent)], activity_type="email", end_of_stream=True, limit=10, offset=0
+        result = await _run_group(
+            client,
+            _email("e1", "2026-01-15T23:00:00-05:00"),
+            activity_type="email",
         )
 
         assert result.date_range == DateRangeResponse(
             start=date(2026, 1, 16), end=date(2026, 1, 16)
         )
 
-    def test_naive_email_timestamp_is_treated_as_utc(self) -> None:
-        sent = datetime(2026, 1, 15, 23, 0)
-        result = _group(
-            [_email("e1", sent)], activity_type="email", end_of_stream=True, limit=10, offset=0
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_naive_email_timestamp_is_treated_as_utc(self, client: BackstopClient) -> None:
+        result = await _run_group(
+            client,
+            _email("e1", "2026-01-15T23:00:00"),
+            activity_type="email",
         )
 
         assert result.date_range == DateRangeResponse(
@@ -121,61 +150,72 @@ class TestDateRange:
 
 
 class TestNext:
-    def test_advances_offset_when_page_is_full(self) -> None:
-        items = [_activity(f"m{i}", "meeting", date(2026, 1, 10 - i)) for i in range(5)]
-        result = _group(items, end_of_stream=False, limit=5, offset=10)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_advances_offset_when_page_is_full(self, client: BackstopClient) -> None:
+        rows = tuple(_activity(f"m{i}", f"2026-01-{10 - i:02d}") for i in range(5))
+        result = await _run_group(client, *rows, limit=5, offset=10)
 
         assert result.next == ActivityContinuationResponse(
             limit=5, offset=15, since=None, until=None
         )
 
-    def test_returns_none_when_page_is_short(self) -> None:
-        result = _group(
-            [_activity("only", "meeting", date(2026, 1, 1))],
-            end_of_stream=True,
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_none_when_page_is_short(self, client: BackstopClient) -> None:
+        result = await _run_group(
+            client,
+            _activity("only", "2026-01-01"),
             limit=5,
-            offset=0,
         )
 
         assert result.next is None
 
-    def test_returns_none_when_page_is_empty(self) -> None:
-        result = _group((), end_of_stream=True, limit=5, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_none_when_page_is_empty(self, client: BackstopClient) -> None:
+        result = await _run_group(client, limit=5)
 
         assert result.next is None
 
-    def test_echoes_limit_since_and_until(self) -> None:
-        items = [_activity("m0", "meeting", date(2026, 1, 1))]
-        result = _group(
-            items,
-            end_of_stream=False,
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_echoes_limit_since_and_until(self, client: BackstopClient) -> None:
+        result = await _run_group(
+            client,
+            _activity("m0", "2026-01-03"),
+            _activity("m1", "2026-01-02"),
+            _activity("m2", "2026-01-01"),
             limit=3,
-            offset=0,
             since=date(2020, 1, 1),
             until=date(2026, 12, 31),
         )
 
         assert result.next == ActivityContinuationResponse(
             limit=3,
-            offset=1,
+            offset=3,
             since=date(2020, 1, 1),
             until=date(2026, 12, 31),
         )
 
 
 class TestItems:
-    def test_returns_items_in_input_order(self) -> None:
-        items = [
-            _activity("newest", "meeting", date(2026, 3, 1)),
-            _activity("oldest", "meeting", date(2026, 1, 1)),
-            _activity("middle", "meeting", date(2026, 2, 1)),
-        ]
-        result = _group(items, end_of_stream=True, limit=10, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_items_in_input_order(self, client: BackstopClient) -> None:
+        result = await _run_group(
+            client,
+            _activity("newest", "2026-03-01"),
+            _activity("oldest", "2026-01-01"),
+            _activity("middle", "2026-02-01"),
+        )
 
         assert [item.activity_id for item in result.items] == ["newest", "oldest", "middle"]
 
-    def test_carries_the_requested_activity_type(self) -> None:
-        result = _group((), activity_type="email", end_of_stream=True, limit=10, offset=0)
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_carries_the_requested_activity_type(self, client: BackstopClient) -> None:
+        result = await _run_group(client, activity_type="email")
 
         assert result.activity_type == "email"
 

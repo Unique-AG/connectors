@@ -5,7 +5,6 @@ from backstop_mcp.features.accounts.queries.get_capital_flows_query import GetCa
 from backstop_mcp.features.accounts.queries.get_holdings_query import (
     FALLBACK_OMITTED_FIELDS,
     GetHoldingsQuery,
-    HoldingsSource,
     HoldingsTableShapeError,
 )
 from backstop_mcp.features.accounts.queries.get_product_query import GetProductQuery
@@ -25,7 +24,6 @@ __all__ = [
     "GetHoldingsQuery",
     "GetProductQuery",
     "GetTimeSeriesQuery",
-    "HoldingsSource",
     "HoldingsTableShapeError",
     "PRODUCT_SERIES",
     "TimeSeriesEntityType",

@@ -42,9 +42,7 @@ DEFAULT_FORMER_MARKERS: frozenset[str] = frozenset({"former", "previous", "ex-",
 def _typed_relationships(
     relationships: list[dict[str, object]],
 ) -> list[BackstopApiResource[EntityRelationshipAttributes]]:
-    return Included(relationships).parse(
-        schema=BackstopApiResource[EntityRelationshipAttributes]
-    )
+    return Included(relationships).parse(schema=BackstopApiResource[EntityRelationshipAttributes])
 
 
 def _typed_types(

@@ -23,7 +23,7 @@ from backstop_mcp.features.accounts.api_responses import (
     TableDataShareAttributes,
 )
 from backstop_mcp.features.custom_fields import CustomFieldValueAttributes
-from backstop_mcp.features.resolution import Candidate, Resolution
+from backstop_mcp.features.resolution import Resolution
 
 __all__ = [
     "AccountListingDto",
@@ -34,7 +34,6 @@ __all__ = [
     "HoldingRowDto",
     "InvestorTypeDto",
     "MoneyDto",
-    "ProductCandidate",
     "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductResolution",
@@ -97,7 +96,6 @@ class ResolvedProductDto(BaseModel):
         return cls.from_attributes(parsed.id, parsed.attributes)
 
 
-type ProductCandidate = Candidate[ResolvedProductDto]
 type ProductResolution = Resolution[ResolvedProductDto]
 
 

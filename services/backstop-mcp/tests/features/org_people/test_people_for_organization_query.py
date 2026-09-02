@@ -1,3 +1,4 @@
+import logging
 from importlib import import_module
 
 import httpx
@@ -109,6 +110,32 @@ class TestPeopleForOrganizationQuery:
             request.url.path.endswith("/entityRelationships")
             for request in recorded_requests(respx.calls)
         )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_side_load_is_dropped_and_warned(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING)
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                ("p1", {"name": "Glenn, Phil"}),
+                included=[
+                    _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    {"type": "entity-relationships", "attributes": {}},
+                    *relationship_types(EMPLOYEE_TYPE),
+                ],
+            )
+        )
+        respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=False,
+        )
+
+        assert [row.employment.person_id for row in listing.people] == ["p1"]
+        assert [record.message for record in caplog.records] == ["org_people.side_load.unreadable"]
 
     @pytest.mark.asyncio
     @respx.mock

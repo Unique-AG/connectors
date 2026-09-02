@@ -6,7 +6,6 @@ from backstop_mcp.features.tasks.queries import (
     MAX_TASK_SCAN_RECORDS,
     GetTasksForPartyQuery,
     TaskFilter,
-    TaskStatus,
 )
 from backstop_mcp.features.tasks.responses import (
     PartyTasksResponse,
@@ -21,7 +20,6 @@ __all__ = [
     "TaskAttributes",
     "TaskFilter",
     "TaskRowResponse",
-    "TaskStatus",
     "TasksResolvedResponse",
     "get_tasks_for_party_query_factory",
 ]

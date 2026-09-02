@@ -188,7 +188,7 @@ class GetCapitalFlowsQuery:
         )
 
     def _subscription_attribution(
-        self, resource: FlowResource, included: Included
+        self, resource: FlowResource | _SubscriptionInclude, included: Included
     ) -> tuple[CapitalFlowPartyResponse | None, CapitalFlowPartyResponse | None]:
         account = included.first(resource, "fundAccount", schema=_AccountInclude)
         owner = included.first(account, "owner", schema=_OwnerInclude)
