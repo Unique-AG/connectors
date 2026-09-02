@@ -211,6 +211,16 @@ def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel 
             },
         )
         return None
+    # `included_resource` reads a present non-object `attributes` as `{}` so a strict schema
+    # can still drop the entry. Include projections are not strict — every field is optional —
+    # so that empty mapping would otherwise become a hollow record (id, no address). Treat it
+    # as unreadable: one broken location must not look like a real one.
+    if not entry.attributes.model_dump():
+        logger.warning(
+            "includes.side_load.unreadable",
+            extra={"include": planned.name, "resource_type": planned.include.resource_type},
+        )
+        return None
     try:
         return planned.model.model_validate(_with_resource_id(entry))
     except ValidationError as exc:

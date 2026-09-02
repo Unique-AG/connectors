@@ -127,7 +127,7 @@ class SearchActivitiesQuery:
                 )
             except BackstopRateLimitError:
                 raise
-            except (BackstopApiError, BackstopResponseSchemaError):
+            except BackstopApiError, BackstopResponseSchemaError:
                 if pages_fetched == 0:
                     raise
                 logger.warning(
