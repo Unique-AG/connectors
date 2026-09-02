@@ -31,6 +31,7 @@ from office_365_mcp.tools import (
     outlook_list_mail,
     outlook_mark_mail,
     outlook_move_mail,
+    outlook_read_event,
     outlook_read_mail,
     outlook_read_thread,
     outlook_search_mail,
@@ -145,6 +146,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_disable_mail_rule,
     outlook_list_calendars,
     outlook_list_events,
+    outlook_read_event,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -243,6 +245,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
     "outlook-calendar": (
         "outlook_list_calendars",
         "outlook_list_events",
+        "outlook_read_event",
     ),
 }
 
