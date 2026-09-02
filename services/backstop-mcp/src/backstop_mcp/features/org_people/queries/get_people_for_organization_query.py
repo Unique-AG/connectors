@@ -1,6 +1,10 @@
 """Walk an organization's `/employees` with employment includes, annotated via `EmploymentIndex`."""
 
+import logging
+from collections.abc import Sequence
 from urllib.parse import quote
+
+from pydantic import BaseModel
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, Included
 from backstop_mcp.features.data_hygiene import (
@@ -16,6 +20,8 @@ from backstop_mcp.features.org_people.responses import (
     PartyOrgPeopleResponse,
     PersonAtOrganizationResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 MAX_ORG_PEOPLE = 500
 
@@ -63,18 +69,24 @@ class GetPeopleForOrganizationQuery:
         employee_includes = Included(employees_page.included)
         organization_includes = Included(organization_relationships_page.included)
         relationships = [
-            *employee_includes.by_type(
+            *self._get_included_resources_of_type(
+                employee_includes,
+                employees_page.included,
                 EntityRelationshipRef.RELATIONSHIPS_RESOURCE,
                 schema=BackstopApiResource[EntityRelationshipAttributes],
             ),
             *organization_relationships_page.items,
         ]
         relationship_types = [
-            *employee_includes.by_type(
+            *self._get_included_resources_of_type(
+                employee_includes,
+                employees_page.included,
                 EntityRelationshipRef.TYPES_RESOURCE,
                 schema=BackstopApiResource[RelationshipTypeAttributes],
             ),
-            *organization_includes.by_type(
+            *self._get_included_resources_of_type(
+                organization_includes,
+                organization_relationships_page.included,
                 EntityRelationshipRef.TYPES_RESOURCE,
                 schema=BackstopApiResource[RelationshipTypeAttributes],
             ),
@@ -127,3 +139,21 @@ class GetPeopleForOrganizationQuery:
         if employee is None:
             return PersonAtOrganizationResponse.from_employment(employment)
         return PersonAtOrganizationResponse.from_resource(employment, employee)
+
+    def _get_included_resources_of_type[ResourceT: BaseModel](
+        self,
+        included: Included,
+        raw: Sequence[dict[str, object]],
+        resource_type: str,
+        *,
+        schema: type[ResourceT],
+    ) -> list[ResourceT]:
+        chips = included.by_type(resource_type, schema=schema)
+        selected = sum(1 for item in raw if item.get("type") == resource_type)
+        dropped = selected - len(chips)
+        if dropped:
+            logger.warning(
+                "org_people.side_load.unreadable",
+                extra={"resource_type": resource_type, "dropped": dropped},
+            )
+        return chips

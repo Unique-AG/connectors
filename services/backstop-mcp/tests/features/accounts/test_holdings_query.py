@@ -453,6 +453,7 @@ class TestFallbackContent:
         assert row.balance_as_of == date(2026, 2, 28)
         assert row.balance_status == "ACTUAL"
 
+
 _BROKEN_ENVELOPES: tuple[dict[str, object], ...] = (
     {"data": [], "meta": {}},
     {"accounts": []},
@@ -868,6 +869,7 @@ class TestUnusableTableFallsBack:
 
         assert result.source == "accounts-api"
         assert result.rows == ()
+
 
 _OWNER_ID = "341688185"
 _OTHER_OWNER_ID = "999"

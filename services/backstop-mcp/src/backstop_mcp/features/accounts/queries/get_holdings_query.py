@@ -39,7 +39,6 @@ party collection exposes an `accounts` subcollection. Open means the `closedDate
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import Literal
 
 from backstop_mcp.backstop_client import (
     BackstopAuthError,
@@ -67,11 +66,9 @@ from backstop_mcp.features.accounts.internal_dto import (
     SeriesFigureDto,
     ShareDto,
 )
-from backstop_mcp.features.accounts.utils import fetch_series, split_open
+from backstop_mcp.features.accounts.utils import fetch_series
 
 logger = logging.getLogger(__name__)
-
-type HoldingsSource = Literal["table-api", "accounts-api"]
 
 _OWNER = "owner"
 
@@ -207,9 +204,20 @@ class GetHoldingsQuery:
             page_size=100,
             parallel=True,
         )
-        return split_open(
+        return self._split_open(
             self._owned_accounts(page.items, included=page.included, owner_id=owner_id),
             include_closed=include_closed,
+        )
+
+    def _split_open(
+        self, records: Sequence[AccountRecordDto], *, include_closed: bool
+    ) -> AccountListingDto:
+        if include_closed:
+            return AccountListingDto(accounts=tuple(records), closed_omitted=0)
+        open_accounts = tuple(record for record in records if record.is_open)
+        return AccountListingDto(
+            accounts=open_accounts,
+            closed_omitted=len(records) - len(open_accounts),
         )
 
     async def _row_with_figures(self, account: AccountRecordDto) -> HoldingRowDto:

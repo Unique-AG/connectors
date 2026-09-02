@@ -15,7 +15,6 @@ from backstop_mcp.features.tasks.responses import PartyTasksResponse, TaskRowRes
 
 logger = logging.getLogger(__name__)
 
-type TaskStatus = Literal["open", "completed"]
 type TaskFilter = Literal["open", "completed", "all"]
 
 # Scan ceiling. `status` is not filterable, so one party's whole task sub-collection is read;

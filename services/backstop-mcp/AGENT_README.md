@@ -12,9 +12,11 @@ before designing from swagger. The live instance is read-only: never `POST` / `P
 
 ## Deprecated layout (do not copy)
 
-Most features still look like `org_people` / `accounts` / `activity_history`. That layout is
-**deprecated as a template**. Do not migrate those features unless the task is to migrate
-them. Do not copy them into new work.
+The catalog trio, `tasks`, `org_people`, `accounts`, and `activity_history` already follow
+the opportunities layout. Do not copy leftover `fetch_*` files into new work
+(`accounts/utils/fetch_series.py`, `party_resolver/fetch_party_name.py`). Those names stay
+only because they still have callers; they are not the template. Do not add a `fetch_*`
+filename ban while they exist.
 
 What that older layout did, and what to do instead:
 
@@ -147,7 +149,9 @@ helpers package.
 **`Included` is the shared include API.** `backstop_client.Included` / `included_resource` /
 `IncludedResource` is what every feature uses to read `?include=` chips. Do not grow a
 second follow/index helper in a feature. Call-site updates in leave-alone packages are
-part of keeping that one API, not a drive-by rewrite.
+part of keeping that one API, not a drive-by rewrite. Warn when a chip is dropped
+(`includes.side_load.unreadable` from `include_plan`; `org_people.side_load.unreadable`
+when `Included.by_type` drops an employment chip).
 
 ---
 
@@ -230,9 +234,11 @@ Three layers, one direction:
 1. **`api_responses`** — `*Attributes` / `BackstopApiResource[...]`. Every field optional,
    every scalar lenient (`LenientStr`, `LenientDate`, … in `lenient.py`). `extra="ignore"`.
    `client.paginate` deserializes a whole page; a required field or a strict type fails every
-   row on one bad record.
+   row on one bad record. `schema=` is this layer — never a published `*Response` or
+   `dict[str, object]`.
 2. **`internal_dto`** — `*Dto` only. Skip the file when there are none. Do not park
-   `Literal` aliases here.
+   `Literal` aliases here. Do not hop wire → `*Dto` → `*Response` when the query can map
+   Attributes onto the published model in one pass.
 3. **`responses`** — `*Response`. This is the published MCP output schema. Every model has
    a docstring; every field has a `Field(description=...)`. A number with no unit or a stage
    name with no direction is where a reader guesses wrong.
@@ -418,8 +424,7 @@ def get_opportunities_query_factory(
         get_map_opportunity_to_response_util_factory
     ),
     custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
-) -> GetOpportunitiesQuery:
-    ...
+) -> GetOpportunitiesQuery: ...
 ```
 
 Export cached factories from the feature `__init__`. `teardown.py` imports them from the

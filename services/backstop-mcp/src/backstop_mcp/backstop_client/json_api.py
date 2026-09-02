@@ -34,6 +34,10 @@ def _clean_str(value: object) -> str | None:
         return None
 
 
+def _empty_mapping_if_none(value: object) -> object:
+    return {} if value is None else value
+
+
 class BackstopRelationshipRef(BaseModel):
     """The `{type, id}` linkage object inside a JSON:API relationship."""
 
@@ -93,7 +97,7 @@ class IncludedResource[AttrT](BaseModel):
     # null as "no linkage" so `Included.first` can still hop owner off an account chip.
     relationships: Annotated[
         dict[str, BackstopRelationship],
-        BeforeValidator(lambda value: {} if value is None else value),
+        BeforeValidator(_empty_mapping_if_none),
     ] = Field(default_factory=dict)
 
     def related_ids(self, name: str) -> tuple[str, ...]:

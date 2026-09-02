@@ -39,7 +39,7 @@ stopped matching Backstop's:
   "this data came from Backstop".
 * **`*Attributes`** — a raw Backstop wire shape, 1:1 with their data model, under their field
   names (`CustomFieldDefinitionAttributes`).
-* **`*Dto`** — computed internally and never published (`AccountRecordDto`, `ActivityItemDto`).
+* **`*Dto`** — computed internally and never published (`AccountRecordDto`, `EntityActivityDto`).
   A model that later ships to MCP clients moves to `*Response`.
 * **`*Response`** — our curated, model-facing shape: trimmed, renamed where Backstop's naming
   would mislead, and documented for the model that consumes it. Used for nested pieces as much as

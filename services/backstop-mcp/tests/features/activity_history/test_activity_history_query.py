@@ -20,7 +20,9 @@ from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityGroupResponse,
+    ActivityRecordResponse,
     ActivityType,
+    EmailRecordResponse,
     Segment,
     TimelineRecord,
 )
@@ -718,6 +720,7 @@ class TestEmailParsing:
 
         assert len(page.items) == 1
         item = page.items[0]
+        assert isinstance(item, EmailRecordResponse)
         assert item.activity_id == "email_1"
         assert item.subject == "Re: Follow-up"
         assert item.occurred_at is not None
@@ -837,6 +840,7 @@ class TestActivityTagFilterAndIncludes:
         assert tag_by_id.call_count == 0
         assert attendees.call_count == 0
         item = page.items[0]
+        assert isinstance(item, ActivityRecordResponse)
         assert item.regarding is not None
         assert item.regarding.id == "o42"
         assert item.regarding.resource_type == "organizations"
