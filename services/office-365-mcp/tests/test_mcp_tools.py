@@ -660,6 +660,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
         "outlook_create_event",
+        "outlook_create_event_on_behalf",
     }
 )
 

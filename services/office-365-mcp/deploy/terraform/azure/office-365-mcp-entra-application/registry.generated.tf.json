@@ -182,6 +182,13 @@
           "permissions": [
             "Calendars.ReadWrite"
           ]
+        },
+        {
+          "name": "outlook_create_event_on_behalf",
+          "permissions": [
+            "Calendars.Read.Shared",
+            "Calendars.ReadWrite.Shared"
+          ]
         }
       ],
       "tool_names": [
@@ -212,7 +219,8 @@
         "outlook_list_calendars",
         "outlook_list_events",
         "outlook_read_event",
-        "outlook_create_event"
+        "outlook_create_event",
+        "outlook_create_event_on_behalf"
       ],
       "always_on": "get_me",
       "presets": {
@@ -306,6 +314,13 @@
           "outlook_list_events",
           "outlook_read_event",
           "outlook_create_event"
+        ],
+        "outlook-calendar-delegate": [
+          "outlook_list_calendars",
+          "outlook_list_events",
+          "outlook_read_event",
+          "outlook_create_event",
+          "outlook_create_event_on_behalf"
         ]
       },
       "requestable_permissions": [
