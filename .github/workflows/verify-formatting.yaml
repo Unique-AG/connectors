@@ -1,0 +1,67 @@
+name: "Verify Formatting"
+
+# The repo-wide `biome check .` ran only in packages.ci.yaml, which triggers on packages/**,
+# pnpm-lock.yaml, pnpm-workspace.yaml, turbo.json, tsconfig.json and biome.json -- never on
+# services/**. Node services check their own files through _template-ci.yaml's per-service
+# `pnpm style`, but a Python service has no Node validate job and python-ci.yaml runs ruff, not
+# biome. So a JSON or YAML file under a Python service had no gate at all, and
+# services/kb-mcp/deploy/helm-charts/kb-mcp/values.additional.schema.json sat unformatted from
+# #875 until a pull request that happened to touch pnpm-lock.yaml surfaced it.
+#
+# NO `paths:` filter, deliberately. Unlike the other gates in this repo, this one guards a
+# property of the whole tree rather than of a directory: a formatting error can arrive with any
+# file, so any path filter reintroduces the blind spot it exists to close.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  # NOT cancel-in-progress. merge-gatekeeper de-duplicates check runs by name, the check-runs API
+  # ordering is unspecified, and a cancelled run under the same name can resolve ahead of a
+  # successful one and hard-fail the gate.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  formatting:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write # the pnpm store cache needs write access
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      # biome is a root devDependency, so the root install is what pins its version. Running the
+      # repo's own `style` script rather than a separate biome action keeps CI and a local
+      # `pnpm style` on the same biome version by construction.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm style
