@@ -21,6 +21,7 @@ from office_365_mcp.shared.seam import ToolAdvice, graph_scope
 from office_365_mcp.tools import (
     get_me,
     outlook_browse_folders,
+    outlook_create_event,
     outlook_disable_mail_rule,
     outlook_draft_mail,
     outlook_draft_reply,
@@ -147,6 +148,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_list_calendars,
     outlook_list_events,
     outlook_read_event,
+    outlook_create_event,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -246,6 +248,12 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_list_calendars",
         "outlook_list_events",
         "outlook_read_event",
+    ),
+    "outlook-calendar-write": (
+        "outlook_list_calendars",
+        "outlook_list_events",
+        "outlook_read_event",
+        "outlook_create_event",
     ),
 }
 

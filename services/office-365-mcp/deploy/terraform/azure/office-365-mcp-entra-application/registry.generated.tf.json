@@ -176,6 +176,12 @@
             "Calendars.Read",
             "Calendars.Read.Shared"
           ]
+        },
+        {
+          "name": "outlook_create_event",
+          "permissions": [
+            "Calendars.ReadWrite"
+          ]
         }
       ],
       "tool_names": [
@@ -205,7 +211,8 @@
         "outlook_disable_mail_rule",
         "outlook_list_calendars",
         "outlook_list_events",
-        "outlook_read_event"
+        "outlook_read_event",
+        "outlook_create_event"
       ],
       "always_on": "get_me",
       "presets": {
@@ -293,6 +300,12 @@
           "outlook_list_calendars",
           "outlook_list_events",
           "outlook_read_event"
+        ],
+        "outlook-calendar-write": [
+          "outlook_list_calendars",
+          "outlook_list_events",
+          "outlook_read_event",
+          "outlook_create_event"
         ]
       },
       "requestable_permissions": [

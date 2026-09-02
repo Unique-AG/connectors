@@ -13,6 +13,7 @@ risks a gateway timeout. `body` alone on twenty-five messages is tens of thousan
 nobody asked for.
 """
 
+import re
 from typing import Literal, Self
 
 from msgraph.generated.models.email_address import EmailAddress
@@ -41,6 +42,13 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 # Microsoft's own documented length for `bodyPreview`, named here because two tools quote it to a
 # model. If the number drifts in just one tool, that tool promises something the other does not.
 PREVIEW_CHARACTERS = 255
+
+# One SMTP address and nothing else: no display name, no angle brackets, no second address. A model
+# that packs `Ada <ada@x.invalid>` or `a@x.invalid, b@y.invalid` into one string names somebody
+# Exchange either rejects or silently reads as a name, and both are quietly wrong. Four tools take
+# a list of addresses from a model — two draft mail, two create an event — and each one refuses in
+# its own words. What none of them decides on its own is which strings are one address.
+ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 
 # The well-known folder names Graph accepts in a URL path are the seven of seventeen that a

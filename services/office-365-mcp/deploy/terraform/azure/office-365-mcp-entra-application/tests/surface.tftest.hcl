@@ -257,6 +257,17 @@ run "preset_outlook_calendar" {
   }
 }
 
+run "preset_outlook_calendar_write" {
+  variables {
+    tools_preset = "outlook-calendar-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite"
+    error_message = "outlook-calendar-write composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "teams_list_chats"]
