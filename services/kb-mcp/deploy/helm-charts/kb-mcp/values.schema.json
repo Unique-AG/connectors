@@ -2010,7 +2010,7 @@
     },
     "mcpConfig": {
       "type": "object",
-      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Unique API credentials stay out of values.yaml — deliver them via envVars/secretKeyRef or the overlay's external-secrets. Zitadel uses a public PKCE client, so no client secret is required.",
+      "description": "Non-secret configuration for the kb-mcp server, mapped to environment variables. Unique API credentials stay out of values.yaml — deliver them via envVars/secretKeyRef or the overlay's external-secrets. Zitadel uses a public PKCE client (no client secret), but requires ZITADEL_JWT_SIGNING_KEY delivered the same way.",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -2034,7 +2034,7 @@
         },
         "zitadel": {
           "type": "object",
-          "description": "Zitadel OIDC issuer (non-secret). Set the public client ID via envVars/secretKeyRef or overlay external-secrets; PKCE means no client secret is required.",
+          "description": "Zitadel OIDC issuer (non-secret). Set the public client ID and ZITADEL_JWT_SIGNING_KEY via envVars/secretKeyRef or overlay external-secrets; PKCE means no client secret is required, but the JWT signing key replaces it for FastMCP's own downstream tokens.",
           "properties": {
             "baseUrl": {
               "type": "string",

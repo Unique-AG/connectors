@@ -26,8 +26,11 @@ Ops access lines for `/probe`, `/health`, and `/metrics` are silenced.
 ## Configuration
 
 MCP authentication uses a public Zitadel client with OAuth PKCE, so
-`ZITADEL_CLIENT_SECRET` is not required. `ENCRYPTION_KEY` is separate: it
-encrypts the OAuth proxy state stored in Postgres. For local development, set
+`ZITADEL_CLIENT_SECRET` is not required. `ZITADEL_JWT_SIGNING_KEY` replaces it
+as local key material FastMCP uses to sign its own downstream OAuth-proxy
+JWTs — it is never sent to Zitadel, but is required since the client is
+secretless. `ENCRYPTION_KEY` is separate: it encrypts the OAuth proxy state
+stored in Postgres. For local development, set
 `ALLOW_EPHEMERAL_OAUTH_STORAGE=true` instead of configuring Postgres.
 
 Set `UNIQUE_API_BASE_URL` to the internal Unique API service in Kubernetes.

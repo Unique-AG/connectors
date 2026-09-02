@@ -13,9 +13,10 @@ podLabels:
 
 env:
   LOG_LEVEL: info
-  MEMORY_TRIM_INTERVAL_SECONDS: 30
   # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
   UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
+  # PYTHONMALLOC: malloc # PID-1 glibc allocator; enable with content_tree
+  # MEMORY_TRIM_INTERVAL_SECONDS: "30" # periodic malloc_trim; toolkit default is 120s
 
 # -- Non-secret, tenant-specific config; see values.schema.json for field
 # descriptions. Mapped to env vars by templates/_ext.tpl + _helpers.tpl.
@@ -64,6 +65,11 @@ mcpConfig:
 #         secretKeyRef:
 #           name: kb-mcp-zitadel-secret
 #           key: ZITADEL_CLIENT_ID
+#     - name: ZITADEL_JWT_SIGNING_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: kb-mcp-zitadel-secret
+#           key: ZITADEL_JWT_SIGNING_KEY
 #     - name: ENCRYPTION_KEY
 #       valueFrom:
 #         secretKeyRef:
@@ -82,10 +88,10 @@ ports:
 
 resources:
   limits:
-    memory: 512Mi
+    memory: 1Gi
   requests:
     cpu: 50m
-    memory: 256Mi
+    memory: 512Mi
 
 probes:
   enabled: true

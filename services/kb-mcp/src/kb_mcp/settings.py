@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     # ── Zitadel ──
     zitadel_base_url: str
     zitadel_client_id: str
+    # Local secret FastMCP uses to sign its own downstream OAuth-proxy JWTs.
+    # Never sent to Zitadel. Previously derived from ZITADEL_CLIENT_SECRET via
+    # PBKDF2; Zitadel is now a public PKCE client, so this must be set
+    # directly — generate with: openssl rand -hex 32
+    zitadel_jwt_signing_key: SecretStr = Field(
+        validation_alias="ZITADEL_JWT_SIGNING_KEY"
+    )
 
     # ── OAuth storage (see auth/storage.py) ──
     database_url: PostgresDsn | None = Field(default=None)

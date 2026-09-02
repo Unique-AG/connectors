@@ -68,7 +68,11 @@ def test_build_auth_uses_a_secretless_zitadel_client(durable_settings, monkeypat
         build_auth(durable_settings)
 
     _, kwargs = mock_create.call_args
-    assert kwargs["zitadel_oidc_proxy_settings"].client_secret is None
+    zitadel_settings = kwargs["zitadel_oidc_proxy_settings"]
+    assert zitadel_settings.client_secret is None
+    # Local secret for FastMCP's own downstream JWTs, never sent to Zitadel —
+    # required because OIDCProxy raises without either client_secret or this.
+    assert zitadel_settings.jwt_signing_key.get_secret_value() == "test-jwt-signing-key"
 
 
 def test_build_auth_passes_required_scopes(durable_settings):
