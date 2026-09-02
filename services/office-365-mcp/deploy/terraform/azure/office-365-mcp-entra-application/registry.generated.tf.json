@@ -186,6 +186,7 @@
         {
           "name": "outlook_create_event_on_behalf",
           "permissions": [
+            "Calendars.Read",
             "Calendars.Read.Shared",
             "Calendars.ReadWrite.Shared"
           ]

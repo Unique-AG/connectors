@@ -146,10 +146,12 @@ _BAD_ZONE = (
     + "such name. Nothing was read. IANA names look like `Europe/Zurich`, `America/New_York` or "
     + "`UTC`: a region and a city, or `UTC` on its own. A Windows zone name such as `W. Europe "
     + "Standard Time` is not one, and neither is a numeric offset such as `+02:00` or a daylight "
-    + "abbreviation such as `CEST` or `PST`. Microsoft returns Windows names on an event, and "
-    + "this connector reports them verbatim beside the converted value, so a name read off a "
-    + "previous answer is not one to pass back here. Call this tool again with an IANA name, or "
-    + "leave `time_zone` out to read the event in UTC. Retrying this value will fail identically."
+    + "abbreviation such as `CEST` or `PST`. `Etc/GMT+2` does resolve, and the sign of an "
+    + "`Etc/GMT` key runs the other way, so that name is two hours BEHIND UTC rather than ahead. "
+    + "Microsoft returns Windows names on an event, and this connector reports them verbatim "
+    + "beside the converted value, so a name read off a previous answer is not one to pass back "
+    + "here. Call this tool again with an IANA name, or leave `time_zone` out to read the event "
+    + "in UTC. Retrying this value will fail identically."
 )
 
 
@@ -321,7 +323,7 @@ def _answer(event: Event, *, calendar_id: str, zone: ZoneInfo) -> CalendarEvent:
         is_online_meeting=summary.is_online_meeting,
         join_url=summary.join_url,
         organizer=summary.organizer,
-        is_organizer=summary.is_organizer,
+        owner_is_organizer=summary.owner_is_organizer,
         owner_response=summary.owner_response,
         attendee_count=summary.attendee_count,
         web_link=summary.web_link,
@@ -388,9 +390,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "which is right for a comparison and wrong for telling a user when their "
                     + "meeting is. Pass the zone the user lives in whenever the answer names a "
                     + "time of day. A Windows zone name such as `W. Europe Standard Time` and a "
-                    + "numeric offset such as `+02:00` are refused. Graph's own two values for "
-                    + "each instant are reported beside the converted one, so nothing is lost to "
-                    + "the conversion."
+                    + "numeric offset such as `+02:00` are refused. `Etc/GMT+2` is a real key "
+                    + "that means two hours BEHIND UTC, so name a place such as `Europe/Berlin` "
+                    + "instead. Graph's own two values for each instant are reported beside the "
+                    + "converted one, so nothing is lost to the conversion."
                 ),
             ),
         ] = "UTC",

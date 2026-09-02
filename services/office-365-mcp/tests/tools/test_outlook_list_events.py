@@ -9,7 +9,9 @@ bounds byte for byte in a zone two hours ahead of UTC and in UTC, pin that no
 Every response body here is synthesised. None came from a real mailbox.
 """
 
+from collections.abc import Mapping, Sequence
 from datetime import date, timedelta
+from typing import cast
 
 import httpx
 import pytest
@@ -126,6 +128,38 @@ def _page(*events: dict[str, object], next_link: str | None = None) -> httpx.Res
     if next_link is not None:
         body["@odata.nextLink"] = next_link
     return httpx.Response(200, json=body)
+
+
+def _fields(node: object, at: str, *, root: Mapping[str, object]) -> dict[str, object]:
+    """Every field of a published schema, at every depth.
+
+    Pydantic publishes a nested model as a `$ref` into the schema's own `$defs` rather than
+    inline, so a walk that does not follow one checks the top level and calls it the whole answer.
+    """
+    schema = _resolved(node, root=root)
+    found: dict[str, object] = {}
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        for name, field in cast("Mapping[str, object]", properties).items():
+            found[f"{at}.{name}"] = field
+            found |= _fields(field, f"{at}.{name}", root=root)
+    items = schema.get("items")
+    if items is not None:
+        found |= _fields(items, f"{at}[]", root=root)
+    branches = schema.get("anyOf")
+    if isinstance(branches, list):
+        for branch in cast("Sequence[object]", branches):
+            found |= _fields(branch, at, root=root)
+    return found
+
+
+def _resolved(node: object, *, root: Mapping[str, object]) -> Mapping[str, object]:
+    schema = cast("Mapping[str, object]", node)
+    reference = schema.get("$ref")
+    if not isinstance(reference, str):
+        return schema
+    definitions = cast("Mapping[str, object]", root.get("$defs", {}))
+    return cast("Mapping[str, object]", definitions[reference.removeprefix("#/$defs/")])
 
 
 @pytest.fixture
@@ -503,6 +537,7 @@ class TestWhatItAnswers:
         assert row.sensitivity == "normal"
         assert row.cancelled is False
         assert row.owner_response == "organizer"
+        assert row.owner_is_organizer is True, "Graph's `isOrganizer` is about the calendar's owner"
         assert row.join_url == "https://teams.microsoft.invalid/l/meetup-join/synthetic"
 
     @pytest.mark.usefixtures("my_calendar")
@@ -867,6 +902,22 @@ class TestWhatItRefuses:
                 limit=25,
             )
 
+    async def test_the_zone_refusal_warns_that_an_etc_gmt_key_reverses_its_sign(
+        self, client: GraphServiceClient
+    ) -> None:
+        """`Etc/GMT+2` is a key the database holds, at two hours behind UTC. The refusal turns
+        down `+02:00`, so it names that key as well and says which way the sign runs."""
+        with pytest.raises(ToolError, match="Etc/GMT") as refused:
+            _ = await lister.list_events(
+                client,
+                starts_on=_MARCH_MONDAY,
+                ends_on=_MARCH_SUNDAY,
+                time_zone="+02:00",
+                limit=25,
+            )
+
+        assert "BEHIND UTC" in str(refused.value)
+
     @pytest.mark.parametrize(
         "calendar_ref",
         [
@@ -974,6 +1025,68 @@ class TestTheSchemaItPublishes:
                 tool.parameters["properties"][argument]["anyOf"][0]["minLength"]
                 == lister.MIN_FRAGMENT_CHARACTERS
             ), argument
+
+    async def test_the_description_sends_a_model_to_local_for_an_all_day_row(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """Graph holds an all-day event at midnight UTC, so the converted `iso` names a time of
+        day and, west of UTC, the day before. `local` is the field that answers which day, and the
+        description states that fact rather than claiming `iso` carries no date at all, which is
+        false in UTC and east of it.
+        """
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        described = tool.description or ""
+        assert "rather than `local`, the wall-clock text" in described
+        assert "in a zone west of UTC it names the day before" in described
+        assert "Take the date of an all-day row from `local`" in described
+
+    async def test_the_zone_argument_says_which_way_an_etc_gmt_key_runs(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """`Etc/GMT+2` resolves, at two hours behind UTC, so this argument accepts it and answers
+        the right meetings at the wrong hours. Nothing fails, so the argument says so."""
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        properties = cast("Mapping[str, object]", tool.parameters["properties"])
+        time_zone = cast("Mapping[str, object]", properties["time_zone"])
+        described = str(time_zone["description"])
+        assert "`Etc/GMT+2`" in described
+        assert "BEHIND UTC" in described
+        assert "`Europe/Berlin`" in described
+
+    async def test_every_field_of_the_answer_says_what_it_is(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """Asserted over the published schema rather than the model classes: a description that
+        never reaches the wire is not one. The window's three fields are unique to this tool, and
+        the rows are the shared summary, so both halves are walked here."""
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        answer = cast("Mapping[str, object]", tool.output_schema)
+        published = _fields(answer, lister.TOOL_NAME, root=answer)
+        # Guards the guard: a walk that stopped descending passes by finding nothing to check.
+        assert f"{lister.TOOL_NAME}.window.starts_at" in published
+        assert f"{lister.TOOL_NAME}.events[].start.iso" in published
+        assert f"{lister.TOOL_NAME}.calendar.owner.address" in published
+        undescribed = sorted(
+            path
+            for path, field in published.items()
+            if not cast("Mapping[str, object]", field).get("description")
+        )
+        assert undescribed == [], "a model is handed these values with nothing to say what they are"
 
 
 class TestGraphFailures:

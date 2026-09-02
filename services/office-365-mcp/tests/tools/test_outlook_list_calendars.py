@@ -390,6 +390,21 @@ class TestTheSchemaItPublishes:
         assert tool.parameters.get("properties", {}) == {}
         assert tool.parameters.get("required", []) == []
 
+    async def test_the_delegated_create_is_named_as_a_tool_this_deployment_might_not_run(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        """Three presets register this tool and only the delegate one registers
+        outlook_create_event_on_behalf, so a flat "this `uri` goes to that tool" sends a model to a
+        tool that is not there. The mention stays conditional.
+        """
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        assert "also runs outlook_create_event_on_behalf" in (tool.description or "")
+
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient
     ) -> None:

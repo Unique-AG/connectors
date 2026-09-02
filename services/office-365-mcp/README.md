@@ -144,7 +144,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organiser-only check), `outlook_list_calendars` (whose calendar a row is) |
+| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organizer-only check), `outlook_search_mail` (the id exchange), `outlook_find_recipient` (the signed-in user every row's `external` is judged against), `outlook_list_calendars` (whose calendar a row is) |
 | `Chat.Read` | Delegated | No | `teams_list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
@@ -159,8 +159,8 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.Send` | Delegated | No | `outlook_send_draft` |
 | `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
 | `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
-| `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` |
-| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` |
+| `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
+| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
 | `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
 | `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
 
@@ -213,13 +213,13 @@ here.** Graph streams an MP4 inline with no ranged contract on that path, a Team
 thirty hours, and a model cannot watch video — so a tool that returned one would be a defect wearing
 a feature's clothes. `recordingContentUrl` is no better: it opens only with this connector's own
 bearer token, so passing it on is either useless or a token leak. What `teams_list_meeting_recordings`
-answers is "there is a 47-minute recording from Tuesday, only the organiser can download it, and
+answers is "there is a 47-minute recording from Tuesday, only the organizer can download it, and
 here is the transcript instead" — existence, start and end, a derived `duration_seconds` (Microsoft
 publishes no duration property at all), and `content_correlation_id`, which is Microsoft's own link
 to the transcript of the same call. Layering rule 7 forbids any module from addressing a single
 recording, because that is the only door to those bytes and the change that opens it looks like a
-convenience. The organiser-only rule is reported rather than recited: Microsoft permits only the
-meeting organiser to download a recording under delegated access, the *metadata* is not so
+convenience. The organizer-only rule is reported rather than recited: Microsoft permits only the
+meeting organizer to download a recording under delegated access, the *metadata* is not so
 restricted, and answering "there is no recording" for a participant would be a wrong answer nobody
 could detect — so an unreachable recording is always listed, with `content_access` saying which side
 of the rule this user is on.
@@ -346,12 +346,13 @@ where the tiers earn their names.
 **A create sends, and there is no draft to inspect first.** Microsoft states that a create with
 attendees mails invitations to all of them, that this keeps the organizer's and the attendees'
 views consistent, and that it *"can't be configured"*. `isDraft` on an event is an unsent-*updates*
-flag and not a state a client asks for. So `outlook_create_event` is the one calendar tool that
-reaches a person outside the mailbox, and this connector cannot recall what it sent. The tool puts
-the subject, the time and every address to the user through MCP elicitation before the first Graph
-call, and a decline creates nothing. With an empty attendee list the event is a private
-appointment nobody is told about, which is why the tool answers `invitations_sent` off the
-attendees Graph stored rather than off the arguments.
+flag and not a state a client asks for. So the two creating tools are the only calendar tools that
+reach a person outside the mailbox, and this connector cannot recall what they sent. Each one reads
+the calendar first, then puts the subject, the time and every address to the user through MCP
+elicitation before anything is written, and a decline creates nothing. With an empty attendee list
+the event is a private appointment nobody is told about, so `outlook_create_event` asks nobody
+about one, and both answer `invitations_sent` off the attendees Graph stored rather than off the
+arguments.
 
 **`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
 delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
@@ -361,7 +362,10 @@ event message, and that no property of the returned event names the delegate. So
 invitation from the owner and the signed-in user appears nowhere in the event. That is Exchange
 behaving as designed, and it is also the whole of the argument for putting this tool behind its own
 preset name. `outlook_create_event_on_behalf` reads the calendar first, refuses when `can_edit` is
-false, and always asks the person at the other end to confirm, naming the owner.
+false, and always asks the person at the other end to confirm, naming the owner. That pre-read is
+declared twice, as `Calendars.Read` and as `Calendars.Read.Shared`, because Microsoft names the
+first on `calendar-get` and the second on the delegated-create walkthrough for the same request.
+The read tier already carries both, so the delegate tier still costs a tenant one permission.
 
 **`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
 answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
@@ -379,10 +383,10 @@ was actually missing rather than the widest one in the deployment — the same r
 buy one line on a consent screen and cost every refusal its precision.
 
 **Zero admin consents is not zero administrator.** Every delegated Outlook permission here is
-published by Microsoft as `AdminConsentRequired: No`, and so is every delegated `Calendars.*` permission, so
-the preset table's last column is honestly
-zero for every Outlook row. A tenant running a restricted user-consent policy still stops an
-unprivileged user at "Need admin approval", and nothing in this service's logs says so.
+published by Microsoft as `AdminConsentRequired: No`, and so is every delegated `Calendars.*`
+permission, so the preset table's last column is honestly zero for every Outlook row. A tenant
+running a restricted user-consent policy still stops an unprivileged user at "Need admin
+approval", and nothing in this service's logs says so.
 
 **`outlook-send` is the tier to argue about, and it is one tool wide.** `outlook_send_draft` takes
 an `outlook:///drafts/{id}` handle and nothing else, and only `outlook_draft_mail` and
@@ -532,9 +536,10 @@ exchange hands the caller's Graph token as a string; this package sends it.
 - **Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
   as the way a client app stops the server from acting twice on one retried POST, and publishes no
   rule for what a duplicate does. Both halves are therefore used: the id is a uuid5 over the target
-  calendar and the event a caller asked for, so the same call composes the same id, and the request
-  opts out of the SDK's retry middleware. One 503 that Graph already acted on is one invitation
-  rather than four.
+  (the user's own calendar, or the delegated calendar's id) and every value the request carried, so
+  the same request composes the same id, and a request that differs in subject, time, zone, place,
+  body, attendees or the Teams setting composes another. The request also opts out of the SDK's
+  retry middleware. One 503 that Graph already acted on is one invitation rather than four.
 
 - **A calendar id and an event id are mailbox-scoped.** Microsoft states that a share recipient's
   calendar and event ids used against another mailbox return an error, so only the local-copy

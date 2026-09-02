@@ -77,17 +77,18 @@ _CalendarsQuery = CalendarsRequestBuilder.CalendarsRequestBuilderGetQueryParamet
 _DESCRIPTION = """\
 List every calendar in the signed-in user's mailbox: their own, and every calendar another person \
 shared or delegated to them. This is the inventory to read before naming anybody's calendar, \
-because the `uri` of a row here is what outlook_list_events and outlook_create_event_on_behalf \
-take as `calendar_ref`, and nothing else names a calendar. A calendar another person delegated \
-arrives as a row named after THAT PERSON, with `is_mine` false and `can_edit` true, so a row \
-called `Alex Wilber` is Alex's own primary calendar as this mailbox sees it. `is_mine` is this \
-connector's own comparison of the owner's address against the signed-in user's two addresses, \
-because Microsoft publishes no sharing flag on a calendar in v1.0: null there means unknown and \
-never false. Read `can_edit` before offering to write to a calendar, because false means a create \
-on it fails whatever else is right about it. Read `can_view_private_items` as well: false means an \
-item the owner marked private arrives with its times and no subject and no preview, so an answer \
-drawn from that calendar is thinner than it looks rather than complete. This tool returns no \
-events. Use outlook_list_events for what sits on a calendar.\
+because the `uri` of a row here is what outlook_list_events takes as `calendar_ref`, and nothing \
+else names a calendar. When this deployment also runs outlook_create_event_on_behalf, that tool \
+takes the same `uri`. A calendar another person delegated arrives as a row named after THAT \
+PERSON, with `is_mine` false and `can_edit` true, so a row called `Alex Wilber` is Alex' own \
+primary calendar as this mailbox sees it. `is_mine` is this connector's own comparison of the \
+owner's address against the signed-in user's two addresses, because Microsoft publishes no \
+sharing flag on a calendar in v1.0: null there means unknown and never false. Read `can_edit` \
+before offering to write to a calendar, because false means a create on it fails whatever else \
+is right about it. Read `can_view_private_items` as well: false means an item the owner marked \
+private arrives with its times and no subject and no preview, so an answer drawn from that \
+calendar is thinner than it looks rather than complete. This tool returns no events. Use \
+outlook_list_events for what sits on a calendar.\
 """
 
 

@@ -12,11 +12,13 @@ confirmation below exists for.
 
 **Two calls, and the read comes first.** Step 1 of that walkthrough is "Adele gets the calendar
 that Alex has delegated to her" and step 2 is "Adele sends a meeting invitation to Christie and
-Megan on Alex' behalf". The read is not a formality here. It answers two questions nothing else
-can: who owns the calendar, which is what makes the confirmation answerable, and `canEdit`, which
-Microsoft describes for the delegated row as "true since as delegate, Adele has write access to
-non-private events in the delegated calendar". A calendar shared read-only reports it false, and
-this file refuses before the create rather than after a Graph 403.
+Megan on Alex' behalf". The read is not a formality here. It answers three questions: who owns the
+calendar, which is what makes the confirmation answerable, `canEdit`, which Microsoft
+describes for the delegated row as "true since as delegate, Adele has write access to
+non-private events in the delegated calendar", and `allowedOnlineMeetingProviders`, which names
+the online-meeting providers that calendar takes. A calendar shared read-only reports `canEdit`
+false, and a calendar that names providers without Teams among them refuses `online_meeting`. This
+file refuses on both before the create rather than after a Graph error.
 
 **A create is a send, and there is no draft.** "When you create an event that includes attendees,
 the server sends invitations to all attendees. This ensures consistency between the organizer's
@@ -31,14 +33,19 @@ attendees notifies nobody, but on a delegated calendar it still writes into anot
 under that person's name, where they find it without ever being asked. So the question goes to a
 person whether the attendee lists are empty or not.
 
-**Two permissions, in the order the two calls happen.** Microsoft names the least privileged
+**Three permissions, in the order the two calls happen.** Microsoft names the least privileged
 delegated permission for step 1 as `Calendars.Read.Shared` and for step 2 as
-`Calendars.ReadWrite.Shared`. The On-Behalf-Of token is minted for exactly what this file
-declares, so declaring the write alone answers a 403 to this tool's own pre-read. The write
-permission is broad by Microsoft's own description — "Allows the app to create, read, update and
-delete events in all calendars in the organization user has permissions to access. This includes
-delegate and shared calendars" (https://learn.microsoft.com/en-us/graph/permissions-reference) —
-and that breadth is exactly why the preset that carries this tool is the one to argue about.
+`Calendars.ReadWrite.Shared`. Step 1 is `GET /me/calendars/{id}`, and that operation's own table
+names `Calendars.ReadBasic`, `Calendars.Read` and `Calendars.ReadWrite` and no `.Shared` scope at
+all (https://learn.microsoft.com/en-us/graph/api/calendar-get). Two Microsoft pages name two
+permissions for one request, so the read is declared under both of them. `Calendars.Read` costs a
+tenant nothing here, because every calendar preset carries it for the read tools already. The
+On-Behalf-Of token is minted for exactly what this file declares, so declaring the write alone
+answers a 403 to this tool's own pre-read. The write permission is broad by Microsoft's own
+description — "Allows the app to create, read, update and delete events in all calendars in the
+organization user has permissions to access. This includes delegate and shared calendars"
+(https://learn.microsoft.com/en-us/graph/permissions-reference) — and that breadth is exactly why
+the preset that carries this tool is the one to argue about.
 
 **`no_retry()` and `transactionId` together.** The SDK retries `POST` on 429, 503 and 504 three
 times by default, so an unguarded create sends the same invitation up to four times. Microsoft's
@@ -64,7 +71,6 @@ those properties, so none of them is spellable here, and a series or an attachme
 person's calendar is not something a model can reach by filling in a field.
 """
 
-import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Annotated
@@ -92,9 +98,14 @@ from office_365_mcp.shared.calendar import (
     EventDraft,
     EventTime,
     calendar_of,
+    created_event,
     event_body,
     event_time,
+    is_midnight,
+    providers_without_teams,
+    repeated_address,
     transaction_id_for,
+    wall_clock,
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
@@ -112,8 +123,14 @@ TOOL_NAME = "outlook_create_event_on_behalf"
 # calendar it lands on, and two names for it make one request read as two on a dashboard.
 STEP_CREATE = "create_event"
 
-# In the order the two calls happen: read the calendar, then write to it.
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read.Shared", "Calendars.ReadWrite.Shared")
+# In the order the two calls happen: read the calendar, then write to it. The read is declared
+# twice, because `calendar-get` names `Calendars.Read` for it and Microsoft's delegated-create
+# walkthrough names `Calendars.Read.Shared` for the same request.
+GRAPH_PERMISSIONS: tuple[str, ...] = (
+    "Calendars.Read",
+    "Calendars.Read.Shared",
+    "Calendars.ReadWrite.Shared",
+)
 
 # Synthetic throughout, and the attendee list is empty on purpose: an example that invited
 # somebody puts the registry's own permission probe behind a person's confirmation.
@@ -137,10 +154,6 @@ GRAPH_NOT_FOUND = (
     + "calendar. Call outlook_list_calendars again to see what the signed-in user can still "
     + "write to, and tell the user the calendar is no longer theirs to write to if it is gone."
 )
-
-# A local wall-clock moment and nothing else: no offset, no trailing `Z`. The zone belongs in
-# `time_zone`, which Graph reads as the zone of both bounds.
-_LOCAL_MOMENT = re.compile(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?\Z")
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
@@ -206,12 +219,32 @@ _BACKWARD_TIMES = (
 
 _ADDRESS_IN_BOTH_LISTS = (
     "outlook_create_event_on_behalf was given the same address in `attendees` and in "
-    + "`optional_attendees`, and Microsoft holds one attendee per person: the second entry "
-    + "silently overwrites the first, so which of the two Exchange keeps is not knowable from "
-    + "here. NO EVENT WAS CREATED and nobody was invited. Put each person in one list only: "
-    + "`attendees` when the user needs them there, `optional_attendees` when the meeting works "
-    + "without them. Retrying the same two lists will fail identically."
+    + "`optional_attendees`, and this tool takes each person once. NO EVENT WAS CREATED and "
+    + "nobody was invited. Put each person in one list only: `attendees` when the user needs them "
+    + "there, `optional_attendees` when the meeting works without them. Retrying the same two "
+    + "lists will fail identically."
 )
+
+
+def _not_midnight(starts_at: str, ends_at: str) -> str:
+    return (
+        f"outlook_create_event_on_behalf was given `all_day` true with {starts_at!r} and "
+        + f'{ends_at!r}, and Microsoft holds an all-day event from midnight to midnight: "If '
+        + "true, regardless of whether it's a single-day or multi-day event, start, and endtime "
+        + 'must be set to midnight and be in the same time zone". NO EVENT WAS CREATED and nobody '
+        + "was invited. Either write `starts_at` as midnight on the first day and `ends_at` as "
+        + "the midnight after the last day the event covers, or leave `all_day` off and book the "
+        + "hours the user asked for. Retrying these values will fail identically."
+    )
+
+
+def _invited_twice(argument: str, address: str) -> str:
+    return (
+        f"outlook_create_event_on_behalf was given {address!r} more than once in `{argument}`, "
+        + "and this tool takes each person once. NO EVENT WAS CREATED and nobody was invited. "
+        + "Name each person once, whatever the case of the address. Retrying the same list will "
+        + "fail identically."
+    )
 
 
 def _bad_moment(argument: str, value: str) -> str:
@@ -325,8 +358,9 @@ class CreatedEventOnBehalf(BaseModel):
     join_url: str | None = Field(
         description=(
             "The link that joins the online meeting, from Graph's `onlineMeeting.joinUrl` and "
-            + "never from the deprecated `onlineMeetingUrl`. Null when the event has no online "
-            + "meeting, and also when Microsoft had not yet filled the joining details in."
+            + "never from `onlineMeetingUrl`, which Microsoft says will be deprecated. Null when "
+            + "the event has no online meeting, and also when Microsoft had not yet filled the "
+            + "joining details in."
         )
     )
     location: str | None = Field(
@@ -420,6 +454,8 @@ async def create_event_on_behalf(
     with graph_errors(TOOL_NAME):
         calendar = await calendar_of(client, calendar_id=handle.calendar_id)
         refused = _READ_ONLY_CALENDAR if calendar.can_edit is False else None
+        if refused is None and draft.online_meeting:
+            refused = _no_teams_meeting(calendar)
         if refused is None:
             with not_graph():
                 refused = await confirm(_question(calendar, draft))
@@ -450,19 +486,23 @@ def _composed(
 ) -> EventDraft:
     """The draft these arguments describe, once every one of them is answerable.
 
-    Every refusal happens here, before the first Graph request. A create that reached Microsoft
-    and then failed validation is a create nobody can be sure did not send an invitation.
+    Every argument refusal happens here, before the first Graph request. A create that reached
+    Microsoft and then failed validation is a create nobody can be sure did not send an
+    invitation.
     """
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
     if closes <= opens:
         raise ToolError(_BACKWARD_TIMES)
+    if all_day and not (is_midnight(opens) and is_midnight(closes)):
+        raise ToolError(_not_midnight(starts_at, ends_at))
     _one_span(closes - opens, all_day=all_day)
     required = _addresses(attendees, argument="attendees")
     optional = _addresses(optional_attendees, argument="optional_attendees")
     if len(required) + len(optional) > MAX_ATTENDEES:
         raise ToolError(_too_many_people(len(required) + len(optional)))
-    if {address.casefold() for address in required} & {address.casefold() for address in optional}:
+    # Each list already names every address once, so a repeat across the two is the only one left.
+    if repeated_address([*required, *optional]) is not None:
         raise ToolError(_ADDRESS_IN_BOTH_LISTS)
     return EventDraft(
         subject=subject,
@@ -481,16 +521,15 @@ def _composed(
 def _moment(argument: str, value: str) -> datetime:
     """One bound as a local wall-clock time, for the comparison and the length check only.
 
-    The value that reaches Graph is the caller's own string, not this datetime: Microsoft reads
-    `dateTime` beside the `timeZone` name, and reformatting the string here changes which
-    instant the event is at for a zone this connector cannot resolve.
+    `wall_clock` in `shared/calendar.py` is the one speller for the shape both creates accept, so
+    the two tools refuse the same values. The value that reaches Graph is the caller's own string,
+    not this datetime: Microsoft reads `dateTime` beside the `timeZone` name, and reformatting the
+    string here changes which instant the event is at for a zone this connector cannot resolve.
     """
-    if _LOCAL_MOMENT.match(value) is None:
+    moment = wall_clock(value)
+    if moment is None:
         raise ToolError(_bad_moment(argument, value))
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        raise ToolError(_bad_moment(argument, value)) from None
+    return moment
 
 
 def _one_span(span: timedelta, *, all_day: bool) -> None:
@@ -501,12 +540,41 @@ def _one_span(span: timedelta, *, all_day: bool) -> None:
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    """Each entry trimmed, once every one of them is a single address."""
+    """Each entry trimmed, once every one of them is one address that the list names once.
+
+    `repeated_address` in `shared/calendar.py` is the one speller for the repeat, so this tool and
+    the own-calendar create accept the same lists. One list is checked against itself for the same
+    reason the two lists are checked against each other: this tool takes each person once.
+    """
     trimmed = tuple(address.strip() for address in addresses)
     for address in trimmed:
         if ONE_ADDRESS.match(address) is None:
             raise ToolError(_bad_address(argument, address))
+    twice = repeated_address(trimmed)
+    if twice is not None:
+        raise ToolError(_invited_twice(argument, twice))
     return trimmed
+
+
+def _no_teams_meeting(calendar: Calendar) -> str | None:
+    """The refusal for a calendar Microsoft says takes no Teams meeting, and None otherwise.
+
+    `providers_without_teams` in `shared/calendar.py` is the one speller for that reading of the
+    pre-read, so this tool and the own-calendar create refuse the same calendars. It answers None
+    for an empty or an absent list, which is Graph naming no provider rather than Graph refusing
+    Teams.
+    """
+    allowed = providers_without_teams(calendar)
+    if allowed is None:
+        return None
+    return (
+        "outlook_create_event_on_behalf was asked for an online meeting on a calendar that takes "
+        + "no Microsoft Teams meeting: Microsoft reports the providers it allows as "
+        + f"{', '.join(allowed)}, and a Teams meeting is the only kind this connector creates. NO "
+        + "EVENT WAS CREATED and nobody was invited. Call again with `online_meeting` left off to "
+        + "book the time without a joining link, and tell the user which providers that calendar "
+        + "allows. Retrying the same call fails identically."
+    )
 
 
 def _question(calendar: Calendar, draft: EventDraft) -> str:
@@ -541,8 +609,21 @@ def _everyone(draft: EventDraft) -> list[str]:
     return [*draft.attendees, *(f"{address} (optional)" for address in draft.optional_attendees)]
 
 
+def a_person_agrees(ctx: Context) -> Confirm:
+    """This tool's own three words for the confirmation `shared/seam.py` puts to a person.
+
+    Named rather than written inline in `register`, so a test can drive the same confirmation the
+    registered tool builds instead of one that only resembles it.
+    """
+    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_HAPPENED)
+
+
 async def _created(client: GraphServiceClient, calendar: Calendar, draft: EventDraft) -> Event:
-    """The create itself. One request, not retried, and answered with Graph's own 201."""
+    """The create itself. One request, not retried, and answered with Graph's own 201.
+
+    `created_event` is what reads that 201: Microsoft's own walkthrough answers this step with an
+    `eventMessage` envelope, and an unchecked answer mints an event handle around a message id.
+    """
     assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
     with graph_step(STEP_CREATE):
         created = await client.me.calendars.by_calendar_id(calendar.id).events.post(
@@ -551,8 +632,7 @@ async def _created(client: GraphServiceClient, calendar: Calendar, draft: EventD
                 options=no_retry(), headers=_immutable_ids()
             ),
         )
-    assert created is not None, "Graph answered an event create with no event"
-    return created
+    return created_event(created)
 
 
 def _immutable_ids() -> HeadersCollection:
@@ -570,7 +650,10 @@ def _answer(created: Event, *, calendar: Calendar, draft: EventDraft) -> Created
     name Graph accepts and `zoneinfo` cannot resolve, such as `W. Europe Standard Time`, leaves UTC
     as the zone to render in, and `EventTime` still carries Microsoft's own two values verbatim.
     """
-    assert created.id is not None, "Graph created an event it gave no id, which cannot be addressed"
+    assert created.id is not None, (
+        "Graph created an event it gave no id, which cannot be addressed. The event was created, "
+        "and any invitations went out."
+    )
     assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
     online = created.online_meeting
     stored = EventAttendee.each_of(created.attendees)
@@ -660,11 +743,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The zone both `starts_at` and `ends_at` are read in. There is no default, "
                     + "because guessing one puts the meeting hours away from where the user wants "
                     + "it. Ask the user which zone they mean if you do not know. It reaches "
-                    + "Microsoft exactly as written, and Microsoft accepts either an IANA name "
-                    + "such as `Europe/Zurich` or a Windows name such as `W. Europe Standard "
-                    + "Time`. A zone this connector cannot resolve costs only the converted "
-                    + "timestamp in the answer: the event itself is still created in the zone "
-                    + "named here."
+                    + "Microsoft exactly as written, and Microsoft accepts every Windows name "
+                    + "such as `W. Europe Standard Time` and a fixed list of IANA names such as "
+                    + "`Europe/Berlin`. A name outside both lists, or one the mailbox server is "
+                    + "not configured for, is refused by Exchange after the person confirmed. A "
+                    + "zone this connector cannot resolve costs only the converted timestamp in "
+                    + "the answer: the event itself is still created in the zone named here."
                 ),
             ),
         ],
@@ -744,9 +828,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Add a Microsoft Teams meeting, so the invitation carries a joining link. "
                     + "Microsoft cannot undo this once the event exists: no tool here removes "
-                    + "the meeting from it afterwards. The calendar's own "
-                    + "`allowed_online_meeting_providers` says whether the tenant takes Teams "
-                    + "meetings on that calendar at all."
+                    + "the meeting from it afterwards. This tool reads that calendar's own "
+                    + "`online_meeting_providers`, the field outlook_list_calendars reports, and "
+                    + "refuses before it asks anybody when Teams is not among them, naming the "
+                    + "providers that calendar allows."
                 ),
             ),
         ] = False,
@@ -765,7 +850,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             location=location,
             all_day=all_day,
             online_meeting=online_meeting,
-            confirm=person_confirms(
-                ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_HAPPENED
-            ),
+            confirm=a_person_agrees(ctx),
         )
