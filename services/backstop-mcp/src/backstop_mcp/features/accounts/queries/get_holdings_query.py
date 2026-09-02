@@ -121,7 +121,8 @@ class GetHoldingsQuery:
             # endpoint did not answer usably, so use the documented one.
             logger.warning(
                 "accounts.holdings.table_unavailable_using_documented_walk",
-                extra={"owner_id": owner_id, "error": f"{type(exc).__name__}: {exc}"},
+                extra={"owner_id": owner_id},
+                exc_info=exc,
             )
         return await self._documented_holdings(owner_id=owner_id, include_closed=include_closed)
 
