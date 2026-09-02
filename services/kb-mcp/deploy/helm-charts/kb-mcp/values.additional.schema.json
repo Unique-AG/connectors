@@ -46,9 +46,7 @@
             "type": "string"
           },
           "default": [],
-          "examples": [
-            ["search", "read_file"]
-          ]
+          "examples": [["search", "read_file"]]
         },
         "search": {
           "type": "object",
