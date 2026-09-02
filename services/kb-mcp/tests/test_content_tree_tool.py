@@ -75,8 +75,10 @@ class FakeSnapshot:
     files: list[tuple[MagicMock, PurePosixPath]] = field(default_factory=list)
     complete: bool = True
     rendered: str = "tree output"
+    render_calls: list[dict[str, object]] = field(default_factory=list)
 
-    def render(self, **_kwargs: object) -> str:
+    def render(self, **kwargs: object) -> str:
+        self.render_calls.append(kwargs)
         return self.rendered
 
 
@@ -617,6 +619,28 @@ async def test_tree_forwards_clamped_timeout_to_via_folders_api():
     _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
     assert kwargs["timeout"] == 45.0
     assert kwargs["max_concurrent_directory_listings"] == 25
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_hides_files_in_the_render():
+    snapshot = FakeSnapshot()
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="tree", folders_only=True, config=ContentTreeToolConfig()
+        )
+
+    assert snapshot.render_calls[-1]["show_files"] is False
+
+
+@pytest.mark.asyncio
+async def test_tree_default_shows_files_in_the_render():
+    snapshot = FakeSnapshot()
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    assert snapshot.render_calls[-1]["show_files"] is True
 
 
 @pytest.mark.asyncio

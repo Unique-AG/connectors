@@ -7,6 +7,7 @@
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
@@ -50,9 +51,50 @@ _INCOMPLETE_NOTICE = (
 )
 
 
+def _with_incomplete_notice(complete: bool, body: str) -> str:
+    return ("" if complete else _INCOMPLETE_NOTICE) + body
+
+
 def clamped_content_tree_timeout(requested: float | None, settings: Settings) -> float:
     raw = settings.content_tree_timeout_seconds if requested is None else requested
     return min(max(0.0, raw), settings.content_tree_max_timeout_seconds)
+
+
+def _substring_matches(
+    files: Sequence[tuple[ContentInfo, PathLike]],
+    *,
+    query: str,
+    limit: int,
+    min_score: float,
+    match_on: MatchTarget,
+    case_sensitive: bool,
+) -> list[FuzzyMatch]:
+    needle = query if case_sensitive else query.lower()
+    matches: list[FuzzyMatch] = []
+    for content_info, path in files:
+        key = content_info.key or ""
+        display = display_path(path)
+        key_matches = needle in key if case_sensitive else needle in key.lower()
+        path_matches = (
+            needle in display if case_sensitive else needle in display.lower()
+        )
+        if match_on == "key":
+            matched, matched_on = key_matches, "key"
+        elif match_on == "path":
+            matched, matched_on = path_matches, "path"
+        else:
+            matched = key_matches or path_matches
+            matched_on = "key" if key_matches else "path"
+        if matched and 1.0 >= min_score:
+            matches.append(
+                FuzzyMatch(
+                    content_info=content_info,
+                    path_segments=list(path_parts(path)),
+                    score=1.0,
+                    matched_on=matched_on,
+                )
+            )
+    return matches[:limit]
 
 
 def _file_link(
@@ -116,6 +158,15 @@ async def content_tree(
         int | None,
         Field(description="Maximum folder depth to render (1 = top-level only)."),
     ] = None,
+    folders_only: Annotated[
+        bool,
+        Field(
+            description=(
+                "mode='tree' only: omit files, showing just the folder "
+                "structure (like `tree -d`)."
+            )
+        ),
+    ] = False,
     folder_path: Annotated[
         str | None,
         Field(
@@ -185,7 +236,8 @@ async def content_tree(
     need to enumerate everything in a known location; or you're about to call
     read_file and need the content_id first. Pick a mode; only that mode's
     args below apply, rest ignored. '*' = required.
-    - mode='tree': max_depth, timeout — first orientation view of folders/files.
+    - mode='tree': max_depth, folders_only, timeout — first orientation view
+    of folders/files.
     - mode='list': folder_path, limit, timeout — flat listing; each result's
     content_id is needed for a later read_file call.
     - mode='search': query*, limit, min_score, match_on, case_sensitive,
@@ -250,8 +302,9 @@ async def content_tree(
         )
 
         if mode == "tree":
-            text = ("" if snapshot.complete else _INCOMPLETE_NOTICE) + snapshot.render(
-                max_depth=max_depth
+            text = _with_incomplete_notice(
+                snapshot.complete,
+                snapshot.render(max_depth=max_depth, show_files=not folders_only),
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])
@@ -278,7 +331,7 @@ async def content_tree(
                 for content_info, path in rows
             ]
             body = "\n".join(lines) if lines else "No visible files match."
-            text = ("" if snapshot.complete else _INCOMPLETE_NOTICE) + body
+            text = _with_incomplete_notice(snapshot.complete, body)
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
                 cid,
@@ -311,38 +364,14 @@ async def content_tree(
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
         else:
-            needle = query if effective_case_sensitive else query.lower()
-            matches = []
-            for content_info, path in snapshot.files:
-                key = content_info.key or ""
-                display = display_path(path)
-                key_matches = (
-                    needle in key if effective_case_sensitive else needle in key.lower()
-                )
-                path_matches = (
-                    needle in display
-                    if effective_case_sensitive
-                    else needle in display.lower()
-                )
-                if effective_match_on == "key":
-                    matched = key_matches
-                    matched_on = "key"
-                elif effective_match_on == "path":
-                    matched = path_matches
-                    matched_on = "path"
-                else:
-                    matched = key_matches or path_matches
-                    matched_on = "key" if key_matches else "path"
-                if matched and 1.0 >= effective_min_score:
-                    matches.append(
-                        FuzzyMatch(
-                            content_info=content_info,
-                            path_segments=list(path_parts(path)),
-                            score=1.0,
-                            matched_on=matched_on,
-                        )
-                    )
-            matches = matches[:effective_limit]
+            matches = _substring_matches(
+                snapshot.files,
+                query=query,
+                limit=effective_limit,
+                min_score=effective_min_score,
+                match_on=effective_match_on,
+                case_sensitive=effective_case_sensitive,
+            )
         frontend_base_url = kb_settings.frontend_base_url_str()
         lines = [
             f"{_file_link(m.content_info, m.path_segments, frontend_base_url)} "
@@ -350,7 +379,7 @@ async def content_tree(
             for m in matches
         ]
         body = "\n".join(lines) if lines else "No matching files found."
-        text = ("" if snapshot.complete else _INCOMPLETE_NOTICE) + body
+        text = _with_incomplete_notice(snapshot.complete, body)
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
             cid,
