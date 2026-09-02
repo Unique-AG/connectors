@@ -62,6 +62,40 @@ def clamped_content_tree_timeout(requested: float | None, settings: Settings) ->
     return min(max(0.0, raw), settings.content_tree_max_timeout_seconds)
 
 
+def _mode_misuse_error(
+    mode: Literal["tree", "list", "search"],
+    *,
+    query: str | None,
+    match_on: MatchTarget | None,
+    min_score: float | None,
+    case_sensitive: bool | None,
+    folder_path: str | None,
+) -> str | None:
+    """A param from the wrong mode silently doing nothing gives the caller no
+    signal it made a mistake — surface it instead of quietly ignoring it."""
+    if mode != "search":
+        search_only = {
+            "query": query,
+            "match_on": match_on,
+            "min_score": min_score,
+            "case_sensitive": case_sensitive,
+        }
+        misused = [name for name, value in search_only.items() if value is not None]
+        if misused:
+            return (
+                f"{', '.join(misused)} only apply to mode='search' and are ignored "
+                f"under mode='{mode}'. Call content_tree(mode='search', query=...) "
+                f"to filter, or drop them to browse with mode='{mode}'."
+            )
+    if mode != "list" and folder_path is not None:
+        return (
+            "folder_path only applies to mode='list' and is ignored under "
+            f"mode='{mode}'. Call content_tree(mode='list', folder_path=...) to "
+            f"scope a listing, or drop it to use mode='{mode}'."
+        )
+    return None
+
+
 def _substring_matches(
     files: Sequence[tuple[ContentInfo, PathLike]],
     *,
@@ -272,6 +306,20 @@ async def content_tree(
                         text="query is required when mode='search'",
                     )
                 ],
+            )
+
+        misuse_error = _mode_misuse_error(
+            mode,
+            query=query,
+            match_on=match_on,
+            min_score=min_score,
+            case_sensitive=case_sensitive,
+            folder_path=folder_path,
+        )
+        if misuse_error is not None:
+            return ToolResult(
+                is_error=True,
+                content=[TextContent(type="text", text=misuse_error)],
             )
 
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.

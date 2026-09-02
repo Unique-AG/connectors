@@ -215,6 +215,71 @@ async def test_mode_search_without_query_returns_error_without_calling_service()
 
 
 @pytest.mark.asyncio
+async def test_tree_mode_with_query_errors_instead_of_silently_ignoring_it():
+    """A search-only param under mode='tree' used to be silently ignored,
+    giving no signal the call did the wrong thing — must now error before
+    ever reaching the service."""
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="tree",
+            query="reconciliation",
+            match_on="both",
+            config=ContentTreeToolConfig(),
+        )
+
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "query" in text
+    assert "match_on" in text
+    assert "mode='search'" in text
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_list_mode_with_min_score_errors():
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="list", min_score=0.5, config=ContentTreeToolConfig()
+        )
+
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    assert "min_score" in result.content[0].text  # type: ignore[union-attr]
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_search_mode_with_folder_path_errors():
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="search",
+            query="a.pdf",
+            folder_path="Contracts",
+            config=ContentTreeToolConfig(),
+        )
+
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "folder_path" in text
+    assert "mode='list'" in text
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tree_mode_with_folder_path_errors():
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree") as mock_cls:
+        result = await content_tree(
+            mode="tree", folder_path="Contracts", config=ContentTreeToolConfig()
+        )
+
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_folder_path_prefix_filter_is_case_sensitive_exact_match():
     mock_tree = _make_mock_tree(
         snapshot=FakeSnapshot(
