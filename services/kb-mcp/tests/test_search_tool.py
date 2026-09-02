@@ -161,6 +161,93 @@ async def test_search_string_becomes_the_search_query():
     assert len(result.content) == 2
 
 
+class _FakeState:
+    """Distinguishes "never touched" from "set to None" — a MagicMock can't."""
+
+    metadata_filter_override: object = "UNSET_SENTINEL"
+
+
+async def _run_search_capturing_state(**search_kwargs) -> _FakeState:
+    chunks = [_make_chunk("result A")]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await search(search_string="query", config=SearchToolConfig(), **search_kwargs)
+
+    return mock_service.state
+
+
+@pytest.mark.asyncio
+async def test_no_folder_ids_leaves_metadata_filter_override_untouched():
+    state = await _run_search_capturing_state()
+
+    assert state.metadata_filter_override == "UNSET_SENTINEL"
+
+
+_DEFAULT_ADMIN_FILTER = {"path": ["folderId"], "operator": "isNotNull", "value": ""}
+
+
+@pytest.mark.asyncio
+async def test_folder_ids_defaults_to_include_subfolders_true():
+    state = await _run_search_capturing_state(folder_ids=["scope_a"])
+
+    assert state.metadata_filter_override == {
+        "and": [
+            {
+                "or": [
+                    {
+                        "operator": "contains",
+                        "path": ["folderIdPath"],
+                        "value": "scope_a",
+                    }
+                ]
+            },
+            _DEFAULT_ADMIN_FILTER,
+        ]
+    }
+
+
+@pytest.mark.asyncio
+async def test_folder_ids_include_subfolders_true_uses_contains_on_folder_id_path():
+    state = await _run_search_capturing_state(
+        folder_ids=["scope_a"], include_subfolders=True
+    )
+
+    scope_clause = state.metadata_filter_override["and"][0]
+    assert scope_clause == {
+        "or": [{"operator": "contains", "path": ["folderIdPath"], "value": "scope_a"}]
+    }
+    # Admin's static default filter is always folded in, never bypassed.
+    assert _DEFAULT_ADMIN_FILTER in state.metadata_filter_override["and"]
+
+
+@pytest.mark.asyncio
+async def test_folder_ids_include_subfolders_false_uses_folder_id_in_clause():
+    state = await _run_search_capturing_state(
+        folder_ids=["scope_a"], include_subfolders=False
+    )
+
+    scope_clause = state.metadata_filter_override["and"][0]
+    assert scope_clause == {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_a"],
+    }
+    assert _DEFAULT_ADMIN_FILTER in state.metadata_filter_override["and"]
+
+
 @pytest.mark.asyncio
 async def test_logs_never_contain_raw_user_or_company_id(caplog):
     """user_id/company_id are confidential; logs must carry a correlation

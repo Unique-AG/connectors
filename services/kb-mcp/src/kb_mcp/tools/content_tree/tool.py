@@ -38,8 +38,10 @@ from kb_mcp.tools.content_tree.path_utils import (
     PathLike,
     display_path,
     display_path_segments,
+    folder_scope_ids,
     normalize_path_segment,
     path_parts,
+    render_tree_with_folder_ids,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -237,7 +239,12 @@ async def content_tree(
     read_file and need the content_id first. Pick a mode; only that mode's
     args below apply, rest ignored. '*' = required.
     - mode='tree': max_depth, folders_only, timeout — first orientation view
-    of folders/files.
+    of folders/files. Folder lines carry `(folder_id=scope_xxx)` when known —
+    pass that id as search's `folder_ids` to scope a search to that folder.
+    A folder shows no id until the walk reaches a file beneath it; if the one
+    you need is missing, re-run with a larger max_depth (folders_only=true
+    keeps this cheap — it only hides files from the rendered lines, not from
+    the walk that discovers ids).
     - mode='list': folder_path, limit, timeout — flat listing; each result's
     content_id is needed for a later read_file call.
     - mode='search': query*, limit, min_score, match_on, case_sensitive,
@@ -292,7 +299,13 @@ async def content_tree(
             else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
         )
         wait = clamped_content_tree_timeout(timeout, kb_settings)
-        walk_depth = max_depth if mode == "tree" else None
+        # Walk one level past the rendered cutoff: a folder at exactly
+        # max_depth is only ever discovered via its parent's listing, never
+        # visited itself, so without this its own contents are unknown —
+        # it would render as an empty leaf with no folder_id even when full.
+        walk_depth = None
+        if mode == "tree":
+            walk_depth = max_depth if max_depth is None else max_depth + 1
 
         snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
             metadata_filter=metadata_filter,
@@ -304,7 +317,12 @@ async def content_tree(
         if mode == "tree":
             text = _with_incomplete_notice(
                 snapshot.complete,
-                snapshot.render(max_depth=max_depth, show_files=not folders_only),
+                render_tree_with_folder_ids(
+                    snapshot,
+                    folder_scope_ids(snapshot.files),
+                    max_depth=max_depth,
+                    show_files=not folders_only,
+                ),
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])

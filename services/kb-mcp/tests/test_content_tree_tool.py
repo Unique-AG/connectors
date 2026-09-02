@@ -13,6 +13,9 @@ from fastmcp.server.providers.filesystem_discovery import import_module_from_fil
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
 from unique_toolkit.experimental.components.content_tree.schemas import (
+    FolderWalkSnapshot,
+)
+from unique_toolkit.experimental.components.content_tree.schemas import (
     MatchTarget as ServiceMatchTarget,
 )
 from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
@@ -53,10 +56,10 @@ def identity(monkeypatch):
     return mock
 
 
-def _make_content_info(content_id: str, key: str = ""):
+def _make_content_info(content_id: str, key: str = "", metadata: dict | None = None):
     info = MagicMock()
     info.id = content_id
-    info.metadata = None
+    info.metadata = metadata
     info.owner_id = "user_123"
     info.key = key or content_id
     return info
@@ -73,6 +76,7 @@ def _make_fuzzy_match(path_segments: list[str], score: float, content_id: str):
 @dataclass
 class FakeSnapshot:
     files: list[tuple[MagicMock, PurePosixPath]] = field(default_factory=list)
+    folder_paths: list[PurePosixPath] = field(default_factory=list)
     complete: bool = True
     rendered: str = "tree output"
     render_calls: list[dict[str, object]] = field(default_factory=list)
@@ -80,6 +84,13 @@ class FakeSnapshot:
     def render(self, **kwargs: object) -> str:
         self.render_calls.append(kwargs)
         return self.rendered
+
+    def to_trie(self):
+        # Real trie-building logic (sorting, sentinel/bracket handling) lives
+        # on the toolkit's own snapshot type — delegate rather than refork it.
+        return FolderWalkSnapshot(
+            files=self.files, folder_paths=self.folder_paths, complete=self.complete
+        ).to_trie()
 
 
 def _make_mock_tree(*, snapshot: FakeSnapshot | None = None):
@@ -130,7 +141,7 @@ async def test_mode_tree_returns_tree_view_only():
 
     assert isinstance(result, ToolResult)
     text = result.content[0].text  # type: ignore[union-attr]
-    assert text == "TREE VIEW"
+    assert text == ".\n└── LIST\n    └── VIEW"
     assert "list-result" not in text
     assert "search-result" not in text
 
@@ -362,7 +373,7 @@ async def test_refresh_true_invalidates_caller_cache_only():
     mock_tree.invalidate_cache.assert_called_once_with()
     mock_tree.resolve_visible_file_paths_via_folders_async.assert_called_once()
     assert isinstance(result, ToolResult)
-    assert result.content[0].text == "tree output"  # type: ignore[union-attr]
+    assert result.content[0].text == "."  # type: ignore[union-attr]  # empty snapshot
 
 
 @pytest.mark.asyncio
@@ -623,24 +634,105 @@ async def test_tree_forwards_clamped_timeout_to_via_folders_api():
 
 @pytest.mark.asyncio
 async def test_tree_folders_only_hides_files_in_the_render():
-    snapshot = FakeSnapshot()
+    snapshot = FakeSnapshot(
+        files=[(_make_content_info("f1"), PurePosixPath("Docs/a.pdf"))]
+    )
     mock_tree = _make_mock_tree(snapshot=snapshot)
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
-        await content_tree(
+        result = await content_tree(
             mode="tree", folders_only=True, config=ContentTreeToolConfig()
         )
 
-    assert snapshot.render_calls[-1]["show_files"] is False
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Docs" in text
+    assert "a.pdf" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folders_only_still_shows_folder_id():
+    """folders_only only ever hides files — it must not also suppress the
+    folder_id annotation (plan's "show ids regardless of folders_only")."""
+    info = _make_content_info(
+        "nda", metadata={"folderIdPath": "uniquepathid://scope_legal"}
+    )
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=[(info, PurePosixPath("Legal/nda.pdf"))])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", folders_only=True, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Legal (folder_id=scope_legal)" in text
+    assert "nda.pdf" not in text
 
 
 @pytest.mark.asyncio
 async def test_tree_default_shows_files_in_the_render():
-    snapshot = FakeSnapshot()
+    snapshot = FakeSnapshot(
+        files=[(_make_content_info("f1"), PurePosixPath("Docs/a.pdf"))]
+    )
     mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Docs" in text
+    assert "a.pdf" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_walks_one_level_past_the_rendered_max_depth():
+    """A folder at exactly max_depth is only ever recorded via its parent's
+    listing, never visited itself — so the walk must go one level deeper
+    than what's rendered, or that boundary folder's own contents (and thus
+    its folder_id) can never be discovered."""
+    mock_tree = _make_mock_tree()
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await content_tree(
+            mode="tree",
+            max_depth=2,
+            config=ContentTreeToolConfig(),
+        )
+
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    assert kwargs["max_depth"] == 3
+
+
+@pytest.mark.asyncio
+async def test_tree_unlimited_depth_still_walks_unlimited():
+    mock_tree = _make_mock_tree()
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         await content_tree(mode="tree", config=ContentTreeToolConfig())
 
-    assert snapshot.render_calls[-1]["show_files"] is True
+    _, kwargs = mock_tree.resolve_visible_file_paths_via_folders_async.call_args
+    assert kwargs["max_depth"] is None
+
+
+@pytest.mark.asyncio
+async def test_tree_boundary_folder_gets_id_and_honest_summary_at_max_depth():
+    """Simulates a real walk with max_depth=2 (render cutoff) but the +1
+    fetch reaching one level further: ``Mid`` sits exactly at the render
+    cutoff and has its own file plus a further subfolder. Without the extra
+    walked level, ``Mid`` would show neither an id nor a "below" summary —
+    indistinguishable from a genuinely empty folder."""
+    info = _make_content_info(
+        "b1", metadata={"folderIdPath": "uniquepathid://scope_top/scope_mid"}
+    )
+    snapshot = FakeSnapshot(
+        files=[(info, PurePosixPath("Top/Mid/b1.txt"))],
+        folder_paths=[PurePosixPath("Top"), PurePosixPath("Top/Mid/Deep")],
+    )
+    mock_tree = _make_mock_tree(snapshot=snapshot)
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(
+            mode="tree", max_depth=2, config=ContentTreeToolConfig()
+        )
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Mid (folder_id=scope_mid)" in text
+    assert "dirs" in text and "files below" in text
 
 
 @pytest.mark.asyncio
@@ -660,7 +752,10 @@ async def test_list_does_not_pass_max_depth_into_the_walk():
 @pytest.mark.asyncio
 async def test_incomplete_tree_tells_the_model_the_listing_is_partial():
     mock_tree = _make_mock_tree(
-        snapshot=FakeSnapshot(complete=False, rendered="Legal/\n└── nda.pdf")
+        snapshot=FakeSnapshot(
+            files=[(_make_content_info("nda"), PurePosixPath("Legal/nda.pdf"))],
+            complete=False,
+        )
     )
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="tree", config=ContentTreeToolConfig())
@@ -668,7 +763,7 @@ async def test_incomplete_tree_tells_the_model_the_listing_is_partial():
     text = result.content[0].text  # type: ignore[union-attr]
     assert text.startswith("This listing is incomplete.")
     assert "call content_tree again" in text
-    assert "Legal/" in text
+    assert "Legal" in text
     assert "nda.pdf" in text
 
 
@@ -738,3 +833,60 @@ async def test_incomplete_search_respects_match_options(
         assert "No matching files found." in text
     else:
         assert f"content_id={expected_content_id}" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_shows_folder_id_for_a_folder_with_a_direct_file():
+    info = _make_content_info(
+        "nda", metadata={"folderIdPath": "uniquepathid://scope_legal"}
+    )
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=[(info, PurePosixPath("Legal/nda.pdf"))])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Legal (folder_id=scope_legal)" in text
+    assert "nda.pdf (folder_id" not in text
+
+
+@pytest.mark.asyncio
+async def test_tree_shows_folder_id_derived_from_a_nested_file_only():
+    """``Archive`` itself has no direct file — its id must still be derivable
+    from a file two levels down, via the full ancestor chain in that file's
+    ``folderIdPath``."""
+    info = _make_content_info(
+        "report",
+        metadata={"folderIdPath": "uniquepathid://scope_archive/scope_old"},
+    )
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=[(info, PurePosixPath("Archive/Old/report.pdf"))])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Archive (folder_id=scope_archive)" in text
+    assert "Old (folder_id=scope_old)" in text
+
+
+@pytest.mark.asyncio
+async def test_tree_folder_with_nothing_beneath_renders_without_id():
+    """An empty folder (no files anywhere under it) has no derivable id —
+    its line renders with no ``(folder_id=...)`` suffix, and doesn't error."""
+    info = _make_content_info(
+        "nda", metadata={"folderIdPath": "uniquepathid://scope_legal"}
+    )
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=[(info, PurePosixPath("Legal/nda.pdf"))],
+            folder_paths=[PurePosixPath("Empty")],
+        )
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Empty" in text
+    assert "Empty (folder_id" not in text

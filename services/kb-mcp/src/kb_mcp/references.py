@@ -125,7 +125,13 @@ SEARCH_SYSTEM_PROMPT = (
     "in. Returns relevant text chunks with citations; you can fetch a chunk's "
     "full source file afterward via read_file using the content_id in the "
     'result header. Do not call content_tree first "to see what\'s there" — '
-    "search directly."
+    "search directly. Exception: when the user asks to restrict the search "
+    "to a named folder ('only in X', 'just inside the X folder') rather "
+    "than merely mentioning one as a topic, call content_tree(mode='tree') "
+    "first and pass the folder_id it prints for that folder as folder_ids. "
+    "Only use an id read verbatim from a content_tree result — a guessed "
+    "one matches nothing and returns zero results with no error, so retry "
+    "unscoped before telling the user there's no answer."
 )
 
 # Trailing content block, generic clients (Claude Desktop/Code, Inspector —
@@ -162,13 +168,18 @@ SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
 )
 
 
-def scope_id_from_folder_id_path(folder_id_path: str) -> str | None:
-    """Return the leaf scope id from a ``uniquepathid://…`` path."""
+def scope_ids_from_folder_id_path(folder_id_path: str) -> list[str]:
+    """Return the ordered root→leaf ancestor scope ids from a ``uniquepathid://…`` path."""
     if not folder_id_path:
-        return None
-    segments = [
+        return []
+    return [
         sid for sid in folder_id_path.replace("uniquepathid://", "").split("/") if sid
     ]
+
+
+def scope_id_from_folder_id_path(folder_id_path: str) -> str | None:
+    """Return the leaf scope id from a ``uniquepathid://…`` path."""
+    segments = scope_ids_from_folder_id_path(folder_id_path)
     return segments[-1] if segments else None
 
 
