@@ -127,12 +127,13 @@ class SearchActivitiesQuery:
                 )
             except BackstopRateLimitError:
                 raise
-            except BackstopApiError, BackstopResponseSchemaError:
+            except (BackstopApiError, BackstopResponseSchemaError) as exc:
                 if pages_fetched == 0:
                     raise
                 logger.warning(
                     "activity_history.entity_activities.later_page_failed_returning_partial",
                     extra={"page_num": page_num, "pages_fetched": pages_fetched},
+                    exc_info=exc,
                 )
                 partial_due_to_error = True
                 break

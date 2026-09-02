@@ -387,7 +387,7 @@ async def search_activities(
         # to produce.
         logger.warning(
             "activity_history.search.primary_unavailable",
-            extra={"error": f"{type(exc).__name__}: {exc}"},
+            exc_info=exc,
         )
         return SearchActivitiesUnavailableResponse(message=_FALLBACK_MESSAGE)
 
