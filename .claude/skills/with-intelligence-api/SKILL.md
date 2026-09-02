@@ -72,9 +72,14 @@ GET  /v3/...              Authorization: Bearer <accessToken>
   design a passcode step into a login flow.
 - `POST /v3/auth/forgot-password` → emailed code → `POST /v3/auth/confirm-forgot-password`
   `{username, code, newPassword}` is the recovery path.
-- Open question worth confirming against a live call: whether `/v3/auth/refresh` returns a
-  *rotated* refresh token or the same one. It decides whether a stored session is rewritten on
-  every refresh, and therefore whether a refresh needs a lock.
+- Whether `/v3/auth/refresh` *rotates* the refresh token or returns the same one is still
+  unconfirmed against a live call. The service assumes it rotates: the stored session is
+  rewritten on every refresh and the renewal is taken under a row lock, so two replicas cannot
+  spend one token. Harmless if it turns out not to rotate; the reverse would not be.
+- The session — access and refresh token — is what this service persists, not the password.
+  A database and key compromise then yields a credential scoped to this API rather than the
+  user's whole account. The cost: nothing to fall back on when a refresh is refused, so the
+  login form is the only way back.
 
 ## 3. Shape of every read
 

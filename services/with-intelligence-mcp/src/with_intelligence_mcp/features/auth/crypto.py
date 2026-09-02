@@ -1,24 +1,27 @@
+from datetime import datetime
+
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from with_intelligence_mcp.config import EncryptionConfig
-from with_intelligence_mcp.with_intelligence_client import VendorCredential
+from with_intelligence_mcp.with_intelligence_client import VendorSession
 
 
-class InvalidCredentialEnvelopeError(ValueError):
-    """Raised when a stored credential blob is malformed, tampered with, or wrong-keyed."""
+class InvalidSessionEnvelopeError(ValueError):
+    """Raised when a stored session blob is malformed, tampered with, or wrong-keyed."""
 
 
-class _CredentialPayload(BaseModel):
-    """The JSON shape encrypted inside a credential blob.
+class _SessionPayload(BaseModel):
+    """The JSON shape encrypted inside a session blob.
 
     Plain `str`, not `SecretStr`: this is the payload actually encrypted, and pydantic's
     `SecretStr` serializes to the literal "**********" via `model_dump_json()` — using it here
-    would encrypt the redacted placeholder instead of the real password.
+    would encrypt the redacted placeholder instead of the real token.
     """
 
-    username: str
-    password: str
+    access_token: str
+    refresh_token: str
+    issued_at: datetime
 
 
 def load_key(config: EncryptionConfig) -> bytes:
@@ -37,11 +40,13 @@ def load_key(config: EncryptionConfig) -> bytes:
     return key
 
 
-def encrypt_credential(credential: VendorCredential, key: bytes) -> bytes:
-    """Encrypt a vendor credential for storage with Fernet (AES-128-CBC + HMAC)."""
+def encrypt_session(session: VendorSession, key: bytes) -> bytes:
+    """Encrypt a vendor session for storage with Fernet (AES-128-CBC + HMAC)."""
     plaintext = (
-        _CredentialPayload(
-            username=credential.username, password=credential.password.get_secret_value()
+        _SessionPayload(
+            access_token=session.access_token.get_secret_value(),
+            refresh_token=session.refresh_token.get_secret_value(),
+            issued_at=session.issued_at,
         )
         .model_dump_json()
         .encode("utf-8")
@@ -49,20 +54,24 @@ def encrypt_credential(credential: VendorCredential, key: bytes) -> bytes:
     return Fernet(key).encrypt(plaintext)
 
 
-def decrypt_credential(blob: bytes, key: bytes) -> VendorCredential:
-    """Decrypt a credential blob previously produced by `encrypt_credential`."""
+def decrypt_session(blob: bytes, key: bytes) -> VendorSession:
+    """Decrypt a session blob previously produced by `encrypt_session`."""
     try:
         plaintext = Fernet(key).decrypt(blob)
     except InvalidToken as exc:
-        raise InvalidCredentialEnvelopeError(
-            "Credential blob failed authentication — wrong key, tampered, or malformed data"
+        raise InvalidSessionEnvelopeError(
+            "Session blob failed authentication — wrong key, tampered, or malformed data"
         ) from exc
 
     try:
-        payload = _CredentialPayload.model_validate_json(plaintext)
+        payload = _SessionPayload.model_validate_json(plaintext)
     except ValidationError as exc:
-        raise InvalidCredentialEnvelopeError(
-            "Decrypted credential payload has an unexpected shape"
+        raise InvalidSessionEnvelopeError(
+            "Decrypted session payload has an unexpected shape"
         ) from exc
 
-    return VendorCredential(username=payload.username, password=SecretStr(payload.password))
+    return VendorSession(
+        access_token=SecretStr(payload.access_token),
+        refresh_token=SecretStr(payload.refresh_token),
+        issued_at=payload.issued_at,
+    )

@@ -81,8 +81,9 @@ Point MCP Inspector (`npx @modelcontextprotocol/inspector`) at the endpoint with
 metadata, so the client registers itself, runs PKCE and opens the login form in a browser. Submit
 the username and password the With Intelligence platform accepts — not the one-time passcode from
 their onboarding mail, which sets a password on their site and is never seen by this service. The
-credential is verified by signing in, encrypted, and stored against your user id; tool calls then
-query With Intelligence as you.
+password buys a vendor session and is then discarded — the access and refresh tokens it returns
+are what gets encrypted and stored against your user id, so tool calls query With Intelligence as
+you. Idle longer than the 30-day refresh lifetime and you log in again.
 
 Postgres is required: OAuth token validation reads it on every request.
 

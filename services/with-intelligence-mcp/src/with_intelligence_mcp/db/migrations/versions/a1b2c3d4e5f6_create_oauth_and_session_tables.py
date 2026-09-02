@@ -1,4 +1,4 @@
-"""create oauth, credential and login-attempt tables
+"""create oauth, session and login-attempt tables
 
 Revision ID: a1b2c3d4e5f6
 Revises:
@@ -20,7 +20,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.create_table(
-        "with_intelligence_credentials",
+        "with_intelligence_sessions",
         sa.Column("user_id", sa.String(), nullable=False),
         sa.Column("wi_username", sa.String(), nullable=False),
         sa.Column("encrypted_blob", sa.LargeBinary(), nullable=False),
@@ -39,8 +39,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("user_id"),
     )
     op.create_index(
-        op.f("ix_with_intelligence_credentials_wi_username"),
-        "with_intelligence_credentials",
+        op.f("ix_with_intelligence_sessions_wi_username"),
+        "with_intelligence_sessions",
         ["wi_username"],
         unique=True,
     )
@@ -169,7 +169,7 @@ def downgrade() -> None:
     op.drop_table("authorization_codes")
     op.drop_table("oauth_clients")
     op.drop_index(
-        op.f("ix_with_intelligence_credentials_wi_username"),
-        table_name="with_intelligence_credentials",
+        op.f("ix_with_intelligence_sessions_wi_username"),
+        table_name="with_intelligence_sessions",
     )
-    op.drop_table("with_intelligence_credentials")
+    op.drop_table("with_intelligence_sessions")

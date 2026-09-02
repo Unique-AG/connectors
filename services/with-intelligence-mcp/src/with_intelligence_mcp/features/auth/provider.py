@@ -27,12 +27,6 @@ from with_intelligence_mcp.db import AuthorizationCode as AuthorizationCodeRow
 from with_intelligence_mcp.db import OAuthClient as OAuthClientRow
 from with_intelligence_mcp.db import OAuthToken as OAuthTokenRow
 from with_intelligence_mcp.db import PendingAuthorization, read_session, transaction
-from with_intelligence_mcp.features.auth.credential_store import (
-    find_user_id_by_username,
-    get_credential,
-    save_credential,
-)
-from with_intelligence_mcp.features.auth.crypto import InvalidCredentialEnvelopeError
 from with_intelligence_mcp.features.auth.login_csrf import (
     clear_csrf_cookie,
     csrf_token_is_valid,
@@ -40,6 +34,10 @@ from with_intelligence_mcp.features.auth.login_csrf import (
     set_csrf_cookie,
 )
 from with_intelligence_mcp.features.auth.login_form import render_login_form
+from with_intelligence_mcp.features.auth.session_store import (
+    find_user_id_by_username,
+    save_session,
+)
 from with_intelligence_mcp.features.auth.throttle import (
     MAX_USERNAME_LENGTH,
     ThrottleConfig,
@@ -337,13 +335,12 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
                 ),
             )
 
-        # The sign-in *is* the credential check: there is no cheaper probe, and a session we
-        # obtain here is discarded rather than stored — `features/vendor_session` obtains its own
-        # from the stored password, so a login and a later tool call cannot disagree about which
-        # session is current.
+        # The sign-in *is* the credential check, and its result is what gets stored: the
+        # password is used here and never persisted. From this point on the refresh token is
+        # the only way back — see `db/models.WithIntelligenceSession`.
         credential = VendorCredential(username=username, password=SecretStr(password))
         try:
-            _ = await self._vendor_clients.sign_in(credential)
+            vendor_session = await self._vendor_clients.sign_in(credential)
         except SignInFailed:
             await record_failure(self._session_factory, username, source_ip=_source_ip(request))
             return self._form_response(
@@ -364,28 +361,9 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
         # Authenticated, so the guessing budget is irrelevant for this username.
         await clear_failures(self._session_factory, username)
 
-        existing_id: str | None
-        previous: VendorCredential | None = None
         async with read_session(self._session_factory) as session:
             existing_id = await find_user_id_by_username(session, username)
-            if existing_id is not None:
-                try:
-                    previous = await get_credential(session, existing_id, self._encryption_key)
-                except InvalidCredentialEnvelopeError:
-                    previous = None
-        had_previous_credential = existing_id is not None
-        credential_changed = (
-            had_previous_credential
-            if previous is None
-            else previous.password.get_secret_value() != password
-        )
-        logger.info(
-            "auth.login.succeeded",
-            extra={
-                "had_previous_credential": had_previous_credential,
-                "credential_changed": credential_changed,
-            },
-        )
+        logger.info("auth.login.succeeded", extra={"reconnected": existing_id is not None})
 
         code = secrets.token_urlsafe(32)
         code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()
@@ -404,12 +382,13 @@ class WithIntelligenceOAuthProvider(OAuthProvider):
             if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
                 already_claimed = True
             else:
-                # Propose a fresh id; `save_credential` upserts on `wi_username` and
-                # returns the durable id (existing row wins under concurrent first logins).
-                user_id = await save_credential(
+                # Propose a fresh id; `save_session` upserts on `wi_username` and returns
+                # the durable id (an existing row wins under concurrent first logins).
+                user_id = await save_session(
                     session,
                     str(uuid.uuid4()),
-                    credential,
+                    username,
+                    vendor_session,
                     self._encryption_key,
                 )
                 session.add(

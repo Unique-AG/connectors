@@ -23,11 +23,11 @@ from starlette.requests import Request
 from tests.conftest import DatabaseFixture
 from tests.helpers import BASE_URL, sign_in_ok, vendor_factory
 from with_intelligence_mcp.db import LoginAttempt, PendingAuthorization, read_session
-from with_intelligence_mcp.db import WithIntelligenceCredential as CredentialRow
+from with_intelligence_mcp.db import WithIntelligenceSession as SessionRow
 from with_intelligence_mcp.features.auth import ThrottleConfig
-from with_intelligence_mcp.features.auth.credential_store import get_credential
 from with_intelligence_mcp.features.auth.login_csrf import csrf_cookie_name
 from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthProvider
+from with_intelligence_mcp.features.auth.session_store import get_session
 
 _REDIRECT_URI = "https://client.example/callback"
 _SIGN_IN = f"{BASE_URL}/v3/auth/sign-in"
@@ -195,7 +195,10 @@ class TestLoginSubmission:
         assert "state=xyz" in location
 
     @respx.mock
-    async def test_the_credential_is_stored_encrypted(self, db: DatabaseFixture) -> None:
+    async def test_the_vendor_session_is_stored_and_the_password_is_not(
+        self, db: DatabaseFixture
+    ) -> None:
+        """The password buys a session and is then discarded — only the session is at rest."""
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
         provider = _make_provider(db)
         _, factory = db
@@ -205,13 +208,14 @@ class TestLoginSubmission:
 
         async with read_session(factory) as session:
             result = await session.execute(
-                select(CredentialRow).where(CredentialRow.wi_username == username)
+                select(SessionRow).where(SessionRow.wi_username == username)
             )
             row = result.scalar_one()
             assert b"the-password" not in row.encrypted_blob
-            restored = await get_credential(session, row.user_id, provider._encryption_key)  # pyright: ignore[reportPrivateUsage]
+            restored = await get_session(session, row.user_id, provider._encryption_key)  # pyright: ignore[reportPrivateUsage]
         assert restored is not None
-        assert restored.password.get_secret_value() == "the-password"
+        assert restored.access_token.get_secret_value() == "access-1"
+        assert restored.refresh_token.get_secret_value() == "refresh-1"
 
     @respx.mock
     async def test_a_refused_sign_in_mints_no_code(self, db: DatabaseFixture) -> None:
@@ -435,7 +439,7 @@ class TestTokenLifecycle:
 
     @respx.mock
     async def test_the_subject_is_the_stored_users_id(self, db: DatabaseFixture) -> None:
-        """This is what lets a tool call resolve whose credential to use."""
+        """This is what lets a tool call resolve whose vendor session to use."""
         respx.post(_SIGN_IN).mock(return_value=sign_in_ok())
         provider = _make_provider(db)
         _, factory = db
@@ -448,7 +452,7 @@ class TestTokenLifecycle:
         assert access is not None
         async with read_session(factory) as session:
             result = await session.execute(
-                select(CredentialRow.user_id).where(CredentialRow.wi_username == username)
+                select(SessionRow.user_id).where(SessionRow.wi_username == username)
             )
             assert access.subject == result.scalar_one()
 

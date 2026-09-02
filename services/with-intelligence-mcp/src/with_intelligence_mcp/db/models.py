@@ -113,16 +113,23 @@ class OAuthToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class WithIntelligenceCredential(Base):
-    """A user's With Intelligence username and password, encrypted at rest.
+class WithIntelligenceSession(Base):
+    """A user's vendor session — access and refresh token — encrypted at rest.
 
-    The password rather than a vendor session: their access token lives an hour and the refresh
-    token 30 days, so a stored session would expire while a stored password keeps working. The
-    session itself is held in memory (see `features/vendor_session`) and re-obtained after a
-    restart.
+    The session rather than their password, deliberately: a database and key compromise then
+    yields a credential that is scoped to this API and can be revoked, instead of the password
+    to the user's whole With Intelligence account.
+
+    The cost is that the refresh token is the only way back. It lives 30 days, so a user idle
+    longer than that logs in again, and there is nothing to fall back on if a refresh is
+    refused — `features/vendor_session` revokes their MCP tokens and the login form is the way
+    back. It also rotates, so this row is rewritten on every renewal rather than written once.
+
+    `wi_username` is kept so a returning user maps to their existing `user_id`, and so the
+    login throttle has something to key on. The password is used at login and discarded.
     """
 
-    __tablename__: str = "with_intelligence_credentials"
+    __tablename__: str = "with_intelligence_sessions"
 
     user_id: Mapped[str] = mapped_column(String, primary_key=True)
     wi_username: Mapped[str] = mapped_column(String, unique=True, index=True)

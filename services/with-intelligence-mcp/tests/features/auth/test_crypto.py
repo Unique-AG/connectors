@@ -1,6 +1,7 @@
-"""Credential encryption: the round trip, and the trap that would store a placeholder."""
+"""Session encryption: the round trip, and the trap that would store a placeholder."""
 
 import json
+from datetime import UTC, datetime
 from typing import cast
 
 import pytest
@@ -8,51 +9,63 @@ from cryptography.fernet import Fernet
 from pydantic import SecretStr
 
 from with_intelligence_mcp.config import EncryptionConfig
-from with_intelligence_mcp.features.auth import InvalidCredentialEnvelopeError, load_key
-from with_intelligence_mcp.features.auth.crypto import decrypt_credential, encrypt_credential
-from with_intelligence_mcp.with_intelligence_client import VendorCredential
+from with_intelligence_mcp.features.auth import InvalidSessionEnvelopeError, load_key
+from with_intelligence_mcp.features.auth.crypto import decrypt_session, encrypt_session
+from with_intelligence_mcp.with_intelligence_client import VendorSession
 
-CREDENTIAL = VendorCredential(username="ir@example.invalid", password=SecretStr("s3cret-pw"))
+SESSION = VendorSession(
+    access_token=SecretStr("wi-access-token"),
+    refresh_token=SecretStr("wi-refresh-token"),
+    issued_at=datetime.now(UTC),
+)
 
 
 class TestRoundTrip:
-    def test_encrypt_then_decrypt_returns_the_credential(self) -> None:
+    def test_encrypt_then_decrypt_returns_the_session(self) -> None:
         key = Fernet.generate_key()
-        restored = decrypt_credential(encrypt_credential(CREDENTIAL, key), key)
-        assert restored.username == CREDENTIAL.username
-        assert restored.password.get_secret_value() == "s3cret-pw"
+        restored = decrypt_session(encrypt_session(SESSION, key), key)
+        assert restored.access_token.get_secret_value() == "wi-access-token"
+        assert restored.refresh_token.get_secret_value() == "wi-refresh-token"
 
-    def test_the_real_password_is_encrypted_not_the_redacted_placeholder(self) -> None:
+    def test_the_real_tokens_are_encrypted_not_the_redacted_placeholder(self) -> None:
         """`SecretStr` serializes to "**********" — using it in the payload would store that."""
         key = Fernet.generate_key()
-        plaintext = Fernet(key).decrypt(encrypt_credential(CREDENTIAL, key))
+        plaintext = Fernet(key).decrypt(encrypt_session(SESSION, key))
         payload = cast("dict[str, str]", json.loads(plaintext))
-        assert payload["password"] == "s3cret-pw"
-        assert "*" not in payload["password"]
+        assert payload["refresh_token"] == "wi-refresh-token"
+        assert "*" not in payload["access_token"]
 
-    def test_the_blob_does_not_contain_the_password_in_clear(self) -> None:
+    def test_the_blob_does_not_contain_a_token_in_clear(self) -> None:
         key = Fernet.generate_key()
-        assert b"s3cret-pw" not in encrypt_credential(CREDENTIAL, key)
+        blob = encrypt_session(SESSION, key)
+        assert b"wi-refresh-token" not in blob
+        assert b"wi-access-token" not in blob
+
+    def test_freshness_survives_the_round_trip(self) -> None:
+        """`issued_at` is ours, not the vendor's, and is what `is_fresh` reads."""
+        key = Fernet.generate_key()
+        restored = decrypt_session(encrypt_session(SESSION, key), key)
+        assert restored.is_fresh is True
 
 
 class TestRejection:
     def test_a_blob_encrypted_with_another_key_is_refused(self) -> None:
-        blob = encrypt_credential(CREDENTIAL, Fernet.generate_key())
-        with pytest.raises(InvalidCredentialEnvelopeError):
-            decrypt_credential(blob, Fernet.generate_key())
+        blob = encrypt_session(SESSION, Fernet.generate_key())
+        with pytest.raises(InvalidSessionEnvelopeError):
+            decrypt_session(blob, Fernet.generate_key())
 
     def test_a_tampered_blob_is_refused(self) -> None:
         key = Fernet.generate_key()
-        blob = bytearray(encrypt_credential(CREDENTIAL, key))
+        blob = bytearray(encrypt_session(SESSION, key))
         blob[-1] ^= 0x01
-        with pytest.raises(InvalidCredentialEnvelopeError):
-            decrypt_credential(bytes(blob), key)
+        with pytest.raises(InvalidSessionEnvelopeError):
+            decrypt_session(bytes(blob), key)
 
     def test_a_wrong_shaped_payload_is_refused(self) -> None:
         key = Fernet.generate_key()
-        blob = Fernet(key).encrypt(b'{"username": "u"}')
-        with pytest.raises(InvalidCredentialEnvelopeError):
-            decrypt_credential(blob, key)
+        blob = Fernet(key).encrypt(b'{"access_token": "a"}')
+        with pytest.raises(InvalidSessionEnvelopeError):
+            decrypt_session(blob, key)
 
 
 class TestLoadKey:

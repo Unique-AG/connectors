@@ -13,7 +13,7 @@ from with_intelligence_mcp.db.models import (
     OAuthClient,
     OAuthToken,
     PendingAuthorization,
-    WithIntelligenceCredential,
+    WithIntelligenceSession,
 )
 
 __all__ = [
@@ -23,7 +23,7 @@ __all__ = [
     "OAuthClient",
     "OAuthToken",
     "PendingAuthorization",
-    "WithIntelligenceCredential",
+    "WithIntelligenceSession",
     "create_engine",
     "create_session_factory",
     "read_session",
