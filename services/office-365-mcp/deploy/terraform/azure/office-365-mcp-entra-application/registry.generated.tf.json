@@ -154,6 +154,14 @@
           "permissions": [
             "MailboxSettings.ReadWrite"
           ]
+        },
+        {
+          "name": "outlook_list_calendars",
+          "permissions": [
+            "Calendars.Read",
+            "Calendars.Read.Shared",
+            "User.Read"
+          ]
         }
       ],
       "tool_names": [
@@ -180,7 +188,8 @@
         "outlook_draft_reply",
         "outlook_send_draft",
         "outlook_set_automatic_reply",
-        "outlook_disable_mail_rule"
+        "outlook_disable_mail_rule",
+        "outlook_list_calendars"
       ],
       "always_on": "get_me",
       "presets": {
@@ -263,6 +272,9 @@
           "outlook_get_mailbox_settings",
           "outlook_set_automatic_reply",
           "outlook_disable_mail_rule"
+        ],
+        "outlook-calendar": [
+          "outlook_list_calendars"
         ]
       },
       "requestable_permissions": [

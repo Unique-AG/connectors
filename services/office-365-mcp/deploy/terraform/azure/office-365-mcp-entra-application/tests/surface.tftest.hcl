@@ -246,6 +246,17 @@ run "preset_outlook_automate" {
   }
 }
 
+run "preset_outlook_calendar" {
+  variables {
+    tools_preset = "outlook-calendar"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared"
+    error_message = "outlook-calendar composed ${join(",", local.permissions)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "teams_list_chats"]

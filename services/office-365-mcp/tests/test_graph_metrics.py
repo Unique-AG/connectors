@@ -769,6 +769,7 @@ GRAPH_STEPS = frozenset(
         "transcript_attributed",
         "transcript_unattributed",
         "calendar",
+        "calendars",
     }
 )
 
