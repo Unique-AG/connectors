@@ -94,6 +94,7 @@ class ToolsPreset(StrEnum):
     OUTLOOK_WRITE = "outlook-write"
     OUTLOOK_SEND = "outlook-send"
     OUTLOOK_AUTOMATE = "outlook-automate"
+    OUTLOOK_CALENDAR = "outlook-calendar"
 
 
 class AppConfig(BaseSettings):

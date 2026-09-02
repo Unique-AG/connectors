@@ -26,6 +26,7 @@ from office_365_mcp.tools import (
     outlook_draft_reply,
     outlook_find_recipient,
     outlook_get_mailbox_settings,
+    outlook_list_calendars,
     outlook_list_mail,
     outlook_mark_mail,
     outlook_move_mail,
@@ -141,6 +142,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_send_draft,
     outlook_set_automatic_reply,
     outlook_disable_mail_rule,
+    outlook_list_calendars,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -232,6 +234,11 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
     ),
+    # One ladder, not two axes, and the reason is what a tenant is asked to grant. Reading a
+    # calendar another person delegated costs `Calendars.Read.Shared`, so the read tier already
+    # carries the permission that a delegated deployment would otherwise be the first to ask for.
+    # Writing as another person is the tier to argue about, and it is the last row.
+    "outlook-calendar": ("outlook_list_calendars",),
 }
 
 

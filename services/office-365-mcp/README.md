@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-four
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-five
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -23,7 +23,8 @@ categories; and `outlook_mark_mail`, the first tool here that changes anything; 
 which drafts a reply or a forward from a message this connector found; and `outlook_send_draft`,
 the only tool here that puts mail on the wire; and `outlook_set_automatic_reply`,
 which turns the out-of-office on for a bounded window or off; and `outlook_disable_mail_rule`,
-which switches one inbox rule off and cannot switch one on,
+which switches one inbox rule off and cannot switch one on; and `outlook_list_calendars`,
+every calendar this mailbox reaches, the user's own and every one another person delegated,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -75,6 +76,15 @@ thing belongs there when two tools would otherwise each need a copy *and* a diff
 copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
 anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
+
+**`handles.py` spells one segment per family, and one family spells two.** Every `teams:///`
+family and every `outlook:///` mail family names a single id, and so does a calendar: Microsoft
+documents that a container type supports no immutable id, because its regular ids
+*"were already constant"*. An event is `outlook:///events/{calendar}/{event}`, two
+segments, because an event id is only meaningful beside the calendar it was read from — Graph
+answers a different id for the same meeting in a delegated copy — and the read is addressed as
+`/me/calendars/{calendar}/events/{event}` with both halves. `teams:///transcripts/{a}/{b}` is the
+same shape for the same reason.
 
 The layering rules are that **`shared/` imports no tool module, and only `shared/seam.py` imports
 FastMCP** — the seam is where the framework is spoken, which is what keeps it out of the handle
@@ -129,7 +139,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organiser-only check) |
+| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organiser-only check), `outlook_list_calendars` (whose calendar a row is) |
 | `Chat.Read` | Delegated | No | `teams_list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
@@ -144,6 +154,8 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.Send` | Delegated | No | `outlook_send_draft` |
 | `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
 | `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
+| `Calendars.Read` | Delegated | No | `outlook_list_calendars` |
+| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -286,6 +298,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
 | `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
+| `outlook-calendar` | name every calendar this mailbox reaches, own and delegated | `outlook_list_calendars` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -304,13 +317,22 @@ to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses 
 that no preset names. The names carry a product axis from the
 start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
 
-**The Outlook rows are two axes, not one ladder.** Mail content goes `outlook-read` →
+**The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
 configuration goes `outlook-mailbox` → `outlook-automate`, and touches no `Mail.*` permission at
-all. The two axes never meet, because they are unrelated: an out-of-office reply has nothing to do
-with sending mail as the user, and a forwarding-rule audit has nothing to do with reading one. A
-single cumulative chain made `outlook-automate` require `Mail.Send`, which is the defect this shape
-exists to prevent. A deployment that wants both axes names the tools in `TOOLS_ENABLED`.
+all. Calendars start at `outlook-calendar` and touch neither. The axes never meet, because they are
+unrelated: an out-of-office reply has nothing to do with sending mail as the user, a
+forwarding-rule audit has nothing to do with reading one, and a calendar read has nothing to do
+with any of them. A single cumulative chain made `outlook-automate` require `Mail.Send`, which is
+the defect this shape exists to prevent. A deployment that wants two axes names the tools in
+`TOOLS_ENABLED`.
+
+**The calendar axis carries `Calendars.Read.Shared` on its read tier, and that is why it is one
+ladder.** A calendar another person delegated arrives as a plain row of `GET /me/calendars`, and
+Microsoft names `Calendars.Read.Shared` as the least privileged permission for reading that row. So
+a deployment that reads the signed-in user's own calendars pays the same two permissions as one
+that reads a colleague's, and cutting the read tier in two buys a tenant nothing at all. Writing is
+where the tiers earn their names.
 
 **`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
 answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
@@ -328,8 +350,9 @@ was actually missing rather than the widest one in the deployment — the same r
 buy one line on a consent screen and cost every refusal its precision.
 
 **Zero admin consents is not zero administrator.** Every delegated Outlook permission here is
-published by Microsoft as `AdminConsentRequired: No`, so the preset table's last column is honestly
-zero for all five Outlook rows. A tenant running a restricted user-consent policy still stops an
+published by Microsoft as `AdminConsentRequired: No`, and so is every delegated `Calendars.*` permission, so
+the preset table's last column is honestly
+zero for every Outlook row. A tenant running a restricted user-consent policy still stops an
 unprivileged user at "Need admin approval", and nothing in this service's logs says so.
 
 **`outlook-send` is the tier to argue about, and it is one tool wide.** `outlook_send_draft` takes
