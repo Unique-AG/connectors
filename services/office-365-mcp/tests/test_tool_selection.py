@@ -324,6 +324,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_disable_mail_rule": {"rule_ref": ("outlook_get_mailbox_settings",)},
     "outlook_list_events": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_read_event": {"uri": ("outlook_list_events",)},
+    "outlook_create_event_on_behalf": {"calendar_ref": ("outlook_list_calendars",)},
 }
 
 
@@ -360,6 +361,9 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     ),
     "outlook_read_event": frozenset({"time_zone"}),
     "outlook_create_event": frozenset(
+        {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
+    ),
+    "outlook_create_event_on_behalf": frozenset(
         {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
     ),
 }
@@ -623,6 +627,18 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ("User.Read", "Calendars.Read", "Calendars.Read.Shared", "Calendars.ReadWrite"),
         0,
         5,
+    ),
+    (
+        ToolsPreset.OUTLOOK_CALENDAR_DELEGATE,
+        (
+            "User.Read",
+            "Calendars.Read",
+            "Calendars.Read.Shared",
+            "Calendars.ReadWrite",
+            "Calendars.ReadWrite.Shared",
+        ),
+        0,
+        6,
     ),
 )
 

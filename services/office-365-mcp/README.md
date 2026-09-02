@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-eight
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-nine
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -28,7 +28,8 @@ every calendar this mailbox reaches, the user's own and every one another person
 and `outlook_list_events`, what sits on one of those calendars between two dates; and
 `outlook_read_event`, one of those events in full with every attendee and their answer; and
 `outlook_create_event`, which puts one event on the user's own calendar and sends the
-invitations as it does,
+invitations as it does; and `outlook_create_event_on_behalf`, which does the same on a calendar
+somebody delegated, under that person's name,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -161,6 +162,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` |
 | `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` |
 | `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
+| `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -305,6 +307,7 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
 | `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, read what sits on one between two dates, and read one event in full | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
 | `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
+| `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -350,19 +353,15 @@ call, and a decline creates nothing. With an empty attendee list the event is a 
 appointment nobody is told about, which is why the tool answers `invitations_sent` off the
 attendees Graph stored rather than off the arguments.
 
-**Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
-as the way a client app stops the server from acting twice on one retried POST, and publishes no
-rule for what a duplicate does. So both halves are used: the id is a uuid5 over the target
-calendar and the event a caller asked for, so the same call composes the same id, and the request
-also opts out of the SDK's retry middleware. One 503 that Graph acted on is one invitation, not
-four.
-
-**Times go on the wire as wall-clock text plus a zone name, and come back in UTC.** Graph's
-`start` and `end` are a naive string beside a zone name, and Microsoft states that without the
-`Prefer: outlook.timezone` header those values are returned in UTC. This connector sends that
-header nowhere. Every answer reports Graph's own two values verbatim and converts them with
-`zoneinfo` into the zone the caller named, so nothing is lost and no conversion happens inside
-Exchange, where a zone name it rejects fails the whole call.
+**`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
+delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
+`Calendars.ReadWrite.Shared`, and Microsoft states of its own worked example that the organizer is
+the calendar owner, that the delegate's identity appears only in the sender property of the
+event message, and that no property of the returned event names the delegate. So recipients see an
+invitation from the owner and the signed-in user appears nowhere in the event. That is Exchange
+behaving as designed, and it is also the whole of the argument for putting this tool behind its own
+preset name. `outlook_create_event_on_behalf` reads the calendar first, refuses when `can_edit` is
+false, and always asks the person at the other end to confirm, naming the owner.
 
 **`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
 answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
@@ -507,6 +506,43 @@ exchange hands the caller's Graph token as a string; this package sends it.
   them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap: an empty page spends no scan
   budget, so a shared budget is no bound on empty pages at all), and raises `GraphPagingUnending`
   rather than answering short — because a short answer means a cap.
+
+- **A calendar answers "next week" through `calendarView` and never through `/me/events`.**
+  Microsoft says the events collection holds single instance meetings and series masters, and that
+  a calendar view returns the occurrences, exceptions and single instances inside a time range. So
+  a weekly series shows once per week in `outlook_list_events` and once in total in the other
+  collection. `startDateTime` and `endDateTime` are required, and Microsoft states that both are
+  read with the offset written into the value and are not affected by `Prefer: outlook.timezone`,
+  so this connector renders each bound with the offset of the zone the caller named.
+
+- **Times come back in UTC, and this connector converts them here rather than in Exchange.**
+  Graph's `start` and `end` are a naive wall-clock string beside a zone name, and Microsoft states
+  that without `Prefer: outlook.timezone` those values are returned in UTC. That header is sent
+  nowhere. Every answer reports Graph's own two values verbatim and adds the same instant converted
+  with `zoneinfo`, so nothing is lost, and a zone name Exchange rejects cannot fail a whole call.
+  The `dateTime` string carries seven fractional digits, which is one more than
+  `datetime.fromisoformat` accepts.
+
+- **There is no draft state for an event, so a create sends.** Microsoft states that creating an
+  event with attendees mails invitations to all of them and that this *"can't be configured"*, and
+  that `isDraft` marks unsent *updates* rather than an unsent event. An event with an empty
+  attendee list notifies nobody. So the two creating tools ask a person first, through MCP
+  elicitation, and nothing here recalls an invitation.
+
+- **Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
+  as the way a client app stops the server from acting twice on one retried POST, and publishes no
+  rule for what a duplicate does. Both halves are therefore used: the id is a uuid5 over the target
+  calendar and the event a caller asked for, so the same call composes the same id, and the request
+  opts out of the SDK's retry middleware. One 503 that Graph already acted on is one invitation
+  rather than four.
+
+- **A calendar id and an event id are mailbox-scoped.** Microsoft states that a share recipient's
+  calendar and event ids used against another mailbox return an error, so only the local-copy
+  routes are used — `/me/calendars/{id}` and `/me/calendars/{id}/events/{id}` — and nothing here
+  addresses `/users/{id}/...`. The same meeting therefore carries a different event id in a
+  delegated copy than in the owner's own mailbox, which is why an event handle names its calendar
+  too. An event read or minted here sends `Prefer: IdType="ImmutableId"`; a container type carries
+  no immutable id, and Microsoft says its regular ids were already constant.
 
 - **Trap:** The SDK bearer provider does not consult the allowed-hosts validator, so the host and
   scheme checks live in `_CallerTokenProvider` itself. The live exposure is `@odata.nextLink`: a next

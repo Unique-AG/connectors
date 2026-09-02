@@ -268,6 +268,22 @@ run "preset_outlook_calendar_write" {
   }
 }
 
+run "preset_outlook_calendar_delegate" {
+  variables {
+    tools_preset = "outlook-calendar-delegate"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Calendars.Read,Calendars.Read.Shared,Calendars.ReadWrite,Calendars.ReadWrite.Shared"
+    error_message = "outlook-calendar-delegate composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "every delegated Calendars permission is AdminConsentRequired: No, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "the_order_is_the_registrys_and_never_the_callers" {
   variables {
     tools_enabled = ["teams_read_message", "teams_list_chats"]
