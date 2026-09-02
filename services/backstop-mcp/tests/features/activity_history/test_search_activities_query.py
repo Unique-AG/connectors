@@ -1,4 +1,5 @@
 from datetime import date
+from typing import cast
 
 import httpx
 import pytest
@@ -6,10 +7,10 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_history import (
-    entity_activities_request_body,
-    fetch_entity_activities,
-    party_bean,
+    EntityActivityType,
+    SearchActivitiesQuery,
 )
+from tests.features.activity_history.conftest import make_search_activities_query
 from tests.helpers import BASE_URL, recorded_json_bodies
 from tests.server.tools.helpers import object_dict
 
@@ -63,20 +64,41 @@ def _meeting(row_id: int, *, title: str = "Meeting") -> dict[str, object]:
     }
 
 
-class TestPartyBean:
-    def test_encodes_the_measured_associated_withs_form(self) -> None:
-        assert party_bean("354566359") == "PartyBean_354566359"
+def _request_body(
+    *,
+    page_num: int,
+    page_size: int,
+    start_date: date,
+    end_date: date,
+    types: tuple[EntityActivityType, ...] = (),
+    party_id: str | None = None,
+    activity_tags: tuple[str, ...] = (),
+    authors: tuple[str, ...] = (),
+    include_description: bool = False,
+) -> dict[str, object]:
+    query = SearchActivitiesQuery(client=cast(BackstopClient, object()))
+    return query._request_body(  # pyright: ignore[reportPrivateUsage]
+        page_num=page_num,
+        page_size=page_size,
+        start_date=start_date,
+        end_date=end_date,
+        types=types,
+        party_id=party_id,
+        activity_tags=activity_tags,
+        authors=authors,
+        include_description=include_description,
+    )
 
 
 class TestEntityActivitiesRequestBody:
     def test_pins_the_measured_search_envelope(self) -> None:
-        body = entity_activities_request_body(
+        body = _request_body(
             page_num=1,
             page_size=500,
             start_date=date(2025, 8, 20),
             end_date=date(2026, 8, 20),
             types=("meeting_call", "email"),
-            associated_withs=("PartyBean_354566359",),
+            party_id="354566359",
             activity_tags=("474963", "455289"),
             authors=("achandrinou@deepcapitalgroup.com",),
             include_description=False,
@@ -103,13 +125,13 @@ class TestEntityActivitiesRequestBody:
 
     def test_description_flag_is_opt_in(self) -> None:
         attributes = _body_attributes(
-            entity_activities_request_body(
+            _request_body(
                 page_num=1,
                 page_size=50,
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 1, 31),
                 types=(),
-                associated_withs=(),
+                party_id=None,
                 activity_tags=("474963",),
                 authors=(),
                 include_description=True,
@@ -128,8 +150,7 @@ class TestFetchEntityActivities:
     ) -> None:
         route = respx.post(_URL).mock(return_value=_page(_meeting(76715331), total=1))
 
-        result = await fetch_entity_activities(
-            client,
+        result = await make_search_activities_query(client).run(
             start_date=date(2025, 8, 20),
             end_date=date(2026, 8, 20),
             page_size=5,
@@ -160,8 +181,7 @@ class TestFetchEntityActivities:
             ]
         )
 
-        result = await fetch_entity_activities(
-            client,
+        result = await make_search_activities_query(client).run(
             start_date=date(2024, 1, 1),
             end_date=date(2026, 8, 20),
             page_size=2,
@@ -187,8 +207,7 @@ class TestFetchEntityActivities:
             ]
         )
 
-        result = await fetch_entity_activities(
-            client,
+        result = await make_search_activities_query(client).run(
             start_date=date(2000, 1, 1),
             end_date=date(2026, 12, 31),
             page_size=10,
@@ -206,8 +225,7 @@ class TestFetchEntityActivities:
             return_value=_page(_meeting(1), _meeting(2), _meeting(3), total=50)
         )
 
-        result = await fetch_entity_activities(
-            client,
+        result = await make_search_activities_query(client).run(
             start_date=date(2024, 1, 1),
             end_date=date(2026, 8, 20),
             page_size=3,
@@ -223,8 +241,9 @@ class TestFetchEntityActivities:
     async def test_unreadable_row_is_dropped(self, client: BackstopClient) -> None:
         respx.post(_URL).mock(return_value=_page({"title": "no id"}, _meeting(9), total=2))
 
-        result = await fetch_entity_activities(
-            client, start_date=date(2024, 1, 1), end_date=date(2026, 8, 20)
+        result = await make_search_activities_query(client).run(
+            start_date=date(2024, 1, 1),
+            end_date=date(2026, 8, 20),
         )
 
         assert [row.id for row in result.rows] == ["9"]
@@ -240,8 +259,7 @@ class TestFetchEntityActivities:
             ]
         )
 
-        result = await fetch_entity_activities(
-            client,
+        result = await make_search_activities_query(client).run(
             start_date=date(2024, 1, 1),
             end_date=date(2026, 8, 20),
             page_size=2,
@@ -257,8 +275,7 @@ class TestFetchEntityActivities:
     async def test_max_rows_narrows_page_size_on_the_wire(self, client: BackstopClient) -> None:
         route = respx.post(_URL).mock(return_value=_page(_meeting(1), _meeting(2), total=50))
 
-        result = await fetch_entity_activities(
-            client,
+        result = await make_search_activities_query(client).run(
             start_date=date(2024, 1, 1),
             end_date=date(2026, 8, 20),
             max_rows=2,
@@ -277,8 +294,9 @@ class TestFetchEntityActivities:
         del row["associatedWith"]
         respx.post(_URL).mock(return_value=_page(row, total=1))
 
-        result = await fetch_entity_activities(
-            client, start_date=date(2024, 1, 1), end_date=date(2026, 8, 20)
+        result = await make_search_activities_query(client).run(
+            start_date=date(2024, 1, 1),
+            end_date=date(2026, 8, 20),
         )
 
         assert result.rows[0].associated_with == ()
@@ -291,8 +309,9 @@ class TestFetchEntityActivities:
             return_value=_page(_meeting(1) | {"attendees": "nope"}, _meeting(2), total=2)
         )
 
-        result = await fetch_entity_activities(
-            client, start_date=date(2024, 1, 1), end_date=date(2026, 8, 20)
+        result = await make_search_activities_query(client).run(
+            start_date=date(2024, 1, 1),
+            end_date=date(2026, 8, 20),
         )
 
         assert [row.id for row in result.rows] == ["2"]
@@ -306,8 +325,9 @@ class TestFetchEntityActivities:
         )
 
         with pytest.raises(BackstopApiError) as raised:
-            await fetch_entity_activities(
-                client, start_date=date(2024, 1, 1), end_date=date(2026, 8, 20)
+            await make_search_activities_query(client).run(
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
             )
 
         assert raised.value.status_code == 404

@@ -1,4 +1,4 @@
-"""`to_timeline_record`: the pure conversion from a fetched item to its wire shape.
+"""History records map from wire attributes: gist, recipient cap, and `occurred_at`.
 
 Each test targets one behaviour from the design doc's "Token budget" section: an activity
 record's gist/truncation/`description_length` wiring, email recipient capping (both under- and
@@ -10,15 +10,15 @@ gist rather than an error.
 from datetime import UTC, date, datetime
 
 from backstop_mcp.features.activity_history import (
+    ActivityAttributes,
     ActivityGroupResponse,
     ActivityHistoryResolvedResponse,
-    ActivityItemDto,
     ActivityRecordResponse,
     BackstopActivityType,
-    EmailItemDto,
+    EmailAttributes,
     EmailRecordResponse,
     ResolvedPartyAsOfResponse,
-    to_timeline_record,
+    TimelineRecord,
 )
 from backstop_mcp.features.data_hygiene import AsOfResponse, ProvenanceAttributes
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
@@ -27,7 +27,7 @@ _DEFAULT_ACTIVITY_DATE = date(2026, 1, 15)
 _DEFAULT_EMAIL_TIMESTAMP = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
 
 
-def _activity_item(
+def _activity_record(
     *,
     item_id: str = "meeting-or-calls_1",
     stream: BackstopActivityType = "meeting",
@@ -35,21 +35,32 @@ def _activity_item(
     description: str | None = "<p>hello</p>",
     effective_date: date | None = _DEFAULT_ACTIVITY_DATE,
     resource_id: str | None = "76280387",
-) -> ActivityItemDto:
-    return ActivityItemDto(
-        id=item_id,
-        stream=stream,
-        title=title,
-        description=description,
-        effective_date=effective_date,
-        resource_type="meeting-or-calls",
-        resource_id=resource_id,
-        created_timestamp=None,
-        modified_timestamp=None,
+    gist_max_chars: int = 300,
+    regarding: object | None = None,
+) -> ActivityRecordResponse:
+    return ActivityRecordResponse.from_attributes(
+        item_id,
+        stream,
+        ActivityAttributes.model_validate(
+            {
+                "title": title,
+                "description": description,
+                "effectiveDate": effective_date,
+                "specificResource": (
+                    None
+                    if resource_id is None
+                    else {"resourceId": resource_id, "resourceType": "meeting-or-calls"}
+                ),
+                "regarding": regarding,
+            }
+        ),
+        tags=(),
+        attendees=(),
+        gist_max_chars=gist_max_chars,
     )
 
 
-def _email_item(
+def _email_record(
     *,
     item_id: str = "email_1",
     subject: str | None = "Re: proposal",
@@ -58,80 +69,88 @@ def _email_item(
     to_emails: tuple[str, ...] = ("a@example.com",),
     cc_emails: tuple[str, ...] = (),
     has_attachments: bool | None = False,
-) -> EmailItemDto:
-    return EmailItemDto(
-        id=item_id,
-        subject=subject,
-        sent_timestamp=sent_timestamp,
-        from_email=from_email,
-        to_emails=to_emails,
-        cc_emails=cc_emails,
-        has_attachments=has_attachments,
-        content_url=None,
+) -> EmailRecordResponse:
+    return EmailRecordResponse.from_attributes(
+        item_id,
+        EmailAttributes.model_validate(
+            {
+                "subject": subject,
+                "sentTimestamp": sent_timestamp,
+                "fromEmail": from_email,
+                "toEmails": list(to_emails),
+                "ccEmails": list(cc_emails),
+                "hasAttachments": has_attachments,
+            }
+        ),
     )
 
 
 class TestActivityRecord:
     def test_untruncated_gist_omits_description_length(self) -> None:
-        item = _activity_item(description="<p>short body</p>")
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _activity_record(description="<p>short body</p>")
 
-        assert isinstance(record, ActivityRecordResponse)
         assert record.gist == "short body"
         assert record.gist_truncated is False
         assert record.description_length is None
 
     def test_truncated_gist_reports_full_length(self) -> None:
         body = "word " * 200
-        item = _activity_item(description=f"<p>{body}</p>")
-        record = to_timeline_record(item, gist_max_chars=20)
+        record = _activity_record(description=f"<p>{body}</p>", gist_max_chars=20)
 
-        assert isinstance(record, ActivityRecordResponse)
         assert record.gist_truncated is True
         assert record.description_length == len(body.strip())
         assert len(record.gist or "") <= 20
 
     def test_no_description_yields_empty_gist_not_an_error(self) -> None:
-        item = _activity_item(description=None)
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _activity_record(description=None)
 
-        assert isinstance(record, ActivityRecordResponse)
         assert record.gist == ""
         assert record.gist_truncated is False
         assert record.description_length is None
 
     def test_occurred_at_is_a_plain_date(self) -> None:
-        item = _activity_item(effective_date=date(2026, 3, 4))
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _activity_record(effective_date=date(2026, 3, 4))
 
-        assert isinstance(record, ActivityRecordResponse)
         assert record.occurred_at == date(2026, 3, 4)
 
     def test_carries_type_activity_id_and_resource_id(self) -> None:
-        item = _activity_item(item_id="meeting-or-calls_76280387", resource_id="76280387")
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _activity_record(item_id="meeting-or-calls_76280387", resource_id="76280387")
 
-        assert isinstance(record, ActivityRecordResponse)
         assert record.type == "meeting"
         assert record.activity_id == "meeting-or-calls_76280387"
         assert record.resource_id == "76280387"
 
+    def test_regarding_parses_from_the_stored_ref(self) -> None:
+        record = _activity_record(
+            regarding={
+                "resourceId": "o42",
+                "resourceType": "organizations",
+                "resourceLink": "/organizations/o42",
+            }
+        )
+
+        assert record.regarding is not None
+        assert record.regarding.id == "o42"
+        assert record.regarding.resource_type == "organizations"
+        assert record.regarding.search_type == "organizations"
+
+    def test_malformed_regarding_is_omitted(self) -> None:
+        record = _activity_record(regarding="not-a-ref")
+
+        assert record.regarding is None
+
 
 class TestEmailRecord:
     def test_recipient_list_under_cap_has_no_count(self) -> None:
-        item = _email_item(to_emails=("a@example.com", "b@example.com"))
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _email_record(to_emails=("a@example.com", "b@example.com"))
 
-        assert isinstance(record, EmailRecordResponse)
         assert record.to_emails == ("a@example.com", "b@example.com")
         assert record.to_emails_count is None
 
     def test_recipient_list_over_cap_is_truncated_with_count(self) -> None:
         addresses = tuple(f"user{i}@example.com" for i in range(5))
-        item = _email_item(to_emails=addresses, cc_emails=addresses)
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _email_record(to_emails=addresses, cc_emails=addresses)
 
-        assert isinstance(record, EmailRecordResponse)
         assert record.to_emails == addresses[:3]
         assert record.to_emails_count == 5
         assert record.cc_emails == addresses[:3]
@@ -139,25 +158,21 @@ class TestEmailRecord:
 
     def test_occurred_at_is_a_full_timestamp(self) -> None:
         sent = datetime(2026, 3, 4, 8, 15, tzinfo=UTC)
-        item = _email_item(sent_timestamp=sent)
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _email_record(sent_timestamp=sent)
 
-        assert isinstance(record, EmailRecordResponse)
         assert record.occurred_at == sent
 
     def test_carries_type_email_and_activity_id(self) -> None:
-        item = _email_item(item_id="email_42")
-        record = to_timeline_record(item, gist_max_chars=300)
+        record = _email_record(item_id="email_42")
 
-        assert isinstance(record, EmailRecordResponse)
         assert record.type == "email"
         assert record.activity_id == "email_42"
 
 
 class TestActivityHistoryResolvedResponse:
     def test_accepts_groups_and_has_no_flat_records_or_cursor(self) -> None:
-        record = to_timeline_record(_activity_item(), gist_max_chars=300)
-        group = ActivityGroupResponse(
+        record: TimelineRecord = _activity_record()
+        group: ActivityGroupResponse[TimelineRecord] = ActivityGroupResponse(
             activity_type="meeting",
             items=(record,),
             date_range=None,

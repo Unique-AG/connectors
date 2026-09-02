@@ -1,4 +1,4 @@
-"""`fetch_activity_page`/`fetch_email_page`: the per-stream single-page fetch primitive.
+"""Per-stream single-page fetch via `GetActivityHistoryQuery.run`.
 
 Each test targets one behaviour called out in the design doc: the fixed `fields=`/`sort=`/
 `filter[activityType][eq]` per activity stream kind, the two incompatible date dialects
@@ -10,14 +10,63 @@ that a short raw page (or, for activities, a since-cutoff) is what "exhausted" m
 
 from collections.abc import KeysView
 from datetime import date
+from urllib.parse import quote
 
 import httpx
 import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.activity_history import fetch_activity_page, fetch_email_page
+from backstop_mcp.features.activity_history import (
+    ActivityContinuationResponse,
+    ActivityGroupResponse,
+    ActivityType,
+    Segment,
+    TimelineRecord,
+)
+from backstop_mcp.features.party_resolver import ResolvedPartyDto
+from tests.features.activity_history.conftest import make_get_activity_history_query
 from tests.helpers import BASE_URL, client_factory, collection, credential, resource
+
+
+def _mock_party(segment: str, entity_id: str) -> None:
+    respx.get(f"{BASE_URL}/{segment}/{quote(entity_id, safe='')}").mock(
+        return_value=httpx.Response(
+            200,
+            json={"data": {"type": segment, "id": entity_id, "attributes": {"name": "Party"}}},
+        )
+    )
+
+
+async def _run_stream(
+    client: BackstopClient,
+    *,
+    segment: Segment,
+    entity_id: str,
+    stream: ActivityType,
+    limit: int = 10,
+    offset: int = 0,
+    since: date | None = None,
+    until: date | None = None,
+    activity_tag_ids: tuple[str, ...] = (),
+) -> ActivityGroupResponse[TimelineRecord]:
+    _mock_party(segment, entity_id)
+    result = await make_get_activity_history_query(client).run(
+        segment=segment,
+        entity_id=entity_id,
+        party=ResolvedPartyDto(id=entity_id, search_type=segment, name="Party"),
+        continuations={
+            stream: ActivityContinuationResponse(
+                limit=limit,
+                offset=offset,
+                since=since,
+                until=until,
+                activity_tag_ids=activity_tag_ids or None,
+            )
+        },
+        gist_max_chars=300,
+    )
+    return result.groups[stream]
 
 
 class TestActivityRequestShape:
@@ -30,7 +79,7 @@ class TestActivityRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
         )
 
@@ -54,7 +103,7 @@ class TestActivityRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="people", entity_id="7", stream="call", limit=10, offset=0
         )
 
@@ -67,7 +116,7 @@ class TestActivityRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="people", entity_id="7", stream="note", limit=10, offset=0
         )
 
@@ -82,7 +131,7 @@ class TestActivityRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="people", entity_id="7", stream="document", limit=10, offset=0
         )
 
@@ -95,7 +144,7 @@ class TestActivityRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="people", entity_id="99", stream="meeting", limit=10, offset=0
         )
 
@@ -112,7 +161,7 @@ class TestActivityRequestShape:
         built = client_factory(page_limit_param="limit", page_offset_param="offset")
         try:
             client = built.for_credential(credential())
-            await fetch_activity_page(
+            await _run_stream(
                 client,
                 segment="organizations",
                 entity_id="42",
@@ -138,7 +187,7 @@ class TestActivityDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client,
             segment="organizations",
             entity_id="42",
@@ -159,7 +208,7 @@ class TestActivityDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client,
             segment="organizations",
             entity_id="42",
@@ -183,7 +232,7 @@ class TestActivityDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client,
             segment="organizations",
             entity_id="42",
@@ -205,7 +254,7 @@ class TestActivityDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
         )
 
@@ -228,12 +277,12 @@ class TestActivityExhaustion:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=5, offset=0
         )
 
         assert len(page.items) == 1
-        assert page.end_of_stream is True
+        assert page.next is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -250,12 +299,12 @@ class TestActivityExhaustion:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=2, offset=0
         )
 
         assert len(page.items) == 2
-        assert page.end_of_stream is False
+        assert page.next is not None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -278,7 +327,7 @@ class TestActivityExhaustion:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client,
             segment="organizations",
             entity_id="42",
@@ -289,8 +338,11 @@ class TestActivityExhaustion:
             until=date(2026, 2, 1),
         )
 
-        assert [item.id for item in page.items] == ["meeting-or-calls_1", "meeting-or-calls_2"]
-        assert page.end_of_stream is True
+        assert [item.activity_id for item in page.items] == [
+            "meeting-or-calls_1",
+            "meeting-or-calls_2",
+        ]
+        assert page.next is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -306,7 +358,7 @@ class TestActivityExhaustion:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client,
             segment="organizations",
             entity_id="42",
@@ -318,7 +370,7 @@ class TestActivityExhaustion:
         )
 
         assert len(page.items) == 1
-        assert page.end_of_stream is True
+        assert page.next is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -333,12 +385,15 @@ class TestActivityExhaustion:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=5, offset=0
         )
 
-        assert [item.id for item in page.items] == ["meeting-or-calls_1", "meeting-or-calls_2"]
-        assert page.items[0].effective_date == date(2099, 1, 1)
+        assert [item.activity_id for item in page.items] == [
+            "meeting-or-calls_1",
+            "meeting-or-calls_2",
+        ]
+        assert page.items[0].occurred_at == date(2099, 1, 1)
 
 
 class TestActivityParsing:
@@ -368,21 +423,18 @@ class TestActivityParsing:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="call", limit=5, offset=0
         )
 
         assert len(page.items) == 1
         item = page.items[0]
-        assert item.id == "meeting-or-calls_76280387"
-        assert item.stream == "call"
+        assert item.activity_id == "meeting-or-calls_76280387"
+        assert item.type == "call"
         assert item.title == "Quarterly Review"
-        assert item.description == "<p>notes</p>"
-        assert item.effective_date == date(2026, 1, 15)
-        assert item.resource_type == "meeting-or-calls"
+        assert item.gist == "notes"
+        assert item.occurred_at == date(2026, 1, 15)
         assert item.resource_id == "76280387"
-        assert item.created_timestamp is not None
-        assert item.modified_timestamp is not None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -402,7 +454,7 @@ class TestActivityParsing:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=5, offset=0
         )
 
@@ -418,7 +470,7 @@ class TestActivityParsing:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client,
             segment="organizations",
             entity_id="foo/../bar",
@@ -443,7 +495,9 @@ class TestEmailRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(client, segment="organizations", entity_id="42", limit=10, offset=0)
+        await _run_stream(
+            client, stream="email", segment="organizations", entity_id="42", limit=10, offset=0
+        )
 
         params = route.calls.last.request.url.params
         assert params["fields"] == (
@@ -462,7 +516,9 @@ class TestEmailRequestShape:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(client, segment="people", entity_id="7", limit=10, offset=0)
+        await _run_stream(
+            client, stream="email", segment="people", entity_id="7", limit=10, offset=0
+        )
 
         assert route.called
 
@@ -477,8 +533,8 @@ class TestEmailRequestShape:
         built = client_factory(page_limit_param="limit", page_offset_param="offset")
         try:
             client = built.for_credential(credential())
-            await fetch_email_page(
-                client, segment="organizations", entity_id="42", limit=25, offset=50
+            await _run_stream(
+                client, stream="email", segment="organizations", entity_id="42", limit=25, offset=50
             )
         finally:
             await built.aclose()
@@ -497,8 +553,9 @@ class TestEmailDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(
+        await _run_stream(
             client,
+            stream="email",
             segment="organizations",
             entity_id="42",
             limit=10,
@@ -517,8 +574,9 @@ class TestEmailDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(
+        await _run_stream(
             client,
+            stream="email",
             segment="organizations",
             entity_id="42",
             limit=10,
@@ -537,8 +595,9 @@ class TestEmailDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(
+        await _run_stream(
             client,
+            stream="email",
             segment="organizations",
             entity_id="42",
             limit=10,
@@ -558,7 +617,9 @@ class TestEmailDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(client, segment="organizations", entity_id="42", limit=10, offset=0)
+        await _run_stream(
+            client, stream="email", segment="organizations", entity_id="42", limit=10, offset=0
+        )
 
         params = route.calls.last.request.url.params
         assert "filter[startDate]" not in params
@@ -574,8 +635,9 @@ class TestEmailDateDialect:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_email_page(
+        await _run_stream(
             client,
+            stream="email",
             segment="organizations",
             entity_id="42",
             limit=10,
@@ -599,12 +661,12 @@ class TestEmailExhaustion:
             )
         )
 
-        page = await fetch_email_page(
-            client, segment="organizations", entity_id="42", limit=5, offset=0
+        page = await _run_stream(
+            client, stream="email", segment="organizations", entity_id="42", limit=5, offset=0
         )
 
         assert len(page.items) == 1
-        assert page.end_of_stream is True
+        assert page.next is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -619,12 +681,12 @@ class TestEmailExhaustion:
             )
         )
 
-        page = await fetch_email_page(
-            client, segment="organizations", entity_id="42", limit=2, offset=0
+        page = await _run_stream(
+            client, stream="email", segment="organizations", entity_id="42", limit=2, offset=0
         )
 
         assert len(page.items) == 2
-        assert page.end_of_stream is False
+        assert page.next is not None
 
 
 class TestEmailParsing:
@@ -650,21 +712,20 @@ class TestEmailParsing:
             )
         )
 
-        page = await fetch_email_page(
-            client, segment="organizations", entity_id="42", limit=5, offset=0
+        page = await _run_stream(
+            client, stream="email", segment="organizations", entity_id="42", limit=5, offset=0
         )
 
         assert len(page.items) == 1
         item = page.items[0]
-        assert item.id == "email_1"
+        assert item.activity_id == "email_1"
         assert item.subject == "Re: Follow-up"
-        assert item.sent_timestamp is not None
-        assert item.sent_timestamp.year == 2026
+        assert item.occurred_at is not None
+        assert item.occurred_at.year == 2026
         assert item.from_email == "ada@example.com"
         assert item.to_emails == ("bob@example.com",)
         assert item.cc_emails == ("carol@example.com", "dave@example.com")
         assert item.has_attachments is True
-        assert item.content_url == "https://example.backstopsolutions.com/emails/1/content"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -680,8 +741,8 @@ class TestEmailParsing:
             )
         )
 
-        page = await fetch_email_page(
-            client, segment="organizations", entity_id="42", limit=5, offset=0
+        page = await _run_stream(
+            client, stream="email", segment="organizations", entity_id="42", limit=5, offset=0
         )
 
         assert len(page.items) == 1
@@ -699,7 +760,7 @@ class TestActivityTagFilterAndIncludes:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client,
             segment="organizations",
             entity_id="42",
@@ -719,7 +780,7 @@ class TestActivityTagFilterAndIncludes:
             return_value=httpx.Response(200, json=collection())
         )
 
-        await fetch_activity_page(
+        await _run_stream(
             client, segment="organizations", entity_id="42", stream="note", limit=10, offset=0
         )
 
@@ -769,7 +830,7 @@ class TestActivityTagFilterAndIncludes:
             )
         )
 
-        page = await fetch_activity_page(
+        page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
         )
 

@@ -35,6 +35,7 @@ from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import PartyAmbiguousResponse, PartyCandidateResponse
 from backstop_mcp.features.resolution import NotFoundResponse
+from tests.features.activity_history.conftest import make_get_activity_history_query
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,
@@ -146,6 +147,7 @@ class TestFirstCallByTrustedPartyId:
                 _first(search_type="organizations", party_id="o42"),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -202,6 +204,7 @@ class TestFirstCallBySearch:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -239,6 +242,7 @@ class TestFirstCallBySearch:
                 _first(search_type="organizations", search="Capstone"),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             PartyAmbiguousResponse,
         )
@@ -280,6 +284,7 @@ class TestFirstCallBySearch:
                 _first(search_type="people", search="Nope"),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse | PartyAmbiguousResponse | NotFoundResponse,
         )
@@ -333,6 +338,7 @@ class TestFirstCallBySearch:
                 _first(search_type="people", search="Jane Contact", activity_types=["meeting"]),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -386,6 +392,7 @@ class TestFirstCallBySearch:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -428,6 +435,7 @@ class TestResumedCall:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -479,6 +487,7 @@ class TestResumedCall:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -527,6 +536,7 @@ class TestResumedCall:
             _first(search_type="organizations", party_id="o42"),
             client=client,
             activity_history=_SETTINGS,
+            get_activity_history_query=make_get_activity_history_query(client),
         )
         first_payload = tool_payload(first_result)
 
@@ -552,6 +562,7 @@ class TestResumedCall:
             ),
             client=client,
             activity_history=_SETTINGS,
+            get_activity_history_query=make_get_activity_history_query(client),
         )
         second_payload = tool_payload(second_result)
         second = tool_model(second_result, ActivityHistoryResolvedResponse)
@@ -685,6 +696,7 @@ class TestPartialFailurePropagates:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             )
 
     @pytest.mark.asyncio
@@ -726,6 +738,7 @@ class TestPartialFailurePropagates:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -759,6 +772,7 @@ class TestDocumentInclusion:
                 ),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             ),
             ActivityHistoryResolvedResponse,
         )
@@ -788,6 +802,7 @@ class TestWireOmitsNone:
                 _first(search_type="organizations", party_id="o42", activity_types=["meeting"]),
                 client=client,
                 activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
             )
         )
 

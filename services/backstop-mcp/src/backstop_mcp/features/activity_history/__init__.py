@@ -4,31 +4,26 @@
 conversion artifacts (synthetic empty-header table rows, blank-line runs), and truncate at a
 word boundary to a caller-supplied budget.
 
-`fetch_activity_page`/`fetch_email_page`/`fetch_activities_page`: the per-stream single-page
-fetch primitive behind activity history — one HTTP call per (activity type, entity, page),
-returning typed items (`ActivityItemDto`/`EmailItemDto`) plus whether that type is now exhausted.
-`fetch_activities_page` dispatches email vs activity. See `fetch_activities_page.py`'s module
-docstring for the Backstop quirks this layer absorbs.
+`GetActivityHistoryQuery`: per-stream single-page fetch plus grouping for `get_activity_history`.
+Grouping is private on that query. See `queries/get_activity_history_query.py` for the
+Backstop quirks this layer absorbs.
 
-`group_activity_page`: computes one stream page's `date_range` (min/max `occurred_at` among this
-page's items) and `next` continuation (`None` once that stream is exhausted). Items pass through
-in fetch order — no client-side re-sort. See `group_activity_page.py`.
-
-`ActivityRecordResponse`/`EmailRecordResponse`/`TimelineRecord`/`to_timeline_record`: the wire
-shape of one fetched item and the union conversion into it. `ActivityHistoryResolvedResponse`/
+`ActivityRecordResponse`/`EmailRecordResponse`/`TimelineRecord`: the wire shape of one
+history row, mapped from attributes. `ActivityHistoryResolvedResponse`/
 `GetActivityHistoryResponse`: the top-level tool response union. See `responses.py`.
 
-`fetch_activity_detail`/`fetch_meeting_specifics`/`fetch_attendees`: the `get_activity_detail`
-fetch primitive — one activity's full `entity-activity-details` record plus, for a
-meeting-or-calls handle, timings and attendees. `ResourceIdentifierDto.from_activity_id`
-accepts a history composite `{resource_type}_{resource_id}` or a search_activities row id
-and rejects a history email handle (`email_*` / `emails_*` — those are `/emails` ids);
+`GetActivityDetailQuery`: the `get_activity_detail` fetch — one activity's full
+`entity-activity-details` record plus, for a meeting-or-calls handle, timings and attendees.
+`ResourceIdentifierDto.from_activity_id` accepts a history composite
+`{resource_type}_{resource_id}` or a search_activities row id and rejects a history email
+handle (`email_*` / `emails_*` — those are `/emails` ids);
 `ResourceIdentifierDto.is_meeting_or_call` gates the two `/meeting-or-calls` fetches for a
-composite. A search id waits on the detail record's `type`. See `fetch_activity_detail.py`.
-`ActivityDetailResponse`/`AttendeeResponse`: that tool's wire shape
-and the pure conversion into it. See `responses.py`.
+composite. A search id waits on the detail record's `type`. See
+`queries/get_activity_detail_query.py`. `ActivityDetailResponse`/`AttendeeResponse`: that
+tool's wire shape and the pure conversion into it. See `responses.py`.
 
-`fetch_entity_activities`: `POST /entity-activities` pageNum loop for `search_activities`.
+`SearchActivitiesQuery`: `POST /entity-activities` pageNum loop for `search_activities`.
+`EntityActivityType`: search-path stream names shared by the tool and the query.
 `aggregate_entity_activities`: counts grouped by type, tag, party, or period.
 
 `ActivityHistorySettings`: the per-stream page size and gist truncation budget, translated from
@@ -37,38 +32,33 @@ and the pure conversion into it. See `responses.py`.
 The MCP tools live in `features/activity_history/tools/`.
 """
 
+from backstop_mcp.features.activity_history.activity_type import (
+    ActivityType,
+    BackstopActivityType,
+    Segment,
+)
 from backstop_mcp.features.activity_history.aggregate_entity_activities import (
     ActivityAggregateBy,
     aggregate_entity_activities,
 )
-from backstop_mcp.features.activity_history.api_responses import ActivityAttributes
-from backstop_mcp.features.activity_history.dependencies import get_activity_history_settings
+from backstop_mcp.features.activity_history.api_responses import (
+    ActivityAttributes,
+    EmailAttributes,
+)
+from backstop_mcp.features.activity_history.dependencies import (
+    get_activity_detail_query_factory,
+    get_activity_history_query_factory,
+    get_activity_history_settings,
+    get_search_activities_query_factory,
+)
+from backstop_mcp.features.activity_history.entity_activity_type import (
+    ENTITY_ACTIVITY_TYPES,
+    EntityActivityType,
+)
 from backstop_mcp.features.activity_history.extract_gist_from_html import (
     Gist,
     extract_gist_from_html,
 )
-from backstop_mcp.features.activity_history.fetch_activities_page import (
-    ActivityType,
-    BackstopActivityType,
-    Segment,
-    fetch_activities_page,
-    fetch_activity_page,
-    fetch_email_page,
-)
-from backstop_mcp.features.activity_history.fetch_activity_detail import (
-    fetch_activity_detail,
-    fetch_attendees,
-    fetch_meeting_specifics,
-)
-from backstop_mcp.features.activity_history.fetch_entity_activities import (
-    ENTITY_ACTIVITY_TYPES,
-    MAX_RETRIEVABLE,
-    EntityActivityType,
-    entity_activities_request_body,
-    fetch_entity_activities,
-    party_bean,
-)
-from backstop_mcp.features.activity_history.group_activity_page import group_activity_page
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
     ActivityItemDto,
@@ -83,6 +73,12 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivityDto,
     MeetingSpecificsDto,
     ResourceIdentifierDto,
+)
+from backstop_mcp.features.activity_history.queries import (
+    MAX_RETRIEVABLE,
+    GetActivityDetailQuery,
+    GetActivityHistoryQuery,
+    SearchActivitiesQuery,
 )
 from backstop_mcp.features.activity_history.responses import (
     ActivityContinuationResponse,
@@ -102,7 +98,6 @@ from backstop_mcp.features.activity_history.responses import (
     SearchActivitiesRowResponse,
     SearchActivitiesUnavailableResponse,
     TimelineRecord,
-    to_timeline_record,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
 from backstop_mcp.features.collection_scan import (
@@ -133,6 +128,7 @@ __all__ = [
     "AttendeeResponse",
     "BackstopActivityType",
     "DateRangeResponse",
+    "EmailAttributes",
     "EmailItemDto",
     "EmailPageDto",
     "EmailRecordResponse",
@@ -140,6 +136,8 @@ __all__ = [
     "EntityActivitiesFetchDto",
     "EntityActivityDto",
     "EntityActivityType",
+    "GetActivityDetailQuery",
+    "GetActivityHistoryQuery",
     "GetActivityHistoryResponse",
     "GetSearchActivitiesResponse",
     "Gist",
@@ -148,23 +146,16 @@ __all__ = [
     "ResolvedPartyAsOfResponse",
     "ResourceIdentifierDto",
     "ScanCoverageResponse",
+    "SearchActivitiesQuery",
     "SearchActivitiesResolvedResponse",
     "SearchActivitiesRowResponse",
     "SearchActivitiesUnavailableResponse",
     "Segment",
     "TimelineRecord",
     "aggregate_entity_activities",
-    "entity_activities_request_body",
     "extract_gist_from_html",
-    "fetch_activity_detail",
-    "fetch_activity_page",
-    "fetch_activities_page",
-    "fetch_attendees",
-    "fetch_email_page",
-    "fetch_entity_activities",
-    "fetch_meeting_specifics",
+    "get_activity_detail_query_factory",
+    "get_activity_history_query_factory",
     "get_activity_history_settings",
-    "group_activity_page",
-    "party_bean",
-    "to_timeline_record",
+    "get_search_activities_query_factory",
 ]

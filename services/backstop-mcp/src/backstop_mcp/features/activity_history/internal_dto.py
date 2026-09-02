@@ -1,12 +1,13 @@
 import logging
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
-from typing import ClassVar, Literal, Self, cast
+from typing import ClassVar, Self, cast
 
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from backstop_mcp.backstop_client import ResourceRef
+from backstop_mcp.features.activity_history.activity_type import BackstopActivityType
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityAttributes,
     EmailAttributes,
@@ -25,7 +26,6 @@ __all__ = [
     "ActivityTagChipDto",
     "AttendeeChipDto",
     "AttendeeDto",
-    "BackstopActivityType",
     "EmailItemDto",
     "EmailPageDto",
     "EntityActivitiesFetchDto",
@@ -36,8 +36,6 @@ __all__ = [
 
 _MEETING_OR_CALL_RESOURCE_TYPE = "meeting-or-calls"
 _EMAIL_RESOURCE_TYPES = frozenset({"email", "emails"})
-
-BackstopActivityType = Literal["meeting", "call", "note", "document"]
 
 
 class ActivityRegardingDto(BaseModel):

@@ -1,5 +1,4 @@
-"""Wire response models for an activity-history tool payload, and the pure conversion from a
-fetched item (`ActivityItemDto` / `EmailItemDto`) to its wire shape (`TimelineRecord`).
+"""Wire response models for an activity-history tool payload.
 
 Standing caveats (documents excluded from the token budget concerns, same-day email-vs-activity
 ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
@@ -13,10 +12,11 @@ rows publish the same `activity_id` field with the search-row id, which
 handle — `EmailRecordResponse` must not send them to `get_activity_detail`. `type` already
 says which stream a record came from.
 
-Field renames (`id`→`activity_id`, `effective_date`/`sent_timestamp`→`occurred_at`) use
-`validation_alias` + `from_attributes`. Gist conversion, recipient capping, and the
-`stream`→`type` assignment (kept explicit: discriminators reject aliases on `type`) stay in
-`ActivityRecordResponse.from_item` / `EmailRecordResponse.from_item`.
+History pages map wire attributes through `ActivityRecordResponse.from_attributes` /
+`EmailRecordResponse.from_attributes`. Field renames (`id`→`activity_id`,
+`effective_date`/`sent_timestamp`→`occurred_at`) use `validation_alias`. Gist conversion,
+recipient capping, regarding parse, and the `stream`→`type` assignment (kept explicit:
+discriminators reject aliases on `type`) stay on those constructors.
 """
 
 import logging
@@ -26,19 +26,19 @@ from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
-from backstop_mcp.features.activity_history.extract_gist_from_html import extract_gist_from_html
-from backstop_mcp.features.activity_history.fetch_activities_page import (
+from backstop_mcp.backstop_client import ResourceRef
+from backstop_mcp.features.activity_history.activity_type import (
     ActivityType,
     BackstopActivityType,
 )
+from backstop_mcp.features.activity_history.api_responses import (
+    ActivityAttributes,
+    EmailAttributes,
+)
+from backstop_mcp.features.activity_history.extract_gist_from_html import extract_gist_from_html
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
-    ActivityItemDto,
-    ActivityRegardingDto,
-    ActivityTagChipDto,
-    AttendeeChipDto,
     AttendeeDto,
-    EmailItemDto,
     EntityActivitiesFetchDto,
     EntityActivityDto,
     MeetingSpecificsDto,
@@ -54,7 +54,7 @@ from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     ProvenanceAttributes,
 )
-from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.entity_types import SearchType, party_search_type
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyDto,
@@ -84,7 +84,6 @@ __all__ = [
     "SearchActivitiesRowResponse",
     "SearchActivitiesUnavailableResponse",
     "TimelineRecord",
-    "to_timeline_record",
 ]
 
 _MAX_RECIPIENTS = 3
@@ -253,12 +252,16 @@ class ActivityRegardingResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_dto(cls, regarding: ActivityRegardingDto) -> Self:
+    def from_stored(cls, value: object) -> Self | None:
+        ref = ResourceRef.safe_model_validate(value)
+        if ref is None:
+            return None
+        resource_type = ref.resource_type
         return cls(
-            id=regarding.id,
-            resource_type=regarding.resource_type,
-            resource_link=regarding.resource_link,
-            search_type=regarding.search_type,
+            id=ref.resource_id,
+            resource_type=resource_type,
+            resource_link=ref.resource_link,
+            search_type=party_search_type(resource_type) if resource_type else None,
         )
 
 
@@ -274,10 +277,6 @@ class ActivityTagChipResponse(OmitNoneModel):
     )
     name: str = Field(description="Tag name as Backstop publishes it.")
 
-    @classmethod
-    def from_dto(cls, tag: ActivityTagChipDto) -> Self:
-        return cls(id=tag.id, name=tag.name)
-
 
 class AttendeeResponse(OmitNoneModel):
     """One person listed on a meeting or call."""
@@ -292,10 +291,6 @@ class AttendeeResponse(OmitNoneModel):
         ),
     )
     name: str | None = Field(default=None, description="Display name of the attendee.")
-
-    @classmethod
-    def from_chip(cls, attendee: AttendeeChipDto) -> Self:
-        return cls(id=attendee.id, name=attendee.name)
 
 
 class ActivityAttachmentResponse(OmitNoneModel):
@@ -387,24 +382,30 @@ class ActivityRecordResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_item(cls, item: ActivityItemDto, *, gist_max_chars: int) -> Self:
-        gist = extract_gist_from_html(item.description or "", max_chars=gist_max_chars)
+    def from_attributes(
+        cls,
+        item_id: str,
+        stream: BackstopActivityType,
+        attributes: ActivityAttributes,
+        *,
+        tags: tuple[ActivityTagChipResponse, ...],
+        attendees: tuple[AttendeeResponse, ...],
+        gist_max_chars: int,
+    ) -> Self:
+        gist = extract_gist_from_html(attributes.description or "", max_chars=gist_max_chars)
+        specific = attributes.specific_resource
         return cls(
-            type=item.stream,
-            activity_id=item.id,
-            resource_id=item.resource_id,
-            occurred_at=item.effective_date,
-            title=item.title,
+            type=stream,
+            activity_id=item_id,
+            resource_id=None if specific is None else specific.resource_id,
+            occurred_at=attributes.effective_date,
+            title=attributes.title,
             gist=gist.text,
             gist_truncated=gist.truncated,
             description_length=gist.full_length if gist.truncated else None,
-            regarding=(
-                None
-                if item.regarding is None
-                else ActivityRegardingResponse.from_dto(item.regarding)
-            ),
-            tags=tuple(ActivityTagChipResponse.from_dto(tag) for tag in item.tags),
-            attendees=tuple(AttendeeResponse.from_chip(attendee) for attendee in item.attendees),
+            regarding=ActivityRegardingResponse.from_stored(attributes.regarding),
+            tags=tags,
+            attendees=attendees,
         )
 
 
@@ -456,19 +457,19 @@ class EmailRecordResponse(OmitNoneModel):
     )
 
     @classmethod
-    def from_item(cls, item: EmailItemDto) -> Self:
-        to_emails, to_emails_count = _cap_recipients(item.to_emails)
-        cc_emails, cc_emails_count = _cap_recipients(item.cc_emails)
+    def from_attributes(cls, item_id: str, attributes: EmailAttributes) -> Self:
+        to_emails, to_emails_count = _cap_recipients(tuple(attributes.to_emails))
+        cc_emails, cc_emails_count = _cap_recipients(tuple(attributes.cc_emails))
         return cls(
-            activity_id=item.id,
-            occurred_at=item.sent_timestamp,
-            subject=item.subject,
-            from_email=item.from_email,
+            activity_id=item_id,
+            occurred_at=attributes.sent_timestamp,
+            subject=attributes.subject,
+            from_email=attributes.from_email,
             to_emails=to_emails,
             to_emails_count=to_emails_count,
             cc_emails=cc_emails,
             cc_emails_count=cc_emails_count,
-            has_attachments=item.has_attachments,
+            has_attachments=attributes.has_attachments,
         )
 
 
@@ -488,16 +489,24 @@ def _cap_recipients(emails: tuple[str, ...]) -> tuple[tuple[str, ...], int | Non
     return emails[:_MAX_RECIPIENTS], len(emails)
 
 
-def to_timeline_record(
-    item: ActivityItemDto | EmailItemDto, *, gist_max_chars: int
-) -> TimelineRecord:
-    """Convert one fetched item to its wire shape. Pure: no HTTP, no config lookups.
+class PartyRecordResponse(ProvenanceAttributes):
+    """Minimal attributes this tool needs from the party fetch: a display name plus provenance.
 
-    Picks the union arm; construction lives on the concrete models.
+    `extra="ignore"`, not `"allow"` — unlike `get_person`/`get_organization`, this tool never
+    surfaces the raw attribute dump, only `name` (for the resolve echo) and provenance (for
+    `as_of`). People records often omit `name` and send `firstName`/`lastName` instead; keep
+    those so a `type="next"` page (where `ResolvedPartyDto.name` is None) can still rebuild it.
     """
-    if isinstance(item, EmailItemDto):
-        return EmailRecordResponse.from_item(item)
-    return ActivityRecordResponse.from_item(item, gist_max_chars=gist_max_chars)
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    name: str | None = None
+    first_name: str | None = Field(
+        default=None, validation_alias=AliasChoices("firstName", "first_name")
+    )
+    last_name: str | None = Field(
+        default=None, validation_alias=AliasChoices("lastName", "last_name")
+    )
 
 
 class ResolvedPartyAsOfResponse(ResolvedPartyResponse):
@@ -571,9 +580,10 @@ class ActivityDetailResponse(OmitNoneModel):
     `type`, `title`, `body` and `attachments` come from `entity-activity-details`; `start`/`stop`/
     `location`/`time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is
     only fetched for a meeting-or-calls handle (it 404s for a note or document — see
-    `fetch_activity_detail.py`). Meeting fields are therefore absent for a note or document
-    because nobody asked, not because Backstop returned nothing. The attachment list is this
-    tool's one unique capability versus `search_activities`, which only publishes a count.
+    `queries/get_activity_detail_query.py`). Meeting fields are therefore absent for a note
+    or document because nobody asked, not because Backstop returned nothing. The attachment
+    list is this tool's one unique capability versus `search_activities`, which only
+    publishes a count.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
