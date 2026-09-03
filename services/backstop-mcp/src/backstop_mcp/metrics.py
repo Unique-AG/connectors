@@ -88,17 +88,17 @@ CUSTOM_FIELD_SCHEMA_LOADS = _meter.create_counter(
     "custom_field_schema_loads_total",
     description="Custom-field schema loads, by source (backstop refresh, stale reuse).",
 )
-# The demand half of the pair. Every `CachedCatalog.get` records here exactly once, whatever
+# The demand half of the pair. Every `CachedValue.get` records here exactly once, whatever
 # answered it, so `_count` is the question "how many walks would there be with no cache at all?"
 # — and `served` says what each caller actually got: its own walk (`backstop`), another caller's
-# in-flight walk (`coalesced`), a TTL hit (`cache`), the previous catalog after a failed refresh
+# in-flight walk (`coalesced`), a TTL hit (`cache`), the previous value after a failed refresh
 # (`stale`), or nothing (`error` / `cancelled`). The duration is caller-visible latency, lock and
 # coalescing wait included, which is what a tool call actually pays.
 CATALOG_GET_DURATION = _meter.create_histogram(
     "catalog_get_duration_seconds",
     unit="s",
     description=(
-        "Wall-clock duration of one `CachedCatalog.get`, by catalog and what served it. "
+        "Wall-clock duration of one `CachedValue.get`, by catalog and what served it. "
         "`_count` is total demand — the walks there would be with no cache and no coalescing."
     ),
 )
@@ -109,7 +109,7 @@ CATALOG_FETCH_DURATION = _meter.create_histogram(
     "catalog_fetch_duration_seconds",
     unit="s",
     description=(
-        "Wall-clock duration of one `CachedCatalog` walk, by catalog and outcome. `_count` is "
+        "Wall-clock duration of one `CachedValue` fetch, by catalog and outcome. `_count` is "
         "how often Backstop was actually walked, however many callers were served from it."
     ),
 )

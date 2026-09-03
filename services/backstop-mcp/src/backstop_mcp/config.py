@@ -243,7 +243,7 @@ class BackstopConfig(BaseSettings):
     # Whether the custom-field catalogs (definitions and groups) are held between calls.
     # On: every party and product read otherwise pays that 6.15 s walk. Cold start
     # and TTL expiry still cost one caller the walk (~12 times a day per process);
-    # CachedCatalog's single-flight pin shares it with concurrent callers. After one successful
+    # CachedValue's single-flight pin shares it with concurrent callers. After one successful
     # load, a failed refresh re-serves the previous catalog.
     #
     # The held catalog is process-wide, so whichever caller loads it serves every other caller
@@ -266,8 +266,8 @@ class BackstopConfig(BaseSettings):
 
     # How long a fetched opportunity-stage vocabulary stays usable. Seven rows on the instance
     # this was built against, and a stage is added about as often as a custom field, so the same
-    # one-hour default and 24-hour cap apply. No cache flag: `OpportunityStagesService` does not
-    # use `CachedCatalog` and always holds its vocabulary.
+    # one-hour default and 24-hour cap apply. No cache flag: `OpportunityStagesService` composes
+    # `CachedValue` with serve-stale off and always holds its vocabulary.
     opportunity_stage_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
     # How long a fetched activity-tag catalog stays usable before it is re-fetched. Tags change

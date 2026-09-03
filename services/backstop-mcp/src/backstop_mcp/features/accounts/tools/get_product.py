@@ -38,14 +38,12 @@ type GetProductResponse = ProductAmbiguousResponse | NotFoundResponse | ProductR
 
 
 async def _record(
-    client: BackstopClient,
     custom_fields: CustomFieldsService,
     fetched: ProductFetchDto,
     *,
     names: Sequence[str],
 ) -> ProductRecordResponse:
     values = await custom_fields.join_values(
-        client,
         fetched.stored_custom_field_values,
         filters=CustomFieldFilters(names=tuple(names)),
     )
@@ -130,15 +128,12 @@ async def get_product(
         # against a filled catalog; the load return is unused because `_record` reads the cache.
         catalog, _ = await asyncio.gather(
             get_product_query.catalog(),
-            custom_fields.load_catalog(client),
+            custom_fields.load_catalog(),
         )
         # Concurrently: the catalog is ~72 rows and each row is a catalog join, so a sequential
         # comprehension is 72 awaits in a row for work that has no ordering between rows.
         products = await asyncio.gather(
-            *(
-                _record(client, custom_fields, item, names=custom_field_names)
-                for item in catalog.products
-            )
+            *(_record(custom_fields, item, names=custom_field_names) for item in catalog.products)
         )
         return ProductResolvedResponse(
             products=tuple(products), scan_truncated=catalog.scan_truncated
@@ -149,7 +144,6 @@ async def get_product(
         # product twice — once sparse to confirm it exists, once in full — and the full read
         # already carries `name` and `configuration`, and already 404s when it does not exist.
         return await _by_trusted_id(
-            client,
             custom_fields,
             get_product_query,
             product_id=product_id,
@@ -163,15 +157,14 @@ async def get_product(
 
     item, _ = await asyncio.gather(
         get_product_query.run(product_id=outcome.value.id),
-        custom_fields.load_catalog(client),
+        custom_fields.load_catalog(),
     )
     return ProductResolvedResponse(
-        products=(await _record(client, custom_fields, item, names=custom_field_names),)
+        products=(await _record(custom_fields, item, names=custom_field_names),)
     )
 
 
 async def _by_trusted_id(
-    client: BackstopClient,
     custom_fields: CustomFieldsService,
     get_product_query: GetProductQuery,
     *,
@@ -187,12 +180,10 @@ async def _by_trusted_id(
     try:
         item, _ = await asyncio.gather(
             get_product_query.run(product_id=product_id),
-            custom_fields.load_catalog(client),
+            custom_fields.load_catalog(),
         )
     except BackstopApiError as exc:
         if exc.status_code != HTTPStatus.NOT_FOUND:
             raise
         return NotFoundResponse(query=product_id, scope="products")
-    return ProductResolvedResponse(
-        products=(await _record(client, custom_fields, item, names=names),)
-    )
+    return ProductResolvedResponse(products=(await _record(custom_fields, item, names=names),))

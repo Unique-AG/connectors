@@ -77,7 +77,7 @@ class GetOpportunitiesByIdsQuery:
         include_query_param = ",".join(include_relations)
 
         catalog, settled = await asyncio.gather(
-            self._custom_fields_service.load_catalog(self._client),
+            self._custom_fields_service.load_catalog(),
             asyncio.gather(
                 *(
                     self._fetch_one_opportunity(

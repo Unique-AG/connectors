@@ -1,7 +1,8 @@
 """The custom-field definition catalog: what a definition projection keeps, and the walk.
 
-The TTL, single-flight and serve-stale protocol behind `get` is `CachedCatalog`, exercised for
-this service among the others in `tests/features/test_cached_catalog.py`.
+The TTL, single-flight and serve-stale protocol behind `get` is `CachedValue`, exercised in
+`tests/test_cached_value.py`. Service-to-Backstop wiring is in
+`tests/features/test_cached_catalog.py`.
 """
 
 import logging
@@ -53,8 +54,8 @@ async def clients() -> AsyncGenerator[ClientBuilder]:
         await factory.aclose()
 
 
-def _service(*, ttl_minutes: int = 60) -> CustomFieldsService:
-    return CustomFieldsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+def _service(client: BackstopClient, *, ttl_minutes: int = 60) -> CustomFieldsService:
+    return CustomFieldsService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def _definition_resource(
@@ -180,7 +181,7 @@ class TestCatalogGet:
     @respx.mock
     async def test_first_get_paginates_and_caches(self, clients: ClientBuilder) -> None:
         base_url = f"{BASE_URL}/refresh-index"
-        service = _service()
+        service = _service(clients(base_url))
 
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=httpx.Response(
@@ -220,7 +221,7 @@ class TestCatalogGet:
             )
         )
 
-        definitions, cache = await service.get(clients(base_url))
+        definitions, cache = await service.get()
 
         params = route.calls.last.request.url.params
         assert params["page[limit]"] == "1000"
@@ -293,10 +294,9 @@ async def _join(
     *,
     filters: CustomFieldFilters | None = None,
 ) -> list[ResolvedCustomFieldValueResponse]:
-    service = _service()
+    service = _service(cast(BackstopClient, MagicMock()))
     service.load_catalog = AsyncMock(return_value=catalog)
     return await service.join_values(
-        cast(BackstopClient, MagicMock()),
         custom_fields,
         filters=filters if filters is not None else CustomFieldFilters(),
     )
@@ -404,7 +404,7 @@ class TestLoadCatalog:
             return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
         )
 
-        catalog = await _service().load_catalog(clients(base_url))
+        catalog = await _service(clients(base_url)).load_catalog()
 
         assert catalog is None
 
@@ -418,8 +418,7 @@ class TestJoinValuesCatalog:
             return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
         )
 
-        published = await _service().join_values(
-            clients(base_url),
+        published = await _service(clients(base_url)).join_values(
             _rows({"definitionId": "8648265", "value": 0.3}),
         )
 
@@ -447,8 +446,7 @@ class TestJoinValuesCatalog:
             )
         )
 
-        published = await _service().join_values(
-            clients(base_url),
+        published = await _service(clients(base_url)).join_values(
             _rows({"definitionId": 8648265, "value": 0.3}),
         )
 

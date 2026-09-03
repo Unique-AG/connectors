@@ -2,12 +2,12 @@ import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Self, cast, override
+from typing import Self, cast
 
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, ResourceRef
-from backstop_mcp.features.cached_catalog import CachedCatalog, CatalogSource
+from backstop_mcp.caching import CachedValue, CacheFreshness, CacheSource
 from backstop_mcp.features.custom_fields.api_responses import (
     CustomFieldDefinitionAttributes,
     CustomFieldValueAttributes,
@@ -64,40 +64,53 @@ async def _fetch_custom_field_definitions(
     return definitions_by_id
 
 
-class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
+def _record_schema_load(source: CacheSource) -> None:
+    CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": source})
+
+
+class CustomFieldsService:
     """Process-wide custom-field schema catalog, and the join of record values onto it.
 
     A party GET only embeds `{definitionId, value}`. Names, types, tabs, groups and picklist
     options live on the definition catalog. Until a fetch succeeds this service has nothing to
     serve. Constructed by `get_custom_fields_service` in this feature's `dependencies.py`.
 
-    The TTL, single-flight and serve-stale protocol behind `get` is `CachedCatalog`; this is the
-    one catalog that meters its loads, so it overrides `record_load`.
+    The TTL, single-flight and serve-stale protocol behind `get` is the composed `CachedValue`;
+    this is the one catalog that meters its loads, via `on_load`.
     """
 
     _ENTITY_FIELD_TYPE: str = "entity"
     _OPTION_TEXT_KEYS: tuple[str, ...] = ("label", "value", "name", "id")
 
-    def __init__(self, *, ttl: timedelta, caching_enabled: bool = True) -> None:
-        super().__init__(
+    def __init__(
+        self, *, client: BackstopClient, ttl: timedelta, caching_enabled: bool = True
+    ) -> None:
+        self._client: BackstopClient = client
+        self._cache: CachedValue[dict[str, CustomFieldDefinitionDto]] = CachedValue(
             ttl=ttl,
-            fetch=_fetch_custom_field_definitions,
+            snapshot=dict,
+            name="custom-field",
             log_prefix="custom_fields.schema",
-            subject="custom-field",
             caching_enabled=caching_enabled,
+            on_load=_record_schema_load,
         )
 
     @classmethod
-    def with_ttl_minutes(cls, *, ttl_minutes: int, caching_enabled: bool = True) -> Self:
-        return cls(ttl=timedelta(minutes=ttl_minutes), caching_enabled=caching_enabled)
+    def with_ttl_minutes(
+        cls, *, client: BackstopClient, ttl_minutes: int, caching_enabled: bool = True
+    ) -> Self:
+        return cls(
+            client=client, ttl=timedelta(minutes=ttl_minutes), caching_enabled=caching_enabled
+        )
 
-    @override
-    def record_load(self, source: CatalogSource) -> None:
-        CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": source})
+    async def get(
+        self, *, refresh: bool = False
+    ) -> tuple[dict[str, CustomFieldDefinitionDto], CacheFreshness]:
+        return await self._cache.get(
+            lambda: _fetch_custom_field_definitions(self._client), refresh=refresh
+        )
 
-    async def load_catalog(
-        self, client: BackstopClient
-    ) -> dict[str, CustomFieldDefinitionDto] | None:
+    async def load_catalog(self) -> dict[str, CustomFieldDefinitionDto] | None:
         """The definition catalog, or `None` when it could not be loaded.
 
         `None` is distinct from an empty catalog: the caller can tell "unavailable" from
@@ -105,19 +118,18 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
         hits a warm cache.
         """
         try:
-            catalog, _status = await self.get(client)
+            catalog, _status = await self.get()
         except Exception:
             logger.warning("custom_fields.values.catalog_unavailable", exc_info=True)
             return None
         return catalog
 
-    async def is_catalog_available(self, client: BackstopClient) -> bool:
-        catalog = await self.load_catalog(client=client)
+    async def is_catalog_available(self) -> bool:
+        catalog = await self.load_catalog()
         return catalog is not None
 
     async def join_values(
         self,
-        client: BackstopClient,
         regular_custom_field_values: Sequence[CustomFieldValueAttributes] | None,
         *,
         filters: CustomFieldFilters = _NO_FILTERS,
@@ -129,7 +141,7 @@ class CustomFieldsService(CachedCatalog[CustomFieldDefinitionDto]):
         current option list are kept and flagged. A cold-cache fetch failure returns an
         empty list rather than raising, so the parent lookup still succeeds.
         """
-        catalog = await self.load_catalog(client)
+        catalog = await self.load_catalog()
         if catalog is None:
             return []
         published: list[ResolvedCustomFieldValueResponse] = []

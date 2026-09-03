@@ -148,9 +148,8 @@ class TestListCustomFieldGroupsTool:
             result = tool_model(
                 await list_custom_field_groups(
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
-                    custom_field_groups=custom_field_groups_service(),
+                    custom_fields=custom_fields_service(client),
+                    custom_field_groups=custom_field_groups_service(client),
                 ),
                 ListCustomFieldGroupsResponse,
             )
@@ -212,13 +211,11 @@ class TestListCustomFieldGroupsTool:
         definitions_route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=_collection_page(_status_flag())
         )
-        fields = custom_fields_service()
-        groups = custom_field_groups_service()
-
         async with tool_client(base_url) as client:
+            fields = custom_fields_service(client)
+            groups = custom_field_groups_service(client)
             first = tool_model(
                 await list_custom_field_groups(
-                    client=client,
                     custom_fields=fields,
                     custom_field_groups=groups,
                 ),
@@ -226,7 +223,6 @@ class TestListCustomFieldGroupsTool:
             )
             second = tool_model(
                 await list_custom_field_groups(
-                    client=client,
                     custom_fields=fields,
                     custom_field_groups=groups,
                 ),
@@ -235,7 +231,6 @@ class TestListCustomFieldGroupsTool:
             refreshed = tool_model(
                 await list_custom_field_groups(
                     refresh=True,
-                    client=client,
                     custom_fields=fields,
                     custom_field_groups=groups,
                 ),
@@ -261,14 +256,12 @@ class TestListCustomFieldGroupsTool:
         respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=_collection_page(_status_flag())
         )
-        fields = custom_fields_service()
-        groups = custom_field_groups_service()
-
         async with tool_client(base_url) as client:
+            fields = custom_fields_service(client)
+            groups = custom_field_groups_service(client)
             first = tool_model(
                 await list_custom_field_groups(
                     refresh=True,
-                    client=client,
                     custom_fields=fields,
                     custom_field_groups=groups,
                 ),
@@ -278,7 +271,6 @@ class TestListCustomFieldGroupsTool:
             result = tool_model(
                 await list_custom_field_groups(
                     refresh=True,
-                    client=client,
                     custom_fields=fields,
                     custom_field_groups=groups,
                 ),

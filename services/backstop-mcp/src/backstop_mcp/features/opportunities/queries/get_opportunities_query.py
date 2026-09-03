@@ -61,7 +61,7 @@ class GetOpportunitiesQuery:
                 max_records=None,
                 page_size=100,
             ),
-            self._custom_fields_service.load_catalog(self._client),
+            self._custom_fields_service.load_catalog(),
         )
         opportunities_mapped: list[OpportunityResponse] = []
         for opportunity in pages.items:

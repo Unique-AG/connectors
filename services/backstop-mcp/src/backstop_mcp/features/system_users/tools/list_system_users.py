@@ -5,8 +5,6 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.includes import InternalOwnerResponse
 from backstop_mcp.features.system_users import (
     ListSystemUsersResponse,
@@ -62,7 +60,6 @@ async def list_system_users(
         bool,
         Field(description="Do not pass true unless the user reports a missing colleague."),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     system_users: SystemUsersService = Depends(get_system_users_service),
 ) -> ListSystemUsersResponse:
     """List our colleagues' Backstop logins.
@@ -72,7 +69,7 @@ async def list_system_users(
     keep colleagues whose name or login contains that substring. Pass refresh=true only when
     the user reports a missing colleague.
     """
-    catalog, cache = await system_users.get(client, refresh=refresh)
+    catalog, cache = await system_users.get(refresh=refresh)
     selected = tuple(catalog.values())
     if search is not None:
         needle = search.casefold()

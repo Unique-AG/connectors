@@ -50,11 +50,10 @@ class GetOrganizationQuery:
                 params={"include": plan.param} if plan.param else None,
                 schema=BackstopApiResourceDocument[OrganizationAttributes],
             ),
-            self._custom_fields_service.load_catalog(self._client),
+            self._custom_fields_service.load_catalog(),
         )
         attributes = document.require_data(path=path).attributes
         custom_field_values = await self._custom_fields_service.join_values(
-            self._client,
             attributes.regular_custom_field_values,
             filters=custom_fields_filters,
         )
