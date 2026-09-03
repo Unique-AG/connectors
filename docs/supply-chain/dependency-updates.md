@@ -13,15 +13,15 @@ each one to the control that satisfies it here.
 | When | What happens | Where |
 |---|---|---|
 | Friday 06:00 Berlin | Dependabot opens the grouped update pull requests | `.github/dependabot.yaml` |
-| Within 20 minutes | They are converted to draft | `dependency-updates.yaml` |
+| Within a few minutes | They are converted to draft | `dependency-updates.yaml` |
 | Friday to Monday | The pins age. Nothing changes them | `rebase-strategy: disabled` |
-| Monday 06:00–08:00 UTC | They are marked ready for review | `dependency-updates.yaml` |
+| Monday morning UTC | They are marked ready for review | `dependency-updates.yaml` |
 | Monday | The team reviews and merges them | people |
 
 Draft is a server-side merge block. Nobody can merge a held pull request early. Marking one ready
 also requests review from CODEOWNERS, so the promotion is the review request.
 
-Tuesday to Thursday windows exist only to catch a dropped Monday run.
+Tuesday to Thursday runs exist only to catch a dropped Monday run.
 
 ## What rides, and what does not
 

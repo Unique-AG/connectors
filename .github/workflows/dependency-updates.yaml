@@ -2,11 +2,12 @@ name: "Dependency Updates"
 
 on:
   schedule:
-    - cron: "3,23,43 * * * *"
+    - cron: "3,23,43 2-7 * * 5"
+    - cron: "3 4-7 * * *"
   workflow_dispatch:
     inputs:
       mode:
-        description: "report = decide and print, change nothing. apply = converge. A manual run may promote outside the Mon-Thu 06:00-08:00 UTC window."
+        description: "report = decide and print, change nothing. apply = converge. A manual run may promote on any day."
         type: choice
         options: [report, apply]
         default: report
@@ -35,7 +36,6 @@ jobs:
       REQUESTED_MODE: ${{ inputs.mode || 'apply' }}
       AGE_HOURS: "72"
       GROUP_NAME: minor-and-patch
-      FREEZE_FALLBACK_HOURS: "1"
       STALE_READY_DAYS: "2"
       ISSUE_TITLE: "Dependency updates: attention required"
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -54,9 +54,8 @@ jobs:
 
           now=$(date -u +%s)
           dow=$(date -u +%u)
-          hour=$((10#$(date -u +%H)))
           window=no
-          if [ "$dow" -le 4 ] && [ "$hour" -ge 6 ] && [ "$hour" -lt 8 ]; then window=yes; fi
+          if [ "$dow" -le 4 ]; then window=yes; fi
           if [ "$DISPATCHED" = "true" ]; then window=manual; fi
 
           gh api graphql --paginate \
@@ -95,7 +94,7 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| mode | \`$MODE\` (\`vars.DEPENDENCY_UPDATES\` = \`${HOLD_STATE:-<unset>}\`) |"
-            echo "| now (UTC) | day $dow, hour $hour — promotion window: **$window** |"
+            echo "| now (UTC) | day $dow — promotion window: **$window** |"
             echo "| hold window | ${AGE_HOURS}h measured on the head commit |"
             echo "| open PRs / in scope | $open_total / $held_total |"
             echo "| open a batch off-cycle | ${DEPENDABOT_URL} — one \`Check for updates\` per ecosystem, needs repo admin |"
@@ -117,11 +116,7 @@ jobs:
 
             action=none
             if [ "$draft" = "false" ] && [ "$aged" = "no" ]; then
-              if [ "$rollup" != "PENDING" ] || [ "$age_h" -ge "$FREEZE_FALLBACK_HOURS" ]; then
-                action=freeze
-              else
-                action=wait-for-checks
-              fi
+              action=freeze
             elif [ "$draft" = "true" ] && [ "$aged" = "yes" ] && [ "$window" != "no" ]; then
               action=promote
             elif [ "$draft" = "false" ] && [ "$age_h" -ge $(( AGE_HOURS + STALE_READY_DAYS * 24 )) ]; then
