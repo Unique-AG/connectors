@@ -15,6 +15,10 @@ const TIMED_OUT =
   'The confirmation prompt timed out, so nothing was sent. Ask the user whether they still want this, then call the tool again.';
 const UNSUPPORTED =
   'This client cannot show a confirmation prompt, and calendar writes are not performed without one. Tell the user to run this from a client that supports confirmations.';
+const INVALID_RESPONSE =
+  'The confirmation response was invalid, so nothing was sent. Ask the user to try the confirmation again.';
+const FAILED =
+  'The confirmation prompt failed, so nothing was sent. Ask the user whether they still want this, then call the tool again.';
 
 /**
  * Runs the confirmation gate for a calendar write.
@@ -64,11 +68,14 @@ function elicitFailureMessage(error: unknown): string {
   if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
     return TIMED_OUT;
   }
+  if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
+    return INVALID_RESPONSE;
+  }
   if (
     error instanceof Error &&
-    /does not support elicitation|not supported in stateless/i.test(error.message)
+    /does not support (form |url )?elicitation|not supported in stateless/i.test(error.message)
   ) {
     return UNSUPPORTED;
   }
-  return TIMED_OUT;
+  return FAILED;
 }

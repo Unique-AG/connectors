@@ -105,6 +105,37 @@ describe(CreateEventTool.name, () => {
     expect(result.transactionId).toBe(INPUT.transactionId);
   });
 
+  it('does not call the command when the parent request aborts an in-flight elicitation', async () => {
+    const abortController = new AbortController();
+    const elicit = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          abortController.signal.addEventListener(
+            'abort',
+            () =>
+              reject(new McpError(ErrorCode.RequestTimeout, String(abortController.signal.reason))),
+            { once: true },
+          );
+        }),
+    );
+    const { tool, run } = createTool({ elicit });
+
+    const resultPromise = tool.createEvent(
+      INPUT,
+      { elicit } as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+    await vi.waitFor(() => expect(elicit).toHaveBeenCalledOnce());
+
+    abortController.abort();
+
+    const result = await resultPromise;
+    expect(run).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/timed out/i);
+    expect(result.transactionId).toBe(INPUT.transactionId);
+  });
+
   it('names a shared calendar by its name and owner, and collapses newlines in the title', async () => {
     const { tool, elicit } = createTool({
       calendar: {
