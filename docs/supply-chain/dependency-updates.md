@@ -20,8 +20,9 @@ There is no automated gate. The three days are a merge policy the team follows, 
 standard asks for. Two mechanisms make it real, and both live in `.github/dependabot.yaml`.
 
 `cooldown: default-days: 3` stops Dependabot offering a version until it has been public three days.
-So on npm, uv, github-actions, terraform and helm every pin is already three days old when the pull
-request opens, before anyone waits at all.
+Dependabot applies that same three days **by default, even when the key is absent**, so every
+ecosystem gets it and the explicit setting only makes it visible. In the ordinary case a pin is
+already three days old when the pull request opens, before anyone waits at all.
 
 `rebase-strategy: disabled` stops Dependabot rebasing an open pull request when the base branch
 moves. It does **not** stop Dependabot force-pushing a newer version of the dependency into that
@@ -38,11 +39,19 @@ The failure direction is the dangerous one. `createdAt` still reads the original
 pushed in this morning looks a week old. That is why "clear it before the next Friday" below is a
 correctness rule, not tidiness.
 
-Docker is the exception and it matters, because the standard is about base images. Its `cooldown` is
-deliberately absent — Dependabot reads a Docker release date from `Last-Modified` on the manifest
-HEAD, which neither `registry-1.docker.io` nor `ghcr.io` returns, so the setting fails open. For
-docker the three days come only from the pull request sitting from Friday to Monday. Nothing enforces
-that. Merging a docker update on Friday takes a pin that may be hours old.
+Docker is the one to watch, because the standard is about base images and its cooldown is the least
+certain. GitHub lists docker as supporting `default-days`, and the three-day default applies whether
+or not the key is set — so omitting it, as this configuration does, changes nothing either way.
+
+What is not established is whether that cooldown ever **binds** for these images. Dependabot needs a
+release date. `Last-Modified` is absent from a `ghcr.io` manifest HEAD — checked directly with a
+pull token — and that is the header the omission was originally justified against. A date does exist
+one level down, in the OCI image config blob: `ghcr.io/astral-sh/uv:0.11.33` reports
+`created = 2026-07-28T09:39:24Z`, reachable in four requests. Nothing documents whether Dependabot
+reads it, and it cannot be observed from outside.
+
+So treat docker's cooldown as unverified rather than absent, and do not lean on it. If you want
+certainty for docker, the `created` field makes a custom check cheap — see the open items.
 
 ## What rides, and what does not
 
@@ -85,7 +94,7 @@ merge policy. This is one, written down, with the pin freeze done mechanically.
 |---|---|
 | Major and minor move by hand. Patch and digest updates flow as pull requests | `major` and `python-runtime` are their own groups and get their own review. Everything else rides the weekly pull request |
 | node and nginx minors are the exception. python is excluded | Applied literally. We have no nginx. `node:X.Y.Z` minors ride; `python` and `uv` minors do not |
-| No tooled age cooldown | Read the other way here. `cooldown: 3` is set on the five ecosystems where release dates resolve, and omitted on docker where it fails open |
+| No tooled age cooldown | Read the other way here. `cooldown: 3` is stated explicitly, and Dependabot applies the same three days by default even where the key is absent. Whether it binds for docker images is unverified — see the open items |
 | The cooldown is a manual merge policy, with the pin frozen | This is the cycle above. `rebase-strategy: disabled` is the freeze. The three days are the merge policy, and nothing enforces them — see the open items |
 | A rebase resets the age (accepted hole) | **Open, narrowed.** `rebase-strategy: disabled` holds the pin for one Friday-to-Monday cycle. A pull request that survives to the next Friday is force-pushed to a newer pin while `createdAt` stays put — see the open items |
 | Automerge off. A human approves every base pull request | No dependency pull request has automerge armed, and every merge to `main` carries an approval. The repository does allow automerge, so nothing prevents someone arming it — see the open items |
@@ -112,13 +121,17 @@ These are accepted risks, not satisfied controls. Do not describe them as satisf
 5. **Nothing asserts that every external `FROM` carries a digest.** It is true for all 11
    Dockerfiles today and no gate keeps it true. A mutable tag would build and deploy normally.
 6. **Nothing enforces the three days, and nothing reads the real pin age.** The wait is a written
-   policy. Anyone with write access can merge a Friday pull request on Friday, and for docker that
-   pin may be hours old. Worse, a pull request that survives to the next Friday is force-pushed to a
+   policy. Anyone with write access can merge a Friday pull request on Friday. Worse, a pull request that survives to the next Friday is force-pushed to a
    newer pin while `createdAt` keeps the original date, so a fresh pin reads as aged — observed on 6
    of the last 30 Dependabot pull requests, diverging by 3 to 21 days. The deleted gate was the only
    thing that ever computed age from the head commit. The routine now asks the operator to run one
    `gh` command instead. If this must become a control, the options are a required status check on
    `main` — which needs repo admin and would be this repository's first — or restoring the gate.
+8. **Docker's cooldown is unverified.** GitHub lists docker as supporting `default-days` and applies
+   three days by default, but Dependabot needs a release date and `Last-Modified` is absent from a
+   `ghcr.io` manifest HEAD. The OCI config blob does carry one — `ghcr.io/astral-sh/uv:0.11.33`
+   reports `created = 2026-07-28T09:39:24Z` in four requests — so a check that reads it and compares
+   against the pin in the diff is a small, self-contained job if docker staleness must be certain.
 7. **Automerge is allowed on this repository.** `allow_auto_merge` is true, and the team uses it: 4
    of the last 60 pull requests had it armed, by two different people. None was a Dependabot pull
    request, and nothing stops someone arming one — which would merge it as soon as checks pass
@@ -142,8 +155,8 @@ There is nothing to arm and nothing to operate. The process is the routine below
    Dependabot replaces it and the review threads go with it, and it force-pushes a newer pin into
    any that survive, so the three days silently restart.
 
-**Do not merge a docker update before Monday.** It is the one ecosystem with no version cooldown, so
-the three days come only from the pull request sitting there. Nothing will stop you.
+**Be strictest with docker.** Its cooldown is the one that may not bind, so the Friday-to-Monday wait
+is the only staleness you can count on. Nothing will stop you merging it on Friday.
 
 Nobody is notified when the week's pull requests are ready, because the CODEOWNERS review request
 fires when Dependabot opens them on Friday. Monday is a routine, not a response to a prompt.
