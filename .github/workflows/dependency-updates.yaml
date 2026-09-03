@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "report = decide and print, change nothing. apply = converge. A manual run may promote on any day."
+        description: "report = decide and print, change nothing. apply = converge."
         type: choice
         options: [report, apply]
         default: report
@@ -40,7 +40,7 @@ jobs:
       ISSUE_TITLE: "Dependency updates: attention required"
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       DEPENDABOT_URL: ${{ github.server_url }}/${{ github.repository }}/network/updates
-      DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}
+      HELD_URL: ${{ github.server_url }}/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+is%3Adraft+author%3Aapp%2Fdependabot
     steps:
       - name: Reconcile
         run: |
@@ -53,10 +53,6 @@ jobs:
           : > "$WORK/anomalies.txt"
 
           now=$(date -u +%s)
-          dow=$(date -u +%u)
-          window=no
-          if [ "$dow" -le 4 ]; then window=yes; fi
-          if [ "$DISPATCHED" = "true" ]; then window=manual; fi
 
           gh api graphql --paginate \
             -f owner="${GH_REPO%/*}" -f name="${GH_REPO#*/}" \
@@ -94,9 +90,10 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| mode | \`$MODE\` (\`vars.DEPENDENCY_UPDATES\` = \`${HOLD_STATE:-<unset>}\`) |"
-            echo "| now (UTC) | day $dow — promotion window: **$window** |"
             echo "| hold window | ${AGE_HOURS}h measured on the head commit |"
+            echo "| release | a maintainer marks each held pull request ready for review |"
             echo "| open PRs / in scope | $open_total / $held_total |"
+            echo "| held now | ${HELD_URL} |"
             echo "| open a batch off-cycle | ${DEPENDABOT_URL} — one \`Check for updates\` per ecosystem, needs repo admin |"
             echo
             echo "| PR | pin frozen at | age | draft | checks | action |"
@@ -117,21 +114,20 @@ jobs:
             action=none
             if [ "$draft" = "false" ] && [ "$aged" = "no" ]; then
               action=freeze
-            elif [ "$draft" = "true" ] && [ "$aged" = "yes" ] && [ "$window" != "no" ]; then
-              action=promote
-            elif [ "$draft" = "false" ] && [ "$age_h" -ge $(( AGE_HOURS + STALE_READY_DAYS * 24 )) ]; then
-              echo "PR #${num} has been ready for review for over ${STALE_READY_DAYS} days. Dependabot supersedes an unmerged group pull request on the next Friday run, and its review threads go with it." >> "$WORK/anomalies.txt"
+            elif [ "$age_h" -ge $(( AGE_HOURS + STALE_READY_DAYS * 24 )) ]; then
+              if [ "$draft" = "true" ]; then
+                action=stale-draft
+                echo "PR #${num} has been held for ${age_h}h and is still a draft. Its pin cleared the ${AGE_HOURS}h window and nobody has marked it ready for review. Mark it ready, or close it." >> "$WORK/anomalies.txt"
+              else
+                action=stale-ready
+                echo "PR #${num} is ready for review on a pin ${age_h}h old and is not merged. Dependabot supersedes an unmerged group pull request on the next Friday run, and its review threads go with it." >> "$WORK/anomalies.txt"
+              fi
             fi
 
             if [ "$MODE" = "apply" ]; then
               case "$action" in
                 freeze)
                   gh pr ready --undo "$num" </dev/null
-                  ;;
-                promote)
-                  gh pr ready "$num" </dev/null
-                  gh pr comment "$num" --body \
-                    "Held since \`${frozen}\` and unchanged for ${age_h}h. Ready for review." </dev/null
                   ;;
               esac
             fi

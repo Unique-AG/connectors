@@ -15,13 +15,20 @@ each one to the control that satisfies it here.
 | Friday 06:00 Berlin | Dependabot opens the grouped update pull requests | `.github/dependabot.yaml` |
 | Within a few minutes | They are converted to draft | `dependency-updates.yaml` |
 | Friday to Monday | The pins age. Nothing changes them | `rebase-strategy: disabled` |
-| Monday morning UTC | They are marked ready for review | `dependency-updates.yaml` |
-| Monday | The team reviews and merges them | people |
+| Monday | A maintainer marks each held pull request ready for review, then the team reviews and merges | people |
 
-Draft is a server-side merge block. Nobody can merge a held pull request early. Marking one ready
-also requests review from CODEOWNERS, so the promotion is the review request.
+Draft is a server-side merge block. Nobody can merge a held pull request early, and auto-merge
+cannot be armed on one — verified across every open pull request: `viewerCanEnableAutoMerge` is
+false on all six drafts and true on all nine non-drafts, with `mergeStateStatus` mixed within both
+groups. Nothing lifts that block on a schedule. A person does, by hand, on Monday.
 
-Tuesday to Thursday runs exist only to catch a dropped Monday run.
+Dependabot cannot open a draft, so it opens ready for review and the CODEOWNERS request fires at
+the Friday open. Converting to draft does not withdraw it, and marking a pull request ready a second
+time sends no new request — pull request #164 shows four `review_requested` events on the first
+ready, none on the second. The Monday click lifts the merge block. It is not the review request.
+
+The daily runs re-freeze a pin that moved. Dependabot force-pushes released pull requests often
+enough to matter, and a force push resets the pin to zero age with the merge block already lifted.
 
 ## What rides, and what does not
 
@@ -57,10 +64,14 @@ A `schedule` run is not Dependabot-initiated and has neither restriction.
 holds state, so the workflow cannot disagree with itself, and a human who flips draft state by hand
 is simply converged back on the next run.
 
-**The hold does not convert a pull request while its checks are still running.** Third-party review
-apps skip drafts, and one that abandons an in-flight run leaves a check stuck, which
-merge-gatekeeper then polls to its timeout and hard-fails with no way to re-run it. After one hour
-the hold converts anyway, so a permanently stuck check cannot keep a pull request out of the freeze.
+**The hold converts a pull request as soon as it sees it, without waiting for checks.** An earlier
+version waited up to an hour for the check rollup to settle, on the theory that a third-party review
+app abandoning an in-flight run would leave a check stuck for merge-gatekeeper. That wait was
+removed: no workflow in `.github/workflows` triggers on `draft`, `ready_for_review` or
+`converted_to_draft`, so converting a pull request to draft cancels nothing, and the wait only
+widened the window in which a fresh pin was mergeable. The rollup is still queried and still shown
+in the step summary, because it is what a maintainer wants to see before releasing a hold, but no
+decision reads it.
 
 **`cancel-in-progress: false` on the pin check is deliberate.** merge-gatekeeper de-duplicates check
 runs by name and the check-runs API ordering is unspecified, so a cancelled run and a successful run
@@ -72,24 +83,23 @@ under `GITHUB_TOKEN`, `convertPullRequestToDraft` and `markPullRequestReadyForRe
 `write` (cli/cli#8910, reproduced February 2026, still open). `pull-requests: write` alone is not
 enough, so a run will not prove `contents: write` unnecessary — it will fail.
 
-`checks: read` and `statuses: read` are what make the check wait real. `statusCheckRollup` is a
+`checks: read` and `statuses: read` are what make the rollup column real. `statusCheckRollup` is a
 union over `CheckRun` and `StatusContext`, owned by those two permissions, and a token holding
 neither is refused the whole `commit.statusCheckRollup` node. GitHub answers 200 with the node
 nulled and a `FORBIDDEN` entry in `errors`, and `gh` turns any `errors` entry into a non-zero exit.
-So the reconciler fails outright rather than reading every pull request as `NONE` and freezing it
-mid-check. `gatekeeper.yaml` grants the same pair for the same reason. `actions: read` is not
+So the reconciler fails outright rather than silently showing every pull request as `NONE`. `gatekeeper.yaml` grants the same pair for the same reason. `actions: read` is not
 needed: it covers `checkSuite.workflowRun`, which this query never selects.
 
 ## Mapping to the standard
 
 | Standard rule | Control here |
 |---|---|
-| Major and minor move by hand. Patch and digest updates flow as pull requests | The `major` and `python-runtime` groups are never held and never promoted automatically |
+| Major and minor move by hand. Patch and digest updates flow as pull requests | The `major` and `python-runtime` groups are never held. They open ready for review |
 | node and nginx minors are the exception. python is excluded | Applied literally. We have no nginx. `node:X.Y.Z` minors ride; `python` and `uv` minors do not |
 | No tooled age cooldown | `cooldown` removed from the docker entry. Dependabot reads a Docker release date from `Last-Modified` on the manifest HEAD, which neither registry returns, so it fails open |
 | The cooldown is a manual merge policy, with the pin frozen | This is the cycle above. `rebase-strategy: disabled` is the freeze, draft state is the enforcement |
 | A rebase resets the age (accepted hole) | Closed. See the design notes |
-| Automerge off. A human approves every base pull request | No automerge. The workflow has no `checks: write` and never submits a review |
+| Automerge off. A human approves every base pull request | No automerge. The workflow has no `checks: write`, never submits a review, and never lifts the merge block — only a person does |
 | Every external `FROM` is digest-pinned | True for all 11 Dockerfiles today. **Not asserted by CI** — see the open items |
 | Images are cosign-signed | Satisfied and exceeded. `_template-cd.yaml` signs **and** verifies, with SBOM and provenance |
 | Two tag classes: rolling and immutable | Not applicable as written — we consume bases, we do not publish them. See the open items |
@@ -120,6 +130,12 @@ workflow runs in report mode until it is set to `on`, and returns to report mode
 anything else. Every run writes its full decision table to the job step summary.
 
 To check the hold without waiting for a cron, run the workflow manually with `mode: report`.
+
+**Releasing the hold.** Every Monday, open the held pull requests — the `held now` link in each run's
+step summary, or `is:pr is:open is:draft author:app/dependabot` — click **Ready for review** on each,
+then review and merge. Nothing else releases them. Wait until the pins are past 72h or the next run
+puts them back to draft. A held pull request still in draft at 120h raises the `dependency-updates`
+issue: that is the missed-Monday alarm, and it is the only one.
 
 There is no supported API to trigger Dependabot itself. The only manual triggers are the
 **Check for updates** button under Insights → Dependency graph → Dependabot, which is one click per
