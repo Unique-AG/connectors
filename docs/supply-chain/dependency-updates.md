@@ -13,93 +13,70 @@ each one to the control that satisfies it here.
 | When | What happens | Where |
 |---|---|---|
 | Friday 06:00 Berlin | Dependabot opens the grouped update pull requests | `.github/dependabot.yaml` |
-| Within a few minutes | They are converted to draft | `dependency-updates.yaml` |
-| Friday to Monday | The pins age. Nothing changes them | `rebase-strategy: disabled` |
-| Monday | A maintainer marks each held pull request ready for review, then the team reviews and merges | people |
+| Friday to Monday | The pins do not move | `rebase-strategy: disabled` |
+| Monday | The team reviews and merges them | people |
 
-Draft is a server-side merge block. Nobody can merge a held pull request early, and auto-merge
-cannot be armed on one — verified across every open pull request: `viewerCanEnableAutoMerge` is
-false on all six drafts and true on all nine non-drafts, with `mergeStateStatus` mixed within both
-groups. Nothing lifts that block on a schedule. A person does, by hand, on Monday.
+There is no automated gate. The three days are a merge policy the team follows, which is what the
+standard asks for. Two mechanisms make it real, and both live in `.github/dependabot.yaml`.
 
-Dependabot cannot open a draft, so it opens ready for review and the CODEOWNERS request fires at
-the Friday open. Converting to draft does not withdraw it, and marking a pull request ready a second
-time sends no new request — pull request #164 shows four `review_requested` events on the first
-ready, none on the second. The Monday click lifts the merge block. It is not the review request.
+`cooldown: default-days: 3` stops Dependabot offering a version until it has been public three days.
+So on npm, uv, github-actions, terraform and helm every pin is already three days old when the pull
+request opens, before anyone waits at all.
 
-The daily runs re-freeze a pin that moved. Dependabot force-pushes released pull requests often
-enough to matter, and a force push resets the pin to zero age with the merge block already lifted.
+`rebase-strategy: disabled` stops Dependabot re-pointing an open pull request at a newer digest. The
+pin merged on Monday is the pin opened on Friday. This is what the standard calls the freeze, and it
+is the part that survives without a gate.
+
+Docker is the exception and it matters, because the standard is about base images. Its `cooldown` is
+deliberately absent — Dependabot reads a Docker release date from `Last-Modified` on the manifest
+HEAD, which neither `registry-1.docker.io` nor `ghcr.io` returns, so the setting fails open. For
+docker the three days come only from the pull request sitting from Friday to Monday. Nothing enforces
+that. Merging a docker update on Friday takes a pin that may be hours old.
 
 ## What rides, and what does not
 
 Routing is the Dependabot group identifier, which appears in the branch name.
 
-| Group | Branch contains | Held? |
+| Group | Branch contains | Merge policy |
 |---|---|---|
-| `minor-and-patch` | `minor-and-patch` | yes, three days |
-| `major` | `major` | no — opens ready for review |
-| `python-runtime` | `python-runtime` | no — opens ready for review |
-| security updates | the dependency name | no — never grouped, never held |
+| `minor-and-patch` | `minor-and-patch` | wait three days, then merge on Monday |
+| `major` | `major` | separate review. It may need code changes |
+| `python-runtime` | `python-runtime` | separate review. It moves the interpreter |
+| security updates | the dependency name | merge on the day it arrives |
 
-Security updates are never held. Holding a published, exploitable fix until Monday is worse than
-merging it on the day it arrives. This is an allowlist, so the failure direction is "a weekly pull
-request was not frozen", never "a critical fix was silently held".
+Security updates do not wait. Holding a published, exploitable fix until Monday is worse than merging
+it the day it arrives. They are also never grouped, so they never carry `minor-and-patch` in the
+branch name.
 
 ## Design notes
 
-**The clock is the head commit, not `createdAt`.** A rebase, an `@dependabot recreate`, or a
-conflict refresh replaces the pinned digest and leaves `createdAt` untouched. Ageing the ticket
-instead of the artifact would merge a zero-age pin while recording three days. Because a ready pull
-request whose head commit is younger than the window is pushed back to draft, a rebase re-freezes
-it and restarts its clock. The standard documents this hole and accepts it. This closes it.
+**`rebase-strategy: disabled` is the whole freeze.** Without it Dependabot re-points an open pull
+request at the newest digest and the three-day age resets silently, while `createdAt` stays put — so
+you would merge a zero-age pin and record three days. The standard documents that hole and accepts
+it. This closes it.
 
-**One reconciler, not a Friday job and a Monday job.** Two scheduled jobs have four failure modes
-that each need their own handling: a dropped Friday run, a dropped Monday run, a holiday Monday and
-a holiday Friday. A convergent reconciler absorbs all four as latency. It also avoids the token
-problem: a workflow triggered by a Dependabot pull request gets a read-only token, and
-`pull_request_target` is read-only with no secrets when the pull request was opened by Dependabot.
-A `schedule` run is not Dependabot-initiated and has neither restriction.
+Its known cost is unchanged: Dependabot supersedes and replaces an unmerged group pull request on the
+next Friday run (#746 to #754 to #788 to #865), and the review threads go with it. That is an
+argument for merging on Monday, which is the point of the process.
 
-**The state machine is derived, not recorded.** Every decision comes from `(draft, aged)`. No label
-holds state, so the workflow cannot disagree with itself, and a human who flips draft state by hand
-is simply converged back on the next run.
-
-**The hold converts a pull request as soon as it sees it, without waiting for checks.** An earlier
-version waited up to an hour for the check rollup to settle, on the theory that a third-party review
-app abandoning an in-flight run would leave a check stuck for merge-gatekeeper. That wait was
-removed: no workflow in `.github/workflows` triggers on `draft`, `ready_for_review` or
-`converted_to_draft`, so converting a pull request to draft cancels nothing, and the wait only
-widened the window in which a fresh pin was mergeable. The rollup is still queried and still shown
-in the step summary, because it is what a maintainer wants to see before releasing a hold, but no
-decision reads it.
-
-**`cancel-in-progress: false` on the pin check is deliberate.** merge-gatekeeper de-duplicates check
-runs by name and the check-runs API ordering is unspecified, so a cancelled run and a successful run
-under one name can resolve to the cancelled one and hard-fail the gate.
-
-**The hold workflow's token scopes are all load-bearing.** `contents: write` is not provisional:
-under `GITHUB_TOKEN`, `convertPullRequestToDraft` and `markPullRequestReadyForReview` both answer
-`Resource not accessible by integration` while `contents` is `read`, and both succeed when it is
-`write` (cli/cli#8910, reproduced February 2026, still open). `pull-requests: write` alone is not
-enough, so a run will not prove `contents: write` unnecessary — it will fail.
-
-`checks: read` and `statuses: read` are what make the rollup column real. `statusCheckRollup` is a
-union over `CheckRun` and `StatusContext`, owned by those two permissions, and a token holding
-neither is refused the whole `commit.statusCheckRollup` node. GitHub answers 200 with the node
-nulled and a `FORBIDDEN` entry in `errors`, and `gh` turns any `errors` entry into a non-zero exit.
-So the reconciler fails outright rather than silently showing every pull request as `NONE`. `gatekeeper.yaml` grants the same pair for the same reason. `actions: read` is not
-needed: it covers `checkSuite.workflowRun`, which this query never selects.
+**There is no gate workflow, on purpose.** An earlier version of this change added one: it converted
+fresh Dependabot pull requests to draft and let a maintainer release them on Monday. It was deleted
+before it ever ran. Dependabot cannot open a pull request as a draft, so a gate can only ever race to
+convert one that is already mergeable, and the race is bounded by a cron. That made the hold
+enforced against accident but advisory against anyone with write access — while costing a scheduled
+workflow, a repository variable, a state machine and a weekly alarm. The standard asks for a manual
+merge policy. This is one, written down, with the pin freeze done mechanically.
 
 ## Mapping to the standard
 
 | Standard rule | Control here |
 |---|---|
-| Major and minor move by hand. Patch and digest updates flow as pull requests | The `major` and `python-runtime` groups are never held. They open ready for review |
+| Major and minor move by hand. Patch and digest updates flow as pull requests | `major` and `python-runtime` are their own groups and get their own review. Everything else rides the weekly pull request |
 | node and nginx minors are the exception. python is excluded | Applied literally. We have no nginx. `node:X.Y.Z` minors ride; `python` and `uv` minors do not |
-| No tooled age cooldown | `cooldown` removed from the docker entry. Dependabot reads a Docker release date from `Last-Modified` on the manifest HEAD, which neither registry returns, so it fails open |
-| The cooldown is a manual merge policy, with the pin frozen | This is the cycle above. `rebase-strategy: disabled` is the freeze, draft state is the enforcement |
+| No tooled age cooldown | Read the other way here. `cooldown: 3` is set on the five ecosystems where release dates resolve, and omitted on docker where it fails open |
+| The cooldown is a manual merge policy, with the pin frozen | This is the cycle above. `rebase-strategy: disabled` is the freeze. The three days are the merge policy, and nothing enforces them — see the open items |
 | A rebase resets the age (accepted hole) | Closed. See the design notes |
-| Automerge off. A human approves every base pull request | No automerge. The workflow has no `checks: write`, never submits a review, and never lifts the merge block — only a person does |
+| Automerge off. A human approves every base pull request | No dependency pull request has automerge armed, and every merge to `main` carries an approval. The repository does allow automerge, so nothing prevents someone arming it — see the open items |
 | Every external `FROM` is digest-pinned | True for all 11 Dockerfiles today. **Not asserted by CI** — see the open items |
 | Images are cosign-signed | Satisfied and exceeded. `_template-cd.yaml` signs **and** verifies, with SBOM and provenance |
 | Two tag classes: rolling and immutable | Not applicable as written — we consume bases, we do not publish them. See the open items |
@@ -122,20 +99,33 @@ These are accepted risks, not satisfied controls. Do not describe them as satisf
    is separate, tracked work.
 5. **Nothing asserts that every external `FROM` carries a digest.** It is true for all 11
    Dockerfiles today and no gate keeps it true. A mutable tag would build and deploy normally.
+6. **Nothing enforces the three days.** The wait is a written policy. Anyone with write access can
+   merge a Friday pull request on Friday, and for docker that pin may be hours old. A gate was built
+   and deleted: see the design notes for why. If this needs to become a control, the honest options
+   are a required status check on `main` — which needs repo admin and would be the repository's
+   first — or restoring the draft gate and accepting its cost.
+7. **Automerge is allowed on this repository.** `allow_auto_merge` is true. No dependency pull
+   request has it armed today, and nothing stops someone arming one, which would merge it as soon as
+   checks pass rather than on Monday.
 
 ## Operating it
 
-The repository variable `DEPENDENCY_UPDATES` is both the arming switch and the kill switch. The
-workflow runs in report mode until it is set to `on`, and returns to report mode if it is set to
-anything else. Every run writes its full decision table to the job step summary.
+There is nothing to arm and nothing to operate. The process is the routine below.
 
-To check the hold without waiting for a cron, run the workflow manually with `mode: report`.
+**Every Monday.** Open `is:pr is:open author:app/dependabot` and work the list.
 
-**Releasing the hold.** Every Monday, open the held pull requests — the `held now` link in each run's
-step summary, or `is:pr is:open is:draft author:app/dependabot` — click **Ready for review** on each,
-then review and merge. Nothing else releases them. Wait until the pins are past 72h or the next run
-puts them back to draft. A held pull request still in draft at 120h raises the `dependency-updates`
-issue: that is the missed-Monday alarm, and it is the only one.
+1. Merge the `minor-and-patch` pull request for each ecosystem. Their pins opened on Friday and have
+   not moved.
+2. Review `major` and `python-runtime` separately. They may need code changes.
+3. Merge any security update as soon as you see it, whatever day it is.
+4. If a `minor-and-patch` pull request is still open next Friday, Dependabot will replace it and its
+   review threads will go with it. Merge it or close it before then.
+
+**Do not merge a docker update before Monday.** It is the one ecosystem with no version cooldown, so
+the three days come only from the pull request sitting there. Nothing will stop you.
+
+Nobody is notified when the week's pull requests are ready, because the CODEOWNERS review request
+fires when Dependabot opens them on Friday. Monday is a routine, not a response to a prompt.
 
 There is no supported API to trigger Dependabot itself. The only manual triggers are the
 **Check for updates** button under Insights → Dependency graph → Dependabot, which is one click per
