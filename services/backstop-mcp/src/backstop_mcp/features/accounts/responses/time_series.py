@@ -5,11 +5,8 @@ from typing import Literal, Self
 
 from pydantic import Field
 
-from backstop_mcp.features.accounts.internal_dto import (
-    SeriesPointDto,
-    TimeSeriesEntityType,
-    TimeSeriesName,
-)
+from backstop_mcp.features.accounts.internal_dto import SeriesPointDto
+from backstop_mcp.features.accounts.time_series_name import TimeSeriesEntityType, TimeSeriesName
 from backstop_mcp.models import OmitNoneModel
 
 

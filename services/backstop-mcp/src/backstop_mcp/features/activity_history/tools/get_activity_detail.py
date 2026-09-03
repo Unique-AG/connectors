@@ -8,11 +8,10 @@ already that bare id (`/entity-activity-details/{id}` answers it live); meeting 
 follow the detail record's `type`, because a search id has no resource type. A history
 email handle is rejected: `/emails` ids (body via `contentUrl`) are not this id space.
 
-For a meeting/call composite, all three fetches — the detail record, the meeting specifics,
-and the attendees — run CONCURRENTLY via `asyncio.gather`. A note or document composite is
-one request: both `/meeting-or-calls` paths 404 for a resource id that is not a meeting/call.
-A bare id fetches detail first, then the two meeting endpoints only when `type` is meeting
-or call.
+The query gathers the three GETs for a meeting/call composite. A note or document composite
+is one request: both `/meeting-or-calls` paths 404 for a resource id that is not a
+meeting/call. A bare id fetches detail first, then the two meeting endpoints only when
+`type` is meeting or call.
 
 A stale or invented `activity_id` raises rather than returning a bespoke not-found response.
 An empty handle fails locally as a `ToolError`; one that is well-formed but unknown becomes
@@ -20,7 +19,6 @@ a 404 `BackstopApiError` (`/entity-activity-details` answers 200 with null prima
 those, which `BackstopApiResourceDocument.require_data` converts).
 """
 
-import asyncio
 import logging
 from typing import Annotated
 
@@ -30,24 +28,15 @@ from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
 from backstop_mcp.features.activity_history import (
     ActivityDetailResponse,
+    GetActivityDetailQuery,
     ResourceIdentifierDto,
-    fetch_activity_detail,
-    fetch_attendees,
-    fetch_meeting_specifics,
 )
+from backstop_mcp.features.activity_history.dependencies import get_activity_detail_query_factory
 from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
-
-_MEETING_DETAIL_TYPES = frozenset({"meeting", "call"})
-
-
-def _is_meeting_detail_type(detail_type: str | None) -> bool:
-    return (detail_type or "").casefold() in _MEETING_DETAIL_TYPES
 
 
 @tool(
@@ -73,7 +62,7 @@ async def get_activity_detail(
             ),
         ),
     ],
-    client: BackstopClient = Depends(get_backstop_client),
+    get_activity_detail_query: GetActivityDetailQuery = Depends(get_activity_detail_query_factory),
 ) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, attendees, and attachment list.
 
@@ -92,52 +81,23 @@ async def get_activity_detail(
     """
     _ = ctx
     handle = ResourceIdentifierDto.from_activity_id(activity_id)
-    resource_id = handle.resource_id
     logger.info(
         "activity_history.detail.get.start",
         extra={
             "activity_id": activity_id,
             "resource_type": handle.resource_type,
-            "resource_id": resource_id,
+            "resource_id": handle.resource_id,
             "meeting_or_call": handle.is_meeting_or_call,
         },
     )
-    if handle.is_meeting_or_call:
-        detail, specifics, attendees = await asyncio.gather(
-            fetch_activity_detail(client, resource_id=resource_id),
-            fetch_meeting_specifics(client, resource_id=resource_id),
-            fetch_attendees(client, resource_id=resource_id),
-        )
-    elif handle.resource_type is not None:
-        logger.debug(
-            "activity_history.detail.get.skip_meeting_fetches",
-            extra={"activity_id": activity_id, "resource_type": handle.resource_type},
-        )
-        detail = await fetch_activity_detail(client, resource_id=resource_id)
-        specifics = None
-        attendees = ()
-    else:
-        # search_activities `id` has no resource type. Detail's `type` says whether
-        # /meeting-or-calls applies (email/note/document 404 there).
-        detail = await fetch_activity_detail(client, resource_id=resource_id)
-        if _is_meeting_detail_type(detail.type):
-            specifics, attendees = await asyncio.gather(
-                fetch_meeting_specifics(client, resource_id=resource_id),
-                fetch_attendees(client, resource_id=resource_id),
-            )
-        else:
-            specifics = None
-            attendees = ()
-
+    result = await get_activity_detail_query.run(activity_id=activity_id, handle=handle)
     logger.info(
         "activity_history.detail.get.completed",
         extra={
             "activity_id": activity_id,
-            "type": detail.type,
-            "attendees": len(attendees),
-            "has_body": detail.description is not None,
+            "type": result.type,
+            "attendees": len(result.attendees),
+            "has_body": bool(result.body),
         },
     )
-    return ActivityDetailResponse.from_detail(
-        activity_id=activity_id, detail=detail, specifics=specifics, attendees=attendees
-    )
+    return result

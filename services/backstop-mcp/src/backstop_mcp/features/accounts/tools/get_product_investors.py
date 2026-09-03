@@ -15,13 +15,14 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
+    GetAccountsForProductQuery,
     ProductAmbiguousResponse,
     ProductInvestorsResolvedResponse,
-    fetch_accounts_for_product,
     resolve_product_query,
 )
+from backstop_mcp.features.accounts.dependencies import get_accounts_for_product_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.models import published_output_schema
 
@@ -84,7 +85,10 @@ async def get_product_investors(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    get_accounts_for_product_query: GetAccountsForProductQuery = Depends(
+        get_accounts_for_product_query_factory
+    ),
 ) -> GetProductInvestorsResponse:
     """The accounts in one product, and who owns them. No balances, no series.
 
@@ -118,15 +122,15 @@ async def get_product_investors(
         "accounts.product_investors.start",
         extra={"product_id": resolved.id, "include_closed": include_closed},
     )
-    listing = await fetch_accounts_for_product(
-        client, product_id=resolved.id, include_closed=include_closed
+    result = await get_accounts_for_product_query.run(
+        product=resolved, include_closed=include_closed
     )
     logger.info(
         "accounts.product_investors.completed",
         extra={
             "product_id": resolved.id,
-            "returned": len(listing.accounts),
-            "closed_omitted": listing.closed_omitted,
+            "returned": len(result.accounts),
+            "closed_omitted": result.closed_omitted,
         },
     )
-    return ProductInvestorsResolvedResponse.from_listing(listing, product=resolved)
+    return result

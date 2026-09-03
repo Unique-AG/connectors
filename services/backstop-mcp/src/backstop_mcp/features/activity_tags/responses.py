@@ -1,12 +1,12 @@
 """Published activity-tag catalog response models."""
 
-from typing import ClassVar, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.features.activity_tags.internal_dto import ActivityTagDto
 
-__all__ = ["ActivityTagResponse"]
+__all__ = ["ActivityTagResponse", "ListActivityTagsResponse"]
 
 
 class ActivityTagResponse(BaseModel):
@@ -45,3 +45,22 @@ class ActivityTagResponse(BaseModel):
             quantity_tagged=tag.quantity_tagged,
             viewable=tag.viewable,
         )
+
+
+class ListActivityTagsResponse(BaseModel):
+    """Activity tags from the standard Backstop activity-tag catalog."""
+
+    status: Literal["ok"] = Field(default="ok", description="Always 'ok'.")
+    cache: Literal["ok", "stale"] = Field(
+        description=(
+            "'ok' when the catalog was fetched this call or is still fresh; 'stale' when a "
+            "previous catalog is served because refresh failed."
+        )
+    )
+    tags: list[ActivityTagResponse] = Field(
+        description=(
+            "Activity tags in catalog order. Each tag's id is the stable identifier for "
+            "filtering activities by tag. quantity_tagged is how many activities currently "
+            "carry the tag; viewable is whether the tag is shown in the Backstop UI."
+        )
+    )

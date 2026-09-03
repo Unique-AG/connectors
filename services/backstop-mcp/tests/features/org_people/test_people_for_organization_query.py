@@ -1,0 +1,264 @@
+import logging
+from importlib import import_module
+
+import httpx
+import pytest
+import respx
+
+from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.features.org_people import MAX_ORG_PEOPLE
+from tests.features.data_hygiene.helpers import (
+    EMPLOYEE_TYPE,
+    FORMER_MIRROR_TYPE,
+    OWNS_ACCOUNT_TYPE,
+    person_org,
+    relationship_types,
+)
+from tests.features.org_people.conftest import make_get_people_for_organization_query
+from tests.helpers import BASE_URL, recorded_requests
+
+_ORG = "o1"
+_ER_URL = f"{BASE_URL}/organizations/{_ORG}/entityRelationships"
+_EMPLOYEES_URL = f"{BASE_URL}/organizations/{_ORG}/employees"
+
+
+def _er_page(*rows: dict[str, object], included: list[dict[str, object]]) -> httpx.Response:
+    return httpx.Response(200, json={"data": list(rows), "included": included})
+
+
+def _employees_page(
+    *people: tuple[str, dict[str, object]],
+    included: list[dict[str, object]] | None = None,
+) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "data": [
+                {"id": person_id, "type": "employees", "attributes": attributes}
+                for person_id, attributes in people
+            ],
+            "included": [] if included is None else included,
+        },
+    )
+
+
+def _person_link(er_id: str, *, person_id: str, type_id: str) -> dict[str, object]:
+    return person_org(
+        er_id,
+        source_type="people",
+        source_id=person_id,
+        dest_type="organizations",
+        dest_id=_ORG,
+        type_id=type_id,
+    )
+
+
+def _org_link(er_id: str, *, person_id: str, type_id: str) -> dict[str, object]:
+    return person_org(
+        er_id,
+        source_type="organizations",
+        source_id=_ORG,
+        dest_type="people",
+        dest_id=person_id,
+        type_id=type_id,
+    )
+
+
+class TestPeopleForOrganizationQuery:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_current_people_from_employee_includes(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                (
+                    "p1",
+                    {
+                        "name": "Glenn, Phil",
+                        "jobTitle": "Tax Director",
+                        "email": "phil@example.com",
+                        "categories": ["Investor", "Decision Maker"],
+                    },
+                ),
+                included=[
+                    _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    _person_link("er-account", person_id="p3", type_id=OWNS_ACCOUNT_TYPE),
+                    *relationship_types(EMPLOYEE_TYPE, OWNS_ACCOUNT_TYPE),
+                ],
+            )
+        )
+
+        respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=False,
+        )
+
+        assert [row.employment.person_id for row in listing.people] == ["p1"]
+        assert listing.people[0].employment.status == "current"
+        assert listing.people[0].name == "Glenn, Phil"
+        assert listing.people[0].job_title == "Tax Director"
+        assert listing.people[0].categories == ("Investor", "Decision Maker")
+        assert listing.former_omitted == 0
+        assert listing.people_omitted == 0
+        query = dict(route.calls.last.request.url.params)
+        assert query["include"] == "entityRelationships,entityRelationships.entityRelationshipType"
+        assert query["fields[employees]"] == "name,jobTitle,email,phone,companyName,categories"
+        assert any(
+            request.url.path.endswith("/entityRelationships")
+            for request in recorded_requests(respx.calls)
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_side_load_is_dropped_and_warned(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING)
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                ("p1", {"name": "Glenn, Phil"}),
+                included=[
+                    _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    {"type": "entity-relationships", "attributes": {}},
+                    *relationship_types(EMPLOYEE_TYPE),
+                ],
+            )
+        )
+        respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=False,
+        )
+
+        assert [row.employment.person_id for row in listing.people] == ["p1"]
+        assert [record.message for record in caplog.records] == ["org_people.side_load.unreadable"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_include_former_adds_org_entity_relationships(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                ("p1", {"name": "Current"}),
+                included=[
+                    _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    *relationship_types(EMPLOYEE_TYPE),
+                ],
+            )
+        )
+        respx.get(_ER_URL).mock(
+            return_value=_er_page(
+                _org_link("er-former", person_id="p2", type_id=FORMER_MIRROR_TYPE),
+                included=relationship_types(FORMER_MIRROR_TYPE),
+            )
+        )
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=True,
+        )
+
+        by_id = {row.employment.person_id: row for row in listing.people}
+        assert set(by_id) == {"p1", "p2"}
+        assert by_id["p1"].employment.status == "current"
+        assert by_id["p1"].name == "Current"
+        assert by_id["p2"].employment.status == "former"
+        assert by_id["p2"].name is None
+        assert listing.former_omitted == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_former_only_org_reports_former_omitted(self, client: BackstopClient) -> None:
+        respx.get(_EMPLOYEES_URL).mock(return_value=_employees_page())
+        respx.get(_ER_URL).mock(
+            return_value=_er_page(
+                _org_link("er-former", person_id="p2", type_id=FORMER_MIRROR_TYPE),
+                included=relationship_types(FORMER_MIRROR_TYPE),
+            )
+        )
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=False,
+        )
+
+        assert listing.people == ()
+        assert listing.former_omitted == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_current_plus_former_counts_omitted_former(self, client: BackstopClient) -> None:
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                ("p1", {"name": "Current"}),
+                included=[
+                    _person_link("er-current", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    *relationship_types(EMPLOYEE_TYPE),
+                ],
+            )
+        )
+        respx.get(_ER_URL).mock(
+            return_value=_er_page(
+                _org_link("er-former", person_id="p2", type_id=FORMER_MIRROR_TYPE),
+                included=relationship_types(FORMER_MIRROR_TYPE),
+            )
+        )
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=False,
+        )
+
+        assert [row.employment.person_id for row in listing.people] == ["p1"]
+        assert listing.former_omitted == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_auth_failure_on_employees_aborts(self, client: BackstopClient) -> None:
+        respx.get(_EMPLOYEES_URL).mock(return_value=httpx.Response(401))
+
+        with pytest.raises(BackstopAuthError):
+            await make_get_people_for_organization_query(client).run(
+                organization_id=_ORG,
+                include_former=False,
+            )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_caps_the_fan_out(
+        self, client: BackstopClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Package re-exports a same-named constant; dotted setattr would bind it, not the module.
+        monkeypatch.setattr(
+            import_module(
+                "backstop_mcp.features.org_people.queries.get_people_for_organization_query"
+            ),
+            "MAX_ORG_PEOPLE",
+            1,
+        )
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=_employees_page(
+                ("p1", {"name": "A"}),
+                ("p2", {"name": "B"}),
+                included=[
+                    _person_link("er-a", person_id="p1", type_id=EMPLOYEE_TYPE),
+                    _person_link("er-b", person_id="p2", type_id=EMPLOYEE_TYPE),
+                    *relationship_types(EMPLOYEE_TYPE),
+                ],
+            )
+        )
+        respx.get(_ER_URL).mock(return_value=_er_page(included=[]))
+
+        listing = await make_get_people_for_organization_query(client).run(
+            organization_id=_ORG,
+            include_former=False,
+        )
+
+        assert len(listing.people) == 1
+        assert listing.people_omitted == 1
+        assert MAX_ORG_PEOPLE == 500

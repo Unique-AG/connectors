@@ -6,9 +6,9 @@ from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiResource,
     BackstopApiResourceDocument,
+    Included,
     IncludedResource,
     ResourceRef,
-    follow_included,
     included_resource,
 )
 
@@ -130,8 +130,8 @@ class TestBackstopApiCollectionDocument:
             BackstopApiCollectionDocument[_Attrs].model_validate({"data": None})
 
 
-class TestFollowIncluded:
-    def test_resolves_side_loaded_resources_in_linkage_order(self) -> None:
+class TestIncluded:
+    def test_related_resolves_side_loaded_resources_in_linkage_order(self) -> None:
         document = BackstopApiResourceDocument[_Attrs].model_validate(
             {
                 "data": {
@@ -153,11 +153,15 @@ class TestFollowIncluded:
                 ],
             }
         )
-        related = follow_included(document.included, document.data, "entityRelationships")
+        related = Included(document.included).related(
+            document.data,
+            "entityRelationships",
+            schema=IncludedResource[_OptionalAttrs],
+        )
 
-        assert [item["id"] for item in related] == ["er2", "er1"]
+        assert [item.id for item in related] == ["er2", "er1"]
 
-    def test_matches_by_type_and_id_when_ids_collide_across_types(self) -> None:
+    def test_related_matches_by_type_and_id_when_ids_collide_across_types(self) -> None:
         """Backstop reuses numeric ids across resource types in one `included` array."""
         document = BackstopApiResourceDocument[_Attrs].model_validate(
             {
@@ -185,11 +189,92 @@ class TestFollowIncluded:
                 ],
             }
         )
-        related = follow_included(document.included, document.data, "entityRelationships")
+        related = Included(document.included).related(
+            document.data,
+            "entityRelationships",
+            schema=IncludedResource[_OptionalAttrs],
+        )
 
         assert len(related) == 1
-        assert related[0]["type"] == "entity-relationships"
-        assert related[0]["attributes"] == {"endDate": "2020-01-01"}
+        assert related[0].id == "42"
+        assert related[0].type == "entity-relationships"
+
+    def test_first_parses_the_first_linked_side_load(self) -> None:
+        document = BackstopApiResourceDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "opportunities",
+                    "attributes": {"name": "Deal"},
+                    "relationships": {
+                        "product": {"data": {"type": "products", "id": "9"}},
+                    },
+                },
+                "included": [
+                    {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+                ],
+            }
+        )
+
+        chip = Included(document.included).first(
+            document.data,
+            "product",
+            schema=IncludedResource[_Attrs],
+        )
+
+        assert chip is not None
+        assert (chip.id, chip.attributes.name) == ("9", "Acme")
+
+    def test_missing_linkage_is_none(self) -> None:
+        document = BackstopApiResourceDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "opportunities",
+                    "attributes": {"name": "Deal"},
+                }
+            }
+        )
+
+        assert (
+            Included(document.included).first(
+                document.data,
+                "product",
+                schema=IncludedResource[_Attrs],
+            )
+            is None
+        )
+
+    def test_by_type_parses_every_entry_of_the_requested_type(self) -> None:
+        included: list[dict[str, object]] = [
+            {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+            {"type": "people", "id": "1", "attributes": {"name": "noise"}},
+            {"type": "products", "id": "8", "attributes": {"name": "Beta"}},
+        ]
+
+        chips = Included(included).by_type("products", schema=IncludedResource[_Attrs])
+
+        assert [(chip.id, chip.attributes.name) for chip in chips] == [("9", "Acme"), ("8", "Beta")]
+
+    def test_parse_keeps_every_usable_entry(self) -> None:
+        included: list[dict[str, object]] = [
+            {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+            {"id": "  ", "type": "products", "attributes": {"name": "blank"}},
+        ]
+
+        chips = Included(included).parse(schema=IncludedResource[_Attrs])
+
+        assert [chip.id for chip in chips] == ["9"]
+
+    def test_an_unreadable_entry_is_dropped_on_its_own(self) -> None:
+        included: list[dict[str, object]] = [
+            {"type": "products", "id": "9", "attributes": {"name": "Acme"}},
+            {"type": "products", "id": "8"},
+        ]
+
+        chips = Included(included).by_type("products", schema=IncludedResource[_Attrs])
+
+        assert [chip.id for chip in chips] == ["9"]
 
 
 class TestBackstopApiResourceIdValidation:
@@ -247,7 +332,7 @@ class TestResourceRef:
 
 
 class TestIncludedResource:
-    """Reading one entry of an `included` array — what `follow_included` hands back."""
+    """Reading one entry of an `included` array — what follow helpers deserialize into."""
 
     def test_keeps_the_identity_alongside_the_parsed_attributes(self) -> None:
         entry = included_resource(
@@ -275,6 +360,37 @@ class TestIncludedResource:
             included_resource({"id": "42", "type": "products"}, schema=IncludedResource[_Attrs])
             is None
         )
+
+    def test_a_non_object_attributes_is_read_as_empty(self) -> None:
+        entry = included_resource(
+            {"id": "42", "type": "products", "attributes": "not an object"},
+            schema=IncludedResource[_OptionalAttrs],
+        )
+
+        assert entry is not None
+        assert (entry.id, entry.attributes.name) == ("42", None)
+
+    def test_first_follows_owner_off_an_included_account_with_null_relationships(
+        self,
+    ) -> None:
+        """A side-load chip is `IncludedResource`, not a primary `BackstopApiResource`."""
+        account = included_resource(
+            {
+                "id": "7",
+                "type": "hedge-fund-accounts",
+                "attributes": {"name": "Acct"},
+                "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
+            },
+            schema=IncludedResource[_Attrs],
+        )
+        assert account is not None
+
+        owner = Included([{"id": "o1", "type": "contacts", "attributes": {"name": "Koch"}}]).first(
+            account, "owner", schema=IncludedResource[_Attrs]
+        )
+
+        assert owner is not None
+        assert (owner.id, owner.attributes.name) == ("o1", "Koch")
 
     def test_a_blank_id_is_dropped_like_a_missing_one(self) -> None:
         assert (

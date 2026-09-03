@@ -18,14 +18,13 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
-from backstop_mcp.features.data_hygiene import (
-    EmploymentIndexFactory,
-    get_employment_index_factory,
-)
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.org_people import (
+    GetPeopleForOrganizationQuery,
     OrgPeopleResolvedResponse,
-    fetch_people_for_organization,
+)
+from backstop_mcp.features.org_people.dependencies import (
+    get_people_for_organization_query_factory,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -92,8 +91,10 @@ async def get_people_for_party(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
-    employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    get_people_for_organization_query: GetPeopleForOrganizationQuery = Depends(
+        get_people_for_organization_query_factory
+    ),
 ) -> GetPeopleForPartyResponse:
     """List the people Backstop links to an organization, with employment status at that org.
 
@@ -128,9 +129,7 @@ async def get_people_for_party(
         "org_people.start",
         extra={"entity_id": party.id, "include_former": include_former},
     )
-    listing = await fetch_people_for_organization(
-        client,
-        employment_index_factory,
+    listing = await get_people_for_organization_query.run(
         organization_id=party.id,
         include_former=include_former,
     )
@@ -143,6 +142,9 @@ async def get_people_for_party(
             "people_omitted": listing.people_omitted,
         },
     )
-    return OrgPeopleResolvedResponse.from_listing(
-        listing, resolved=ResolvedPartyResponse.from_party(party)
+    return OrgPeopleResolvedResponse.from_people(
+        resolved=ResolvedPartyResponse.from_party(party),
+        people=listing.people,
+        former_omitted=listing.former_omitted,
+        people_omitted=listing.people_omitted,
     )

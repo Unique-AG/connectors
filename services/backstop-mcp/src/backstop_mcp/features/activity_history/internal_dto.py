@@ -1,15 +1,13 @@
 import logging
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
-from typing import ClassVar, Literal, Self, cast
+from typing import ClassVar, Self, cast
 
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from backstop_mcp.backstop_client import ResourceRef
 from backstop_mcp.features.activity_history.api_responses import (
-    ActivityAttributes,
-    EmailAttributes,
     EntityActivityAttributes,
 )
 from backstop_mcp.features.entity_types import SearchType, party_search_type
@@ -19,15 +17,10 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ActivityAttachmentDto",
     "ActivityDetailDto",
-    "ActivityItemDto",
-    "ActivityPageDto",
     "ActivityRegardingDto",
     "ActivityTagChipDto",
     "AttendeeChipDto",
     "AttendeeDto",
-    "BackstopActivityType",
-    "EmailItemDto",
-    "EmailPageDto",
     "EntityActivitiesFetchDto",
     "EntityActivityDto",
     "MeetingSpecificsDto",
@@ -36,8 +29,6 @@ __all__ = [
 
 _MEETING_OR_CALL_RESOURCE_TYPE = "meeting-or-calls"
 _EMAIL_RESOURCE_TYPES = frozenset({"email", "emails"})
-
-BackstopActivityType = Literal["meeting", "call", "note", "document"]
 
 
 class ActivityRegardingDto(BaseModel):
@@ -79,94 +70,6 @@ class AttendeeChipDto(BaseModel):
 
     id: str | None = None
     name: str | None = None
-
-
-class ActivityItemDto(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    # A row with no id is not a record: timeline handles and detail fetches key on it.
-    id: str
-    # Without the stream the row cannot be typed or routed onto the right collection.
-    stream: BackstopActivityType
-    title: str | None = None
-    description: str | None = None
-    effective_date: date | None = None
-    resource_type: str | None = None
-    resource_id: str | None = None
-    created_timestamp: datetime | None = None
-    modified_timestamp: datetime | None = None
-    regarding: ActivityRegardingDto | None = None
-    tags: tuple[ActivityTagChipDto, ...] = ()
-    attendees: tuple[AttendeeChipDto, ...] = ()
-
-    @classmethod
-    def from_attributes(
-        cls,
-        item_id: str,
-        stream: BackstopActivityType,
-        attributes: ActivityAttributes,
-        *,
-        tags: tuple[ActivityTagChipDto, ...] = (),
-        attendees: tuple[AttendeeChipDto, ...] = (),
-    ) -> Self:
-        specific = attributes.specific_resource
-        return cls(
-            id=item_id,
-            stream=stream,
-            title=attributes.title,
-            description=attributes.description,
-            effective_date=attributes.effective_date,
-            resource_type=None if specific is None else specific.resource_type,
-            resource_id=None if specific is None else specific.resource_id,
-            created_timestamp=attributes.created_timestamp,
-            modified_timestamp=attributes.modified_timestamp,
-            regarding=ActivityRegardingDto.from_stored(attributes.regarding),
-            tags=tags,
-            attendees=attendees,
-        )
-
-
-class EmailItemDto(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    # A row with no id is not a record: timeline handles key on it.
-    id: str
-    subject: str | None = None
-    sent_timestamp: datetime | None = None
-    from_email: str | None = None
-    to_emails: tuple[str, ...] = ()
-    cc_emails: tuple[str, ...] = ()
-    has_attachments: bool | None = None
-    content_url: str | None = None
-
-    @classmethod
-    def from_attributes(cls, item_id: str, attributes: EmailAttributes) -> Self:
-        return cls(
-            id=item_id,
-            subject=attributes.subject,
-            sent_timestamp=attributes.sent_timestamp,
-            from_email=attributes.from_email,
-            to_emails=tuple(attributes.to_emails),
-            cc_emails=tuple(attributes.cc_emails),
-            has_attachments=attributes.has_attachments,
-            content_url=attributes.content_url,
-        )
-
-
-class ActivityPageDto(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    items: tuple[ActivityItemDto, ...] = ()
-    # Without this, a short page and a full page are indistinguishable.
-    end_of_stream: bool
-
-
-class EmailPageDto(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    items: tuple[EmailItemDto, ...] = ()
-    # Without this, a short page and a full page are indistinguishable.
-    end_of_stream: bool
 
 
 class ActivityAttachmentDto(BaseModel):

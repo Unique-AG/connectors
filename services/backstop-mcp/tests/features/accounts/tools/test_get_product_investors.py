@@ -14,6 +14,7 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
+from tests.features.accounts.conftest import make_get_accounts_for_product_query
 from tests.features.party_resolver.helpers import ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_params, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
@@ -120,7 +121,12 @@ class TestGetProductInvestors:
         )
 
         result = tool_model(
-            await get_product_investors(ctx_never_elicit(), product_id=_PRODUCT_ID, client=client),
+            await get_product_investors(
+                ctx_never_elicit(),
+                product_id=_PRODUCT_ID,
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            ),
             ProductInvestorsResolvedResponse,
         )
 
@@ -162,6 +168,7 @@ class TestGetProductInvestors:
             await get_product_investors(
                 ctx_never_elicit(),
                 client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 product=kwargs.get("product"),
                 search=kwargs.get("search"),
             ),
@@ -185,7 +192,12 @@ class TestGetProductInvestors:
         respx.get(_ACCOUNTS_URL).mock(return_value=_accounts_page())
 
         result = tool_model(
-            await get_product_investors(ctx_never_elicit(), product_id="CGUP", client=client),
+            await get_product_investors(
+                ctx_never_elicit(),
+                product_id="CGUP",
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            ),
             ProductInvestorsResolvedResponse,
         )
 
@@ -204,7 +216,12 @@ class TestGetProductInvestors:
         )
 
         result = tool_model(
-            await get_product_investors(ctx_never_elicit(), product_id=_PRODUCT_ID, client=client),
+            await get_product_investors(
+                ctx_never_elicit(),
+                product_id=_PRODUCT_ID,
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            ),
             ProductInvestorsResolvedResponse,
         )
 
@@ -230,6 +247,7 @@ class TestGetProductInvestors:
                 product_id=_PRODUCT_ID,
                 include_closed=True,
                 client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -247,7 +265,12 @@ class TestGetProductInvestors:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page())
 
         result = tool_model(
-            await get_product_investors(ctx_never_elicit(), product_id=_PRODUCT_ID, client=client),
+            await get_product_investors(
+                ctx_never_elicit(),
+                product_id=_PRODUCT_ID,
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            ),
             NotFoundResponse,
         )
 
@@ -279,7 +302,12 @@ class TestGetProductInvestors:
         )
 
         result = tool_model(
-            await get_product_investors(ctx_decline(), product="BLUC", client=client),
+            await get_product_investors(
+                ctx_decline(),
+                product="BLUC",
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            ),
             ProductAmbiguousResponse,
         )
 
@@ -296,7 +324,12 @@ class TestGetProductInvestors:
         )
 
         with pytest.raises(BackstopApiError) as caught:
-            await get_product_investors(ctx_never_elicit(), product_id=_PRODUCT_ID, client=client)
+            await get_product_investors(
+                ctx_never_elicit(),
+                product_id=_PRODUCT_ID,
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            )
 
         assert caught.value.status_code == 500
 
@@ -308,13 +341,18 @@ class TestGetProductInvestors:
         products = respx.get(_PRODUCTS_URL)
         accounts = respx.get(_ACCOUNTS_URL)
         with pytest.raises(ValueError, match="Exactly one of product_id or product"):
-            await get_product_investors(ctx_never_elicit(), client=client)
+            await get_product_investors(
+                ctx_never_elicit(),
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+            )
         with pytest.raises(ValueError, match="Exactly one of product_id or product"):
             await get_product_investors(
                 ctx_never_elicit(),
                 product_id=_PRODUCT_ID,
                 product="CGUP",
                 client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
             )
         with pytest.raises(ValueError, match="Pass at most one of product or search"):
             await get_product_investors(
@@ -322,6 +360,7 @@ class TestGetProductInvestors:
                 product="CGUP",
                 search="Keystone",
                 client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
             )
         assert products.call_count == 0
         assert accounts.call_count == 0

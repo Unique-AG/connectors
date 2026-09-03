@@ -4,12 +4,13 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.features.accounts.tools.get_capital_flows import (
+from backstop_mcp.features.accounts import (
     CapitalFlowRowResponse,
     CapitalFlowsResolvedResponse,
-    get_capital_flows,
 )
+from backstop_mcp.features.accounts.tools.get_capital_flows import get_capital_flows
 from backstop_mcp.server.tools import TOOLS
+from tests.features.accounts.conftest import make_get_capital_flows_query
 from tests.helpers import BASE_URL, recorded_requests, resource, tool_client
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
@@ -132,7 +133,7 @@ class TestGetCapitalFlows:
                 await get_capital_flows(
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -192,7 +193,7 @@ class TestGetCapitalFlows:
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
                     owner_id="o1",
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -216,7 +217,7 @@ class TestGetCapitalFlows:
                 await get_capital_flows(
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -240,7 +241,7 @@ class TestGetCapitalFlows:
                 await get_capital_flows(
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -280,7 +281,7 @@ class TestGetCapitalFlows:
                     end_date=date(2026, 12, 31),
                     account_ids=["a-keep"],
                     max_rows=1,
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -318,7 +319,7 @@ class TestGetCapitalFlows:
                     end_date=date(2026, 12, 31),
                     owner_id="o1",
                     max_rows=1,
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -350,7 +351,7 @@ class TestGetCapitalFlows:
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
                     max_rows=1,
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
@@ -375,7 +376,7 @@ class TestGetCapitalFlows:
                 await get_capital_flows(
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
-                    client=client,
+                    get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )

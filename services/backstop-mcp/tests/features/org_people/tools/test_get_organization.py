@@ -9,10 +9,12 @@ from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaE
 from backstop_mcp.features.custom_fields import CustomFieldsService
 from backstop_mcp.features.data_hygiene import AsOfResponse
 from backstop_mcp.features.includes import InternalOwnerResponse
-from backstop_mcp.features.org_people import OrganizationRecordResponse
+from backstop_mcp.features.org_people import (
+    OrganizationRecordResponse,
+    OrganizationResolvedResponse,
+)
 from backstop_mcp.features.org_people.tools.get_organization import (
     GetOrganizationResponse,
-    OrganizationResolvedResponse,
     get_organization,
 )
 from backstop_mcp.features.party_resolver import (
@@ -22,6 +24,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import CoercedId
+from tests.features.org_people.conftest import make_get_organization_query
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,
@@ -48,8 +51,8 @@ def _empty_custom_field_definitions() -> None:
     )
 
 
-def _catalog() -> CustomFieldsService:
-    return custom_fields_service()
+def _catalog(client: BackstopClient) -> CustomFieldsService:
+    return custom_fields_service(client)
 
 
 def _organization_document(
@@ -134,7 +137,12 @@ class TestGetOrganization:
 
         result = tool_model(
             await get_organization(
-                ctx_never_elicit(), search="Capstone", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                search="Capstone",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -179,7 +187,12 @@ class TestGetOrganization:
 
         result = tool_model(
             await get_organization(
-                ctx_decline(), search="Capstone", client=client, custom_fields=_catalog()
+                ctx_decline(),
+                search="Capstone",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             PartyAmbiguousResponse,
         )
@@ -232,7 +245,9 @@ class TestGetOrganization:
                 party_id="trusted-9",
                 search_type="organizations",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -268,7 +283,12 @@ class TestGetOrganization:
 
         result = tool_model(
             await get_organization(
-                ctx_never_elicit(), party_id="trusted 9", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                party_id="trusted 9",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -284,7 +304,12 @@ class TestGetOrganization:
 
         with pytest.raises(ValueError, match="must not contain '/'"):
             await get_organization(
-                ctx_never_elicit(), party_id="../admin", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                party_id="../admin",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
 
     @pytest.mark.asyncio
@@ -304,13 +329,16 @@ class TestGetOrganization:
 
         with pytest.raises(BackstopResponseSchemaError) as exc_info:
             await get_organization(
-                ctx_never_elicit(), party_id="trusted-9", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                party_id="trusted-9",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
 
         assert exc_info.value.path == "/organizations/trusted-9"
-        assert exc_info.value.schema_name == (
-            "BackstopApiResourceDocument[OrganizationRecordResponse]"
-        )
+        assert exc_info.value.schema_name == ("BackstopApiResourceDocument[OrganizationAttributes]")
 
     @pytest.mark.asyncio
     @respx.mock
@@ -326,7 +354,12 @@ class TestGetOrganization:
 
         result = tool_model_union(
             await get_organization(
-                ctx_never_elicit(), search="Capstoen", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                search="Capstoen",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             GetOrganizationResponse,
         )
@@ -366,7 +399,12 @@ class TestGetOrganization:
 
         result = tool_model(
             await get_organization(
-                ctx_never_elicit(), search="Capstone", client=client, custom_fields=_catalog()
+                ctx_never_elicit(),
+                search="Capstone",
+                client=client,
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -410,7 +448,9 @@ class TestGetOrganizationIncludes:
                 party_id="o42",
                 include=["locations"],
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -455,7 +495,9 @@ class TestGetOrganizationIncludes:
                 party_id="o42",
                 include=["email_addresses"],
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -511,7 +553,9 @@ class TestGetOrganizationIncludes:
                 party_id="o42",
                 include=["primary_contact"],
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -573,7 +617,9 @@ class TestGetOrganizationIncludes:
                 party_id="o42",
                 include=["representative"],
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )
@@ -608,7 +654,9 @@ class TestGetOrganizationIncludes:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -632,7 +680,9 @@ class TestGetOrganizationIncludes:
                 party_id="o42",
                 include=["locations", "email_addresses", "primary_contact", "representative"],
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -662,7 +712,9 @@ class TestGetOrganizationIncludes:
                 party_id="o42",
                 include=["primary_contact"],
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -701,7 +753,9 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -736,7 +790,9 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -763,7 +819,9 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -787,7 +845,9 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -929,7 +989,7 @@ async def _organization_custom_fields(
             ctx_never_elicit(),
             party_id="o42",
             client=client,
-            custom_fields=catalog,
+            get_organization_query=make_get_organization_query(client, custom_fields=catalog),
             custom_field_tabs=custom_field_tabs,
             custom_field_groups=custom_field_groups,
             custom_field_group_ids=custom_field_group_ids,
@@ -951,7 +1011,7 @@ class TestGetOrganizationCustomFields:
             return_value=httpx.Response(200, json=_org_custom_field_document(_ORG_AND_PARTY_VALUES))
         )
 
-        values = await _organization_custom_fields(client, _catalog())
+        values = await _organization_custom_fields(client, _catalog(client))
 
         assert [item["definition_id"] for item in values] == ["101", "202"]
         assert [item["entity_type"] for item in values] == ["OrganizationBean", "PartyBean"]
@@ -974,7 +1034,7 @@ class TestGetOrganizationCustomFields:
             )
         )
 
-        values = await _organization_custom_fields(client, _catalog())
+        values = await _organization_custom_fields(client, _catalog(client))
 
         assert [(item["name"], item["definition_id"]) for item in values] == [
             ("Shared Name", "301"),
@@ -1001,7 +1061,7 @@ class TestGetOrganizationCustomFields:
                 ),
             )
         )
-        catalog = _catalog()
+        catalog = _catalog(client)
 
         by_tab = await _organization_custom_fields(client, catalog, custom_field_tabs=("org tab",))
         by_tabs = await _organization_custom_fields(
@@ -1068,7 +1128,7 @@ class TestGetOrganizationCustomFields:
             )
         )
 
-        values = await _organization_custom_fields(client, _catalog())
+        values = await _organization_custom_fields(client, _catalog(client))
 
         assert values[0]["value"] == "Legacy Value"
         assert values[0]["outside_current_options"] is True
@@ -1108,7 +1168,7 @@ class TestGetOrganizationCustomFields:
             )
         )
 
-        values = await _organization_custom_fields(client, _catalog())
+        values = await _organization_custom_fields(client, _catalog(client))
 
         person_ref = object_dict(values[0]["value"])
         account_ref = object_dict(values[1]["value"])
@@ -1133,7 +1193,7 @@ class TestGetOrganizationCustomFields:
         org_get = respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_custom_field_document(_ORG_AND_PARTY_VALUES))
         )
-        catalog = _catalog()
+        catalog = _catalog(client)
 
         await _organization_custom_fields(client, catalog)
         await _organization_custom_fields(client, catalog)
@@ -1162,7 +1222,9 @@ class TestGetOrganizationCustomFields:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             )
         )
 
@@ -1193,7 +1255,9 @@ class TestGetOrganizationCustomFields:
                 ctx_never_elicit(),
                 party_id="o42",
                 client=client,
-                custom_fields=_catalog(),
+                get_organization_query=make_get_organization_query(
+                    client, custom_fields=_catalog(client)
+                ),
             ),
             OrganizationResolvedResponse,
         )

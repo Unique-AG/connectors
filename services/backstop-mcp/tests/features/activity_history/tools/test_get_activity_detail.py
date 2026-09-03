@@ -8,7 +8,7 @@ full body is untruncated even for HTML long enough that the timeline's gist budg
 truncated it; a 404 propagates as `BackstopApiError`; and missing/unexpected wire fields
 degrade to `None`/empty rather than crashing (the defensive `AliasChoices`/`extra="ignore"`
 parsing — none of this tool's upstream field names were byte-verified, see
-`fetch_activity_detail.py`'s module docstring).
+`queries/get_activity_detail_query.py`'s module docstring).
 """
 
 from datetime import datetime
@@ -21,6 +21,7 @@ from fastmcp.exceptions import ToolError
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_history import ActivityDetailResponse
 from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
+from tests.features.activity_history.conftest import make_get_activity_detail_query
 from tests.features.party_resolver.helpers import BASE_URL, collection, ctx_never_elicit
 from tests.helpers import resource
 from tests.server.tools.helpers import tool_model
@@ -49,6 +50,14 @@ def _attendees_route(resource_id: str) -> respx.Route:
 
 def _specifics_document(resource_id: str, **attributes: object) -> dict[str, object]:
     return {"data": {"type": "meeting-or-calls", "id": resource_id, "attributes": attributes}}
+
+
+async def _call(client: BackstopClient, activity_id: str) -> object:
+    return await get_activity_detail(
+        ctx_never_elicit(),
+        activity_id=activity_id,
+        get_activity_detail_query=make_get_activity_detail_query(client),
+    )
 
 
 class TestGetActivityDetailDocstring:
@@ -108,7 +117,7 @@ class TestMeetingOrCall:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -156,7 +165,7 @@ class TestMeetingOrCall:
         _attendees_route("99999").mock(return_value=httpx.Response(200, json=collection()))
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -193,7 +202,7 @@ class TestNoteOrDocument:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -230,7 +239,7 @@ class TestErrorPropagation:
         _attendees_route("missing").mock(return_value=httpx.Response(200, json=collection()))
 
         with pytest.raises(BackstopApiError):
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client)
+            await _call(client, activity_id)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -242,7 +251,7 @@ class TestErrorPropagation:
         _details_route("404404").mock(return_value=httpx.Response(200, json={"data": None}))
 
         with pytest.raises(BackstopApiError) as exc_info:
-            await get_activity_detail(ctx_never_elicit(), activity_id="notes_404404", client=client)
+            await _call(client, "notes_404404")
 
         assert exc_info.value.status_code == 404
 
@@ -272,7 +281,7 @@ class TestErrorPropagation:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -323,7 +332,7 @@ class TestErrorPropagation:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -340,7 +349,7 @@ class TestErrorPropagation:
     ) -> None:
 
         with pytest.raises(ToolError, match="not a valid activity_id"):
-            await get_activity_detail(ctx_never_elicit(), activity_id="   ", client=client)
+            await _call(client, "   ")
 
         assert len(respx.calls) == 0
 
@@ -352,7 +361,7 @@ class TestErrorPropagation:
     ) -> None:
 
         with pytest.raises(ToolError, match="email handle"):
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client)
+            await _call(client, activity_id)
 
         assert len(respx.calls) == 0
 
@@ -400,7 +409,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -437,7 +446,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -471,7 +480,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 
@@ -496,7 +505,7 @@ class TestDefensiveParsing:
         )
 
         result = tool_model(
-            await get_activity_detail(ctx_never_elicit(), activity_id=activity_id, client=client),
+            await _call(client, activity_id),
             ActivityDetailResponse,
         )
 

@@ -26,15 +26,39 @@ from backstop_mcp.dependencies import (
     get_resolution_config,
     get_session_factory,
 )
-from backstop_mcp.features.activity_history import get_activity_history_settings
+from backstop_mcp.features.accounts import (
+    get_accounts_for_product_query_factory,
+    get_capital_flows_query_factory,
+    get_holdings_query_factory,
+    get_product_query_factory,
+    get_time_series_query_factory,
+)
+from backstop_mcp.features.activity_history import (
+    get_activity_detail_query_factory,
+    get_activity_history_query_factory,
+    get_activity_history_settings,
+    get_search_activities_query_factory,
+)
 from backstop_mcp.features.activity_tags import get_activity_tags_service
 from backstop_mcp.features.custom_fields import (
     get_custom_field_groups_service,
     get_custom_fields_service,
 )
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
-from backstop_mcp.features.opportunities import get_opportunity_stages_service
+from backstop_mcp.features.opportunities import (
+    get_opportunities_by_ids_query_factory,
+    get_opportunities_query_factory,
+    get_opportunity_stages_service_factory,
+    get_search_opportunities_query_factory,
+    get_stage_history_query_factory,
+)
+from backstop_mcp.features.org_people import (
+    get_organization_query_factory,
+    get_people_for_organization_query_factory,
+    get_person_query_factory,
+)
 from backstop_mcp.features.system_users import get_system_users_service
+from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
 
 
 class CachedProvider(Protocol):
@@ -57,12 +81,28 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_backstop_client_factory,
     get_auth_provider,
     get_activity_history_settings,
+    get_activity_detail_query_factory,
+    get_activity_history_query_factory,
+    get_search_activities_query_factory,
     get_activity_tags_service,
     get_system_users_service,
     get_custom_fields_service,
     get_custom_field_groups_service,
     get_employment_index_factory,
-    get_opportunity_stages_service,
+    get_opportunity_stages_service_factory,
+    get_stage_history_query_factory,
+    get_opportunities_query_factory,
+    get_opportunities_by_ids_query_factory,
+    get_search_opportunities_query_factory,
+    get_tasks_for_party_query_factory,
+    get_person_query_factory,
+    get_organization_query_factory,
+    get_people_for_organization_query_factory,
+    get_accounts_for_product_query_factory,
+    get_capital_flows_query_factory,
+    get_holdings_query_factory,
+    get_product_query_factory,
+    get_time_series_query_factory,
 )
 
 

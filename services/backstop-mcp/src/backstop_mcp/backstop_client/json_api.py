@@ -1,9 +1,10 @@
 from collections.abc import Mapping, Sequence
 from http import HTTPStatus
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Self
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -22,9 +23,8 @@ _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 _CleanStr: TypeAdapter[str] = TypeAdapter(_NonEmptyStr)
 
-# JSON:API identity -> the `included` entry carrying it. Read-only by design: a caller
-# builds one with `index_included` and follows relationships against it.
-type IncludedIndex = Mapping[tuple[str | None, str], dict[str, object]]
+# JSON:API identity -> the `included` entry carrying it. Built once inside `Included`.
+type _IncludedIndex = Mapping[tuple[str | None, str], dict[str, object]]
 
 
 def _clean_str(value: object) -> str | None:
@@ -32,6 +32,10 @@ def _clean_str(value: object) -> str | None:
         return _CleanStr.validate_python(value)
     except ValidationError:
         return None
+
+
+def _empty_mapping_if_none(value: object) -> object:
+    return {} if value is None else value
 
 
 class BackstopRelationshipRef(BaseModel):
@@ -49,7 +53,7 @@ class BackstopRelationship(BaseModel):
         if self.data is None:
             return ()
         refs = self.data if isinstance(self.data, list) else [self.data]
-        return tuple(ref.id for ref in refs if ref.id)
+        return tuple(ref.id.strip() for ref in refs if ref.id and ref.id.strip() != "")
 
 
 class BackstopApiResource[AttrT](BaseModel):
@@ -73,11 +77,12 @@ class BackstopApiResource[AttrT](BaseModel):
 class IncludedResource[AttrT](BaseModel):
     """One entry of a document's `included` array, with its `attributes` parsed as `AttrT`.
 
-    `follow_included` hands back raw JSON:API dicts, so every caller of it has to parse them; this
-    is that shape, once. Deliberately *not* `BackstopApiResource`, which models a **primary**
-    resource: there `type` and `attributes` are required and `relationships` is a declared field,
-    and Backstop sends `"relationships": null` on some side-loads, which a declared `dict` field
-    rejects. `extra="ignore"` drops it here, along with `links` and the rest of the envelope.
+    `Included.related` / `Included.first` / `Included.by_type` deserialize into this (or another
+    `schema`) so callers do not parse raw JSON:API dicts. Deliberately *not*
+    `BackstopApiResource`, which models a **primary** resource: there `type` is required and
+    `"relationships": null` on a side-load fails a declared `dict` field. Here `type` is
+    optional and a null `relationships` is an empty mapping, so a later `Included.first`
+    can still hop `owner` off an account chip. `extra="ignore"` drops `links` and the rest.
 
     `id` is kept. A side-load is usually a record the caller can go on to ask for by id, and a
     projection that drops it leaves the reader holding a name to search by instead.
@@ -88,6 +93,16 @@ class IncludedResource[AttrT](BaseModel):
     id: _NonEmptyStr
     type: _StrippedStr | None = None
     attributes: AttrT
+    # Side-loads often send `"relationships": null`. A declared `dict` would reject that; treat
+    # null as "no linkage" so `Included.first` can still hop owner off an account chip.
+    relationships: Annotated[
+        dict[str, BackstopRelationship],
+        BeforeValidator(_empty_mapping_if_none),
+    ] = Field(default_factory=dict)
+
+    def related_ids(self, name: str) -> tuple[str, ...]:
+        relationship = self.relationships.get(name)
+        return relationship.ids() if relationship is not None else ()
 
 
 def included_resource[ResourceT: BaseModel](
@@ -95,19 +110,20 @@ def included_resource[ResourceT: BaseModel](
 ) -> ResourceT | None:
     """One `included` entry as `schema` — an `IncludedResource[...]` — or `None`.
 
-    `None` in, `None` out, so a caller can pass the first entry `follow_included` returned, or the
-    absence of one, without branching first. An entry that does not validate is `None` too: one
-    unreadable side-load costs its own field, not the record it hangs off.
+    `None` in, `None` out, so a caller can pass a missing side-load without branching first. An
+    entry that does not validate is `None` too: one unreadable side-load costs its own field,
+    not the record it hangs off. `Included` methods call this after selecting entries.
     """
     if raw is None:
         return None
-    # JSON:API permits a resource object with no `attributes`. Reading that as an empty mapping
-    # keeps the identity of a side-load that carries nothing else, and costs nothing when the
-    # schema needs more than that: a required field is still missing, so the entry is still None.
-    empty: dict[str, object] = {}
-    payload: dict[str, object] = (
-        raw if isinstance(raw.get("attributes"), dict) else {**raw, "attributes": empty}
-    )
+    # JSON:API permits a resource object with no `attributes`. A present non-object is the same
+    # for our purposes — keep the identity and read `{}`. A required field is still missing, so
+    # a strict schema still drops the entry.
+    attributes = raw.get("attributes")
+    if "attributes" not in raw or not isinstance(attributes, dict):
+        payload: dict[str, object] = {**raw, "attributes": {}}
+    else:
+        payload = raw
     try:
         return schema.model_validate(payload)
     except ValidationError:
@@ -153,7 +169,7 @@ class ResourceRef(BaseModel):
     """Backstop's inline reference to another record, embedded in an attribute value.
 
     Backstop's *second* reference format. JSON:API linkage under `relationships` is `{type, id}`
-    and is resolved by `follow_included`; some attributes instead carry an inline
+    and is resolved by `Included.related`; some attributes instead carry an inline
     `{resourceType, resourceId, resourceLink, restricted}` object
     (`opportunity-stage-history.attributes.stage`, the values inside `regularCustomFieldValues`).
     Modelling it here means the second format is handled explicitly wherever it turns up rather
@@ -180,76 +196,131 @@ class ResourceRef(BaseModel):
         description="Backstop API URL of the referenced record.",
     )
 
+    @classmethod
+    def safe_model_validate(cls, value: object) -> Self | None:
+        try:
+            return cls.model_validate(value)
+        except ValidationError:
+            return None
 
-def index_included(
-    included: Sequence[dict[str, object]],
-) -> dict[tuple[str | None, str], dict[str, object]]:
-    """`included` keyed by JSON:API identity `(type, id)`, built once.
 
-    Keyed by the pair rather than by id alone: ids are not unique across resource types in the
-    same `included` array (e.g. entity-relationships and entity-relationship-types can share
-    numeric ids).
+class Included:
+    """A document's `included` array, indexed once, with one method per selection.
 
-    `follow_included` builds this per call, which is the right trade for a single-party document
-    and the wrong one for a firm-wide walk that follows two relationships on each of a thousand
-    rows against one accumulated array. Such a caller indexes once and uses `follow_indexed`.
+    Build once for a walk that follows relationships on many rows against one accumulated
+    array. A by-id document builds it once too.
+
+    - `related` — every resource linked from a relationship, linkage order
+    - `first` — the first of those (to-one)
+    - `by_type` — every entry of one JSON:API `type` (nested includes with no primary linkage)
+    - `parse` — every entry, already selected by the caller
     """
-    return {
-        (_clean_str(item.get("type")), item_id): item
-        for item in included
-        if (item_id := _clean_str(item.get("id"))) is not None
-    }
 
+    def __init__(self, included: Sequence[dict[str, object]]) -> None:
+        self._raw: Sequence[dict[str, object]] = included
+        self._index: _IncludedIndex = self._index_by_identity(included)
 
-def follow_indexed[AttrT](
-    index: IncludedIndex,
-    resource: BackstopApiResource[AttrT] | None,
-    relationship_name: str,
-) -> list[dict[str, object]]:
-    """`follow_included` against a prebuilt `index_included` map — same result, same order.
+    @staticmethod
+    def _index_by_identity(
+        included: Sequence[dict[str, object]],
+    ) -> dict[tuple[str | None, str], dict[str, object]]:
+        """`included` keyed by JSON:API identity `(type, id)`.
 
-    A `None` resource — a document whose primary data was null — has no linkage to follow, so it
-    yields nothing rather than forcing every caller to narrow before asking. Order follows the
-    relationship linkage, not the `included` order.
-    """
-    if resource is None:
-        return []
-    relationship = resource.relationships.get(relationship_name)
-    if relationship is None or relationship.data is None:
-        return []
-    refs = relationship.data if isinstance(relationship.data, list) else [relationship.data]
-    wanted = tuple(
-        (_clean_str(ref.type), related_id)
-        for ref in refs
-        if (related_id := _clean_str(ref.id)) is not None
-    )
-    return [index[key] for key in wanted if key in index]
+        Keyed by the pair rather than by id alone: ids are not unique across resource types in the
+        same `included` array (e.g. entity-relationships and entity-relationship-types can share
+        numeric ids).
+        """
+        return {
+            (_clean_str(item.get("type")), item_id): item
+            for item in included
+            if (item_id := _clean_str(item.get("id"))) is not None
+        }
 
+    @staticmethod
+    def _parse[ResourceT: BaseModel](
+        raw_items: Sequence[dict[str, object]], *, schema: type[ResourceT]
+    ) -> list[ResourceT]:
+        parsed: list[ResourceT] = []
+        for raw in raw_items:
+            item = included_resource(raw, schema=schema)
+            if item is not None:
+                parsed.append(item)
+        return parsed
 
-def follow_included[AttrT](
-    included: Sequence[dict[str, object]],
-    resource: BackstopApiResource[AttrT] | None,
-    relationship_name: str,
-) -> list[dict[str, object]]:
-    """The entries of `included` linked from `resource` via `relationship_name`.
+    def _linked_raw[AttrT](
+        self,
+        resource: BackstopApiResource[AttrT] | IncludedResource[AttrT] | None,
+        relationship_name: str,
+    ) -> list[dict[str, object]]:
+        if resource is None:
+            return []
+        relationship = resource.relationships.get(relationship_name)
+        if relationship is None or relationship.data is None:
+            return []
+        refs = relationship.data if isinstance(relationship.data, list) else [relationship.data]
+        wanted = tuple(
+            (_clean_str(ref.type), related_id)
+            for ref in refs
+            if (related_id := _clean_str(ref.id)) is not None
+        )
+        return [self._index[key] for key in wanted if key in self._index]
 
-    Takes the side-loaded resources rather than the document they arrived in, so a paginated walk
-    can hand over its accumulated `included` without building an intermediate document.
+    def related[AttrT, ResourceT: BaseModel](
+        self,
+        resource: BackstopApiResource[AttrT] | IncludedResource[AttrT] | None,
+        relationship_name: str,
+        *,
+        schema: type[ResourceT],
+    ) -> list[ResourceT]:
+        """The `included` entries linked from `resource` via `relationship_name`, as `schema`.
 
-    Indexes `included` on every call. That is one pass per relationship followed, which is free
-    for a by-id document and quadratic for a walk projecting many rows out of one array — those
-    callers hold an `index_included` map and call `follow_indexed`.
-    """
-    return follow_indexed(index_included(included), resource, relationship_name)
+        A `None` resource — a document whose primary data was null — has no linkage to follow, so
+        this yields nothing rather than forcing every caller to narrow first. Order follows the
+        relationship linkage, not the `included` order. Unreadable entries are dropped, same as
+        `included_resource`.
+        """
+        return self._parse(self._linked_raw(resource, relationship_name), schema=schema)
 
+    def first[AttrT, ResourceT: BaseModel](
+        self,
+        resource: BackstopApiResource[AttrT] | IncludedResource[AttrT] | None,
+        relationship_name: str,
+        *,
+        schema: type[ResourceT],
+    ) -> ResourceT | None:
+        """The first `included` entry linked from `resource` via `relationship_name`, as `schema`.
 
-def included_by_type(
-    included: Sequence[dict[str, object]], resource_type: str
-) -> list[dict[str, object]]:
-    """The entries of `included` carrying one JSON:API `type`.
+        Follows linkage, then `included_resource` on the first match only — a later readable chip
+        is not a substitute for an unreadable first. None when the relationship has no linkage,
+        the side-load is missing, or that first entry does not validate.
+        """
+        matches = self._linked_raw(resource, relationship_name)
+        if not matches:
+            return None
+        return included_resource(matches[0], schema=schema)
 
-    Selected by `type` rather than followed from a linkage, because a nested include
-    (`entityRelationships.entityRelationshipType`) puts the second hop's resources in the same
-    `included` array with nothing on the primary resource pointing at them.
-    """
-    return [item for item in included if _clean_str(item.get("type")) == resource_type]
+    def by_type[ResourceT: BaseModel](
+        self,
+        resource_type: str,
+        *,
+        schema: type[ResourceT],
+    ) -> list[ResourceT]:
+        """The entries carrying one JSON:API `type`, as `schema`.
+
+        Selected by `type` rather than followed from a linkage, because a nested include
+        (`entityRelationships.entityRelationshipType`) puts the second hop's resources in the same
+        `included` array with nothing on the primary resource pointing at them. Unreadable entries
+        are dropped, same as `included_resource`.
+        """
+        return self._parse(
+            [item for item in self._raw if _clean_str(item.get("type")) == resource_type],
+            schema=schema,
+        )
+
+    def parse[ResourceT: BaseModel](self, *, schema: type[ResourceT]) -> list[ResourceT]:
+        """Every `included` entry as `schema`.
+
+        Use when the caller already selected the rows (a test fixture, a pre-filtered list).
+        Unreadable entries are dropped, same as `included_resource`.
+        """
+        return self._parse(self._raw, schema=schema)

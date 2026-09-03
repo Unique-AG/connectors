@@ -2,8 +2,8 @@
 
 Reads Backstop's undocumented account-table endpoint first — one request for the whole table,
 figures included — and falls back to the documented `/accounts` walk plus per-account series when
-that fails. `fetch_holdings` owns that choice; this module owns the tool contract and one thing
-the fetch layer cannot do.
+that fails. `GetHoldingsQuery` owns that choice; this module owns the tool contract and one thing
+the query cannot do.
 
 That one thing is the fail-open hole. The table endpoint answers `200` with an empty table for a
 nonexistent id, for a wrong-typed id, and for a party that genuinely owns nothing — three cases it
@@ -14,7 +14,6 @@ costs one request, only on the branch where being wrong is silent.
 """
 
 import logging
-from collections.abc import Sequence
 from typing import Annotated
 
 from fastmcp import Context
@@ -24,11 +23,13 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
+    GetHoldingsQuery,
+    HoldingListingDto,
     PartyAccountsResolvedResponse,
-    fetch_holdings,
 )
+from backstop_mcp.features.accounts.dependencies import get_holdings_query_factory
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -99,7 +100,8 @@ async def get_accounts_for_party(
             ),
         ),
     ] = False,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    get_holdings_query: GetHoldingsQuery = Depends(get_holdings_query_factory),
 ) -> GetAccountsForPartyResponse:
     """What a person or organization holds: their accounts, with balances, across products.
 
@@ -148,8 +150,8 @@ async def get_accounts_for_party(
             "include_closed": include_closed,
         },
     )
-    listing = await fetch_holdings(client, owner_id=party.id, include_closed=include_closed)
-    if _would_report_owns_nothing(listing.rows, listing.closed_omitted) and party.name is None:
+    listing = await get_holdings_query.run(owner_id=party.id, include_closed=include_closed)
+    if _listing_is_empty(listing) and party.name is None:
         confirmed = await _confirm_party(client, party)
         if confirmed is None:
             logger.info(
@@ -176,9 +178,9 @@ async def get_accounts_for_party(
     )
 
 
-def _would_report_owns_nothing(rows: Sequence[object], closed_omitted: int) -> bool:
-    """True when the payload says "nothing", with no closed accounts to explain it away."""
-    return not rows and closed_omitted == 0
+def _listing_is_empty(listing: HoldingListingDto) -> bool:
+    """No rows and no closed accounts omitted — the payload that reads as "owns nothing"."""
+    return not listing.rows and listing.closed_omitted == 0
 
 
 async def _confirm_party(

@@ -71,8 +71,9 @@
    per-feature and keeps its filename.
 
 6. **A logic module is named after the symbol it defines.** The filename stem, or the PascalCase
-   of it, must be a top-level function, class, or assignment in that file — `fetch_series.py`
-   holds `fetch_series`, `custom_fields_service.py` holds `CustomFieldsService`. That is how the
+   of it, must be a top-level function, class, or assignment in that file —
+   `raise_if_invalid_series.py` holds `raise_if_invalid_series`, `custom_fields_service.py`
+   holds `CustomFieldsService`. That is how the
    tree stays readable. Modules used to be named after a mechanism (`fetch.py`, `service.py`,
    `project.py`), so you had to open a file or grep for `def` to find anything. Vocabulary
    modules (`api_responses*`, `internal_dto*`, `responses*`, `entity_types.py`,
@@ -117,6 +118,7 @@ _CONFIG_MODULE = "backstop_mcp.config"
 # A new package belongs here as soon as its `__init__` exports anything.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.backstop_client",
+    "backstop_mcp.caching",
     "backstop_mcp.db",
     "backstop_mcp.features.accounts",
     "backstop_mcp.features.activity_history",
@@ -506,6 +508,8 @@ def _top_level_defined_names(tree: ast.Module) -> set[str]:
             names.update(target.id for target in node.targets if isinstance(target, ast.Name))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             names.add(node.target.id)
+        elif isinstance(node, ast.TypeAlias):
+            names.add(node.name.id)
     return names
 
 
@@ -797,14 +801,20 @@ class TestTheDetectionItself:
 
     def test_accepts_a_logic_module_named_after_its_function(self) -> None:
         assert not _logic_module_name_violations(
-            "async def fetch_series(): ...\n",
-            _FEATURES / "accounts" / "fetch_series.py",
+            "def raise_if_invalid_series(): ...\n",
+            _FEATURES / "accounts" / "utils" / "raise_if_invalid_series.py",
         )
 
     def test_accepts_a_logic_module_named_after_its_class(self) -> None:
         assert not _logic_module_name_violations(
             "class CustomFieldsService: ...\n",
             _FEATURES / "custom_fields" / "custom_fields_service.py",
+        )
+
+    def test_accepts_a_logic_module_named_after_its_type_alias(self) -> None:
+        assert not _logic_module_name_violations(
+            "type TimeSeriesName = str\n",
+            _FEATURES / "accounts" / "time_series_name.py",
         )
 
     def test_does_not_fire_on_a_vocabulary_module(self) -> None:

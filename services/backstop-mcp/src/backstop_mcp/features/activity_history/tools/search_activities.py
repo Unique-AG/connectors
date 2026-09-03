@@ -21,19 +21,19 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
     BackstopRateLimitError,
 )
-from backstop_mcp.dependencies import get_backstop_client
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
     ActivityAggregateBy,
     EntityActivityType,
     GetSearchActivitiesResponse,
+    SearchActivitiesQuery,
     SearchActivitiesResolvedResponse,
     SearchActivitiesUnavailableResponse,
     aggregate_entity_activities,
-    fetch_entity_activities,
-    party_bean,
 )
+from backstop_mcp.features.activity_history.dependencies import get_search_activities_query_factory
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     ResolvedPartyResponse,
@@ -99,9 +99,9 @@ SearchRowField = Literal[
 
 
 def _is_wide_sweep(
-    *, associated_withs: Sequence[str], activity_tags: Sequence[str], authors: Sequence[str]
+    *, party_id: str | None, activity_tags: Sequence[str], authors: Sequence[str]
 ) -> bool:
-    return not associated_withs and not activity_tags and not authors
+    return party_id is None and not activity_tags and not authors
 
 
 def _add_years(day: date, years: int) -> date:
@@ -272,7 +272,8 @@ async def search_activities(
             ),
         ),
     ] = None,
-    client: BackstopClient = Depends(get_backstop_client),
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
 ) -> GetSearchActivitiesResponse:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
@@ -315,7 +316,7 @@ async def search_activities(
         raise ValueError("party_id or search is required when search_type is provided")
 
     resolved_party: ResolvedPartyResponse | None = None
-    associated_withs: tuple[str, ...] = ()
+    scoped_party_id: str | None = None
     if search_type is not None:
         outcome = await resolve_party(
             ctx, client, search_type=search_type, party_id=party_id, search=search
@@ -323,16 +324,14 @@ async def search_activities(
         if not isinstance(outcome, Resolved):
             return unresolved_party_response(outcome)
         resolved_party = ResolvedPartyResponse.from_party(outcome.value)
-        associated_withs = (party_bean(outcome.value.id),)
+        scoped_party_id = outcome.value.id
 
     tag_ids = tuple(activity_tag_ids) if activity_tag_ids else ()
     author_emails = tuple(authors) if authors else ()
     selected_types: tuple[EntityActivityType, ...] = (
         tuple(types) if types else ENTITY_ACTIVITY_TYPES
     )
-    wide = _is_wide_sweep(
-        associated_withs=associated_withs, activity_tags=tag_ids, authors=author_emails
-    )
+    wide = _is_wide_sweep(party_id=scoped_party_id, activity_tags=tag_ids, authors=author_emails)
     if include_description and wide:
         raise ValueError(
             "include_description is refused on a wide sweep; pass a party, "
@@ -363,12 +362,11 @@ async def search_activities(
         },
     )
     try:
-        fetch = await fetch_entity_activities(
-            client,
+        fetch = await search_activities_query.run(
             start_date=start_date,
             end_date=end_date,
             types=selected_types,
-            associated_withs=associated_withs,
+            party_id=scoped_party_id,
             activity_tags=tag_ids,
             authors=author_emails,
             include_description=include_description,
@@ -380,7 +378,7 @@ async def search_activities(
         # would answer with more load.
         raise
     except Exception as exc:
-        # Broad on purpose, matching `fetch_holdings`: HTTP status, transport timeout,
+        # Broad on purpose, matching `GetHoldingsQuery`: HTTP status, transport timeout,
         # schema-validation failure, and a 401 that re-verified (`BackstopTransientAuthError`)
         # all mean the same thing here — the undocumented endpoint did not answer usably. A
         # `httpx.TimeoutException` reaches this frame raw (the client lets transport errors
@@ -389,7 +387,7 @@ async def search_activities(
         # to produce.
         logger.warning(
             "activity_history.search.primary_unavailable",
-            extra={"error": f"{type(exc).__name__}: {exc}"},
+            exc_info=exc,
         )
         return SearchActivitiesUnavailableResponse(message=_FALLBACK_MESSAGE)
 

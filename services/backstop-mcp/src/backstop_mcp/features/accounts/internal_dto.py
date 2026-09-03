@@ -1,16 +1,17 @@
 from collections.abc import Sequence
 from datetime import date
-from typing import ClassVar, Literal, Self, cast, get_args
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import (
+    BackstopApiResource,
+    Included,
     IncludedResource,
-    follow_included,
     included_resource,
 )
 from backstop_mcp.features.accounts.api_responses import (
-    AccountApiResponse,
+    AccountApiResource,
     AccountAttributes,
     AccountTableRowAttributes,
     InvestorQualificationAttributes,
@@ -22,92 +23,29 @@ from backstop_mcp.features.accounts.api_responses import (
     TableDataShareAttributes,
 )
 from backstop_mcp.features.custom_fields import CustomFieldValueAttributes
-from backstop_mcp.features.resolution import Candidate, Resolution
+from backstop_mcp.features.resolution import Resolution
 
 __all__ = [
-    "ACCOUNT_SERIES",
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
-    "AccountSeries",
-    "CapitalFlowDto",
-    "CapitalFlowPartyDto",
-    "CapitalFlowWalkDto",
-    "CapitalFlowsFetchDto",
     "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
-    "HoldingsSource",
     "InvestorTypeDto",
     "MoneyDto",
-    "PRODUCT_SERIES",
-    "ProductCandidate",
     "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductResolution",
-    "ProductSeries",
     "ResolvedProductDto",
     "SeriesFigureDto",
     "SeriesPointDto",
     "ShareDto",
-    "TimeSeriesEntityType",
-    "TimeSeriesName",
 ]
 
 _OWNER = "owner"
 _INVESTOR_TYPE = "investorType"
 _PRODUCT = "product"
-
-# Swagger enums for `GET /{accounts|products}/{id}/{timeSeries}`. Keep Backstop's
-# `currentMonthNetAssests` spelling. Membership sets are derived from the Literals so a
-# typo cannot accept a path segment pydantic would reject, or the other way around.
-type TimeSeriesEntityType = Literal["accounts", "products"]
-type AccountSeries = Literal[
-    "currentMonthIrrs",
-    "currentMonthNetAssests",
-    "earnings",
-    "grossValues",
-    "highwaterMarks",
-    "incentiveFees",
-    "incentiveFeesCharged",
-    "irrs",
-    "managementFees",
-    "newIssueIncomes",
-    "percentageOfFundHistory",
-    "performanceFeeAccrued",
-    "returns",
-    "startingValues",
-    "totalInvested",
-    "totalRedemptions",
-    "values",
-]
-type ProductSeries = Literal[
-    "aums",
-    "benchmarkAReturns",
-    "benchmarkBReturns",
-    "benchmarkCReturns",
-    "benchmarkDReturns",
-    "benchmarkEReturns",
-    "benchmarkFReturns",
-    "benchmarkGReturns",
-    "benchmarkHReturns",
-    "expenseDataPoints",
-    "incomeDataPoints",
-]
-type TimeSeriesName = AccountSeries | ProductSeries
-
-
-def _literal_strings(alias: object) -> frozenset[str]:
-    """String members of a PEP 695 `Literal` alias."""
-    value: object = getattr(alias, "__value__", alias)
-    members = cast("tuple[object, ...]", get_args(value))
-    names = tuple(member for member in members if isinstance(member, str))
-    assert names and len(names) == len(members), f"{alias} is not a non-empty string Literal"
-    return frozenset(names)
-
-
-ACCOUNT_SERIES: frozenset[str] = _literal_strings(AccountSeries)
-PRODUCT_SERIES: frozenset[str] = _literal_strings(ProductSeries)
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _OwnerInclude = IncludedResource[OwnerAttributes]
@@ -118,15 +56,6 @@ _ProductInclude = IncludedResource[ProductAttributes]
 def _account_is_open(attributes: AccountAttributes) -> bool:
     """Open means the `closedDate` key was absent on the wire — a present null is still closed."""
     return "closed_date" not in attributes.model_fields_set
-
-
-def _first_included(
-    included: Sequence[dict[str, object]],
-    resource: AccountApiResponse,
-    relationship: str,
-) -> dict[str, object] | None:
-    related = follow_included(included, resource, relationship)
-    return related[0] if related else None
 
 
 class ResolvedProductDto(BaseModel):
@@ -154,14 +83,19 @@ class ResolvedProductDto(BaseModel):
         )
 
     @classmethod
-    def from_included(cls, raw: dict[str, object] | None) -> ResolvedProductDto | None:
-        product = included_resource(raw, schema=_ProductInclude)
-        if product is None:
+    def from_included(
+        cls, product: _ProductInclude | dict[str, object] | None
+    ) -> ResolvedProductDto | None:
+        parsed = (
+            product
+            if product is None or not isinstance(product, dict)
+            else included_resource(product, schema=_ProductInclude)
+        )
+        if parsed is None:
             return None
-        return cls.from_attributes(product.id, product.attributes)
+        return cls.from_attributes(parsed.id, parsed.attributes)
 
 
-type ProductCandidate = Candidate[ResolvedProductDto]
 type ProductResolution = Resolution[ResolvedProductDto]
 
 
@@ -172,6 +106,13 @@ class ProductFetchDto(BaseModel):
 
     product: ResolvedProductDto
     stored_custom_field_values: tuple[CustomFieldValueAttributes, ...] = ()
+
+    @classmethod
+    def from_resource(cls, resource: BackstopApiResource[ProductAttributes]) -> Self:
+        return cls(
+            product=ResolvedProductDto.from_attributes(resource.id, resource.attributes),
+            stored_custom_field_values=tuple(resource.attributes.regular_custom_field_values),
+        )
 
 
 class AccountOwnerDto(BaseModel):
@@ -184,7 +125,7 @@ class AccountOwnerDto(BaseModel):
     resource_type: str | None = None
 
     @classmethod
-    def from_included(cls, raw: dict[str, object] | None) -> Self | None:
+    def from_included(cls, owner: _OwnerInclude | dict[str, object] | None) -> Self | None:
         """The `owner` side-load as an identity.
 
         `specificResource` wins over the JSON:API envelope: an organization owner arrives as a
@@ -194,9 +135,14 @@ class AccountOwnerDto(BaseModel):
         as a `party_id`. On this instance the two happen to be equal; a projection that assumed so
         would hand back an unusable id the day they are not.
         """
-        owner = included_resource(raw, schema=_OwnerInclude)
-        if owner is None:
+        parsed = (
+            owner
+            if owner is None or not isinstance(owner, dict)
+            else included_resource(owner, schema=_OwnerInclude)
+        )
+        if parsed is None:
             return None
+        owner = parsed
         specific = owner.attributes.specific_resource
         if specific is not None and specific.resource_type is not None:
             return cls(
@@ -216,11 +162,17 @@ class InvestorTypeDto(BaseModel):
     name: str | None = None
 
     @classmethod
-    def from_included(cls, raw: dict[str, object] | None) -> Self | None:
-        investor_type = included_resource(raw, schema=_InvestorTypeInclude)
-        if investor_type is None:
+    def from_included(
+        cls, investor_type: _InvestorTypeInclude | dict[str, object] | None
+    ) -> Self | None:
+        parsed = (
+            investor_type
+            if investor_type is None or not isinstance(investor_type, dict)
+            else included_resource(investor_type, schema=_InvestorTypeInclude)
+        )
+        if parsed is None:
             return None
-        return cls(id=investor_type.id, name=investor_type.attributes.name)
+        return cls(id=parsed.id, name=parsed.attributes.name)
 
 
 class AccountRecordDto(BaseModel):
@@ -278,9 +230,9 @@ class AccountRecordDto(BaseModel):
     @classmethod
     def from_resource(
         cls,
-        resource: AccountApiResponse,
+        resource: AccountApiResource,
         *,
-        included: Sequence[dict[str, object]],
+        included: Included,
     ) -> Self:
         """Project one `/accounts` resource and its `owner` / `investorType` / `product` includes.
 
@@ -294,27 +246,32 @@ class AccountRecordDto(BaseModel):
         here are fixed and unconditional), it projects a by-id document (this is a collection walk
         over one shared `included` array), and it keeps `attributes` only — while the ids are part
         of the answer here, `product.id` being what `get_time_series` takes back. What the
-        two do share is the layer below: `follow_included` and `IncludedResource`.
+        two do share is the layer below: `Included` and `IncludedResource`.
         """
         return cls.from_attributes(
             resource.id,
             resource.attributes,
-            owner=AccountOwnerDto.from_included(_first_included(included, resource, _OWNER)),
-            investor_type=InvestorTypeDto.from_included(
-                _first_included(included, resource, _INVESTOR_TYPE)
+            owner=AccountOwnerDto.from_included(
+                included.first(resource, _OWNER, schema=_OwnerInclude)
             ),
-            product=ResolvedProductDto.from_included(_first_included(included, resource, _PRODUCT)),
+            investor_type=InvestorTypeDto.from_included(
+                included.first(resource, _INVESTOR_TYPE, schema=_InvestorTypeInclude)
+            ),
+            product=ResolvedProductDto.from_included(
+                included.first(resource, _PRODUCT, schema=_ProductInclude)
+            ),
             is_open=_account_is_open(resource.attributes),
         )
 
     @classmethod
     def from_resources(
         cls,
-        resources: Sequence[AccountApiResponse],
+        resources: Sequence[AccountApiResource],
         *,
         included: Sequence[dict[str, object]],
     ) -> tuple[Self, ...]:
-        return tuple(cls.from_resource(resource, included=included) for resource in resources)
+        side_loads = Included(included)
+        return tuple(cls.from_resource(resource, included=side_loads) for resource in resources)
 
 
 class AccountListingDto(BaseModel):
@@ -328,12 +285,6 @@ class AccountListingDto(BaseModel):
 
     accounts: tuple[AccountRecordDto, ...]
     closed_omitted: int = 0
-
-
-# Which endpoint produced a holdings listing: the undocumented `bsg-account-table-data` or the
-# documented `/accounts` walk plus series. They answer the same question with different
-# completeness, and the name says which endpoint rather than passing judgement on it.
-type HoldingsSource = Literal["table-api", "accounts-api"]
 
 
 class MoneyDto(BaseModel):
@@ -405,8 +356,8 @@ class HoldingRowDto(BaseModel):
     on the other, and only the date says which. `figure_errors` separates "the request failed"
     from "Backstop publishes no number", which are otherwise the same `None`.
 
-    `account_id` is the id every follow-up call needs, so a row without one is not projected at
-    all: it cannot be used for anything a caller would do next.
+    `account_id` is the id every follow-up call needs. A table row without an account is skipped
+    by the query, not projected as a hollow row.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -431,12 +382,12 @@ class HoldingRowDto(BaseModel):
     figure_errors: tuple[HoldingFigureErrorDto, ...] = ()
 
     @classmethod
-    def from_attributes(cls, attrs: AccountTableRowAttributes) -> Self | None:
-        """Project one table row, or `None` when it carries no usable account id."""
-        if attrs.account is None:
-            return None
+    def from_attributes(cls, attrs: AccountTableRowAttributes) -> Self:
+        """Project one table row that already carries an account id."""
+        account = attrs.account
+        assert account is not None
         return cls(
-            account_id=attrs.account.resource_id,
+            account_id=account.resource_id,
             product_id=attrs.product.resource_id if attrs.product else None,
             product_short_name=attrs.product.short_name if attrs.product else None,
             investor_id=attrs.investor.resource_id if attrs.investor else None,
@@ -470,7 +421,7 @@ class HoldingListingDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     rows: tuple[HoldingRowDto, ...]
-    source: HoldingsSource = "table-api"
+    source: Literal["table-api", "accounts-api"] = "table-api"
     omitted_fields: tuple[str, ...] = ()
     closed_omitted: int = 0
     rows_dropped: int = 0
@@ -524,36 +475,6 @@ class SeriesFigureDto(BaseModel):
     valued: SeriesPointDto | None = None
 
 
-class CapitalFlowPartyDto(BaseModel):
-    """Account or owner chip on a capital-flow row."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    id: str
-    name: str | None = None
-    resource_type: str | None = None
-
-
-class CapitalFlowDto(BaseModel):
-    """One subscription or redemption after includes are resolved."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    id: str
-    kind: Literal["subscription", "redemption"]
-    amount: float | None = None
-    transaction_date: date | None = None
-    notice_date: date | None = None
-    status: str | None = None
-    description: str | None = None
-    share_class: str | None = None
-    share_series: str | None = None
-    liquidating: bool | None = None
-    account: CapitalFlowPartyDto | None = None
-    owner: CapitalFlowPartyDto | None = None
-    unattributed: bool = False
-
-
 class ProductCatalogFetchDto(BaseModel):
     """The product catalog walk, and whether it read all of it.
 
@@ -565,33 +486,4 @@ class ProductCatalogFetchDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     products: tuple[ProductFetchDto, ...]
-    scan_truncated: bool = False
-
-
-class CapitalFlowWalkDto(BaseModel):
-    """One capital-flow collection walk: what it kept, what it cost, and what it missed."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    rows: tuple[CapitalFlowDto, ...]
-    non_actuals_dropped: int
-    request_count: int
-    scan_truncated: bool
-
-
-class CapitalFlowsFetchDto(BaseModel):
-    """Both walks, merged newest-first, with the cost and the coverage of the pair.
-
-    `rows_dropped` is how many rows in the window were not actuals (`status != COMPLETED`) and
-    so are absent from `rows` and from every count derived from it. `request_count` is pages
-    actually fetched across both collections, not a constant. `scan_truncated` is true when
-    either walk stopped at its scan ceiling, which makes `rows` a prefix of the window rather
-    than the window.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    rows: tuple[CapitalFlowDto, ...]
-    rows_dropped: int
-    request_count: int
     scan_truncated: bool = False
