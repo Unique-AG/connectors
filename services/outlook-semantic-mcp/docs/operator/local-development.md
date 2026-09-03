@@ -91,6 +91,7 @@ AMQP_URL=amqp://rabbitmq:rabbitmq@localhost:5672
 
 # Microsoft (from Entra app registration)
 MICROSOFT_CLIENT_ID=<your-client-id>
+# MICROSOFT_SIGN_IN_TENANT_ID=common  # optional; set a foreign-tenant GUID to pin login to that service principal
 MICROSOFT_CLIENT_SECRET=<your-client-secret>
 MICROSOFT_WEBHOOK_SECRET=<generate-128-char-hex>
 MICROSOFT_PUBLIC_WEBHOOK_URL=<your-tunnel-url>  # See webhook testing below

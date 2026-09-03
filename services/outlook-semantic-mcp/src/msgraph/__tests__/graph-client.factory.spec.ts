@@ -32,6 +32,9 @@ describe('GraphClientFactory', () => {
       if (key === 'microsoft.clientSecret') {
         return { value: 'test-client-secret' };
       }
+      if (key === 'microsoft.signInTenantId') {
+        return 'common';
+      }
       if (key === 'app.isDebuggingOn') {
         return false;
       }
@@ -84,6 +87,7 @@ describe('GraphClientFactory', () => {
         userProfileId: 'user-profile-123',
         clientId: 'test-client-id',
         clientSecret: 'test-client-secret',
+        signInTenantId: 'common',
       }),
       expect.objectContaining({
         dispatcher: mockDispatcher,
