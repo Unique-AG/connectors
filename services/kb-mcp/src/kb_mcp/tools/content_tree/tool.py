@@ -268,10 +268,13 @@ async def content_tree(
     """Browse the knowledge base's folder/file structure — use this only when
     you need to know what files or folders exist, not to find information
     inside them (use search for that). Reach for this when: the user names a
-    specific folder/file and you need to resolve its path or content_id; you
-    need to enumerate everything in a known location; or you're about to call
-    read_file and need the content_id first. Pick a mode; only that mode's
-    args below apply, rest ignored. '*' = required.
+    specific folder/file and you need to resolve its path or content_id; the
+    user asks what documents/files exist somewhere rather than a substantive
+    question about their content ('which documents do we have owned by X',
+    'what's in the X folder', 'list files under X') — that's an enumeration
+    request (use mode='list' with folder_path, or mode='tree'), not a content
+    search; or you're about to call read_file and need the content_id first.
+    Pick a mode; only that mode's args below apply, rest ignored. '*' = required.
     - mode='tree': max_depth, folders_only, timeout — first orientation view
     of folders/files. Folder lines carry `(folder_id=scope_xxx)` when known —
     pass that id as search's `folder_ids` to scope a search to that folder.
