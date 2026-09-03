@@ -1,0 +1,116 @@
+nameOverride: with-intelligence-mcp
+fullnameOverride: with-intelligence-mcp
+selectorComponentLabel: server
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  APP_ENV: production
+  LOG_LEVEL: info
+  PORT: "8000"
+  WITH_INTELLIGENCE_ASSET_CLASS_GROUPS: '["hfm"]'
+
+# Required from the overlay, as secrets:
+# - WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY: Fernet key encrypting stored vendor credentials.
+#   Generate with:
+#     python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+#   Rotating it makes every stored credential undecryptable — users must log in again.
+# - PUBLIC_BASE_URL: the externally-reachable OAuth issuer URL.
+# - DB_URL, unless postgresql.enabled injects DATABASE_URL.
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/with-intelligence-mcp
+  tag: 0.0.1 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 25m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  # /health is process-up; /ready checks Postgres. Liveness must not restart the pod
+  # when the database is briefly unreachable.
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: true
+    command: |
+      alembic upgrade head
+
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    ephemeralPorts:
+      enabled: false

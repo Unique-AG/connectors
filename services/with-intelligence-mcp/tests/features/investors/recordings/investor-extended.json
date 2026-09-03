@@ -1,0 +1,95 @@
+{
+  "_shape": "GET /v3/investors/{id}, recorded from the live API. Structure verbatim; every value is placeholder — the vendor's data is licensed and not ours to commit.",
+  "id": 2504,
+  "name": "Example Retirement System (ERS)",
+  "updated_at": "2026-08-17T13:13:23",
+  "summary": "<p>A defined benefit pension fund for public employees. The state also offers the <em><strong>Example Retirement System (Defined Contribution)</strong></em> plan.</p><p>A. Example was appointed CIO in January 2023.</p>",
+  "website": "https://example.invalid/",
+  "aum": 135900,
+  "latest_aum": {
+    "as_of": "2026-08-07T00:00:00",
+    "value": 135900,
+    "value_usd": 135900,
+    "ranges_usd": [{ "label": "> $50bn", "middle": 135900, "range": "50000.0-*" }]
+  },
+  "currency": { "id": 840, "short_name": "USD" },
+  "type": { "id": 535, "name": "Public D.B." },
+  "address": {
+    "address1": "1 Example Street",
+    "address2": "",
+    "address3": "",
+    "city": "Exampleville",
+    "city_id": 6282,
+    "postcode": "00000",
+    "continent": { "id": 6, "name": "North America" },
+    "country": { "id": 840, "name": "United States" },
+    "state": { "abbreviation": "EX", "id": 53, "name": "Example State" }
+  },
+  "contacts_total": 64,
+  "contacts": [{ "id": 650889 }, { "id": 471270 }, { "id": 779796 }],
+  "consultants": {
+    "0": {
+      "id": 1587689175,
+      "is_lead": true,
+      "name": "Consultant One",
+      "role_extended": "Lead Consultant",
+      "services": [{ "id": 4, "name": "Consultant" }]
+    },
+    "1": {
+      "asset_classes": [{ "id": 6, "name": "Real Estate Equity" }],
+      "id": 1673276263,
+      "is_lead": false,
+      "name": "Consultant Two",
+      "role_extended": "Consultant",
+      "services": [{ "id": 4, "name": "Consultant" }]
+    }
+  },
+  "managers": [
+    { "id": 2145858758, "name": "Manager One" },
+    { "id": -179975042, "name": "Manager Two" }
+  ],
+  "asset_classes": [
+    { "id": 1, "name": "Hedge Funds" },
+    { "id": 18, "name": "Alternative" }
+  ],
+  "investment_strategies": [
+    {
+      "primary_strategy": { "id": 77, "name": "Equity" },
+      "secondary_strategies": [{ "id": 78, "name": "Long/Short Equity" }]
+    },
+    { "primary_strategy": { "id": 9, "name": "Multi-Strategy" } }
+  ],
+  "primary_strategies": [
+    { "id": 9, "name": "Multi-Strategy" },
+    { "id": 77, "name": "Equity" }
+  ],
+  "secondary_strategies": [{ "id": 78, "name": "Long/Short Equity" }],
+  "investment_countries": [{ "id": 840, "name": "United States" }],
+  "investment_regions": [{ "id": 3, "name": "Developed Markets" }],
+  "investment_fund_structures": [{ "id": 8, "name": "Open-End Fund" }],
+  "investment_instruments": [{ "id": 6, "name": "Equities" }],
+  "investment_attributes": [{ "id": 2, "name": "Socially Responsible Investments/ESG" }],
+  "asset_allocation_breakdown": [
+    {
+      "actual_percentage": 5.7,
+      "as_of": "2026-08-07T00:00:00",
+      "asset_classes": [{ "id": 1, "name": "Hedge Funds" }],
+      "target_percentage": { "mid": 6 }
+    }
+  ],
+  "allocation_calculations": {
+    "allocation_trend": "Return Seeking",
+    "current_allocation": "Return Seeking",
+    "current_allocation_as_of": "2026-08-07T00:00:00"
+  },
+  "investment_industries": [
+    {
+      "primary_industry": { "id": 17, "name": "Diversified" },
+      "secondary_industries": [{ "id": 17, "name": "Financial Services" }]
+    }
+  ],
+  "service_providers": [{ "id": 2138658499, "name": "Custodian One", "role": "Custodian" }],
+  "classification_investment_regions": [{ "id": 3, "name": "North America" }],
+  "investment_continents": [{ "id": 6, "name": "North America" }],
+  "investment_fund_approaches": [{ "id": 1, "name": "Discretionary (Fundamental)" }]
+}
