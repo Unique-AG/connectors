@@ -679,9 +679,9 @@ class TestTheSchemaItPublishes:
 
         assert tool is not None, "register left the tool off the server"
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is False
-        assert tool.annotations.destructiveHint is True
-        assert tool.annotations.idempotentHint is False
+        assert tool.annotations.read_only_hint is False
+        assert tool.annotations.destructive_hint is True
+        assert tool.annotations.idempotent_hint is False
 
 
 class TestWhatItSaysAboutItself:

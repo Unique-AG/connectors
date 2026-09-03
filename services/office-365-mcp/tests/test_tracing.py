@@ -48,7 +48,7 @@ class _HttpResponse(Protocol):
 def _post(client: TestClient, body: dict[str, object], headers: Mapping[str, str]) -> _HttpResponse:
     return cast(
         "_HttpResponse",
-        client.post("/mcp", json=body, headers=dict(headers)),  # pyright: ignore[reportUnknownMemberType]
+        client.post("/mcp", json=body, headers=dict(headers)),
     )
 
 

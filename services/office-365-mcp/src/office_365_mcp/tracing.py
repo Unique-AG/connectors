@@ -1,24 +1,11 @@
 """Give every MCP message the trace context of the HTTP request that carried it.
 
-Trap: an MCP session's server task starts once, during `initialize`, and every message for the
-rest of that session's life runs inside it (mcp 1.28.1,
-`mcp/server/streamable_http_manager.py:331`). A later request on the same session starts nothing
-new (`:261`). An asyncio task snapshots the contextvars of whoever created it, so every message
-handler carries the OpenTelemetry context that was ambient during `initialize` and no other.
-FastMCP prefers a valid ambient span over anything a message carries (fastmcp 3.4.5,
-`fastmcp/telemetry.py:95-98`), and that stale one is valid. So a session's traces come out as one
-ever-growing `initialize` trace plus one orphan HTTP span per request.
-
-The team tried bridging the incoming `traceparent` into `params._meta` and measured that it did
-nothing: `extract_trace_context` consults `_meta` only when there is no valid ambient span. The fix
-must replace the ambient context, not supplement it.
-
-Hence two halves. `TraceContextCaptureMiddleware` records the ambient context on the ASGI `scope`,
-which is per request and not a contextvar, so the session task's snapshot cannot make it stale.
-It must be mounted INSIDE `OpenTelemetryMiddleware`, which for an outside-in Starlette list means
-listed after it. Otherwise it captures the context from before the server span became current and
-hands every message the request's *parent*. `TraceContextRestoreMiddleware` reads that value back
-off the request now being served and attaches it for the duration of the message.
+A session's server task starts once, during `initialize`, and runs every later message inside
+it (mcp 2.1.1, `mcp/server/streamable_http_manager.py:353`; a later request on the same session
+starts nothing new, `:257`), so its ambient OpenTelemetry context is permanently stale, and
+FastMCP prefers a valid ambient span (fastmcp 4.0.2, `fastmcp/telemetry.py:281-282`).
+`TraceContextCaptureMiddleware` goes after `OpenTelemetryMiddleware`, or it captures the
+request's parent.
 """
 
 from collections.abc import Mapping

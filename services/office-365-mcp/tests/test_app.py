@@ -102,13 +102,13 @@ class _HttpResponse(Protocol):
 
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
-    return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+    return cast("_HttpResponse", client.get(path))
 
 
 def _request(client: TestClient, method: str, path: str) -> _HttpResponse:
     return cast(
         "_HttpResponse",
-        client.request(method, path),  # pyright: ignore[reportUnknownMemberType]
+        client.request(method, path),
     )
 
 
