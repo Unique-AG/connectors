@@ -13,7 +13,7 @@ each one to the control that satisfies it here.
 | When | What happens | Where |
 |---|---|---|
 | Friday 06:00 Berlin | Dependabot opens the grouped update pull requests | `.github/dependabot.yaml` |
-| Friday to Monday | The pins do not move | `rebase-strategy: disabled` |
+| Friday to Monday | The pins do not move, as long as the pull request is merged before the next Friday | `rebase-strategy: disabled` |
 | Monday | The team reviews and merges them | people |
 
 There is no automated gate. The three days are a merge policy the team follows, which is what the
@@ -23,9 +23,20 @@ standard asks for. Two mechanisms make it real, and both live in `.github/depend
 So on npm, uv, github-actions, terraform and helm every pin is already three days old when the pull
 request opens, before anyone waits at all.
 
-`rebase-strategy: disabled` stops Dependabot re-pointing an open pull request at a newer digest. The
-pin merged on Monday is the pin opened on Friday. This is what the standard calls the freeze, and it
-is the part that survives without a gate.
+`rebase-strategy: disabled` stops Dependabot rebasing an open pull request when the base branch
+moves. It does **not** stop Dependabot force-pushing a newer version of the dependency into that
+same pull request on its next scheduled run. Read the two apart, because the difference decides
+whether the three days are real.
+
+Within one cycle the pin is stable: a pull request opened Friday and merged Monday sees no Dependabot
+run in between, so the pin merged is the pin opened. Survive to the next Friday and it is not. Pull
+request #788 opened 2026-08-14, was force-pushed 2026-08-21 at 04:11:40Z — Dependabot's own Friday
+run — and merged 2026-08-26. Six of the last thirty Dependabot pull requests have a head commit
+later than `createdAt`, by three to twenty-one days.
+
+The failure direction is the dangerous one. `createdAt` still reads the original Friday, so a pin
+pushed in this morning looks a week old. That is why "clear it before the next Friday" below is a
+correctness rule, not tidiness.
 
 Docker is the exception and it matters, because the standard is about base images. Its `cooldown` is
 deliberately absent — Dependabot reads a Docker release date from `Last-Modified` on the manifest
@@ -50,14 +61,15 @@ branch name.
 
 ## Design notes
 
-**`rebase-strategy: disabled` is the whole freeze.** Without it Dependabot re-points an open pull
-request at the newest digest and the three-day age resets silently, while `createdAt` stays put — so
-you would merge a zero-age pin and record three days. The standard documents that hole and accepts
-it. This closes it.
+**The age that matters is the head commit, not `createdAt`.** The standard documents a hole — a
+rebase resets the pin age while the ticket keeps its original date — and accepts it. This repository
+does not close it. `rebase-strategy: disabled` narrows it to one cycle, and nothing checks the
+remainder. The deleted gate read `commits(last:1).committedDate` and was the only thing in the
+repository that ever looked at the real pin date; the Monday routine replaces that with a command
+the operator has to run.
 
-Its known cost is unchanged: Dependabot supersedes and replaces an unmerged group pull request on the
-next Friday run (#746 to #754 to #788 to #865), and the review threads go with it. That is an
-argument for merging on Monday, which is the point of the process.
+Dependabot also supersedes and replaces an unmerged group pull request on the next Friday run (#746
+to #754 to #788 to #865), and the review threads go with it. Same deadline, second reason.
 
 **There is no gate workflow, on purpose.** An earlier version of this change added one: it converted
 fresh Dependabot pull requests to draft and let a maintainer release them on Monday. It was deleted
@@ -75,7 +87,7 @@ merge policy. This is one, written down, with the pin freeze done mechanically.
 | node and nginx minors are the exception. python is excluded | Applied literally. We have no nginx. `node:X.Y.Z` minors ride; `python` and `uv` minors do not |
 | No tooled age cooldown | Read the other way here. `cooldown: 3` is set on the five ecosystems where release dates resolve, and omitted on docker where it fails open |
 | The cooldown is a manual merge policy, with the pin frozen | This is the cycle above. `rebase-strategy: disabled` is the freeze. The three days are the merge policy, and nothing enforces them — see the open items |
-| A rebase resets the age (accepted hole) | Closed. See the design notes |
+| A rebase resets the age (accepted hole) | **Open, narrowed.** `rebase-strategy: disabled` holds the pin for one Friday-to-Monday cycle. A pull request that survives to the next Friday is force-pushed to a newer pin while `createdAt` stays put — see the open items |
 | Automerge off. A human approves every base pull request | No dependency pull request has automerge armed, and every merge to `main` carries an approval. The repository does allow automerge, so nothing prevents someone arming it — see the open items |
 | Every external `FROM` is digest-pinned | True for all 11 Dockerfiles today. **Not asserted by CI** — see the open items |
 | Images are cosign-signed | Satisfied and exceeded. `_template-cd.yaml` signs **and** verifies, with SBOM and provenance |
@@ -99,11 +111,14 @@ These are accepted risks, not satisfied controls. Do not describe them as satisf
    is separate, tracked work.
 5. **Nothing asserts that every external `FROM` carries a digest.** It is true for all 11
    Dockerfiles today and no gate keeps it true. A mutable tag would build and deploy normally.
-6. **Nothing enforces the three days.** The wait is a written policy. Anyone with write access can
-   merge a Friday pull request on Friday, and for docker that pin may be hours old. A gate was built
-   and deleted: see the design notes for why. If this needs to become a control, the honest options
-   are a required status check on `main` — which needs repo admin and would be the repository's
-   first — or restoring the draft gate and accepting its cost.
+6. **Nothing enforces the three days, and nothing reads the real pin age.** The wait is a written
+   policy. Anyone with write access can merge a Friday pull request on Friday, and for docker that
+   pin may be hours old. Worse, a pull request that survives to the next Friday is force-pushed to a
+   newer pin while `createdAt` keeps the original date, so a fresh pin reads as aged — observed on 6
+   of the last 30 Dependabot pull requests, diverging by 3 to 21 days. The deleted gate was the only
+   thing that ever computed age from the head commit. The routine now asks the operator to run one
+   `gh` command instead. If this must become a control, the options are a required status check on
+   `main` — which needs repo admin and would be this repository's first — or restoring the gate.
 7. **Automerge is allowed on this repository.** `allow_auto_merge` is true, and the team uses it: 4
    of the last 60 pull requests had it armed, by two different people. None was a Dependabot pull
    request, and nothing stops someone arming one — which would merge it as soon as checks pass
@@ -115,12 +130,17 @@ There is nothing to arm and nothing to operate. The process is the routine below
 
 **Every Monday.** Open `is:pr is:open author:app/dependabot` and work the list.
 
-1. Merge the `minor-and-patch` pull request for each ecosystem. Their pins opened on Friday and have
-   not moved.
+1. Merge the `minor-and-patch` pull request for each ecosystem. Check the real pin age first — the
+   pull request header shows when it was opened, not when the pin was pushed:
+
+   ```bash
+   gh pr view <number> --json commits --jq '.commits[-1].committedDate'
+   ```
 2. Review `major` and `python-runtime` separately. They may need code changes.
 3. Merge any security update as soon as you see it, whatever day it is.
-4. If a `minor-and-patch` pull request is still open next Friday, Dependabot will replace it and its
-   review threads will go with it. Merge it or close it before then.
+4. Clear every `minor-and-patch` pull request before the next Friday. Two things happen otherwise:
+   Dependabot replaces it and the review threads go with it, and it force-pushes a newer pin into
+   any that survive, so the three days silently restart.
 
 **Do not merge a docker update before Monday.** It is the one ecosystem with no version cooldown, so
 the three days come only from the pull request sitting there. Nothing will stop you.
