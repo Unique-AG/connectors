@@ -141,9 +141,17 @@ let the user choose which one is meant. `owner_response` is the answer of the pe
 calendar, so on a shared calendar it is that person's answer and never the signed-in user's. On a \
 calendar the user does not own, a row whose `sensitivity` is `private` or `confidential` is the \
 owner's private business: say that something is on at that time, and do not relay its subject or \
-its preview. A canceled event stays in a calendar until somebody removes it, so this tool flags \
-those rows with `cancelled` rather than hiding them. Read that field before telling anybody a \
-meeting is on. Pass a row's `uri` to outlook_read_event for the full body and the attendee list.\
+its preview. One calendar whose `can_edit` and `can_view_private_items` were both false returned \
+stripped rows: `subject` holding the display form of its own `show_as` (`Tentative` for \
+`tentative`), an empty `preview` and `location`, `attendee_count` 0, and `organizer` naming the \
+signed-in user on every row, all with `sensitivity` still `normal`. The two flags alone do not \
+say a row was stripped. On a calendar whose `can_edit` and `can_view_private_items` are both \
+false, a row of that shape has no readable subject, preview, location or attendee count: report \
+its time, its `show_as` and its `cancelled` flag, and say the rest was not readable. A canceled \
+event stays in a calendar until somebody \
+removes it, so this tool flags those rows with `cancelled` rather than hiding them. Read that \
+field before telling anybody a meeting is on. Pass a row's `uri` to outlook_read_event for the \
+full body and the attendee list.\
 """
 
 _ENDS_BEFORE_STARTS = (

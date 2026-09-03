@@ -85,9 +85,12 @@ primary calendar as this mailbox sees it. `is_mine` is this connector's own comp
 owner's address against the signed-in user's two addresses, because Microsoft publishes no \
 sharing flag on a calendar in v1.0: null there means unknown and never false. Read `can_edit` \
 before offering to write to a calendar, because false means a create on it fails whatever else \
-is right about it. Read `can_view_private_items` as well: false means an item the owner marked \
-private arrives with its times and no subject and no preview, so an answer drawn from that \
-calendar is thinner than it looks rather than complete. This tool returns no events. Use \
+is right about it. Read `can_view_private_items` too: false means the owner's private items \
+are not legible here, so an answer drawn from that calendar is thinner than it looks rather than \
+complete. On one calendar where it and `can_edit` were both false, every row arrived with an \
+empty `preview`, `attendee_count` 0 and `subject` holding the display form of its own `show_as` \
+(`Tentative` for `tentative`). On a calendar with those two flags, a row of that shape has no \
+readable subject: give its time and say so. This tool returns no events. Use \
 outlook_list_events for what sits on a calendar.\
 """
 

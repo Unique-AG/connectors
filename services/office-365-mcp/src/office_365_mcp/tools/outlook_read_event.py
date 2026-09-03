@@ -123,8 +123,13 @@ joining block rather than a word the organizer wrote. It also carries one respon
 owner's. `attendees` here is where one named person's answer is. This tool never returns an \
 attachment's contents. On a calendar the signed-in user does not own, treat a `private` or a \
 `confidential` event as somebody else's business: say that it exists and at what time, and do not \
-relay its subject or its body. `uri` must be a handle a tool result carried. No subject, meeting \
-link, or Outlook web link becomes one.\
+relay its subject or its body. On one calendar whose `can_edit` and `can_view_private_items` were \
+both false, an event came back with `subject` holding the display form of its own `show_as` \
+(`Tentative` for `tentative`), a null `body`, an empty `attendees` list and the signed-in \
+user as `organizer`. For an event of that shape on a calendar whose `can_edit` and \
+`can_view_private_items` are both false, report the time and say the rest was not readable. \
+`uri` must be a handle a tool result carried. No subject, meeting link, or Outlook web link \
+becomes one.\
 """
 
 _BAD_HANDLE = (

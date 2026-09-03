@@ -335,8 +335,12 @@ class CalendarSummary(BaseModel):
     )
     can_view_private_items: bool | None = Field(
         description=(
-            "Whether the signed-in user sees the details of items the owner marked private. When "
-            + "this is false, a private row still appears with its times and no subject."
+            "Whether the signed-in user sees the details of items the owner marked private. On "
+            + "one calendar where this and `can_edit` were both false, every row arrived stripped "
+            + "even though its `sensitivity` was `normal`: an empty `preview`, `attendee_count` "
+            + "0, and `subject` holding the display form of its own `show_as` (`Tentative` for "
+            + "`tentative`). The two flags alone do not say a row was stripped; on a calendar "
+            + "with both false, a row of that shape does."
         )
     )
     is_default: bool | None = Field(
@@ -464,7 +468,12 @@ class EventSummary(BaseModel):
         )
     )
     subject: str | None = Field(
-        description="The subject line. Null when the event was created without one."
+        description=(
+            "The subject line. Null when the event was created without one. On one calendar whose "
+            + "`can_edit` and `can_view_private_items` were both false, this held the display "
+            + "form of the row's own `show_as` (`Tentative` for `tentative`, `Free` for `free`) "
+            + "instead of anything the organizer wrote."
+        )
     )
     preview: str | None = Field(
         description=(
@@ -537,7 +546,14 @@ class EventSummary(BaseModel):
     organizer: MailAddress | None = Field(
         description=(
             "Who organized the event. On an event created on somebody else's behalf, this is that "
-            + "person and no property names the delegate. Null when Graph recorded no organizer."
+            + "person and no property names the delegate. On one calendar whose `can_edit` and "
+            + "`can_view_private_items` were both false, this named the signed-in user on every "
+            + "row, and one of the rows that matched by time a meeting on the user's own calendar "
+            + "named somebody else there. On a calendar whose `can_edit` and "
+            + "`can_view_private_items` are both false, a row whose `preview` is empty, whose "
+            + "`attendee_count` is 0 and whose `subject` is the display form of its own `show_as` "
+            + "has an unconfirmed organizer: do not report this name as who called the meeting. "
+            + "Null when Graph recorded no organizer."
         )
     )
     owner_is_organizer: bool | None = Field(
@@ -559,8 +575,9 @@ class EventSummary(BaseModel):
     attendee_count: int = Field(
         description=(
             "How many attendees Graph holds for the event, the organizer included when Microsoft "
-            + "lists them. Zero means Graph listed none, which is what a private appointment looks "
-            + "like."
+            + "lists them. Zero means Graph listed none: an appointment with nobody invited looks "
+            + "like that, and so did every row of one calendar whose `can_edit` and "
+            + "`can_view_private_items` were both false."
         )
     )
     web_link: str | None = Field(
