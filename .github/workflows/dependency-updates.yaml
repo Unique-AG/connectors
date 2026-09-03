@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "report = decide and print, change nothing. apply = converge."
+        description: "report = decide and print, change nothing. apply = converge. A manual run may promote outside the Mon-Thu 06:00-08:00 UTC window."
         type: choice
         options: [report, apply]
         default: report
@@ -39,6 +39,8 @@ jobs:
       STALE_READY_DAYS: "2"
       ISSUE_TITLE: "Dependency updates: attention required"
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      DEPENDABOT_URL: ${{ github.server_url }}/${{ github.repository }}/network/updates
+      DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Reconcile
         run: |
@@ -55,6 +57,7 @@ jobs:
           hour=$((10#$(date -u +%H)))
           window=no
           if [ "$dow" -le 4 ] && [ "$hour" -ge 6 ] && [ "$hour" -lt 8 ]; then window=yes; fi
+          if [ "$DISPATCHED" = "true" ]; then window=manual; fi
 
           gh api graphql --paginate \
             -f owner="${GH_REPO%/*}" -f name="${GH_REPO#*/}" \
@@ -95,6 +98,7 @@ jobs:
             echo "| now (UTC) | day $dow, hour $hour — promotion window: **$window** |"
             echo "| hold window | ${AGE_HOURS}h measured on the head commit |"
             echo "| open PRs / in scope | $open_total / $held_total |"
+            echo "| open a batch off-cycle | ${DEPENDABOT_URL} — one \`Check for updates\` per ecosystem, needs repo admin |"
             echo
             echo "| PR | pin frozen at | age | draft | checks | action |"
             echo "|---|---|---|---|---|---|"
@@ -118,7 +122,7 @@ jobs:
               else
                 action=wait-for-checks
               fi
-            elif [ "$draft" = "true" ] && [ "$aged" = "yes" ] && [ "$window" = "yes" ]; then
+            elif [ "$draft" = "true" ] && [ "$aged" = "yes" ] && [ "$window" != "no" ]; then
               action=promote
             elif [ "$draft" = "false" ] && [ "$age_h" -ge $(( AGE_HOURS + STALE_READY_DAYS * 24 )) ]; then
               echo "PR #${num} has been ready for review for over ${STALE_READY_DAYS} days. Dependabot supersedes an unmerged group pull request on the next Friday run, and its review threads go with it." >> "$WORK/anomalies.txt"
