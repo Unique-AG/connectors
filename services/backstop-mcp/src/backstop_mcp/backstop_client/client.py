@@ -298,7 +298,7 @@ class BackstopClient:
         logger.debug("backstop.request.start", extra=self._log_extra(method=method, path=path))
         try:
             response: httpx.Response = await retrying(make_request)
-        except (BackstopAuthError, BackstopTransientAuthError):
+        except BackstopAuthError, BackstopTransientAuthError:
             # Logged at the 401 site (`backstop.request.unauthorized` / re-check events). A
             # rejected credential is an ordinary outcome rather than a fault, so no traceback.
             raise
