@@ -138,10 +138,28 @@ jobs:
         with:
           node-version: "26"
 
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        working-directory: .
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Node dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
       - name: Check formatting of the files ruff does not own
-        run: |
-          version=$(jq -r '.devDependencies["@biomejs/biome"]' "${GITHUB_WORKSPACE}/package.json")
-          npx --yes "@biomejs/biome@${version}" check .
+        run: pnpm exec biome check .
 
       - name: Lint
         run: uv run ruff check .

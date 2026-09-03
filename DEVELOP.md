@@ -38,16 +38,22 @@ Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outs
 workspace and are driven by [uv](https://docs.astral.sh/uv/). `Python CI` runs exactly this:
 
 ```bash
+pnpm install --frozen-lockfile          # from the repo root, for biome
 cd services/<service>
 uv sync --locked
 uv run ruff format --check . && uv run ruff check .
-npx --yes "@biomejs/biome@$(jq -r '.devDependencies["@biomejs/biome"]' ../../package.json)" check .
+pnpm exec biome check .
 uv run basedpyright
 uv run pytest
 ```
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
 chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.
+
+biome arrives through `pnpm install --frozen-lockfile` rather than `npx`, so the binary that runs is
+the one `pnpm-lock.yaml` pins. `--frozen-lockfile` also fails if `package.json` and the lockfile
+disagree on the version, which a runtime `npx` fetch would silently ignore. It is the same
+acquisition path the TypeScript CI uses, so there is one mechanism to understand rather than two.
 
 ### Trap: basedpyright in a git worktree
 
