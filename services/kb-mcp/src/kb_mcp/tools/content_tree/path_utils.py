@@ -60,8 +60,11 @@ def folder_scope_ids(
             continue
         scope_ids = scope_ids_from_folder_id_path(folder_id_path)
         dirs = tuple(path_parts(path))[:-1]
-        for depth in range(min(len(dirs), len(scope_ids))):
-            result.setdefault(dirs[: depth + 1], scope_ids[depth])
+        # folderIdPath may have a hidden root the walk never renders as a dirs
+        # entry, so align from the leaf: dirs[-1] is always scope_ids[-1].
+        overlap = min(len(dirs), len(scope_ids))
+        for depth in range(1, overlap + 1):
+            result.setdefault(dirs[: len(dirs) - depth + 1], scope_ids[-depth])
     return result
 
 
@@ -73,13 +76,8 @@ def render_tree_with_folder_ids(
     show_files: bool = True,
 ) -> str:
     """``FolderWalkSnapshot.render()``, but with ``(folder_id=scope_xxx)``
-    appended to each directory line whose id is known.
-
-    Reuses the toolkit's own trie (``snapshot.to_trie()``) and mirrors
-    ``PathTrieNode.format_trie_walk``'s box-drawing/sorting/depth-truncation
-    exactly — the toolkit's renderer has no per-node annotation hook, so this
-    walks the same tree by hand instead of forking its formatting logic.
-    """
+    appended to each directory line whose id is known. Walks ``snapshot.to_trie()``
+    by hand since the toolkit renderer has no per-node annotation hook."""
     lines = ["."] + _format_node(
         snapshot.to_trie(),
         prefix="",

@@ -937,6 +937,28 @@ async def test_tree_shows_folder_id_derived_from_a_nested_file_only():
 
 
 @pytest.mark.asyncio
+async def test_tree_folder_ids_align_from_leaf_when_folder_id_path_has_a_hidden_root():
+    """``folderIdPath`` can carry a hidden ancestor above the walk's own
+    root; ids must still align via the guaranteed leaf match, not position 0."""
+    info = _make_content_info(
+        "report",
+        metadata={
+            "folderIdPath": "uniquepathid://scope_hidden_root/scope_archive/scope_old"
+        },
+    )
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(files=[(info, PurePosixPath("Archive/Old/report.pdf"))])
+    )
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        result = await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    text = result.content[0].text  # type: ignore[union-attr]
+    assert "Archive (folder_id=scope_archive)" in text
+    assert "Old (folder_id=scope_old)" in text
+    assert "scope_hidden_root" not in text
+
+
+@pytest.mark.asyncio
 async def test_tree_folder_with_nothing_beneath_renders_without_id():
     """An empty folder (no files anywhere under it) has no derivable id —
     its line renders with no ``(folder_id=...)`` suffix, and doesn't error."""
