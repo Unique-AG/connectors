@@ -104,9 +104,10 @@ These are accepted risks, not satisfied controls. Do not describe them as satisf
    and deleted: see the design notes for why. If this needs to become a control, the honest options
    are a required status check on `main` — which needs repo admin and would be the repository's
    first — or restoring the draft gate and accepting its cost.
-7. **Automerge is allowed on this repository.** `allow_auto_merge` is true. No dependency pull
-   request has it armed today, and nothing stops someone arming one, which would merge it as soon as
-   checks pass rather than on Monday.
+7. **Automerge is allowed on this repository.** `allow_auto_merge` is true, and the team uses it: 4
+   of the last 60 pull requests had it armed, by two different people. None was a Dependabot pull
+   request, and nothing stops someone arming one — which would merge it as soon as checks pass
+   rather than on Monday. Draft state used to make that impossible; nothing does now.
 
 ## Operating it
 
