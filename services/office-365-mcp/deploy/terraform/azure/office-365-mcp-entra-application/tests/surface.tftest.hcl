@@ -307,7 +307,7 @@ run "the_registration_is_signable_in_through" {
 
   assert {
     condition     = one(azuread_application.office_365_mcp.api).requested_access_token_version == 2
-    error_message = "a v1 access token carries the sts.windows.net issuer, which this service's single-issuer check rejects"
+    error_message = "a v1 access token carries the sts.windows.net issuer, which this service's issuer check rejects for one tenant and for every tenant alike"
   }
 }
 
@@ -585,14 +585,14 @@ run "a_single_tenant_registration_emits_a_tenant_id" {
   }
 }
 
-run "a_multi_tenant_registration_emits_no_tenant_id" {
+run "a_multi_tenant_registration_emits_the_organizations_authority" {
   variables {
     tools_preset     = "teams-chat"
     sign_in_audience = "AzureADMultipleOrgs"
   }
 
   assert {
-    condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == null
-    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id"
+    condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == "organizations"
+    error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id, not the organizations authority the pod validates every tenant's tokens under"
   }
 }
