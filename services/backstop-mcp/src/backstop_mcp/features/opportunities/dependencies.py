@@ -38,7 +38,6 @@ def get_stage_history_query_factory(
 
 
 def get_map_opportunity_to_response_util_factory(
-    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     opportunity_stages_service: OpportunityStagesService = Depends(
         get_opportunity_stages_service_factory
     ),
@@ -46,7 +45,6 @@ def get_map_opportunity_to_response_util_factory(
     custom_fields_service: CustomFieldsService = Depends(get_custom_fields_service),
 ) -> MapOpportunityToResponseUtil:
     return MapOpportunityToResponseUtil(
-        client=client,
         opportunity_stages_service=opportunity_stages_service,
         custom_fields_service=custom_fields_service,
         get_stage_history_query=get_stage_history_query,

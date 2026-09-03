@@ -59,7 +59,7 @@ class GetPersonQuery:
                 params={"include": include_param} if include_param else None,
                 schema=BackstopApiResourceDocument[PersonAttributes],
             ),
-            self._custom_fields_service.load_catalog(self._client),
+            self._custom_fields_service.load_catalog(),
         )
         person_attributes = person_document.require_data(path=person_path).attributes
         entity_relationships = project_entity_relationships(person_document)
@@ -68,7 +68,6 @@ class GetPersonQuery:
             relationship_types=entity_relationships.relationship_types,
         )
         custom_field_values = await self._custom_fields_service.join_values(
-            self._client,
             person_attributes.regular_custom_field_values,
             filters=custom_fields_filters,
         )

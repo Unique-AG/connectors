@@ -183,7 +183,10 @@ class TestWiring:
 
     def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
         _ = app_client
-        assert get_custom_fields_service() is not None
+        assert (
+            get_custom_fields_service(get_backstop_client_factory().for_current_caller())
+            is not None
+        )
         assert get_backstop_client_factory() is not None
         assert get_opportunity_stages_service_factory is not None
 

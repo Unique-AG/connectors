@@ -35,7 +35,7 @@ def make_get_person_query(
         client=client,
         custom_fields_service=custom_fields
         if custom_fields is not None
-        else custom_fields_service(),
+        else custom_fields_service(client),
         employment_index_factory=(
             employment_index_factory
             if employment_index_factory is not None
@@ -53,7 +53,7 @@ def make_get_organization_query(
         client=client,
         custom_fields_service=custom_fields
         if custom_fields is not None
-        else custom_fields_service(),
+        else custom_fields_service(client),
     )
 
 

@@ -96,8 +96,7 @@ class TestListCustomFieldsTool:
                         CustomFieldEntityType.PEOPLE,
                     ],
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
+                    custom_fields=custom_fields_service(client),
                 ),
                 ListCustomFieldsResponse,
             )
@@ -147,8 +146,7 @@ class TestListCustomFieldsTool:
                     await list_custom_fields(
                         entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                         refresh=True,
-                        client=client,
-                        custom_fields=custom_fields_service(),
+                        custom_fields=custom_fields_service(client),
                     ),
                     ListCustomFieldsResponse,
                 )
@@ -202,14 +200,12 @@ class TestListCustomFieldsTool:
             "page[offset]=1000&page[limit]=1000&sentinel=literal-next"
         )
         route = _definitions_route(base_url, first_definition)
-        service = custom_fields_service()
-
         async with tool_client(base_url) as client:
+            service = custom_fields_service(client)
             first = tool_model(
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                     refresh=True,
-                    client=client,
                     custom_fields=service,
                 ),
                 ListCustomFieldsResponse,
@@ -225,7 +221,6 @@ class TestListCustomFieldsTool:
                     await list_custom_fields(
                         entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                         refresh=True,
-                        client=client,
                         custom_fields=service,
                     ),
                     ListCustomFieldsResponse,
@@ -263,8 +258,7 @@ class TestListCustomFieldsTool:
                         CustomFieldEntityType.ORGANIZATIONS,
                     ],
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
+                    custom_fields=custom_fields_service(client),
                 ),
                 ListCustomFieldsResponse,
             )
@@ -284,8 +278,7 @@ class TestListCustomFieldsTool:
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.PEOPLE],
                     refresh=True,
-                    client=client,
-                    custom_fields=custom_fields_service(),
+                    custom_fields=custom_fields_service(client),
                 ),
                 ListCustomFieldsResponse,
             )
@@ -298,14 +291,12 @@ class TestListCustomFieldsTool:
     async def test_surfaces_stale_cache(self) -> None:
         base_url = tenant("cf-list-stale")
         route = _definitions_route(base_url, _investor_status())
-        service = custom_fields_service()
-
         async with tool_client(base_url) as client:
+            service = custom_fields_service(client)
             first = tool_model(
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                     refresh=True,
-                    client=client,
                     custom_fields=service,
                 ),
                 ListCustomFieldsResponse,
@@ -318,7 +309,6 @@ class TestListCustomFieldsTool:
                 await list_custom_fields(
                     entity_types=[CustomFieldEntityType.ORGANIZATIONS],
                     refresh=True,
-                    client=client,
                     custom_fields=service,
                 ),
                 ListCustomFieldsResponse,

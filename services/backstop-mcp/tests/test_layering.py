@@ -118,6 +118,7 @@ _CONFIG_MODULE = "backstop_mcp.config"
 # A new package belongs here as soon as its `__init__` exports anything.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.backstop_client",
+    "backstop_mcp.caching",
     "backstop_mcp.db",
     "backstop_mcp.features.accounts",
     "backstop_mcp.features.activity_history",

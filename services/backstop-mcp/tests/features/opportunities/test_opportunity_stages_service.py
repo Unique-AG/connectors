@@ -87,7 +87,7 @@ def _stages_response(*rows: dict[str, object]) -> httpx.Response:
 
 def _age_past_ttl(service: OpportunityStagesService) -> None:
     past = datetime.now(UTC) - timedelta(minutes=90)
-    service._freshness.mark(past)  # pyright: ignore[reportPrivateUsage]
+    service._cache._freshness.mark(past)  # pyright: ignore[reportPrivateUsage]
 
 
 def _age_past_failure_cooldown(service: OpportunityStagesService) -> None:

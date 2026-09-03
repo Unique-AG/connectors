@@ -112,24 +112,26 @@ def build_employment_index_factory(
     )
 
 
-def activity_tags_service(*, ttl_minutes: int = 60) -> ActivityTagsService:
-    return ActivityTagsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+def activity_tags_service(client: BackstopClient, *, ttl_minutes: int = 60) -> ActivityTagsService:
+    return ActivityTagsService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
-def system_users_service(*, ttl_minutes: int = 60) -> SystemUsersService:
-    return SystemUsersService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+def system_users_service(client: BackstopClient, *, ttl_minutes: int = 60) -> SystemUsersService:
+    return SystemUsersService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 def custom_fields_service(
-    *, ttl_minutes: int = 60, caching_enabled: bool = True
+    client: BackstopClient, *, ttl_minutes: int = 60, caching_enabled: bool = True
 ) -> CustomFieldsService:
     return CustomFieldsService.with_ttl_minutes(
-        ttl_minutes=ttl_minutes, caching_enabled=caching_enabled
+        client=client, ttl_minutes=ttl_minutes, caching_enabled=caching_enabled
     )
 
 
-def custom_field_groups_service(*, ttl_minutes: int = 60) -> CustomFieldGroupsService:
-    return CustomFieldGroupsService.with_ttl_minutes(ttl_minutes=ttl_minutes)
+def custom_field_groups_service(
+    client: BackstopClient, *, ttl_minutes: int = 60
+) -> CustomFieldGroupsService:
+    return CustomFieldGroupsService.with_ttl_minutes(client=client, ttl_minutes=ttl_minutes)
 
 
 class _RecordedCall(Protocol):

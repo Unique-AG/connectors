@@ -1,7 +1,8 @@
 """What is specific to the activity-tag catalog.
 
-The TTL, single-flight and serve-stale protocol behind `get` is `CachedCatalog`, exercised for
-this service among the others in `tests/features/test_cached_catalog.py`.
+The TTL, single-flight and serve-stale protocol behind `get` is `CachedValue`, exercised in
+`tests/test_cached_value.py`. Service-to-Backstop wiring is in
+`tests/features/test_cached_catalog.py`.
 """
 
 from collections.abc import AsyncGenerator, Callable
@@ -42,7 +43,7 @@ class TestActivityTagsService:
     ) -> None:
         """`quantityTagged` and `viewable` are what makes a tag usable as a filter value."""
         base_url = f"{BASE_URL}/activity-tags-projection"
-        service = ActivityTagsService.with_ttl_minutes(ttl_minutes=60)
+        service = ActivityTagsService.with_ttl_minutes(client=clients(base_url), ttl_minutes=60)
         respx.get(f"{base_url}/activity-tags").mock(
             return_value=httpx.Response(
                 200,
@@ -61,7 +62,7 @@ class TestActivityTagsService:
             )
         )
 
-        tags, cache = await service.get(clients(base_url))
+        tags, cache = await service.get()
 
         assert cache == "ok"
         assert tags[_LIVE_TAG_ID].name == "Quarterly Review"

@@ -92,7 +92,7 @@ class SearchOpportunitiesQuery:
                 page_size=500,
                 parallel=True,
             ),
-            self._custom_fields_service.load_catalog(self._client),
+            self._custom_fields_service.load_catalog(),
         )
         # Indexed once for the whole walk. This loop follows two relationships per opportunity
         # against one array holding every side-loaded investor, product and stage from every page.

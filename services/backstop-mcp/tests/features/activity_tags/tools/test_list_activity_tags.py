@@ -101,8 +101,7 @@ class TestListActivityTagsTool:
             result = tool_model(
                 await list_activity_tags(
                     refresh=True,
-                    client=client,
-                    activity_tags=activity_tags_service(),
+                    activity_tags=activity_tags_service(client),
                 ),
                 ListActivityTagsResponse,
             )
@@ -148,19 +147,18 @@ class TestListActivityTagsTool:
         tags_route = respx.get(f"{base_url}/activity-tags").mock(
             return_value=_collection_page(_quarterly_review(base_url=base_url))
         )
-        tags = activity_tags_service()
-
         async with tool_client(base_url) as client:
+            tags = activity_tags_service(client)
             first = tool_model(
-                await list_activity_tags(client=client, activity_tags=tags),
+                await list_activity_tags(activity_tags=tags),
                 ListActivityTagsResponse,
             )
             second = tool_model(
-                await list_activity_tags(client=client, activity_tags=tags),
+                await list_activity_tags(activity_tags=tags),
                 ListActivityTagsResponse,
             )
             refreshed = tool_model(
-                await list_activity_tags(refresh=True, client=client, activity_tags=tags),
+                await list_activity_tags(refresh=True, activity_tags=tags),
                 ListActivityTagsResponse,
             )
 
@@ -179,16 +177,15 @@ class TestListActivityTagsTool:
         tags_route = respx.get(f"{base_url}/activity-tags").mock(
             return_value=_collection_page(_quarterly_review(base_url=base_url))
         )
-        tags = activity_tags_service()
-
         async with tool_client(base_url) as client:
+            tags = activity_tags_service(client)
             first = tool_model(
-                await list_activity_tags(refresh=True, client=client, activity_tags=tags),
+                await list_activity_tags(refresh=True, activity_tags=tags),
                 ListActivityTagsResponse,
             )
             tags_route.mock(side_effect=httpx.ConnectError("backstop down"))
             result = tool_model(
-                await list_activity_tags(refresh=True, client=client, activity_tags=tags),
+                await list_activity_tags(refresh=True, activity_tags=tags),
                 ListActivityTagsResponse,
             )
 
@@ -218,8 +215,7 @@ class TestListActivityTagsTool:
                 result = tool_model(
                     await list_activity_tags(
                         refresh=True,
-                        client=client,
-                        activity_tags=activity_tags_service(),
+                        activity_tags=activity_tags_service(client),
                     ),
                     ListActivityTagsResponse,
                 )
@@ -265,13 +261,11 @@ class TestListActivityTagsTool:
         route = respx.get(f"{base_url}/activity-tags").mock(
             return_value=_collection_page(first_tag)
         )
-        tags = activity_tags_service()
-
         async with tool_client(base_url) as client:
+            tags = activity_tags_service(client)
             first = tool_model(
                 await list_activity_tags(
                     refresh=True,
-                    client=client,
                     activity_tags=tags,
                 ),
                 ListActivityTagsResponse,
@@ -286,7 +280,6 @@ class TestListActivityTagsTool:
                 refreshed = tool_model(
                     await list_activity_tags(
                         refresh=True,
-                        client=client,
                         activity_tags=tags,
                     ),
                     ListActivityTagsResponse,
@@ -317,14 +310,12 @@ class TestListActivityTagsTool:
                 _hidden_unused(),
             )
         )
-        tags = activity_tags_service()
-
         async with tool_client(base_url) as client:
+            tags = activity_tags_service(client)
             first = tool_model(
                 await list_activity_tags(
                     search="quarterly",
                     refresh=True,
-                    client=client,
                     activity_tags=tags,
                 ),
                 ListActivityTagsResponse,
@@ -332,7 +323,6 @@ class TestListActivityTagsTool:
             cached = tool_model(
                 await list_activity_tags(
                     search="scratch",
-                    client=client,
                     activity_tags=tags,
                 ),
                 ListActivityTagsResponse,

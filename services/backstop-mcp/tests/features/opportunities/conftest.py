@@ -41,7 +41,6 @@ def make_map_opportunity_to_response_util(
 ) -> MapOpportunityToResponseUtil:
     stages = OpportunityStagesService.with_ttl_minutes(client=client, ttl_minutes=60)
     return MapOpportunityToResponseUtil(
-        client=client,
         opportunity_stages_service=stages,
         custom_fields_service=custom_fields,
         get_stage_history_query=GetStageHistoryQuery(opportunity_stages_service=stages),
@@ -49,7 +48,7 @@ def make_map_opportunity_to_response_util(
 
 
 def make_get_opportunities_query(client: BackstopClient) -> GetOpportunitiesQuery:
-    custom_fields = custom_fields_service()
+    custom_fields = custom_fields_service(client)
     return GetOpportunitiesQuery(
         client=client,
         map_opportunity_to_response_util=make_map_opportunity_to_response_util(
@@ -60,7 +59,7 @@ def make_get_opportunities_query(client: BackstopClient) -> GetOpportunitiesQuer
 
 
 def make_get_opportunities_by_ids_query(client: BackstopClient) -> GetOpportunitiesByIdsQuery:
-    custom_fields = custom_fields_service()
+    custom_fields = custom_fields_service(client)
     return GetOpportunitiesByIdsQuery(
         client=client,
         map_opportunity_to_response_util=make_map_opportunity_to_response_util(
@@ -71,7 +70,7 @@ def make_get_opportunities_by_ids_query(client: BackstopClient) -> GetOpportunit
 
 
 def make_search_opportunities_query(client: BackstopClient) -> SearchOpportunitiesQuery:
-    custom_fields = custom_fields_service()
+    custom_fields = custom_fields_service(client)
     return SearchOpportunitiesQuery(
         client=client,
         map_opportunity_to_response_util=make_map_opportunity_to_response_util(

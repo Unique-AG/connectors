@@ -47,8 +47,8 @@ def _empty_custom_field_definitions() -> None:
     )
 
 
-def _catalog() -> CustomFieldsService:
-    return custom_fields_service()
+def _catalog(client: BackstopClient) -> CustomFieldsService:
+    return custom_fields_service(client)
 
 
 # The measured trio on one live person: two retired addresses from previous firms alongside the
@@ -139,7 +139,7 @@ class TestGetPerson:
                 search="Jane Doe",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -195,7 +195,7 @@ class TestGetPerson:
                 search="Jane Doe",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -242,7 +242,7 @@ class TestGetPerson:
                 search="Jane Contact",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -285,7 +285,7 @@ class TestGetPerson:
                 search_type="contacts",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -320,7 +320,7 @@ class TestGetPerson:
                 search="Jane",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PartyAmbiguousResponse,
@@ -373,7 +373,7 @@ class TestGetPerson:
                 search="Jane Doe",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -416,7 +416,7 @@ class TestGetPersonIncludes:
                 include=["email_addresses"],
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -473,7 +473,7 @@ class TestGetPersonIncludes:
                 include=["email_addresses", "company"],
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -506,7 +506,7 @@ class TestGetPersonIncludes:
                 party_id="p9",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )
@@ -571,7 +571,7 @@ class TestGetPersonIncludes:
                 include=["locations", "representative"],
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             ),
             PersonResolvedResponse,
@@ -623,7 +623,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 party_id="p9",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )
@@ -661,7 +661,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 party_id="p9",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )
@@ -689,7 +689,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 party_id="p9",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )
@@ -721,7 +721,7 @@ class TestGetPersonOmitsNullsFromTheWire:
                 party_id="p9",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )
@@ -781,7 +781,7 @@ class TestGetPersonCustomFields:
                 party_id="p9",
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )
@@ -809,7 +809,7 @@ class TestGetPersonCustomFields:
                 custom_field_definition_ids=cast(list[CoercedId], [202]),
                 client=client,
                 get_person_query=make_get_person_query(
-                    client, custom_fields=_catalog(), employment_index_factory=_INDEX
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
                 ),
             )
         )

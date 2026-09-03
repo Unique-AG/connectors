@@ -1,10 +1,10 @@
-import asyncio
 import logging
 from collections.abc import Mapping
 from datetime import timedelta
 from typing import Self
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
+from backstop_mcp.caching import CachedValue
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.responses import OpportunityStageResponse
 from backstop_mcp.timed_gate import TimedGate
@@ -24,26 +24,30 @@ class OpportunityStagesService:
     pointer — and only some of the stages it points at arrive in the response's `included`
     array. The rest are named from here.
 
-    Deliberately simpler than `CustomFieldsService`: no in-flight pin, no serve-stale path. That
-    catalog is 3,274 definitions and 6.15 s unfiltered, so refetching it is expensive enough to be
-    worth softening a failure; this vocabulary is seven rows in one page, and a stage history
-    that silently loses half its entries reads as complete when it isn't. So a failed fetch
+    Composes `CachedValue` with `serve_stale=False`. The custom-field catalog is 3,274
+    definitions and 6.15 s unfiltered, so refetching it is expensive enough to be worth
+    softening a failure; this vocabulary is seven rows in one page, and a stage history that
+    silently loses half its entries reads as complete when it isn't. So a failed fetch
     propagates and the caller fails with it.
 
     A failure is remembered for `_FAILURE_COOLDOWN` and re-raised, rather than re-fetched, for
-    callers that arrive inside it. Without that, a down Backstop is hit once per `get()` — and
-    since every caller queues on the same lock, the Nth of them waits N failure latencies,
-    retries and backoff included. The stored exception is raised as-is because the alternative
-    during a failure is an empty vocabulary, which reports every stage as unnameable.
+    callers that arrive inside it. The in-flight pin already collapses concurrent waiters onto
+    one walk; the cooldown is for callers that arrive *after* that walk finishes. The stored
+    exception is raised as-is because the alternative during a failure is an empty vocabulary,
+    which reports every stage as unnameable.
     """
 
     def __init__(self, *, client: BackstopClient, ttl: timedelta) -> None:
         self._client: BackstopClient = client
-        self._stages: dict[str, OpportunityStageResponse] | None = None
-        self._freshness: TimedGate = TimedGate(duration=ttl)
+        self._cache: CachedValue[dict[str, OpportunityStageResponse]] = CachedValue(
+            ttl=ttl,
+            snapshot=dict,
+            name="opportunity-stage",
+            log_prefix="opportunities.stages",
+            serve_stale=False,
+        )
         self._cooldown: TimedGate = TimedGate(duration=_FAILURE_COOLDOWN)
         self._failure: Exception | None = None
-        self._lock: asyncio.Lock = asyncio.Lock()
 
     @classmethod
     def with_ttl_minutes(cls, *, client: BackstopClient, ttl_minutes: int) -> Self:
@@ -69,41 +73,32 @@ class OpportunityStagesService:
         return stage.name if stage else None
 
     async def get_catalog(self) -> dict[str, OpportunityStageResponse]:
-        cached = self._stages
-        if cached is not None and self._freshness.within():
-            return dict(cached)
+        failure = self._failure
+        if failure is not None and self._cooldown.within():
+            raise failure
 
-        async with self._lock:
-            # A caller that queued behind the lock while the holder fetched is now fresh.
-            cached = self._stages
-            if cached is not None and self._freshness.within():
-                return dict(cached)
+        try:
+            catalog, _status = await self._cache.get(self._fetch_stages)
+        except Exception as error:
+            self._failure = error
+            self._cooldown.mark()
+            logger.warning("opportunities.stages.fetch_failed", exc_info=True)
+            raise
 
-            failure = self._failure
-            if failure is not None and self._cooldown.within():
-                raise failure
+        self._failure = None
+        self._cooldown.clear()
+        return catalog
 
-            try:
-                page = await self._client.paginate(
-                    "/opportunity-stages",
-                    schema=BackstopApiResource[OpportunityStageAttributes],
-                    max_records=None,
-                    page_size=100,
-                )
-                stages: dict[str, OpportunityStageResponse] = {}
-                for resource in page.items:
-                    stage = OpportunityStageResponse.from_resource(resource)
-                    if stage is not None:
-                        stages[stage.id] = stage
-            except Exception as error:
-                self._failure = error
-                self._cooldown.mark()
-                logger.warning("opportunities.stages.fetch_failed", exc_info=True)
-                raise
-
-            self._failure = None
-            self._cooldown.clear()
-            self._stages = stages
-            self._freshness.mark()
-            logger.info("opportunities.stages.refreshed", extra={"stages": len(stages)})
-            return dict(stages)
+    async def _fetch_stages(self) -> dict[str, OpportunityStageResponse]:
+        page = await self._client.paginate(
+            "/opportunity-stages",
+            schema=BackstopApiResource[OpportunityStageAttributes],
+            max_records=None,
+            page_size=100,
+        )
+        stages: dict[str, OpportunityStageResponse] = {}
+        for resource in page.items:
+            stage = OpportunityStageResponse.from_resource(resource)
+            if stage is not None:
+                stages[stage.id] = stage
+        return stages

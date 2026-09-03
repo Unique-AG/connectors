@@ -71,8 +71,7 @@ class TestListSystemUsers:
             result = tool_model(
                 await list_system_users(
                     refresh=True,
-                    client=client,
-                    system_users=system_users_service(),
+                    system_users=system_users_service(client),
                 ),
                 ListSystemUsersResponse,
             )
@@ -97,19 +96,18 @@ class TestListSystemUsers:
         users_route = respx.get(f"{base_url}/system-users").mock(
             return_value=_collection_page(_user("u1"))
         )
-        users = system_users_service()
-
         async with tool_client(base_url) as client:
+            users = system_users_service(client)
             first = tool_model(
-                await list_system_users(client=client, system_users=users),
+                await list_system_users(system_users=users),
                 ListSystemUsersResponse,
             )
             second = tool_model(
-                await list_system_users(client=client, system_users=users),
+                await list_system_users(system_users=users),
                 ListSystemUsersResponse,
             )
             refreshed = tool_model(
-                await list_system_users(refresh=True, client=client, system_users=users),
+                await list_system_users(refresh=True, system_users=users),
                 ListSystemUsersResponse,
             )
 
@@ -125,16 +123,15 @@ class TestListSystemUsers:
         users_route = respx.get(f"{base_url}/system-users").mock(
             return_value=_collection_page(_user("u1"))
         )
-        users = system_users_service()
-
         async with tool_client(base_url) as client:
+            users = system_users_service(client)
             first = tool_model(
-                await list_system_users(refresh=True, client=client, system_users=users),
+                await list_system_users(refresh=True, system_users=users),
                 ListSystemUsersResponse,
             )
             users_route.mock(side_effect=httpx.ConnectError("backstop down"))
             result = tool_model(
-                await list_system_users(refresh=True, client=client, system_users=users),
+                await list_system_users(refresh=True, system_users=users),
                 ListSystemUsersResponse,
             )
 
@@ -152,14 +149,12 @@ class TestListSystemUsers:
                 _user("u2", name="Departed", user_name="jsmith", disabled=True),
             )
         )
-        users = system_users_service()
-
         async with tool_client(base_url) as client:
+            users = system_users_service(client)
             by_login = tool_model(
                 await list_system_users(
                     search="MLUCAS",
                     refresh=True,
-                    client=client,
                     system_users=users,
                 ),
                 ListSystemUsersResponse,
@@ -167,7 +162,6 @@ class TestListSystemUsers:
             by_name = tool_model(
                 await list_system_users(
                     search="departed",
-                    client=client,
                     system_users=users,
                 ),
                 ListSystemUsersResponse,

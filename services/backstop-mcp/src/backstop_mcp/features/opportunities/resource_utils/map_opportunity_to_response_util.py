@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 
-from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.opportunities.api_responses import OpportunityResource
 from backstop_mcp.features.opportunities.opportunity_stages_service import (
@@ -22,12 +21,10 @@ class MapOpportunityToResponseUtil:
     def __init__(
         self,
         *,
-        client: BackstopClient,
         opportunity_stages_service: OpportunityStagesService,
         custom_fields_service: CustomFieldsService,
         get_stage_history_query: GetStageHistoryQuery,
     ) -> None:
-        self._client: BackstopClient = client
         self._opportunity_stages_service: OpportunityStagesService = opportunity_stages_service
         self._custom_fields_service: CustomFieldsService = custom_fields_service
         self._get_stage_history_query: GetStageHistoryQuery = get_stage_history_query
@@ -43,7 +40,6 @@ class MapOpportunityToResponseUtil:
         stage_id = first_item(row.related_ids("stage"))
 
         custom_field_values = await self._custom_fields_service.join_values(
-            self._client,
             row.attributes.regular_custom_field_values,
             filters=custom_fields_filters,
         )
