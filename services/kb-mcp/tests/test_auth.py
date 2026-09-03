@@ -61,6 +61,20 @@ def test_build_auth_never_passes_none_client_storage(durable_settings):
     assert kwargs["client_storage"] is not None
 
 
+def test_build_auth_uses_a_secretless_zitadel_client(durable_settings, monkeypatch):
+    monkeypatch.setenv("ZITADEL_CLIENT_SECRET", "legacy-secret")
+    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
+        mock_create.return_value = MagicMock()
+        build_auth(durable_settings)
+
+    _, kwargs = mock_create.call_args
+    zitadel_settings = kwargs["zitadel_oidc_proxy_settings"]
+    assert zitadel_settings.client_secret is None
+    # Local secret for FastMCP's own downstream JWTs, never sent to Zitadel —
+    # required because OIDCProxy raises without either client_secret or this.
+    assert zitadel_settings.jwt_signing_key.get_secret_value() == "test-jwt-signing-key"
+
+
 def test_build_auth_passes_required_scopes(durable_settings):
     with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
         mock_create.return_value = MagicMock()

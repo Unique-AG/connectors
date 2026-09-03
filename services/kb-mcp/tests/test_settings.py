@@ -82,6 +82,27 @@ def test_storage_rejects_ephemeral_flag_with_durable_pair(monkeypatch):
         Settings(_env_file=None)  # type: ignore[call-arg]
 
 
+def test_content_tree_timeout_defaults_and_env_override(monkeypatch):
+    get_settings.cache_clear()
+    assert get_settings().content_tree_timeout_seconds == 30.0
+    assert get_settings().content_tree_max_timeout_seconds == 45.0
+
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "25")
+    get_settings.cache_clear()
+    assert get_settings().content_tree_timeout_seconds == 20.0
+    assert get_settings().content_tree_max_timeout_seconds == 25.0
+
+
+def test_content_tree_timeout_rejects_default_above_max(monkeypatch):
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS", "30")
+    monkeypatch.setenv("KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS", "20")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError, match="must not exceed"):
+        get_settings()
+
+
 def test_enabled_tools_defaults_to_all_known(monkeypatch):
     monkeypatch.delenv("KB_MCP_ENABLED_TOOLS", raising=False)
     get_settings.cache_clear()

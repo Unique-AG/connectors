@@ -15,6 +15,8 @@ env:
   LOG_LEVEL: info
   # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
   UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
+  # PYTHONMALLOC: malloc # PID-1 glibc allocator; enable with content_tree
+  # MEMORY_TRIM_INTERVAL_SECONDS: "30" # periodic malloc_trim; toolkit default is 120s
 
 # -- Non-secret, tenant-specific config; see values.schema.json for field
 # descriptions. Mapped to env vars by templates/_ext.tpl + _helpers.tpl.
@@ -35,52 +37,39 @@ mcpConfig:
   # content_tree is enabled (see enabledTools above).
   contentTree:
     cache:
-      ttlSeconds: 1800
-      maxEntries: 128
+      ttlSeconds: 600
+      maxEntries: 24
+    timeoutSeconds: 30
+    maxTimeoutSeconds: 45
+  # -- Outbound Unique API HTTP connection-pool tuning.
+  http:
+    maxConnections: 100
+    maxKeepaliveConnections: 20
+    poolTimeoutSeconds: 60
 
-# -- Secrets. The Unique QA overlay uses extraEnvSecrets + external-secrets
+# -- Credentials. The Unique QA overlay uses extraEnvSecrets + external-secrets
 # instead; the envVars + secretKeyRef pattern below is a portable fallback
-# for third-party installs. ENCRYPTION_KEY protects OAuth proxy state in
-# Postgres — generate with:
+# for third-party installs. ENCRYPTION_KEY protects OAuth proxy state in Postgres
+# — generate with:
 #   openssl rand -hex 32
+#
+# Example for loading the non-secret internal API URL:
+#   envVars:
+#     - name: UNIQUE_API_BASE_URL
+#       value: http://unique-api.<namespace>.svc.cluster.local
 #
 # Example for loading secrets (uncomment and customize as needed):
 #   envVars:
-#     - name: UNIQUE_APP_KEY
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-unique-secret
-#           key: UNIQUE_APP_KEY
-#     - name: UNIQUE_APP_ID
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-unique-secret
-#           key: UNIQUE_APP_ID
-#     - name: UNIQUE_API_BASE_URL
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-unique-secret
-#           key: UNIQUE_API_BASE_URL
-#     - name: UNIQUE_APP_ENDPOINT
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-unique-secret
-#           key: UNIQUE_APP_ENDPOINT
-#     - name: UNIQUE_APP_ENDPOINT_SECRET
-#       valueFrom:
-#         secretKeyRef:
-#           name: kb-mcp-unique-secret
-#           key: UNIQUE_APP_ENDPOINT_SECRET
 #     - name: ZITADEL_CLIENT_ID
 #       valueFrom:
 #         secretKeyRef:
 #           name: kb-mcp-zitadel-secret
 #           key: ZITADEL_CLIENT_ID
-#     - name: ZITADEL_CLIENT_SECRET
+#     - name: ZITADEL_JWT_SIGNING_KEY
 #       valueFrom:
 #         secretKeyRef:
 #           name: kb-mcp-zitadel-secret
-#           key: ZITADEL_CLIENT_SECRET
+#           key: ZITADEL_JWT_SIGNING_KEY
 #     - name: ENCRYPTION_KEY
 #       valueFrom:
 #         secretKeyRef:
@@ -99,10 +88,10 @@ ports:
 
 resources:
   limits:
-    memory: 512Mi
+    memory: 1Gi
   requests:
     cpu: 50m
-    memory: 256Mi
+    memory: 512Mi
 
 probes:
   enabled: true

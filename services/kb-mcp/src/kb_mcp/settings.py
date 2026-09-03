@@ -55,7 +55,11 @@ class Settings(BaseSettings):
     # ── Zitadel ──
     zitadel_base_url: str
     zitadel_client_id: str
-    zitadel_client_secret: SecretStr
+    # Local secret for FastMCP's own downstream JWTs (never sent to Zitadel).
+    # Generate with: openssl rand -hex 32
+    zitadel_jwt_signing_key: SecretStr = Field(
+        validation_alias="ZITADEL_JWT_SIGNING_KEY"
+    )
 
     # ── OAuth storage (see auth/storage.py) ──
     database_url: PostgresDsn | None = Field(default=None)
@@ -69,15 +73,67 @@ class Settings(BaseSettings):
 
     # ── Content-tree cache ──
     content_tree_cache_ttl_seconds: int = Field(
-        default=1800, validation_alias="KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS"
+        default=600,
+        ge=1,
+        description="Seconds a cached ContentTree stays valid.",
+        validation_alias="KB_MCP_CONTENT_TREE_CACHE_TTL_SECONDS",
     )
     content_tree_cache_max_entries: int = Field(
-        default=128, validation_alias="KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES"
+        default=24,
+        description="Max cached ContentTree entries (one per company+user).",
+        validation_alias="KB_MCP_CONTENT_TREE_CACHE_MAX_ENTRIES",
+    )
+
+    # ── Content-tree wait (not a toolkit cache key) ──
+    content_tree_timeout_seconds: float = Field(
+        default=30.0,
+        ge=0,
+        description=(
+            "Default seconds content_tree waits before returning a partial "
+            "tree. The walk keeps running; a follow-up call is usually instant."
+        ),
+        validation_alias="KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS",
+    )
+    content_tree_max_timeout_seconds: float = Field(
+        default=45.0,
+        ge=0,
+        description=(
+            "Ceiling on content_tree timeout. Must stay below the MCP client's "
+            "own budget (~60s) or an LLM-supplied value silently disables the "
+            "partial-tree guarantee."
+        ),
+        validation_alias="KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS",
     )
 
     # ── Search scope lookups ──
     scope_lookup_concurrency: int = Field(
         default=8, ge=1, validation_alias="KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY"
+    )
+
+    # ── Outbound HTTP pool (see http_client.py) ──
+    http_max_connections: int = Field(
+        default=100,
+        ge=1,
+        description="Maximum number of outbound HTTP connections.",
+        validation_alias="KB_MCP_HTTP_MAX_CONNECTIONS",
+    )
+    http_max_keepalive_connections: int = Field(
+        default=20,
+        ge=1,
+        description=(
+            "Idle sockets kept in the pool. Must be set on Limits; omitting "
+            "it keeps max_connections idle. Does not bound in-flight connections."
+        ),
+        validation_alias="KB_MCP_HTTP_MAX_KEEPALIVE_CONNECTIONS",
+    )
+    http_pool_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        description=(
+            "Bounds waiting for a free connection only, not request duration. "
+            "Long-running calls hold a connection; they never queue."
+        ),
+        validation_alias="KB_MCP_HTTP_POOL_TIMEOUT_SECONDS",
     )
 
     # ── MCP tool allowlist ──
@@ -141,6 +197,15 @@ class Settings(BaseSettings):
         if self.frontend_base_url is None:
             return None
         return str(self.frontend_base_url).rstrip("/")
+
+    @model_validator(mode="after")
+    def _content_tree_timeout_is_within_max(self) -> Settings:
+        if self.content_tree_timeout_seconds > self.content_tree_max_timeout_seconds:
+            raise ValueError(
+                "KB_MCP_CONTENT_TREE_TIMEOUT_SECONDS must not exceed "
+                "KB_MCP_CONTENT_TREE_MAX_TIMEOUT_SECONDS"
+            )
+        return self
 
     @model_validator(mode="after")
     def _storage_must_be_durable(self) -> Settings:
