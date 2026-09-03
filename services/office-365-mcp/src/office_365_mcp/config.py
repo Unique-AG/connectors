@@ -225,20 +225,18 @@ class SurfaceConfig(BaseSettings):
         return self
 
 
-# Trap: Entra authority aliases. AzureProvider derives one expected issuer from tenant_id
-# (https://{authority}/{tenant_id}/v2.0) with no way to turn the check off, and a real token's `iss`
-# names the caller's tenant — so these reject every token, with nothing in logs naming tenant_id.
-_MULTI_TENANT_AUTHORITIES = frozenset({"common", "organizations", "consumers"})
+# The Entra authority a multi-tenant registration signs in through; `auth.py` validates each token
+# against its own tenant's issuer.
+ORGANIZATIONS = "organizations"
+
+_PERSONAL_ACCOUNT_AUTHORITIES = frozenset({"common", "consumers"})
+
+_NAMED_AUTHORITIES = _PERSONAL_ACCOUNT_AUTHORITIES | {ORGANIZATIONS}
 
 
 class EntraConfig(BaseSettings):
-    """Microsoft Entra app registration for this service.
-
-    AzureProvider owns the authorization endpoint, PKCE, redirect callback, token refresh, and
-    On-Behalf-Of exchange. client_secret is required here (though the provider allows omitting
-    it) because On-Behalf-Of cannot be done without one — and calling Graph as the signed-in
-    user is the point.
-    """
+    """Microsoft Entra app registration. `client_secret` is optional to AzureProvider but required
+    here: the On-Behalf-Of exchange that calls Graph as the user needs one."""
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="ENTRA_")
 
@@ -246,15 +244,26 @@ class EntraConfig(BaseSettings):
     client_id: str = Field(min_length=1)
     client_secret: SecretStr = Field(min_length=1)
 
+    @field_validator("tenant_id", mode="before")
+    @classmethod
+    def _lowercase_a_named_authority(cls, value: object) -> object:
+        if isinstance(value, str) and value.lower() in _NAMED_AUTHORITIES:
+            return value.lower()
+        return value
+
     @model_validator(mode="after")
-    def _reject_multi_tenant_authority(self) -> Self:
-        if self.tenant_id.lower() in _MULTI_TENANT_AUTHORITIES:
+    def _reject_personal_account_authorities(self) -> Self:
+        if self.tenant_id in _PERSONAL_ACCOUNT_AUTHORITIES:
             raise ValueError(
-                f"ENTRA_TENANT_ID must name a single tenant, not {self.tenant_id!r}: the auth "
-                + "provider validates every token against one issuer derived from this value, "
-                + "so a multi-tenant authority rejects all of them. Use the tenant's ID."
+                f"ENTRA_TENANT_ID must name one tenant or be {ORGANIZATIONS!r}, not "
+                + f"{self.tenant_id!r}: that authority admits personal Microsoft accounts, which "
+                + "have no Microsoft 365 mailbox or Teams for any tool here to read"
             )
         return self
+
+    @property
+    def multi_tenant(self) -> bool:
+        return self.tenant_id == ORGANIZATIONS
 
 
 class DatabaseConfig(BaseSettings):

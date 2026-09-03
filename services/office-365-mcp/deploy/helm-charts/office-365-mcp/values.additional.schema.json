@@ -25,7 +25,7 @@
           "properties": {
             "tenantId": {
               "type": "string",
-              "description": "The single tenant whose issuer every access token is validated against. A multi-tenant authority is rejected at startup."
+              "description": "One tenant's ID, or 'organizations' for a multi-tenant (AzureADMultipleOrgs) registration: then any Entra tenant's users can sign in, every access token is validated against its own tenant's issuer, and Graph is called in that tenant. 'common' and 'consumers' are rejected at startup: personal Microsoft accounts have no Microsoft 365 mailbox or Teams."
             },
             "clientId": {
               "type": "string",
