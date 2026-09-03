@@ -40,6 +40,7 @@ from kb_mcp.references import (
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.search.config import SearchToolConfig
+from kb_mcp.tools.search.metadata_filter import build_folder_scoped_metadata_filter
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,6 +76,40 @@ async def search(
         str,
         Field(description="The query to search for in the knowledge base."),
     ],
+    folder_ids: Annotated[
+        list[str] | None,
+        Field(
+            description=(
+                "Restrict results to these folders. A value is only ever a "
+                "`scope_xxx` id copied verbatim from a `folder_id=` "
+                "annotation in content_tree(mode='tree') output — never a "
+                "folder name, a path, an id you assembled yourself, or a "
+                "`scope_xxx` lifted from a citation/document link in an "
+                "earlier result (those are the leaf folder a file happens "
+                "to sit in, not the folder the user named). No id in hand "
+                "means omit this parameter — an unrestricted search is the "
+                "default and correct for most requests. If the folder you "
+                "need shows no id, re-run content_tree(mode='tree', "
+                "folders_only=true) with a larger max_depth — a folder only "
+                "gets an id once the walk has reached a file beneath it."
+            )
+        ),
+    ] = None,
+    include_subfolders: Annotated[
+        bool,
+        Field(
+            description=(
+                "Ignored unless folder_ids is set. Leave it true — even "
+                "'search only in the Legal folder' means Legal plus "
+                "everything nested under it, and folders often hold their "
+                "files in subfolders rather than directly, so false often "
+                "returns nothing. Set it false only when the user's own "
+                "words rule out nested content: 'directly in', 'top level "
+                "only', 'not the subfolders'. Plain scoping language ('in "
+                "X', 'only in X') keeps it true."
+            )
+        ),
+    ] = True,
     config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
 ) -> ToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
@@ -94,6 +129,16 @@ async def search(
             config.service_config
         ).bind_settings(settings)
         service.state.search_queries = [search_string]
+        if folder_ids:
+            # KnowledgeBaseInternalSearchState narrows this in, but .state is
+            # typed via the generic InternalSearchState base at this call site.
+            service.state.metadata_filter_override = (  # pyright: ignore[reportAttributeAccessIssue]
+                build_folder_scoped_metadata_filter(
+                    folder_ids,
+                    include_subfolders=include_subfolders,
+                    admin_metadata_filter=config.service_config.metadata_filter,
+                )
+            )
 
         result = await service.run()
 

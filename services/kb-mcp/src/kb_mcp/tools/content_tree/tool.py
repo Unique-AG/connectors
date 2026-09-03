@@ -38,8 +38,10 @@ from kb_mcp.tools.content_tree.path_utils import (
     PathLike,
     display_path,
     display_path_segments,
+    folder_scope_ids,
     normalize_path_segment,
     path_parts,
+    render_tree_with_folder_ids,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,6 +60,40 @@ def _with_incomplete_notice(complete: bool, body: str) -> str:
 def clamped_content_tree_timeout(requested: float | None, settings: Settings) -> float:
     raw = settings.content_tree_timeout_seconds if requested is None else requested
     return min(max(0.0, raw), settings.content_tree_max_timeout_seconds)
+
+
+def _mode_misuse_error(
+    mode: Literal["tree", "list", "search"],
+    *,
+    query: str | None,
+    match_on: MatchTarget | None,
+    min_score: float | None,
+    case_sensitive: bool | None,
+    folder_path: str | None,
+) -> str | None:
+    """A param from the wrong mode silently doing nothing gives the caller no
+    signal it made a mistake — surface it instead of quietly ignoring it."""
+    if mode != "search":
+        search_only = {
+            "query": query,
+            "match_on": match_on,
+            "min_score": min_score,
+            "case_sensitive": case_sensitive,
+        }
+        misused = [name for name, value in search_only.items() if value is not None]
+        if misused:
+            return (
+                f"{', '.join(misused)} only apply to mode='search' and are ignored "
+                f"under mode='{mode}'. Call content_tree(mode='search', query=...) "
+                f"to filter, or drop them to browse with mode='{mode}'."
+            )
+    if mode != "list" and folder_path is not None:
+        return (
+            "folder_path only applies to mode='list' and is ignored under "
+            f"mode='{mode}'. Call content_tree(mode='list', folder_path=...) to "
+            f"scope a listing, or drop it to use mode='{mode}'."
+        )
+    return None
 
 
 def _substring_matches(
@@ -232,12 +268,20 @@ async def content_tree(
     """Browse the knowledge base's folder/file structure — use this only when
     you need to know what files or folders exist, not to find information
     inside them (use search for that). Reach for this when: the user names a
-    specific folder/file and you need to resolve its path or content_id; you
-    need to enumerate everything in a known location; or you're about to call
-    read_file and need the content_id first. Pick a mode; only that mode's
-    args below apply, rest ignored. '*' = required.
+    specific folder/file and you need to resolve its path or content_id; the
+    user asks what documents/files exist somewhere rather than a substantive
+    question about their content ('which documents do we have owned by X',
+    'what's in the X folder', 'list files under X') — that's an enumeration
+    request (use mode='list' with folder_path, or mode='tree'), not a content
+    search; or you're about to call read_file and need the content_id first.
+    Pick a mode; only that mode's args below apply, rest ignored. '*' = required.
     - mode='tree': max_depth, folders_only, timeout — first orientation view
-    of folders/files.
+    of folders/files. Folder lines carry `(folder_id=scope_xxx)` when known —
+    pass that id as search's `folder_ids` to scope a search to that folder.
+    A folder shows no id until the walk reaches a file beneath it; if the one
+    you need is missing, re-run with a larger max_depth (folders_only=true
+    keeps this cheap — it only hides files from the rendered lines, not from
+    the walk that discovers ids).
     - mode='list': folder_path, limit, timeout — flat listing; each result's
     content_id is needed for a later read_file call.
     - mode='search': query*, limit, min_score, match_on, case_sensitive,
@@ -267,6 +311,20 @@ async def content_tree(
                 ],
             )
 
+        misuse_error = _mode_misuse_error(
+            mode,
+            query=query,
+            match_on=match_on,
+            min_score=min_score,
+            case_sensitive=case_sensitive,
+            folder_path=folder_path,
+        )
+        if misuse_error is not None:
+            return ToolResult(
+                is_error=True,
+                content=[TextContent(type="text", text=misuse_error)],
+            )
+
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
         company_id = settings.authcontext.get_confidential_company_id()
@@ -292,7 +350,11 @@ async def content_tree(
             else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
         )
         wait = clamped_content_tree_timeout(timeout, kb_settings)
-        walk_depth = max_depth if mode == "tree" else None
+        # Walk one level past max_depth — otherwise a folder exactly at the
+        # cutoff never gets its own contents visited and stays id-less.
+        walk_depth = None
+        if mode == "tree":
+            walk_depth = max_depth if max_depth is None else max_depth + 1
 
         snapshot = await tree_svc.resolve_visible_file_paths_via_folders_async(
             metadata_filter=metadata_filter,
@@ -304,7 +366,12 @@ async def content_tree(
         if mode == "tree":
             text = _with_incomplete_notice(
                 snapshot.complete,
-                snapshot.render(max_depth=max_depth, show_files=not folders_only),
+                render_tree_with_folder_ids(
+                    snapshot,
+                    folder_scope_ids(snapshot.files),
+                    max_depth=max_depth,
+                    show_files=not folders_only,
+                ),
             )
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])
