@@ -99,7 +99,7 @@ export class McpToolsHandler extends McpHandlerBase {
       };
     });
 
-    mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       this.logger.debug('CallToolRequestSchema is being called');
 
       const toolInfo = this.registry.findTool(this.mcpModuleId, request.params.name);
@@ -129,7 +129,10 @@ export class McpToolsHandler extends McpHandlerBase {
           strict: false,
         });
 
-        const context = this.createContext(mcpServer, request);
+        const context = this.createContext(mcpServer, {
+          mcpRequest: request,
+          requestHandlerExtra: extra,
+        });
 
         if (!toolInstance) {
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);

@@ -63,7 +63,7 @@ export class McpPromptsHandler extends McpHandlerBase {
       };
     });
 
-    mcpServer.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    mcpServer.server.setRequestHandler(GetPromptRequestSchema, async (request, extra) => {
       this.logger.debug('GetPromptRequestSchema is being called');
 
       try {
@@ -88,7 +88,10 @@ export class McpPromptsHandler extends McpHandlerBase {
           );
         }
 
-        const context = this.createContext(mcpServer, request);
+        const context = this.createContext(mcpServer, {
+          mcpRequest: request,
+          requestHandlerExtra: extra,
+        });
         const methodName = promptInfo.methodName;
 
         const result = await promptInstance[methodName].call(
