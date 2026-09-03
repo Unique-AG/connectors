@@ -350,10 +350,8 @@ async def content_tree(
             else DEFAULT_METADATA_FILTER_STATEMENT.to_dict()
         )
         wait = clamped_content_tree_timeout(timeout, kb_settings)
-        # Walk one level past the rendered cutoff: a folder at exactly
-        # max_depth is only ever discovered via its parent's listing, never
-        # visited itself, so without this its own contents are unknown —
-        # it would render as an empty leaf with no folder_id even when full.
+        # Walk one level past max_depth — otherwise a folder exactly at the
+        # cutoff never gets its own contents visited and stays id-less.
         walk_depth = None
         if mode == "tree":
             walk_depth = max_depth if max_depth is None else max_depth + 1

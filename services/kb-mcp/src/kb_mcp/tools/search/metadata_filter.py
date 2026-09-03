@@ -22,17 +22,8 @@ def build_folder_scoped_metadata_filter(
     include_subfolders: bool,
     admin_metadata_filter: UniqueQL | dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """AND a folder-scope clause onto the admin's static ``metadata_filter``.
-
-    ``include_subfolders=True`` matches ``folderIdPath`` by ``contains`` (path
-    ancestry), so a given folder id also covers everything nested under it.
-    ``include_subfolders=False`` matches ``folderId`` exactly, mirroring the
-    toolkit's own scope-id search parameter.
-
-    The admin filter is always folded in, never bypassed — the result can
-    never resolve to ``None`` when ``admin_metadata_filter`` isn't (search
-    requires a non-null effective filter).
-    """
+    """AND a folder-scope clause onto the admin's ``metadata_filter``, never
+    bypassing it — the result is never ``None`` when the admin filter isn't."""
     if include_subfolders:
         scope_clause = OrStatement(
             or_list=[

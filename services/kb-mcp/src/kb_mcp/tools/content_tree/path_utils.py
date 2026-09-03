@@ -50,14 +50,8 @@ def display_path(path: PathLike) -> str:
 def folder_scope_ids(
     files: Sequence[tuple[ContentInfo, PathLike]],
 ) -> dict[tuple[str, ...], str]:
-    """Map each visited folder's raw path-segment tuple to its scope id.
-
-    Derived once from every file's ``metadata["folderIdPath"]`` (the full
-    root→leaf ancestor chain), zipped against that file's own raw path
-    segments — the same segments the tree trie is keyed by, so a folder only
-    lacks an entry if it has no file anywhere beneath it (pointless to filter
-    to anyway). ``O(files × path depth)``, a single linear pass.
-    """
+    """Map each visited folder's path-segment tuple to its scope id. A folder
+    is absent only if it has no file anywhere beneath it."""
     result: dict[tuple[str, ...], str] = {}
     for content_info, path in files:
         metadata = content_info.metadata
