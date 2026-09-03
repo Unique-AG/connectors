@@ -55,6 +55,12 @@ the one `pnpm-lock.yaml` pins. `--frozen-lockfile` also fails if `package.json` 
 disagree on the version, which a runtime `npx` fetch would silently ignore. It is the same
 acquisition path the TypeScript CI uses, so there is one mechanism to understand rather than two.
 
+There is deliberately no `actions/cache` on the pnpm store here. No workflow in this repo runs on
+`main`, so a store cache can never land on `refs/heads/main`, which means every PR misses on its
+first job and then writes a 177 MB entry of its own. The repo's Actions cache already sits above its
+10 GB limit, so those entries evict the `setup-uv` caches this same job depends on. A cold
+`pnpm install` costs about 8s; the restore-plus-save round trip cost 13s and made things worse.
+
 ### Trap: basedpyright in a git worktree
 
 `[tool.basedpyright]` pins `venvPath = "."` and `venv = ".venv"`, so basedpyright resolves imports
