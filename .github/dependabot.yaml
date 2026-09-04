@@ -1,53 +1,145 @@
 version: 2
 
 updates:
-  - package-ecosystem: github-actions
+  - package-ecosystem: npm
     directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 6 * * 5"
+      timezone: Europe/Berlin
     cooldown:
       default-days: 3
-    schedule:
-      interval: monthly
+    commit-message:
+      prefix: build
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
     groups:
-      actions-minor:
+      major:
+        patterns:
+          - "*"
         update-types:
-          - minor
-          - patch
+          - major
+      minor-and-patch:
+        patterns:
+          - "*"
+
+  - package-ecosystem: uv
+    directories:
+      - services/**/*
+    schedule:
+      interval: cron
+      cronjob: "0 6 * * 5"
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: build
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      major:
+        patterns:
+          - "*"
+        update-types:
+          - major
+      minor-and-patch:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directories:
       - services/**/*
+    schedule:
+      interval: cron
+      cronjob: "0 6 * * 5"
+      timezone: Europe/Berlin
     cooldown:
       default-days: 3
-    schedule:
-      interval: weekly
-      day: friday
-      time: "06:00"
-      timezone: Europe/Berlin
-    labels:
-      - dependencies
-      - dependabot-docker
+    commit-message:
+      prefix: build
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
     groups:
-      service-base-images:
+      major:
         patterns:
           - "*"
-    ignore:
-      - dependency-name: node
         update-types:
-          - version-update:semver-major
-    rebase-strategy: disabled
+          - major
+      python-runtime:
+        patterns:
+          - "python"
+          - "astral-sh/uv"
+          - "*astral-sh/uv*"
+        update-types:
+          - minor
+      minor-and-patch:
+        patterns:
+          - "*"
 
-  - package-ecosystem: helm
-    directories:
-      - services/**/*
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 6 * * 5"
+      timezone: Europe/Berlin
     cooldown:
       default-days: 3
-    schedule:
-      interval: monthly
+    commit-message:
+      prefix: build
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      major:
+        patterns:
+          - "*"
+        update-types:
+          - major
+      minor-and-patch:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directories:
       - services/**/*
+    schedule:
+      interval: cron
+      cronjob: "0 6 * * 5"
+      timezone: Europe/Berlin
     cooldown:
       default-days: 3
+    commit-message:
+      prefix: build
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      major:
+        patterns:
+          - "*"
+        update-types:
+          - major
+      minor-and-patch:
+        patterns:
+          - "*"
+
+  - package-ecosystem: helm
+    directories:
+      - services/**/*
     schedule:
-      interval: weekly
+      interval: cron
+      cronjob: "0 6 * * 5"
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: build
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      major:
+        patterns:
+          - "*"
+        update-types:
+          - major
+      minor-and-patch:
+        patterns:
+          - "*"
