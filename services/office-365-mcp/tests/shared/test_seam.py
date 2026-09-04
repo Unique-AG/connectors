@@ -61,10 +61,9 @@ async def _middleware_message(delivered: BaseException) -> str:
 
 
 def _as_fastmcp_delivers_it(failure: BaseException) -> ToolError:
-    """The dependency engine reports anything that is not a `FastMCPError` as a `RuntimeError`
-    naming the parameter (fastmcp 3.4.5, `fastmcp/server/dependencies.py:686`) and the tool caller
-    re-raises that as a `ToolError` naming the tool (`fastmcp/server/server.py:1357`). That the real
-    chain is this shape is pinned in `tests/test_error_mapping.py` and `tests/test_mcp_tools.py`."""
+    """fastmcp 4.0.2 wraps a non-`FastMCPError` in a `RuntimeError` naming the parameter
+    (`fastmcp/server/dependencies.py:814`), then a `ToolError` (`fastmcp/server/server.py:1555`).
+    """
     dependency = RuntimeError(f"Failed to resolve dependency 'client' for {_TOOL}")
     dependency.__cause__ = failure
     delivered = ToolError(f"Error calling tool '{_TOOL}': {dependency}")

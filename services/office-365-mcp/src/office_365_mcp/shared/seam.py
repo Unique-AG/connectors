@@ -1,64 +1,9 @@
-"""How a tool is attached to the outside: the Graph client it calls with, the token in it, and what
-a refusal becomes.
+"""How a tool is attached to the outside: the Graph client, the token in it, and what a refusal
+becomes. The only file in `shared/` that imports FastMCP.
 
-A model reads this server as one thing, so every token refusal is worded the same way and every 403
-names its permission. This module is the seam, and it is the only file in `shared/` that imports
-FastMCP. That keeps the framework out of shared vocabulary, and tests/test_layering.py enforces it.
-
-## Token exchange
-
-`EntraOBOToken` is FastMCP's On-Behalf-Of dependency. It exchanges Entra's token (audience
-`api://{client_id}`, useless against Graph) for a Graph token in the requested scopes. It is a
-dependency default, so models never see it.
-
-`GraphToken` wraps it for one reason. A dependency is resolved *outside* the tool body, so an
-exchange that Entra refuses never enters the body and never reaches the mapping inside it.
-FastMCP reports it as "Failed to resolve dependency 'client' for get_me" — the parameter it
-failed to resolve, which tells a model nothing that it can act on. So the wrapper raises
-`TokenExchangeFailed`, which carries the permissions that the exchange asked for and is
-deliberately NOT a `FastMCPError`. `fastmcp.server.dependencies` lets `FastMCPError` subclasses
-out of dependency resolution unwrapped, and it wraps everything else. Being wrapped is what lets
-the middleware below recognize it by type. That is what makes an unconsented permission as
-fixable before the Graph call as a 403 is after it.
-
-One instance covers one exchange, however many permissions that exchange asks for. Entra redeems
-them together and refuses them together, so a tool that needs two gets one token or none, and the
-refusal never says which one was missing. The message therefore names all of them, exactly as a
-403 does.
-
-## The client a tool is handed
-
-`graph_client_for_caller` is the whole of what a tool needs to reach Graph, and it is built in
-`register`, because that is where the process-wide transport is in scope. A tool that reads the
-transport out of ambient state can be registered against nothing at all, and nothing says so
-until its first call.
-
-## One mapping, not one per tool
-
-`GraphAdviceMiddleware` is where a failure becomes advice. It wraps every `tools/call`, so it
-covers the tool body and the dependency resolution that runs before it. It is also the outermost
-middleware, so the operations layer below still logs the untranslated failure with its cause
-chain intact.
-
-It words a Graph refusal from a table that its constructor is handed. This table has one entry
-per registered tool, built in `tools/__init__.py` from each tool module's own
-`GRAPH_PERMISSIONS`, so it cannot drift from the registered surface.
-
-The permissions travel this way instead of living on the tool itself, for two reasons. A tool's
-`tags` are a set, and a set loses the order that the message names the permissions in. And if the
-permissions lived in a tool's `meta` instead, it publishes this connector's permission names to
-every client in `tools/list`.
-
-Every refusal here is written to one shape: the thing that refused, then the remedy, then the
-evidence an operator needs in a trailing parenthesis. It is always "Microsoft 365", never
-"Microsoft Graph" — the caller is not calling that API. Graph is named only where it is the
-explanation, or as `Graph request id`, which is what Microsoft support asks for by that name.
-
-Trap: the middleware never sees a `GraphFailure`. FastMCP re-raises whatever leaves a tool as
-`ToolError` (fastmcp 3.4.5, `fastmcp/server/server.py:1356`), and the dependency engine wraps a
-failed dependency in a `RuntimeError` before that. So what has to be recognized is two links down
-a `__cause__` chain, matched on type. Matching on FastMCP's own message text instead is fragile: a
-wording change breaks it, and nobody here reviews FastMCP's commits for that kind of change.
+Trap: the middleware never sees a `GraphFailure` — FastMCP re-raises a tool failure as `ToolError`
+(fastmcp 4.0.2, `fastmcp/server/server.py:1554-1555`) over the dependency engine's `RuntimeError`,
+so causes are matched two links down `__cause__`, by type, never on message text.
 """
 
 import re
@@ -182,10 +127,8 @@ class GraphToken(Dependency[str]):
         try:
             return await self._exchange.__aenter__()
         except Exception as failure:
-            # This catches every exception, not just one type: azure-identity reports a refused
-            # exchange as `ClientAuthenticationError`, and `_EntraOBOToken.__aenter__` raises
-            # plain `RuntimeError`s of its own first (fastmcp 3.4.5,
-            # `fastmcp/server/auth/providers/azure.py:838,848`).
+            # Broad: azure-identity raises `ClientAuthenticationError`, `_EntraOBOToken` its own
+            # `RuntimeError`s (fastmcp 4.0.2, `fastmcp/server/auth/providers/azure.py:851,858`).
             raise TokenExchangeFailed(permissions=self._permissions, cause=failure) from failure
 
     @override
@@ -238,9 +181,8 @@ class Advised(ToolError):
 
 @dataclass(frozen=True, slots=True)
 class ToolAdvice:
-    """This states what one tool's failures are worded from. It carries `permissions`, in the
-    order that the message names them, and the sentence that its 404 needs instead of the
-    default one."""
+    """What one tool's failures are worded from. Permissions live here, not on the tool: `tags`
+    is a set and loses their order, and `meta` is published to every client in `tools/list`."""
 
     permissions: tuple[str, ...]
     not_found: str | None = None

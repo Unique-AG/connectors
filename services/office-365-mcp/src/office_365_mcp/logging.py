@@ -37,7 +37,6 @@ __all__ = [
     "HttpRequestIdMiddleware",
     "MessageLogMiddleware",
     "RedactionFilter",
-    "StaleMessageLineFilter",
     "configure_logging",
 ]
 
@@ -420,32 +419,9 @@ def _forwarded_request_id(scope: ASGIScope) -> str | None:
     return None
 
 
-# `mcp/server/lowlevel/server.py`, in `_handle_request`, immediately before the request handler —
-# which is where FastMCP's whole middleware chain lives. Matched on the template, a literal in that
-# file. A drift guard in `tests/test_logging.py` reads it back out of the SDK and fails if it moved.
-_SDK_MESSAGE_LOGGER = "mcp.server.lowlevel.server"
-_SDK_PER_MESSAGE_LINE = "Processing request of type %s"
-
-
-class StaleMessageLineFilter(logging.Filter):
-    """Drop the SDK's per-message line, the one line that cannot carry the right trace id.
-
-    It is emitted inside the session task before any middleware of ours, so it is formatted under
-    the OpenTelemetry context that task snapshotted at `initialize`, for the session's whole life.
-    `tracing.py` says why that cannot be corrected from inside the task. `MessageLogMiddleware`
-    emits the replacement.
-    """
-
-    @override
-    def filter(self, record: logging.LogRecord) -> bool:
-        return not (record.name == _SDK_MESSAGE_LOGGER and record.msg == _SDK_PER_MESSAGE_LINE)
-
-
 class MessageLogMiddleware(Middleware):
-    """One line per MCP message, in the trace of the request that carried it.
-
-    Mount inside `TraceContextRestoreMiddleware`. Outside it, this line is the defect it replaces.
-    """
+    """Mount inside `TraceContextRestoreMiddleware`, or the line carries the session task's
+    stale trace. See `tracing.py`."""
 
     @override
     async def on_message(
@@ -476,10 +452,8 @@ class ColorMessageFilter(logging.Filter):
         return True
 
 
-# `fastmcp/__init__.py:22-26` configures its own logger at import time — `RichHandler`s on stderr
-# plus `propagate = False` — so every `fastmcp.*` line skips the pino formatter and every filter
-# above. Reclaimed by removing those handlers rather than via `FASTMCP_LOG_ENABLED`, which is read
-# when `fastmcp` is imported and so is already too late.
+# `fastmcp/__init__.py:21-25` installs stderr handlers and sets `propagate = False` at import time.
+# `FASTMCP_LOG_ENABLED` is read during that import, too late to prevent it, so strip the handlers.
 _RECLAIMED_LOGGERS: tuple[str, ...] = ("fastmcp",)
 
 
@@ -490,9 +464,7 @@ def _reclaim(name: str) -> None:
     reclaimed.propagate = True
 
 
-# Order is the order they run in: drop first, so nothing is identified or redacted for nothing.
 _FILTERS: tuple[type[logging.Filter], ...] = (
-    StaleMessageLineFilter,
     ColorMessageFilter,
     CorrelationFilter,
     RedactionFilter,

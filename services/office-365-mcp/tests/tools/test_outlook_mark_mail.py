@@ -477,8 +477,8 @@ class TestHowItDeclaresItself:
         tool = await _registered(transport)
 
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is False
-        assert tool.annotations.destructiveHint is True
+        assert tool.annotations.read_only_hint is False
+        assert tool.annotations.destructive_hint is True
         assert WRITE_DESTRUCTIVE["destructiveHint"] is True
 
     def test_it_asks_for_the_permission_that_can_write(self) -> None:
