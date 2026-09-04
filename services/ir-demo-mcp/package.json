@@ -18,9 +18,9 @@
     "test": "echo \"No tests for this demo server\""
   },
   "dependencies": {
-    "@nestjs/common": "11.2.3",
-    "@nestjs/core": "11.2.3",
-    "@nestjs/platform-express": "11.2.3",
+    "@nestjs/common": "12.0.1",
+    "@nestjs/core": "12.0.1",
+    "@nestjs/platform-express": "12.0.1",
     "@opentelemetry/api": "1.9.1",
     "@unique-ag/mcp-server-module": "workspace:*",
     "nestjs-otel": "8.1.0",
@@ -29,9 +29,9 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@nestjs/cli": "11.0.24",
+    "@nestjs/cli": "12.0.0",
     "@types/node": "26.4.0",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "unplugin-swc": "1.5.11"
   },
   "packageManager": "pnpm@10.34.5"
