@@ -7,8 +7,6 @@ concurrency:
 on:
   pull_request:
     types: [opened, edited, synchronize, labeled, unlabeled]
-    branches:
-      - main
 
 jobs:
   conventional-pr-title:
@@ -72,6 +70,5 @@ jobs:
           self: gatekeeper
           token: ${{ secrets.GITHUB_TOKEN }}
           timeout: "1200"
-          # python-ci / services-ci cancel-in-progress leaves unexpanded matrix job names
-          # as cancelled checks; treat those placeholders as ignored.
-          ignored: "Test $${{ '{{' }} matrix.package }},Helm $${{ '{{' }} matrix.package }}"
+          interval: "60"
+          ignored: "Test $${{ '{{' }} matrix.package }},Helm $${{ '{{' }} matrix.package }},Terraform $${{ '{{' }} matrix.package }},matrix.service"

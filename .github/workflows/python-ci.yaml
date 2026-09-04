@@ -12,6 +12,7 @@ on:
     paths:
       - "services/**"
       - ".github/workflows/python-ci.yaml"
+      - "scripts/render-values-schema.sh"
   workflow_dispatch:
     inputs:
       packages:
@@ -29,7 +30,7 @@ permissions:
 
 jobs:
   detect-changes:
-    name: Detect changes
+    name: Detect changes (Python)
     runs-on: ubuntu-slim
     outputs:
       packages: ${{ steps.build-matrix.outputs.packages }}
@@ -44,6 +45,9 @@ jobs:
           filters: |
             services:
               - 'services/**'
+            workflow:
+              - '.github/workflows/python-ci.yaml'
+              - 'scripts/render-values-schema.sh'
 
       # Builds a JSON array of Python service names to fan out into parallel CI matrix jobs.
       # Handles:
@@ -57,6 +61,7 @@ jobs:
           INPUT_PACKAGES: ${{ github.event.inputs.packages }}
           SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
+          WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
           list_python_services() {
             find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/pyproject.toml' \; -print | xargs -n1 basename | sort
@@ -82,6 +87,8 @@ jobs:
               done
               packages=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
+          elif [ "$WORKFLOW_CHANGED" = "true" ]; then
+            packages=$(list_python_services | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$SERVICES_CHANGED" = "true" ]; then
             packages=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r pkg; do
               [ -f "services/$pkg/pyproject.toml" ] && echo "$pkg"
