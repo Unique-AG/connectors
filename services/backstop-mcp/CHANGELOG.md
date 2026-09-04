@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.5](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.4...backstop-mcp@0.0.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** run the Python services on 3.14 ([#866](https://github.com/Unique-AG/connectors/issues/866)) ([7f2321a](https://github.com/Unique-AG/connectors/commit/7f2321afffb27bcd13e566eea12b0f4c6ceaecc1))
+* **backstop-mcp:** build and run on one interpreter ([#899](https://github.com/Unique-AG/connectors/issues/899)) ([9185ed6](https://github.com/Unique-AG/connectors/commit/9185ed6d8469cd977acf62585c669aa0b026cdf0))
+
 ## [0.0.4](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.3...backstop-mcp@0.0.4) (2026-08-28)
 
 
