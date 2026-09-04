@@ -118,9 +118,14 @@ starting. Some only make every login fail, with no startup error:
   (Entra omits OIDC scopes from the scp claim, so a custom scope is the only gate)
 - `"requestedAccessTokenVersion": 2` in the manifest
 - A client secret (ENTRA_CLIENT_SECRET required for On-Behalf-Of)
-- A single tenant ID (common/organizations/consumers rejected at startup; the provider validates
-  all tokens against one issuer derived from this value, so multi-tenant values would reject all of
-  them rather than accept all tenants due to issuer mismatch)
+- A tenant: one tenant's ID, or `organizations` for a multi-tenant registration
+  (`sign_in_audience = "AzureADMultipleOrgs"` in the Terraform module). Under `organizations` any
+  Entra tenant's users can sign in; each access token is accepted only if its `iss` is
+  `https://login.microsoftonline.com/{tid}/v2.0` for its own GUID `tid`, and the On-Behalf-Of
+  exchange is made against that tenant, as Microsoft's rules for multi-tenant token validation and
+  for the exchange both require. There is no tenant allowlist: consent in the user's own
+  tenant is the gate. `common` and `consumers` are rejected at startup, because personal Microsoft
+  accounts have no Microsoft 365 mailbox or Teams to read.
 
 **Graph permissions.** Tools declare what they need. `create_app` passes the union of the *selected*
 tools' permissions to the provider as `additional_authorize_scopes`. Entra issues one token per
