@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.2](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.1...confluence-connector@3.0.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* **deps,ci,main:** update 67 pnpm dependencies within their current majors ([#862](https://github.com/Unique-AG/connectors/issues/862)) ([bef205f](https://github.com/Unique-AG/connectors/commit/bef205f33962020c7a94879c98858fe847aa53a6))
+* **deps:** align Node engines, CI, and types with Docker Node 26 ([#849](https://github.com/Unique-AG/connectors/issues/849)) ([0b053a9](https://github.com/Unique-AG/connectors/commit/0b053a99f4540463d5385665c4fe1320ca3ff647))
+* **deps:** bump the service-base-images group across 8 directories with 3 updates ([#788](https://github.com/Unique-AG/connectors/issues/788)) ([7187ed7](https://github.com/Unique-AG/connectors/commit/7187ed758f2a1d4114a01e8dd2e414936ea3b5e4))
+
 ## [3.0.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.0...confluence-connector@3.0.1) (2026-08-13)
 
 
