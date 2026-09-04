@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.0](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.1.0...office-365-mcp@0.2.0) (2026-09-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **office-365-mcp:** add an Outlook mail surface of 14 tools, and prefix every Teams tool ([#868](https://github.com/Unique-AG/connectors/issues/868))
+
+### Features
+
+* **office-365-mcp:** add an Outlook mail surface of 14 tools, and prefix every Teams tool ([#868](https://github.com/Unique-AG/connectors/issues/868)) ([4b9dfe9](https://github.com/Unique-AG/connectors/commit/4b9dfe93367bd31bde4e2e5be6b00a641fe20831))
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+* **office-365-mcp:** raise the pod memory request and limit above the observed working set ([#869](https://github.com/Unique-AG/connectors/issues/869)) ([ff0812a](https://github.com/Unique-AG/connectors/commit/ff0812a66e15c2b97e76411226a906318a882773))
+
+
+### Dependencies
+
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** run the Python services on 3.14 ([#866](https://github.com/Unique-AG/connectors/issues/866)) ([7f2321a](https://github.com/Unique-AG/connectors/commit/7f2321afffb27bcd13e566eea12b0f4c6ceaecc1))
+* **backstop-mcp,hello-mcp,kb-mcp,office-365-mcp:** update Python dependencies ([#864](https://github.com/Unique-AG/connectors/issues/864)) ([2833248](https://github.com/Unique-AG/connectors/commit/2833248838b4f6221ccf46f721146e5b1a17c0e4))
+* **office-365-mcp:** build and run on one interpreter ([#902](https://github.com/Unique-AG/connectors/issues/902)) ([b4088b1](https://github.com/Unique-AG/connectors/commit/b4088b11e43e4accb0cf40f4cb02e09d29e42f2d))
+
 ## 0.1.0 (2026-08-27)
 
 
