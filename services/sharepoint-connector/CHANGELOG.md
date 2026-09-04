@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.1...sharepoint-connector@3.1.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
 ## [3.1.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.0...sharepoint-connector@3.1.1) (2026-09-01)
 
 
