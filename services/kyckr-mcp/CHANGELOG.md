@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1-alpha](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.0...kyckr-mcp@0.1.1-alpha) (2026-09-04)
+
+
+### Dependencies
+
+* **deps,ci,main:** update 67 pnpm dependencies within their current majors ([#862](https://github.com/Unique-AG/connectors/issues/862)) ([bef205f](https://github.com/Unique-AG/connectors/commit/bef205f33962020c7a94879c98858fe847aa53a6))
+* **deps:** align Node engines, CI, and types with Docker Node 26 ([#849](https://github.com/Unique-AG/connectors/issues/849)) ([0b053a9](https://github.com/Unique-AG/connectors/commit/0b053a99f4540463d5385665c4fe1320ca3ff647))
+* **deps:** bump the service-base-images group across 8 directories with 3 updates ([#788](https://github.com/Unique-AG/connectors/issues/788)) ([7187ed7](https://github.com/Unique-AG/connectors/commit/7187ed758f2a1d4114a01e8dd2e414936ea3b5e4))
+* **teams-mcp,outlook-semantic-mcp,sharepoint-connector,confluence-connector,kyckr-mcp,temenos-mcp,ir-demo-mcp,ci,deps:** dockerfiles and dependabot harmonized and updated ([#720](https://github.com/Unique-AG/connectors/issues/720)) ([a079984](https://github.com/Unique-AG/connectors/commit/a079984c612f5dc24e5bf1bdf61fe553015a6597))
+
 ## 0.1.0 (2026-07-10)
 
 
