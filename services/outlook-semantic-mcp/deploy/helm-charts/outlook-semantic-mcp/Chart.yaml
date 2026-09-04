@@ -7,4 +7,4 @@ appVersion: 3.5.0
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
-    version: 0.1.0-4c70c3
+    version: 0.1.0-87990c
