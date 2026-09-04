@@ -46,7 +46,7 @@
     "bottleneck": "2.19.5",
     "cron": "4.4.0",
     "graphql": "16.14.2",
-    "graphql-request": "7.3.4",
+    "graphql-request": "7.4.0",
     "js-yaml": "4.3.2",
     "nestjs-otel": "8.1.0",
     "nestjs-pino": "4.6.1",
