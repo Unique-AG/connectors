@@ -53,6 +53,8 @@ updates:
       interval: cron
       cronjob: "0 6 * * 5"
       timezone: Europe/Berlin
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: build
     open-pull-requests-limit: 5
