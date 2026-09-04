@@ -21,14 +21,19 @@ from office_365_mcp.shared.seam import ToolAdvice, graph_scope
 from office_365_mcp.tools import (
     get_me,
     outlook_browse_folders,
+    outlook_create_event,
+    outlook_create_event_on_behalf,
     outlook_disable_mail_rule,
     outlook_draft_mail,
     outlook_draft_reply,
     outlook_find_recipient,
     outlook_get_mailbox_settings,
+    outlook_list_calendars,
+    outlook_list_events,
     outlook_list_mail,
     outlook_mark_mail,
     outlook_move_mail,
+    outlook_read_event,
     outlook_read_mail,
     outlook_read_thread,
     outlook_search_mail,
@@ -141,6 +146,11 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_send_draft,
     outlook_set_automatic_reply,
     outlook_disable_mail_rule,
+    outlook_list_calendars,
+    outlook_list_events,
+    outlook_read_event,
+    outlook_create_event,
+    outlook_create_event_on_behalf,
 )
 
 TOOL_NAMES: tuple[str, ...] = tuple(module.TOOL_NAME for module in _TOOL_MODULES)
@@ -231,6 +241,28 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_get_mailbox_settings",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
+    ),
+    # One ladder, not two axes, and the reason is what a tenant is asked to grant. Reading a
+    # calendar another person delegated costs `Calendars.Read.Shared`, so the read tier already
+    # carries the permission that a delegated deployment would otherwise be the first to ask for.
+    # Writing as another person is the tier to argue about, and it is the last row.
+    "outlook-calendar": (
+        "outlook_list_calendars",
+        "outlook_list_events",
+        "outlook_read_event",
+    ),
+    "outlook-calendar-write": (
+        "outlook_list_calendars",
+        "outlook_list_events",
+        "outlook_read_event",
+        "outlook_create_event",
+    ),
+    "outlook-calendar-delegate": (
+        "outlook_list_calendars",
+        "outlook_list_events",
+        "outlook_read_event",
+        "outlook_create_event",
+        "outlook_create_event_on_behalf",
     ),
 }
 

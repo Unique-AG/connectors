@@ -109,7 +109,7 @@ _HANDLE_OWNER = _SHARED / "handles.py"
 # became addressable without anybody deciding it should be.
 _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
     "teams:///": frozenset({"chats", "teams", "meetings", "transcripts"}),
-    "outlook:///": frozenset({"messages", "folders", "drafts", "rules"}),
+    "outlook:///": frozenset({"messages", "folders", "drafts", "rules", "calendars", "events"}),
 }
 _HANDLE_SCHEMES: tuple[str, ...] = tuple(_HANDLE_FAMILIES)
 _HANDLE_FAMILY: Mapping[str, re.Pattern[str]] = {

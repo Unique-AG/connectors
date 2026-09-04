@@ -2,7 +2,7 @@
 
 An MCP server for Microsoft 365 via Microsoft Graph API.
 
-Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-four
+Users sign in with their own Microsoft account and the server acts as them. It exposes twenty-nine
 MCP tools so far — `get_me`, the signed-in user's own profile; `teams_list_chats`, their Microsoft Teams chats
 most recently active first; `teams_list_my_teams`, the teams they are a member of; `teams_list_channels`, the
 channels of one of those teams; `teams_browse_channel`, what was posted in one of those channels;
@@ -23,7 +23,13 @@ categories; and `outlook_mark_mail`, the first tool here that changes anything; 
 which drafts a reply or a forward from a message this connector found; and `outlook_send_draft`,
 the only tool here that puts mail on the wire; and `outlook_set_automatic_reply`,
 which turns the out-of-office on for a bounded window or off; and `outlook_disable_mail_rule`,
-which switches one inbox rule off and cannot switch one on,
+which switches one inbox rule off and cannot switch one on; and `outlook_list_calendars`,
+every calendar this mailbox reaches, the user's own and every one another person delegated;
+and `outlook_list_events`, what sits on one of those calendars between two dates; and
+`outlook_read_event`, one of those events in full with every attendee and their answer; and
+`outlook_create_event`, which puts one event on the user's own calendar and sends the
+invitations as it does; and `outlook_create_event_on_behalf`, which does the same on a calendar
+somebody delegated, under that person's name,
 and more land in later PRs, stacked on top of this one, one tool per PR.
 
 An operator chooses which of those tools a deployment runs, and the permissions sign-in asks every
@@ -75,6 +81,15 @@ thing belongs there when two tools would otherwise each need a copy *and* a diff
 copies would be a bug a caller could see — a handle one tool minted and another answers 404 to, two
 answers to "who am I", a refusal that sounds like a different server. What does not belong there is
 anything one tool could own — a description, an argument, an answer shape, a request, a refusal.
+
+**`handles.py` spells one segment per family, and one family spells two.** Every `teams:///`
+family and every `outlook:///` mail family names a single id, and so does a calendar: Microsoft
+documents that a container type supports no immutable id, because its regular ids
+*"were already constant"*. An event is `outlook:///events/{calendar}/{event}`, two
+segments, because an event id is only meaningful beside the calendar it was read from — Graph
+answers a different id for the same meeting in a delegated copy — and the read is addressed as
+`/me/calendars/{calendar}/events/{event}` with both halves. `teams:///transcripts/{a}/{b}` is the
+same shape for the same reason.
 
 The layering rules are that **`shared/` imports no tool module, and only `shared/seam.py` imports
 FastMCP** — the seam is where the framework is spoken, which is what keeps it out of the handle
@@ -129,7 +144,7 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 
 | Permission | Type | Admin consent | Used by |
 | --- | --- | --- | --- |
-| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organiser-only check) |
+| `User.Read` | Delegated | No | `get_me`, `teams_list_meeting_recordings` (the organizer-only check), `outlook_search_mail` (the id exchange), `outlook_find_recipient` (the signed-in user every row's `external` is judged against), `outlook_list_calendars` (whose calendar a row is) |
 | `Chat.Read` | Delegated | No | `teams_list_chats`, `teams_search_messages`, `teams_read_message` (chats) |
 | `Team.ReadBasic.All` | Delegated | No | `teams_list_my_teams` |
 | `Channel.ReadBasic.All` | Delegated | No | `teams_list_channels` |
@@ -144,6 +159,10 @@ call via On-Behalf-Of. A permission never requested at sign-in cannot be consent
 | `Mail.Send` | Delegated | No | `outlook_send_draft` |
 | `Mail.ReadBasic` | Delegated | No | `outlook_send_draft` (the pre-read) |
 | `MailboxSettings.ReadWrite` | Delegated | No | `outlook_set_automatic_reply`, `outlook_disable_mail_rule` |
+| `Calendars.Read` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
+| `Calendars.Read.Shared` | Delegated | No | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_create_event_on_behalf` (the pre-read) |
+| `Calendars.ReadWrite` | Delegated | No | `outlook_create_event` |
+| `Calendars.ReadWrite.Shared` | Delegated | No | `outlook_create_event_on_behalf` |
 
 `Team.ReadBasic.All` is the least-privileged one Microsoft documents for `/me/joinedTeams`, and it
 is a separate scope from the broad message permission below on purpose: a tenant that refuses
@@ -194,13 +213,13 @@ here.** Graph streams an MP4 inline with no ranged contract on that path, a Team
 thirty hours, and a model cannot watch video — so a tool that returned one would be a defect wearing
 a feature's clothes. `recordingContentUrl` is no better: it opens only with this connector's own
 bearer token, so passing it on is either useless or a token leak. What `teams_list_meeting_recordings`
-answers is "there is a 47-minute recording from Tuesday, only the organiser can download it, and
+answers is "there is a 47-minute recording from Tuesday, only the organizer can download it, and
 here is the transcript instead" — existence, start and end, a derived `duration_seconds` (Microsoft
 publishes no duration property at all), and `content_correlation_id`, which is Microsoft's own link
 to the transcript of the same call. Layering rule 7 forbids any module from addressing a single
 recording, because that is the only door to those bytes and the change that opens it looks like a
-convenience. The organiser-only rule is reported rather than recited: Microsoft permits only the
-meeting organiser to download a recording under delegated access, the *metadata* is not so
+convenience. The organizer-only rule is reported rather than recited: Microsoft permits only the
+meeting organizer to download a recording under delegated access, the *metadata* is not so
 restricted, and answering "there is no recording" for a participant would be a wrong answer nobody
 could detect — so an unreachable recording is always listed, with `content_access` saying which side
 of the rule this user is on.
@@ -286,6 +305,9 @@ deployment gets by not choosing. `TOOLS_PRESET=teams` keeps "everything" a one-w
 | `outlook-send` | the above, plus sending a draft the user can already read | + `outlook_send_draft` | + `Mail.Send`, `Mail.ReadBasic` | 0 |
 | `outlook-mailbox` | say what is quietly acting on the mailbox — the rules, the automatic reply, the categories | `outlook_get_mailbox_settings` | `User.Read`, `MailboxSettings.Read` | 0 |
 | `outlook-automate` | the above, plus setting the automatic reply and switching an inbox rule off | + `outlook_set_automatic_reply`, `outlook_disable_mail_rule` | + `MailboxSettings.ReadWrite` | 0 |
+| `outlook-calendar` | name every calendar this mailbox reaches, own and delegated, read what sits on one between two dates, and read one event in full | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event` | `User.Read`, `Calendars.Read`, `Calendars.Read.Shared` | 0 |
+| `outlook-calendar-write` | the read tier, plus creating one event on the user's own calendar and inviting people to it | + `outlook_create_event` | + `Calendars.ReadWrite` | 0 |
+| `outlook-calendar-delegate` | the above, plus creating an event on a calendar somebody delegated, as that person | + `outlook_create_event_on_behalf` | + `Calendars.ReadWrite.Shared` | 0 |
 
 `get_me` is always on, which is why no preset lists it — each of those rows is one
 tool wider than its third column. Read the second column before choosing: `teams-chat` is the narrowest surface there
@@ -304,13 +326,46 @@ to review. `tests/test_tool_selection.py` refuses a derived preset, and refuses 
 that no preset names. The names carry a product axis from the
 start: `outlook-*` and `sharepoint-*` join the table as those tools land, without re-cutting these.
 
-**The Outlook rows are two axes, not one ladder.** Mail content goes `outlook-read` →
+**The Outlook rows are three axes, not one ladder.** Mail content goes `outlook-read` →
 `outlook-write` → `outlook-send`, each row adding one permission to the row above. Mailbox
 configuration goes `outlook-mailbox` → `outlook-automate`, and touches no `Mail.*` permission at
-all. The two axes never meet, because they are unrelated: an out-of-office reply has nothing to do
-with sending mail as the user, and a forwarding-rule audit has nothing to do with reading one. A
-single cumulative chain made `outlook-automate` require `Mail.Send`, which is the defect this shape
-exists to prevent. A deployment that wants both axes names the tools in `TOOLS_ENABLED`.
+all. Calendars start at `outlook-calendar` and touch neither. The axes never meet, because they are
+unrelated: an out-of-office reply has nothing to do with sending mail as the user, a
+forwarding-rule audit has nothing to do with reading one, and a calendar read has nothing to do
+with any of them. A single cumulative chain made `outlook-automate` require `Mail.Send`, which is
+the defect this shape exists to prevent. A deployment that wants two axes names the tools in
+`TOOLS_ENABLED`.
+
+**The calendar axis carries `Calendars.Read.Shared` on its read tier, and that is why it is one
+ladder.** A calendar another person delegated arrives as a plain row of `GET /me/calendars`, and
+Microsoft names `Calendars.Read.Shared` as the least privileged permission for reading that row. So
+a deployment that reads the signed-in user's own calendars pays the same two permissions as one
+that reads a colleague's, and cutting the read tier in two buys a tenant nothing at all. Writing is
+where the tiers earn their names.
+
+**A create sends, and there is no draft to inspect first.** Microsoft states that a create with
+attendees mails invitations to all of them, that this keeps the organizer's and the attendees'
+views consistent, and that it *"can't be configured"*. `isDraft` on an event is an unsent-*updates*
+flag and not a state a client asks for. So the two creating tools are the only calendar tools that
+reach a person outside the mailbox, and this connector cannot recall what they sent. Each one reads
+the calendar first, then puts the subject, the time and every address to the user through MCP
+elicitation before anything is written, and a decline creates nothing. With an empty attendee list
+the event is a private appointment nobody is told about, so `outlook_create_event` asks nobody
+about one, and both answer `invitations_sent` off the attendees Graph stored rather than off the
+arguments.
+
+**`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
+delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
+`Calendars.ReadWrite.Shared`, and Microsoft states of its own worked example that the organizer is
+the calendar owner, that the delegate's identity appears only in the sender property of the
+event message, and that no property of the returned event names the delegate. So recipients see an
+invitation from the owner and the signed-in user appears nowhere in the event. That is Exchange
+behaving as designed, and it is also the whole of the argument for putting this tool behind its own
+preset name. `outlook_create_event_on_behalf` reads the calendar first, refuses when `can_edit` is
+false, and always asks the person at the other end to confirm, naming the owner. That pre-read is
+declared twice, as `Calendars.Read` and as `Calendars.Read.Shared`, because Microsoft names the
+first on `calendar-get` and the second on the delegated-create walkthrough for the same request.
+The read tier already carries both, so the delegate tier still costs a tenant one permission.
 
 **`outlook-mailbox` is two tools and one permission on purpose.** `outlook_get_mailbox_settings`
 answers "is something forwarding my mail?", and a tenant that wants that answer should not have to
@@ -328,9 +383,10 @@ was actually missing rather than the widest one in the deployment — the same r
 buy one line on a consent screen and cost every refusal its precision.
 
 **Zero admin consents is not zero administrator.** Every delegated Outlook permission here is
-published by Microsoft as `AdminConsentRequired: No`, so the preset table's last column is honestly
-zero for all five Outlook rows. A tenant running a restricted user-consent policy still stops an
-unprivileged user at "Need admin approval", and nothing in this service's logs says so.
+published by Microsoft as `AdminConsentRequired: No`, and so is every delegated `Calendars.*`
+permission, so the preset table's last column is honestly zero for every Outlook row. A tenant
+running a restricted user-consent policy still stops an unprivileged user at "Need admin
+approval", and nothing in this service's logs says so.
 
 **`outlook-send` is the tier to argue about, and it is one tool wide.** `outlook_send_draft` takes
 an `outlook:///drafts/{id}` handle and nothing else, and only `outlook_draft_mail` and
@@ -454,6 +510,44 @@ exchange hands the caller's Graph token as a string; this package sends it.
   them (`MAX_EMPTY_PAGES`, and it is not pooled with the scan cap: an empty page spends no scan
   budget, so a shared budget is no bound on empty pages at all), and raises `GraphPagingUnending`
   rather than answering short — because a short answer means a cap.
+
+- **A calendar answers "next week" through `calendarView` and never through `/me/events`.**
+  Microsoft says the events collection holds single instance meetings and series masters, and that
+  a calendar view returns the occurrences, exceptions and single instances inside a time range. So
+  a weekly series shows once per week in `outlook_list_events` and once in total in the other
+  collection. `startDateTime` and `endDateTime` are required, and Microsoft states that both are
+  read with the offset written into the value and are not affected by `Prefer: outlook.timezone`,
+  so this connector renders each bound with the offset of the zone the caller named.
+
+- **Times come back in UTC, and this connector converts them here rather than in Exchange.**
+  Graph's `start` and `end` are a naive wall-clock string beside a zone name, and Microsoft states
+  that without `Prefer: outlook.timezone` those values are returned in UTC. That header is sent
+  nowhere. Every answer reports Graph's own two values verbatim and adds the same instant converted
+  with `zoneinfo`, so nothing is lost, and a zone name Exchange rejects cannot fail a whole call.
+  The `dateTime` string carries seven fractional digits, which is one more than
+  `datetime.fromisoformat` accepts.
+
+- **There is no draft state for an event, so a create sends.** Microsoft states that creating an
+  event with attendees mails invitations to all of them and that this *"can't be configured"*, and
+  that `isDraft` marks unsent *updates* rather than an unsent event. An event with an empty
+  attendee list notifies nobody. So the two creating tools ask a person first, through MCP
+  elicitation, and nothing here recalls an invitation.
+
+- **Every create carries a `transactionId` and is never retried.** Microsoft publishes the property
+  as the way a client app stops the server from acting twice on one retried POST, and publishes no
+  rule for what a duplicate does. Both halves are therefore used: the id is a uuid5 over the target
+  (the user's own calendar, or the delegated calendar's id) and every value the request carried, so
+  the same request composes the same id, and a request that differs in subject, time, zone, place,
+  body, attendees or the Teams setting composes another. The request also opts out of the SDK's
+  retry middleware. One 503 that Graph already acted on is one invitation rather than four.
+
+- **A calendar id and an event id are mailbox-scoped.** Microsoft states that a share recipient's
+  calendar and event ids used against another mailbox return an error, so only the local-copy
+  routes are used — `/me/calendars/{id}` and `/me/calendars/{id}/events/{id}` — and nothing here
+  addresses `/users/{id}/...`. The same meeting therefore carries a different event id in a
+  delegated copy than in the owner's own mailbox, which is why an event handle names its calendar
+  too. An event read or minted here sends `Prefer: IdType="ImmutableId"`; a container type carries
+  no immutable id, and Microsoft says its regular ids were already constant.
 
 - **Trap:** The SDK bearer provider does not consult the allowed-hosts validator, so the host and
   scheme checks live in `_CallerTokenProvider` itself. The live exposure is `@odata.nextLink`: a next

@@ -40,6 +40,12 @@ dependencies = [
     # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
     "unique-toolkit[monitoring,otel]==2026.34.3",
+    # `shared/calendar.py` converts every calendar time through `zoneinfo`, which reads the system
+    # tz database first and falls back to this package. The pinned runtime image ships a system
+    # database today, and this package also arrives transitively, so declaring it reads like
+    # duplication — until a base-image bump or a dropped transitive edge removes the fallback. That
+    # failure resolves cleanly and breaks at runtime, with every IANA zone name refused as unknown.
+    "tzdata==2026.3",
 ]
 
 [project.scripts]

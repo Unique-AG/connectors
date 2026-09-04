@@ -67,7 +67,6 @@ here the same kind of thing as every other handle this connector hands out. It i
 `outlook_send_draft` declare the same header when it reads one back.
 """
 
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal
@@ -94,7 +93,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_draft_reply"
@@ -129,11 +128,6 @@ type MailReplyMode = Literal["reply", "forward"]
 # The runtime vocabulary, beside the `Literal` the schema publishes. Typed as plain strings
 # because the point of the guard is a value the schema does not let through.
 MODES: tuple[str, ...] = ("reply", "forward")
-
-# One address and nothing else: no display name, no angle brackets, no second address. A model
-# that packs `Ada <ada@x.invalid>` or `a@x.invalid, b@y.invalid` into one string writes a
-# recipient Exchange either rejects or silently reads as a name, and both are quietly wrong.
-_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 _PREFER_IMMUTABLE_IDS = ("Prefer", 'IdType="ImmutableId"')
 
@@ -320,7 +314,7 @@ def _forward_recipients(mode: MailReplyMode, to: Sequence[str]) -> list[Recipien
     if not trimmed:
         raise ToolError(_NO_FORWARD_RECIPIENT)
     for address in trimmed:
-        if _ADDRESS.match(address) is None:
+        if ONE_ADDRESS.match(address) is None:
             raise ToolError(_bad_address(address))
     return [Recipient(email_address=EmailAddress(address=address)) for address in trimmed]
 
