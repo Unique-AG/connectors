@@ -6,6 +6,13 @@ on:
     branches:
       - main
 
+# `queue: max` because the default, `single`, keeps one pending run and cancels it when the next
+# arrives; the resources this guards — tags, releases, refs — are repository-wide, so is the group.
+concurrency:
+  group: release-please
+  queue: max
+  cancel-in-progress: false
+
 permissions:
   contents: write
   id-token: write
