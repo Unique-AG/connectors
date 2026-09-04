@@ -19,17 +19,17 @@
     "@proventuslabs/nestjs-zod": "2.0.0",
     "@unique-ag/utils": "workspace:*",
     "bottleneck": "2.19.5",
-    "graphql": "16.14.2",
+    "graphql": "17.0.2",
     "graphql-request": "7.3.4",
     "remeda": "2.45.0",
-    "undici": "7.29.0",
+    "undici": "8.10.1",
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@nestjs/common": "11.2.3",
-    "@nestjs/core": "11.2.3",
-    "@nestjs/terminus": "11.1.1",
-    "@nestjs/testing": "11.2.3",
+    "@nestjs/common": "12.0.1",
+    "@nestjs/core": "12.0.1",
+    "@nestjs/terminus": "12.0.0",
+    "@nestjs/testing": "12.0.1",
     "@opentelemetry/api": "1.9.1",
     "@suites/di.nestjs": "3.1.0",
     "@suites/doubles.vitest": "3.1.0",
@@ -38,9 +38,9 @@
     "@types/node": "26.4.0",
     "nestjs-otel": "8.1.0",
     "reflect-metadata": "0.2.2",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "unplugin-swc": "1.5.11",
-    "vitest": "3.2.7"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",
