@@ -2,28 +2,31 @@
   "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
   "root": true,
   "vcs": {
-    "enabled": false,
+    "enabled": true,
     "clientKind": "git",
-    "useIgnoreFile": false
+    "useIgnoreFile": true
+  },
+  "html": {
+    "parser": {
+      "interpolation": true
+    }
   },
   "files": {
     "ignoreUnknown": false,
     "includes": [
       "**",
       "!**/dist",
-      "!**/.github",
+      "!**/coverage",
       "!**/.turbo",
       "!**/.pnpm-store",
+      "!**/.venv",
       "!**/.zed",
       "!**/@generated",
-      "!**/*.generated.tf.json",
-      "!**/coverage",
+      "!**/*.generated.*",
       "!**/drizzle",
       "!**/helm-charts/**/values.schema.json",
-      "!**/scripts",
-      "!**/local-scripts",
-      "!**/services/backstop-mcp",
-      "!**/.venv"
+      "!**/.github",
+      "!**/scripts"
     ]
   },
   "formatter": {

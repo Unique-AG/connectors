@@ -39,6 +39,22 @@
 ## Generated Files
 - Don't create README files for generated code
 
+## Formatting
+
+- `ruff` owns `.py`. `biome` owns everything else it can parse, in every service and package,
+  whatever language the service is written in.
+- `biome.json` excludes four categories and nothing else. A new service needs no new entry if it
+  follows them:
+  1. build and test output — `dist`, `coverage`
+  2. tool caches and editor state — `.turbo`, `.pnpm-store`, `.venv`, `.zed`
+  3. generated files — anything under `@generated`, anything named `*.generated.*`, `drizzle`,
+     and a chart's `values.schema.json`
+  4. paths owned by another toolchain — `.github` (yaml), `scripts` (Deno)
+- Name a generated file `<name>.generated.<ext>` and biome ignores it without an edit to
+  `biome.json`.
+- `html.parser.interpolation` is on, so a Jinja or Handlebars template parses and is checked
+  rather than skipped. Helm templates are yaml and `.tpl`, which biome does not parse at all.
+
 ## Tests
 
 ### Test Implementation Guidelines
