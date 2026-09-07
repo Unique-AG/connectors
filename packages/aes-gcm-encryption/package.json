@@ -14,11 +14,12 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "26.4.0",
-    "typescript": "5.9.3"
+    "@nestjs/common": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "^11"

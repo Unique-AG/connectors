@@ -14,7 +14,9 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "@nestjs/common": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",

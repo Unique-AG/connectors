@@ -33,13 +33,12 @@ dependencies = [
     "opentelemetry-instrumentation-asgi==0.65b0",
     "asyncpg==0.31.0",
     "cryptography==50.0.1",
-    "tenacity==9.1.4",
-    "typing-extensions==4.16.0",
     "unique-mcp==2026.34.3",
     # unique-mcp already depends on unique-toolkit[monitoring,otel]; declared here for the
     # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
     "unique-toolkit[monitoring,otel]==2026.36.1",
+    "mcp==2.1.1",
 ]
 
 [project.scripts]
