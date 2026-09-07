@@ -13,6 +13,15 @@ updates:
       prefix: build
     open-pull-requests-limit: 5
     rebase-strategy: disabled
+    groups:
+      per-dependency:
+        patterns:
+          - "*"
+        update-types:
+          - major
+          - minor
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: uv
     directories:
@@ -72,6 +81,15 @@ updates:
       prefix: build
     open-pull-requests-limit: 5
     rebase-strategy: disabled
+    groups:
+      per-dependency:
+        patterns:
+          - "*"
+        update-types:
+          - major
+          - minor
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: terraform
     directories:
