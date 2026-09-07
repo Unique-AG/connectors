@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
+import type { DocumentNode } from 'graphql';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
 import { fetch as undiciFetch } from 'undici';
@@ -169,8 +170,14 @@ export class UniqueGraphqlClient {
   }
 
   private extractOperationName(document: RequestDocument): string {
-    const query = typeof document === 'string' ? document : (document.loc?.source.body ?? '');
+    const query = isDocumentNode(document)
+      ? (document.loc?.source.body ?? '')
+      : document.toString();
     const match = query.match(/(?:query|mutation|subscription)\s+(\w+)/);
     return match?.[1] ?? 'unknown';
   }
+}
+
+function isDocumentNode(document: RequestDocument): document is DocumentNode {
+  return typeof document !== 'string' && 'kind' in document;
 }

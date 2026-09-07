@@ -119,11 +119,11 @@ catalogs:
       specifier: 0.45.2
       version: 0.45.2
     graphql:
-      specifier: 16.14.2
-      version: 16.14.2
+      specifier: 17.0.2
+      version: 17.0.2
     graphql-request:
-      specifier: 7.3.4
-      version: 7.3.4
+      specifier: 7.4.0
+      version: 7.4.0
     istanbul-badges-readme:
       specifier: 1.9.0
       version: 1.9.0
@@ -539,10 +539,10 @@ importers:
         version: 2.19.5
       graphql:
         specifier: 'catalog:'
-        version: 16.14.2
+        version: 17.0.2
       graphql-request:
         specifier: 'catalog:'
-        version: 7.3.4(graphql@16.14.2)
+        version: 7.4.0(graphql@17.0.2)
       remeda:
         specifier: 'catalog:'
         version: 2.45.0
@@ -1165,10 +1165,10 @@ importers:
         version: 4.4.0
       graphql:
         specifier: 'catalog:'
-        version: 16.14.2
+        version: 17.0.2
       graphql-request:
         specifier: 'catalog:'
-        version: 7.3.4(graphql@16.14.2)
+        version: 7.4.0(graphql@17.0.2)
       js-yaml:
         specifier: 'catalog:'
         version: 4.3.2
@@ -5055,14 +5055,14 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  graphql-request@7.3.4:
-    resolution: {integrity: sha512-kbpP5dw9hHIL5jN/2VS2JU0/Sc1hlsj7zrYBKSDiYd5iG8QfX7P79u26ZBi84eAijsqYVZEpLvCCwEzVxscWhg==}
+  graphql-request@7.4.0:
+    resolution: {integrity: sha512-xfr+zFb/QYbs4l4ty0dltqiXIp07U6sl+tOKAb0t50/EnQek6CVVBLjETXi+FghElytvgaAWtIOt3EV7zLzIAQ==}
     peerDependencies:
       graphql: 14 - 16
 
-  graphql@16.14.2:
-    resolution: {integrity: sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA==}
-    engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
+  graphql@17.0.2:
+    resolution: {integrity: sha512-FRWbddMxfkjiB7z+aQDWIR+E34xo9I8c9mtK2RPv8PmMzKRvrdsreHL/Ui/TmwHJfhHChEtsFPyMHKI+xuarQQ==}
+    engines: {node: ^22.0.0 || ^24.0.0 || ^25.0.0 || >=26.0.0}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -7222,9 +7222,9 @@ snapshots:
 
   '@golevelup/ts-vitest@4.0.0': {}
 
-  '@graphql-typed-document-node/core@3.2.0(graphql@16.14.2)':
+  '@graphql-typed-document-node/core@3.2.0(graphql@17.0.2)':
     dependencies:
-      graphql: 16.14.2
+      graphql: 17.0.2
 
   '@grpc/grpc-js@1.14.4':
     dependencies:
@@ -10085,12 +10085,12 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  graphql-request@7.3.4(graphql@16.14.2):
+  graphql-request@7.4.0(graphql@17.0.2):
     dependencies:
-      '@graphql-typed-document-node/core': 3.2.0(graphql@16.14.2)
-      graphql: 16.14.2
+      '@graphql-typed-document-node/core': 3.2.0(graphql@17.0.2)
+      graphql: 17.0.2
 
-  graphql@16.14.2: {}
+  graphql@17.0.2: {}
 
   has-flag@4.0.0: {}
 
