@@ -78,6 +78,7 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.event import Event
 from msgraph.graph_service_client import GraphServiceClient
@@ -413,12 +414,16 @@ async def create_event(
     all_day: bool = False,
     online_meeting: bool = False,
     confirm: Confirm,
-) -> CreatedEvent:
+) -> CreatedEvent | InputRequiredResult:
     """Read the default calendar, put the event to a person when it invites anybody, then create it.
 
     `confirm` has no default. Microsoft mails every attendee as the event is created, so the
     question is the only thing between this call and somebody else's inbox, and a caller free to
     omit it puts the whole gate back in a docstring.
+
+    On a connection with no server-to-client channel the question is answered rather than awaited:
+    `confirm` hands back the question itself, this call returns it instead of creating anything,
+    and a client that can elicit puts it to a person and calls the tool again with their answer.
 
     The read comes before the question. It carries `allowedOnlineMeetingProviders`, so a Teams
     meeting on a calendar that lists other providers is refused before anybody is asked about an
@@ -445,16 +450,23 @@ async def create_event(
     )
 
     created: Event | None = None
+    asked: InputRequiredResult | None = None
+    # One id for both halves of the same request: what the answer is bound to, and what Microsoft
+    # is asked to deduplicate on. It is derived from the draft, so the round that answers the
+    # question composes it again and only an answer bound to that draft authorizes writing it.
+    transaction = transaction_id_for(_ME, draft)
     with graph_errors(TOOL_NAME):
         calendar = await calendar_of(client, calendar_id=None)
         refused = _no_teams_meeting_here(calendar) if draft.online_meeting else None
         if refused is None and (draft.attendees or draft.optional_attendees):
             with not_graph():
-                refused = await confirm(_question(draft))
-        if refused is None:
+                answer = await confirm(_question(draft), transaction)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if refused is None and asked is None:
             with graph_step(STEP_CREATE):
                 created = await client.me.events.post(
-                    event_body(draft, transaction_id=transaction_id_for(_ME, draft)),
+                    event_body(draft, transaction_id=transaction),
                     request_configuration=RequestConfiguration[QueryParameters](
                         options=no_retry(), headers=_immutable_ids()
                     ),
@@ -463,7 +475,11 @@ async def create_event(
     # Decided inside the block above and raised outside it. `graph_errors` reads a `ToolError`
     # that escapes it as a Graph operation that failed for a reason the seam cannot describe, and
     # neither a person saying no nor a calendar that takes no Teams meeting is a Graph failure at
-    # all. `not_graph` keeps the wait for the answer out of Microsoft's own latency histogram.
+    # all. On a handshake connection `not_graph` keeps the wait for the answer out of Microsoft's
+    # own latency histogram; on a 2026-07-28 one there is no wait inside this call, and the
+    # question nobody has answered yet leaves the block the same way, returned not raised.
+    if asked is not None:
+        return asked
     if refused is not None:
         raise ToolError(refused)
     return _answer(
@@ -789,7 +805,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = False,
         client: GraphServiceClient = graph,
-    ) -> CreatedEvent:
+    ) -> CreatedEvent | InputRequiredResult:
         return await create_event(
             client,
             subject=subject,

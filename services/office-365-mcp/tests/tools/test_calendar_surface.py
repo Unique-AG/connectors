@@ -16,6 +16,7 @@ Every tool is driven through an in-memory MCP client, on the arguments its own
 `GRAPH_CALL_EXAMPLE` publishes, because those are the ones the registry promises reach Graph.
 """
 
+import json
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from typing import cast
 
@@ -24,10 +25,23 @@ import pytest
 import respx
 from azure.core.credentials import AccessToken as GraphAccessToken
 from fastmcp import Client, FastMCP
-from fastmcp.client.elicitation import ElicitRequestParams
+from fastmcp.client.elicitation import ElicitRequestParams, ElicitResult
 from fastmcp.client.transports import FastMCPTransport
+from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
+from mcp.types import (
+    CallToolResult,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    InputRequest,
+    InputRequiredResult,
+    TextContent,
+)
+
+# The wire type a client carries an answer back in, which is not the fastmcp handler's own.
+from mcp.types import ElicitResult as CarriedAnswer
+from mcp.types.version import LATEST_HANDSHAKE_VERSION, LATEST_MODERN_VERSION
 from respx.models import Call
 from starlette.applications import Starlette
 
@@ -175,15 +189,43 @@ def _made(router: respx.MockRouter) -> Sequence[Call]:
     return cast("Sequence[Call]", router.calls)
 
 
+def _object(value: object) -> Mapping[str, object]:
+    return cast("Mapping[str, object]", value)
+
+
+def _the_word_for_yes(asked: InputRequest) -> str:
+    """The answer that means agreement, read off the question a call actually minted rather than
+    written out here, so a second round cannot agree with the first by coincidence."""
+    assert isinstance(asked, ElicitRequest), "the question is not one a person answers"
+    params = asked.params
+    assert isinstance(params, ElicitRequestFormParams), "the question is not one a client can fill"
+    choices = _object(_object(_object(params.requested_schema)["properties"])["value"])["enum"]
+    return cast("Sequence[str]", choices)[0]
+
+
 async def _agree(
     _message: str,
     _response_type: type | None,
     _params: ElicitRequestParams,
     _context: object,
 ) -> str:
-    """Agreement, so a create reaches Graph. A declining client stops before the first request,
-    which is `tests/tools/test_outlook_create_event.py`'s subject and proves nothing here."""
+    """Agreement, so a create reaches Graph.
+
+    A refusal is worth driving from here too, now that the question is answered over the client's
+    own multi-round driver rather than inside one call: `_decline` below is the only place in the
+    suite where a real client carries the question out and a real refusal back.
+    """
     return _AGREES
+
+
+async def _decline(
+    _message: str,
+    _response_type: type | None,
+    _params: ElicitRequestParams,
+    _context: object,
+) -> ElicitResult[str]:
+    """A person who said no, answered the way a client answers rather than by raising."""
+    return ElicitResult(action="decline")
 
 
 @pytest.fixture
@@ -221,11 +263,38 @@ async def every_calendar_tool(app: Starlette) -> AsyncIterator[Client[FastMCPTra
         yield client
 
 
+@pytest.fixture
+async def a_declining_client(app: Starlette) -> AsyncIterator[Client[FastMCPTransport]]:
+    """The same server, and a person who says no to every question it asks."""
+    server = cast("FastMCP[None]", app.state.fastmcp_server)
+    async with Client(FastMCPTransport(server), elicitation_handler=_decline) as client:
+        yield client
+
+
 _CALENDAR_TOOLS: tuple[tuple[str, Mapping[str, object]], ...] = (
     (outlook_list_calendars.TOOL_NAME, outlook_list_calendars.GRAPH_CALL_EXAMPLE),
     (outlook_list_events.TOOL_NAME, outlook_list_events.GRAPH_CALL_EXAMPLE),
     (outlook_read_event.TOOL_NAME, outlook_read_event.GRAPH_CALL_EXAMPLE),
     (outlook_create_event.TOOL_NAME, outlook_create_event.GRAPH_CALL_EXAMPLE),
+    (
+        outlook_create_event_on_behalf.TOOL_NAME,
+        outlook_create_event_on_behalf.GRAPH_CALL_EXAMPLE,
+    ),
+)
+
+# One address, so an own-calendar create reaches the question at all: outlook_create_event asks
+# only when somebody would be mailed, and the example it publishes invites nobody on purpose.
+_ONE_ATTENDEE = "grace@example.invalid"
+
+_INVITING: Mapping[str, object] = {
+    **outlook_create_event.GRAPH_CALL_EXAMPLE,
+    "attendees": [_ONE_ATTENDEE],
+}
+
+# The two calls that reach a person. The delegated create asks whether it invites anybody or not,
+# because it writes into somebody else's day either way.
+_THE_TWO_CREATES: tuple[tuple[str, Mapping[str, object]], ...] = (
+    (outlook_create_event.TOOL_NAME, _INVITING),
     (
         outlook_create_event_on_behalf.TOOL_NAME,
         outlook_create_event_on_behalf.GRAPH_CALL_EXAMPLE,
@@ -269,6 +338,118 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
             "/v1.0/me/events",
             f"/v1.0/me/calendars/{_CALENDAR_ID}/events",
         ], f"the two creates posted {posted}"
+
+    async def test_a_person_who_says_no_leaves_both_calendars_untouched(
+        self, a_declining_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        """The half of "never write without an accept" only a real client can prove: the driver
+        that carries the question out to a person and the answer back is the client's own, and a
+        stubbed confirmation never runs it.
+
+        Both calls still read, because the read is what makes the question answerable, and neither
+        writes anything at all.
+        """
+        for name, arguments in _THE_TWO_CREATES:
+            with pytest.raises(ToolError):
+                _ = await a_declining_client.call_tool(name, dict(arguments))
+
+        reached = {f"{call.request.method} {call.request.url.path}" for call in _made(graph)}
+        posted = [call.request.url.path for call in _made(graph) if call.request.method == "POST"]
+
+        assert posted == [], f"a declined create posted {posted}"
+        assert f"GET /v1.0/me/calendars/{_CALENDAR_ID}" in reached, (
+            "the delegated create never read the calendar the question names an owner off"
+        )
+        assert "GET /v1.0/me/calendar" in reached, "the own-calendar create never read anything"
+
+    async def test_an_agreed_create_that_invites_somebody_posts_once_under_a_transaction_id(
+        self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        """outlook_create_event's own example invites nobody, so it never reaches the question and
+        the sweeps above never drive its gate. An address is what puts a person in front of the
+        write, and the write is what carries the id Microsoft dedupes a retry on.
+        """
+        assert every_calendar_tool.protocol_version == LATEST_MODERN_VERSION, (
+            "this file's whole point is a connection whose era has no back-channel"
+        )
+
+        result = await every_calendar_tool.call_tool(
+            outlook_create_event.TOOL_NAME, dict(_INVITING)
+        )
+
+        assert result.structured_content is not None, "the confirmed create answered nothing"
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+
+        assert [call.request.url.path for call in posted] == ["/v1.0/me/events"], (
+            f"the agreed create posted {[call.request.url.path for call in posted]}"
+        )
+        assert sent["transactionId"], "nothing told Microsoft what to dedupe a retry on"
+        assert _ONE_ATTENDEE in json.dumps(sent), "the address the call named never reached Graph"
+
+    async def test_an_accept_that_omits_the_request_state_creates_nothing(
+        self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        """The framework unseals and verifies a `requestState` only when the retry carries one, so
+        a client that answers the question and drops the field reaches the seam's own binding check
+        with nothing bound, and that check is the only thing left to refuse it.
+
+        Driven over the session rather than the client, because the client's own driver echoes the
+        state back and this is about the retry that does not.
+        """
+        first = await every_calendar_tool.session.call_tool(
+            outlook_create_event.TOOL_NAME, dict(_INVITING), allow_input_required=True
+        )
+
+        assert isinstance(first, InputRequiredResult), "the question was never put to anybody"
+        requests = first.input_requests or {}
+        (key,) = requests
+        agrees = _the_word_for_yes(requests[key])
+
+        second = await every_calendar_tool.session.call_tool(
+            outlook_create_event.TOOL_NAME,
+            dict(_INVITING),
+            input_responses={key: CarriedAnswer(action="accept", content={"value": agrees})},
+            allow_input_required=True,
+        )
+
+        assert isinstance(second, CallToolResult), "the unbound retry asked again instead"
+        assert second.is_error, "an accept bound to nothing was read as agreement"
+        refusal = " ".join(block.text for block in second.content if isinstance(block, TextContent))
+        posted = [call.request.url.path for call in _made(graph) if call.request.method == "POST"]
+
+        assert "given for a different request" in refusal, refusal
+        assert posted == [], f"an accept nothing was bound to posted {posted}"
+
+    async def test_a_client_pinned_to_the_handshake_era_still_asks_and_writes(
+        self, app: Starlette, graph: respx.MockRouter
+    ) -> None:
+        """The one connection in this suite pinned to an era. Everything else here negotiates
+        whatever an in-process client negotiates by default, which is the point of those tests, and
+        this is the only thing that would notice if that default moved back.
+
+        `mode="legacy"` negotiates 2025-11-25, where `ctx.elicit` still has a back-channel and one
+        call carries the whole confirmation.
+        """
+        server = cast("FastMCP[None]", app.state.fastmcp_server)
+
+        async with Client(
+            FastMCPTransport(server), mode="legacy", elicitation_handler=_agree
+        ) as client:
+            assert client.protocol_version == LATEST_HANDSHAKE_VERSION, (
+                "this pin no longer reaches the era it exists to cover"
+            )
+            result = await client.call_tool(
+                outlook_create_event_on_behalf.TOOL_NAME,
+                dict(outlook_create_event_on_behalf.GRAPH_CALL_EXAMPLE),
+            )
+
+        posted = [call.request.url.path for call in _made(graph) if call.request.method == "POST"]
+
+        assert result.structured_content is not None, "the confirmed create answered nothing"
+        assert posted == [f"/v1.0/me/calendars/{_CALENDAR_ID}/events"], (
+            f"a handshake-era create posted {posted}"
+        )
 
     async def test_nothing_answers_cancels_forwards_updates_or_deletes_an_event(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter

@@ -712,7 +712,7 @@ class TestHowItDeclaresItself:
 
         assert tool is not None, "register left the tool off the server"
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is True
+        assert tool.annotations.read_only_hint is True
 
 
 class TestTheFailuresItPassesOn:

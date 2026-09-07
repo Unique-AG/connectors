@@ -17,6 +17,14 @@ from fastmcp.server.elicitation import (
     DeclinedElicitation,
 )
 from fastmcp.tools import Tool
+from mcp.types import (
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+    InputResponse,
+)
+from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -174,16 +182,18 @@ def _ready(graph: respx.MockRouter, payload: dict[str, object] | None = None) ->
     return _creates(graph, payload)
 
 
-async def _agrees(question: str) -> str | None:
+async def _agrees(question: str, about: str) -> str | None:
     """A person who said yes. Named rather than a lambda, because every call below states which
     side of the gate it is testing."""
     assert question, "the person was asked nothing at all"
+    assert about, "the answer was bound to nothing"
     return None
 
 
-async def _refuses(question: str) -> str | None:
+async def _refuses(question: str, about: str) -> str | None:
     """A person who said no, in the shape a refusal takes here: answered, never raised."""
     assert question
+    assert about
     return "No event was created."
 
 
@@ -202,8 +212,12 @@ async def _create(
     online_meeting: bool = False,
     confirm: Confirm = _agrees,
 ) -> CreatedEvent:
-    """One valid call, so a test that is about something else says only that thing."""
-    return await create_event(
+    """One valid call, so a test that is about something else says only that thing.
+
+    Narrowed to the event, because a call whose question is still open answers with the question.
+    Only `TestTheEraWithNoBackChannel` drives that, and it calls `create_event` through `_round`.
+    """
+    created = await create_event(
         client,
         subject=subject,
         starts_at=starts_at,
@@ -217,6 +231,8 @@ async def _create(
         online_meeting=online_meeting,
         confirm=confirm,
     )
+    assert isinstance(created, CreatedEvent), "this call was answered with a question, not an event"
+    return created
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -556,8 +572,9 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         create = _creates(graph)
         made_when_asked: list[tuple[int, int]] = []
 
-        async def watching(question: str) -> str | None:
+        async def watching(question: str, about: str) -> str | None:
             assert question
+            assert about
             made_when_asked.append((read.call_count, create.call_count))
             return None
 
@@ -572,11 +589,13 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
     ) -> None:
         """A person cannot answer "invite these people" without being told who they are, and the
         optional list is mail too."""
-        _ = _ready(graph)
+        create = _ready(graph)
         asked: list[str] = []
+        bound: list[str] = []
 
-        async def capturing(question: str) -> str | None:
+        async def capturing(question: str, about: str) -> str | None:
             asked.append(question)
+            bound.append(about)
             return None
 
         _ = await _create(
@@ -597,6 +616,9 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert _GRACE in question
         assert f"{_PAM} (optional)" in question, "an optional attendee reads as a required one"
         assert "cannot recall" in question
+        # What was confirmed is what was written: the id the answer is bound to is the id the
+        # create carries, so an answer given for another draft cannot authorize this one.
+        assert bound == [_sent(create)["transactionId"]]
 
     async def test_an_optional_attendee_on_their_own_is_still_asked_about(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -617,7 +639,8 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         create = _ready(graph)
         asked: list[str] = []
 
-        async def counting(question: str) -> str | None:
+        async def counting(question: str, about: str) -> str | None:
+            assert about
             asked.append(question)
             return None
 
@@ -644,7 +667,9 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         whole wait as its latency."""
         confirm = a_person_agrees(_context(answer))
 
-        refusal = await confirm("Create 'Pricing review' and invite ada@example.invalid?")
+        refusal = await confirm(
+            "Create 'Pricing review' and invite ada@example.invalid?", _TRANSACTION_ID
+        )
 
         assert isinstance(refusal, str)
         assert refusal
@@ -667,25 +692,35 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         calendar is untouched rather than half written."""
         confirm = a_person_agrees(_context(answer))
 
-        refusal = await confirm("Create 'Pricing review' and invite ada@example.invalid?")
+        refusal = await confirm(
+            "Create 'Pricing review' and invite ada@example.invalid?", _TRANSACTION_ID
+        )
 
-        assert (refusal or "").startswith("No event was created.")
+        assert isinstance(refusal, str), "a confirmation on this era answers a string or nothing"
+        assert refusal.startswith("No event was created.")
 
     async def test_a_refusal_the_client_itself_composed_is_passed_through(self) -> None:
         """A `ToolError` from the client is already a refusal in the caller's own words, and
         rewording it loses why the client said no."""
         confirm = a_person_agrees(_context(ToolError("the client refused the request")))
 
-        assert await confirm("Create 'Pricing review'?") == "the client refused the request"
+        answer = await confirm("Create 'Pricing review'?", _TRANSACTION_ID)
+
+        assert answer == "the client refused the request"
 
     async def test_agreeing_answers_with_no_refusal(self) -> None:
         confirm = a_person_agrees(_context(AcceptedElicitation(data="create")))
 
-        assert await confirm("Create 'Pricing review'?") is None
+        assert await confirm("Create 'Pricing review'?", _TRANSACTION_ID) is None
 
 
 def _context(answer: object) -> Context:
+    """A handshake-era connection: no request context at all, which is the era `shared/seam.py`
+    documents as not modern, so every answer here comes back over `elicit`."""
+
     class _Client:
+        request_context: object = None
+
         async def elicit(self, message: str, response_type: object = None) -> object:
             assert message
             assert response_type is not None, "the caller must say what it expects back"
@@ -694,6 +729,187 @@ def _context(answer: object) -> Context:
             return answer
 
     return cast("Context", cast("object", _Client()))
+
+
+class _ModernRequest:
+    """The one thing `shared/seam.py` reads to decide the era. The constant comes from the SDK
+    rather than the date written out, so a future era moves these tests with it."""
+
+    protocol_version: str = LATEST_MODERN_VERSION
+
+
+def _modern_context(
+    *, answers: Mapping[str, InputResponse] | None = None, state: str | None = None
+) -> Context:
+    """A 2026-07-28 connection, carrying whatever a client already answered and echoed.
+
+    `elicit` raises rather than answering: this era has no server-to-client channel, so a call
+    that reaches it is a leak back onto a channel that is not there.
+    """
+
+    class _Client:
+        request_context: _ModernRequest = _ModernRequest()
+        input_responses: Mapping[str, InputResponse] | None = answers
+        request_state: str | None = state
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            raise AssertionError(
+                f"a connection with no back-channel was asked {message!r} over it, "
+                + f"expecting {response_type!r} back"
+            )
+
+    return cast("Context", cast("object", _Client()))
+
+
+async def _round(
+    client: GraphServiceClient, *, confirm: Confirm, attendees: Sequence[str] = (_ADA,)
+) -> CreatedEvent | InputRequiredResult:
+    """One call whose answer is not narrowed to an event, because a question nobody has answered
+    yet is what this tool returns on a connection with no back-channel."""
+    return await create_event(
+        client,
+        subject=_SUBJECT,
+        starts_at=_STARTS,
+        ends_at=_ENDS,
+        time_zone="UTC",
+        attendees=attendees,
+        confirm=confirm,
+    )
+
+
+def _the_question(answer: CreatedEvent | InputRequiredResult) -> tuple[str, str, str]:
+    """Round one's own key, what it bound the answer to, and the word that means yes.
+
+    All three are read off the question this call actually minted rather than written out here, so
+    round two cannot agree with round one by coincidence.
+    """
+    assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
+    requests = answer.input_requests or {}
+    assert len(requests) == 1, f"one question per call, and this one asked {sorted(requests)}"
+    key = next(iter(requests))
+    request = requests[key]
+    assert isinstance(request, ElicitRequest)
+    params = request.params
+    assert isinstance(params, ElicitRequestFormParams), "the question is not one a client can fill"
+    assert params.message, "the person is asked nothing at all"
+    schema = _object(_object(_object(params.requested_schema)["properties"])["value"])
+    # The two answers in the order the tool offered them, so the first is the one that means yes.
+    choices = cast("Sequence[str]", schema["enum"])
+    assert len(choices) == 2, f"a confirmation offers two answers, this one offered {choices}"
+    assert answer.request_state is not None, "the answer was bound to nothing"
+    return key, answer.request_state, choices[0]
+
+
+class TestTheEraWithNoBackChannel:
+    """A 2026-07-28 connection has no server-to-client channel (SEP-2577), so the question cannot
+    be awaited inside the call. It is answered instead: this tool returns it, the client puts it to
+    a person, and it calls the tool again with the answer. `shared/seam.py` owns that branch, so
+    every test here drives the real confirmation the registered tool builds."""
+
+    async def test_the_first_round_asks_and_never_reaches_the_create(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The calendar read still happens: it is what refuses a Teams meeting the calendar does
+        not take before anybody is asked. Nothing after it does."""
+        read = _reads(graph)
+        create = _creates(graph)
+
+        answer = await _round(client, confirm=a_person_agrees(_modern_context()))
+
+        _key, _state, _agree = _the_question(answer)
+        assert read.call_count == 1
+        assert create.call_count == 0, "an unanswered question created the event anyway"
+
+    async def test_the_first_round_asks_the_question_this_tool_words(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The wording is the tool's on both eras. A question minted for a client to render is
+        still the sentence that names who receives mail."""
+        _ = _ready(graph)
+
+        answer = await _round(client, confirm=a_person_agrees(_modern_context()))
+
+        assert isinstance(answer, InputRequiredResult)
+        requests = answer.input_requests or {}
+        request = requests[next(iter(requests))]
+        assert isinstance(request, ElicitRequest)
+        params = request.params
+        assert isinstance(params, ElicitRequestFormParams)
+        assert _SUBJECT in params.message
+        assert _ADA in params.message
+        assert "cannot recall" in params.message
+
+    async def test_the_second_round_creates_the_event_under_the_id_it_was_agreed_to_by(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The whole trip, and the one assertion that ties it together: the id the person's answer
+        came back bound to is the id the create carries, so what was written is what was
+        confirmed."""
+        create = _ready(graph)
+        key, state, agree = _the_question(
+            await _round(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        answer = await _round(
+            client,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agree})},
+                    state=state,
+                )
+            ),
+        )
+
+        assert isinstance(answer, CreatedEvent)
+        assert create.call_count == 1, "the confirmed create did not happen exactly once"
+        assert _sent(create)["transactionId"] == state
+
+    async def test_an_answer_bound_to_another_request_creates_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """A retry that carries a state alongside other arguments is rejected by the framework
+        before this tool runs. A retry that carries the accept and omits the state is not: the
+        framework unseals and verifies a `requestState` only when one is present, so it arrives
+        here bound to nothing and this check is the only thing that refuses it.
+        `tests/tools/test_calendar_surface.py` drives that path through a real client."""
+        create = _ready(graph)
+        key, _state, agree = _the_question(
+            await _round(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _round(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": agree})},
+                        state=_TRANSACTION_ID,
+                    )
+                ),
+            )
+
+        assert create.call_count == 0, "an event was written under an id nobody agreed to"
+
+    async def test_a_second_round_the_person_declined_creates_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The refusal is this tool's own words on this era too, and it is raised rather than
+        answered, exactly as a handshake refusal is."""
+        create = _ready(graph)
+        key, state, _agree = _the_question(
+            await _round(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        with pytest.raises(ToolError, match="did not agree") as raised:
+            _ = await _round(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
+                ),
+            )
+
+        assert str(raised.value).startswith("No event was created.")
+        assert create.call_count == 0
 
 
 class TestWhatItRefuses:
@@ -1008,7 +1224,8 @@ class TestTheTeamsMeetingACalendarDoesNotTake:
         create = _creates(graph)
         asked: list[str] = []
 
-        async def counting(question: str) -> str | None:
+        async def counting(question: str, about: str) -> str | None:
+            assert about
             asked.append(question)
             return None
 
@@ -1534,9 +1751,9 @@ class TestHowItDeclaresItself:
         assert annotations is not None, (
             "a tool with no annotations joins the write surface by omission"
         )
-        assert annotations.readOnlyHint is WRITE_ADDITIVE["readOnlyHint"]
-        assert annotations.destructiveHint is WRITE_ADDITIVE["destructiveHint"]
-        assert annotations.idempotentHint is WRITE_ADDITIVE["idempotentHint"]
+        assert annotations.read_only_hint is WRITE_ADDITIVE["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
     async def test_the_description_opens_with_the_create_being_a_send(
         self, transport: httpx.AsyncClient

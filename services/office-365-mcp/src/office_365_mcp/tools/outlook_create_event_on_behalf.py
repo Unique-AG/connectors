@@ -82,6 +82,7 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.event import Event
 from msgraph.graph_service_client import GraphServiceClient
@@ -425,12 +426,17 @@ async def create_event_on_behalf(
     all_day: bool = False,
     online_meeting: bool = False,
     confirm: Confirm,
-) -> CreatedEventOnBehalf:
+) -> CreatedEventOnBehalf | InputRequiredResult:
     """Read the calendar `calendar_ref` addresses, put the create to a person, then create it.
 
     `confirm` has no default. The read is what makes the question answerable, because the owner's
     name comes off it, so the confirmation belongs between the two requests. A caller that
     omits it is back to a promise in a docstring.
+
+    On a connection with no server-to-client channel the question cannot be answered inside one
+    call, so `confirm` answers with the question itself and this returns it: a client that can
+    elicit puts it to a person and calls this tool again, and the second call re-reads the calendar
+    and re-composes the same draft before it writes anything.
     """
     assert 1 <= len(subject) <= MAX_SUBJECT_CHARACTERS, (
         f"the subject is bounded by the schema, got {len(subject)} characters"
@@ -451,20 +457,32 @@ async def create_event_on_behalf(
         online_meeting=online_meeting,
     )
 
+    created: Event | None = None
+    asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME):
         calendar = await calendar_of(client, calendar_id=handle.calendar_id)
+        assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
+        transaction = transaction_id_for(calendar.id, draft)
         refused = _READ_ONLY_CALENDAR if calendar.can_edit is False else None
         if refused is None and draft.online_meeting:
             refused = _no_teams_meeting(calendar)
         if refused is None:
             with not_graph():
-                refused = await confirm(_question(calendar, draft))
-        created = None if refused is not None else await _created(client, calendar, draft)
+                answer = await confirm(_question(calendar, draft), transaction)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if refused is None and asked is None:
+            created = await _created(
+                client, calendar_id=calendar.id, draft=draft, transaction=transaction
+            )
 
     # This function decides inside the block above, and raises every refusal outside it.
     # `graph_errors` treats a `ToolError` that escapes it as a Graph operation that failed for a
     # reason the seam cannot describe. An event this tool refuses to create is not a Graph failure
     # at all, whether the refusal is the person's, their client's, or "that calendar is read-only".
+    # A question still waiting for an answer leaves the block the same way, and is returned.
+    if asked is not None:
+        return asked
     if refused is not None:
         raise ToolError(refused)
     assert created is not None, "a create that nothing refused answered with no event"
@@ -618,16 +636,19 @@ def a_person_agrees(ctx: Context) -> Confirm:
     return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_HAPPENED)
 
 
-async def _created(client: GraphServiceClient, calendar: Calendar, draft: EventDraft) -> Event:
+async def _created(
+    client: GraphServiceClient, *, calendar_id: str, draft: EventDraft, transaction: str
+) -> Event:
     """The create itself. One request, not retried, and answered with Graph's own 201.
 
-    `created_event` is what reads that 201: Microsoft's own walkthrough answers this step with an
-    `eventMessage` envelope, and an unchecked answer mints an event handle around a message id.
+    `transaction` is composed by the caller rather than here, because the same string is what the
+    confirmation was bound to. `created_event` is what reads that 201: Microsoft's own walkthrough
+    answers this step with an `eventMessage` envelope, and an unchecked answer mints an event
+    handle around a message id.
     """
-    assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
     with graph_step(STEP_CREATE):
-        created = await client.me.calendars.by_calendar_id(calendar.id).events.post(
-            event_body(draft, transaction_id=transaction_id_for(calendar.id, draft)),
+        created = await client.me.calendars.by_calendar_id(calendar_id).events.post(
+            event_body(draft, transaction_id=transaction),
             request_configuration=RequestConfiguration[QueryParameters](
                 options=no_retry(), headers=_immutable_ids()
             ),
@@ -836,7 +857,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = False,
         client: GraphServiceClient = graph,
-    ) -> CreatedEventOnBehalf:
+    ) -> CreatedEventOnBehalf | InputRequiredResult:
         return await create_event_on_behalf(
             client,
             calendar_ref=calendar_ref,

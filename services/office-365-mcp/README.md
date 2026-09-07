@@ -352,7 +352,9 @@ the calendar first, then puts the subject, the time and every address to the use
 elicitation before anything is written, and a decline creates nothing. With an empty attendee list
 the event is a private appointment nobody is told about, so `outlook_create_event` asks nobody
 about one, and both answer `invitations_sent` off the attendees Graph stored rather than off the
-arguments.
+arguments. On a 2026-07-28 connection, which has no channel for a server to ask a person anything,
+the tool answers with the question instead and a client that can elicit calls it again with the
+answer, and nothing is written before an accept that is bound to the same request.
 
 **`outlook-calendar-delegate` is the tier to argue about, and one tool wide.** Microsoft's
 delegated route is `POST /me/calendars/{delegated-calendar-id}/events` under
