@@ -14,14 +14,12 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
-        patterns:
-          - "*"
-        update-types:
-          - major
       minor-and-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: uv
     directories:
@@ -37,14 +35,12 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
-        patterns:
-          - "*"
-        update-types:
-          - major
       minor-and-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: docker
     directories:
@@ -60,11 +56,6 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
-        patterns:
-          - "*"
-        update-types:
-          - major
       python-runtime:
         patterns:
           - "python"
@@ -75,6 +66,9 @@ updates:
       minor-and-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
@@ -89,14 +83,12 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
-        patterns:
-          - "*"
-        update-types:
-          - major
       minor-and-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: terraform
     directories:
@@ -112,14 +104,12 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
-        patterns:
-          - "*"
-        update-types:
-          - major
       minor-and-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: helm
     directories:
@@ -135,11 +125,9 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
-        patterns:
-          - "*"
-        update-types:
-          - major
       minor-and-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
