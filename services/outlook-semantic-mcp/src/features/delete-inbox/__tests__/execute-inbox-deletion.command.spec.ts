@@ -2,6 +2,7 @@
 
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { inboxConfigurations, userProfiles } from '~/db';
 import { ExecuteInboxDeletionCommand } from '../execute-inbox-deletion.command';
 
 const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
@@ -119,5 +120,41 @@ describe('ExecuteInboxDeletionCommand', () => {
     await command.run(userProfileId);
 
     expect(mockDb.delete).not.toHaveBeenCalled();
+  });
+
+  it('keeps a dual mailbox profile and downgrades source to oauth', async () => {
+    mockDb.query.userProfiles.findFirst.mockResolvedValue({
+      id: userProfileId,
+      providerUserId,
+      source: 'shared-mailbox-with-login',
+    });
+
+    const command = makeCommand({ db: mockDb, uniqueApi: mockUniqueApi });
+
+    await command.run(userProfileId);
+
+    expect(mockDb.delete).toHaveBeenCalledTimes(3);
+    expect(mockDb.delete).toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.delete).not.toHaveBeenCalledWith(userProfiles);
+    expect(mockDb.update).toHaveBeenCalledTimes(5);
+    expect(mockDb.update).toHaveBeenCalledWith(userProfiles);
+    expect(mockDb.update.mock.results.at(-1)?.value.set).toHaveBeenCalledWith({ source: 'oauth' });
+  });
+
+  it('deletes the user profile for a pure shared-mailbox', async () => {
+    mockDb.query.userProfiles.findFirst.mockResolvedValue({
+      id: userProfileId,
+      providerUserId,
+      source: 'shared-mailbox',
+    });
+
+    const command = makeCommand({ db: mockDb, uniqueApi: mockUniqueApi });
+
+    await command.run(userProfileId);
+
+    expect(mockDb.delete).toHaveBeenCalledTimes(3);
+    expect(mockDb.delete).toHaveBeenCalledWith(userProfiles);
+    expect(mockDb.delete).not.toHaveBeenCalledWith(inboxConfigurations);
+    expect(mockDb.update).toHaveBeenCalledTimes(4);
   });
 });

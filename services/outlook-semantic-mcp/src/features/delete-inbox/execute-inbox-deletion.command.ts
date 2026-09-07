@@ -88,6 +88,12 @@ export class ExecuteInboxDeletionCommand {
         ...logContext,
         msg: 'InboxConfiguration deleted',
       });
+      if (userProfile.source === 'shared-mailbox-with-login') {
+        await this.db
+          .update(userProfiles)
+          .set({ source: 'oauth' })
+          .where(eq(userProfiles.id, userProfile.id));
+      }
     }
 
     this.logger.warn({ ...logContext, msg: 'Inbox deletion finished' });
