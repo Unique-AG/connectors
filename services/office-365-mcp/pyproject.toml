@@ -39,7 +39,7 @@ dependencies = [
     # unique-mcp already depends on unique-toolkit[monitoring,otel]; declared here for the
     # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
-    "unique-toolkit[monitoring,otel]==2026.34.3",
+    "unique-toolkit[monitoring,otel]==2026.36.1",
 ]
 
 [project.scripts]
