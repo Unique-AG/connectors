@@ -682,21 +682,21 @@ class TestTheToolsThisServerAdvertises:
             "teams_list_meeting_recordings",
         }
         for tool in tools.values():
-            arguments = _properties(tool.inputSchema)
+            arguments = _properties(tool.input_schema)
             assert "client" not in arguments
             assert "ctx" not in arguments
 
     async def test_get_me_takes_no_arguments(self, mcp_client: Client[FastMCPTransport]) -> None:
         tools = _named(await mcp_client.list_tools())
 
-        assert _properties(tools["get_me"].inputSchema) == {}
-        assert tools["get_me"].inputSchema.get("required", []) == []
+        assert _properties(tools["get_me"].input_schema) == {}
+        assert tools["get_me"].input_schema.get("required", []) == []
 
     async def test_teams_list_chats_bounds_its_limit_where_graph_bounds_it(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        limit = _object(_properties(tools["teams_list_chats"].inputSchema)["limit"])
+        limit = _object(_properties(tools["teams_list_chats"].input_schema)["limit"])
 
         assert limit["type"] == "integer", "not `number`: a fractional page size is meaningless"
         assert (limit["minimum"], limit["maximum"], limit["default"]) == (1, 50, 25)
@@ -706,26 +706,26 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         tools = _named(await mcp_client.list_tools())
 
-        assert set(_properties(tools["get_me"].outputSchema)) == {
+        assert set(_properties(tools["get_me"].output_schema)) == {
             "user_id",
             "display_name",
             "email",
             "user_principal_name",
             "job_title",
         }
-        assert set(_properties(tools["teams_list_chats"].outputSchema)) == {"chats"}
-        assert set(_properties(tools["teams_list_my_teams"].outputSchema)) == {"teams"}
-        assert set(_properties(tools["teams_list_channels"].outputSchema)) == {"channels"}
-        assert set(_properties(tools["teams_browse_channel"].outputSchema)) == {
+        assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats"}
+        assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
+        assert set(_properties(tools["teams_list_channels"].output_schema)) == {"channels"}
+        assert set(_properties(tools["teams_browse_channel"].output_schema)) == {
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
         }
-        assert set(_properties(tools["teams_search_messages"].outputSchema)) == {
+        assert set(_properties(tools["teams_search_messages"].output_schema)) == {
             "messages",
             "next_offset",
         }
-        assert set(_properties(tools["teams_read_message"].outputSchema)) == {
+        assert set(_properties(tools["teams_read_message"].output_schema)) == {
             "uri",
             "message_id",
             "chat_id",
@@ -744,7 +744,7 @@ class TestTheToolsThisServerAdvertises:
             "mentions",
             "attachments",
         }
-        assert set(_properties(tools["teams_list_meeting_transcripts"].outputSchema)) == {
+        assert set(_properties(tools["teams_list_meeting_transcripts"].output_schema)) == {
             "status",
             "meeting_id",
             "subject",
@@ -754,7 +754,7 @@ class TestTheToolsThisServerAdvertises:
             "transcripts",
             "scan_incomplete",
         }
-        assert set(_properties(tools["teams_read_transcript"].outputSchema)) == {
+        assert set(_properties(tools["teams_read_transcript"].output_schema)) == {
             "uri",
             "meeting_id",
             "transcript_id",
@@ -762,7 +762,7 @@ class TestTheToolsThisServerAdvertises:
             "turns",
             "next_offset",
         }
-        assert set(_properties(tools["teams_list_meeting_recordings"].outputSchema)) == {
+        assert set(_properties(tools["teams_list_meeting_recordings"].output_schema)) == {
             "status",
             "meeting_id",
             "subject",
@@ -782,7 +782,7 @@ class TestTheToolsThisServerAdvertises:
         published = {
             path: field
             for name, tool in tools.items()
-            for path, field in _fields(tool.outputSchema, name).items()
+            for path, field in _fields(tool.output_schema, name).items()
         }
 
         # Guards the guard: a walk that stopped descending would pass by finding nothing to check.
@@ -804,25 +804,25 @@ class TestTheToolsThisServerAdvertises:
         for name in tools:
             assert re.fullmatch(r"[a-z]+(_[a-z]+)+", name), f"{name} is not verb_noun"
         for tool in tools.values():
-            for field in _properties(tool.outputSchema):
+            for field in _properties(tool.output_schema):
                 assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
         for name, tool in tools.items():
-            assert "truncated" not in _properties(tool.outputSchema), name
+            assert "truncated" not in _properties(tool.output_schema), name
         for name in ("teams_search_messages", "teams_read_transcript"):
-            assert "next_offset" in _properties(tools[name].outputSchema), name
+            assert "next_offset" in _properties(tools[name].output_schema), name
         for name, flag in (
             ("teams_browse_channel", "include_window_completeness"),
             ("teams_list_meeting_transcripts", "include_scan_completeness"),
             ("teams_list_meeting_recordings", "include_scan_completeness"),
         ):
-            asked_for = _object(_properties(tools[name].inputSchema)[flag])
+            asked_for = _object(_properties(tools[name].input_schema)[flag])
             assert asked_for["default"] is False, f"{name} would report completeness unasked"
 
     async def test_teams_search_messages_makes_its_criteria_optional_but_not_all_of_them(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_search_messages"].inputSchema
+        schema = tools["teams_search_messages"].input_schema
         properties = _properties(schema)
 
         assert schema.get("required", []) == [], "each criterion is individually optional"
@@ -847,7 +847,7 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         """Microsoft matches a mention on the id alone: a display name silently matches nothing."""
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_search_messages"].inputSchema)
+        properties = _properties(tools["teams_search_messages"].input_schema)
 
         assert _optional_type(properties["mentions"]) == {"type": "string", "format": "uuid"}
         assert _optional_type(properties["sent_after"]) == {"type": "string", "format": "date"}
@@ -857,7 +857,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        query = _object(_properties(tools["teams_search_messages"].inputSchema)["query"])
+        query = _object(_properties(tools["teams_search_messages"].input_schema)["query"])
         description = cast("str", query["description"])
 
         assert "Every word must appear" in description
@@ -869,7 +869,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_search_messages"].inputSchema)
+        properties = _properties(tools["teams_search_messages"].input_schema)
         size = _object(properties["size"])
         offset = _object(properties["offset"])
 
@@ -892,7 +892,7 @@ class TestTheToolsThisServerAdvertises:
         so `MessageSender`'s own paragraph is live protocol surface on every tool that does not
         override it, and editing that docstring changes the wire."""
         tools = _named(await mcp_client.list_tools())
-        taught = {name: _sender_schema(tools[name].outputSchema) for name in _MESSAGE_TOOLS}
+        taught = {name: _sender_schema(tools[name].output_schema) for name in _MESSAGE_TOOLS}
 
         for name in ("teams_read_message", "teams_browse_channel"):
             written = taught[name]["description"]
@@ -914,7 +914,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_read_message"].inputSchema
+        schema = tools["teams_read_message"].input_schema
 
         assert set(_properties(schema)) == {"uri"}
         assert schema.get("required") == ["uri"]
@@ -923,7 +923,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        uri = _object(_properties(tools["teams_read_message"].inputSchema)["uri"])
+        uri = _object(_properties(tools["teams_read_message"].input_schema)["uri"])
         described = cast("str", uri["description"])
 
         assert "teams:///chats/{chat_id}/messages/{message_id}" in described
@@ -941,7 +941,7 @@ class TestTheToolsThisServerAdvertises:
         """Two readers deliberately: a token is exchanged per tool, so one polymorphic reader
         would have to redeem transcript access to read a chat message."""
         tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_read_transcript"].inputSchema
+        schema = tools["teams_read_transcript"].input_schema
         description = tools["teams_read_transcript"].description
         handle = str(_object(_properties(schema)["uri"])["description"])
         assert description is not None
@@ -966,7 +966,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_read_transcript"].inputSchema)
+        properties = _properties(tools["teams_read_transcript"].input_schema)
 
         for bound in ("from_seconds", "to_seconds"):
             assert _optional_type(properties[bound])["type"] == "number", bound
@@ -979,7 +979,7 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         """20 and 50 are Graph's own default and maximum for this collection."""
         tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_browse_channel"].inputSchema
+        schema = tools["teams_browse_channel"].input_schema
         limit = _object(_properties(schema)["limit"])
 
         assert set(_properties(schema)) == {
@@ -1018,8 +1018,8 @@ class TestTheToolsThisServerAdvertises:
         across the tenant, so the tool makes exactly one and `limit` is the entire window."""
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_browse_channel"].description
-        limit = _object(_properties(tools["teams_browse_channel"].inputSchema)["limit"])
-        posts = _object(_properties(tools["teams_browse_channel"].outputSchema)["messages"])
+        limit = _object(_properties(tools["teams_browse_channel"].input_schema)["limit"])
+        posts = _object(_properties(tools["teams_browse_channel"].output_schema)["messages"])
         assert description is not None
 
         assert "One call is one request" in description
@@ -1040,10 +1040,10 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_transcripts"].description
         status = _object(
-            _properties(tools["teams_list_meeting_transcripts"].outputSchema)["status"]
+            _properties(tools["teams_list_meeting_transcripts"].output_schema)["status"]
         )
         meeting_type = _object(
-            _properties(tools["teams_list_meeting_transcripts"].outputSchema)["meeting_type"]
+            _properties(tools["teams_list_meeting_transcripts"].output_schema)["meeting_type"]
         )
         assert description is not None
         taught = str(status.get("description"))
@@ -1098,7 +1098,7 @@ class TestTheToolsThisServerAdvertises:
         further into the collection: `scan_incomplete` is the one status with no remedy to offer."""
         tools = _named(await mcp_client.list_tools())
         description = tools[tool].description
-        status = str(_object(_properties(tools[tool].outputSchema)["status"]))
+        status = str(_object(_properties(tools[tool].output_schema)["status"]))
         assert description is not None
 
         assert f"more {artifact} than one call reads" in status, "the cause, where the status is"
@@ -1114,7 +1114,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_list_meeting_transcripts"].inputSchema
+        schema = tools["teams_list_meeting_transcripts"].input_schema
         properties = _properties(schema)
         limit = _object(properties["limit"])
 
@@ -1141,7 +1141,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport], bound: str
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_list_meeting_transcripts"].inputSchema)
+        properties = _properties(tools["teams_list_meeting_transcripts"].input_schema)
 
         assert _optional_types(properties[bound]) == [
             {"type": "string", "format": "date"},
@@ -1152,7 +1152,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        properties = _properties(tools["teams_list_meeting_transcripts"].inputSchema)
+        properties = _properties(tools["teams_list_meeting_transcripts"].input_schema)
         after = str(_object(properties["started_after"])["description"])
         before = str(_object(properties["started_before"])["description"])
 
@@ -1168,7 +1168,7 @@ class TestTheToolsThisServerAdvertises:
         for an occurrence that ended last month polls forever."""
         tools = _named(await mcp_client.list_tools())
         status = _object(
-            _properties(tools["teams_list_meeting_transcripts"].outputSchema)["status"]
+            _properties(tools["teams_list_meeting_transcripts"].output_schema)["status"]
         )
         taught = str(status["description"])
 
@@ -1181,7 +1181,7 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        schema = tools["teams_list_meeting_recordings"].inputSchema
+        schema = tools["teams_list_meeting_recordings"].input_schema
         properties = _properties(schema)
         limit = _object(properties["limit"])
 
@@ -1210,13 +1210,13 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        transcripts_schema = set(_properties(tools["teams_list_meeting_transcripts"].outputSchema))
-        recordings_schema = set(_properties(tools["teams_list_meeting_recordings"].outputSchema))
+        transcripts_schema = set(_properties(tools["teams_list_meeting_transcripts"].output_schema))
+        recordings_schema = set(_properties(tools["teams_list_meeting_recordings"].output_schema))
 
         assert transcripts_schema - recordings_schema == {"transcripts"}
         assert recordings_schema - transcripts_schema == {"recordings"}
-        assert set(_properties(tools["teams_list_meeting_transcripts"].inputSchema)) == set(
-            _properties(tools["teams_list_meeting_recordings"].inputSchema)
+        assert set(_properties(tools["teams_list_meeting_transcripts"].input_schema)) == set(
+            _properties(tools["teams_list_meeting_recordings"].input_schema)
         )
 
     async def test_teams_list_meeting_recordings_promises_no_video_and_sends_content_elsewhere(
@@ -1225,7 +1225,7 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_recordings"].description
         assert description is not None
-        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].outputSchema)
+        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
         assert "no video is returned or reachable here" in description
         assert "teams_list_meeting_transcripts" in description, (
@@ -1240,7 +1240,7 @@ class TestTheToolsThisServerAdvertises:
         description = tools["teams_list_meeting_recordings"].description
         assert description is not None
         # The whole schema, `$defs` included: a recording's fields are described there, not inline.
-        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].outputSchema)
+        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
         assert "Meeting participants don't have permission to download meeting recordings" in (
             rendered
@@ -1252,7 +1252,7 @@ class TestTheToolsThisServerAdvertises:
         assert "organizer_user_id" in rendered, "who to ask for it"
         assert "you_are_the_organizer" in rendered and "organizer_only" in rendered
         assert "Meeting participants don't have permission" in json.dumps(
-            tools["teams_list_meeting_recordings"].outputSchema
+            tools["teams_list_meeting_recordings"].output_schema
         ), "the constraint belongs where the result is read, not only in the tool's prose"
 
     async def test_teams_list_meeting_recordings_names_its_five_answers_and_their_remedies(
@@ -1260,10 +1260,12 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_list_meeting_recordings"].description
-        status = _object(_properties(tools["teams_list_meeting_recordings"].outputSchema)["status"])
+        status = _object(
+            _properties(tools["teams_list_meeting_recordings"].output_schema)["status"]
+        )
         assert description is not None
         taught = str(status.get("description"))
-        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].outputSchema)
+        rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
         for value in (
             "available",
@@ -1290,7 +1292,7 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await mcp_client.list_tools())
         shared = {"available", "not_ready", "scan_incomplete", "meeting_not_found"}
         statuses = {
-            name: str(_object(_properties(tools[name].outputSchema)["status"]).get("description"))
+            name: str(_object(_properties(tools[name].output_schema)["status"]).get("description"))
             for name in ("teams_list_meeting_transcripts", "teams_list_meeting_recordings")
         }
 
@@ -1314,8 +1316,8 @@ class TestTheToolsThisServerAdvertises:
         self, mcp_client: Client[FastMCPTransport], tool: str, collection: str
     ) -> None:
         tools = _named(await mcp_client.list_tools())
-        limit = _object(_properties(tools[tool].inputSchema)["limit"])
-        listed = _object(_properties(tools[tool].outputSchema)[collection])
+        limit = _object(_properties(tools[tool].input_schema)["limit"])
+        listed = _object(_properties(tools[tool].output_schema)[collection])
         rendered = str(limit.get("description")) + str(listed.get("description"))
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in rendered, "the cap is named where it binds"
@@ -1353,8 +1355,8 @@ class TestTheToolsThisServerAdvertises:
             described = " ".join(
                 [
                     tool.description or "",
-                    *_described(tool.inputSchema),
-                    *_described(tool.outputSchema),
+                    *_described(tool.input_schema),
+                    *_described(tool.output_schema),
                 ]
             )
             named = set(_TOOL_MENTION.findall(described))
@@ -1378,7 +1380,7 @@ class TestTheToolsThisServerAdvertises:
         writes = {
             name
             for name, tool in tools.items()
-            if tool.annotations is not None and tool.annotations.readOnlyHint is not True
+            if tool.annotations is not None and tool.annotations.read_only_hint is not True
         }
 
         assert writes == WRITE_TOOLS, (
@@ -1397,7 +1399,9 @@ class TestTheToolsThisServerAdvertises:
         assert tools, "no tools are advertised, so the write surface proves nothing"
         for name, tool in tools.items():
             assert tool.annotations is not None, f"{name} carries no annotations"
-            assert tool.annotations.readOnlyHint is not None, f"{name} says neither read nor write"
+            assert tool.annotations.read_only_hint is not None, (
+                f"{name} says neither read nor write"
+            )
 
     async def test_a_write_tool_says_whether_it_can_destroy(
         self, every_tool: Client[FastMCPTransport]
@@ -1409,8 +1413,8 @@ class TestTheToolsThisServerAdvertises:
         for name in WRITE_TOOLS:
             annotations = tools[name].annotations
             assert annotations is not None
-            assert annotations.destructiveHint is not None, f"{name} does not say"
-            assert annotations.idempotentHint is not None, f"{name} does not say"
+            assert annotations.destructive_hint is not None, f"{name} does not say"
+            assert annotations.idempotent_hint is not None, f"{name} does not say"
 
 
 class TestCallingThem:

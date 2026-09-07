@@ -8,19 +8,19 @@ dependencies = [
     # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
     # also arrive transitively via `msgraph-sdk`, which is precisely why this is declared: the day
     # the Graph SDK stops depending on them, OBO must not break silently.
-    "fastmcp[azure]==3.4.7",
+    "fastmcp[azure]==4.0.2",
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
     # the postgresql extra and because auth.py imports it directly (OAuth state store).
     "py-key-value-aio[postgresql]==0.4.5",
     # The official Microsoft Graph SDK. `msgraph-core` (the request-adapter/telemetry layer),
     # `microsoft-kiota-*` (the HTTP middleware pipeline) and `azure-core` (the credential
     # protocol the SDK authenticates with) all arrive transitively and are pinned in uv.lock.
-    "msgraph-sdk==1.61.0",
+    "msgraph-sdk==1.62.0",
     "uvicorn[standard]==0.52.4",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
     "starlette==1.6.0",
-    "pydantic==2.13.4",
+    "pydantic==2.13.5",
     "pydantic-settings==2.15.0",
     "python-dotenv==1.2.3",
     # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
@@ -37,8 +37,8 @@ dependencies = [
     # unique-mcp already depends on unique-toolkit[monitoring,otel]; declared here for the
     # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
-    "unique-toolkit[monitoring,otel]==2026.34.3",
-    "mcp==1.28.1",
+    "unique-toolkit[monitoring,otel]==2026.36.1",
+    "mcp==2.1.1",
 ]
 
 [project.scripts]
@@ -59,7 +59,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "hatchling==1.32.0",
-    "ruff==0.16.5",
+    "ruff==0.16.6",
     "basedpyright==1.39.10",
     "respx==0.23.1",
     "testcontainers==4.15.0",
@@ -94,3 +94,7 @@ extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
 reportUnusedFunction = false
+
+[tool.uv]
+# unique-mcp pins fastmcp<4 but imports nothing 4.x changed; drop when it allows fastmcp 4.
+override-dependencies = ["fastmcp[azure]==4.0.2"]

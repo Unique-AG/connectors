@@ -60,9 +60,8 @@ _PROFILES: Mapping[str, Mapping[str, object]] = {
 
 
 class _StubOboCredential:
-    """One instance per caller, as the real provider does it: `get_obo_credential` caches a
-    credential per user assertion (fastmcp 3.4.5,
-    `fastmcp/server/auth/providers/azure.py:628-683`)."""
+    """One instance per caller: upstream caches a credential per user assertion
+    (fastmcp 4.0.2, `fastmcp/server/auth/providers/azure.py:629-684`)."""
 
     def __init__(self, user_assertion: str) -> None:
         self._user_assertion: str = user_assertion

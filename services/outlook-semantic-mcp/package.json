@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -60,7 +60,7 @@
     "fastest-levenshtein": "1.0.16",
     "keyv": "catalog:",
     "lru-cache": "11.5.2",
-    "markdown-it": "14.3.0",
+    "markdown-it": "15.0.1",
     "nestjs-otel": "catalog:",
     "nestjs-pino": "catalog:",
     "nestjs-zod": "catalog:",

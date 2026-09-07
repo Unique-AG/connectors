@@ -6,7 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "cryptography==50.0.1",
     "fastmcp==3.4.7",
-    "pydantic==2.13.4",
+    "pydantic==2.13.5",
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory];
     # this adds the postgresql extra (asyncpg) for durable OAuth storage.
     "py-key-value-aio[postgresql]==0.4.5",
@@ -40,7 +40,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "hatchling==1.32.0",
-    "ruff==0.16.5",
+    "ruff==0.16.6",
     "basedpyright==1.39.10",
 ]
 

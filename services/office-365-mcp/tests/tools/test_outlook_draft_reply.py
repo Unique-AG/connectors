@@ -482,9 +482,9 @@ class TestHowItDeclaresItself:
         assert annotations is not None, (
             "a tool with no annotations joins the write surface by omission"
         )
-        assert annotations.readOnlyHint is WRITE_ADDITIVE["readOnlyHint"]
-        assert annotations.destructiveHint is WRITE_ADDITIVE["destructiveHint"]
-        assert annotations.idempotentHint is WRITE_ADDITIVE["idempotentHint"]
+        assert annotations.read_only_hint is WRITE_ADDITIVE["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
 
     async def test_the_description_says_it_cannot_send_and_that_the_human_does(
         self, transport: httpx.AsyncClient

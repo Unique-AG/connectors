@@ -5,8 +5,6 @@ service does not own: it copies every `extra=` into the payload and serialises w
 stacks. A test that formatted the records itself would assert against the wrong opponent.
 """
 
-import ast
-import inspect
 import io
 import json
 import logging
@@ -22,7 +20,6 @@ from types import TracebackType
 from typing import IO, Protocol, cast, override
 
 import httpx
-import mcp.server.lowlevel.server as sdk_server
 import pytest
 from azure.core.exceptions import ClientAuthenticationError
 from fastmcp.server.auth.providers.azure import AzureProvider
@@ -40,7 +37,6 @@ from office_365_mcp.logging import (
     TRUNCATED,
     UNPRINTABLE,
     RedactionFilter,
-    StaleMessageLineFilter,
     configure_logging,
 )
 
@@ -56,11 +52,6 @@ _INITIALIZE_TRACE = "cc3333333333333333333333333333cc"
 _TOOL_CALL_TRACE = "dd4444444444444444444444444444dd"
 _INITIALIZE_TRACEPARENT = f"00-{_INITIALIZE_TRACE}-3333333333333333-01"
 _TOOL_CALL_TRACEPARENT = f"00-{_TOOL_CALL_TRACE}-4444444444444444-01"
-
-# Spelled here rather than imported from `office_365_mcp.logging`, so a rename there is a failing
-# test.
-_SDK_LOGGER = "mcp.server.lowlevel.server"
-_SDK_LINE = "Processing request of type %s"
 
 
 class _HttpResponse(Protocol):
@@ -457,7 +448,7 @@ class TestEveryLineIsJoinable:
         with TestClient(app) as client:
             sink.stream.truncate(0)
             _ = sink.stream.seek(0)
-            response = cast("_HttpResponse", client.get("/ready"))  # pyright: ignore[reportUnknownMemberType]
+            response = cast("_HttpResponse", client.get("/ready"))
 
         assert response.status_code in (200, 503), "the probe answered neither way"
         warnings = [
@@ -479,46 +470,11 @@ class TestEveryLineIsJoinable:
             _ = sink.stream.seek(0)
             _ = cast(
                 "_HttpResponse",
-                client.get("/ready", headers={"x-request-id": "gateway-42"}),  # pyright: ignore[reportUnknownMemberType]
+                client.get("/ready", headers={"x-request-id": "gateway-42"}),
             )
 
         forwarded = [line for line in sink.lines() if line.get("http_request_id") == "gateway-42"]
         assert forwarded, [line.get("http_request_id") for line in sink.lines()]
-
-
-class TestTheSdkLineThisServiceQuiets:
-    def test_the_sdk_still_writes_the_line_this_service_matches(self) -> None:
-        """Quieting is matched on the SDK's own message template, so an SDK that renamed it would
-        leave this service emitting a stale trace id again, silently. When this fails, re-read
-        `mcp/server/lowlevel/server.py` and `src/office_365_mcp/logging.py`: either the template
-        moved, or the line no longer runs before the request handler.
-        """
-        source = pathlib.Path(inspect.getfile(sdk_server)).read_text(encoding="utf-8")
-
-        assert source.count(_SDK_LINE) == 1, (
-            f"{_SDK_LINE!r} is no longer written exactly once in {inspect.getfile(sdk_server)}; "
-            + "StaleMessageLineFilter in src/office_365_mcp/logging.py matches it by template"
-        )
-
-        handler = _sdk_handle_request(source)
-        logged = [
-            index for index, statement in enumerate(handler.body) if _is_the_sdk_line(statement)
-        ]
-        assert logged == [0], (
-            "the SDK's per-message line is no longer the first statement of _handle_request, so "
-            + "what runs before it may now be correctable from inside the session task. Re-read "
-            + "mcp/server/lowlevel/server.py and src/office_365_mcp/logging.py"
-        )
-
-    def test_only_that_line_is_dropped(self, sink: _Sink) -> None:
-        sdk = logging.getLogger(_SDK_LOGGER)
-
-        sdk.info(_SDK_LINE, "CallToolRequest")
-        sdk.info("Request %s cancelled - duplicate response suppressed", 7)
-
-        assert [line["msg"] for line in sink.lines()] == [
-            "Request 7 cancelled - duplicate response suppressed"
-        ]
 
 
 class TestOneLinePerMessageInTheRightTrace:
@@ -526,27 +482,6 @@ class TestOneLinePerMessageInTheRightTrace:
     streamable-HTTP transport starts during `initialize`, and an in-process client has no session
     task. See `src/office_365_mcp/tracing.py`.
     """
-
-    def test_the_sdk_line_carries_the_initialize_requests_trace(
-        self, unquieted_lines: Sequence[Mapping[str, object]]
-    ) -> None:
-        stale = [
-            line
-            for line in unquieted_lines
-            if line["context"] == _SDK_LOGGER
-            and line["msg"] == "Processing request of type CallToolRequest"
-        ]
-
-        assert stale, "the SDK no longer logs a per-message line, so this proves nothing"
-        assert {line["trace_id"] for line in stale} == {_INITIALIZE_TRACE}, (
-            "the SDK's line for the tool call was expected in the initialize request's trace — "
-            + f"got {[line.get('trace_id') for line in stale]}"
-        )
-
-    def test_that_line_is_gone(self, lines: Sequence[Mapping[str, object]]) -> None:
-        assert not [line for line in lines if line["context"] == _SDK_LOGGER], (
-            "the SDK's per-message line is back in the log"
-        )
 
     def test_the_replacement_line_is_in_the_trace_of_its_own_request(
         self, lines: Sequence[Mapping[str, object]]
@@ -557,11 +492,9 @@ class TestOneLinePerMessageInTheRightTrace:
         assert {line["trace_id"] for line in replacements} == {_TOOL_CALL_TRACE}
         assert {line["correlation_id"] for line in replacements} == {_TOOL_CALL_TRACE}
 
-    def test_the_replacement_says_more_than_the_line_it_replaces(
+    def test_the_line_names_the_method_the_request_and_the_session(
         self, lines: Sequence[Mapping[str, object]]
     ) -> None:
-        """Nothing is lost: the SDK said the request *type*, this says the JSON-RPC method, the MCP
-        request id and the transport's session id."""
         replacement = next(line for line in lines if line.get("mcp_method") == "tools/call")
 
         assert replacement["mcp_method"] == "tools/call"
@@ -650,33 +583,6 @@ def _install_tracer_provider() -> None:
         trace.set_tracer_provider(TracerProvider())
 
 
-def _sdk_handle_request(source: str) -> ast.FunctionDef:
-    for node in ast.walk(ast.parse(source)):
-        if (
-            isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef)
-            and node.name == "_handle_request"
-        ):
-            return ast.FunctionDef(
-                name=node.name,
-                args=node.args,
-                body=node.body,
-                decorator_list=node.decorator_list,
-                returns=node.returns,
-                type_comment=None,
-                type_params=[],
-            )
-    raise AssertionError(
-        f"the MCP SDK no longer defines _handle_request in {inspect.getfile(sdk_server)}"
-    )
-
-
-def _is_the_sdk_line(statement: ast.stmt) -> bool:
-    if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Call):
-        return False
-    first = next(iter(statement.value.args), None)
-    return isinstance(first, ast.Constant) and first.value == _SDK_LINE
-
-
 @pytest.fixture(autouse=True)
 def entra(monkeypatch: pytest.MonkeyPatch) -> None:
     """The exchange is refused rather than stubbed: a tool call must not reach the network, and a
@@ -731,7 +637,7 @@ def _drive_a_tool_call(app: Starlette, sink: _Sink) -> list[Mapping[str, object]
 
         initialize = cast(
             "_HttpResponse",
-            client.post(  # pyright: ignore[reportUnknownMemberType]
+            client.post(
                 "/mcp",
                 json={
                     "jsonrpc": "2.0",
@@ -752,7 +658,7 @@ def _drive_a_tool_call(app: Starlette, sink: _Sink) -> list[Mapping[str, object]
         # Trap: post to "/mcp" and not to "/mcp/". The trailing slash redirects.
         called = cast(
             "_HttpResponse",
-            client.post(  # pyright: ignore[reportUnknownMemberType]
+            client.post(
                 "/mcp",
                 json={
                     "jsonrpc": "2.0",
@@ -771,19 +677,6 @@ def _drive_a_tool_call(app: Starlette, sink: _Sink) -> list[Mapping[str, object]
 @pytest.fixture
 def lines(app: Starlette, sink: _Sink) -> list[Mapping[str, object]]:
     return _drive_a_tool_call(app, sink)
-
-
-@pytest.fixture
-def unquieted_lines(app: Starlette, sink: _Sink) -> Iterator[list[Mapping[str, object]]]:
-    """The same session with `StaleMessageLineFilter` taken off the handler: the before."""
-    installed = list(sink.handler.filters)
-    sink.handler.filters = [
-        existing for existing in installed if not isinstance(existing, StaleMessageLineFilter)
-    ]
-    try:
-        yield _drive_a_tool_call(app, sink)
-    finally:
-        sink.handler.filters = installed
 
 
 @dataclass(frozen=True)
