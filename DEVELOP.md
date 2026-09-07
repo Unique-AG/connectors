@@ -38,12 +38,28 @@ Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outs
 workspace and are driven by [uv](https://docs.astral.sh/uv/). `Python CI` runs exactly this:
 
 ```bash
+pnpm install --frozen-lockfile          # from the repo root, for biome
 cd services/<service>
 uv sync --locked
 uv run ruff format --check . && uv run ruff check .
+pnpm exec biome check .
 uv run basedpyright
 uv run pytest
 ```
+
+`ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
+chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.
+
+biome arrives through `pnpm install --frozen-lockfile` rather than `npx`, so the binary that runs is
+the one `pnpm-lock.yaml` pins. `--frozen-lockfile` also fails if `package.json` and the lockfile
+disagree on the version, which a runtime `npx` fetch would silently ignore. It is the same
+acquisition path the TypeScript CI uses, so there is one mechanism to understand rather than two.
+
+There is deliberately no `actions/cache` on the pnpm store here. No workflow in this repo runs on
+`main`, so a store cache can never land on `refs/heads/main`, which means every PR misses on its
+first job and then writes a 177 MB entry of its own. The repo's Actions cache already sits above its
+10 GB limit, so those entries evict the `setup-uv` caches this same job depends on. A cold
+`pnpm install` costs about 8s; the restore-plus-save round trip cost 13s and made things worse.
 
 ### Trap: basedpyright in a git worktree
 

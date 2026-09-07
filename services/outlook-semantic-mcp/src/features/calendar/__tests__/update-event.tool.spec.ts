@@ -146,7 +146,7 @@ describe(UpdateEventTool.name, () => {
 
   it('does not update when the client cannot show a confirmation prompt', async () => {
     const { tool, run, elicit } = createTool({
-      elicit: vi.fn().mockRejectedValue(new Error('This client does not support elicitation')),
+      elicit: vi.fn().mockRejectedValue(new Error('Client does not support form elicitation.')),
     });
 
     const result = await tool.updateEvent(

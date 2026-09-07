@@ -161,7 +161,9 @@ describe(CancelEventTool.name, () => {
   });
 
   it('does not cancel when the client cannot show a confirmation prompt', async () => {
-    const elicit = vi.fn().mockRejectedValue(new Error('This client does not support elicitation'));
+    const elicit = vi
+      .fn()
+      .mockRejectedValue(new Error('Client does not support form elicitation.'));
     const { tool, run } = createTool({ elicit });
 
     const result = await tool.cancelEvent(

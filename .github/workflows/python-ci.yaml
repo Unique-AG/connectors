@@ -134,6 +134,17 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check .
 
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+
+      - name: Install Node dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting of the files ruff does not own
+        run: pnpm exec biome check .
+
       - name: Lint
         run: uv run ruff check .
 

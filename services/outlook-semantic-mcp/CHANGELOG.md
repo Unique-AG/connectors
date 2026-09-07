@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.5.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.4.1...outlook-semantic-mcp@3.5.0) (2026-09-03)
+
+
+### Features
+
+* **outlook-semantic-mcp:** allow pinning the Microsoft OAuth tenant ([#905](https://github.com/Unique-AG/connectors/issues/905)) ([149895a](https://github.com/Unique-AG/connectors/commit/149895a7aa2314c165bbc0125a077d7400e9a98d))
+
+
+### Bug Fixes
+
+* **mcp-server-module,outlook-semantic-mcp:** handle elicitation lifecycle ([#911](https://github.com/Unique-AG/connectors/issues/911)) ([e43e7c6](https://github.com/Unique-AG/connectors/commit/e43e7c68e5a77aeb0d4723ba6e90107dfca2d899))
+
 ## [3.4.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.4.0...outlook-semantic-mcp@3.4.1) (2026-08-27)
 
 

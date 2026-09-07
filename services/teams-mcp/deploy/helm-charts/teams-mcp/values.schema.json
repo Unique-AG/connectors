@@ -1583,9 +1583,9 @@
         "high-priority"
       ]
     },
-    "extraManifests": {
+    "extraObjects": {
       "type": "array",
-      "description": "Additional raw Kubernetes manifests to include",
+      "description": "Additional raw Kubernetes manifests to include once at the chart root, alongside the chart's own templates. Each item is a full manifest (apiVersion/kind/metadata/spec); tpl-rendered.",
       "items": {
         "type": "object"
       }

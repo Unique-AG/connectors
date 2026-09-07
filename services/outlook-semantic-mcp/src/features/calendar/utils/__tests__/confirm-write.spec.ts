@@ -20,7 +20,7 @@ function run(elicit: ReturnType<typeof vi.fn>) {
 }
 
 describe(confirmWrite.name, () => {
-  it('returns the content when the user accepts', async () => {
+  it('returns explicit content when the user accepts', async () => {
     const { result } = run(vi.fn().mockResolvedValue({ action: 'accept', content: {} }));
 
     await expect(result).resolves.toEqual({ status: 'accepted', content: {} });
@@ -44,14 +44,13 @@ describe(confirmWrite.name, () => {
     expect(warn).toHaveBeenCalled();
   });
 
-  it('explains when the client cannot show a prompt at all', async () => {
-    const { result } = run(
-      vi
-        .fn()
-        .mockRejectedValue(
-          new Error('Client does not support elicitation (required for elicitation/create)'),
-        ),
-    );
+  it.each([
+    'Client does not support elicitation.',
+    'Client does not support form elicitation.',
+    'Client does not support url elicitation.',
+    'elicit is not supported in stateless mode',
+  ])('explains when the client cannot show a prompt: %s', async (errorMessage) => {
+    const { result } = run(vi.fn().mockRejectedValue(new Error(errorMessage)));
 
     const outcome = await result;
     expect(outcome).toMatchObject({
@@ -60,10 +59,28 @@ describe(confirmWrite.name, () => {
     });
   });
 
+  it('reports malformed confirmation content as invalid rather than timed out', async () => {
+    const { result } = run(
+      vi.fn().mockRejectedValue(new McpError(ErrorCode.InvalidParams, 'applyTo is required')),
+    );
+
+    const outcome = await result;
+    expect(outcome).toMatchObject({
+      status: 'unavailable',
+      message: expect.stringMatching(/invalid/i),
+    });
+    expect(outcome).toMatchObject({ message: expect.not.stringMatching(/timed out/i) });
+  });
+
   it('fails closed on an unexpected error instead of propagating it', async () => {
     const { result, warn } = run(vi.fn().mockRejectedValue(new Error('socket hang up')));
 
-    await expect(result).resolves.toMatchObject({ status: 'unavailable' });
+    const outcome = await result;
+    expect(outcome).toMatchObject({
+      status: 'unavailable',
+      message: expect.stringMatching(/failed/i),
+    });
+    expect(outcome).toMatchObject({ message: expect.not.stringMatching(/timed out/i) });
     expect(warn).toHaveBeenCalled();
   });
 });
