@@ -274,7 +274,8 @@ class GetHoldingsQuery:
             message = f"{type(settled).__name__}: {settled}"
             logger.warning(
                 "accounts.holdings.fallback_series_failed",
-                extra={"account_id": account_id, "figure": field, "error": message},
+                extra={"account_id": account_id, "figure": field},
+                exc_info=settled,
             )
             return None, HoldingFigureErrorDto(figure=field, message=message)
         return settled, None

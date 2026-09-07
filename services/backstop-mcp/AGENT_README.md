@@ -332,7 +332,7 @@ only when the set is no longer small.
 the catalog (or reuses it) and returns `[]` on a miss. An empty `custom_field_values` list
 is therefore ambiguous unless the caller also reports the miss.
 
-Each opportunity query `asyncio.gather`s `custom_fields_service.load_catalog(client)` with
+Each opportunity query `asyncio.gather`s `custom_fields_service.load_catalog()` with
 the Backstop walk (or the per-id GETs), then sets `custom_fields_unavailable=catalog is None`
 on the response. Do that in the query, not behind a mapper wrapper:
 
