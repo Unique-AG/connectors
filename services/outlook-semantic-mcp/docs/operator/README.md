@@ -74,7 +74,7 @@ After [granting admin consent](https://login.microsoftonline.com/organizations/a
   - `disabled` *(default)* — no delegation scanning
   - `full_access_only` — Full Access (Read & Manage) grants via Exchange admin
   - `granular_access` — folder-level grants (e.g. shared Inbox or RFQ folder); subsumes `full_access_only`
-- [ ] **Shared mailbox emails** — only if you have Microsoft 365 shared mailboxes with no sign-in, or sign-in-eligible mailboxes that nobody will log into in the MCP. List those addresses in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](./configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS). Do not list a mailbox that users will connect as a normal Outlook account.
+- [ ] **Shared mailbox emails** — Microsoft 365 shared mailboxes, including sign-in-eligible ones that someone may log into in the MCP. List those addresses in [`DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS`](./configuration.md#DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS). Login as the mailbox is optional: if they sign in, their own token is primary and Full Access delegates are the backup.
 
 Unique will configure your deployment using the following process:
 
