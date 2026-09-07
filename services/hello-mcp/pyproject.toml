@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Minimal no-auth FastMCP Hello World server"
 requires-python = ">=3.14"
 dependencies = [
-    "fastmcp==3.4.7",
+    "fastmcp==4.0.0",
 ]
 
 [project.scripts]
