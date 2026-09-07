@@ -5,7 +5,7 @@ import { timestamps } from '../timestamps.columns';
 import { authorizationCodes } from './auth/authorization-codes.table';
 import { tokens } from './auth/tokens.table';
 
-const userProfileSourceValues = ['oauth', 'shared-mailbox'] as const;
+const userProfileSourceValues = ['oauth', 'shared-mailbox', 'shared-mailbox-with-login'] as const;
 
 export type UserProfileSource = (typeof userProfileSourceValues)[number];
 
