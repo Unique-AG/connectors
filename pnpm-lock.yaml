@@ -8,8 +8,8 @@ settings:
 catalogs:
   default:
     '@golevelup/nestjs-rabbitmq':
-      specifier: 6.1.0
-      version: 6.1.0
+      specifier: 9.0.2
+      version: 9.0.2
     '@microsoft/microsoft-graph-client':
       specifier: 3.0.7
       version: 3.0.7
@@ -891,7 +891,7 @@ importers:
     dependencies:
       '@golevelup/nestjs-rabbitmq':
         specifier: 'catalog:'
-        version: 6.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        version: 9.0.2(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@microsoft/microsoft-graph-client':
         specifier: 'catalog:'
         version: 3.0.7
@@ -1268,7 +1268,7 @@ importers:
     dependencies:
       '@golevelup/nestjs-rabbitmq':
         specifier: 'catalog:'
-        version: 6.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        version: 9.0.2(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@microsoft/microsoft-graph-client':
         specifier: 'catalog:'
         version: 3.0.7
@@ -2370,17 +2370,17 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@golevelup/nestjs-discovery@5.0.0':
-    resolution: {integrity: sha512-NaIWLCLI+XvneUK05LH2idHLmLNITYT88YnpOuUQmllKtiJNIS3woSt7QXrMZ5k3qUWuZpehEVz1JtlX4I1KyA==}
+  '@golevelup/nestjs-discovery@7.0.3':
+    resolution: {integrity: sha512-wBlSxU1wgBS+x4adwgp2qklXKCC9sufn8zrrSJ1WSCEHb48OBMrn0FskU862CFPwyotJaElRrirHTICAOsl1Mg==}
     peerDependencies:
-      '@nestjs/common': ^11.0.20
-      '@nestjs/core': ^11.0.20
+      '@nestjs/common': ^11.1.21
+      '@nestjs/core': ^11.1.21
 
-  '@golevelup/nestjs-rabbitmq@6.1.0':
-    resolution: {integrity: sha512-lGn2qVjNXd8+wdD4BB6s4q/8HVRepHPqsAW0HctU3I5lbTNd7HoMc6Art6u+Wt0xVfYekw/PJ6ALz0i7g0ZUJw==}
+  '@golevelup/nestjs-rabbitmq@9.0.2':
+    resolution: {integrity: sha512-fuU+EMErNA50uPZ9npKsBtBpi76OBLAJah2plyZYjTKcZKygI06yKoKmekUnFiy2U6IMBzMf0qc4fZLqGtLEeg==}
     peerDependencies:
-      '@nestjs/common': ^11.1.3
-      '@nestjs/core': ^11.1.3
+      '@nestjs/common': ^11.1.21
+      '@nestjs/core': ^11.1.21
       reflect-metadata: ^0.2.2
       rxjs: ^7.8.1
 
@@ -4136,8 +4136,8 @@ packages:
   ajv@8.18.0:
     resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
 
-  amqp-connection-manager@4.1.15:
-    resolution: {integrity: sha512-YGi8MuO2K4u0qC4b1qAKVIK8CdBJF+PpEZpHKxmrL3x61pU1sAb2SHzQl7ypoqr6oECIfVqtG9DGdOZxaUq1Wg==}
+  amqp-connection-manager@5.0.0:
+    resolution: {integrity: sha512-88yQzqa5RSBgnLl504XjvCQJ7d+osskdwvg35Lwm1LRbfLjNU9p7SQUMSP82BB7mseiq9tIUPJ3HE3eXQbpjEw==}
     engines: {node: '>=10.0.0', npm: '>5.0.0'}
     peerDependencies:
       amqplib: '*'
@@ -7203,18 +7203,17 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@golevelup/nestjs-discovery@5.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)':
+  '@golevelup/nestjs-discovery@7.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)':
     dependencies:
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      lodash: 4.18.1
 
-  '@golevelup/nestjs-rabbitmq@6.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@golevelup/nestjs-rabbitmq@9.0.2(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@golevelup/nestjs-discovery': 5.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
+      '@golevelup/nestjs-discovery': 7.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      amqp-connection-manager: 4.1.15(amqplib@0.10.9)
+      amqp-connection-manager: 5.0.0(amqplib@0.10.9)
       amqplib: 0.10.9
       lodash: 4.18.1
       reflect-metadata: 0.2.2
@@ -9128,7 +9127,7 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
-  amqp-connection-manager@4.1.15(amqplib@0.10.9):
+  amqp-connection-manager@5.0.0(amqplib@0.10.9):
     dependencies:
       amqplib: 0.10.9
       promise-breaker: 6.0.0
