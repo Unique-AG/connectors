@@ -14,14 +14,14 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
+      per-dependency:
         patterns:
           - "*"
         update-types:
           - major
-      minor-and-patch:
-        patterns:
-          - "*"
+          - minor
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: uv
     directories:
@@ -37,14 +37,14 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
+      per-dependency:
         patterns:
           - "*"
         update-types:
           - major
-      minor-and-patch:
-        patterns:
-          - "*"
+          - minor
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: docker
     directories:
@@ -60,21 +60,14 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
+      per-dependency:
         patterns:
           - "*"
         update-types:
           - major
-      python-runtime:
-        patterns:
-          - "python"
-          - "astral-sh/uv"
-          - "*astral-sh/uv*"
-        update-types:
           - minor
-      minor-and-patch:
-        patterns:
-          - "*"
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: github-actions
     directory: /
@@ -89,14 +82,14 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
+      per-dependency:
         patterns:
           - "*"
         update-types:
           - major
-      minor-and-patch:
-        patterns:
-          - "*"
+          - minor
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: terraform
     directories:
@@ -112,14 +105,14 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
+      per-dependency:
         patterns:
           - "*"
         update-types:
           - major
-      minor-and-patch:
-        patterns:
-          - "*"
+          - minor
+          - patch
+        group-by: dependency-name
 
   - package-ecosystem: helm
     directories:
@@ -135,11 +128,11 @@ updates:
     open-pull-requests-limit: 5
     rebase-strategy: disabled
     groups:
-      major:
+      per-dependency:
         patterns:
           - "*"
         update-types:
           - major
-      minor-and-patch:
-        patterns:
-          - "*"
+          - minor
+          - patch
+        group-by: dependency-name
