@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.5.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.5.0...outlook-semantic-mcp@3.5.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* **backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** bump base chart dependency to 0.1.0-87990c ([#915](https://github.com/Unique-AG/connectors/issues/915)) ([1bc27a7](https://github.com/Unique-AG/connectors/commit/1bc27a713ab7e2a5bf36671fa1f1f294497c649e))
+
+
+### Dependencies
+
+* bump @opentelemetry/instrumentation-pg from 0.73.0 to 0.74.0 ([#938](https://github.com/Unique-AG/connectors/issues/938)) ([e68832a](https://github.com/Unique-AG/connectors/commit/e68832adc6426aeb1c40d84464b06f0be84af5ab))
+* bump node from 26.7.0-trixie-slim to 26.8.1-trixie-slim in /services/outlook-semantic-mcp/deploy ([#923](https://github.com/Unique-AG/connectors/issues/923)) ([9da1d92](https://github.com/Unique-AG/connectors/commit/9da1d92c88ae01873aba962e5a7af2eaa7c84c7f))
+
 ## [3.5.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.4.1...outlook-semantic-mcp@3.5.0) (2026-09-03)
 
 
