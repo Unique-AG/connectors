@@ -556,24 +556,27 @@ describe(SearchCalendarEventsQuery.name, () => {
   it.each([
     ['403', makeGraphError(403, 'ErrorAccessDenied')],
     ['404', makeGraphError(404, 'ErrorItemNotFound')],
-  ])('keeps other calendars and records a note when one calendarView returns %s', async (_label, error) => {
-    const { query } = createQuery({
-      calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
-      getByPath: {
-        [OWN_VIEW]: { value: [graphEvent()] },
-        [OWNER_VIEW]: error,
-      },
-    });
+  ])(
+    'keeps other calendars and records a note when one calendarView returns %s',
+    async (_label, error) => {
+      const { query } = createQuery({
+        calendars: [OWN_CALENDAR, DELEGATED_CALENDAR],
+        getByPath: {
+          [OWN_VIEW]: { value: [graphEvent()] },
+          [OWNER_VIEW]: error,
+        },
+      });
 
-    const result = await query.run(
-      USER_PROFILE_ID,
-      search({ calendars: [OWN_CALENDAR_REF, DELEGATED_CALENDAR_REF] }),
-    );
+      const result = await query.run(
+        USER_PROFILE_ID,
+        search({ calendars: [OWN_CALENDAR_REF, DELEGATED_CALENDAR_REF] }),
+      );
 
-    expect(result.success).toBe(true);
-    expect(result.events).toHaveLength(1);
-    expect(result.searchNotes).toEqual([`Could not read calendar "Banker" (${OWNER_EMAIL}).`]);
-  });
+      expect(result.success).toBe(true);
+      expect(result.events).toHaveLength(1);
+      expect(result.searchNotes).toEqual([`Could not read calendar "Banker" (${OWNER_EMAIL}).`]);
+    },
+  );
 
   it('passes through consentRequired from list_calendars', async () => {
     const { query } = createQuery({
