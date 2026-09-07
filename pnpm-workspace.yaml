@@ -55,6 +55,7 @@ catalog:
   graphql-request: 7.3.4
   istanbul-badges-readme: 1.9.0
   js-yaml: 4.3.2
+  keyv: 5.6.0
   nestjs-otel: 8.1.0
   nestjs-pino: 4.6.1
   nestjs-zod: 5.0.1
@@ -62,6 +63,7 @@ catalog:
   passport: 0.7.0
   passport-microsoft: 2.1.0
   pg: 8.23.0
+  pino: 10.3.1
   pino-http: 10.5.0
   reflect-metadata: 0.2.2
   remeda: 2.45.0

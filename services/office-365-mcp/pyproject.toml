@@ -38,6 +38,7 @@ dependencies = [
     # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
     "unique-toolkit[monitoring,otel]==2026.34.3",
+    "mcp==1.28.1",
 ]
 
 [project.scripts]

@@ -46,6 +46,7 @@
     "istanbul-badges-readme": "catalog:",
     "nestjs-otel": "catalog:",
     "passport": "catalog:",
+    "rxjs": "catalog:",
     "supertest": "catalog:",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
@@ -56,6 +57,7 @@
     "@nestjs/core": "^11",
     "@opentelemetry/api": "^1.9.0",
     "nestjs-otel": "^8",
-    "passport": "^0.7"
+    "passport": "^0.7",
+    "rxjs": "^7"
   }
 }
