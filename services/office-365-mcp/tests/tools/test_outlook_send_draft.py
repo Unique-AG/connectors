@@ -606,9 +606,9 @@ class TestHowItDeclaresItself:
         assert annotations is not None, (
             "a tool with no annotations joins the write surface by omission"
         )
-        assert annotations.readOnlyHint is WRITE_DESTRUCTIVE["readOnlyHint"]
-        assert annotations.destructiveHint is WRITE_DESTRUCTIVE["destructiveHint"]
-        assert annotations.idempotentHint is WRITE_DESTRUCTIVE["idempotentHint"]
+        assert annotations.read_only_hint is WRITE_DESTRUCTIVE["readOnlyHint"]
+        assert annotations.destructive_hint is WRITE_DESTRUCTIVE["destructiveHint"]
+        assert annotations.idempotent_hint is WRITE_DESTRUCTIVE["idempotentHint"]
 
     async def test_the_description_says_it_sends_as_the_user_and_cannot_be_undone(
         self, transport: httpx.AsyncClient

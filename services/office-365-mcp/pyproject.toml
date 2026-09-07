@@ -8,7 +8,7 @@ dependencies = [
     # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
     # also arrive transitively via `msgraph-sdk`, which is precisely why this is declared: the day
     # the Graph SDK stops depending on them, OBO must not break silently.
-    "fastmcp[azure]==3.4.7",
+    "fastmcp[azure]==4.0.2",
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
     # the postgresql extra and because auth.py imports it directly (OAuth state store).
     "py-key-value-aio[postgresql]==0.4.5",
@@ -95,3 +95,7 @@ extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
 reportUnusedFunction = false
+
+[tool.uv]
+# unique-mcp pins fastmcp<4 but imports nothing 4.x changed; drop when it allows fastmcp 4.
+override-dependencies = ["fastmcp[azure]==4.0.2"]
