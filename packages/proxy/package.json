@@ -27,6 +27,7 @@
     "@nestjs/config": "catalog:",
     "@swc/core": "catalog:",
     "@types/node": "catalog:",
+    "typeid-js": "catalog:",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
     "vitest": "catalog:",
@@ -35,6 +36,7 @@
   "peerDependencies": {
     "@nestjs/common": "^11",
     "@nestjs/config": "^4",
+    "typeid-js": "^1.2.0",
     "zod": "^4.1.5"
   },
   "exports": {

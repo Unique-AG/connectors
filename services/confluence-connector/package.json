@@ -55,6 +55,7 @@
     "reflect-metadata": "catalog:",
     "remeda": "catalog:",
     "rxjs": "catalog:",
+    "typeid-js": "catalog:",
     "undici": "catalog:",
     "zod": "catalog:"
   },
