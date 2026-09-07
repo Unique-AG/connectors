@@ -339,7 +339,10 @@ and cannot send a message a reader found. It takes no recipient, subject or body
 what leaves the mailbox is exactly what a person can already read in their Drafts folder. Microsoft's
 one-shot `POST /me/sendMail` is deliberately never used, because it is the only send that can set
 `saveToSentItems: false` and leave no trace anywhere, and it answers `202` with an empty body so
-nothing can be reported about what it did.
+nothing can be reported about what it did. On a 2026-07-28 connection, which has no channel for a
+server to ask a person anything mid-call, the tool answers with the question instead and a client
+that can elicit calls it again with the answer — so nothing is sent before an accept bound to that
+same question.
 
 **`MailboxSettings.ReadWrite` is the permission to read hardest, and its display text does not say
 so.** Entra shows it as "Read and write user mailbox settings". It is also the only delegated

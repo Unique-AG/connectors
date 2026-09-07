@@ -68,10 +68,10 @@ from typing import Annotated
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from fastmcp.server.elicitation import AcceptedElicitation
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.messages.item.message_item_request_builder import (
     MessageItemRequestBuilder,
@@ -82,7 +82,12 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.mail import MailAddress
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    WRITE_DESTRUCTIVE,
+    Confirmed,
+    graph_client_for_caller,
+    person_confirms,
+)
 
 TOOL_NAME = "outlook_send_draft"
 
@@ -213,26 +218,12 @@ class MailSent(BaseModel):
 
 SEND = "send"
 _DO_NOT_SEND = "do not send"
+_NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
-_DECLINED = (
-    "Nothing was sent. The person at the other end of this conversation was asked to confirm "
-    "the send and did not agree to it. The draft is untouched and still in Drafts, so this is "
-    "not a failure to report as one: say the send was not confirmed. Do not call this tool again "
-    "for the same draft unless the user asks for it in a new message."
-)
-
-_NO_WAY_TO_ASK = (
-    "Nothing was sent. This connector asks a person to confirm every send, and the MCP client on "
-    "the other end does not support elicitation, so there was nobody to ask. This is a property "
-    "of the client, not of the draft or of the mailbox: retrying will fail the same way. The "
-    "draft is untouched and still in Drafts, where the user can send it from Outlook. Tell the "
-    "user that, and tell them their client cannot confirm a send."
-)
-
-# The refusal to report, or None when the person agreed. Answered rather than raised: a
-# `ToolError` leaving this crosses the block that measures the Graph operation, which then
-# records a person saying no as a Graph failure. See `send_draft`.
-type _Confirm = Callable[[Message], Awaitable[str | None]]
+# The refusal to report, the question nobody has answered yet, or None when the person agreed.
+# Answered rather than raised: a `ToolError` leaving this crosses the block that measures the
+# Graph operation, which then records a person saying no as a Graph failure. See `send_draft`.
+type _Confirm = Callable[[Message], Awaitable[Confirmed]]
 
 
 def a_person_agrees(ctx: Context) -> _Confirm:
@@ -242,8 +233,9 @@ def a_person_agrees(ctx: Context) -> _Confirm:
     so the question names the recipients and the subject and cannot name the body. That is the
     whole of what this tool can show, and it is what makes "send to these people" answerable.
     """
+    confirm = person_confirms(ctx, agree=SEND, decline=_DO_NOT_SEND, nothing_happened=_NOTHING_SENT)
 
-    async def confirm(draft: Message) -> str | None:
+    async def asked(draft: Message) -> Confirmed:
         everyone = [
             one.address or one.name or "an address Microsoft did not record"
             for one in MailAddress.each_of(draft.to_recipients)
@@ -253,30 +245,29 @@ def a_person_agrees(ctx: Context) -> _Confirm:
             f"Send the draft {draft.subject or '(no subject)'!r} to "
             f"{', '.join(everyone) or 'nobody'}? Sending cannot be undone."
         )
-        try:
-            answer = await ctx.elicit(question, response_type=[SEND, _DO_NOT_SEND])
-        except ToolError as already_a_refusal:
-            return str(already_a_refusal)
-        except Exception:
-            # Every exception: a client with no elicitation capability is reported differently by
-            # different transports, and none of those is a reason to send anyway.
-            return _NO_WAY_TO_ASK
-        if not isinstance(answer, AcceptedElicitation) or answer.data != SEND:
-            return _DECLINED
-        return None
+        # Bound to the question itself, so a subject or recipient changed between the rounds is
+        # refused. The body is not named, Mail.ReadBasic withholds it, so a body edit is not caught.
+        return await confirm(question, question)
 
-    return confirm
+    return asked
 
 
-async def send_draft(client: GraphServiceClient, *, draft_ref: str, confirm: _Confirm) -> MailSent:
+async def send_draft(
+    client: GraphServiceClient, *, draft_ref: str, confirm: _Confirm
+) -> MailSent | InputRequiredResult:
     """Read the draft `draft_ref` addresses, put it to a person, then send it.
 
     `confirm` has no default. The read is what makes the question answerable, so the confirmation
     belongs between the two requests, and a caller that could omit it would be back to a promise
     in a docstring.
+
+    On a connection with no server-to-client channel the question is answered rather than awaited:
+    `confirm` hands back the question itself, this call returns it instead of sending anything, and
+    a client that can elicit puts it to a person and calls the tool again with their answer.
     """
     handle = _handle_for(draft_ref)
 
+    asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_READ_DRAFT):
             draft = await client.me.messages.by_message_id(handle.draft_id).get(
@@ -285,14 +276,20 @@ async def send_draft(client: GraphServiceClient, *, draft_ref: str, confirm: _Co
         refused: str | None = _ALREADY_SENT
         if draft is not None and draft.is_draft is True:
             with not_graph():
-                refused = await confirm(draft)
-        sent_at = await _send(client, handle) if refused is None else None
+                answer = await confirm(draft)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        sent_at = await _send(client, handle) if refused is None and asked is None else None
 
     # This function decides inside the block above, and raises every refusal outside it.
     # `graph_errors` treats a `ToolError` that escapes it as a Graph operation that failed for a
     # reason the seam cannot describe. A message this tool refuses to send is not a Graph failure
     # at all, whether the refusal is the person's, their client's, or "that draft already went".
+    # A question nobody has answered yet leaves the block the same way, and is returned rather
+    # than raised: it is not a refusal at all, it is the send still waiting on a person.
     assert draft is not None, "Graph answered a draft read with no message"
+    if asked is not None:
+        return asked
     if refused is not None:
         raise ToolError(refused)
     assert sent_at is not None, "a send that nothing refused recorded no time"
@@ -386,5 +383,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ],
         ctx: Context,
         client: GraphServiceClient = graph,
-    ) -> MailSent:
+    ) -> MailSent | InputRequiredResult:
         return await send_draft(client, draft_ref=draft_ref, confirm=a_person_agrees(ctx))

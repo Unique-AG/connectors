@@ -4,10 +4,16 @@ becomes. The only file in `shared/` that imports FastMCP.
 Trap: the middleware never sees a `GraphFailure` — FastMCP re-raises a tool failure as `ToolError`
 (fastmcp 4.0.2, `fastmcp/server/server.py:1554-1555`) over the dependency engine's `RuntimeError`,
 so causes are matched two links down `__cause__`, by type, never on message text.
+
+`person_confirms` is the one way a tool asks a person before it writes: the question is the tool's,
+the two refusals (a person said no, a client that cannot ask) are shared, and both say nothing
+happened. It owns the era too: a handshake connection is asked over the back-channel and answers
+inside the call, and a 2026-07-28 connection has none, so the tool answers with the question and a
+client that can elicit calls it again with the answer.
 """
 
 import re
-from collections.abc import Generator, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
@@ -18,9 +24,21 @@ from fastmcp import Context
 from fastmcp.dependencies import Dependency, Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import EntraOBOToken
+from fastmcp.server.elicitation import (
+    AcceptedElicitation,
+    handle_elicit_accept,
+    parse_elicit_response_type,
+)
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
-from mcp.types import CallToolRequestParams
+from mcp.types import (
+    CallToolRequestParams,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    InputRequiredResult,
+)
+from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import (
@@ -168,6 +186,136 @@ def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> 
         return graph_client_for(transport, access_token)
 
     return Depends(client_for_this_call)
+
+
+# What a refusal says last, so a model does not read "no" as "ask again": MCP gives a server no way
+# to remember that a person already said no to this request.
+_ASK_AGAIN = (
+    "Do not call this tool again for the same request unless the user asks for it in a new message."
+)
+
+# Answered, never raised, so a person saying no is not recorded as a Graph failure. `None` lets the
+# write happen, a string is the refusal, and an `InputRequiredResult` is the question for a re-call.
+type Confirmed = str | InputRequiredResult | None
+
+# The question, and what the answer is bound to: a value that changes whenever the thing being
+# confirmed changes. Both creating tools pass the `transactionId` they also send to Graph.
+type Confirm = Callable[[str, str], Awaitable[Confirmed]]
+
+# The key this connector's one question is asked under. Every tool here asks at most one thing per
+# call, and the client answers under the key the question was minted with.
+_CONFIRMATION = "confirm"
+
+
+def _modern_protocol(ctx: Context) -> bool:
+    """True when this connection's era has no server-to-client channel to elicit over.
+
+    `Context._is_modern_protocol` is this same check and is private, so this reads the negotiated
+    version off the public request context, and treats no request context as not modern the way
+    that method documents.
+    """
+    request = ctx.request_context
+    return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
+
+
+def _nobody_to_ask(nothing_happened: str) -> str:
+    """A client with no elicitation capability. Shared so both eras refuse in the same words."""
+    return (
+        f"{nothing_happened} This connector asks a person to confirm this, and the MCP "
+        + "client on the other end does not support elicitation, so there was nobody to "
+        + "ask. This is a property of the client and not of the request: retrying will "
+        + "fail the same way. Tell the user that their client cannot confirm this, and "
+        + f"that they can do it in Outlook instead. {_ASK_AGAIN}"
+    )
+
+
+def _not_agreed(nothing_happened: str) -> str:
+    """A person was asked and said no. Shared so both eras refuse in the same words."""
+    return (
+        f"{nothing_happened} The person at the other end of this conversation was asked to "
+        + "confirm it and did not agree. Nothing was changed, so this is not a failure to "
+        + f"report as one: say that the request was not confirmed. {_ASK_AGAIN}"
+    )
+
+
+def _another_request(nothing_happened: str) -> str:
+    """The answer came back bound to something other than what this call would write."""
+    return (
+        f"{nothing_happened} The confirmation that came back was given for a different request "
+        + "than this one, so that agreement does not cover this request, and nothing was changed. "
+        + f"Ask the user again and call this tool with exactly what they confirm. {_ASK_AGAIN}"
+    )
+
+
+def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
+    """Ask the caller's own client to put a question to a person, and refuse unless they agree.
+
+    `agree` and `decline` are the two answers the person picks between, and `agree` is the only one
+    that lets the call continue. `nothing_happened` opens both refusals, because what a model needs
+    first is the fact that the write did not happen.
+
+    Elicitation is a capability of the client and not of this server
+    (https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation), so a client that
+    does not support it leaves nobody to ask. On a handshake connection that is a refusal worded
+    here; on a 2026-07-28 connection the client's own driver fails the round instead, and nothing
+    is written either way.
+
+    Two eras, one question. A handshake-era connection is asked over the back-channel and answers
+    inside this call. A 2026-07-28 connection has none (SEP-2577), so the question is answered
+    with: `confirm` hands back the `InputRequiredResult` the tool returns, and a client that can
+    elicit asks the person and calls the tool again with the answer on `ctx.input_responses`.
+    `about` is what ties that answer to the request it was given for, because the second call
+    composes its own draft and only an answer bound to that draft authorizes writing it. The
+    framework verifies `request_state` only when the re-call carries one, so the comparison here
+    is what refuses an accept that arrives without its state.
+    """
+    answers = parse_elicit_response_type([agree, decline])
+
+    async def elicited(question: str) -> str | None:
+        try:
+            answer = await ctx.elicit(question, response_type=[agree, decline])
+        except ToolError as already_a_refusal:
+            return str(already_a_refusal)
+        except Exception:
+            # Every exception: a client with no elicitation capability is reported differently by
+            # different transports, and none of those is a reason to write anyway.
+            return _nobody_to_ask(nothing_happened)
+        if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
+            return _not_agreed(nothing_happened)
+        return None
+
+    def asked(question: str, about: str) -> Confirmed:
+        answered = (ctx.input_responses or {}).get(_CONFIRMATION)
+        if answered is None:
+            # Nothing has been asked yet, or the client came back without an answer. Both are a
+            # question that still needs putting, and neither is a reason to write.
+            return InputRequiredResult(
+                input_requests={
+                    _CONFIRMATION: ElicitRequest(
+                        params=ElicitRequestFormParams(
+                            message=question, requested_schema=answers.schema
+                        )
+                    )
+                },
+                request_state=about,
+            )
+        if not isinstance(answered, ElicitResult) or answered.action != "accept":
+            return _not_agreed(nothing_happened)
+        if ctx.request_state != about:
+            return _another_request(nothing_happened)
+        try:
+            accepted = handle_elicit_accept(answers, answered.content)
+        except Exception:
+            # Every exception: the content is the client's, checked against the schema this
+            # question was asked under, and an answer that fails that check agreed to nothing.
+            return _not_agreed(nothing_happened)
+        chosen = cast("str", accepted.data)
+        return None if chosen == agree else _not_agreed(nothing_happened)
+
+    async def confirm(question: str, about: str) -> Confirmed:
+        return asked(question, about) if _modern_protocol(ctx) else await elicited(question)
+
+    return confirm
 
 
 class Advised(ToolError):
