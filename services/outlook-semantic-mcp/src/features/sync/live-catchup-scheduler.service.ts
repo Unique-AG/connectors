@@ -11,6 +11,7 @@ import {
   DrizzleDatabase,
   delegatedAccessAccounts,
   inboxConfigurations,
+  SOURCES_WITH_DELEGATE_FALLBACK,
   userProfiles,
 } from '~/db';
 import { NewTrace, traceEvent } from '~/features/tracing.utils';
@@ -243,7 +244,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
             inboxConfigurations.userProfileId,
             selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
           ),
-          eq(userProfiles.source, 'shared-mailbox'),
+          inArray(userProfiles.source, SOURCES_WITH_DELEGATE_FALLBACK),
           eq(inboxConfigurations.liveCatchUpState, 'ready'),
           lt(
             inboxConfigurations.liveCatchUpHeartbeatAt,

@@ -1,6 +1,12 @@
-import { and, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
 import { alias, union } from 'drizzle-orm/pg-core';
-import { DrizzleDatabase, delegatedAccessAccounts, subscriptions, userProfiles } from '~/db';
+import {
+  DrizzleDatabase,
+  delegatedAccessAccounts,
+  SOURCES_WITH_DELEGATE_FALLBACK,
+  subscriptions,
+  userProfiles,
+} from '~/db';
 
 const delegateProfiles = alias(userProfiles, 'delegate_profiles');
 
@@ -24,7 +30,7 @@ export function selectUserProfileIdsWhichCanRunTheSyncProcess(db: DrizzleDatabas
       userProfiles,
       and(
         eq(userProfiles.id, delegatedAccessAccounts.ownerUserId),
-        eq(userProfiles.source, 'shared-mailbox'),
+        inArray(userProfiles.source, SOURCES_WITH_DELEGATE_FALLBACK),
       ),
     );
 
