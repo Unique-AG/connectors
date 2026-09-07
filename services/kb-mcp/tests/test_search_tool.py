@@ -369,14 +369,14 @@ async def test_search_returns_error_when_identity_unresolvable():
 
 def test_is_unique_ai_client_true_for_node_chats_own_client_name():
     ctx = MagicMock()
-    ctx.session.client_params.clientInfo.name = "unique-ai-mcp-client-module-kb-mcp"
+    ctx.session.client_params.client_info.name = "unique-ai-mcp-client-module-kb-mcp"
     with patch("kb_mcp.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is True
 
 
 def test_is_unique_ai_client_false_for_generic_client_name():
     ctx = MagicMock()
-    ctx.session.client_params.clientInfo.name = "claude-code"
+    ctx.session.client_params.client_info.name = "claude-code"
     with patch("kb_mcp.references.get_context", return_value=ctx):
         assert is_unique_ai_client() is False
 

@@ -5,8 +5,8 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.elicitation import AcceptedElicitation
-from mcp.shared.exceptions import McpError
-from mcp.types import METHOD_NOT_FOUND, ClientCapabilities, ErrorData
+from mcp.shared.exceptions import MCPError
+from mcp.types import METHOD_NOT_FOUND, ClientCapabilities
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
@@ -1312,7 +1312,7 @@ class TestElicitChoice:
             nonlocal elicit_calls
             elicit_calls += 1
             _ = message, response_type
-            raise McpError(ErrorData(code=METHOD_NOT_FOUND, message="Method not found"))
+            raise MCPError(code=METHOD_NOT_FOUND, message="Method not found")
 
         ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
         result = await elicit_choice(

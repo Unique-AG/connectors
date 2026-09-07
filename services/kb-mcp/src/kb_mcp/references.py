@@ -61,7 +61,7 @@ def is_unique_ai_client() -> bool:
     client_params = ctx.session.client_params
     if client_params is None:
         return False
-    return client_params.clientInfo.name.startswith(_UNIQUE_AI_CLIENT_NAME_PREFIX)
+    return client_params.client_info.name.startswith(_UNIQUE_AI_CLIENT_NAME_PREFIX)
 
 
 REFERENCE_META_KEY = "unique.app/reference"
