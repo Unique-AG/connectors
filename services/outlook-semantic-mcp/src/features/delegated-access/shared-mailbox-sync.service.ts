@@ -18,6 +18,7 @@ import {
   DRIZZLE,
   DrizzleDatabase,
   inboxConfigurations,
+  SOURCES_OWNED_BY_SYNC,
   type UserProfileSource,
   upgradedSource,
   userProfiles,
@@ -226,11 +227,11 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     }
 
     const profilesToRemove = await this.db
-      .select({ id: userProfiles.id })
+      .select({ id: userProfiles.id, source: userProfiles.source })
       .from(userProfiles)
       .where(
         and(
-          eq(userProfiles.source, 'shared-mailbox'),
+          inArray(userProfiles.source, SOURCES_OWNED_BY_SYNC),
           allMatchedUsers.length > 0
             ? not(
                 inArray(
@@ -253,12 +254,22 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
           });
         }
       } else {
-        await this.db.delete(userProfiles).where(
-          inArray(
-            userProfiles.id,
-            profilesToRemove.map((p) => p.id),
-          ),
-        );
+        const pureSharedMailboxIds = profilesToRemove
+          .filter((profile) => profile.source === 'shared-mailbox')
+          .map((profile) => profile.id);
+        const dualMailboxIds = profilesToRemove
+          .filter((profile) => profile.source === 'shared-mailbox-with-login')
+          .map((profile) => profile.id);
+
+        if (pureSharedMailboxIds.length > 0) {
+          await this.db.delete(userProfiles).where(inArray(userProfiles.id, pureSharedMailboxIds));
+        }
+        if (dualMailboxIds.length > 0) {
+          await this.db
+            .update(userProfiles)
+            .set({ source: 'oauth' })
+            .where(inArray(userProfiles.id, dualMailboxIds));
+        }
       }
     }
 
@@ -337,8 +348,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
         const ingestionCfg = this.ingestionCfg;
 
-        // Query all shared-mailbox profiles that have no inbox configuration. This is broader than
-        // filtering upsertedProfiles: it also catches profiles whose config was removed by an async
+        // Query all sync-owned profiles that have no inbox configuration. Dual mailboxes
+        // are still ingested as shared mailboxes. This is broader than filtering
+        // upsertedProfiles: it also catches profiles whose config was removed by an async
         // deletion triggered in a previous run. Profiles mid-deletion still have their config row
         // so they are naturally excluded by the LEFT JOIN / IS NULL predicate.
         const sharedMailboxesWithMissingInboxConfiguration = await this.db
@@ -347,7 +359,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
           .leftJoin(inboxConfigurations, eq(inboxConfigurations.userProfileId, userProfiles.id))
           .where(
             and(
-              eq(userProfiles.source, 'shared-mailbox'),
+              inArray(userProfiles.source, SOURCES_OWNED_BY_SYNC),
               isNull(inboxConfigurations.userProfileId),
             ),
           );

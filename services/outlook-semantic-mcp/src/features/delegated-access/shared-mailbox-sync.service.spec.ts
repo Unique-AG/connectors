@@ -89,9 +89,13 @@ function createMockDb(
       source: string;
       accessToken: string | null;
     }>;
+    profilesToRemove?: Array<{ id: string; source: string }>;
   },
 ) {
   const deleteMock = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+  const updateMock = vi.fn().mockReturnValue({
+    set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+  });
   const returning = vi
     .fn()
     .mockResolvedValue(profileIds.map((id) => ({ id, source: 'shared-mailbox' })));
@@ -112,7 +116,9 @@ function createMockDb(
   const leftJoinMock = vi.fn().mockReturnValue({ where: profilesWithoutConfigWhere });
   const selectWhere = vi
     .fn()
-    .mockResolvedValueOnce([{ id: 'stale-profile-id' }])
+    .mockResolvedValueOnce(
+      options?.profilesToRemove ?? [{ id: 'stale-profile-id', source: 'shared-mailbox' }],
+    )
     .mockResolvedValue(options?.existingProfiles ?? []);
   const selectMock = vi.fn().mockReturnValue({
     from: vi.fn().mockReturnValue({
@@ -120,7 +126,7 @@ function createMockDb(
       leftJoin: leftJoinMock,
     }),
   });
-  return { delete: deleteMock, insert: insertMock, select: selectMock };
+  return { delete: deleteMock, insert: insertMock, select: selectMock, update: updateMock };
 }
 
 function createService(overrides?: {
@@ -139,9 +145,11 @@ function createService(overrides?: {
     source: string;
     accessToken: string | null;
   }>;
+  profilesToRemove?: Array<{ id: string; source: string }>;
 }) {
   const db = createMockDb(overrides?.profileIds ?? [], {
     existingProfiles: overrides?.existingProfiles,
+    profilesToRemove: overrides?.profilesToRemove,
   });
   const config = {
     scan: 'full_access_only' as const,
@@ -208,6 +216,7 @@ function createService(overrides?: {
     schedulerRegistry,
     config,
     amqp,
+    deleteInboxDataCommand,
   };
 }
 
@@ -782,6 +791,48 @@ describe('SharedMailboxSyncService', () => {
 
       const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
       expect(insertedValues[0].source).toBe('shared-mailbox');
+    });
+
+    it('de-listing a dual mailbox keeps the profile and downgrades source to oauth', async () => {
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: [] },
+        factoryResults: [null],
+        profilesToRemove: [{ id: 'dual-profile-id', source: 'shared-mailbox-with-login' }],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      expect(db.delete).not.toHaveBeenCalled();
+      expect(db.update).toHaveBeenCalledOnce();
+      expect(db.update.mock.results[0]?.value.set).toHaveBeenCalledWith({ source: 'oauth' });
+    });
+
+    it('de-listing a pure shared-mailbox still deletes the profile', async () => {
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: [] },
+        factoryResults: [null],
+        profilesToRemove: [{ id: 'pure-profile-id', source: 'shared-mailbox' }],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      expect(db.delete).toHaveBeenCalledOnce();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('de-listing a dual mailbox on UniqueApi enqueues inbox deletion and does not hard-delete', async () => {
+      const { service, db, deleteInboxDataCommand } = createService({
+        config: { sharedMailboxEmails: [] },
+        ingestionConfig: { mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi },
+        factoryResults: [null],
+        profilesToRemove: [{ id: 'dual-profile-id', source: 'shared-mailbox-with-login' }],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      expect(deleteInboxDataCommand.run).toHaveBeenCalledWith('dual-profile-id');
+      expect(db.delete).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
     });
 
     it('cache is updated with new hash after successful sync', async () => {
