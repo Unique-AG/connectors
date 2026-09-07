@@ -17,6 +17,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@nestjs/common": "11.2.3",
     "@types/node": "26.4.0",
     "typescript": "5.9.3"
   },
