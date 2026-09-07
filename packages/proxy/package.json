@@ -16,21 +16,21 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@proventuslabs/nestjs-zod": "2.0.0",
+    "@proventuslabs/nestjs-zod": "catalog:",
     "@unique-ag/utils": "workspace:*",
     "https-proxy-agent": "7.0.6",
-    "remeda": "2.45.0",
-    "undici": "7.29.0"
+    "remeda": "catalog:",
+    "undici": "catalog:"
   },
   "devDependencies": {
-    "@nestjs/common": "11.2.3",
-    "@nestjs/config": "4.0.4",
-    "@swc/core": "1.16.1",
-    "@types/node": "26.4.0",
-    "typescript": "5.9.3",
-    "unplugin-swc": "1.5.11",
-    "vitest": "3.2.7",
-    "zod": "4.4.3"
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@swc/core": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",

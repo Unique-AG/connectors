@@ -16,25 +16,25 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@proventuslabs/nestjs-zod": "2.0.0",
+    "@proventuslabs/nestjs-zod": "catalog:",
     "@unique-ag/utils": "workspace:*",
-    "bottleneck": "2.19.5",
-    "graphql": "16.14.2",
-    "graphql-request": "7.3.4",
-    "remeda": "2.45.0",
-    "undici": "7.29.0",
-    "zod": "4.4.3"
+    "bottleneck": "catalog:",
+    "graphql": "catalog:",
+    "graphql-request": "catalog:",
+    "remeda": "catalog:",
+    "undici": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@nestjs/common": "11.2.3",
-    "@nestjs/terminus": "11.1.1",
-    "@opentelemetry/api": "1.9.1",
-    "@swc/core": "1.16.1",
-    "@types/node": "26.4.0",
-    "reflect-metadata": "0.2.2",
-    "typescript": "5.9.3",
-    "unplugin-swc": "1.5.11",
-    "vitest": "3.2.7"
+    "@nestjs/common": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@swc/core": "catalog:",
+    "@types/node": "catalog:",
+    "reflect-metadata": "catalog:",
+    "typescript": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",

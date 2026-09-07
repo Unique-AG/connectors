@@ -5,6 +5,192 @@ settings:
   excludeLinksFromLockfile: false
   injectWorkspacePackages: true
 
+catalogs:
+  default:
+    '@golevelup/nestjs-rabbitmq':
+      specifier: 6.1.0
+      version: 6.1.0
+    '@microsoft/microsoft-graph-client':
+      specifier: 3.0.7
+      version: 3.0.7
+    '@modelcontextprotocol/sdk':
+      specifier: 1.30.0
+      version: 1.30.0
+    '@nestjs/cache-manager':
+      specifier: 3.1.3
+      version: 3.1.3
+    '@nestjs/cli':
+      specifier: 11.0.24
+      version: 11.0.24
+    '@nestjs/common':
+      specifier: 11.2.3
+      version: 11.2.3
+    '@nestjs/config':
+      specifier: 4.0.4
+      version: 4.0.4
+    '@nestjs/core':
+      specifier: 11.2.3
+      version: 11.2.3
+    '@nestjs/platform-express':
+      specifier: 11.2.3
+      version: 11.2.3
+    '@nestjs/schedule':
+      specifier: 6.1.3
+      version: 6.1.3
+    '@nestjs/schematics':
+      specifier: 11.1.0
+      version: 11.1.0
+    '@nestjs/swagger':
+      specifier: 11.4.7
+      version: 11.4.7
+    '@nestjs/terminus':
+      specifier: 11.1.1
+      version: 11.1.1
+    '@nestjs/testing':
+      specifier: 11.2.3
+      version: 11.2.3
+    '@opentelemetry/api':
+      specifier: 1.9.1
+      version: 1.9.1
+    '@opentelemetry/instrumentation-pg':
+      specifier: 0.73.0
+      version: 0.73.0
+    '@proventuslabs/nestjs-zod':
+      specifier: 2.0.0
+      version: 2.0.0
+    '@suites/di.nestjs':
+      specifier: 3.1.0
+      version: 3.1.0
+    '@suites/doubles.vitest':
+      specifier: 3.1.0
+      version: 3.1.0
+    '@suites/unit':
+      specifier: 3.1.1
+      version: 3.1.1
+    '@swc/cli':
+      specifier: 0.8.1
+      version: 0.8.1
+    '@swc/core':
+      specifier: 1.16.1
+      version: 1.16.1
+    '@types/amqplib':
+      specifier: 0.10.8
+      version: 0.10.8
+    '@types/express':
+      specifier: 5.0.6
+      version: 5.0.6
+    '@types/js-yaml':
+      specifier: 4.0.9
+      version: 4.0.9
+    '@types/node':
+      specifier: 26.4.0
+      version: 26.4.0
+    '@types/passport-microsoft':
+      specifier: 2.1.1
+      version: 2.1.1
+    '@types/pg':
+      specifier: 8.23.1
+      version: 8.23.1
+    '@types/supertest':
+      specifier: 6.0.3
+      version: 6.0.3
+    '@vitest/coverage-istanbul':
+      specifier: 3.2.7
+      version: 3.2.7
+    '@vitest/coverage-v8':
+      specifier: 3.2.7
+      version: 3.2.7
+    amqplib:
+      specifier: 0.10.9
+      version: 0.10.9
+    bottleneck:
+      specifier: 2.19.5
+      version: 2.19.5
+    cache-manager:
+      specifier: 7.2.9
+      version: 7.2.9
+    cron:
+      specifier: 4.4.0
+      version: 4.4.0
+    drizzle-kit:
+      specifier: 0.31.10
+      version: 0.31.10
+    drizzle-orm:
+      specifier: 0.45.2
+      version: 0.45.2
+    graphql:
+      specifier: 16.14.2
+      version: 16.14.2
+    graphql-request:
+      specifier: 7.3.4
+      version: 7.3.4
+    istanbul-badges-readme:
+      specifier: 1.9.0
+      version: 1.9.0
+    js-yaml:
+      specifier: 4.3.2
+      version: 4.3.2
+    nestjs-otel:
+      specifier: 8.1.0
+      version: 8.1.0
+    nestjs-pino:
+      specifier: 4.6.1
+      version: 4.6.1
+    nestjs-zod:
+      specifier: 5.0.1
+      version: 5.0.1
+    p-limit:
+      specifier: 7.3.1
+      version: 7.3.1
+    passport:
+      specifier: 0.7.0
+      version: 0.7.0
+    passport-microsoft:
+      specifier: 2.1.0
+      version: 2.1.0
+    pg:
+      specifier: 8.23.0
+      version: 8.23.0
+    pino-http:
+      specifier: 10.5.0
+      version: 10.5.0
+    reflect-metadata:
+      specifier: 0.2.2
+      version: 0.2.2
+    remeda:
+      specifier: 2.45.0
+      version: 2.45.0
+    rxjs:
+      specifier: 7.8.2
+      version: 7.8.2
+    serialize-error-cjs:
+      specifier: 0.2.0
+      version: 0.2.0
+    supertest:
+      specifier: 7.2.2
+      version: 7.2.2
+    type-fest:
+      specifier: 5.8.0
+      version: 5.8.0
+    typeid-js:
+      specifier: 1.2.0
+      version: 1.2.0
+    typescript:
+      specifier: 5.9.3
+      version: 5.9.3
+    undici:
+      specifier: 7.29.0
+      version: 7.29.0
+    unplugin-swc:
+      specifier: 1.5.11
+      version: 1.5.11
+    vitest:
+      specifier: 3.2.7
+      version: 3.2.7
+    zod:
+      specifier: 4.4.3
+      version: 4.4.3
+
 overrides:
   minimatch@<3.1.4: 3.1.5
   path-to-regexp@>=8.0.0 <8.4.2: 8.4.2
@@ -28,35 +214,35 @@ importers:
         specifier: 2.10.12
         version: 2.10.12
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   packages/aes-gcm-encryption:
     dependencies:
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
 
   packages/instrumentation:
     dependencies:
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@opentelemetry/auto-instrumentations-node':
         specifier: 0.79.0
@@ -101,51 +287,51 @@ importers:
         specifier: 1.0.0
         version: 1.0.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
 
   packages/logger:
     dependencies:
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       serialize-error-cjs:
-        specifier: 0.2.0
+        specifier: 'catalog:'
         version: 0.2.0
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       pino-http:
-        specifier: 10.5.0
+        specifier: 'catalog:'
         version: 10.5.0
       pino-pretty:
         specifier: 13.1.3
         version: 13.1.3
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   packages/mcp-oauth:
     dependencies:
       '@nestjs/schedule':
-        specifier: 6.1.3
+        specifier: 'catalog:'
         version: 6.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/throttler':
         specifier: 6.5.0
@@ -154,135 +340,135 @@ importers:
         specifier: 6.0.0
         version: 6.0.0
       nestjs-zod:
-        specifier: 5.0.1
+        specifier: 'catalog:'
         version: 5.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       serialize-error-cjs:
-        specifier: 0.2.0
+        specifier: 'catalog:'
         version: 0.2.0
       typeid-js:
-        specifier: 1.2.0
+        specifier: 'catalog:'
         version: 1.2.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/bcrypt':
         specifier: 6.0.0
         version: 6.0.0
       '@types/express':
-        specifier: 5.0.6
+        specifier: 'catalog:'
         version: 5.0.6
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/passport':
         specifier: 1.0.17
         version: 1.0.17
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-istanbul':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       passport:
-        specifier: 0.7.0
+        specifier: 'catalog:'
         version: 0.7.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   packages/mcp-server-module:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: 1.30.0
+        specifier: 'catalog:'
         version: 1.30.0(zod@4.4.3)
       path-to-regexp:
         specifier: 8.4.2
         version: 8.4.2
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@types/express':
-        specifier: 5.0.6
+        specifier: 'catalog:'
         version: 5.0.6
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
 
   packages/probe:
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/swagger':
-        specifier: 11.4.7
+        specifier: 'catalog:'
         version: 11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
 
   packages/proxy:
     dependencies:
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/utils':
         specifier: workspace:*
@@ -291,145 +477,145 @@ importers:
         specifier: 7.0.6
         version: 7.0.6
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
 
   packages/unique-api:
     dependencies:
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../utils
       bottleneck:
-        specifier: 2.19.5
+        specifier: 'catalog:'
         version: 2.19.5
       graphql:
-        specifier: 16.14.2
+        specifier: 'catalog:'
         version: 16.14.2
       graphql-request:
-        specifier: 7.3.4
+        specifier: 'catalog:'
         version: 7.3.4(graphql@16.14.2)
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/terminus':
-        specifier: 11.1.1
+        specifier: 'catalog:'
         version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   packages/utils:
     dependencies:
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
     devDependencies:
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       typeid-js:
-        specifier: 1.2.0
+        specifier: 'catalog:'
         version: 1.2.0
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
 
   services/confluence-connector:
     dependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/schedule':
-        specifier: 6.1.3
+        specifier: 'catalog:'
         version: 6.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/terminus':
-        specifier: 11.1.1
+        specifier: 'catalog:'
         version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/instrumentation':
         specifier: workspace:*
@@ -447,125 +633,125 @@ importers:
         specifier: workspace:*
         version: link:../../packages/utils
       bottleneck:
-        specifier: 2.19.5
+        specifier: 'catalog:'
         version: 2.19.5
       cron:
-        specifier: 4.4.0
+        specifier: 'catalog:'
         version: 4.4.0
       htmlparser2:
         specifier: 12.0.0
         version: 12.0.0
       js-yaml:
-        specifier: 4.3.2
+        specifier: 'catalog:'
         version: 4.3.2
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       p-limit:
-        specifier: 7.3.1
+        specifier: 'catalog:'
         version: 7.3.1
       pino:
         specifier: 10.3.1
         version: 10.3.1
       pino-http:
-        specifier: 10.5.0
+        specifier: 'catalog:'
         version: 10.5.0
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       rxjs:
-        specifier: 7.8.2
+        specifier: 'catalog:'
         version: 7.8.2
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@golevelup/ts-vitest':
         specifier: 4.0.0
         version: 4.0.0
       '@nestjs/cli':
-        specifier: 11.0.24
+        specifier: 'catalog:'
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.1))(@swc/core@1.16.1)(@types/node@26.4.0)(esbuild@0.28.2)
       '@nestjs/schematics':
-        specifier: 11.1.0
+        specifier: 'catalog:'
         version: 11.1.0(chokidar@4.0.3)(typescript@5.9.3)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/cli':
-        specifier: 0.8.1
+        specifier: 'catalog:'
         version: 0.8.1(@swc/core@1.16.1)(chokidar@4.0.3)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/js-yaml':
-        specifier: 4.0.9
+        specifier: 'catalog:'
         version: 4.0.9
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-v8':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       domhandler:
         specifier: 6.0.1
         version: 6.0.1
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   services/kyckr-mcp:
     dependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/instrumentation':
         specifier: workspace:*
@@ -583,125 +769,125 @@ importers:
         specifier: workspace:*
         version: link:../../packages/utils
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
-        specifier: 5.0.1
+        specifier: 'catalog:'
         version: 5.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       rxjs:
-        specifier: 7.8.2
+        specifier: 'catalog:'
         version: 7.8.2
       typeid-js:
-        specifier: 1.2.0
+        specifier: 'catalog:'
         version: 1.2.0
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/cli':
-        specifier: 11.0.24
+        specifier: 'catalog:'
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.1))(@swc/core@1.16.1)(@types/node@26.4.0)(esbuild@0.28.2)
       '@nestjs/schematics':
-        specifier: 11.1.0
+        specifier: 'catalog:'
         version: 11.1.0(chokidar@4.0.3)(typescript@5.9.3)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/cli':
-        specifier: 0.8.1
+        specifier: 'catalog:'
         version: 0.8.1(@swc/core@1.16.1)(chokidar@4.0.3)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-istanbul':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   services/outlook-semantic-mcp:
     dependencies:
       '@golevelup/nestjs-rabbitmq':
-        specifier: 6.1.0
+        specifier: 'catalog:'
         version: 6.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@microsoft/microsoft-graph-client':
-        specifier: 3.0.7
+        specifier: 'catalog:'
         version: 3.0.7
       '@modelcontextprotocol/sdk':
-        specifier: 1.30.0
+        specifier: 'catalog:'
         version: 1.30.0(zod@4.4.3)
       '@nestjs/cache-manager':
-        specifier: 3.1.3
+        specifier: 'catalog:'
         version: 3.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(cache-manager@7.2.9)(keyv@5.6.0)(rxjs@7.8.2)
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/schedule':
-        specifier: 6.1.3
+        specifier: 'catalog:'
         version: 6.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/swagger':
-        specifier: 11.4.7
+        specifier: 'catalog:'
         version: 11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)
       '@nestjs/terminus':
-        specifier: 11.1.1
+        specifier: 'catalog:'
         version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@opentelemetry/instrumentation-pg':
-        specifier: 0.73.0
+        specifier: 'catalog:'
         version: 0.73.0(@opentelemetry/api@1.9.1)
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/aes-gcm-encryption':
         specifier: workspace:*
@@ -731,19 +917,19 @@ importers:
         specifier: workspace:*
         version: link:../../packages/utils
       bottleneck:
-        specifier: 2.19.5
+        specifier: 'catalog:'
         version: 2.19.5
       cache-manager:
-        specifier: 7.2.9
+        specifier: 'catalog:'
         version: 7.2.9
       cron:
-        specifier: 4.4.0
+        specifier: 'catalog:'
         version: 4.4.0
       drizzle-kit:
-        specifier: 0.31.10
+        specifier: 'catalog:'
         version: 0.31.10
       drizzle-orm:
-        specifier: 0.45.2
+        specifier: 'catalog:'
         version: 0.45.2(@opentelemetry/api@1.9.1)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.23.1)(pg@8.23.0)(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))
       express:
         specifier: 5.2.1
@@ -758,34 +944,34 @@ importers:
         specifier: 14.3.0
         version: 14.3.0
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
-        specifier: 5.0.1
+        specifier: 'catalog:'
         version: 5.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
       p-limit:
-        specifier: 7.3.1
+        specifier: 'catalog:'
         version: 7.3.1
       passport:
-        specifier: 0.7.0
+        specifier: 'catalog:'
         version: 0.7.0
       passport-microsoft:
-        specifier: 2.1.0
+        specifier: 'catalog:'
         version: 2.1.0
       pg:
-        specifier: 8.23.0
+        specifier: 'catalog:'
         version: 8.23.0
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       rxjs:
-        specifier: 7.8.2
+        specifier: 'catalog:'
         version: 7.8.2
       safe-regex2:
         specifier: 5.1.1
@@ -794,86 +980,86 @@ importers:
         specifier: 1.0.4
         version: 1.0.4
       typeid-js:
-        specifier: 1.2.0
+        specifier: 'catalog:'
         version: 1.2.0
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
       windows-iana:
         specifier: 5.1.0
         version: 5.1.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/cli':
-        specifier: 11.0.24
+        specifier: 'catalog:'
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.1))(@swc/core@1.16.1)(@types/node@26.4.0)(esbuild@0.28.2)
       '@nestjs/schematics':
-        specifier: 11.1.0
+        specifier: 'catalog:'
         version: 11.1.0(chokidar@4.0.3)(typescript@5.9.3)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/cli':
-        specifier: 0.8.1
+        specifier: 'catalog:'
         version: 0.8.1(@swc/core@1.16.1)(chokidar@4.0.3)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/amqplib':
-        specifier: 0.10.8
+        specifier: 'catalog:'
         version: 0.10.8
       '@types/express':
-        specifier: 5.0.6
+        specifier: 'catalog:'
         version: 5.0.6
       '@types/markdown-it':
         specifier: 14.2.0
         version: 14.2.0
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/passport-microsoft':
-        specifier: 2.1.1
+        specifier: 'catalog:'
         version: 2.1.1
       '@types/pg':
-        specifier: 8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-istanbul':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       amqplib:
-        specifier: 0.10.9
+        specifier: 'catalog:'
         version: 0.10.9
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       type-fest:
-        specifier: 5.8.0
+        specifier: 'catalog:'
         version: 5.8.0
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   services/sharepoint-connector:
@@ -882,31 +1068,31 @@ importers:
         specifier: 3.8.10
         version: 3.8.10
       '@microsoft/microsoft-graph-client':
-        specifier: 3.0.7
+        specifier: 'catalog:'
         version: 3.0.7
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/schedule':
-        specifier: 6.1.3
+        specifier: 'catalog:'
         version: 6.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/terminus':
-        specifier: 11.1.1
+        specifier: 'catalog:'
         version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/instrumentation':
         specifier: workspace:*
@@ -918,146 +1104,146 @@ importers:
         specifier: workspace:*
         version: link:../../packages/probe
       bottleneck:
-        specifier: 2.19.5
+        specifier: 'catalog:'
         version: 2.19.5
       cron:
-        specifier: 4.4.0
+        specifier: 'catalog:'
         version: 4.4.0
       graphql:
-        specifier: 16.14.2
+        specifier: 'catalog:'
         version: 16.14.2
       graphql-request:
-        specifier: 7.3.4
+        specifier: 'catalog:'
         version: 7.3.4(graphql@16.14.2)
       js-yaml:
-        specifier: 4.3.2
+        specifier: 'catalog:'
         version: 4.3.2
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       p-limit:
-        specifier: 7.3.1
+        specifier: 'catalog:'
         version: 7.3.1
       pino-http:
-        specifier: 10.5.0
+        specifier: 'catalog:'
         version: 10.5.0
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       rxjs:
-        specifier: 7.8.2
+        specifier: 'catalog:'
         version: 7.8.2
       serialize-error-cjs:
-        specifier: 0.2.0
+        specifier: 'catalog:'
         version: 0.2.0
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@microsoft/microsoft-graph-types':
         specifier: 2.43.1
         version: 2.43.1
       '@nestjs/cli':
-        specifier: 11.0.24
+        specifier: 'catalog:'
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.1))(@swc/core@1.16.1)(@types/node@26.4.0)(esbuild@0.28.2)
       '@nestjs/schematics':
-        specifier: 11.1.0
+        specifier: 'catalog:'
         version: 11.1.0(chokidar@4.0.3)(typescript@5.9.3)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/cli':
-        specifier: 0.8.1
+        specifier: 'catalog:'
         version: 0.8.1(@swc/core@1.16.1)(chokidar@4.0.3)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/js-yaml':
-        specifier: 4.0.9
+        specifier: 'catalog:'
         version: 4.0.9
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-v8':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   services/teams-mcp:
     dependencies:
       '@golevelup/nestjs-rabbitmq':
-        specifier: 6.1.0
+        specifier: 'catalog:'
         version: 6.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@microsoft/microsoft-graph-client':
-        specifier: 3.0.7
+        specifier: 'catalog:'
         version: 3.0.7
       '@modelcontextprotocol/sdk':
-        specifier: 1.30.0
+        specifier: 'catalog:'
         version: 1.30.0(zod@4.4.3)
       '@nestjs/cache-manager':
-        specifier: 3.1.3
+        specifier: 'catalog:'
         version: 3.1.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(cache-manager@7.2.9)(keyv@5.6.0)(rxjs@7.8.2)
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/swagger':
-        specifier: 11.4.7
+        specifier: 'catalog:'
         version: 11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)
       '@nestjs/terminus':
-        specifier: 11.1.1
+        specifier: 'catalog:'
         version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@opentelemetry/instrumentation-pg':
-        specifier: 0.73.0
+        specifier: 'catalog:'
         version: 0.73.0(@opentelemetry/api@1.9.1)
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@qfetch/qfetch':
         specifier: 0.1.0
@@ -1081,137 +1267,137 @@ importers:
         specifier: workspace:*
         version: link:../../packages/probe
       cache-manager:
-        specifier: 7.2.9
+        specifier: 'catalog:'
         version: 7.2.9
       drizzle-kit:
-        specifier: 0.31.10
+        specifier: 'catalog:'
         version: 0.31.10
       drizzle-orm:
-        specifier: 0.45.2
+        specifier: 'catalog:'
         version: 0.45.2(@opentelemetry/api@1.9.1)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.23.1)(pg@8.23.0)(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
-        specifier: 5.0.1
+        specifier: 'catalog:'
         version: 5.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
       p-limit:
-        specifier: 7.3.1
+        specifier: 'catalog:'
         version: 7.3.1
       passport:
-        specifier: 0.7.0
+        specifier: 'catalog:'
         version: 0.7.0
       passport-microsoft:
-        specifier: 2.1.0
+        specifier: 'catalog:'
         version: 2.1.0
       pg:
-        specifier: 8.23.0
+        specifier: 'catalog:'
         version: 8.23.0
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       rxjs:
-        specifier: 7.8.2
+        specifier: 'catalog:'
         version: 7.8.2
       serialize-error-cjs:
-        specifier: 0.2.0
+        specifier: 'catalog:'
         version: 0.2.0
       typeid-js:
-        specifier: 1.2.0
+        specifier: 'catalog:'
         version: 1.2.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/cli':
-        specifier: 11.0.24
+        specifier: 'catalog:'
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.1))(@swc/core@1.16.1)(@types/node@26.4.0)(esbuild@0.28.2)
       '@nestjs/schematics':
-        specifier: 11.1.0
+        specifier: 'catalog:'
         version: 11.1.0(chokidar@4.0.3)(typescript@5.9.3)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/cli':
-        specifier: 0.8.1
+        specifier: 'catalog:'
         version: 0.8.1(@swc/core@1.16.1)(chokidar@4.0.3)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/amqplib':
-        specifier: 0.10.8
+        specifier: 'catalog:'
         version: 0.10.8
       '@types/express':
-        specifier: 5.0.6
+        specifier: 'catalog:'
         version: 5.0.6
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/passport-microsoft':
-        specifier: 2.1.1
+        specifier: 'catalog:'
         version: 2.1.1
       '@types/pg':
-        specifier: 8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-istanbul':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       amqplib:
-        specifier: 0.10.9
+        specifier: 'catalog:'
         version: 0.10.9
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       type-fest:
-        specifier: 5.8.0
+        specifier: 'catalog:'
         version: 5.8.0
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
   services/temenos-mcp:
     dependencies:
       '@nestjs/common':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: 4.0.4
+        specifier: 'catalog:'
         version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@opentelemetry/api':
-        specifier: 1.9.1
+        specifier: 'catalog:'
         version: 1.9.1
       '@proventuslabs/nestjs-zod':
-        specifier: 2.0.0
+        specifier: 'catalog:'
         version: 2.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.4.3)
       '@unique-ag/instrumentation':
         specifier: workspace:*
@@ -1229,80 +1415,80 @@ importers:
         specifier: workspace:*
         version: link:../../packages/utils
       nestjs-otel:
-        specifier: 8.1.0
+        specifier: 'catalog:'
         version: 8.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(rxjs@7.8.2)
       nestjs-pino:
-        specifier: 4.6.1
+        specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
-        specifier: 5.0.1
+        specifier: 'catalog:'
         version: 5.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.7(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
       reflect-metadata:
-        specifier: 0.2.2
+        specifier: 'catalog:'
         version: 0.2.2
       remeda:
-        specifier: 2.45.0
+        specifier: 'catalog:'
         version: 2.45.0
       rxjs:
-        specifier: 7.8.2
+        specifier: 'catalog:'
         version: 7.8.2
       typeid-js:
-        specifier: 1.2.0
+        specifier: 'catalog:'
         version: 1.2.0
       undici:
-        specifier: 7.29.0
+        specifier: 'catalog:'
         version: 7.29.0
       zod:
-        specifier: 4.4.3
+        specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
       '@nestjs/cli':
-        specifier: 11.0.24
+        specifier: 'catalog:'
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.1))(@swc/core@1.16.1)(@types/node@26.4.0)(esbuild@0.28.2)
       '@nestjs/schematics':
-        specifier: 11.1.0
+        specifier: 'catalog:'
         version: 11.1.0(chokidar@4.0.3)(typescript@5.9.3)
       '@nestjs/testing':
-        specifier: 11.2.3
+        specifier: 'catalog:'
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@suites/di.nestjs':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
       '@suites/doubles.vitest':
-        specifier: 3.1.0
+        specifier: 'catalog:'
         version: 3.1.0(@vitest/spy@3.2.7)(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       '@suites/unit':
-        specifier: 3.1.1
+        specifier: 'catalog:'
         version: 3.1.1
       '@swc/cli':
-        specifier: 0.8.1
+        specifier: 'catalog:'
         version: 0.8.1(@swc/core@1.16.1)(chokidar@4.0.3)
       '@swc/core':
-        specifier: 1.16.1
+        specifier: 'catalog:'
         version: 1.16.1
       '@types/node':
-        specifier: 26.4.0
+        specifier: 'catalog:'
         version: 26.4.0
       '@types/supertest':
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       '@vitest/coverage-istanbul':
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(vitest@3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))
       istanbul-badges-readme:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       supertest:
-        specifier: 7.2.2
+        specifier: 'catalog:'
         version: 7.2.2
       typescript:
-        specifier: 5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       unplugin-swc:
-        specifier: 1.5.11
+        specifier: 'catalog:'
         version: 1.5.11(@swc/core@1.16.1)(esbuild@0.28.2)(rollup@4.60.1)(vite@7.3.2(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3))(webpack@5.106.2(@swc/core@1.16.1)(esbuild@0.28.2))
       vitest:
-        specifier: 3.2.7
+        specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.23.12)(yaml@2.8.3)
 
 packages:
@@ -4695,10 +4881,6 @@ packages:
     resolution: {integrity: sha512-G6NsmEW15s0Uw9XnCg+33H3ViYRyiM0hMrMhhqQOR8NFc5GhYrI+6I3u7OTw7b91J2g8rtvMBZJDbcGb2YUniw==}
     engines: {node: '>= 18'}
 
-  form-data@4.0.4:
-    resolution: {integrity: sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==}
-    engines: {node: '>= 6'}
-
   form-data@4.0.6:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
@@ -4831,10 +5013,6 @@ packages:
   hashery@1.5.1:
     resolution: {integrity: sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ==}
     engines: {node: '>=20'}
-
-  hasown@2.0.2:
-    resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
-    engines: {node: '>= 0.4'}
 
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
@@ -5482,9 +5660,6 @@ packages:
     resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
     peerDependencies:
       pg: '>=8.0'
-
-  pg-protocol@1.10.3:
-    resolution: {integrity: sha512-6DIBgBQaTKDJyxnXaLiLR8wBpQQcGWuAESkRBX/t6OwA8YsqP+iVSiond2EDy6Y/dsGk8rh/jtax3js5NeV7JQ==}
 
   pg-protocol@1.16.0:
     resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
@@ -8585,7 +8760,7 @@ snapshots:
   '@types/pg@8.23.1':
     dependencies:
       '@types/node': 26.4.0
-      pg-protocol: 1.10.3
+      pg-protocol: 1.16.0
       pg-types: 2.2.0
 
   '@types/qs@6.14.0': {}
@@ -8607,7 +8782,7 @@ snapshots:
       '@types/cookiejar': 2.1.5
       '@types/methods': 1.1.4
       '@types/node': 26.4.0
-      form-data: 4.0.4
+      form-data: 4.0.6
 
   '@types/supertest@6.0.3':
     dependencies:
@@ -9405,7 +9580,7 @@ snapshots:
       es-errors: 1.3.0
       get-intrinsic: 1.3.0
       has-tostringtag: 1.0.2
-      hasown: 2.0.2
+      hasown: 2.0.4
 
   esbuild@0.18.20:
     optionalDependencies:
@@ -9724,14 +9899,6 @@ snapshots:
 
   form-data-encoder@4.1.0: {}
 
-  form-data@4.0.4:
-    dependencies:
-      asynckit: 0.4.0
-      combined-stream: 1.0.8
-      es-set-tostringtag: 2.1.0
-      hasown: 2.0.2
-      mime-types: 2.1.35
-
   form-data@4.0.6:
     dependencies:
       asynckit: 0.4.0
@@ -9801,7 +9968,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-proto@1.0.1:
@@ -9886,10 +10053,6 @@ snapshots:
   hashery@1.5.1:
     dependencies:
       hookified: 1.15.1
-
-  hasown@2.0.2:
-    dependencies:
-      function-bind: 1.1.2
 
   hasown@2.0.4:
     dependencies:
@@ -10459,8 +10622,6 @@ snapshots:
   pg-pool@3.14.0(pg@8.23.0):
     dependencies:
       pg: 8.23.0
-
-  pg-protocol@1.10.3: {}
 
   pg-protocol@1.16.0: {}
 
