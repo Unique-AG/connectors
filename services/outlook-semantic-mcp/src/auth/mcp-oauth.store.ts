@@ -13,7 +13,7 @@ import {
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
-import { eq, lt } from 'drizzle-orm';
+import { and, eq, lt } from 'drizzle-orm';
 import { typeid } from 'typeid-js';
 import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
 import { DrizzleDatabase } from '../db/drizzle.module';
@@ -21,7 +21,9 @@ import {
   authorizationCodes,
   oauthClients,
   oauthSessions,
+  SOURCES_OWNED_BY_SYNC,
   tokens,
+  upgradedSource,
   userProfiles,
 } from '../db/schema';
 import {
@@ -168,12 +170,28 @@ export class McpOAuthStore implements IOAuthStore {
       refreshToken: encryptedRefreshToken,
     };
 
+    const existing = await this.drizzle.query.userProfiles.findFirst({
+      where: and(eq(userProfiles.provider, provider), eq(userProfiles.providerUserId, profile.id)),
+      columns: { source: true, accessToken: true },
+    });
+
+    // Login always writes a token. listedAsSharedMailbox is true only when the
+    // existing row is already sync-owned — a shared-mailbox row can only have
+    // come from the env-list sync. A plain oauth row must not be upgraded here;
+    // Case 1 (oauth mailbox listed later) is the sync writer's job.
+    const nextSource = upgradedSource(
+      existing ? { source: existing.source, hasToken: true } : undefined,
+      existing != null && SOURCES_OWNED_BY_SYNC.includes(existing.source),
+    );
+    const conflictSet =
+      nextSource === null ? mappedProfile : { ...mappedProfile, source: nextSource };
+
     const [saved] = await this.drizzle
       .insert(userProfiles)
       .values(mappedProfile)
       .onConflictDoUpdate({
         target: [userProfiles.provider, userProfiles.providerUserId],
-        set: mappedProfile,
+        set: conflictSet,
       })
       .returning({ id: userProfiles.id });
     if (!saved) {

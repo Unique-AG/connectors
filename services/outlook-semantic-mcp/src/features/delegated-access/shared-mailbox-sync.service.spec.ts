@@ -81,7 +81,16 @@ function hashEmails(emails: string[], mcpBackend = McpBackendType.MicrosoftGraph
   return `${mcpBackend}_${createHash('sha256').update(emails.sort().join(',')).digest('hex')}`;
 }
 
-function createMockDb(profileIds: string[] = []) {
+function createMockDb(
+  profileIds: string[] = [],
+  options?: {
+    existingProfiles?: Array<{
+      providerUserId: string;
+      source: string;
+      accessToken: string | null;
+    }>;
+  },
+) {
   const deleteMock = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
   const returning = vi
     .fn()
@@ -96,14 +105,18 @@ function createMockDb(profileIds: string[] = []) {
     .mockReturnValueOnce({ onConflictDoUpdate })
     .mockReturnValue({ onConflictDoNothing });
   const insertMock = vi.fn().mockReturnValue({ values });
-  // profilesToRemove query: select().from().where()
-  // profilesWithoutConfig query: select().from().leftJoin().where()
+  // 1st from().where(): profilesToRemove
+  // 2nd from().where(): existing rows for source upgrade
+  // from().leftJoin().where(): profiles without inbox config
   const profilesWithoutConfigWhere = vi.fn().mockResolvedValue(profileIds.map((id) => ({ id })));
   const leftJoinMock = vi.fn().mockReturnValue({ where: profilesWithoutConfigWhere });
-  // Default returns one stale shared-mailbox profile so the profilesToRemove delete path is reachable.
+  const selectWhere = vi
+    .fn()
+    .mockResolvedValueOnce([{ id: 'stale-profile-id' }])
+    .mockResolvedValue(options?.existingProfiles ?? []);
   const selectMock = vi.fn().mockReturnValue({
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue([{ id: 'stale-profile-id' }]),
+      where: selectWhere,
       leftJoin: leftJoinMock,
     }),
   });
@@ -121,8 +134,15 @@ function createService(overrides?: {
   factoryResults?: Array<{ client: any; userId: string } | null>;
   cacheResult?: { payload: { envarHash: string; lastSyncedAt: number } } | null;
   profileIds?: string[];
+  existingProfiles?: Array<{
+    providerUserId: string;
+    source: string;
+    accessToken: string | null;
+  }>;
 }) {
-  const db = createMockDb(overrides?.profileIds ?? []);
+  const db = createMockDb(overrides?.profileIds ?? [], {
+    existingProfiles: overrides?.existingProfiles,
+  });
   const config = {
     scan: 'full_access_only' as const,
     mcpBackend: McpBackendType.MicrosoftGraph,
@@ -713,6 +733,55 @@ describe('SharedMailboxSyncService', () => {
 
       // Only the userProfiles upsert should occur — inboxConfigurations insert is skipped for MicrosoftGraph backend
       expect(db.insert).toHaveBeenCalledOnce();
+    });
+
+    it('listed email matching an oauth row with a token upgrades source to shared-mailbox-with-login', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+        existingProfiles: [
+          { providerUserId: 'aad-id', source: 'oauth', accessToken: 'stored-token' },
+        ],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
+      expect(insertedValues[0].source).toBe('shared-mailbox-with-login');
+    });
+
+    it('listed email matching an oauth row with no token leaves source as oauth', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+        existingProfiles: [{ providerUserId: 'aad-id', source: 'oauth', accessToken: null }],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
+      expect(insertedValues[0].source).toBe('oauth');
+    });
+
+    it('listed email matching a tokenless shared-mailbox row leaves source unchanged', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+        existingProfiles: [
+          { providerUserId: 'aad-id', source: 'shared-mailbox', accessToken: null },
+        ],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
+      expect(insertedValues[0].source).toBe('shared-mailbox');
     });
 
     it('cache is updated with new hash after successful sync', async () => {

@@ -291,6 +291,61 @@ describe('McpOAuthStore', () => {
       );
     });
 
+    it('login on a shared-mailbox row upgrades source to shared-mailbox-with-login', async () => {
+      mockDrizzle.__nextQueryUserProfile = { source: 'shared-mailbox', accessToken: null };
+      mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_upgraded' }];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.upsertUserProfile(mockUser);
+
+      const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
+      expect(insertBuilder.values.mock.calls[0][0]).not.toHaveProperty('source');
+      expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set.source).toBe(
+        'shared-mailbox-with-login',
+      );
+    });
+
+    it('login on an oauth row leaves source out of the conflict set', async () => {
+      mockDrizzle.__nextQueryUserProfile = { source: 'oauth', accessToken: 'existing-token' };
+      mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_oauth' }];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.upsertUserProfile(mockUser);
+
+      const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
+      expect(insertBuilder.values.mock.calls[0][0]).not.toHaveProperty('source');
+      expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set).not.toHaveProperty('source');
+    });
+
+    it('brand-new profile has no source in insert values so the column default applies', async () => {
+      mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_new' }];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.upsertUserProfile(mockUser);
+
+      const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
+      expect(insertBuilder.values.mock.calls[0][0]).not.toHaveProperty('source');
+      expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set).not.toHaveProperty('source');
+    });
+
     it('gets user profile by ID', async () => {
       const mockProfile = {
         id: 'profile-123',

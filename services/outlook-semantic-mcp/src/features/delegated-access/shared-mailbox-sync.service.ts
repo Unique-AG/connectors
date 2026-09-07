@@ -14,7 +14,14 @@ import {
   ingestionConfig,
   McpBackendType,
 } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  inboxConfigurations,
+  type UserProfileSource,
+  upgradedSource,
+  userProfiles,
+} from '~/db';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
@@ -255,8 +262,28 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    let upsertedSources: { id: string; source: UserProfileSource }[] = [];
+
     // Upsert matched users
     if (allMatchedUsers.length > 0) {
+      const existingRows = await this.db
+        .select({
+          providerUserId: userProfiles.providerUserId,
+          source: userProfiles.source,
+          accessToken: userProfiles.accessToken,
+        })
+        .from(userProfiles)
+        .where(
+          inArray(
+            userProfiles.providerUserId,
+            allMatchedUsers.map((user) => user.id),
+          ),
+        );
+
+      const existingByProviderUserId = new Map(
+        existingRows.map((row) => [row.providerUserId, row] as const),
+      );
+
       type UserProfileInsert = typeof userProfiles.$inferInsert;
       const mappedProfiles: UserProfileInsert[] = allMatchedUsers.map((user) => {
         const rawData: OAuthUserProfile = {
@@ -267,25 +294,33 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
           avatarUrl: undefined,
           raw: user,
         };
+        const existing = existingByProviderUserId.get(user.id);
+        const nextSource = upgradedSource(
+          existing
+            ? { source: existing.source, hasToken: existing.accessToken != null }
+            : undefined,
+          true,
+        );
         return {
           provider: 'microsoft' as const,
           providerUserId: user.id,
           username: user.mail,
           email: user.mail,
           displayName: user.displayName ?? null,
-          source: 'shared-mailbox' as const,
+          // New rows insert as shared-mailbox. When upgradedSource returns null
+          // the existing source is reused so excluded.source is a no-op on conflict.
+          source: nextSource ?? existing?.source ?? 'shared-mailbox',
           accessToken: null,
           refreshToken: null,
           raw: rawData,
         };
       });
 
-      // source is intentionally omitted from the conflict update: if an Entra identity
-      // already exists as an OAuth row we leave it as oauth. Overwriting source would
-      // silently strip the user's own token-based access and subject them to delegate-only
-      // logic, which is the wrong behaviour for a real user who also happens to be listed
-      // as a shared mailbox.
-      await this.db
+      // source is included in the conflict update via excluded.source. upgradedSource
+      // promotes an oauth+token row to shared-mailbox-with-login (Case 1) and leaves
+      // a tokenless oauth row untouched so we never convert a real user who happens
+      // to share an address with the env list.
+      upsertedSources = await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
         .onConflictDoUpdate({
@@ -294,6 +329,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
             email: sql.raw(`excluded.${userProfiles.email.name}`),
             username: sql.raw(`excluded.${userProfiles.username.name}`),
             displayName: sql.raw(`excluded.${userProfiles.displayName.name}`),
+            source: sql.raw(`excluded.${userProfiles.source.name}`),
           },
         })
         .returning({ id: userProfiles.id, source: userProfiles.source });
@@ -360,6 +396,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       msg: 'SharedMailboxSync: sync complete',
       upserted: allMatchedUsers.length,
       syncedDomains,
+      sources: upsertedSources.map((row) => row.source),
     });
   }
 
