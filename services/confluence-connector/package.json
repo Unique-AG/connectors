@@ -69,6 +69,7 @@
     "@suites/unit": "catalog:",
     "@swc/cli": "catalog:",
     "@swc/core": "catalog:",
+    "@types/express": "catalog:",
     "@types/js-yaml": "catalog:",
     "@types/node": "catalog:",
     "@types/supertest": "catalog:",
