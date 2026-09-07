@@ -22,7 +22,7 @@
     "@swc/core": "1.16.1",
     "@types/node": "26.4.0",
     "typeid-js": "1.2.0",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "unplugin-swc": "1.5.11",
     "vitest": "3.2.7",
     "zod": "4.4.3"
