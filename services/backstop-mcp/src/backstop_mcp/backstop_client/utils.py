@@ -21,8 +21,6 @@ from backstop_mcp.backstop_client.errors import (
 
 logger = logging.getLogger(__name__)
 
-# `typing_extensions.TypeVar` (not stdlib) so `T` can carry a PEP 696 default: native PEP 695
-# generic-method syntax can't express a default until Python 3.13, but this repo targets 3.12.
 T = TypeVar("T", default=dict[str, object])
 
 # Ordinary classes (including pydantic's parameterized models like `_Page[Record]`) plus
