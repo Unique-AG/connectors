@@ -63,7 +63,7 @@
     "fastest-levenshtein": "1.0.16",
     "jsonwebtoken": "9.0.3",
     "lru-cache": "11.5.2",
-    "markdown-it": "14.3.0",
+    "markdown-it": "15.0.1",
     "nestjs-otel": "8.1.0",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
