@@ -420,6 +420,8 @@ class TestContract:
         assert "data_caveat" in doc
         assert "undocumented" in doc
         assert "may 404" in doc
+        assert "search_type" in doc
+        assert "rejected" in doc
 
     def test_output_schema_explains_provenance_and_the_zero_trap(self) -> None:
         meta = get_fastmcp_meta(get_accounts_for_party)

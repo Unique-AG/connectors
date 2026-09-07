@@ -32,6 +32,9 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_holdings_query_factory
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyDto,
     ResolvedPartyResponse,
@@ -62,34 +65,15 @@ async def get_accounts_for_party(
     ctx: Context,
     search_type: Annotated[
         SearchType,
-        Field(
-            description=(
-                "Which Backstop collection to resolve the party against — fold the caller's "
-                "wording to one of the four. A company, firm, fund, institution, or manager is "
-                "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
-                "when a prior resolve echoed one (echo it back — a contact or employee id is "
-                "not a people id) or the caller clearly means an internal staff member."
-            ),
-        ),
+        Field(description=REQUIRED_SEARCH_TYPE_DESCRIPTION),
     ],
     party_id: Annotated[
         str | None,
-        Field(
-            description=(
-                "Trusted Backstop Party ID from a prior resolve echo (`id` / `search_type` / "
-                "`name`). Never invent or guess. Exactly one of `party_id` or `search` must be "
-                "provided."
-            ),
-        ),
+        Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     search: Annotated[
         str | None,
-        Field(
-            description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly one "
-                "of `party_id` or `search` must be provided."
-            ),
-        ),
+        Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     include_closed: Annotated[
         bool,
@@ -105,9 +89,10 @@ async def get_accounts_for_party(
 ) -> GetAccountsForPartyResponse:
     """What a person or organization holds: their accounts, with balances, across products.
 
-    Pass `search_type` plus a trusted `party_id` (from a prior resolve echo — never invent one) or
-    `search`. Ownership is the account's owner, not its name: ACCOUNT quick-search matches names
-    and will miss a differently named vehicle.
+    Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
+    `search_type` is rejected. Pass a trusted `party_id` from a prior resolve echo — never
+    invent one — or `search`. Ownership is the account's owner, not its name: ACCOUNT
+    quick-search matches names and will miss a differently named vehicle.
 
     The primary path is Backstop's undocumented UI table-data endpoint and may 404, or refuse
     the credential while documented endpoints still authenticate, on another tenant — that is

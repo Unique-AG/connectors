@@ -20,7 +20,10 @@ from backstop_mcp.features.org_people.api_responses import (
     OrganizationAttributes,
     PersonAttributes,
 )
-from backstop_mcp.features.party_resolver import ResolvedPartyResponse
+from backstop_mcp.features.party_resolver import (
+    RESOLVED_PARTY_ECHO_DESCRIPTION,
+    ResolvedPartyResponse,
+)
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
@@ -246,12 +249,7 @@ class PersonResolvedResponse(OmitNoneModel):
             "this record."
         )
     )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
+    resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
     as_of: AsOfResponse | None = Field(
         default=None,
         description=(
@@ -306,12 +304,7 @@ class OrganizationResolvedResponse(OmitNoneModel):
             "`custom_field_values`, not on this record."
         )
     )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
+    resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
     as_of: AsOfResponse | None = Field(
         default=None,
         description=(
@@ -344,12 +337,7 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the organization was found and its people listed.",
     )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
+    resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
     people: tuple[PersonAtOrganizationResponse, ...] = Field(
         description=(
             "People the CRM links to this organization through employment relationships. "

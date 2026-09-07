@@ -10,8 +10,11 @@ from fastmcp.dependencies import Depends
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
 from pydantic import BaseModel
 
+from backstop_mcp.features.party_resolver import ResolvedPartyResponse
 from backstop_mcp.server.tools import TOOLS
 from tests.server.tools.helpers import object_dict
+
+_COLLAPSED_PARTY_ECHO = "/ `search_type` / `name` as"
 
 
 def _is_model(annotation: object) -> type[BaseModel] | None:
@@ -114,6 +117,24 @@ def test_every_tool_response_field_is_described() -> None:
         if not field.description
     ]
     assert missing == []
+
+
+def test_echo_does_not_tell_the_model_to_pass_search_type_as_party_id() -> None:
+    collapsed = [
+        f"{model.__name__}.{name}"
+        for model in sorted(_tool_return_models(), key=lambda item: item.__name__)
+        for name, field in model.model_fields.items()
+        if field.description and _COLLAPSED_PARTY_ECHO in field.description
+    ]
+    assert collapsed == []
+
+
+def test_resolved_party_echo_names_two_separate_arguments() -> None:
+    for name in ("id", "search_type"):
+        description = ResolvedPartyResponse.model_fields[name].description or ""
+        assert "party_id" in description
+        assert "search_type" in description
+        assert "separate" in description
 
 
 # The marker `Depends(...)` leaves as a parameter default, taken from FastMCP's own export so a

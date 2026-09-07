@@ -557,8 +557,9 @@ class ActivityHistoryResolvedResponse(OmitNoneModel):
     )
     resolved: ResolvedPartyAsOfResponse = Field(
         description=(
-            "The party identity this call settled on, plus `as_of` provenance. Echo "
-            "`id` / `search_type` / `name` as `party_id` later."
+            "The party identity this call settled on, plus `as_of` provenance. Echo `id` as "
+            "`party_id` and `search_type` as `search_type` on the next party-scoped tool — "
+            "two separate arguments. `party_id` alone is rejected. Never invent them."
         )
     )
     groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = Field(
@@ -847,7 +848,8 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         default=None,
         description=(
             "The party this search was scoped to, when a party filter was used. Omitted on a "
-            "firm-wide search. Echo `id` / `search_type` / `name` as party_id later."
+            "firm-wide search. Echo `id` as `party_id` and `search_type` as `search_type` — "
+            "two separate arguments. `party_id` alone is rejected."
         ),
     )
     mode: Literal["rows", "aggregate"] = Field(

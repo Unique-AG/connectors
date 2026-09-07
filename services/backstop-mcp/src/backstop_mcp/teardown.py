@@ -46,6 +46,7 @@ from backstop_mcp.features.custom_fields import (
 )
 from backstop_mcp.features.data_hygiene import get_employment_index_factory
 from backstop_mcp.features.opportunities import (
+    get_map_opportunity_to_response_util_factory,
     get_opportunities_by_ids_query_factory,
     get_opportunities_query_factory,
     get_opportunity_stages_service_factory,
@@ -91,6 +92,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_employment_index_factory,
     get_opportunity_stages_service_factory,
     get_stage_history_query_factory,
+    get_map_opportunity_to_response_util_factory,
     get_opportunities_query_factory,
     get_opportunities_by_ids_query_factory,
     get_search_opportunities_query_factory,

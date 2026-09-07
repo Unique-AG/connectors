@@ -5,6 +5,7 @@ from backstop_mcp.features.opportunities.api_responses import (
     OpportunityStageAttributes,
 )
 from backstop_mcp.features.opportunities.dependencies import (
+    get_map_opportunity_to_response_util_factory,
     get_opportunities_by_ids_query_factory,
     get_opportunities_query_factory,
     get_opportunity_stages_service_factory,
@@ -61,6 +62,7 @@ __all__ = [
     "SearchOpportunitiesResolvedResponse",
     "StageChangeResponse",
     "aggregate_search_opportunities",
+    "get_map_opportunity_to_response_util_factory",
     "get_opportunities_by_ids_query_factory",
     "get_opportunities_query_factory",
     "get_opportunity_stages_service_factory",

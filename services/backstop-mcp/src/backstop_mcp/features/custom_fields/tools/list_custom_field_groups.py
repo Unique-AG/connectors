@@ -76,7 +76,10 @@ async def list_custom_field_groups(
     Use when you need the standard Backstop custom-field group catalog: group ids, names,
     full_path_name tab-to-section segments, parent {id, name, parent_id}, and field membership
     joined by group_id from the definition catalog. Instance tab and section names come back as
-    data. Pass refresh=true only when the user reports a missing field.
+    data. Pass refresh=true only when the user reports a missing field. Takes only `refresh`.
+    Field definitions are list_custom_fields (`entity_types`).
+
+    Call like: {}
     """
     groups, groups_cache = await custom_field_groups.get(refresh=refresh)
     definitions, definitions_cache = await custom_fields.get(refresh=refresh)

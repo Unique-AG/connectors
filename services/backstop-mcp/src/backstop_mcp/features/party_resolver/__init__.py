@@ -11,6 +11,10 @@ from backstop_mcp.features.party_resolver.internal_dto import (
 )
 from backstop_mcp.features.party_resolver.resolve_party import resolve_parties, resolve_party
 from backstop_mcp.features.party_resolver.responses import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    RESOLVED_PARTY_ECHO_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     PartyCandidateResponse,
     ResolvedPartyResponse,
@@ -20,6 +24,7 @@ from backstop_mcp.features.party_resolver.responses import (
 
 __all__ = [
     "BatchPartyResolution",
+    "PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "PartyAmbiguousResponse",
     "PartyAttributes",
     "PartyCandidate",
@@ -27,8 +32,11 @@ __all__ = [
     "PartyResolution",
     "PartyResolveItemDto",
     "QuickSearchOptionsDto",
+    "REQUIRED_SEARCH_TYPE_DESCRIPTION",
+    "RESOLVED_PARTY_ECHO_DESCRIPTION",
     "ResolvedPartyDto",
     "ResolvedPartyResponse",
+    "SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "SearchType",
     "fetch_party_name",
     "resolve_parties",

@@ -158,8 +158,9 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Party collection when scoping to one person or organization. Required with "
-                "`party_id` or `search`. Omit with both of those for a firm-wide search."
+                "Required when passing `party_id` or `search` — never pass a `party_id` "
+                "without this. Party collection: organizations, people, contacts, or "
+                "employees. Omit with both of those for a firm-wide search."
             ),
         ),
     ] = None,
@@ -168,9 +169,10 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Trusted Backstop Party ID from a prior resolve echo. Sent as "
-                "`associatedWiths: PartyBean_{id}`. Never invent one. Exactly one of "
-                "`party_id` or `search` when scoping to a party."
+                "The argument is `party_id`. Trusted Backstop Party ID from a prior "
+                "resolve echo. Sent as `associatedWiths: PartyBean_{id}`. Always pass "
+                "together with `search_type` — `party_id` alone is rejected. Never invent "
+                "one. Exactly one of `party_id` or `search` when scoping to a party."
             ),
         ),
     ] = None,
@@ -179,8 +181,9 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly "
-                "one of `party_id` or `search` when scoping to a party."
+                "Name or email to resolve when no trusted `party_id` is available. Always "
+                "pass together with `search_type`. Exactly one of `party_id` or `search` "
+                "when scoping to a party."
             ),
         ),
     ] = None,
@@ -189,9 +192,10 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Activity streams to include. Default is every stream this endpoint serves: "
-                "meeting_call, meeting, document, email, email_blast, note. Within this list "
-                "the filter is OR."
+                "Allowed tokens: meeting_call, meeting, document, email, email_blast, note. "
+                "Calls are `meeting_call` — `get_activity_history` uses `call` for the same "
+                "stream. Default is every stream this endpoint serves. Within this list the "
+                "filter is OR."
             ),
         ),
     ] = None,
@@ -279,8 +283,13 @@ async def search_activities(
 
     Always start here when the question has a date window. Pass `start_date` and `end_date`;
     omitting `start_date` uses one year before `end_date`, omitting `end_date` uses today.
-    Optionally scope to a party (`search_type` plus `party_id` or `search`), restrict `types`,
+    Optionally scope to a party (`search_type` plus `party_id` or `search` — a `party_id`
+    without `search_type` is rejected), restrict `types`,
     filter `activity_tag_ids` (OR, unlike get_activity_history), and filter `authors` by email.
+
+    Call like: {"search_type": "organizations",
+    "party_id": "<id from prior resolve echo>",
+    "types": ["meeting_call", "meeting", "note"]}
 
     This is the primary activity tool; `get_activity_history` is fallback only. It is an
     undocumented UI search (`POST /entity-activities`) and may 404 or refuse the credential

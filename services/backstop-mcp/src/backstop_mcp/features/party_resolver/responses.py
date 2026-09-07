@@ -25,15 +25,45 @@ from backstop_mcp.features.resolution import (
 )
 from backstop_mcp.models import OmitNoneModel
 
+# Published party-selector contract. Party-scoped tools that require `search_type` reuse
+# these strings so the model sees the same pairing on the way in and on the resolve echo.
+RESOLVED_PARTY_ECHO_DESCRIPTION = (
+    "The identity this call settled on. Echo `id` as `party_id` and `search_type` as "
+    "`search_type` on the next party-scoped tool — two separate arguments. "
+    "`party_id` alone is rejected. Never invent them."
+)
+REQUIRED_SEARCH_TYPE_DESCRIPTION = (
+    "Required. Never omit, including when you already have a `party_id`. "
+    "The argument is `search_type`. "
+    "Which Backstop collection to resolve the party against — fold the caller's "
+    "wording to one of the four. A company, firm, fund, institution, or manager is "
+    "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
+    "when a prior resolve echoed one (echo it back — a contact or employee id is "
+    "not a people id) or the caller clearly means an internal staff member."
+)
+PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION = (
+    "Trusted Backstop Party ID from a prior resolve echo. The argument is `party_id` "
+    "(not `entity_id` — that name is only on `get_activity_history` `request.type=next`). "
+    "Always pass together with that echo's `search_type` as a separate argument — "
+    "`party_id` alone is rejected. "
+    "Never invent or guess. Exactly one of `party_id` or `search` must be provided."
+)
+SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION = (
+    "Name or email to resolve when no trusted `party_id` is available. The argument "
+    "is `search`. Always pass together with `search_type`. Exactly one of `party_id` "
+    "or `search` must be provided."
+)
+
 
 class PartyCandidateResponse(CandidateResponse):
     """One ambiguous party match, returned so the model can ask the user to pick one.
 
     `search_type` is the candidate's own collection (which may differ from the requested
-    scope when `enhance_search_types` returns a cross-type hit) — callers must echo it
-    verbatim with `id` when retrying as a trusted `party_id`. `label` already names that
-    collection in readable form (`Capstone (organization)`, `Jane Doe (person)`), so
-    elicitation and this payload both show what the user is looking at.
+    scope when `enhance_search_types` returns a cross-type hit) — callers must pass it
+    as `search_type` together with `id` as `party_id`, two separate arguments. `label`
+    already names that collection in readable form (`Capstone (organization)`,
+    `Jane Doe (person)`), so elicitation and this payload both show what the user is
+    looking at.
     """
 
     label: str = Field(
@@ -44,14 +74,16 @@ class PartyCandidateResponse(CandidateResponse):
     )
     id: str = Field(
         description=(
-            "Backstop id of this candidate. Echo it with `search_type` when retrying as "
-            "`party_id` — never invent one."
+            "Backstop id of this candidate. Pass it as `party_id` together with this "
+            "candidate's `search_type` as a separate argument — never invent one. "
+            "`party_id` alone is rejected."
         )
     )
     search_type: SearchType = Field(
         description=(
             "Collection this candidate belongs to: organizations, people, contacts, or "
-            "employees. Echo it with `id` — a contact or employee id is not a people id."
+            "employees. Pass it as `search_type` together with `id` as `party_id` — two "
+            "separate arguments. A contact or employee id is not a people id."
         )
     )
     name: str | None = Field(
@@ -72,7 +104,7 @@ class PartyCandidateResponse(CandidateResponse):
 
 
 class ResolvedPartyResponse(OmitNoneModel):
-    """The id/search_type/name a caller must pass back verbatim as a trusted `party_id` later.
+    """The id and search_type a caller must pass back as two separate tool arguments later.
 
     Never invent or guess these values — only return what a prior resolve call returned. Not a
     `CandidateResponse`: this is the single identity a call settled on, not one option among many.
@@ -82,14 +114,16 @@ class ResolvedPartyResponse(OmitNoneModel):
 
     id: str = Field(
         description=(
-            "Backstop id of this party. Echo it with `search_type` as `party_id` later — "
-            "never invent one."
+            "Backstop id of this party. Pass it as `party_id` together with this object's "
+            "`search_type` as a separate `search_type` argument — never invent one. "
+            "`party_id` alone is rejected on party-scoped tools."
         )
     )
     search_type: SearchType = Field(
         description=(
             "Collection this party belongs to: organizations, people, contacts, or employees. "
-            "Echo it with `id` — a contact or employee id is not a people id."
+            "Pass it as `search_type` together with `id` as `party_id` — two separate "
+            "arguments. A contact or employee id is not a people id."
         )
     )
     name: str | None = Field(
@@ -147,12 +181,16 @@ def unresolved_parties_response(
 
 
 __all__ = [
+    "PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "PartyAmbiguousResponse",
     "PartyBatchAmbiguousResponse",
     "PartyBatchResolvedResponse",
     "PartyBatchUnresolvedResponse",
     "PartyCandidateResponse",
+    "REQUIRED_SEARCH_TYPE_DESCRIPTION",
+    "RESOLVED_PARTY_ECHO_DESCRIPTION",
     "ResolvedPartyResponse",
+    "SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "unresolved_parties_response",
     "unresolved_party_response",
 ]

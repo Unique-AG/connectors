@@ -6,7 +6,10 @@ from typing import ClassVar, Literal, Self
 from pydantic import ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource
-from backstop_mcp.features.party_resolver import ResolvedPartyResponse
+from backstop_mcp.features.party_resolver import (
+    RESOLVED_PARTY_ECHO_DESCRIPTION,
+    ResolvedPartyResponse,
+)
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.models import OmitNoneModel
 
@@ -75,12 +78,7 @@ class TasksResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the party was found and its tasks fetched.",
     )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
+    resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
     tasks: tuple[TaskRowResponse, ...] = Field(
         description="Tasks matching `status`, after the client-side open/completed split."
     )

@@ -54,11 +54,11 @@ async def get_activity_detail(
         str,
         Field(
             description=(
-                "The `activity_id` from get_activity_history (`meeting-or-calls_76537547`) or "
-                "the `id` from a search_activities row (`1659094659`). Both resolve on "
-                "`/entity-activity-details`. Do not pass a history email handle — those are "
-                "`/emails` ids. Never invent or guess one — an unknown id raises rather than "
-                "returning a not-found response."
+                "The argument is `activity_id`. The `activity_id` from get_activity_history "
+                "(`meeting-or-calls_76537547`) or the `id` from a search_activities row "
+                "(`1659094659`). Both resolve on `/entity-activity-details`. Do not pass a "
+                "history email handle — those are `/emails` ids. Never invent or guess one — "
+                "an unknown id raises rather than returning a not-found response."
             ),
         ),
     ],
@@ -78,6 +78,8 @@ async def get_activity_detail(
     token budget), `body` here is the FULL converted text. `start`/`stop`/`location`/
     `time_zone` and `attendees` are only populated for a meeting/call record; a note,
     document, or email leaves them `None`/empty.
+
+    Call like: {"activity_id": "meeting-or-calls_<id from a history or search row>"}
     """
     _ = ctx
     handle = ResourceIdentifierDto.from_activity_id(activity_id)

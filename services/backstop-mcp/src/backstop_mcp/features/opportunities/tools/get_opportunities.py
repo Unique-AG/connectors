@@ -32,6 +32,9 @@ from backstop_mcp.features.opportunities import (
 )
 from backstop_mcp.features.opportunities.dependencies import get_opportunities_query_factory
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
     resolve_party,
@@ -60,34 +63,15 @@ async def get_opportunities(
     ctx: Context,
     search_type: Annotated[
         SearchType,
-        Field(
-            description=(
-                "Which Backstop collection to resolve the party against — fold the caller's "
-                "wording to one of the four. A company, firm, fund, institution, or manager is "
-                "`organizations`; any human is `people`. Pick `contacts` or `employees` only "
-                "when a prior resolve echoed one (echo it back — a contact or employee id is "
-                "not a people id) or the caller clearly means an internal staff member."
-            ),
-        ),
+        Field(description=REQUIRED_SEARCH_TYPE_DESCRIPTION),
     ],
     party_id: Annotated[
         str | None,
-        Field(
-            description=(
-                "Trusted Backstop Party ID from a prior resolve echo (`id` / `search_type` / "
-                "`name`). Never invent or guess. Exactly one of `party_id` or `search` must be "
-                "provided."
-            ),
-        ),
+        Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     search: Annotated[
         str | None,
-        Field(
-            description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly one "
-                "of `party_id` or `search` must be provided."
-            ),
-        ),
+        Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     status: Annotated[
         OpportunityStatus,
@@ -123,9 +107,12 @@ async def get_opportunities(
 ) -> GetOpportunitiesResponse:
     """Fetch a party's opportunities: stage, stage timing, and how each deal got there.
 
-    Pass `search_type` plus a trusted `party_id` (from a prior resolve echo — never invent or
-    guess one) or `search`. When retrying with `party_id`, pass that resolve's `search_type`
-    — a contact or employee id is not a people id.
+    Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
+    `search_type` is rejected. Pass a trusted `party_id` from a prior resolve echo — never
+    invent or guess one — or `search`. When retrying with `party_id`, pass that resolve's
+    `search_type` — a contact or employee id is not a people id.
+
+    Call like: {"search_type": "organizations", "party_id": "<id from prior resolve echo>"}
 
     There is no cursor. The whole party's pipeline is returned, filtered by `status` (`open` /
     `closed` / `all`, default `all`) and ordered newest-first by the day each deal entered its

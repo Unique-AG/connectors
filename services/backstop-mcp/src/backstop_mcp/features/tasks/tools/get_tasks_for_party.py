@@ -13,6 +13,9 @@ from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    REQUIRED_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
     resolve_party,
@@ -43,29 +46,18 @@ async def get_tasks_for_party(
         SearchType,
         Field(
             description=(
-                "Which Backstop collection to resolve the party against. Organizations use "
-                "OrganizationBean on the tasks filter; people use PersonBean. Echo a prior "
-                "resolve's search_type — a contact id is not a people id."
+                REQUIRED_SEARCH_TYPE_DESCRIPTION
+                + " Organizations use OrganizationBean on the tasks filter; people use PersonBean."
             )
         ),
     ],
     party_id: Annotated[
         str | None,
-        Field(
-            description=(
-                "Trusted Backstop Party ID from a prior resolve echo. Never invent or guess. "
-                "Exactly one of `party_id` or `search` must be provided."
-            )
-        ),
+        Field(description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     search: Annotated[
         str | None,
-        Field(
-            description=(
-                "Name or email to resolve when no trusted `party_id` is available. Exactly "
-                "one of `party_id` or `search` must be provided."
-            )
-        ),
+        Field(description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION),
     ] = None,
     status: Annotated[
         TaskFilter,
@@ -80,6 +72,12 @@ async def get_tasks_for_party(
     get_tasks_for_party_query: GetTasksForPartyQuery = Depends(get_tasks_for_party_query_factory),
 ) -> GetTasksForPartyResponse:
     """List a party's CRM tasks.
+
+    Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
+    `search_type` is rejected.
+
+    Call like: {"search_type": "organizations",
+    "party_id": "<id from prior resolve echo>", "status": "open"}
 
     Both `filter[entityType]` and `filter[entityId]` are always sent. Either alone is
     silently ignored and returns every task in the instance. Organizations use

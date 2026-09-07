@@ -76,9 +76,9 @@ async def get_activity_history(
     not "no notes" — retry those types on `search_activities` with `include_description`.
 
     Pass `request.type="first"` with `search_type` plus a trusted `party_id` (from a prior resolve
-    echo — never invent or guess one) or `search` to start. When retrying with `party_id`, pass
-    that resolve's `search_type` — a contact or employee id is not a people id. Default
-    `activity_types` are all five streams including
+    echo — never invent or guess one) or `search` to start. A `party_id` without `search_type` is
+    rejected. When retrying with `party_id`, pass that resolve's `search_type` — a contact or
+    employee id is not a people id. Default `activity_types` are all five streams including
     `document`. The response is `groups`: one entry per requested stream, not a single merged
     timeline. Each group's `date_range` is that page's span (min/max `occurred_at` among its
     dated items), not a cumulative window.
@@ -108,6 +108,13 @@ async def get_activity_history(
     the full untruncated body and the attachment list. History email ids are from `/emails`
     and do not work there — use `search_activities` for email body. `search_activities` rows
     use the same argument.
+
+    Call like: {"request": {"type": "first", "search_type": "organizations",
+    "party_id": "<id from prior resolve echo>", "activity_types": ["call"]}}
+    Continue: {"request": {"type": "next", "search_type": "organizations",
+    "entity_id": "<resolved.id>", "next": {"call": {"limit": 15, "offset": 15}}}}
+    Arguments live on `request`, not at the top level. Echo each `groups[type].next` object;
+    do not pass raw integers.
     """
     args = await extract_fetch_activity_history_args(
         ctx, client, request, page_size=activity_history.page_size

@@ -347,10 +347,6 @@ Inject the same `CustomFieldsService` instance into the query and the mapper (pr
 the cached `get_custom_fields_service`; tests: one `custom_fields_service()` shared by both).
 Two instances means two catalogs and the parallel load does not warm the join.
 
-`get_map_opportunity_to_response_util_factory` is **not** `@lru_cache` — do not list it in
-`teardown.PROVIDERS`. Only cached providers go there; `tests/test_teardown.py` fails when
-the two disagree.
-
 ---
 
 ## Documentation
@@ -370,7 +366,9 @@ Worth a docstring or an inline note:
 Not worth a comment: "paginate the collection", "return the response", "map the row".
 
 Tool docstrings are for the model that will call them. Say what to echo, what not to invent,
-and what an empty list means when a flag is set.
+and what an empty list means when a flag is set. When published argument names differ from
+Backstop camelCase or a sibling tool, include a `Call like:` JSON sample of the published
+arguments — teach the correct call rather than accepting aliases.
 
 ---
 
@@ -431,6 +429,12 @@ Export cached factories from the feature `__init__`. `teardown.py` imports them 
 feature package (`from backstop_mcp.features.opportunities import …`), never from
 `dependencies.py` — that file already imports `backstop_mcp.dependencies`, and the reverse
 is a cycle.
+
+Cached factories must only `Depends` on other cached factories (or
+`get_backstop_client_for_current_caller`, which returns the process-wide client). Read
+`BackstopConfig` inside the body. An uncached or unhashable Depends — a fresh mapper, a
+settings object — is either `TypeError: unhashable type` or a new object every request,
+and FastMCP surfaces `Failed to resolve dependency '…'` on every tool in that chain.
 
 ---
 

@@ -26,8 +26,9 @@ async def list_activity_tags(
         str | None,
         Field(
             description=(
-                "Optional case-insensitive substring of the tag name. Filters the cached "
-                "catalog in memory — the catalog walk never sends `filter[name][like]`."
+                "Optional case-insensitive substring of the tag name. The argument is "
+                "`search`. Filters the cached catalog in memory — the catalog walk never "
+                "sends `filter[name][like]`."
             ),
         ),
     ] = None,
@@ -43,6 +44,8 @@ async def list_activity_tags(
     a tag is shown in the Backstop UI. Instance tag names come back as data. Pass `search` to
     keep tags whose name contains that substring. Pass refresh=true only when the user reports
     a missing field.
+
+    Call like: {"search": "follow"}
     """
     catalog, cache = await activity_tags.get(refresh=refresh)
     tags = [ActivityTagResponse.from_tag(tag) for tag in catalog.values()]

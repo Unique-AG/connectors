@@ -57,9 +57,9 @@ async def get_people_for_party(
         str | None,
         Field(
             description=(
-                "Trusted Backstop organization Party ID from a prior resolve echo "
-                "(`id` / `search_type` / `name`). Never invent or guess. Exactly one of "
-                "`party_id` or `search` must be provided."
+                "The argument is `party_id`. Trusted Backstop organization Party ID from a "
+                "prior resolve echo (`id` / `search_type` / `name`). Never invent or guess. "
+                "Exactly one of `party_id` or `search` must be provided."
             ),
         ),
     ] = None,
@@ -99,6 +99,9 @@ async def get_people_for_party(
     """List the people Backstop links to an organization, with employment status at that org.
 
     Pass a trusted `party_id` (from a prior resolve echo — never invent one) or `search`.
+
+    Call like: {"search_type": "organizations", "party_id": "<id from prior resolve echo>"}
+
     This is the roster of current staff: `numberOfEmployees` on `get_organization` is often 0
     even when people are on file. Name and email come from `/employees` (same ids as people)
     side-loaded with employment relationships on that walk — not a fetch per person.

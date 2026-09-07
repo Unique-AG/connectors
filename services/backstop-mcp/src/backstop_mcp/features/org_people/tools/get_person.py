@@ -70,13 +70,15 @@ async def get_person(
         Sequence[PersonInclude],
         Field(
             description=(
-                "Related records to side-load on the same request, returned under `included`: "
-                "`locations` for the postal addresses on file with their per-address phone "
-                "numbers; `email_addresses` for the person's address book, with retired "
-                "addresses flagged rather than hidden; `company` for the organization they "
-                "work at; `representative` for the colleague at our own firm who owns the "
-                "relationship, which is not a way to contact the person. Omit to return only "
-                "the person's own fields."
+                "snake_case only: locations, email_addresses, company, representative. "
+                "`employments` and `categories` are always on the person; they are not include "
+                "keys. Related records to side-load on the same request, returned under "
+                "`included`: `locations` for the postal addresses on file with their "
+                "per-address phone numbers; `email_addresses` for the person's address book, "
+                "with retired addresses flagged rather than hidden; `company` for the "
+                "organization they work at; `representative` for the colleague at our own "
+                "firm who owns the relationship, which is not a way to contact the person. "
+                "Omit to return only the person's own fields."
             ),
         ),
     ] = (),
@@ -139,6 +141,8 @@ async def get_person(
     `search_type` too when it is not `people`. Otherwise pass `search` (person name or
     email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
+
+    Call like: {"party_id": "<id from prior resolve echo>", "include": ["locations", "company"]}
 
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
     trip). `employments` lists every current and former organization link — always relay those

@@ -41,8 +41,10 @@ async def list_custom_fields(
         Field(
             min_length=1,
             description=(
-                "Standard Backstop entity types whose custom-field definitions to list: "
-                "organizations, people, accounts, opportunities, products, or party."
+                "Required. Standard Backstop entity types whose custom-field definitions to "
+                "list: organizations, people, accounts, opportunities, products, or party. "
+                "There is no name-substring filter — pass the types and read names from the "
+                "result."
             ),
         ),
     ],
@@ -59,6 +61,8 @@ async def list_custom_fields(
     products, or party. Definitions may belong to a party or a concrete Backstop entity resource.
     A definition's group_id identifies its Backstop layout group when available.
     Pass refresh=true only when the user reports a missing field.
+
+    Call like: {"entity_types": ["organizations", "opportunities"]}
     """
     catalog, cache = await custom_fields.get(refresh=refresh)
     return ListCustomFieldsResponse(

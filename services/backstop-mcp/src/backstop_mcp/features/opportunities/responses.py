@@ -41,7 +41,10 @@ from backstop_mcp.features.opportunities.api_responses import (
     SearchContactAttributes,
     SearchProductAttributes,
 )
-from backstop_mcp.features.party_resolver import ResolvedPartyResponse
+from backstop_mcp.features.party_resolver import (
+    RESOLVED_PARTY_ECHO_DESCRIPTION,
+    ResolvedPartyResponse,
+)
 from backstop_mcp.models import OmitNoneModel, StrippedStr
 
 __all__ = [
@@ -332,12 +335,7 @@ class OpportunitiesResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the party was found and its pipeline fetched.",
     )
-    resolved: ResolvedPartyResponse = Field(
-        description=(
-            "The identity this call settled on. Echo `id` / `search_type` / `name` as "
-            "`party_id` later — never invent them."
-        )
-    )
+    resolved: ResolvedPartyResponse = Field(description=RESOLVED_PARTY_ECHO_DESCRIPTION)
     opportunities: tuple[OpportunityResponse, ...] = Field(
         description=(
             "The deals matching the requested status, newest first by the day each entered "

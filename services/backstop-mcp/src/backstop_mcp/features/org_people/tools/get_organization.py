@@ -72,7 +72,10 @@ async def get_organization(
         Sequence[OrganizationInclude],
         Field(
             description=(
-                "Related records to side-load on the same request, returned under `included`: "
+                "snake_case only: locations, email_addresses, primary_contact, representative. "
+                "Categories and custom-field values are already on the organization "
+                "(`categories`, `custom_field_values`); they are not include keys. Related "
+                "records to side-load on the same request, returned under `included`: "
                 "`locations` for the postal addresses on file with their per-address phone "
                 "numbers; `email_addresses` for the organization's address book, with retired "
                 "addresses flagged rather than hidden; `primary_contact` for the person "
@@ -141,6 +144,9 @@ async def get_organization(
     you have it; this tool accepts only `organizations`. Otherwise pass `search`
     (organization name or email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
+
+    Call like: {"party_id": "<id from prior resolve echo>",
+    "include": ["locations", "primary_contact"]}
 
     Pass `include` to side-load related records on the same request — addresses, the email
     address book, the primary contact, the representative. They come back under `included`,

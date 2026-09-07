@@ -145,8 +145,11 @@ async def search_opportunities(
     Amounts are on this walk; select them with `fields`.
 
     For one party's deals, call get_opportunities instead — that is one cheap sub-collection,
-    not this walk. `mode=aggregate` with `group_by` answers a counting question without row
-    bodies. Investor geography is on the `investor` chip (the include is a contacts resource).
+    not this walk. This tool has no `party_id`. `mode=aggregate` with `group_by` answers a
+    counting question without row bodies. Investor geography is on the `investor` chip (the
+    include is a contacts resource).
+
+    Call like: {"representative": "blazarus", "is_open": true}
     """
     if mode == "aggregate" and group_by is None:
         raise ValueError("group_by is required when mode is aggregate")
